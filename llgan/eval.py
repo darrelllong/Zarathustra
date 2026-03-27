@@ -1,5 +1,27 @@
 """
-Evaluation metrics for LLGAN: MMD² and PRDC (Precision / Recall / Density / Coverage).
+Evaluation metrics for LLGAN: MMD², PRDC, and DMD-GEN.
+
+DMD-GEN (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292) is the first
+principled metric for temporal mode collapse in time series generative models.
+
+Algorithm:
+  1. Run truncated Dynamic Mode Decomposition (DMD) on batches of real and
+     generated sequences to extract their dominant temporal eigenvectors.
+  2. Represent the r-dimensional DMD subspace as a point on the Grassmann
+     manifold Gr(r, d) — the space of r-dim subspaces of R^d.
+  3. Compute the principal angles between the real and generated subspaces
+     (via SVD of U_real^T @ U_fake).
+  4. Compute the 1-Wasserstein distance between the sorted principal-angle
+     distributions over multiple mini-batches.
+
+Interpretation:
+  DMD-GEN ≈ 0  : generated sequences have the same temporal dynamics as real.
+  DMD-GEN > 0.3: dynamical modes are meaningfully different (burst structure
+                  wrong, wrong autocorrelation, missing periodic regimes).
+
+Unlike MMD², DMD-GEN catches cases where the marginal distribution looks right
+but the temporal autocorrelation / regime structure is wrong.
+
 
 MMD² measures distributional closeness but cannot distinguish mode collapse from
 good coverage — a generator that nails one narrow mode scores well on MMD².
@@ -35,6 +57,100 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from scipy.stats import wasserstein_distance
+from scipy.linalg import subspace_angles
+
+# ---------------------------------------------------------------------------
+# DMD-GEN: Grassmannian Geometry + Dynamic Mode Decomposition metric
+# (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292)
+# Code not yet released — implemented from paper description.
+# ---------------------------------------------------------------------------
+
+def _dmd_subspace(X: np.ndarray, r: int) -> np.ndarray:
+    """
+    Truncated DMD on a batch of sequences.
+
+    X: (T, N) data matrix where T = timesteps, N = batch_size * num_features
+       (sequences are stacked column-wise).
+    r: number of DMD modes to retain.
+
+    Returns U: (N, r) orthonormal basis for the r-dimensional DMD subspace,
+    a point on the Grassmann manifold Gr(r, N).
+    """
+    X1 = X[:-1, :]   # (T-1, N)
+    X2 = X[1:, :]    # (T-1, N)
+
+    # Thin SVD of X1 → truncate to r modes
+    r_eff = min(r, min(X1.shape) - 1)
+    U, s, Vh = np.linalg.svd(X1, full_matrices=False)
+    U_r  = U[:, :r_eff]           # (T-1, r)
+    S_r  = s[:r_eff]
+    Vh_r = Vh[:r_eff, :]          # (r, N)
+
+    # Reduced DMD operator Ã = U_r^T X2 Vh_r^T S_r^{-1}
+    A_tilde = U_r.T @ X2 @ Vh_r.T @ np.diag(1.0 / S_r)   # (r, r)
+
+    # Eigendecomposition of Ã
+    eigvals, W = np.linalg.eig(A_tilde)   # W: (r, r) right eigenvectors
+
+    # Exact DMD modes Φ = X2 Vh_r^T S_r^{-1} W  (shape: N, r)
+    Phi = (X2 @ Vh_r.T @ np.diag(1.0 / S_r) @ W).real   # (N, r)
+
+    # Orthonormalise columns via QR to get a Grassmann point
+    Q, _ = np.linalg.qr(Phi)
+    return Q[:, :r_eff]   # (N, r_eff)
+
+
+def dmdgen(
+    real_seqs: np.ndarray,
+    fake_seqs: np.ndarray,
+    r: int = 4,
+    n_batches: int = 10,
+    batch_size: int = 64,
+    rng: np.random.Generator = None,
+) -> float:
+    """
+    DMD-GEN metric: 1-Wasserstein distance between principal-angle distributions
+    of real and generated sequence batches on the Grassmann manifold.
+
+    real_seqs / fake_seqs: (N, T, d) arrays of sequences.
+    r      : DMD rank (number of modes to retain).
+    n_batches: number of mini-batches; average over them for stability.
+
+    Returns a scalar ≥ 0; lower = generated dynamics closer to real dynamics.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    N = min(len(real_seqs), len(fake_seqs))
+    T, d = real_seqs.shape[1], real_seqs.shape[2]
+
+    angle_distances = []
+    for _ in range(n_batches):
+        ri = rng.choice(len(real_seqs), batch_size, replace=False)
+        fi = rng.choice(len(fake_seqs), batch_size, replace=False)
+
+        # Stack batch into (T, batch*d) matrix for DMD
+        Xr = real_seqs[ri].transpose(1, 0, 2).reshape(T, -1)   # (T, B*d)
+        Xf = fake_seqs[fi].transpose(1, 0, 2).reshape(T, -1)   # (T, B*d)
+
+        try:
+            Ur = _dmd_subspace(Xr, r)   # (B*d, r_eff)
+            Uf = _dmd_subspace(Xf, r)
+
+            # Principal angles between subspaces (in [0, π/2])
+            r_eff = min(Ur.shape[1], Uf.shape[1])
+            angles = subspace_angles(Ur[:, :r_eff], Uf[:, :r_eff])
+            angle_distances.append(float(np.mean(angles)))
+        except np.linalg.LinAlgError:
+            pass   # degenerate batch — skip
+
+    if not angle_distances:
+        return float("nan")
+
+    # Mean Grassmannian distance across batches
+    return float(np.mean(angle_distances))
+
 
 # prdc ships compute_prdc; fall back to a manual nearest-neighbour impl if absent
 try:
@@ -184,11 +300,22 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
         print(f"Saved MMD² : {ckpt['mmd']:.5f}")
 
     print(f"\nSampling {n_samples} real and fake windows …")
-    real = _sample_real(ckpt, trace_dir, fmt, n_samples)
-    fake = _sample_fake(ckpt, n_samples, device)
+    real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples)
+    fake_flat = _sample_fake(ckpt, n_samples, device)
 
-    mmd = mmd2_numpy(real, fake)
-    prdc = compute_prdc_metrics(real, fake, k=k)
+    cfg  = ckpt["config"]
+    timestep  = cfg.timestep
+    num_cols  = ckpt["prep"].num_cols
+    # Reshape flat (N, T*d) → (N, T, d) for sequence-aware metrics
+    real_seqs = real_flat.reshape(-1, timestep, num_cols)
+    fake_seqs = fake_flat.reshape(-1, timestep, num_cols)
+
+    mmd  = mmd2_numpy(real_flat, fake_flat)
+    prdc = compute_prdc_metrics(real_flat, fake_flat, k=k)
+
+    # DMD-GEN: temporal dynamics distance on Grassmann manifold
+    dmd_score = dmdgen(real_seqs, fake_seqs, r=4, n_batches=20,
+                       batch_size=min(64, len(real_seqs) // 2))
 
     print(f"\n{'─'*40}")
     print(f"  MMD²         : {mmd:.5f}")
@@ -196,18 +323,25 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     print(f"  β-recall     : {prdc['recall']:.4f}  (real coverage)  {'⚠ mode collapse' if prdc['recall'] < 0.3 else ''}")
     print(f"  density      : {prdc['density']:.4f}")
     print(f"  coverage     : {prdc['coverage']:.4f}")
+    print(f"  DMD-GEN      : {dmd_score:.4f}  (temporal dynamics; 0=perfect, >0.3=poor)")
     print(f"{'─'*40}")
 
     if baseline_path:
         print(f"\nBaseline   : {baseline_path}")
         b_ckpt = _load_checkpoint(baseline_path, device)
-        b_real = _sample_real(b_ckpt, trace_dir, fmt, n_samples)
-        b_fake = _sample_fake(b_ckpt, n_samples, device)
-        b_mmd  = mmd2_numpy(b_real, b_fake)
-        b_prdc = compute_prdc_metrics(b_real, b_fake, k=k)
+        b_real_flat = _sample_real(b_ckpt, trace_dir, fmt, n_samples)
+        b_fake_flat = _sample_fake(b_ckpt, n_samples, device)
+        b_cfg  = b_ckpt["config"]
+        b_seqs_real = b_real_flat.reshape(-1, b_cfg.timestep, b_ckpt["prep"].num_cols)
+        b_seqs_fake = b_fake_flat.reshape(-1, b_cfg.timestep, b_ckpt["prep"].num_cols)
+        b_mmd  = mmd2_numpy(b_real_flat, b_fake_flat)
+        b_prdc = compute_prdc_metrics(b_real_flat, b_fake_flat, k=k)
+        b_dmd  = dmdgen(b_seqs_real, b_seqs_fake, r=4, n_batches=20,
+                        batch_size=min(64, len(b_seqs_real) // 2))
         print(f"  MMD²         : {b_mmd:.5f}  (Δ {mmd - b_mmd:+.5f})")
         print(f"  β-recall     : {b_prdc['recall']:.4f}  (Δ {prdc['recall'] - b_prdc['recall']:+.4f})")
         print(f"  α-precision  : {b_prdc['precision']:.4f}  (Δ {prdc['precision'] - b_prdc['precision']:+.4f})")
+        print(f"  DMD-GEN      : {b_dmd:.4f}  (Δ {dmd_score - b_dmd:+.4f})")
 
 
 def parse_args():

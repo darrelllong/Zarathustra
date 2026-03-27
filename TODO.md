@@ -100,6 +100,65 @@ Items marked ✓ are done and in the repo.
 
 ---
 
+## New ideas from literature survey (2024–2025)
+
+### Quick wins (< 1 day each)
+
+- [ ] **FIDE frequency inflation in FFT loss** (`train.py`) — NeurIPS 2024
+  Upweight high-frequency bins in the existing FFT loss to prevent rare/extreme
+  I/O events (burst opcodes, large obj_size) from being washed out.
+  `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. ~10 lines.
+
+- [ ] **Adaptive Gradient Penalty (AGP)** (`train.py`) — MDPI Math 2025
+  Replace fixed `gp_lambda=10` with a PI controller that adjusts λ dynamically
+  based on `‖∇D‖ − 1`. Removes a fragile hyperparameter.
+  `λ_{t+1} = λ_t + Kp*(‖∇D‖ − 1) + Ki*Σ(‖∇D‖ − 1)`. ~20 lines.
+
+- [ ] **R2 regularization on fake samples** (`train.py`) — R3GAN, NeurIPS 2024
+  Already have R1 via WGAN-GP (penalty on interpolated points). Add R2:
+  zero-centered gradient penalty on fake samples.
+  `L_R2 = λ₂ * E[‖∇_x̃ D(x̃)‖²]`. Improves mode coverage with convergence
+  guarantees R1 alone can't provide. ~5 lines.
+
+### Medium-term (1–2 days each)
+
+- [ ] **ChronoGAN slope + skewness TS loss terms** (`train.py`) — ICMLA 2024
+  Add slope (linear regression of each sequence over time) and skewness to the
+  TS loss alongside existing moment matching. Skewness directly penalises
+  mismatch in heavy-tailed distributions (obj_size). GRU+LSTM hybrid backbone
+  is a further option but 2-day effort.
+
+- [ ] **SeriesGAN dual discriminator + 2-step supervisor** (`model.py`, `train.py`)
+  — BigData 2024 (also in Medium-term section above)
+  2-step supervisor predicts `h_t` from `h_{t-2}` instead of `h_{t-1}`.
+  Expected: −34% discriminative score vs TimeGAN. Already have latent AE so
+  mostly wiring.
+
+- [ ] **Relativistic paired GAN loss (RpGAN)** (`train.py`) — R3GAN, NeurIPS 2024
+  Discriminator simultaneously judges "is real more real than fake?" and vice
+  versa in a single forward pass. Shown to achieve full mode coverage on
+  StackedMNIST where standard WGAN misses modes. Replace current WGAN objective.
+
+- [ ] **FiLM conditioning for tenant/workload** (`model.py`) — survey, 2024
+  Feature-wise Linear Modulation: learn per-condition scale+shift for generator
+  hidden states. Cleaner than concatenation for conditioning on tenant_id,
+  read_ratio, obj_size_bucket. Prerequisite for workload conditioning (#9 above).
+
+### Evaluation / diagnostics
+
+- ✓ **DMD-GEN temporal dynamics metric** (`eval.py`) — NeurIPS 2025 (arXiv 2412.11292)
+  Code not yet released — implemented from paper. Runs Dynamic Mode Decomposition
+  on real vs generated batches, compares eigenvector subspaces via Grassmann
+  principal angles + 1-Wasserstein OT. Catches wrong autocorrelation/burst
+  structure that MMD² misses. `dmdgen()` in eval.py.
+
+- [ ] **Simulation-based evaluation** — JSSPP 2024 empirical study
+  Run synthetic traces through a storage/cache simulator; compare queue depths,
+  I/O latency CDFs, cache hit rates. Operational fidelity ≠ statistical fidelity
+  — model may look good on MMD² but behave differently in a real simulator.
+
+---
+
 ## Longer-term (architecture)
 
 - [ ] **Build hierarchical two-level generator**
@@ -125,8 +184,15 @@ Items marked ✓ are done and in the repo.
 | Paper | Key contribution |
 |-------|-----------------|
 | Zhang et al., NAS 2024 | Our work — LLGAN baseline |
-| SeriesGAN, BigData 2024 | Latent AE + supervisor + dual critic + early stopping |
+| SeriesGAN, BigData 2024 | Latent AE + supervisor + dual critic + 2-step supervisor + ℒ_TS loss |
+| ChronoGAN, ICMLA 2024 | GRU+LSTM hybrid; slope/skewness/median TS loss terms |
+| R3GAN, NeurIPS 2024 | RpGAN relativistic loss + R1+R2 joint regularization; full mode coverage |
+| DMD-GEN, NeurIPS 2025 | Grassmannian DMD metric for temporal mode collapse; code not yet released |
 | Diffusion-TS, ICLR 2024 | FFT spectral loss + trend/seasonal decomposition |
+| FIDE, NeurIPS 2024 | Frequency inflation for rare/extreme value generation |
+| ImagenTime, NeurIPS 2024 | Delay embedding → 2D discriminator input |
+| GANs Conditioning Survey, 2024 | FiLM, projection discriminator, AdaIN for conditioning |
+| Adaptive GP, MDPI Math 2025 | PI-controller dynamic λ for WGAN-GP |
 | TTS-GAN, AIME 2022 | Transformer-based GAN; patch embedding for critic |
 | TransFusion, 2023 | Coverage metric; diffusion+transformer for long sequences |
 | NetDiffus, 2023 | Power-transform preprocessing; GASF for evaluation |
