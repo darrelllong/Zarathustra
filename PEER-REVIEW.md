@@ -260,3 +260,192 @@ If you want a single scalar, use a weighted rank or weighted z-score rather than
 The repo is past the stage where the biggest gains come from reading another paper and adding another loss term. The main opportunity now is to tighten the current training/evaluation loop so the architecture you already built gets an honest signal.
 
 Once the four correctness issues above are fixed, the most promising model improvement is a conditioned dual-critic latent AE, not a broader grab-bag of regularizers.
+
+## External Literature Sweep
+
+I also did a fresh sweep across NeurIPS, arXiv, and major ML journal sources for sequence-generation work that is actually transferable to Zarathustra.
+
+One strong conclusion: image-conversion approaches are not a good fit here. Papers that turn time series into images may still contain reusable ideas about conditioning or evaluation, but the image representation itself is the wrong abstraction for I/O traces. For this project, event order, locality, causality, and mixed discrete/continuous structure should stay native.
+
+### Most Relevant Papers and Ideas
+
+#### 1. WaveStitch
+
+Source:
+
+- [WaveStitch: Frequency-Guided Progressive Diffusion for Multivariate Time Series Generation](https://arxiv.org/abs/2503.06231) (arXiv 2025; accepted to SIGMOD 2026)
+
+Why it matters:
+
+- The most transferable idea is not diffusion, but chunk stitching under explicit conditioning.
+- The paper treats long-horizon generation as a continuity problem across generated segments rather than assuming each segment is independent.
+
+Recommendation for Zarathustra:
+
+- Add an explicit boundary-consistency objective across adjacent generated chunks.
+- Hidden-state carry-over in `generate.py` is a start, but training still has no direct pressure for chunk-to-chunk continuity.
+- This is especially relevant if you later increase effective context with hierarchical generation.
+
+#### 2. PCF-GAN
+
+Source:
+
+- [PCF-GAN: Generating Sequential Data via the Characteristic Function of Measures on the Path Space](https://proceedings.neurips.cc/paper_files/paper/2023/hash/7d0e867582cdc156fd280d5a6aa1be08-Abstract-Conference.html) (NeurIPS 2023)
+
+Why it matters:
+
+- This is the most compelling alternative I found to a standard recurrent critic.
+- It defines discrimination in path space, which is much closer to what matters for workload traces than timestep-wise hidden-state pooling.
+
+Recommendation for Zarathustra:
+
+- Explore a path-space critic or, at minimum, a path-space evaluation metric.
+- Even if you do not replace the critic immediately, PCF-style discrimination is likely more sensitive to sequential law and locality dynamics than the current LSTM-attention critic.
+
+#### 3. High-Rank Path Development / HRPCF-style follow-on
+
+Source:
+
+- [High Rank Path Development for Deep Sequential Generative Modeling](https://proceedings.neurips.cc/paper_files/paper/2024/hash/d0cf89927acd9136d27ebf08f9e8a888-Abstract-Conference.html) (NeurIPS 2024)
+
+Why it matters:
+
+- This extends the path-space view and is directly relevant to failures where a model matches marginals but misses temporal filtration structure.
+
+Recommendation for Zarathustra:
+
+- If you pursue a critic redesign, path-development methods are more promising than borrowing image or generic diffusion machinery.
+- This is a good candidate for the "next serious critic," after fixing the current training bugs.
+
+#### 4. Constrained Time-Series Generation
+
+Source:
+
+- [On the Constrained Time-Series Generation Problem](https://proceedings.neurips.cc/paper_files/paper/2023/hash/bfb6a69c0d9e2bc596e1cd31f16fcdde-Abstract-Conference.html) (NeurIPS 2023)
+
+Why it matters:
+
+- This is directly aligned with controllable synthetic trace generation.
+- The useful idea is inference-time guidance under explicit numeric constraints.
+
+Recommendation for Zarathustra:
+
+- Move workload conditioning higher in priority.
+- Think in terms of controllable knobs like read ratio, request intensity, jump-size profile, repeat rate, tenant mix, and working-set proxy.
+- A strong result for Zarathustra would be: one model, multiple target workload profiles, no retraining.
+
+#### 5. Retrieval-Augmented Diffusion for Time Series
+
+Source:
+
+- [Retrieval-Augmented Diffusion Models for Time Series Forecasting](https://proceedings.neurips.cc/paper_files/paper/2024/file/053ee34c0971568bfa5c773015c10502-Paper-Conference.pdf) (NeurIPS 2024)
+
+Why it matters:
+
+- This is not a workload paper, but the retrieval idea is highly relevant.
+- Rare modes are hard for every generator family, including GANs.
+
+Recommendation for Zarathustra:
+
+- Add retrieval-based conditioning for rare workload regimes.
+- For example: at train or generation time, retrieve a small bank of real chunks or chunk-level descriptors with similar burst/locality statistics and use them as context.
+- This looks especially promising for unusual high-burst or hotspot-heavy trace phases.
+
+#### 6. SDformer
+
+Source:
+
+- [SDformer: Similarity-driven Discrete Transformer For Time Series Generation](https://proceedings.neurips.cc/paper_files/paper/2024/hash/ee6c4b99b4c0d3d60efd22c1ecdd9891-Abstract-Conference.html) (NeurIPS 2024)
+
+Why it matters:
+
+- The key transferable idea is discretization/tokenization for time-series generation rather than direct regression of every field.
+- This is relevant because Zarathustra still treats a mixed event record as a mostly continuous object.
+
+Recommendation for Zarathustra:
+
+- If the current direct-output regime tops out, consider a mixed discrete/continuous design:
+- tokenized or bucketized components for categorical / locality-state variables
+- continuous heads only where continuity is semantically real
+
+This is more attractive than image conversion and probably more attractive than jumping straight to full diffusion.
+
+### Journal-Level Techniques Worth Considering
+
+#### 7. Two-Timescale Optimization
+
+Source:
+
+- [Two-Timescale Gradient Descent Ascent Algorithms for Nonconvex Minimax Optimization](https://www.jmlr.org/papers/v26/22-0863.html) (JMLR 2025)
+
+Why it matters:
+
+- This is directly relevant to GAN stability.
+- Right now the code uses `n_critic`, but not a more principled two-timescale schedule.
+
+Recommendation for Zarathustra:
+
+- Make discriminator and generator adaptation rates a first-class design choice, not just an inherited GAN default.
+- This is likely to pay off more than adding another scalar regularizer.
+
+#### 8. Scoring-Rule-Based Generative Objectives
+
+Source:
+
+- [Probabilistic Forecasting with Generative Networks via Scoring Rule Minimization](https://jmlr.org/beta/papers/v25/23-0038.html) (JMLR 2024)
+
+Why it matters:
+
+- This suggests a useful complement to adversarial training: train or rank models with proper sequential scoring rules, not only critic pressure.
+
+Recommendation for Zarathustra:
+
+- Add a sequence-aware auxiliary objective or checkpoint-selection criterion that is not adversarial and not MMD-only.
+- Even if the final model stays GAN-based, scoring-rule ideas are worth importing into evaluation and early stopping.
+
+#### 9. Unified Discrete Diffusion for Categorical Data
+
+Source:
+
+- [Unified Discrete Diffusion for Categorical Data](https://jmlr.org/beta/papers/v26/25-0171.html) (JMLR 2025)
+
+Why it matters:
+
+- The broader lesson is that discrete variables should be modeled as discrete variables.
+- This is relevant to opcode, tenant, bucketized locality states, and any future workload-class control tokens.
+
+Recommendation for Zarathustra:
+
+- Stop expanding the shared continuous output head forever.
+- If more fields are added, separate the modeling path for discrete and continuous structure.
+
+### What This Changes in the Roadmap
+
+After the current-code fixes at the top of this review, I would adjust the medium-term roadmap to prioritize:
+
+1. Path-space critic or path-space evaluation.
+2. Workload conditioning with explicit numeric controls.
+3. Retrieval guidance for rare regimes.
+4. Dual latent + feature critics.
+5. Hierarchical/chunk-continuity generation.
+6. Mixed discrete/continuous outputs if direct regression keeps capping realism.
+
+I would explicitly deprioritize:
+
+- image-based representations
+- vision-model borrowing for its own sake
+- larger architecture swaps that do not address continuity, conditioning, or locality
+
+### Updated Recommendation
+
+The next serious version of Zarathustra should probably look like this:
+
+- conditioned global latent
+- sequence-native generator
+- latent critic plus feature critic
+- path-space metric or critic component
+- locality-aware losses
+- file-held-out, multi-metric selection
+- optional retrieval context for rare trace regimes
+
+That direction is much better supported by the recent literature than any move toward image representations.
