@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Training artifacts
+llgan/checkpoints/
+llgan/*.log
+generated*.csv
+
+# macOS
+.DS_Store
