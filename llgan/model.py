@@ -213,12 +213,15 @@ class Critic(nn.Module):
     discriminative timesteps.
     """
 
-    def __init__(self, num_cols: int, hidden_size: int):
+    def __init__(self, num_cols: int, hidden_size: int,
+                 use_spectral_norm: bool = True):
         super().__init__()
-        from torch.nn.utils import spectral_norm
 
         # Spectral norm on the output projection only — applying it to LSTM
         # weight matrices is prohibitively slow due to per-step power iteration.
+        # When using WGAN-GP the gradient penalty already enforces the Lipschitz
+        # constraint, so spectral norm is optional (and can slightly interfere
+        # with GP by normalising weights before the penalty gradient is computed).
         self.lstm = nn.LSTM(
             input_size=num_cols,
             hidden_size=hidden_size,
@@ -227,7 +230,11 @@ class Critic(nn.Module):
         )
         # Learned attention scorer: maps each hidden state → scalar weight
         self.attn = nn.Linear(hidden_size, 1)
-        self.fc = spectral_norm(nn.Linear(hidden_size, 1))
+        fc = nn.Linear(hidden_size, 1)
+        if use_spectral_norm:
+            from torch.nn.utils import spectral_norm
+            fc = spectral_norm(fc)
+        self.fc = fc
         self._init_weights()
 
     def _init_weights(self):

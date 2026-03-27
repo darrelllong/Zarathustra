@@ -113,7 +113,7 @@ Items marked ✓ are done and in the repo.
   Compare per-corpus vs mixed-corpus models once Alibaba download finishes.
 
 - [ ] **Re-train on NVIDIA GPU once box arrives**
-  1. Enable true WGAN-GP (gradient penalty, second-order autograd)
+  1. ✓ WGAN-GP enabled on MPS (create_graph=True works — CUDA-only assumption was wrong)
   2. Apply spectral norm to LSTM weight matrices (currently too slow on MPS)
   3. Increase `hidden_size`, `num_layers`, `batch_size`, `files_per_epoch`
   4. Benchmark full-corpus training time

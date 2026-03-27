@@ -11,14 +11,15 @@ class Config:
     timestep: int = 12          # window length; paper optimal: 10–15
 
     # Training
-    loss: str = "wgan-sn"       # "wgan-sn" (Wasserstein + spectral norm) or "bce"
-                                # Note: NOT gradient-penalised WGAN-GP — the LSTM weights
-                                # are unconstrained; SN is applied only to the final linear.
-                                # True WGAN-GP requires second-order gradients (CUDA only).
+    loss: str = "wgan-sn"       # "wgan-sn": Wasserstein + spectral norm (output layer only)
+                                # "wgan-gp": Wasserstein + gradient penalty (true Lipschitz;
+                                #   works on MPS — create_graph=True confirmed supported)
+                                # "bce": original GAN cross-entropy
+    gp_lambda: float = 10.0     # gradient penalty coefficient (WGAN-GP; standard value)
     batch_size: int = 64
     epochs: int = 200
     g_rounds: int = 3           # used only for bce mode
-    n_critic: int = 5           # critic steps per generator step (wgan-gp)
+    n_critic: int = 5           # critic steps per generator step
     lr_g: float = 0.0001        # WGAN-GP uses lower, equal LRs
     lr_d: float = 0.0001
     device: str = "cuda"        # falls back to mps/cpu if unavailable

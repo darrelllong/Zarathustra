@@ -229,9 +229,13 @@ def train(cfg: Config) -> None:
     # it operates directly on feature sequences.
     critic_input_dim = cfg.latent_dim if latent_ae else prep.num_cols
 
+    # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
+    # redundant and can interfere with the penalty gradient computation.
+    use_sn = (cfg.loss != "wgan-gp")
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=cfg.latent_dim if latent_ae else None).to(device)
-    C = Critic(critic_input_dim, cfg.hidden_size).to(device)
+    C = Critic(critic_input_dim, cfg.hidden_size,
+               use_spectral_norm=use_sn).to(device)
 
     if latent_ae:
         E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim).to(device)
@@ -430,8 +434,22 @@ def train(cfg: Config) -> None:
                 H_fake = G(z_g, z_l).detach()
 
                 opt_C.zero_grad()
-                if cfg.loss == "wgan-sn":
+                if cfg.loss in ("wgan-sn", "wgan-gp"):
                     c_loss = (C(H_fake) - C(H_real)).mean()
+                    if cfg.loss == "wgan-gp":
+                        # Gradient penalty: enforce 1-Lipschitz on all critic
+                        # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
+                        # Works on MPS (create_graph=True is supported since
+                        # PyTorch 2.0) — previously assumed CUDA-only in error.
+                        eps = torch.rand(B, 1, 1, device=device)
+                        x_hat = (eps * H_real.detach() +
+                                 (1 - eps) * H_fake).requires_grad_(True)
+                        d_hat = C(x_hat)
+                        grads = torch.autograd.grad(
+                            outputs=d_hat.sum(), inputs=x_hat,
+                            create_graph=True)[0]           # (B, T, latent_dim)
+                        gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
+                        c_loss = c_loss + cfg.gp_lambda * gp
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
                     fake_labels = torch.zeros(B, 1, device=device)
@@ -609,9 +627,12 @@ def parse_args() -> Config:
     p.add_argument("--fmt",              default="spc",
                    choices=["spc","msr","k5cloud","systor","oracle_general","csv"])
     p.add_argument("--loss",             default="wgan-sn",
-                   choices=["wgan-sn", "bce"],
-                   help="wgan-sn: Wasserstein + spectral norm (MPS/CPU safe); "
-                        "bce: original GAN cross-entropy")
+                   choices=["wgan-sn", "wgan-gp", "bce"],
+                   help="wgan-sn: Wasserstein + spectral norm; "
+                        "wgan-gp: Wasserstein + gradient penalty (true Lipschitz, "
+                        "works on MPS); bce: original GAN cross-entropy")
+    p.add_argument("--gp-lambda",        type=float, default=10.0,
+                   help="Gradient penalty coefficient for wgan-gp (standard: 10)")
     p.add_argument("--epochs",           type=int,   default=200)
     p.add_argument("--batch-size",       type=int,   default=64)
     p.add_argument("--timestep",         type=int,   default=12)
@@ -679,6 +700,7 @@ def parse_args() -> Config:
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
     cfg.feature_matching_weight     = args.feature_matching_weight
+    cfg.gp_lambda                   = args.gp_lambda
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
