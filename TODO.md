@@ -70,11 +70,13 @@ Items marked ✓ are done and in the repo.
   Fréchet distance in that latent space. More sensitive to temporal structure than MMD².
 
 - ✓ **Implement latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)**
-  Three-phase curriculum: (1) AE pretrain E+R, (2) supervisor pretrain S,
+  Four-phase curriculum: (1) AE pretrain E+R, (2) supervisor pretrain S,
+  (2.5) **generator warm-up** — train G via supervisor consistency only before
+  introducing the critic (TimeGAN §3.3, missing from v6 → v6 completely failed),
   (3) joint GAN in latent space with supervisor consistency loss.
   Generator outputs latents [0,1]; Recovery decodes to features [-1,1].
   Supervisor loss: MSE(G(z)[:,1:,:], S(G(z))[:,:-1,:]) — temporal coherence.
-  SeriesGAN: **34% discriminative improvement** expected. Running as v6.
+  v6 stuck at MMD²≈0.97 — critic saturated before G warmed up. Fixed in v7.
 
 - [ ] **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
   Second lightweight critic on raw decoded output. Latent critic = stable early gradients;
