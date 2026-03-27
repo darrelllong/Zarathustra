@@ -37,37 +37,33 @@ Items marked ✓ are done and in the repo.
   only a slice of the real distribution. Add PRDC metrics (via `prdc` package or
   nearest-neighbor) and report every `mmd_every` epochs.
 
-- [ ] **Early stopping on best combined metric** (`train.py`)
+- ✓ **Early stopping on best combined metric** (`train.py`)
   After 50% of training epochs, save the checkpoint with best
   `discriminative_score + λ * moment_loss` rather than the final epoch.
   SeriesGAN ablation: accounts for 43% of their discriminative improvement alone.
 
-- [ ] **Fix generate.py: carry LSTM hidden state across window boundaries**
-  Currently samples IID windows and concatenates — hidden state resets every 12 steps,
-  so long-range burst structure cannot be coherent. Fix: pass `(h, c)` from each window
-  to the next. Generator.forward() needs to accept and return hidden state.
+- ✓ **Fix generate.py: carry LSTM hidden state across window boundaries**
+  Previously sampled IID windows and concatenated — hidden state reset every 12 steps,
+  so long-range burst structure was incoherent. Fixed: `z_global` is fixed per stream;
+  `(h_n, c_n)` passes from each window to the next. `--n-streams` for parallel traces.
 
 ---
 
 ## Medium-term (days each)
 
-- [ ] **Fix latent design: global z + per-step innovations** (`model.py`, `train.py`)
-  Generator comment says "same noise vector broadcast" but training feeds fresh
-  `randn` at every timestep — neither a global latent nor clean autoregression.
-  Split into: global code `z_global` initialising LSTM hidden state (workload identity),
-  plus per-step innovation noise `z_local` fed at each timestep.
+- ✓ **Fix latent design: global z + per-step innovations** (`model.py`, `train.py`)
+  `z_global (batch, noise_dim)` projects via Linear → LSTM h0/c0 (workload identity).
+  `z_local (batch, timestep, noise_dim)` feeds per-step innovation noise.
+  Result: MMD² 0.093 at epoch 15 vs v3 best of 0.134 at epoch 55 — 30% improvement.
 
-- [ ] **Replace raw `obj_id` regression with locality-aware representation** (`dataset.py`)
-  Euclidean closeness of raw object IDs is not access-structure closeness — treating
-  `obj_id` as a continuous number is a fundamental representational mistake. Replace with:
-  (1) hot/cold binary decision (is this object in the working set?),
-  (2) delta/stride from previous `obj_id` (captures sequential and strided access),
-  (3) coarse bucket + fine offset within bucket.
+- ✓ **Replace raw `obj_id` regression with locality-aware representation** (`dataset.py`)
+  Delta-encode obj_id without clipping, then sign(d)*log1p(|d|) to compress 10-decade
+  range. Encodes: 0=repeat access, small±=sequential/strided, large±=random jump.
+  Inverse: undo signed-log, then cumsum. (v5 training uses this.)
 
-- [ ] **Replace critic mean-pooling with attention pooling** (`model.py`)
-  `h.mean(dim=1)` washes out short bursts, sudden queueing regimes, and rare
-  write-heavy segments. Replace with learned attention pooling (weighted sum) or
-  max+mean pooling. Optionally add multi-scale patch critics.
+- ✓ **Replace critic mean-pooling with attention pooling** (`model.py`)
+  Learned softmax-weighted sum over LSTM hidden states replaces `h.mean(dim=1)`.
+  Critic can now focus on burst / regime-change timesteps instead of averaging them away.
 
 - [ ] **Add Context-FID as primary evaluation metric** (`eval.py`)
   Train a fixed LSTM encoder on real data; embed real and generated windows; compute
