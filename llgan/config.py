@@ -37,6 +37,10 @@ class Config:
     generated_path: str = "generated.csv"
     num_generate: int = 1_000_000
 
+    # Auxiliary generator losses
+    moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
+    fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
+
     # Evaluation
     mmd_every: int = 5
     mmd_samples: int = 1000

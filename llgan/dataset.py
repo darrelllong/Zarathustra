@@ -129,6 +129,11 @@ _TS_COLS = {"ts", "timestamp"}
 # Columns whose raw values are read/write opcodes
 _OPCODE_COLS = {"opcode", "type", "rw", "op"}
 
+# Columns that are log-transformed before min-max normalization.
+# These have heavy-tailed / power-law distributions that confound tanh output.
+# ts_delta (inter-arrival times) and obj_size are the canonical cases.
+_LOG_COLS = {"ts", "timestamp", "obj_size", "size", "response_time"}
+
 
 # ---------------------------------------------------------------------------
 # Preprocessing
@@ -150,6 +155,7 @@ class TracePreprocessor:
         self._cat_maps: Dict[str, dict] = {}
         self._delta_cols: List[str] = []     # columns that were delta-encoded
         self._first_vals: Dict[str, float] = {}  # for inverse cumsum
+        self._log_cols: List[str] = []       # columns that are log1p-transformed
 
     # ------------------------------------------------------------------
     def fit(self, df: pd.DataFrame) -> "TracePreprocessor":
@@ -157,6 +163,14 @@ class TracePreprocessor:
         self._delta_cols = [c for c in df.columns if c.lower() in _TS_COLS]
         df = self._apply_deltas(df, fit=True)
         df = self._encode_categoricals(df, fit=True)
+        # Identify log-transform columns: heavy-tailed continuous columns.
+        # Applied after delta-encoding so ts_delta (inter-arrival times) is
+        # also log-transformed, which is the right thing — IAT is power-law.
+        self._log_cols = [
+            c for c in df.columns
+            if c.lower() in _LOG_COLS and c not in self._cat_maps
+        ]
+        df = self._apply_log(df)
         self.col_names = list(df.columns)
         self.num_cols = len(self.col_names)
         for col in self.col_names:
@@ -169,6 +183,7 @@ class TracePreprocessor:
         df = df.copy()
         df = self._apply_deltas(df, fit=False)
         df = self._encode_categoricals(df, fit=False)
+        df = self._apply_log(df)
         out = np.zeros((len(df), self.num_cols), dtype=np.float32)
         for i, col in enumerate(self.col_names):
             lo = self._stats[col]["lo"]
@@ -184,6 +199,9 @@ class TracePreprocessor:
             hi = self._stats[col]["hi"]
             span = hi - lo if hi != lo else 1.0
             vals = (arr[:, i].astype(np.float64) + 1) / 2 * span + lo
+            # Undo log1p transform before any other post-processing
+            if col in self._log_cols:
+                vals = np.expm1(np.clip(vals, 0, None))
             if col in self._cat_maps:
                 inv_map = {v: k for k, v in self._cat_maps[col].items()}
                 vals = np.array([inv_map.get(int(round(v)), v) for v in vals])
@@ -213,6 +231,14 @@ class TracePreprocessor:
             deltas = np.clip(deltas, 0, None)
             df = df.copy()
             df[col] = deltas
+        return df
+
+    def _apply_log(self, df: pd.DataFrame) -> pd.DataFrame:
+        """log1p-transform heavy-tailed columns to approximately Gaussianize them."""
+        df = df.copy()
+        for col in self._log_cols:
+            if col in df.columns:
+                df[col] = np.log1p(np.clip(df[col].values.astype(np.float64), 0, None))
         return df
 
     def _encode_categoricals(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:

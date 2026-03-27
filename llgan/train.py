@@ -171,6 +171,7 @@ def train(cfg: Config) -> None:
         prep = _fit_prep_on_files(seed_files, cfg.trace_format, cfg.records_per_file)
         print(f"  columns ({prep.num_cols}): {prep.col_names}")
         print(f"  delta-encoded: {prep._delta_cols}")
+        print(f"  log-transformed: {prep._log_cols}")
 
         # Build a fixed val set from a few held-out files for MMD tracking
         val_files = random.sample(all_files, min(2, len(all_files)))
@@ -201,6 +202,7 @@ def train(cfg: Config) -> None:
         )
         print(f"  columns ({prep.num_cols}): {prep.col_names}")
         print(f"  delta-encoded: {prep._delta_cols}")
+        print(f"  log-transformed: {prep._log_cols}")
         print(f"  train windows: {len(train_ds):,}  val: {len(val_ds):,}")
         val_tensor = torch.stack([val_ds[i] for i in range(len(val_ds))])
 
@@ -288,6 +290,25 @@ def train(cfg: Config) -> None:
             else:
                 real_labels = torch.ones(B, 1, device=device)
                 g_loss = bce(C(fake_batch), real_labels)
+
+            # --- Auxiliary losses ---
+            # Moment matching (L_V): penalise differences in per-feature mean
+            # and std so the generator cannot ignore distributional shape.
+            if cfg.moment_loss_weight > 0:
+                loss_V = (
+                    torch.nn.functional.l1_loss(fake_batch.mean(0), real_batch.mean(0)) +
+                    torch.nn.functional.l1_loss(fake_batch.std(0),  real_batch.std(0))
+                )
+                g_loss = g_loss + cfg.moment_loss_weight * loss_V
+
+            # Fourier spectral loss (L_FFT): penalise differences in frequency
+            # content along the time axis — captures burst periodicity.
+            if cfg.fft_loss_weight > 0:
+                real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
+                fake_fft = torch.fft.rfft(fake_batch.float(), dim=1).abs()
+                loss_fft = torch.nn.functional.mse_loss(fake_fft, real_fft)
+                g_loss = g_loss + cfg.fft_loss_weight * loss_fft
+
             g_loss.backward()
             opt_G.step()
             g_losses.append(g_loss.item())
@@ -374,6 +395,10 @@ def parse_args() -> Config:
     p.add_argument("--mmd-every",        type=int,   default=5)
     p.add_argument("--mmd-samples",      type=int,   default=1000)
     p.add_argument("--train-split",      type=float, default=0.8)
+    p.add_argument("--moment-loss-weight", type=float, default=0.1,
+                   help="Weight for per-feature moment matching loss (0 = off)")
+    p.add_argument("--fft-loss-weight",    type=float, default=0.05,
+                   help="Weight for Fourier spectral loss (0 = off)")
     args = p.parse_args()
 
     cfg = Config()
@@ -394,9 +419,11 @@ def parse_args() -> Config:
     cfg.records_per_file = args.records_per_file
     cfg.checkpoint_dir   = args.checkpoint_dir
     cfg.checkpoint_every = args.checkpoint_every
-    cfg.mmd_every        = args.mmd_every
-    cfg.mmd_samples      = args.mmd_samples
-    cfg.train_split      = args.train_split
+    cfg.mmd_every           = args.mmd_every
+    cfg.mmd_samples         = args.mmd_samples
+    cfg.train_split         = args.train_split
+    cfg.moment_loss_weight  = args.moment_loss_weight
+    cfg.fft_loss_weight     = args.fft_loss_weight
     return cfg
 
 
