@@ -164,6 +164,20 @@ def train(cfg: Config) -> None:
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
+
+    # WGAN-GP and R2 both use create_graph=True to compute second-order gradients
+    # through the critic LSTM.  MPS does not implement lstm_mps_backward as a
+    # differentiable operation, so these features are CUDA-only.
+    if device.type == "mps":
+        if cfg.loss == "wgan-gp":
+            print("[warn] wgan-gp requires second-order LSTM gradients; "
+                  "MPS does not support lstm_mps_backward. Falling back to wgan-sn.")
+            cfg.loss = "wgan-sn"
+        if cfg.r2_lambda > 0:
+            print("[warn] r2-lambda requires create_graph=True through LSTM critic; "
+                  "not supported on MPS. Disabling R2.")
+            cfg.r2_lambda = 0.0
+
     print(f"Device: {device}  Loss: {cfg.loss}")
 
     multifile = bool(cfg.trace_dir)

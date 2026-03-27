@@ -206,7 +206,9 @@ Items marked ✓ are done and in the repo.
   Compare per-corpus vs mixed-corpus models once Alibaba download finishes.
 
 - [ ] **Re-train on NVIDIA GPU once box arrives**
-  1. ✓ WGAN-GP enabled on MPS (create_graph=True works — CUDA-only assumption was wrong)
+  1. WGAN-GP on MPS: FAILS for LSTM critic — `lstm_mps_backward` is not differentiable
+     (create_graph=True hits second-order LSTM grad). train.py now auto-falls-back to
+     wgan-sn on MPS. WGAN-GP is CUDA-only for LSTM-based critics.
   2. Apply spectral norm to LSTM weight matrices (currently too slow on MPS)
   3. Increase `hidden_size`, `num_layers`, `batch_size`, `files_per_epoch`
   4. Benchmark full-corpus training time
