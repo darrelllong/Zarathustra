@@ -49,6 +49,7 @@ class Config:
     latent_dim: int = 24              # latent space dimensionality
     pretrain_ae_epochs: int = 50      # Phase 1: pretrain encoder + recovery
     pretrain_sup_epochs: int = 50     # Phase 2: pretrain supervisor on real latents
+    pretrain_g_epochs: int = 100      # Phase 2.5: generator warm-up via supervisor
     supervisor_loss_weight: float = 10.0  # η: supervisor term in joint generator loss
     lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
 

@@ -338,6 +338,53 @@ def train(cfg: Config) -> None:
             if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
                 print(f"  Sup pretrain {pre_ep+1:3d}/{cfg.pretrain_sup_epochs}  "
                       f"sup={sup_mean:.5f}", flush=True)
+
+    # -----------------------------------------------------------------------
+    # Phase 2.5: Generator warm-up via supervisor  (latent AE mode only)
+    #
+    # Before introducing the critic, bootstrap G into the real latent space
+    # using only the supervisor consistency loss.  Since S was trained on real
+    # latent sequences, minimising MSE(G(z)[:,1:,:], S(G(z))[:,:-1,:]) pushes
+    # G's output to obey the same autoregressive dynamics as real data.
+    # Without this step the generator starts at ~0.5 everywhere (Sigmoid of
+    # small random weights) while E(X_real) has rich structure — the critic
+    # saturates immediately and provides no useful gradient signal.
+    # (TimeGAN §3.3 "joint training initialisation")
+    # -----------------------------------------------------------------------
+    if latent_ae and start_epoch == 0 and cfg.pretrain_g_epochs > 0:
+        print(f"\n--- Phase 2.5: Generator warm-up ({cfg.pretrain_g_epochs} epochs) ---")
+        S.eval()   # supervisor is frozen; only G is updated
+        for pre_ep in range(cfg.pretrain_g_epochs):
+            G.train()
+            if multifile:
+                ep_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
+                pre_ds, _ = _load_epoch_dataset(
+                    ep_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep)
+            else:
+                pre_ds = train_ds
+            if pre_ds is None or len(pre_ds) == 0:
+                continue
+            loader = DataLoader(pre_ds, batch_size=cfg.batch_size, shuffle=True,
+                                num_workers=n_workers, drop_last=True)
+            g_sup_losses = []
+            for xb in loader:
+                B_pre = xb.size(0)
+                z_g = torch.randn(B_pre, cfg.noise_dim, device=device)
+                z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
+                H_fake = G(z_g, z_l)
+                with torch.no_grad():
+                    S_out = S(H_fake)
+                # Consistency: G(z)[t+1] ≈ S(G(z))[t]
+                loss_g_sup = nn.functional.mse_loss(H_fake[:, 1:, :], S_out[:, :-1, :])
+                opt_G.zero_grad()
+                loss_g_sup.backward()
+                opt_G.step()
+                g_sup_losses.append(loss_g_sup.item())
+            g_sup_mean = sum(g_sup_losses) / len(g_sup_losses)
+            if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
+                print(f"  G warm-up  {pre_ep+1:3d}/{cfg.pretrain_g_epochs}  "
+                      f"sup={g_sup_mean:.5f}", flush=True)
+
         print(f"\n--- Phase 3: Joint GAN training ({cfg.epochs} epochs) ---")
 
     # -----------------------------------------------------------------------
@@ -584,6 +631,8 @@ def parse_args() -> Config:
                    help="Phase 1: autoencoder pretraining epochs")
     p.add_argument("--pretrain-sup-epochs",  type=int,   default=50,
                    help="Phase 2: supervisor pretraining epochs")
+    p.add_argument("--pretrain-g-epochs",    type=int,   default=100,
+                   help="Phase 2.5: generator warm-up epochs (TimeGAN supervised init)")
     p.add_argument("--supervisor-loss-weight", type=float, default=10.0,
                    help="η: supervisor consistency weight in joint training")
     p.add_argument("--lr-er",                type=float, default=0.0005,
@@ -616,6 +665,7 @@ def parse_args() -> Config:
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
+    cfg.pretrain_g_epochs       = args.pretrain_g_epochs
     cfg.supervisor_loss_weight  = args.supervisor_loss_weight
     cfg.lr_er                   = args.lr_er
     return cfg
