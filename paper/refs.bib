@@ -1,13 +1,17 @@
-%% refs.bib — generated 2026-03-27
-%% Sources fetched from arXiv, NeurIPS proceedings, JMLR, ACM DL, and web search.
-%% Fields marked FIXME could not be verified; do not use without checking.
+%% refs.bib — generated 2026-03-27, updated with Google Scholar / DBLP / ACM DL verification.
+%% One remaining FIXME: wgan_nodual2024 final publication venue unconfirmed.
+%% All other entries verified against arXiv, NeurIPS/ICLR/JMLR/ACM proceedings, or DBLP/IEEE Xplore.
 
 %% 1. NAS 2024 — zhang2024llgan
 @inproceedings{zhang2024llgan,
-  author    = {Hao Zhang and Zili Yang and Yin Xie and Yang Wu and Jing Li and Dan Feng and Avani Wildani and Darrell D. E. Long},
+  author    = {Heyu Zhang and Zhen Yang and Yulai Xie and Yafeng Wu and Jiakun Li and Dan Feng and Avani Wildani and Darrell D. E. Long},
   title     = {Accurate Generation of {I/O} Workloads Using Generative Adversarial Networks},
-  booktitle = {Proceedings of the 17th IEEE International Conference on Networking, Architecture, and Storage (NAS)},
+  booktitle = {2024 {IEEE} International Conference on Networking, Architecture and Storage ({NAS})},
+  pages     = {1--9},
+  publisher = {{IEEE}},
+  address   = {Zhuhai, China},
   year      = {2024},
+  doi       = {10.1109/NAS63802.2024.10781347},
 }
 
 %% 2. NeurIPS 2019 — yoon2019timegan
@@ -334,18 +338,18 @@
 }
 
 %% 31. JSSPP 2024 — geminio2024
-%% "Geminio" does not appear in verified JSSPP 2024 proceedings (LNCS 14591).
-%% The closest verified paper from JSSPP 2024 on ML-based job trace generation is listed below.
-%% Replace with correct entry if a "Geminio" paper can be located.
+%% "Geminio" is not the paper title; it is cited in TODO.md under that name but the actual
+%% paper title (confirmed from the PDF cover page and DBLP) is below.
 @inproceedings{geminio2024,
-  author    = {FIXME},
-  title     = {FIXME: Geminio --- job trace generation, JSSPP 2024},
-  booktitle = {Job Scheduling Strategies for Parallel Processing (JSSPP)},
+  author    = {Monish Soundar Raj and Thomas MacDougall and Di Zhang and Dong Dai},
+  title     = {An Empirical Study of Machine Learning-Based Synthetic Job Trace Generation Methods},
+  booktitle = {Job Scheduling Strategies for Parallel Processing: 27th International Workshop ({JSSPP} 2024)},
   series    = {Lecture Notes in Computer Science},
   volume    = {14591},
+  pages     = {20--39},
   publisher = {Springer},
   year      = {2024},
-  note      = {Could not verify this paper in JSSPP 2024 proceedings. Closest confirmed paper: Soundar Raj et al., "An Empirical Study of Machine Learning-Based Synthetic Job Trace Generation Methods", pages 20--39.}
+  doi       = {10.1007/978-3-031-74430-3_2},
 }
 
 %% 32. ICS/HPDC 2022 — paul2022hpc
@@ -385,14 +389,16 @@
 %% The best match found is arXiv:2110.14150 (Kwon et al., 2021),
 %% "Training Wasserstein GANs without gradient penalties", later submitted to OpenReview 2024.
 %% If this is not the intended paper, replace with correct entry.
-@article{wgan_nodual2024,
-  author    = {Dohyun Kwon and Yeoneung Kim and Guido Montúfar and Insoon Yang},
-  title     = {Training {Wasserstein} {GANs} without Gradient Penalties},
-  journal   = {arXiv preprint arXiv:2110.14150},
-  year      = {2024},
-  eprint    = {2110.14150},
+%% Full OpenReview title adds "via Duality"; confirm which title appears in the PDF.
+%% Final venue not confirmed in any indexed database as of 2026-03-27.
+@misc{wgan_nodual2024,
+  author        = {Dohyun Kwon and Yeoneung Kim and Guido Mont{\'u}far and Insoon Yang},
+  title         = {Training {Wasserstein} {GANs} without Gradient Penalties via Duality},
+  year          = {2024},
+  eprint        = {2110.14150},
   archivePrefix = {arXiv},
-  note      = {arXiv submission 2021; OpenReview version circulated 2024. Verify this is the intended WGAN\_NoDualGP\_2024 paper.}
+  primaryClass  = {cs.LG},
+  note          = {arXiv:2110.14150 (2021); also on OpenReview as id vN3eAGHhpC (submitted June 2024). Final published venue: FIXME.}
 }
 
 %% ---------- Additional entries cited in main.tex ----------
@@ -450,15 +456,15 @@
 }
 
 %% MEMSYS 2023 — memsys2023
-%% Memory workload synthesis paper referenced in README/TODO.
-%% FIXME: full author list and exact title not confirmed.
+%% Confirmed via ACM DL (DOI 10.1145/3631882.3631889).
 @inproceedings{memsys2023,
-  author    = {FIXME},
-  title     = {FIXME: Memory workload synthesis, MEMSYS 2023},
-  booktitle = {Proceedings of the International Symposium on Memory Systems (MEMSYS)},
+  author    = {Chengao Shi and Fan Jiang and Zhenguo Liu and Chen Ding and Jiang Xu},
+  title     = {Memory Workload Synthesis Using Generative {AI}},
+  booktitle = {Proceedings of the International Symposium on Memory Systems ({MEMSYS} '23)},
+  articleno = {7},
+  pages     = {1--7},
+  publisher = {{ACM}},
+  address   = {Alexandria, VA, USA},
   year      = {2023},
-  note      = {Paper referenced in TODO.md as memory workload synthesis predecessor. Full citation not verified.}
+  doi       = {10.1145/3631882.3631889},
 }
-
-%% Geminio JSSPP 2024 — geminio2024 (FIXME: not confirmed in proceedings)
-%% See note in the earlier entry for this cite key above.
