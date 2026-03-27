@@ -40,7 +40,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
 from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
-from model import Generator, Critic
+from model import Generator, Critic, Encoder, Recovery, Supervisor
 from mmd import evaluate_mmd
 
 
@@ -223,8 +223,27 @@ def train(cfg: Config) -> None:
     # -----------------------------------------------------------------------
     # Models
     # -----------------------------------------------------------------------
-    G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size).to(device)
-    C = Critic(prep.num_cols, cfg.hidden_size).to(device)
+    latent_ae = cfg.latent_dim > 0
+
+    # In latent AE mode the critic operates on latent sequences; in legacy mode
+    # it operates directly on feature sequences.
+    critic_input_dim = cfg.latent_dim if latent_ae else prep.num_cols
+
+    G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
+                  latent_dim=cfg.latent_dim if latent_ae else None).to(device)
+    C = Critic(critic_input_dim, cfg.hidden_size).to(device)
+
+    if latent_ae:
+        E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim).to(device)
+        R = Recovery(cfg.latent_dim, cfg.hidden_size, prep.num_cols).to(device)
+        S = Supervisor(cfg.latent_dim, cfg.hidden_size).to(device)
+        opt_AE  = torch.optim.Adam(list(E.parameters()) + list(R.parameters()),
+                                   lr=cfg.lr_er, betas=(0.9, 0.999))
+        opt_S   = torch.optim.Adam(S.parameters(), lr=cfg.lr_er, betas=(0.9, 0.999))
+        opt_ER  = torch.optim.Adam(list(E.parameters()) + list(R.parameters()),
+                                   lr=cfg.lr_er, betas=(0.9, 0.999))
+    else:
+        E = R = S = opt_AE = opt_S = opt_ER = None
 
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
@@ -245,11 +264,81 @@ def train(cfg: Config) -> None:
         C.load_state_dict(ckpt["C"])
         opt_G.load_state_dict(ckpt["opt_G"])
         opt_C.load_state_dict(ckpt["opt_C"])
+        if latent_ae and "E" in ckpt:
+            E.load_state_dict(ckpt["E"])
+            R.load_state_dict(ckpt["R"])
+            S.load_state_dict(ckpt["S"])
         start_epoch = ckpt["epoch"] + 1
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
+
+    # -----------------------------------------------------------------------
+    # Phase 1: Autoencoder pretraining  (latent AE mode only)
+    # -----------------------------------------------------------------------
+    if latent_ae and start_epoch == 0:
+        print(f"\n--- Phase 1: Autoencoder pretraining ({cfg.pretrain_ae_epochs} epochs) ---")
+        for pre_ep in range(cfg.pretrain_ae_epochs):
+            E.train(); R.train()
+            if multifile:
+                ep_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
+                pre_ds, _ = _load_epoch_dataset(
+                    ep_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep)
+            else:
+                pre_ds = train_ds
+            if pre_ds is None or len(pre_ds) == 0:
+                continue
+            loader = DataLoader(pre_ds, batch_size=cfg.batch_size, shuffle=True,
+                                num_workers=n_workers, drop_last=True)
+            ae_losses = []
+            for xb in loader:
+                xb = xb.to(device)
+                opt_AE.zero_grad()
+                loss_ae = nn.functional.mse_loss(R(E(xb)), xb)
+                loss_ae.backward()
+                opt_AE.step()
+                ae_losses.append(loss_ae.item())
+            ae_mean = sum(ae_losses) / len(ae_losses)
+            if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
+                print(f"  AE pretrain {pre_ep+1:3d}/{cfg.pretrain_ae_epochs}  "
+                      f"recon={ae_mean:.5f}", flush=True)
+
+    # -----------------------------------------------------------------------
+    # Phase 2: Supervisor pretraining  (latent AE mode only)
+    # -----------------------------------------------------------------------
+    if latent_ae and start_epoch == 0:
+        print(f"\n--- Phase 2: Supervisor pretraining ({cfg.pretrain_sup_epochs} epochs) ---")
+        E.eval()  # freeze encoder during supervisor pretraining
+        for pre_ep in range(cfg.pretrain_sup_epochs):
+            S.train()
+            if multifile:
+                ep_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
+                pre_ds, _ = _load_epoch_dataset(
+                    ep_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep)
+            else:
+                pre_ds = train_ds
+            if pre_ds is None or len(pre_ds) == 0:
+                continue
+            loader = DataLoader(pre_ds, batch_size=cfg.batch_size, shuffle=True,
+                                num_workers=n_workers, drop_last=True)
+            sup_losses = []
+            for xb in loader:
+                xb = xb.to(device)
+                with torch.no_grad():
+                    H = E(xb)                               # (B, T, latent_dim)
+                opt_S.zero_grad()
+                S_out = S(H)                                # (B, T, latent_dim)
+                # S_out[t] should predict H[t+1]
+                loss_sup = nn.functional.mse_loss(S_out[:, :-1, :], H[:, 1:, :])
+                loss_sup.backward()
+                opt_S.step()
+                sup_losses.append(loss_sup.item())
+            sup_mean = sum(sup_losses) / len(sup_losses)
+            if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
+                print(f"  Sup pretrain {pre_ep+1:3d}/{cfg.pretrain_sup_epochs}  "
+                      f"sup={sup_mean:.5f}", flush=True)
+        print(f"\n--- Phase 3: Joint GAN training ({cfg.epochs} epochs) ---")
 
     # -----------------------------------------------------------------------
     # Epoch loop
@@ -279,20 +368,28 @@ def train(cfg: Config) -> None:
             real_batch = real_batch.to(device)
             B = real_batch.size(0)
 
+            # In latent AE mode the critic operates on latent sequences.
+            # Encode real features once per batch; reuse across critic steps.
+            if latent_ae:
+                with torch.no_grad():
+                    H_real = E(real_batch)              # (B, T, latent_dim)
+            else:
+                H_real = real_batch
+
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
                 z_g = torch.randn(B, cfg.noise_dim, device=device)
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-                fake_batch = G(z_g, z_l).detach()
+                H_fake = G(z_g, z_l).detach()
 
                 opt_C.zero_grad()
                 if cfg.loss == "wgan-sn":
-                    c_loss = (C(fake_batch) - C(real_batch)).mean()
+                    c_loss = (C(H_fake) - C(H_real)).mean()
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
                     fake_labels = torch.zeros(B, 1, device=device)
-                    c_loss = (bce(C(real_batch), real_labels) +
-                              bce(C(fake_batch), fake_labels))
+                    c_loss = (bce(C(H_real), real_labels) +
+                              bce(C(H_fake), fake_labels))
                 c_loss.backward()
                 opt_C.step()
                 c_losses.append(c_loss.item())
@@ -300,22 +397,36 @@ def train(cfg: Config) -> None:
             # --- Generator step ---
             z_g = torch.randn(B, cfg.noise_dim, device=device)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-            fake_batch = G(z_g, z_l)
+            H_fake = G(z_g, z_l)
 
             opt_G.zero_grad()
             if cfg.loss == "wgan-sn":
-                g_loss = -C(fake_batch).mean()
+                g_loss = -C(H_fake).mean()
             else:
                 real_labels = torch.ones(B, 1, device=device)
-                g_loss = bce(C(fake_batch), real_labels)
+                g_loss = bce(C(H_fake), real_labels)
 
-            # --- Auxiliary losses ---
+            if latent_ae:
+                # Supervisor consistency: S(H_fake)[t] should predict H_fake[t+1].
+                # This forces the generator to produce temporally coherent latents
+                # that obey the same autoregressive dynamics as real data.
+                S_on_fake = S(H_fake)
+                loss_sup = nn.functional.mse_loss(
+                    S_on_fake[:, :-1, :], H_fake[:, 1:, :])
+                g_loss = g_loss + cfg.supervisor_loss_weight * loss_sup
+
+                # Decode generated latents to feature space for auxiliary losses
+                fake_decoded = R(H_fake)
+            else:
+                fake_decoded = H_fake
+
+            # --- Auxiliary losses (in feature space) ---
             # Moment matching (L_V): penalise differences in per-feature mean
             # and std so the generator cannot ignore distributional shape.
             if cfg.moment_loss_weight > 0:
                 loss_V = (
-                    torch.nn.functional.l1_loss(fake_batch.mean(0), real_batch.mean(0)) +
-                    torch.nn.functional.l1_loss(fake_batch.std(0),  real_batch.std(0))
+                    nn.functional.l1_loss(fake_decoded.mean(0), real_batch.mean(0)) +
+                    nn.functional.l1_loss(fake_decoded.std(0),  real_batch.std(0))
                 )
                 g_loss = g_loss + cfg.moment_loss_weight * loss_V
 
@@ -323,13 +434,30 @@ def train(cfg: Config) -> None:
             # content along the time axis — captures burst periodicity.
             if cfg.fft_loss_weight > 0:
                 real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
-                fake_fft = torch.fft.rfft(fake_batch.float(), dim=1).abs()
-                loss_fft = torch.nn.functional.mse_loss(fake_fft, real_fft)
+                fake_fft = torch.fft.rfft(fake_decoded.float(), dim=1).abs()
+                loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
             g_loss.backward()
             opt_G.step()
             g_losses.append(g_loss.item())
+
+            # --- Encoder + Recovery joint step (latent AE mode only) ---
+            # Fine-tunes the autoencoder during GAN training to keep the latent
+            # space consistent with the generator's output distribution.
+            if latent_ae:
+                H_real_grad = E(real_batch)
+                X_hat = R(H_real_grad)
+                # Reconstruction loss
+                loss_ae = nn.functional.mse_loss(X_hat, real_batch)
+                # Supervisor guides embedder to produce predictable latents
+                S_on_real = S(H_real_grad.detach())
+                loss_sup_e = nn.functional.mse_loss(
+                    S_on_real[:, :-1, :], H_real_grad[:, 1:, :].detach())
+                er_loss = loss_ae + cfg.supervisor_loss_weight * loss_sup_e
+                opt_ER.zero_grad()
+                er_loss.backward()
+                opt_ER.step()
 
         c_mean = sum(c_losses) / len(c_losses)
         g_mean = sum(g_losses) / len(g_losses)
@@ -343,13 +471,14 @@ def train(cfg: Config) -> None:
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             mmd_val = evaluate_mmd(G, val_tensor, cfg.mmd_samples,
-                                   cfg.timestep, device)
+                                   cfg.timestep, device,
+                                   recovery=R if latent_ae else None)
             log += f"  MMD²={mmd_val:.5f}"
             # Save best.pt whenever MMD² improves — captures the best model
             # regardless of where checkpoint_every lands.
             if mmd_val < best_mmd:
                 best_mmd = mmd_val
-                torch.save({
+                ckpt_data = {
                     "epoch": epoch,
                     "G": G.state_dict(),
                     "C": C.state_dict(),
@@ -358,15 +487,21 @@ def train(cfg: Config) -> None:
                     "prep": prep,
                     "config": cfg,
                     "mmd": best_mmd,
-                }, ckpt_dir / "best.pt")
+                }
+                if latent_ae:
+                    ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
+                                      "S": S.state_dict()})
+                torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
             G.train()
+            if latent_ae:
+                E.train(); R.train(); S.train()
 
         print(log, flush=True)
 
         if (epoch + 1) % cfg.checkpoint_every == 0:
             ckpt_path = ckpt_dir / f"epoch_{epoch+1:04d}.pt"
-            torch.save({
+            ckpt_data = {
                 "epoch": epoch,
                 "G": G.state_dict(),
                 "C": C.state_dict(),
@@ -374,11 +509,15 @@ def train(cfg: Config) -> None:
                 "opt_C": opt_C.state_dict(),
                 "prep": prep,
                 "config": cfg,
-            }, ckpt_path)
+            }
+            if latent_ae:
+                ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
+                                  "S": S.state_dict()})
+            torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
 
     final_path = ckpt_dir / "final.pt"
-    torch.save({
+    final_data = {
         "epoch": cfg.epochs - 1,
         "G": G.state_dict(),
         "C": C.state_dict(),
@@ -386,7 +525,11 @@ def train(cfg: Config) -> None:
         "opt_C": opt_C.state_dict(),
         "prep": prep,
         "config": cfg,
-    }, final_path)
+    }
+    if latent_ae:
+        final_data.update({"E": E.state_dict(), "R": R.state_dict(),
+                           "S": S.state_dict()})
+    torch.save(final_data, final_path)
     print(f"Training complete → {final_path}")
 
 
@@ -434,6 +577,17 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    # Latent AE + supervisor
+    p.add_argument("--latent-dim",           type=int,   default=24,
+                   help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
+    p.add_argument("--pretrain-ae-epochs",   type=int,   default=50,
+                   help="Phase 1: autoencoder pretraining epochs")
+    p.add_argument("--pretrain-sup-epochs",  type=int,   default=50,
+                   help="Phase 2: supervisor pretraining epochs")
+    p.add_argument("--supervisor-loss-weight", type=float, default=10.0,
+                   help="η: supervisor consistency weight in joint training")
+    p.add_argument("--lr-er",                type=float, default=0.0005,
+                   help="Learning rate for encoder + recovery")
     args = p.parse_args()
 
     cfg = Config()
@@ -457,8 +611,13 @@ def parse_args() -> Config:
     cfg.mmd_every           = args.mmd_every
     cfg.mmd_samples         = args.mmd_samples
     cfg.train_split         = args.train_split
-    cfg.moment_loss_weight  = args.moment_loss_weight
-    cfg.fft_loss_weight     = args.fft_loss_weight
+    cfg.moment_loss_weight      = args.moment_loss_weight
+    cfg.fft_loss_weight         = args.fft_loss_weight
+    cfg.latent_dim              = args.latent_dim
+    cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
+    cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
+    cfg.supervisor_loss_weight  = args.supervisor_loss_weight
+    cfg.lr_er                   = args.lr_er
     return cfg
 
 

@@ -19,7 +19,7 @@ import math
 import numpy as np
 import torch
 
-from model import Generator
+from model import Generator, Recovery
 
 
 def generate(
@@ -41,11 +41,21 @@ def generate(
     cfg = ckpt["config"]
     prep = ckpt["prep"]
 
-    G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size).to(device)
+    latent_ae = "R" in ckpt  # latent AE checkpoint includes recovery weights
+    latent_dim = getattr(cfg, "latent_dim", 0) if latent_ae else None
+
+    G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
+                  latent_dim=latent_dim).to(device)
     G.load_state_dict(ckpt["G"])
     G.eval()
 
-    # Identify opcode column index (for binarization)
+    R = None
+    if latent_ae:
+        R = Recovery(latent_dim, cfg.hidden_size, prep.num_cols).to(device)
+        R.load_state_dict(ckpt["R"])
+        R.eval()
+
+    # Identify opcode column index (for binarization, applied in feature space)
     opcode_col = -1
     for i, col in enumerate(prep.col_names):
         if col.lower() in {"opcode", "type", "rw", "op"}:
@@ -70,9 +80,12 @@ def generate(
             z_local = torch.randn(
                 n_streams, timestep, cfg.noise_dim, device=device
             )
-            out, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
+            latent, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
             # Detach hidden to avoid accumulating the full computation graph
             hidden = (hidden[0].detach(), hidden[1].detach())
+
+            # Decode latents to feature space (latent AE mode only)
+            out = R(latent) if R is not None else latent
 
             if binarize_opcode and opcode_col >= 0:
                 out[:, :, opcode_col] = (

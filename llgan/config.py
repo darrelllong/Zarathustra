@@ -44,6 +44,14 @@ class Config:
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
 
+    # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
+    # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).
+    latent_dim: int = 24              # latent space dimensionality
+    pretrain_ae_epochs: int = 50      # Phase 1: pretrain encoder + recovery
+    pretrain_sup_epochs: int = 50     # Phase 2: pretrain supervisor on real latents
+    supervisor_loss_weight: float = 10.0  # η: supervisor term in joint generator loss
+    lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
+
     # Evaluation
     mmd_every: int = 5
     mmd_samples: int = 1000

@@ -50,22 +50,31 @@ def evaluate_mmd(
     n_samples: int,
     timestep: int,
     device: torch.device,
+    recovery=None,
 ) -> float:
     """
     Draw n_samples windows from the generator and the validation set,
     flatten each window to a vector, compute MMD.
+
+    recovery: optional Recovery module (latent AE mode). When provided,
+              generated latents are decoded to feature space before MMD
+              so the metric is comparable across architectures.
     """
     generator.eval()
+    if recovery is not None:
+        recovery.eval()
 
-    # Real samples
+    # Real samples (always in feature space)
     idx = torch.randperm(len(val_data))[:n_samples]
     real = val_data[idx].to(device)                  # (n, timestep, num_cols)
     real_flat = real.view(n_samples, -1)
 
-    # Fake samples
+    # Fake samples — decode latents to feature space when recovery is present
     z_global = torch.randn(n_samples, generator.noise_dim, device=device)
     z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
     fake = generator(z_global, z_local)
+    if recovery is not None:
+        fake = recovery(fake)
     fake_flat = fake.view(n_samples, -1)
 
     return mmd(real_flat.cpu(), fake_flat.cpu())
