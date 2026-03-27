@@ -67,7 +67,11 @@ def generate(
     records_per_stream = math.ceil(n_records / n_streams)
     windows_per_stream = math.ceil(records_per_stream / timestep)
 
-    all_records = []
+    # Collect raw (pre-inverse-transform) windows per stream separately.
+    # Streams must NOT be merged before inverse_transform: timestamp and
+    # obj_id reconstruction both apply cumsum, which must stay within
+    # each stream's sequence boundary.
+    stream_windows: list[list[np.ndarray]] = [[] for _ in range(n_streams)]
 
     with torch.no_grad():
         # Each stream is an independent long trace.
@@ -92,13 +96,24 @@ def generate(
                     (out[:, :, opcode_col] >= 0).float() * 2 - 1
                 )
 
-            # (n_streams, timestep, num_cols) → (n_streams * timestep, num_cols)
-            all_records.append(out.cpu().numpy().reshape(-1, prep.num_cols))
+            # (n_streams, timestep, num_cols) — split by stream before storing
+            out_np = out.cpu().numpy()   # (n_streams, timestep, num_cols)
+            for s in range(n_streams):
+                stream_windows[s].append(out_np[s])  # (timestep, num_cols)
 
-    arr = np.concatenate(all_records, axis=0)[:n_records]
-    df = prep.inverse_transform(arr)
+    # Inverse-transform each stream independently (cumsum stays within stream),
+    # then label and concatenate for a single output file.
+    import pandas as pd
+    per_stream_dfs = []
+    for s in range(n_streams):
+        arr_s = np.concatenate(stream_windows[s], axis=0)[:records_per_stream]
+        df_s = prep.inverse_transform(arr_s)
+        df_s.insert(0, "stream_id", s)
+        per_stream_dfs.append(df_s)
+
+    df = pd.concat(per_stream_dfs, ignore_index=True).head(n_records)
     df.to_csv(output_path, index=False)
-    print(f"Generated {len(df):,} records → {output_path}")
+    print(f"Generated {len(df):,} records ({n_streams} stream(s)) → {output_path}")
 
 
 def parse_args():

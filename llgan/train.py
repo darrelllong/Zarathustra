@@ -201,18 +201,15 @@ def train(cfg: Config) -> None:
         print(f"  delta-encoded: {prep._delta_cols}")
         print(f"  log-transformed: {prep._log_cols}")
 
-        # Build a fixed val set from a few held-out files for MMD tracking
-        val_files = random.sample(all_files, min(2, len(all_files)))
-        import pandas as pd
-        val_dfs = []
-        for f in val_files:
-            try:
-                df = _load_raw_df(f, cfg.trace_format, cfg.records_per_file)
-                val_dfs.append(df)
-            except Exception:
-                pass
-        val_arr = prep.transform(pd.concat(val_dfs, ignore_index=True)) if val_dfs else None
-        val_ds = TraceDataset(val_arr, cfg.timestep) if val_arr is not None else None
+        # Hold out a fixed val set — remove val files from all_files so they
+        # are never sampled during training.  Build per-file TraceDatasets
+        # (same as training) so no window ever crosses a file boundary.
+        n_val_files = min(2, max(0, len(all_files) - cfg.files_per_epoch))
+        val_files = random.sample(all_files, n_val_files)
+        all_files = [f for f in all_files if f not in val_files]
+        val_ds, _ = _load_epoch_dataset(
+            val_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
+        ) if val_files else (None, [])
         val_tensor = (torch.stack([val_ds[i] for i in range(len(val_ds))])
                       if val_ds and len(val_ds) > 0 else None)
         print(f"  val windows: {len(val_ds) if val_ds else 0:,}")
@@ -493,10 +490,10 @@ def train(cfg: Config) -> None:
             H_fake = G(z_g, z_l)
 
             opt_G.zero_grad()
-            if cfg.loss == "wgan-sn":
+            if cfg.loss in ("wgan-sn", "wgan-gp"):
                 g_score, feat_fake = C(H_fake, return_features=True)
                 g_loss = -g_score.mean()
-            else:
+            else:  # bce
                 real_labels = torch.ones(B, 1, device=device)
                 g_score, feat_fake = C(H_fake, return_features=True)
                 g_loss = bce(g_score, real_labels)
@@ -563,14 +560,14 @@ def train(cfg: Config) -> None:
             if latent_ae:
                 H_real_grad = E(real_batch)
                 X_hat = R(H_real_grad)
-                # Reconstruction loss
-                loss_ae = nn.functional.mse_loss(X_hat, real_batch)
-                # Supervisor guides embedder to produce predictable latents
-                S_on_real = S(H_real_grad.detach())
-                k = cfg.supervisor_steps
-                loss_sup_e = nn.functional.mse_loss(
-                    S_on_real[:, :-k, :], H_real_grad[:, k:, :].detach())
-                er_loss = loss_ae + cfg.supervisor_loss_weight * loss_sup_e
+                # Reconstruction loss only: supervisor (S) is frozen after
+                # pretraining and has no optimizer in Phase 3.  The previous
+                # supervisor term here was a no-op — both its input
+                # (H_real_grad.detach()) and target were detached, so no
+                # gradient flowed and no parameter in opt_ER was updated by it.
+                # (Per peer review: freeze S after pretraining rather than
+                # silently running a dead term.)
+                er_loss = nn.functional.mse_loss(X_hat, real_batch)
                 opt_ER.zero_grad()
                 er_loss.backward()
                 opt_ER.step()
