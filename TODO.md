@@ -1,98 +1,121 @@
 # Zarathustra — TODO
 
-Improvements derived from reading DiTTO, TTS-GAN, Diffusion-TS, NetDiffus, SeriesGAN, and TransFusion.
-Ordered by impact-to-effort ratio. No image-conversion hacks — solid theory only.
+Improvements derived from reading DiTTO, TTS-GAN, Diffusion-TS, NetDiffus, SeriesGAN, and
+TransFusion, plus peer code review. Ordered by impact-to-effort ratio. No image-conversion
+hacks — solid theory only.
+
+Items marked ✓ are done and in the repo.
+
+---
+
+## Bugs fixed
+
+- ✓ **Cross-file boundary contamination** (`train.py` `_load_epoch_dataset`)
+  Concatenating raw arrays across files then windowing created sequences spanning
+  last-event-of-file-A → first-event-of-file-B. Fixed: per-file `TraceDataset`,
+  merged with `ConcatDataset`. No window ever crosses a file boundary.
+
+- ✓ **Timestamp inverse_transform off-by-one** (`dataset.py`)
+  `concatenate([[start], deltas[:-1]]).cumsum()` shifted the series by one position
+  and duplicated the first timestamp. Fixed: `start + cumsum(deltas)`.
+
+- ✓ **Loss named "wgan-gp" without gradient penalty** (`config.py`, `train.py`, `model.py`)
+  Spectral norm applied only to the critic's final linear layer — LSTM weights are
+  unconstrained. Renamed to `wgan-sn` throughout. True WGAN-GP requires second-order
+  autograd (CUDA only; deferred to NVIDIA GPU task).
 
 ---
 
 ## Immediate (hours each)
 
-- [ ] **Log-transform `ts_delta` and `obj_size`** in `dataset.py` `TracePreprocessor`
-  `ts_delta` and `obj_size` are power-law distributed. Applying min-max normalization directly
-  causes the generator to collapse toward the mean. Replace with `log1p`/`log10` before
-  normalization; invert with `expm1`/`10**x` at generation time.
+- ✓ **Log-transform `ts_delta` and `obj_size`** (`dataset.py`)
+- ✓ **Fourier spectral auxiliary loss** (`train.py`, `--fft-loss-weight`)
+- ✓ **Moment matching loss L_V** (`train.py`, `--moment-loss-weight`)
 
 - [ ] **Add coverage (β-recall) and α-precision metrics** to evaluation
-  MMD² alone cannot detect mode collapse. β-recall < 0.3 means the generator is only
-  reproducing a slice of the real distribution. Add PRDC metrics (via `prdc` package or
-  nearest-neighbor implementation) and report every `mmd_every` epochs alongside MMD².
-  *Run this first — it will tell us whether mode collapse is already the dominant problem.*
+  MMD² alone cannot detect mode collapse. β-recall < 0.3 means the generator covers
+  only a slice of the real distribution. Add PRDC metrics (via `prdc` package or
+  nearest-neighbor) and report every `mmd_every` epochs.
 
-- [ ] **Add Fourier spectral auxiliary loss** to generator (`train.py`)
-  `L_FFT = MSE(|FFT(real)|, |FFT(fake)|)` along the time axis, weighted ~0.05.
-  Forces the generator to match frequency content: hourly/daily I/O cycles and burst patterns
-  that WGAN alone ignores. Add `--fft-loss-weight` flag (default 0.05, 0 = off).
+- [ ] **Early stopping on best combined metric** (`train.py`)
+  After 50% of training epochs, save the checkpoint with best
+  `discriminative_score + λ * moment_loss` rather than the final epoch.
+  SeriesGAN ablation: accounts for 43% of their discriminative improvement alone.
 
-- [ ] **Add moment matching loss (L_V)** to generator (`train.py`)
-  `L_V = MAE(μ_real, μ_fake) + MAE(σ_real, σ_fake)` per feature column, weighted ~0.1.
-  Prevents WGAN from ignoring distributional shape — critical for `obj_size` and `ts_delta`.
-  Add `--moment-loss-weight` flag.
-
-- [ ] **Implement early stopping on best combined metric** (`train.py`)
-  After 50% of training epochs, evaluate every N steps:
-  `score = discriminative_score + λ * moment_loss`. Save best checkpoint, return it
-  rather than the final epoch. SeriesGAN ablation: this alone accounts for 43% of their
-  discriminative improvement. Add `--early-stop-after` flag.
+- [ ] **Fix generate.py: carry LSTM hidden state across window boundaries**
+  Currently samples IID windows and concatenates — hidden state resets every 12 steps,
+  so long-range burst structure cannot be coherent. Fix: pass `(h, c)` from each window
+  to the next. Generator.forward() needs to accept and return hidden state.
 
 ---
 
 ## Medium-term (days each)
 
+- [ ] **Fix latent design: global z + per-step innovations** (`model.py`, `train.py`)
+  Generator comment says "same noise vector broadcast" but training feeds fresh
+  `randn` at every timestep — neither a global latent nor clean autoregression.
+  Split into: global code `z_global` initialising LSTM hidden state (workload identity),
+  plus per-step innovation noise `z_local` fed at each timestep.
+
+- [ ] **Replace raw `obj_id` regression with locality-aware representation** (`dataset.py`)
+  Euclidean closeness of raw object IDs is not access-structure closeness — treating
+  `obj_id` as a continuous number is a fundamental representational mistake. Replace with:
+  (1) hot/cold binary decision (is this object in the working set?),
+  (2) delta/stride from previous `obj_id` (captures sequential and strided access),
+  (3) coarse bucket + fine offset within bucket.
+
+- [ ] **Replace critic mean-pooling with attention pooling** (`model.py`)
+  `h.mean(dim=1)` washes out short bursts, sudden queueing regimes, and rare
+  write-heavy segments. Replace with learned attention pooling (weighted sum) or
+  max+mean pooling. Optionally add multi-scale patch critics.
+
 - [ ] **Add Context-FID as primary evaluation metric** (`eval.py`)
-  Train a fixed LSTM encoder on real data; embed real and generated windows; compute Fréchet
-  distance in that latent space. More sensitive to temporal structure than MMD² or raw statistics.
-  Replace MMD² as the headline metric once validated.
+  Train a fixed LSTM encoder on real data; embed real and generated windows; compute
+  Fréchet distance in that latent space. More sensitive to temporal structure than MMD².
 
-- [ ] **Implement latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)** — *biggest win*
-  The single highest-leverage architectural upgrade. Three additions:
+- [ ] **Implement latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)**
+  The single highest-leverage architectural upgrade:
   1. GRU encoder `e` + recovery `r`: compress 5 features → ~3-dim latent space
-  2. GRU supervisor `s`: predicts `H_t` from `H_{t-2}` (two-step lookahead autoregression)
-  3. Loss-function autoencoder `ê`: embedding-space moment matching loss `L_TS`
-
-  Move generator to operate entirely in latent space. Train in four phases:
-  - Pre-train `ê` (reconstruction, then freeze)
-  - Pre-train latent autoencoder `e`/`r` with weak discriminator signal
-  - Pre-train supervisor `s`
-  - Joint adversarial training of all networks
-
-  SeriesGAN reports **34% discriminative improvement** over TimeGAN with this structure,
-  and TimeGAN already beats vanilla LSTM-GAN. Requires task above (latent AE) as prerequisite
-  for the dual discriminator task below.
+  2. GRU supervisor `s`: predicts `H_t` from `H_{t-2}` (two-step lookahead)
+  3. Loss-function autoencoder `ê`: embedding-space moment matching `L_TS`
+  Move generator to latent space. Four-phase curriculum training.
+  SeriesGAN: **34% discriminative improvement** over TimeGAN with this.
 
 - [ ] **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
-  Add a second lightweight LSTM critic on the raw decoded feature-space output. Alternate
-  gradient updates between both critics. The latent critic gives stable early gradients;
-  the feature critic catches artifacts the latent critic misses.
+  Second lightweight critic on raw decoded output. Latent critic = stable early gradients;
+  feature critic = catches artifacts latent critic misses.
 
 - [ ] **Add patch embedding to critic** (`model.py`)
-  Prepend `Conv1d(num_cols, embed_dim, kernel_size=3, stride=3)` to the LSTM critic.
-  Compresses the 12-step window into 4 patch tokens before the LSTM, letting the critic
-  reason about local temporal patterns as semantic units rather than individual timesteps.
-  Inspired by TTS-GAN.
+  `Conv1d(num_cols, embed_dim, kernel_size=3, stride=3)` before LSTM critic compresses
+  12-step window into 4 patch tokens. (TTS-GAN)
 
 - [ ] **Add workload conditioning** (`model.py`, `train.py`)
-  Embed condition vector `c = [tenant_id, read_ratio, obj_size_bucket]` via small MLP;
-  inject into generator's initial hidden state and at every timestep. Enables tenant-specific
-  or workload-class-specific generation without separate models. Train with both conditioned
-  and unconditioned batches (classifier-free guidance style) to preserve unconditional generation.
+  Embed `c = [tenant_id, read_ratio, obj_size_bucket]` via MLP into generator hidden
+  state and at every timestep. Classifier-free guidance style for unconditional fallback.
+
+- [ ] **Improve validation** (`train.py`, `mmd.py`)
+  Current MMD val set is 2 random files (may overlap conceptually with training) and
+  MMD is flattened-window RBF — weak signal. Switch to: designated held-out files,
+  replay/locality metrics (stack distance CDF, reuse distance), per-column KS tests.
 
 ---
 
-## Longer-term
+## Longer-term (architecture)
+
+- [ ] **Build hierarchical two-level generator**
+  `timestep=12` captures micro-patterns but not workload phases. Coarse model over
+  burst envelopes / regime states; fine model over events conditioned on coarse state.
+  The FFT and moment losses are compensating for this missing temporal context.
 
 - [ ] **Train separate models per workload class** (Tencent vs Alibaba)
-  The two corpora have fundamentally different character:
-  - Tencent: 9-day traces, 512B–32KB mixed sizes, 83–94% reads
-  - Alibaba: 31-day traces, 4KB-aligned sizes, more variable read ratios
-
-  Once Alibaba download completes, train and evaluate a model per corpus and compare
-  MMD², coverage, and Context-FID against a single mixed-corpus model.
+  Tencent: 9-day, 512B–32KB mixed, 83–94% reads.
+  Alibaba: 31-day, 4KB-aligned, more variable read ratios.
+  Compare per-corpus vs mixed-corpus models once Alibaba download finishes.
 
 - [ ] **Re-train on NVIDIA GPU once box arrives**
-  Current training runs on Apple MPS (wigner.local). On NVIDIA:
-  1. Enable true WGAN-GP (gradient penalty requires second-order gradients, blocked on MPS)
-  2. Increase `hidden_size`, `num_layers`
-  3. Scale `batch_size` and `files_per_epoch`
+  1. Enable true WGAN-GP (gradient penalty, second-order autograd)
+  2. Apply spectral norm to LSTM weight matrices (currently too slow on MPS)
+  3. Increase `hidden_size`, `num_layers`, `batch_size`, `files_per_epoch`
   4. Benchmark full-corpus training time
 
 ---
