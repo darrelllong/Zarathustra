@@ -17,6 +17,7 @@ systor       : Timestamp, ResponseTime, Opcode(R/W), LUN, Offset, Size(512B)
 oracle_general: libCacheSim binary format (24 bytes/record):
                 uint32 ts, uint64 obj_id, uint32 obj_size,
                 int32 next_access_vtime, int16 op, int16 tenant_id
+                obj_id is delta-encoded with signed-log (not raw) — see _OBJ_DELTA_COLS.
 exchange_etw : Windows ETW .csv.gz (MSR Exchange Server traces, SNIA IOTTA):
                DiskRead/DiskWrite completion events only;
                ts(µs), opcode, offset(bytes), size(bytes), response_time(µs), disk
@@ -176,8 +177,16 @@ _READERS = {
     "csv": _read_csv,
 }
 
-# Timestamp column names — will be delta-encoded
+# Timestamp column names — will be delta-encoded (deltas clipped to ≥ 0)
 _TS_COLS = {"ts", "timestamp"}
+
+# Object-ID column names — delta-encoded WITHOUT clipping (seeks can be negative),
+# then signed-log transformed: sign(d)*log1p(|d|).
+# Raw obj_id values are meaningless as continuous numbers (e.g. 17-digit Tencent
+# object IDs); Euclidean closeness of IDs ≠ access-structure closeness.
+# Delta-encoding captures sequential (small Δ), strided (regular Δ), and random
+# (large Δ) access patterns; signed-log compresses the 10-decade dynamic range.
+_OBJ_DELTA_COLS = {"obj_id"}
 
 # Columns whose raw values are read/write opcodes
 _OPCODE_COLS = {"opcode", "type", "rw", "op"}
@@ -185,6 +194,7 @@ _OPCODE_COLS = {"opcode", "type", "rw", "op"}
 # Columns that are log-transformed before min-max normalization.
 # These have heavy-tailed / power-law distributions that confound tanh output.
 # ts_delta (inter-arrival times) and obj_size are the canonical cases.
+# Note: obj_id is NOT listed here — it gets a signed-log transform instead.
 _LOG_COLS = {"ts", "timestamp", "obj_size", "size", "response_time"}
 
 
@@ -206,19 +216,23 @@ class TracePreprocessor:
         self.num_cols: int = 0
         self._stats: Dict[str, dict] = {}
         self._cat_maps: Dict[str, dict] = {}
-        self._delta_cols: List[str] = []     # columns that were delta-encoded
-        self._first_vals: Dict[str, float] = {}  # for inverse cumsum
-        self._log_cols: List[str] = []       # columns that are log1p-transformed
+        self._delta_cols: List[str] = []       # timestamp cols: delta, clip ≥ 0
+        self._first_vals: Dict[str, float] = {}  # for inverse cumsum (ts + obj_id)
+        self._log_cols: List[str] = []         # log1p-transformed cols (non-negative)
+        self._obj_delta_cols: List[str] = []   # obj_id cols: delta, no clip, signed-log
 
     # ------------------------------------------------------------------
     def fit(self, df: pd.DataFrame) -> "TracePreprocessor":
         df = df.copy()
         self._delta_cols = [c for c in df.columns if c.lower() in _TS_COLS]
+        self._obj_delta_cols = [c for c in df.columns if c.lower() in _OBJ_DELTA_COLS]
         df = self._apply_deltas(df, fit=True)
+        df = self._apply_obj_deltas(df, fit=True)
         df = self._encode_categoricals(df, fit=True)
         # Identify log-transform columns: heavy-tailed continuous columns.
         # Applied after delta-encoding so ts_delta (inter-arrival times) is
         # also log-transformed, which is the right thing — IAT is power-law.
+        # obj_id is excluded: it gets signed-log via _apply_obj_deltas.
         self._log_cols = [
             c for c in df.columns
             if c.lower() in _LOG_COLS and c not in self._cat_maps
@@ -235,6 +249,7 @@ class TracePreprocessor:
     def transform(self, df: pd.DataFrame) -> np.ndarray:
         df = df.copy()
         df = self._apply_deltas(df, fit=False)
+        df = self._apply_obj_deltas(df, fit=False)
         df = self._encode_categoricals(df, fit=False)
         df = self._apply_log(df)
         out = np.zeros((len(df), self.num_cols), dtype=np.float32)
@@ -255,6 +270,9 @@ class TracePreprocessor:
             # Undo log1p transform before any other post-processing
             if col in self._log_cols:
                 vals = np.expm1(np.clip(vals, 0, None))
+            # Undo signed-log transform: sign(v)*expm1(|v|)
+            if col in self._obj_delta_cols:
+                vals = np.sign(vals) * np.expm1(np.abs(vals))
             if col in self._cat_maps:
                 inv_map = {v: k for k, v in self._cat_maps[col].items()}
                 vals = np.array([inv_map.get(int(round(v)), v) for v in vals])
@@ -272,6 +290,12 @@ class TracePreprocessor:
                 start = self._first_vals.get(col, 0.0)
                 df[col] = start + np.cumsum(df[col].values)
 
+        # Undo obj_id delta encoding (no clipping — deltas can be negative)
+        for col in self._obj_delta_cols:
+            if col in df.columns:
+                start = self._first_vals.get(col, 0.0)
+                df[col] = start + np.cumsum(df[col].values)
+
         return df
 
     # ------------------------------------------------------------------
@@ -285,6 +309,25 @@ class TracePreprocessor:
             deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
             # Clip negative deltas (out-of-order timestamps) to 0
             deltas = np.clip(deltas, 0, None)
+            df = df.copy()
+            df[col] = deltas
+        return df
+
+    def _apply_obj_deltas(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
+        """
+        Delta-encode object-ID columns without clipping negative deltas.
+        Negative deltas (backward seeks) are valid and meaningful.
+        Applies sign(d)*log1p(|d|) to compress the ~10-decade dynamic range.
+        """
+        for col in self._obj_delta_cols:
+            if col not in df.columns:
+                continue
+            vals = df[col].values.astype(np.float64)
+            if fit:
+                self._first_vals[col] = float(vals[0])
+            deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
+            # Signed-log: preserves sign, compresses magnitude
+            deltas = np.sign(deltas) * np.log1p(np.abs(deltas))
             df = df.copy()
             df[col] = deltas
         return df
