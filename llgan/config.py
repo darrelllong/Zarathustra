@@ -44,7 +44,9 @@ class Config:
     # Auxiliary generator losses
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
+    fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
+    r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
     # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).
@@ -53,6 +55,7 @@ class Config:
     pretrain_sup_epochs: int = 50     # Phase 2: pretrain supervisor on real latents
     pretrain_g_epochs: int = 100      # Phase 2.5: generator warm-up via supervisor
     supervisor_loss_weight: float = 10.0  # η: supervisor term in joint generator loss
+    supervisor_steps: int = 1         # 1 = 1-step supervisor; 2 = 2-step (SeriesGAN)
     lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
 
     # Evaluation

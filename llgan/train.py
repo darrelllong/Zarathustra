@@ -333,8 +333,10 @@ def train(cfg: Config) -> None:
                     H = E(xb)                               # (B, T, latent_dim)
                 opt_S.zero_grad()
                 S_out = S(H)                                # (B, T, latent_dim)
-                # S_out[t] should predict H[t+1]
-                loss_sup = nn.functional.mse_loss(S_out[:, :-1, :], H[:, 1:, :])
+                # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
+                # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
+                k = cfg.supervisor_steps
+                loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
                 loss_sup.backward()
                 opt_S.step()
                 sup_losses.append(loss_sup.item())
@@ -378,8 +380,9 @@ def train(cfg: Config) -> None:
                 H_fake = G(z_g, z_l)
                 with torch.no_grad():
                     S_out = S(H_fake)
-                # Consistency: G(z)[t+1] ≈ S(G(z))[t]
-                loss_g_sup = nn.functional.mse_loss(H_fake[:, 1:, :], S_out[:, :-1, :])
+                # Consistency: G(z)[t+k] ≈ S(G(z))[t]; k = supervisor_steps
+                k = cfg.supervisor_steps
+                loss_g_sup = nn.functional.mse_loss(H_fake[:, k:, :], S_out[:, :-k, :])
                 opt_G.zero_grad()
                 loss_g_sup.backward()
                 opt_G.step()
@@ -450,6 +453,18 @@ def train(cfg: Config) -> None:
                             create_graph=True)[0]           # (B, T, latent_dim)
                         gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
                         c_loss = c_loss + cfg.gp_lambda * gp
+
+                # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                # fake samples. Complements WGAN-GP's 1-centered interpolated-
+                # point penalty — together they provide full convergence guarantees.
+                if cfg.r2_lambda > 0 and cfg.loss in ("wgan-sn", "wgan-gp"):
+                        H_fake_r2 = H_fake.clone().requires_grad_(True)
+                        d_fake_r2 = C(H_fake_r2)
+                        grads_r2 = torch.autograd.grad(
+                            outputs=d_fake_r2.sum(), inputs=H_fake_r2,
+                            create_graph=True)[0]
+                        r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
+                        c_loss = c_loss + cfg.r2_lambda * r2
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
                     fake_labels = torch.zeros(B, 1, device=device)
@@ -489,8 +504,9 @@ def train(cfg: Config) -> None:
                 # This forces the generator to produce temporally coherent latents
                 # that obey the same autoregressive dynamics as real data.
                 S_on_fake = S(H_fake)
+                k = cfg.supervisor_steps
                 loss_sup = nn.functional.mse_loss(
-                    S_on_fake[:, :-1, :], H_fake[:, 1:, :])
+                    S_on_fake[:, :-k, :], H_fake[:, k:, :])
                 g_loss = g_loss + cfg.supervisor_loss_weight * loss_sup
 
                 # Decode generated latents to feature space for auxiliary losses
@@ -510,10 +526,18 @@ def train(cfg: Config) -> None:
 
             # Fourier spectral loss (L_FFT): penalise differences in frequency
             # content along the time axis — captures burst periodicity.
+            # FIDE (NeurIPS 2024): upweight bins where the real spectrum has high
+            # amplitude so rare/extreme I/O events (burst opcodes, large obj_size)
+            # are not washed out by the flat MSE average.
             if cfg.fft_loss_weight > 0:
                 real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
                 fake_fft = torch.fft.rfft(fake_decoded.float(), dim=1).abs()
-                loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
+                if cfg.fide_alpha > 0:
+                    weight_f = 1.0 + cfg.fide_alpha * (
+                        real_fft / (real_fft.mean(dim=1, keepdim=True) + 1e-8))
+                    loss_fft = (weight_f * (fake_fft - real_fft).pow(2)).mean()
+                else:
+                    loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
             g_loss.backward()
@@ -530,8 +554,9 @@ def train(cfg: Config) -> None:
                 loss_ae = nn.functional.mse_loss(X_hat, real_batch)
                 # Supervisor guides embedder to produce predictable latents
                 S_on_real = S(H_real_grad.detach())
+                k = cfg.supervisor_steps
                 loss_sup_e = nn.functional.mse_loss(
-                    S_on_real[:, :-1, :], H_real_grad[:, 1:, :].detach())
+                    S_on_real[:, :-k, :], H_real_grad[:, k:, :].detach())
                 er_loss = loss_ae + cfg.supervisor_loss_weight * loss_sup_e
                 opt_ER.zero_grad()
                 er_loss.backward()
@@ -658,6 +683,8 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    p.add_argument("--fide-alpha",         type=float, default=1.0,
+                   help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
                    help="Weight for critic feature matching loss (0 = off; "
                         "fixes mode collapse by matching critic internal features)")
@@ -672,6 +699,10 @@ def parse_args() -> Config:
                    help="Phase 2.5: generator warm-up epochs (TimeGAN supervised init)")
     p.add_argument("--supervisor-loss-weight", type=float, default=10.0,
                    help="η: supervisor consistency weight in joint training")
+    p.add_argument("--supervisor-steps",   type=int,   default=1,
+                   help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--r2-lambda",          type=float, default=0.0,
+                   help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
                    help="Learning rate for encoder + recovery")
     args = p.parse_args()
@@ -699,13 +730,16 @@ def parse_args() -> Config:
     cfg.train_split         = args.train_split
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
+    cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.gp_lambda                   = args.gp_lambda
+    cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
     cfg.pretrain_g_epochs       = args.pretrain_g_epochs
     cfg.supervisor_loss_weight  = args.supervisor_loss_weight
+    cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     return cfg
 
