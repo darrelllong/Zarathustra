@@ -58,11 +58,13 @@ class Generator(nn.Module):
 
 class Critic(nn.Module):
     """
-    LSTM critic for Wasserstein training.
+    LSTM critic for Wasserstein training (WGAN-SN variant).
 
     Outputs an unbounded real score (no sigmoid) — higher = more "real".
-    Lipschitz constraint is enforced via spectral normalization on all
-    weight matrices, which works on MPS/CPU without second-order gradients.
+    Lipschitz constraint is partially enforced via spectral normalisation on
+    the output linear layer only. The LSTM weights are unconstrained — a known
+    weakness. Full enforcement (WGAN-GP gradient penalty or SN on all weights)
+    requires CUDA and will be added once the NVIDIA box is available.
     """
 
     def __init__(self, num_cols: int, hidden_size: int):

@@ -209,12 +209,15 @@ class TracePreprocessor:
 
         df = pd.DataFrame(data)
 
-        # Undo delta encoding: cumsum restores absolute timestamps.
-        # Generated traces start from t=0 (or the stored first_val).
+        # Undo delta encoding: cumsum of deltas + start restores absolute timestamps.
+        # The first delta is 0 by construction (_apply_deltas uses prepend=vals[0]),
+        # so cumsum gives [0, d1, d1+d2, ...] and adding start gives the correct series.
+        # Previous code did concatenate([[start], deltas[:-1]]).cumsum() which shifted
+        # the series by one position and duplicated the first timestamp — now fixed.
         for col in self._delta_cols:
             if col in df.columns:
                 start = self._first_vals.get(col, 0.0)
-                df[col] = np.concatenate([[start], df[col].values[:-1]]).cumsum()
+                df[col] = start + np.cumsum(df[col].values)
 
         return df
 

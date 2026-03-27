@@ -1,5 +1,9 @@
 """
-LLGAN training — supports BCE (paper) and WGAN-GP (default, more stable).
+LLGAN training — supports BCE (paper) and WGAN-SN (default, more stable).
+
+WGAN-SN: Wasserstein loss with spectral normalisation on the critic's output
+linear layer. Not true WGAN-GP (no gradient penalty) — the LSTM weights are
+unconstrained. True WGAN-GP requires second-order autograd (CUDA only).
 
 Usage
 -----
@@ -32,7 +36,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
 from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
@@ -112,32 +116,41 @@ def _load_epoch_dataset(
     records_per_file: int,
     prep: TracePreprocessor,
     timestep: int,
-) -> Tuple[TraceDataset, Optional[np.ndarray]]:
+) -> Tuple[Optional[ConcatDataset], Optional[np.ndarray]]:
     """
-    Load records_per_file from each file, transform with fitted prep,
-    return a concatenated TraceDataset plus a val array (last 20%).
+    Load records_per_file from each file, transform with fitted prep, and
+    return a ConcatDataset of per-file TraceDatasets.
+
+    Critically: each file gets its own TraceDataset so sliding windows are
+    never formed across file boundaries (last event of file A → first event
+    of file B would be causally meaningless and poison a sequence model).
     """
     import pandas as pd
-    arrays = []
+    train_datasets = []
+    val_arrays = []
+
     for f in files:
         try:
             df = _load_raw_df(f, fmt, records_per_file)
-            if len(df) < timestep + 1:
+            if len(df) < timestep + 2:
                 continue
             arr = prep.transform(df)
-            arrays.append(arr)
+            # 80/20 split within each file so val windows are also file-local
+            n_train = int(len(arr) * 0.8)
+            train_arr = arr[:n_train]
+            val_arr   = arr[n_train:]
+            if len(train_arr) > timestep:
+                train_datasets.append(TraceDataset(train_arr, timestep))
+            if len(val_arr) > 0:
+                val_arrays.append(val_arr)
         except Exception as e:
             print(f"  [warn] skipping {f.name}: {e}")
 
-    if not arrays:
+    if not train_datasets:
         return None, None
 
-    combined = np.concatenate(arrays, axis=0)
-    # 80/20 split for train/val within this epoch's data
-    n_train = int(len(combined) * 0.8)
-    train_arr = combined[:n_train]
-    val_arr = combined[n_train:]
-    return TraceDataset(train_arr, timestep), val_arr
+    combined_val = np.concatenate(val_arrays, axis=0) if val_arrays else None
+    return ConcatDataset(train_datasets), combined_val
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +283,7 @@ def train(cfg: Config) -> None:
                 fake_batch = G(z).detach()
 
                 opt_C.zero_grad()
-                if cfg.loss == "wgan-gp":
+                if cfg.loss == "wgan-sn":
                     c_loss = (C(fake_batch) - C(real_batch)).mean()
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
@@ -286,7 +299,7 @@ def train(cfg: Config) -> None:
             fake_batch = G(z)
 
             opt_G.zero_grad()
-            if cfg.loss == "wgan-gp":
+            if cfg.loss == "wgan-sn":
                 g_loss = -C(fake_batch).mean()
             else:
                 real_labels = torch.ones(B, 1, device=device)
@@ -373,8 +386,10 @@ def parse_args() -> Config:
 
     p.add_argument("--fmt",              default="spc",
                    choices=["spc","msr","k5cloud","systor","oracle_general","csv"])
-    p.add_argument("--loss",             default="wgan-gp",
-                   choices=["wgan-gp", "bce"])
+    p.add_argument("--loss",             default="wgan-sn",
+                   choices=["wgan-sn", "bce"],
+                   help="wgan-sn: Wasserstein + spectral norm (MPS/CPU safe); "
+                        "bce: original GAN cross-entropy")
     p.add_argument("--epochs",           type=int,   default=200)
     p.add_argument("--batch-size",       type=int,   default=64)
     p.add_argument("--timestep",         type=int,   default=12)

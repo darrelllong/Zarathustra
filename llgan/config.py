@@ -11,7 +11,10 @@ class Config:
     timestep: int = 12          # window length; paper optimal: 10–15
 
     # Training
-    loss: str = "wgan-gp"       # "wgan-gp" or "bce"
+    loss: str = "wgan-sn"       # "wgan-sn" (Wasserstein + spectral norm) or "bce"
+                                # Note: NOT gradient-penalised WGAN-GP — the LSTM weights
+                                # are unconstrained; SN is applied only to the final linear.
+                                # True WGAN-GP requires second-order gradients (CUDA only).
     batch_size: int = 64
     epochs: int = 200
     g_rounds: int = 3           # used only for bce mode
