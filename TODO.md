@@ -35,13 +35,10 @@ Items marked ✓ are done and in the repo.
 - ✓ **Add coverage (β-recall) and α-precision metrics** to evaluation (`eval.py`)
   MMD² alone cannot detect mode collapse. Implemented full PRDC evaluation in `eval.py`
   (uses `prdc` package with numpy fallback).
-  v7 eval: MMD²=0.013, recall=0.143 (mode collapse despite good MMD²).
-  v8 eval: MMD²=0.045, recall=0.022 — lowering supervisor weight made collapse worse.
-  Root cause: supervisor diversity pressure was load-bearing; removing it let G
-  collapse to a single high-precision mode. Fix in v9: add critic feature matching
-  (`--feature-matching-weight 1.0`, Salimans et al. 2016) + revert supervisor=10.0
-  + noise_dim=32. Feature matching penalises L2(E[feat_real] - E[feat_fake]) so G
-  must cover all modes the critic can discriminate.
+  v7: MMD²=0.013, recall=0.143 (mode collapse).
+  v8: lowering supervisor weight made collapse worse (recall=0.022).
+  v9: critic feature matching (Salimans et al. 2016) + supervisor=10.0 + noise_dim=32.
+  v9 epoch 50: MMD²=0.020, recall=0.351 ✓ — first model to exit mode-collapse zone.
 
 - ✓ **Early stopping on best combined metric** (`train.py`)
   After 50% of training epochs, save the checkpoint with best
