@@ -17,6 +17,9 @@ systor       : Timestamp, ResponseTime, Opcode(R/W), LUN, Offset, Size(512B)
 oracle_general: libCacheSim binary format (24 bytes/record):
                 uint32 ts, uint64 obj_id, uint32 obj_size,
                 int32 next_access_vtime, int16 op, int16 tenant_id
+exchange_etw : Windows ETW .csv.gz (MSR Exchange Server traces, SNIA IOTTA):
+               DiskRead/DiskWrite completion events only;
+               ts(µs), opcode, offset(bytes), size(bytes), response_time(µs), disk
 csv          : generic — infer numeric cols; opcode col named 'opcode'/'type'/'rw'
 """
 
@@ -114,12 +117,62 @@ def _read_csv(path: str, max_records: int) -> pd.DataFrame:
     return df
 
 
+def _read_exchange_etw(path: str, max_records: int) -> pd.DataFrame:
+    """
+    Microsoft Exchange Server ETW disk trace (MSR SNIA dataset).
+    Format: Windows ETW .csv.gz with mixed event types; we extract only
+    DiskRead/DiskWrite completion events (not DiskReadInit/DiskWriteInit).
+
+    Fields extracted:
+      ts            – TimeStamp in microseconds from trace start (→ delta-encoded IAT)
+      opcode        – 'r' (DiskRead) or 'w' (DiskWrite)
+      offset        – ByteOffset in bytes (hex → int)
+      size          – IOSize in bytes (hex → int, log-transformed)
+      response_time – ElapsedTime in microseconds (log-transformed)
+      disk          – DiskNum (integer LUN id)
+    """
+    import gzip
+    import re
+
+    # Matches DiskRead/DiskWrite completion lines (but NOT DiskReadInit/DiskWriteInit).
+    # Columns: EventType, TimeStamp, ProcessName(PID), ThreadID, IrpPtr,
+    #          ByteOffset, IOSize, ElapsedTime, DiskNum, IrpFlags, ...
+    pattern = re.compile(
+        r'^\s*(DiskRead|DiskWrite),\s+(\d+),\s+[^,]+,\s+\d+,\s+\S+,\s+'
+        r'(0x[\da-fA-F]+),\s+(0x[\da-fA-F]+),\s+(\d+),\s+(\d+),'
+    )
+
+    rows = []
+    opener = gzip.open if path.endswith('.gz') else open
+    with opener(path, 'rt', errors='replace') as f:
+        for line in f:
+            if len(rows) >= max_records:
+                break
+            m = pattern.match(line)
+            if m:
+                event_type, ts, offset_hex, size_hex, elapsed, disk = m.groups()
+                rows.append({
+                    'ts':            int(ts),
+                    'opcode':        'r' if event_type == 'DiskRead' else 'w',
+                    'offset':        int(offset_hex, 16),
+                    'size':          int(size_hex, 16),
+                    'response_time': int(elapsed),
+                    'disk':          int(disk),
+                })
+
+    if not rows:
+        raise ValueError(f"No DiskRead/DiskWrite events found in {path}")
+
+    return pd.DataFrame(rows)
+
+
 _READERS = {
     "spc": _read_spc,
     "msr": _read_msr,
     "k5cloud": _read_k5cloud,
     "systor": _read_systor,
     "oracle_general": _read_oracle_general,
+    "exchange_etw": _read_exchange_etw,
     "csv": _read_csv,
 }
 
