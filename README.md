@@ -3,6 +3,9 @@
 > *"I am Zarathustra the godless — I cook every chance in my pot. And only when it has been thoroughly cooked do I welcome it as my food."*
 > — Gathas, Yasna 43 (attrib. Zarathustra / Zoroaster, c. 1500–1000 BCE)
 
+> *"Iron sharpeneth iron; so a man sharpeneth the countenance of his friend."*
+> — Proverbs 27:17
+
 The project takes its name from the ancient Iranian prophet Zarathustra — Zoroaster in Greek — who articulated the first great dualist cosmology: Ahura Mazda, the Wise Lord of light and truth, in eternal struggle against Angra Mainyu, the destructive spirit of darkness and deception. From that primal opposition all creation emerges and all meaning is made.
 
 Here the duality is literal: a **generator** and a **critic**, forever opposed, each made stronger by the other's resistance. The generator reaches toward the light of real data; the critic is the darkness that refuses to be fooled. Neither can exist without the other. What emerges from their adversarial tension is something neither could produce alone: synthetic I/O traces that are statistically indistinguishable from production reality.
