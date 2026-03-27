@@ -448,10 +448,23 @@ def train(cfg: Config) -> None:
 
             opt_G.zero_grad()
             if cfg.loss == "wgan-sn":
-                g_loss = -C(H_fake).mean()
+                g_score, feat_fake = C(H_fake, return_features=True)
+                g_loss = -g_score.mean()
             else:
                 real_labels = torch.ones(B, 1, device=device)
-                g_loss = bce(C(H_fake), real_labels)
+                g_score, feat_fake = C(H_fake, return_features=True)
+                g_loss = bce(g_score, real_labels)
+
+            # Feature matching (Salimans et al. 2016): match the mean of the
+            # critic's internal representation for real vs fake.  Penalising
+            # the L2 distance between batch-mean features forces the generator
+            # to cover all modes the critic can "see", fixing mode collapse.
+            if cfg.feature_matching_weight > 0:
+                with torch.no_grad():
+                    _, feat_real = C(H_real, return_features=True)
+                loss_fm = nn.functional.mse_loss(
+                    feat_fake.mean(0), feat_real.mean(0))
+                g_loss = g_loss + cfg.feature_matching_weight * loss_fm
 
             if latent_ae:
                 # Supervisor consistency: S(H_fake)[t] should predict H_fake[t+1].
@@ -624,6 +637,9 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    p.add_argument("--feature-matching-weight", type=float, default=1.0,
+                   help="Weight for critic feature matching loss (0 = off; "
+                        "fixes mode collapse by matching critic internal features)")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -660,8 +676,9 @@ def parse_args() -> Config:
     cfg.mmd_every           = args.mmd_every
     cfg.mmd_samples         = args.mmd_samples
     cfg.train_split         = args.train_split
-    cfg.moment_loss_weight      = args.moment_loss_weight
-    cfg.fft_loss_weight         = args.fft_loss_weight
+    cfg.moment_loss_weight          = args.moment_loss_weight
+    cfg.fft_loss_weight             = args.fft_loss_weight
+    cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs

@@ -43,6 +43,7 @@ class Config:
     # Auxiliary generator losses
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
+    feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
 
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
     # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).

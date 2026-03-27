@@ -237,12 +237,21 @@ class Critic(nn.Module):
             elif "bias" in name:
                 nn.init.zeros_(p)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score."""
+    def forward(self, x: torch.Tensor,
+                return_features: bool = False):
+        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score.
+
+        return_features: if True, also return the attention-pooled hidden state
+            (batch, hidden_size) before the final linear.  Used for feature
+            matching in the generator step to improve mode coverage.
+        """
         h, _ = self.lstm(x)                                    # (B, T, H)
         attn_w = torch.softmax(self.attn(h), dim=1)            # (B, T, 1)
         pooled = (attn_w * h).sum(dim=1)                       # (B, H)
-        return self.fc(pooled)                                  # (B, 1)
+        score = self.fc(pooled)                                 # (B, 1)
+        if return_features:
+            return score, pooled
+        return score
 
 
 # Keep old name as alias so existing code that imports Discriminator still works
