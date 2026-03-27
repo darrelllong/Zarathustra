@@ -1,5 +1,5 @@
 """
-Evaluation metrics for LLGAN: MMD², PRDC, and DMD-GEN.
+Evaluation metrics for LLGAN: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr.
 
 DMD-GEN (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292) is the first
 principled metric for temporal mode collapse in time series generative models.
@@ -58,7 +58,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from scipy.stats import wasserstein_distance
-from scipy.linalg import subspace_angles
+from scipy.linalg import subspace_angles, sqrtm
 
 # ---------------------------------------------------------------------------
 # DMD-GEN: Grassmannian Geometry + Dynamic Mode Decomposition metric
@@ -150,6 +150,92 @@ def dmdgen(
 
     # Mean Grassmannian distance across batches
     return float(np.mean(angle_distances))
+
+
+# ---------------------------------------------------------------------------
+# Context-FID  (TSGBench, VLDB 2024, arXiv 2309.03755)
+# ---------------------------------------------------------------------------
+
+def context_fid(
+    real_seqs: np.ndarray,
+    fake_seqs: np.ndarray,
+    E,
+    device,
+    batch_size: int = 256,
+) -> float:
+    """
+    Fréchet distance in the trained Encoder's latent space.
+
+    Uses the checkpoint's Encoder (trained on real data) as a fixed feature
+    extractor — no separate model to train.  More sensitive to temporal
+    structure than MMD² because the LSTM Encoder captures sequential context
+    before projecting to a flat embedding.
+
+    real_seqs / fake_seqs : (N, T, d) numpy arrays.
+    E : trained Encoder module (from checkpoint), frozen.
+
+    Returns a scalar ≥ 0; lower = closer temporal structure.
+    Typical ranges (from TSGBench): < 10 good, < 50 acceptable, > 100 poor.
+    """
+    E.eval()
+
+    def _encode(seqs: np.ndarray) -> np.ndarray:
+        out = []
+        for i in range(0, len(seqs), batch_size):
+            batch = torch.tensor(seqs[i:i+batch_size], dtype=torch.float32,
+                                 device=device)
+            with torch.no_grad():
+                h = E(batch)               # (B, T, latent_dim)
+            out.append(h.mean(dim=1).cpu().numpy())  # mean-pool over time
+        return np.concatenate(out, axis=0)   # (N, latent_dim)
+
+    r_enc = _encode(real_seqs)
+    f_enc = _encode(fake_seqs)
+
+    mu_r, mu_f = r_enc.mean(0), f_enc.mean(0)
+    # Regularise covariance matrices to avoid numerical issues with small samples
+    sigma_r = np.cov(r_enc, rowvar=False) + np.eye(r_enc.shape[1]) * 1e-6
+    sigma_f = np.cov(f_enc, rowvar=False) + np.eye(f_enc.shape[1]) * 1e-6
+
+    diff  = mu_r - mu_f
+    covmean = sqrtm(sigma_r @ sigma_f)
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+
+    fid = float(diff @ diff + np.trace(sigma_r + sigma_f - 2.0 * covmean))
+    return fid
+
+
+# ---------------------------------------------------------------------------
+# Autocorrelation score  (TSGBench, VLDB 2024)
+# ---------------------------------------------------------------------------
+
+def autocorr_score(
+    real_seqs: np.ndarray,
+    fake_seqs: np.ndarray,
+    max_lag: int = 5,
+) -> float:
+    """
+    Average absolute difference in per-feature autocorrelation at lags 1..max_lag.
+
+    Directly measures whether the generated sequences reproduce the temporal
+    dependencies (burst periodicity, diurnal patterns) of real data.
+
+    real_seqs / fake_seqs : (N, T, d) numpy arrays.
+    Returns a scalar ≥ 0; lower = better temporal correlation matching.
+    """
+    def _acf(X: np.ndarray, lag: int) -> np.ndarray:
+        # X: (N, T, d)
+        X_c = X - X.mean(axis=1, keepdims=True)         # centre over time
+        c0 = (X_c ** 2).mean(axis=1)                    # (N, d) variance
+        cl = (X_c[:, :X.shape[1]-lag, :] *
+              X_c[:, lag:, :]).mean(axis=1)              # (N, d) lag-cov
+        return (cl / (c0 + 1e-8)).mean(axis=0)          # (d,) avg over samples
+
+    total = 0.0
+    for lag in range(1, max_lag + 1):
+        total += np.abs(_acf(real_seqs, lag) - _acf(fake_seqs, lag)).mean()
+    return float(total / max_lag)
 
 
 # prdc ships compute_prdc; fall back to a manual nearest-neighbour impl if absent
@@ -263,6 +349,20 @@ def _sample_fake(ckpt, n_samples: int, device) -> np.ndarray:
     return fake.cpu().numpy().reshape(n_samples, -1)
 
 
+def _load_encoder(ckpt, device):
+    """Load the trained Encoder from a latent-AE checkpoint, or None."""
+    if "E" not in ckpt:
+        return None
+    from model import Encoder
+    cfg = ckpt["config"]
+    prep = ckpt["prep"]
+    latent_dim = getattr(cfg, "latent_dim", 0)
+    E = Encoder(prep.num_cols, cfg.hidden_size, latent_dim).to(device)
+    E.load_state_dict(ckpt["E"])
+    E.eval()
+    return E
+
+
 def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int) -> np.ndarray:
     import random
     sys.path.insert(0, ".")
@@ -313,9 +413,18 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     mmd  = mmd2_numpy(real_flat, fake_flat)
     prdc = compute_prdc_metrics(real_flat, fake_flat, k=k)
 
-    # DMD-GEN: temporal dynamics distance on Grassmann manifold
+    # Temporal structure metrics
     dmd_score = dmdgen(real_seqs, fake_seqs, r=4, n_batches=20,
                        batch_size=min(64, len(real_seqs) // 2))
+    ac_score = autocorr_score(real_seqs, fake_seqs, max_lag=5)
+
+    # Context-FID: Fréchet distance in the Encoder's latent space
+    E = _load_encoder(ckpt, device)
+    cfid = None
+    if E is not None:
+        real_t = torch.tensor(real_seqs, dtype=torch.float32)
+        fake_t = torch.tensor(fake_seqs, dtype=torch.float32)
+        cfid = context_fid(real_seqs, fake_seqs, E, device)
 
     print(f"\n{'─'*40}")
     print(f"  MMD²         : {mmd:.5f}")
@@ -324,6 +433,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     print(f"  density      : {prdc['density']:.4f}")
     print(f"  coverage     : {prdc['coverage']:.4f}")
     print(f"  DMD-GEN      : {dmd_score:.4f}  (temporal dynamics; 0=perfect, >0.3=poor)")
+    print(f"  AutoCorr     : {ac_score:.4f}  (lag-1..5 ACF diff; 0=perfect)")
+    if cfid is not None:
+        print(f"  Context-FID  : {cfid:.2f}  (Fréchet in encoder latent space; <10 good)")
     print(f"{'─'*40}")
 
     if baseline_path:
@@ -338,10 +450,16 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
         b_prdc = compute_prdc_metrics(b_real_flat, b_fake_flat, k=k)
         b_dmd  = dmdgen(b_seqs_real, b_seqs_fake, r=4, n_batches=20,
                         batch_size=min(64, len(b_seqs_real) // 2))
+        b_ac   = autocorr_score(b_seqs_real, b_seqs_fake, max_lag=5)
+        b_E    = _load_encoder(b_ckpt, device)
+        b_cfid = context_fid(b_seqs_real, b_seqs_fake, b_E, device) if b_E else None
         print(f"  MMD²         : {b_mmd:.5f}  (Δ {mmd - b_mmd:+.5f})")
         print(f"  β-recall     : {b_prdc['recall']:.4f}  (Δ {prdc['recall'] - b_prdc['recall']:+.4f})")
         print(f"  α-precision  : {b_prdc['precision']:.4f}  (Δ {prdc['precision'] - b_prdc['precision']:+.4f})")
         print(f"  DMD-GEN      : {b_dmd:.4f}  (Δ {dmd_score - b_dmd:+.4f})")
+        print(f"  AutoCorr     : {b_ac:.4f}  (Δ {ac_score - b_ac:+.4f})")
+        if cfid is not None and b_cfid is not None:
+            print(f"  Context-FID  : {b_cfid:.2f}  (Δ {cfid - b_cfid:+.2f})")
 
 
 def parse_args():
