@@ -32,10 +32,11 @@ Items marked ✓ are done and in the repo.
 - ✓ **Fourier spectral auxiliary loss** (`train.py`, `--fft-loss-weight`)
 - ✓ **Moment matching loss L_V** (`train.py`, `--moment-loss-weight`)
 
-- [ ] **Add coverage (β-recall) and α-precision metrics** to evaluation
-  MMD² alone cannot detect mode collapse. β-recall < 0.3 means the generator covers
-  only a slice of the real distribution. Add PRDC metrics (via `prdc` package or
-  nearest-neighbor) and report every `mmd_every` epochs.
+- ✓ **Add coverage (β-recall) and α-precision metrics** to evaluation (`eval.py`)
+  MMD² alone cannot detect mode collapse. Implemented full PRDC evaluation in `eval.py`
+  (uses `prdc` package with numpy fallback). v7 eval revealed β-recall=0.143 (severe
+  mode collapse) despite MMD²=0.013 — supervisor_loss_weight=10.0 constrained G to a
+  narrow temporal pattern. Fix: v8 uses supervisor_loss_weight=1.0, noise_dim=32.
 
 - ✓ **Early stopping on best combined metric** (`train.py`)
   After 50% of training epochs, save the checkpoint with best
