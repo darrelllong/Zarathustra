@@ -69,13 +69,12 @@ Items marked ✓ are done and in the repo.
   Train a fixed LSTM encoder on real data; embed real and generated windows; compute
   Fréchet distance in that latent space. More sensitive to temporal structure than MMD².
 
-- [ ] **Implement latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)**
-  The single highest-leverage architectural upgrade:
-  1. GRU encoder `e` + recovery `r`: compress 5 features → ~3-dim latent space
-  2. GRU supervisor `s`: predicts `H_t` from `H_{t-2}` (two-step lookahead)
-  3. Loss-function autoencoder `ê`: embedding-space moment matching `L_TS`
-  Move generator to latent space. Four-phase curriculum training.
-  SeriesGAN: **34% discriminative improvement** over TimeGAN with this.
+- ✓ **Implement latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)**
+  Three-phase curriculum: (1) AE pretrain E+R, (2) supervisor pretrain S,
+  (3) joint GAN in latent space with supervisor consistency loss.
+  Generator outputs latents [0,1]; Recovery decodes to features [-1,1].
+  Supervisor loss: MSE(G(z)[:,1:,:], S(G(z))[:,:-1,:]) — temporal coherence.
+  SeriesGAN: **34% discriminative improvement** expected. Running as v6.
 
 - [ ] **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
   Second lightweight critic on raw decoded output. Latent critic = stable early gradients;
