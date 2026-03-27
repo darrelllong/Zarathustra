@@ -234,6 +234,8 @@ def train(cfg: Config) -> None:
     ckpt_dir = Path(cfg.checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
+    best_mmd = float("inf")   # track best MMD² for best.pt
+
     # Resume
     start_epoch = 0
     latest = sorted(ckpt_dir.glob("epoch_*.pt"))
@@ -341,6 +343,21 @@ def train(cfg: Config) -> None:
             mmd_val = evaluate_mmd(G, val_tensor, cfg.mmd_samples,
                                    cfg.timestep, device)
             log += f"  MMD²={mmd_val:.5f}"
+            # Save best.pt whenever MMD² improves — captures the best model
+            # regardless of where checkpoint_every lands.
+            if mmd_val < best_mmd:
+                best_mmd = mmd_val
+                torch.save({
+                    "epoch": epoch,
+                    "G": G.state_dict(),
+                    "C": C.state_dict(),
+                    "opt_G": opt_G.state_dict(),
+                    "opt_C": opt_C.state_dict(),
+                    "prep": prep,
+                    "config": cfg,
+                    "mmd": best_mmd,
+                }, ckpt_dir / "best.pt")
+                log += "  ★"
             G.train()
 
         print(log, flush=True)
