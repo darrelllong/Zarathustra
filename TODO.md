@@ -104,21 +104,18 @@ Items marked ✓ are done and in the repo.
 
 ### Quick wins (< 1 day each)
 
-- [ ] **FIDE frequency inflation in FFT loss** (`train.py`) — NeurIPS 2024
-  Upweight high-frequency bins in the existing FFT loss to prevent rare/extreme
-  I/O events (burst opcodes, large obj_size) from being washed out.
-  `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. ~10 lines.
+- ✓ **FIDE frequency inflation in FFT loss** (`train.py`) — NeurIPS 2024
+  `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. Added `--fide-alpha`
+  (default 1.0). Upweights high-amplitude bins so rare I/O events are not averaged away.
 
 - [ ] **Adaptive Gradient Penalty (AGP)** (`train.py`) — MDPI Math 2025
   Replace fixed `gp_lambda=10` with a PI controller that adjusts λ dynamically
   based on `‖∇D‖ − 1`. Removes a fragile hyperparameter.
   `λ_{t+1} = λ_t + Kp*(‖∇D‖ − 1) + Ki*Σ(‖∇D‖ − 1)`. ~20 lines.
 
-- [ ] **R2 regularization on fake samples** (`train.py`) — R3GAN, NeurIPS 2024
-  Already have R1 via WGAN-GP (penalty on interpolated points). Add R2:
-  zero-centered gradient penalty on fake samples.
-  `L_R2 = λ₂ * E[‖∇_x̃ D(x̃)‖²]`. Improves mode coverage with convergence
-  guarantees R1 alone can't provide. ~5 lines.
+- ✓ **R2 regularization on fake samples** (`train.py`) — R3GAN, NeurIPS 2024
+  Added `--r2-lambda` (default 0; enable for v11 ablation). Zero-centered GP on fake
+  samples. Complements WGAN-GP's interpolated-point penalty.
 
 ### Medium-term (1–2 days each)
 
@@ -152,10 +149,10 @@ Items marked ✓ are done and in the repo.
   encoder and decoder share a VAE-style latent space enforced by adversarial loss.
   Priority: HIGH — directly addresses our latent space quality issues.
 
-- [ ] **2-step supervisor (SeriesGAN variant)** (`model.py`, `train.py`) — BigData 2024
-  Supervisor predicts `h_t` from `h_{t-2}` instead of `h_{t-1}`. Forces longer
-  temporal context capture. Expected: −34% discriminative score vs 1-step supervisor.
-  DMD-GEN score 0.739 on v9 suggests temporal dynamics are wrong — this is a direct fix.
+- ✓ **2-step supervisor** (`train.py`) — SeriesGAN, BigData 2024
+  Added `--supervisor-steps 1|2` (default 1). 2-step: S(h_t) predicts h_{t+2}.
+  Forces longer temporal context. DMD-GEN=0.739 on v9 is the main motivation.
+  Use `--supervisor-steps 2` in v11 run.
 
 - [ ] **TIMED-style masked attention in critic** (`model.py`) — arXiv 2509.19638
   Diffusion + autoregressive supervisor + Wasserstein critic with masked self-attention.
