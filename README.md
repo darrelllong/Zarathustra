@@ -49,14 +49,101 @@ Rather than training on a single trace file, Zarathustra samples a random subset
 
 ### Trace corpus
 
-Training data comes from the [libCacheSim cache-datasets](https://github.com/1a1a11a/libCacheSim) corpus in `oracleGeneral` binary format, covering:
-
-- **Tencent Block** (2020): ~191 volumes, 217-hour traces, mixed 512B–32KB requests
-- **Alibaba Block** (2020): ~238 volumes, 744-hour traces, 4KB-aligned block I/O
+Training data comes from the [libCacheSim cache-datasets](https://github.com/1a1a11a/libCacheSim) corpus in `oracleGeneral` binary format, hosted in a public AWS S3 bucket.  See [**Downloading the traces**](#downloading-the-traces) below for instructions.
 
 ### Evaluation
 
 Quality is tracked during training using **Maximum Mean Discrepancy (MMD²)** against a held-out validation set. Lower MMD² indicates the generated distribution is closer to real. The target is statistical indistinguishability — MMD² near zero across all marginal and joint distributions of the trace fields.
+
+## Downloading the traces
+
+The training data is part of the public **libCacheSim cache-dataset** corpus, maintained by Juncheng Yang et al. and hosted in a public AWS S3 bucket.  No account or credentials are required.
+
+| Dataset | Period | Volumes | Size (oracleGeneral) | Character |
+|---------|--------|---------|----------------------|-----------|
+| **Tencent Block 2020** | 9 days (217 h) | ~4,995 | ~152 GB | 512B–32KB, 83–94% reads |
+| **Alibaba Block 2020** | 31 days (744 h) | ~1,001 | ~93 GB | 4KB-aligned, mixed read ratio |
+
+Each volume is a separate `.oracleGeneral.zst` file (zstd-compressed 24-byte binary records).  Volumes are bucketed by the number of unique objects into subdirectories `1K/`, `10K/`, `100K/`, `1M/`.
+
+### Quick start (AWS CLI)
+
+```bash
+# Install AWS CLI if needed:  brew install awscli  or  pip install awscli
+
+# Tencent Block 2020 — all volumes (~152 GB)
+aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/ \
+    ./traces/2020_tencentBlock/ --no-sign-request
+
+# Alibaba Block 2020 — all volumes (~93 GB)
+aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/ \
+    ./traces/2020_alibabaBlock/ --no-sign-request
+```
+
+If you only want a manageable sample to get started, download one size bucket:
+
+```bash
+# ~10–20 GB subset: volumes with 100K–1M unique objects
+aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/ \
+    ./traces/2020_tencentBlock/ --no-sign-request
+
+aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1M/ \
+    ./traces/2020_alibabaBlock/ --no-sign-request
+```
+
+### Alternative: single concatenated files
+
+The full corpora are also available as single pre-concatenated files (useful for quick experiments but bypass the multi-file streaming training mode):
+
+```bash
+# Single-file versions (HTTPS, no AWS CLI needed)
+wget https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/other/tencent_block.oracleGeneral.zst
+wget https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/other/alibaba_block2020.oracleGeneral.zst
+```
+
+### Browsing the full file list
+
+A TSV manifest of all available files and their URLs is at:
+
+```
+https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/
+```
+
+The same data is available in alternative formats under separate prefixes:
+
+| S3 prefix | Format |
+|-----------|--------|
+| `s3://cache-datasets/cache_dataset_oracleGeneral/` | 24-byte binary (oracleGeneral); used by this project |
+| `s3://cache-datasets/cache_dataset_lcs/` | libCacheSim `.lcs.zst` |
+| `s3://cache-datasets/cache_dataset_txt/` | plain-text CSV |
+| `s3://cache-datasets/cache_dataset_parquet/` | Parquet |
+
+### Reading oracleGeneral files
+
+The `oracleGeneral` format is a fixed-width binary format defined by libCacheSim.  Each 24-byte record contains:
+
+```
+uint32  timestamp        (seconds)
+uint64  object_id
+uint32  object_size      (bytes)
+int32   next_access_vtime
+int16   op               (1=read, 2=write, …)
+int16   tenant_id
+```
+
+Zarathustra's `dataset.py` reads this format directly (format flag `--fmt oracle_general`); no external tools are needed.  For other analysis the [libCacheSim](https://github.com/1a1a11a/libCacheSim) C library and Python bindings provide a full reader.
+
+### Citation
+
+If you use these traces, please cite the libCacheSim paper:
+
+> Juncheng Yang, Yao Yue, and K.V. Rashmi.  "A large-scale analysis of hundreds of in-memory key-value cache clusters at Twitter."  *ACM Transactions on Storage*, 2021.
+
+and the cache-dataset collection paper:
+
+> Juncheng Yang, Ziyue Qiu, Yazhuo Zhang, Yao Yue, and K.V. Rashmi.  "FIFO queues are all you need for cache eviction."  *SOSP 2023*.
+
+---
 
 ## Usage
 
@@ -111,7 +198,8 @@ Zarathustra/
 │   ├── config.py       # Hyperparameter dataclass
 │   ├── dataset.py      # Trace loading, preprocessing, sliding-window dataset
 │   ├── model.py        # Generator and Critic (LSTM + spectral norm)
-│   ├── mmd.py          # MMD² evaluation metric
+│   ├── mmd.py          # MMD² training-time evaluation
+│   ├── eval.py         # Full evaluation: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr
 │   ├── train.py        # Training loop (single-file and multi-file modes)
 │   └── generate.py     # Inference: checkpoint → synthetic CSV
 ├── pubs/               # Reference papers
