@@ -467,11 +467,10 @@ def train(cfg: Config) -> None:
                             create_graph=True)[0]           # (B, T, latent_dim)
                         gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
                         c_loss = c_loss + cfg.gp_lambda * gp
-
-                # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
-                # fake samples. Complements WGAN-GP's 1-centered interpolated-
-                # point penalty — together they provide full convergence guarantees.
-                if cfg.r2_lambda > 0 and cfg.loss in ("wgan-sn", "wgan-gp"):
+                    # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                    # fake samples. Complements WGAN-GP's 1-centered interpolated-
+                    # point penalty — together they provide full convergence guarantees.
+                    if cfg.r2_lambda > 0:
                         H_fake_r2 = H_fake.clone().requires_grad_(True)
                         d_fake_r2 = C(H_fake_r2)
                         grads_r2 = torch.autograd.grad(

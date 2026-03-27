@@ -172,6 +172,27 @@ Items marked ✓ are done and in the repo.
 
 ### Evaluation / diagnostics
 
+- [ ] **File-to-file fidelity tool** (`compare.py`) — NEW
+  Given one real log file and one synthetic log file, compute the full metric
+  suite (MMD², PRDC, DMD-GEN, AutoCorr, Context-FID) and report a human-readable
+  summary. Separate from eval.py (no checkpoint needed — takes two CSV/oracleGeneral
+  files directly). Use case: Prof. Amer runs compare.py on a trace pair to verify
+  generation quality without needing the training code.
+  Implementation: thin wrapper around eval.py metrics; `python compare.py real.csv synth.csv`.
+
+- [ ] **Generation drift / length stress test** (`generate.py`, `compare.py`)
+  Determine how long a synthetic stream can run before statistics diverge from real.
+  Method: generate one stream of length L, divide into chunks of length W, compute
+  rolling MMD² and AutoCorr per chunk vs real baseline.  Plot metric vs chunk index.
+  Expected failure modes: timestamp delta cumsum drift, obj_size distribution shift,
+  burst structure decay. Helps set a practical "max reliable stream length" bound.
+  Implementation: `python generate.py --n-streams 1 --n-events 100000` then rolling
+  eval on the output file.
+
+- ✓ **Context-FID + AutoCorr metrics** (`eval.py`) — TSGBench VLDB 2024
+  Fréchet distance in encoder latent space (Context-FID) + lag-1..5 ACF mismatch
+  (AutoCorr). v9/best.pt baselines: Context-FID=0.27, AutoCorr=0.049.
+
 - ✓ **DMD-GEN temporal dynamics metric** (`eval.py`) — NeurIPS 2025 (arXiv 2412.11292)
   Code not yet released — implemented from paper. Runs Dynamic Mode Decomposition
   on real vs generated batches, compares eigenvector subspaces via Grassmann
