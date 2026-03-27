@@ -141,6 +141,72 @@ Items marked ✓ are done and in the repo.
   hidden states. Cleaner than concatenation for conditioning on tenant_id,
   read_ratio, obj_size_bucket. Prerequisite for workload conditioning (#9 above).
 
+### From peer review literature sweep (2025)
+
+- [ ] **WaveStitch: chunk boundary-consistency objective** (`train.py`) — SIGMOD 2026 (arXiv 2503.06231)
+  WaveStitch treats long-horizon generation as a continuity problem across
+  generated segments, not independent windows. The key idea is not diffusion
+  but chunk stitching under explicit conditioning.
+  For Zarathustra: hidden-state carry-over in generate.py is a start, but
+  training has no direct pressure for chunk-to-chunk continuity. Add a boundary
+  loss: penalise distribution mismatch between the last K steps of window t and
+  the first K steps of window t+1. Especially valuable once hierarchical
+  generation is added.
+
+- [ ] **PCF-GAN: path-space critic** (`model.py`, `train.py`) — NeurIPS 2023
+  Defines discrimination in path space (characteristic function of measures on
+  path space) — much closer to what matters for workload traces than LSTM
+  hidden-state pooling. Even as a metric (not a full critic replacement), a
+  PCF-style evaluation is likely more sensitive to sequential law and locality
+  dynamics than MMD².
+  For Zarathustra: explore as a critic replacement after fixing current bugs,
+  or at minimum add as a path-space evaluation metric alongside DMD-GEN.
+
+- [ ] **High-Rank Path Development critic** (`model.py`) — NeurIPS 2024
+  Extends PCF-GAN to avoid rank collapse in path features. Directly relevant
+  when the model matches marginals but misses temporal filtration structure
+  (exactly the DMD-GEN failure mode we see). If pursuing a critic redesign,
+  path-development methods are more promising than image or diffusion machinery.
+  Prerequisite: PCF-GAN exploration above.
+
+- [ ] **Constrained TS Generation: inference-time workload control** (`generate.py`) — NeurIPS 2023
+  Inference-time guidance under explicit numeric constraints — no retraining.
+  Target for Zarathustra: one model, multiple workload profiles. Controllable
+  knobs: read ratio, request intensity, jump-size profile, repeat rate, tenant
+  mix, working-set proxy.
+  Prerequisite: workload conditioning (z_global descriptors) must be in place
+  first so there is something to guide.
+
+- [ ] **Retrieval-augmented conditioning for rare regimes** (`train.py`, `generate.py`) — NeurIPS 2024
+  Retrieval-Augmented Diffusion shows retrieval is valuable for rare modes that
+  a generative model averages away. For Zarathustra: at train or generation time,
+  retrieve a small bank of real chunks or chunk-level descriptors with similar
+  burst/locality statistics and use them as context (e.g., FiLM modulation or
+  prefix hidden state). Especially promising for high-burst or hotspot-heavy
+  trace phases that are statistically rare but operationally critical.
+
+- [ ] **SDformer: discrete tokenization for categorical columns** (`model.py`, `dataset.py`) — NeurIPS 2024
+  Treats mixed discrete/continuous time series natively rather than forcing
+  everything through a continuous regression head. For Zarathustra: tokenize
+  opcode, tenant_id, and potentially bucketized locality states; use continuous
+  heads only for ts_delta and obj_size. More principled than expanding the
+  shared tanh output head indefinitely, and a better path than image conversion.
+
+- [ ] **Two-timescale GDA: principled G/D learning rate schedule** (`train.py`) — JMLR 2025
+  Two-Timescale Gradient Descent Ascent (JMLR 2025) shows that principled
+  timescale separation between G and D is needed for convergence guarantees in
+  nonconvex minimax. Currently we use n_critic steps with equal LRs — not a
+  principled schedule. Make the G/D adaptation rate ratio a first-class
+  hyperparameter with theory-backed defaults. Likely pays off more than adding
+  another scalar regularizer.
+
+- [ ] **Scoring rule auxiliary objective** (`train.py`, `eval.py`) — JMLR 2024
+  Proper sequential scoring rules (JMLR 2024) suggest training or ranking with
+  a sequence-aware objective that is neither adversarial nor MMD-only. Even if
+  the final model stays GAN-based, a scoring-rule early-stopping criterion is
+  more principled than MMD² alone and harder to game than a co-trained metric.
+  Complementary to the multi-metric checkpoint selection item above.
+
 ### Architecture improvements (from second survey)
 
 - [ ] **AVATAR architecture: AAE + autoregressive supervisor** (`model.py`, `train.py`) — SDM 2025 (arXiv 2501.01649)
@@ -170,7 +236,32 @@ Items marked ✓ are done and in the repo.
   conditioned on coarse). Aligns with our hierarchical generator TODO. Stage-Diff
   uses diffusion; we could use GAN with LSTM at each stage.
 
-### Evaluation / diagnostics
+### Evaluation / diagnostics (from peer review)
+
+- [ ] **External Context-FID encoder** (`eval.py`) — peer review §9
+  Current Context-FID uses the checkpoint's own trained encoder → co-adapted
+  with the generator, partially self-serving for model selection.
+  Fix: train a separate LSTM encoder on real data only (no recovery, no GAN),
+  freeze it, and use it as the FID backbone. Keep the co-trained version as a
+  diagnostic but never use it as the primary checkpoint selector.
+  Implementation: small standalone training script; save encoder-only .pt.
+
+- [ ] **Multi-metric checkpoint selection** (`train.py`) — peer review §10
+  `best.pt` currently saves on MMD² alone — misses mode collapse (recall) and
+  temporal structure (DMD-GEN). Switch to a composite rank score:
+  priority order: recall/coverage > DMD-GEN > Context-FID > MMD².
+  Use weighted z-score or rank aggregation, not a hand-tuned linear formula.
+  Prerequisite: DMD-GEN and PRDC must run every mmd_every epochs (currently
+  only in full eval.py pass).
+
+- [ ] **Locality-specific losses** (`train.py`, `eval.py`) — peer review §7
+  The model has no direct pressure on locality structure — only generic moments
+  and FFT. Add explicit decoded-sequence penalties:
+  1. Histogram-matching loss on signed obj_id-delta distribution (KL or L1
+     between real and fake delta histograms over each batch).
+  2. Repeat-access rate: fraction of steps where signed delta ≈ 0.
+  If choosing one to start: histogram-matching on signed deltas + repeat rate.
+  These are the metrics most directly tied to cache-hit fidelity at replay time.
 
 - [ ] **File-to-file fidelity tool** (`compare.py`) — NEW
   Given one real log file and one synthetic log file, compute the full metric
@@ -263,3 +354,11 @@ Items marked ✓ are done and in the repo.
 | SMOGAN, 2025 | GAN + MMD for imbalanced regression; relevant for heavy-tailed obj_size |
 | Stage-Diff, 2025 | Staged diffusion for long sequences; validates hierarchical design |
 | TIMED, 2025 | Diffusion + autoregressive supervisor + masked Wasserstein critic |
+| WaveStitch, SIGMOD 2026 | Chunk-stitching under conditioning; boundary-consistency for long-horizon generation |
+| PCF-GAN, NeurIPS 2023 | Path-space critic via characteristic function; stronger than LSTM pooling for sequential data |
+| High-Rank Path Dev., NeurIPS 2024 | Extends PCF-GAN; avoids rank collapse, catches temporal filtration failures |
+| Constrained TS Gen., NeurIPS 2023 | Inference-time numeric guidance; one model, multiple workload profiles |
+| Retrieval-Augmented Diffusion, NeurIPS 2024 | Retrieval for rare modes; useful for burst/hotspot trace phases |
+| SDformer, NeurIPS 2024 | Discrete tokenization for categorical data; mixed discrete/continuous outputs |
+| Two-Timescale GDA, JMLR 2025 | Principled G/D learning rate separation; theory-backed convergence for nonconvex minimax |
+| Scoring Rules, JMLR 2024 | Proper sequential scoring objectives; complement to adversarial training for checkpoint selection |
