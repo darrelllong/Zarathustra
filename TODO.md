@@ -144,6 +144,35 @@ Items marked ✓ are done and in the repo.
   hidden states. Cleaner than concatenation for conditioning on tenant_id,
   read_ratio, obj_size_bucket. Prerequisite for workload conditioning (#9 above).
 
+### Architecture improvements (from second survey)
+
+- [ ] **AVATAR architecture: AAE + autoregressive supervisor** (`model.py`, `train.py`) — SDM 2025 (arXiv 2501.01649)
+  Adversarial autoencoder (adds discriminator on encoder posterior q(z|x) vs prior p(z))
+  + autoregressive supervisor. Cleaner alternative to TimeGAN: no separate Recovery net;
+  encoder and decoder share a VAE-style latent space enforced by adversarial loss.
+  Priority: HIGH — directly addresses our latent space quality issues.
+
+- [ ] **2-step supervisor (SeriesGAN variant)** (`model.py`, `train.py`) — BigData 2024
+  Supervisor predicts `h_t` from `h_{t-2}` instead of `h_{t-1}`. Forces longer
+  temporal context capture. Expected: −34% discriminative score vs 1-step supervisor.
+  DMD-GEN score 0.739 on v9 suggests temporal dynamics are wrong — this is a direct fix.
+
+- [ ] **TIMED-style masked attention in critic** (`model.py`) — arXiv 2509.19638
+  Diffusion + autoregressive supervisor + Wasserstein critic with masked self-attention.
+  The masked attention prevents critic from seeing future tokens — avoids lookahead bias.
+  Adapt masked attention to our LSTM critic attention pooling layer.
+
+- [ ] **Sig-WGAN: path signature as discriminator feature** (`model.py`, `train.py`) — Math Finance (arXiv 2006.05421)
+  Replace LSTM critic with signature-based Wasserstein distance. Path signatures
+  capture all iterated integrals of a time series — strong theoretical convergence
+  guarantees for sequential data, stronger than WGAN-GP for recurrent generators.
+  Medium complexity: `signatory` library provides GPU signature computation.
+
+- [ ] **Stage-Diff: staged generation for workload phases** (`model.py`) — arXiv 2508.21330
+  Split generation into coarse stage (regime/burst envelope) + fine stage (per-event
+  conditioned on coarse). Aligns with our hierarchical generator TODO. Stage-Diff
+  uses diffusion; we could use GAN with LSTM at each stage.
+
 ### Evaluation / diagnostics
 
 - ✓ **DMD-GEN temporal dynamics metric** (`eval.py`) — NeurIPS 2025 (arXiv 2412.11292)
@@ -151,6 +180,14 @@ Items marked ✓ are done and in the repo.
   on real vs generated batches, compares eigenvector subspaces via Grassmann
   principal angles + 1-Wasserstein OT. Catches wrong autocorrelation/burst
   structure that MMD² misses. `dmdgen()` in eval.py.
+  v9/best.pt score: 0.739 (poor temporal dynamics despite MMD²=0.010, recall=0.47).
+
+- [ ] **TSGBench evaluation suite** (`eval.py`) — VLDB 2024 (arXiv 2309.03755)
+  12-metric benchmark (best paper nominee): discriminative score, predictive score,
+  Context-FID, autocorrelation score, cross-correlation score, distribution metrics.
+  Adopt at minimum: Context-FID (LSTM encoder → Fréchet) + autocorrelation score.
+  High priority — our current eval is MMD²+PRDC+DMD-GEN; TSGBench adds temporal
+  fidelity metrics directly relevant to I/O workload replay accuracy.
 
 - [ ] **Simulation-based evaluation** — JSSPP 2024 empirical study
   Run synthetic traces through a storage/cache simulator; compare queue depths,
@@ -200,3 +237,9 @@ Items marked ✓ are done and in the repo.
 | Paul et al., ICS 2022 | HPC trace generation predecessor |
 | MEMSYS 2023 | Memory workload synthesis predecessor |
 | Geminio, JSSPP 2024 | Job trace generation comparison |
+| AVATAR, SDM 2025 | AAE + autoregressive supervisor; cleaner than TimeGAN architecture |
+| TSGBench, VLDB 2024 | 12-metric evaluation benchmark; best paper nominee |
+| Sig-WGAN, 2021 | Path signature as Wasserstein discriminator; strong convergence guarantees |
+| SMOGAN, 2025 | GAN + MMD for imbalanced regression; relevant for heavy-tailed obj_size |
+| Stage-Diff, 2025 | Staged diffusion for long sequences; validates hierarchical design |
+| TIMED, 2025 | Diffusion + autoregressive supervisor + masked Wasserstein critic |
