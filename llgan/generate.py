@@ -4,12 +4,13 @@ Generate synthetic I/O traces from a trained LLGAN checkpoint.
 Usage
 -----
     python generate.py \
-        --checkpoint checkpoints/msr/final.pt \
+        --checkpoint checkpoints/tencent_v4/best.pt \
         --n 1000000 \
-        --output synthetic_msr.csv
+        --output synthetic_tencent.csv
 
-    # Generate enough windows to fill N records
-    python generate.py --checkpoint checkpoints/msr/final.pt --n 1000000
+    # Generate enough windows to fill N records, 4 parallel trace streams
+    python generate.py --checkpoint checkpoints/tencent_v4/best.pt \
+        --n 1000000 --n-streams 4
 """
 
 import argparse
@@ -25,7 +26,7 @@ def generate(
     checkpoint_path: str,
     n_records: int,
     output_path: str,
-    batch_size: int = 512,
+    n_streams: int = 1,
     device_str: str = "cuda",
     binarize_opcode: bool = True,
 ) -> None:
@@ -52,26 +53,36 @@ def generate(
             break
 
     timestep = cfg.timestep
-    n_windows = math.ceil(n_records / timestep)
-    all_windows = []
+    # Each stream generates ceil(n_records / n_streams) records
+    records_per_stream = math.ceil(n_records / n_streams)
+    windows_per_stream = math.ceil(records_per_stream / timestep)
+
+    all_records = []
 
     with torch.no_grad():
-        for start in range(0, n_windows, batch_size):
-            n = min(batch_size, n_windows - start)
-            z = torch.randn(n, timestep, cfg.noise_dim, device=device)
-            out = G(z)                          # (n, timestep, num_cols)
+        # Each stream is an independent long trace.
+        # z_global is fixed per stream (workload identity); LSTM hidden state
+        # is carried across windows so long-range burst structure is coherent.
+        z_global = torch.randn(n_streams, cfg.noise_dim, device=device)
+        hidden = None   # initialised from z_global on first window
+
+        for _ in range(windows_per_stream):
+            z_local = torch.randn(
+                n_streams, timestep, cfg.noise_dim, device=device
+            )
+            out, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
+            # Detach hidden to avoid accumulating the full computation graph
+            hidden = (hidden[0].detach(), hidden[1].detach())
 
             if binarize_opcode and opcode_col >= 0:
                 out[:, :, opcode_col] = (
                     (out[:, :, opcode_col] >= 0).float() * 2 - 1
                 )
 
-            all_windows.append(out.cpu().numpy())
+            # (n_streams, timestep, num_cols) → (n_streams * timestep, num_cols)
+            all_records.append(out.cpu().numpy().reshape(-1, prep.num_cols))
 
-    # Flatten windows → records
-    arr = np.concatenate(all_windows, axis=0)  # (n_windows, timestep, num_cols)
-    arr = arr.reshape(-1, prep.num_cols)[:n_records]
-
+    arr = np.concatenate(all_records, axis=0)[:n_records]
     df = prep.inverse_transform(arr)
     df.to_csv(output_path, index=False)
     print(f"Generated {len(df):,} records → {output_path}")
@@ -82,7 +93,8 @@ def parse_args():
     p.add_argument("--checkpoint", required=True, help="Path to .pt checkpoint")
     p.add_argument("--n", type=int, default=1_000_000, help="Number of records")
     p.add_argument("--output", default="generated.csv")
-    p.add_argument("--batch-size", type=int, default=512)
+    p.add_argument("--n-streams", type=int, default=1,
+                   help="Number of parallel independent trace streams to generate")
     p.add_argument("--device", default="cuda")
     p.add_argument("--no-binarize-opcode", action="store_true")
     return p.parse_args()
@@ -94,7 +106,7 @@ if __name__ == "__main__":
         args.checkpoint,
         args.n,
         args.output,
-        args.batch_size,
+        args.n_streams,
         args.device,
         not args.no_binarize_opcode,
     )

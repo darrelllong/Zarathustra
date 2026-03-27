@@ -63,8 +63,9 @@ def evaluate_mmd(
     real_flat = real.view(n_samples, -1)
 
     # Fake samples
-    z = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
-    fake = generator(z)
+    z_global = torch.randn(n_samples, generator.noise_dim, device=device)
+    z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
+    fake = generator(z_global, z_local)
     fake_flat = fake.view(n_samples, -1)
 
     return mmd(real_flat.cpu(), fake_flat.cpu())

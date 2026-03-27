@@ -281,8 +281,9 @@ def train(cfg: Config) -> None:
 
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
-                z = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-                fake_batch = G(z).detach()
+                z_g = torch.randn(B, cfg.noise_dim, device=device)
+                z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                fake_batch = G(z_g, z_l).detach()
 
                 opt_C.zero_grad()
                 if cfg.loss == "wgan-sn":
@@ -297,8 +298,9 @@ def train(cfg: Config) -> None:
                 c_losses.append(c_loss.item())
 
             # --- Generator step ---
-            z = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-            fake_batch = G(z)
+            z_g = torch.randn(B, cfg.noise_dim, device=device)
+            z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+            fake_batch = G(z_g, z_l)
 
             opt_G.zero_grad()
             if cfg.loss == "wgan-sn":
