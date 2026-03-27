@@ -25,6 +25,7 @@ import os
 import platform
 import random
 import time
+import warnings
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -428,5 +429,7 @@ def parse_args() -> Config:
 
 
 if __name__ == "__main__":
+    # MPS backend emits a benign buffer-resize warning on rfft; suppress it.
+    warnings.filterwarnings("ignore", message=".*resized since it had shape.*")
     cfg = parse_args()
     train(cfg)
