@@ -15,8 +15,9 @@ Storage system researchers and engineers need realistic workloads for benchmarki
 
 This project is inspired by the approach introduced in:
 
-> D. Haskins, *"Accurate Generation of I/O Workloads Using Generative Adversarial Networks,"*
-> IEEE MASCOTS 2024. ([PDF](pubs/Accurate_Generation_of_I_O_Workloads_Using_Generative_Adversarial_Networks.pdf))
+> H. Zhang, Z. Yang, Y. Xie, Y. Wu, J. Li, D. Feng, A. Wildani, and D. Long,
+> *"Accurate Generation of I/O Workloads Using Generative Adversarial Networks,"*
+> in *Proceedings of the 17th IEEE International Conference on Networking, Architecture, and Storage (NAS 2024)*, Guangzhou, China, Nov. 2024. ([PDF](pubs/Accurate_Generation_of_I_O_Workloads_Using_Generative_Adversarial_Networks.pdf))
 
 That paper established that LSTM-based GANs (LLGANs) can learn and reproduce the statistical properties of block I/O traces — inter-arrival times, request sizes, and opcode distributions — more faithfully than classical models. Zarathustra extends that foundation toward generalization: rather than fitting one model to one trace, the goal is a single model that captures the workload distribution across an entire corpus.
 
