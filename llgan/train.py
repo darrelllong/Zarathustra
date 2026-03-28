@@ -274,6 +274,24 @@ def train(cfg: Config) -> None:
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
+    # Cosine annealing: decay lr from initial → eta_min over cfg.epochs steps.
+    # In the second half of training the generator and critic are close to
+    # equilibrium — large gradient steps cause them to perpetually overshoot
+    # each other (GAN cycling oscillation).  Cosine annealing damps those steps
+    # smoothly without a hard schedule boundary.  EMA handles the weight-space
+    # noise; cosine annealing handles the training-dynamics noise.
+    # eta_min = lr * lr_cosine_decay (default 0.05 = 5% of initial LR).
+    # Set lr_cosine_decay=0 to disable (constant LR, backward-compatible).
+    if cfg.lr_cosine_decay > 0:
+        sched_G = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt_G, T_max=cfg.epochs, eta_min=cfg.lr_g * cfg.lr_cosine_decay
+        )
+        sched_C = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt_C, T_max=cfg.epochs, eta_min=cfg.lr_d * cfg.lr_cosine_decay
+        )
+    else:
+        sched_G = sched_C = None
+
     bce = nn.BCEWithLogitsLoss() if cfg.loss == "bce" else None
 
     # EMA (Exponential Moving Average) of generator weights.
@@ -317,6 +335,17 @@ def train(cfg: Config) -> None:
             ema_G_state = ckpt["G_ema"]
         else:
             ema_G_state = copy.deepcopy(G.state_dict())
+        # Restore scheduler state if present; otherwise fast-forward to the
+        # correct position so the LR matches start_epoch (handles old checkpoints
+        # that predate scheduler support without silently using the wrong LR).
+        if sched_G is not None:
+            if "sched_G" in ckpt:
+                sched_G.load_state_dict(ckpt["sched_G"])
+                sched_C.load_state_dict(ckpt["sched_C"])
+            else:
+                for _ in range(start_epoch):
+                    sched_G.step()
+                    sched_C.step()
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
@@ -710,11 +739,20 @@ def train(cfg: Config) -> None:
                 "prep": prep,
                 "config": cfg,
             }
+            if sched_G is not None:
+                ckpt_data["sched_G"] = sched_G.state_dict()
+                ckpt_data["sched_C"] = sched_C.state_dict()
             if latent_ae:
                 ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
                                   "S": S.state_dict()})
             torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
+
+        # Step cosine scheduler at end of epoch (after checkpoint) so the LR
+        # in the saved opt state matches the epoch that was just trained.
+        if sched_G is not None:
+            sched_G.step()
+            sched_C.step()
 
     final_path = ckpt_dir / "final.pt"
     final_data = {
@@ -795,6 +833,11 @@ def parse_args() -> Config:
                    help="EMA decay for generator weights (default 0.999). "
                         "EMA model is used for evaluation and generation; "
                         "smooths GAN oscillations. 0 = use live weights.")
+    p.add_argument("--lr-cosine-decay",        type=float, default=0.05,
+                   help="Cosine annealing: eta_min = lr * this factor over training "
+                        "(default 0.05 = decay to 5%% of initial LR). "
+                        "Damps GAN oscillations in the second half of training "
+                        "where G and C are near equilibrium. 0 = constant LR.")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -842,6 +885,7 @@ def parse_args() -> Config:
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip
     cfg.ema_decay                   = args.ema_decay
+    cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim

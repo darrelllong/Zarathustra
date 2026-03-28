@@ -22,13 +22,14 @@ class Config:
     n_critic: int = 3           # critic steps per generator step
     lr_g: float = 0.0001
     lr_d: float = 0.00005       # slower critic: two-timescale GDA (JMLR 2025)
+    lr_cosine_decay: float = 0.05  # cosine anneal eta_min = lr * this (0 = constant LR)
     grad_clip: float = 1.0      # gradient norm clip for G and C (0 = off)
     ema_decay: float = 0.999    # EMA decay for generator weights (0 = off / use live G)
     device: str = "cuda"        # falls back to mps/cpu if unavailable
 
     # Data — single file
     trace_path: str = ""
-    trace_format: str = "spc"   # spc | msr | k5cloud | systor | oracle_general | csv
+    trace_format: str = "spc"   # spc | msr | k5cloud | systor | oracle_general | lcs | csv
     max_records: int = 60_000   # max records in single-file mode
     train_split: float = 0.8
 
