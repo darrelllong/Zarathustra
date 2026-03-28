@@ -596,6 +596,23 @@ def train(cfg: Config) -> None:
                     loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
+            # Quantile matching (L_Q): penalise per-feature tail mismatch at
+            # p50/p90/p95/p99.  Moment loss (mean+std) is dominated by the
+            # zero-IAT mass (>50% of samples); the rare 6-second quiet periods
+            # contribute almost nothing to the gradient.  Quantile matching
+            # directly forces the generator to reproduce the tail — small
+            # differences at p95/p99 map directly to large burst-latency errors
+            # in replay benchmarks.
+            if cfg.quantile_loss_weight > 0:
+                q_levels = torch.tensor([0.5, 0.9, 0.95, 0.99], device=device)
+                fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
+                rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
+                with torch.no_grad():
+                    q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (4, d)
+                q_fake = torch.quantile(fd_flat, q_levels, dim=0)
+                loss_Q = nn.functional.mse_loss(q_fake, q_real)
+                g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
+
             g_loss.backward()
             if cfg.grad_clip > 0:
                 nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
@@ -757,6 +774,9 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    p.add_argument("--quantile-loss-weight", type=float, default=0.2,
+                   help="Weight for per-feature quantile matching at p50/90/95/99 (0 = off); "
+                        "directly fixes tail/burst IAT mismatch that moment loss misses")
     p.add_argument("--fide-alpha",         type=float, default=1.0,
                    help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
@@ -811,6 +831,7 @@ def parse_args() -> Config:
     cfg.train_split         = args.train_split
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
+    cfg.quantile_loss_weight        = args.quantile_loss_weight
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip

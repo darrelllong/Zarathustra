@@ -45,6 +45,7 @@ class Config:
 
     # Auxiliary generator losses
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
+    quantile_loss_weight: float = 0.2  # L_Q: per-feature quantile matching at p50/90/95/99 (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
