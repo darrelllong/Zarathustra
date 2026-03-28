@@ -41,7 +41,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 from config import Config
 from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
 from model import Generator, Critic, Encoder, Recovery, Supervisor
-from mmd import evaluate_mmd
+from mmd import evaluate_mmd, evaluate_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ def train(cfg: Config) -> None:
     ckpt_dir = Path(cfg.checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    best_mmd = float("inf")   # track best MMD² for best.pt
+    best_combined = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
 
     # Resume
     start_epoch = 0
@@ -587,14 +587,15 @@ def train(cfg: Config) -> None:
                f"{n_files_str}")
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
-            mmd_val = evaluate_mmd(G, val_tensor, cfg.mmd_samples,
-                                   cfg.timestep, device,
-                                   recovery=R if latent_ae else None)
-            log += f"  MMD²={mmd_val:.5f}"
-            # Save best.pt whenever MMD² improves — captures the best model
-            # regardless of where checkpoint_every lands.
-            if mmd_val < best_mmd:
-                best_mmd = mmd_val
+            mmd_val, recall_val, combined_val = evaluate_metrics(
+                G, val_tensor, cfg.mmd_samples, cfg.timestep, device,
+                recovery=R if latent_ae else None,
+            )
+            log += f"  MMD²={mmd_val:.5f}  recall={recall_val:.3f}  comb={combined_val:.5f}"
+            # Save best.pt on combined score (MMD² + 0.2*(1-recall)) to avoid
+            # saving high-MMD²/high-recall checkpoints over lower-MMD²/mode-collapse ones.
+            if combined_val < best_combined:
+                best_combined = combined_val
                 ckpt_data = {
                     "epoch": epoch,
                     "G": G.state_dict(),
@@ -603,7 +604,9 @@ def train(cfg: Config) -> None:
                     "opt_C": opt_C.state_dict(),
                     "prep": prep,
                     "config": cfg,
-                    "mmd": best_mmd,
+                    "mmd": mmd_val,
+                    "recall": recall_val,
+                    "combined": combined_val,
                 }
                 if latent_ae:
                     ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
