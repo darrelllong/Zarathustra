@@ -271,6 +271,27 @@ def train(cfg: Config) -> None:
     else:
         E = R = S = opt_AE = opt_S = opt_ER = None
 
+    # torch.compile: fuses CUDA kernels for ~20-40% speedup on NVIDIA hardware.
+    # Skipped on MPS/CPU (no benefit) and when create_graph gradients are needed
+    # (WGAN-GP / R1 / R2), because dynamo does not yet fully support
+    # higher-order differentiation through compiled LSTM graphs.
+    _can_compile = (device.type == "cuda"
+                    and cfg.compile
+                    and cfg.loss != "wgan-gp"
+                    and cfg.r1_lambda == 0.0
+                    and cfg.r2_lambda == 0.0)
+    if _can_compile:
+        try:
+            G = torch.compile(G)
+            C = torch.compile(C)
+            if latent_ae:
+                E = torch.compile(E)
+                R = torch.compile(R)
+                S = torch.compile(S)
+            print("[info] torch.compile: models compiled (CUDA).")
+        except Exception as exc:
+            print(f"[warn] torch.compile failed, running eager: {exc}")
+
     # Two-timescale gradient descent-ascent (JMLR 2025): the generator uses a
     # faster learning rate (lr_g > lr_d) while the critic uses a slower one.
     # This asymmetry gives the critic time to "catch up" to each generator
@@ -898,6 +919,9 @@ def parse_args() -> Config:
     p.add_argument("--timestep",         type=int,   default=12)
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--hidden-size",      type=int,   default=256)
+    p.add_argument("--compile",          action="store_true", default=False,
+                   help="torch.compile models for ~20-40%% CUDA speedup "
+                        "(CUDA only; incompatible with wgan-gp/r1/r2)")
     p.add_argument("--no-minibatch-std", action="store_true", default=False,
                    help="Disable minibatch std channel in critic (on by default)")
     p.add_argument("--lr-g",             type=float, default=0.0001)
@@ -979,6 +1003,7 @@ def parse_args() -> Config:
     cfg.timestep         = args.timestep
     cfg.noise_dim        = args.noise_dim
     cfg.hidden_size      = args.hidden_size
+    cfg.compile          = args.compile
     cfg.minibatch_std    = not args.no_minibatch_std
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
