@@ -25,6 +25,7 @@ Multi-file streaming (samples K files per epoch from a directory):
 """
 
 import argparse
+import copy
 import os
 import platform
 import random
@@ -275,6 +276,20 @@ def train(cfg: Config) -> None:
 
     bce = nn.BCEWithLogitsLoss() if cfg.loss == "bce" else None
 
+    # EMA (Exponential Moving Average) of generator weights.
+    # GANs oscillate: the generator finds a good point, the critic adapts and
+    # pushes it away, the generator moves again.  The EMA tracks the geometric
+    # centre of the generator's recent trajectory rather than its instantaneous
+    # position, which smooths out this cycling and consistently produces better
+    # samples than the live weights (StyleGAN2, Karras et al. 2020; DDPM,
+    # Ho et al. 2020; BigGAN, Brock et al. 2019 all use EMA for inference).
+    # We evaluate and checkpoint using ema_G, not G directly.
+    # Decay 0.999: with ~100 batches/epoch the effective window is ~1000 steps
+    # (~10 epochs), long enough to smooth oscillation but short enough to track
+    # genuine improvement.
+    ema_G_state = copy.deepcopy(G.state_dict())
+    ema_decay   = cfg.ema_decay
+
     ckpt_dir = Path(cfg.checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
@@ -297,6 +312,11 @@ def train(cfg: Config) -> None:
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
+        # Restore EMA state if available; otherwise seed from current G weights
+        if "G_ema" in ckpt:
+            ema_G_state = ckpt["G_ema"]
+        else:
+            ema_G_state = copy.deepcopy(G.state_dict())
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
@@ -582,6 +602,12 @@ def train(cfg: Config) -> None:
             opt_G.step()
             g_losses.append(g_loss.item())
 
+            # EMA update: blend live weights toward EMA state.
+            # Done in-place on the CPU-side state dict to avoid GPU memory overhead.
+            with torch.no_grad():
+                for k, v in G.state_dict().items():
+                    ema_G_state[k].mul_(ema_decay).add_(v.cpu(), alpha=1.0 - ema_decay)
+
             # --- Encoder + Recovery joint step (latent AE mode only) ---
             # Fine-tunes the autoencoder during GAN training to keep the latent
             # space consistent with the generator's output distribution.
@@ -611,18 +637,24 @@ def train(cfg: Config) -> None:
                f"{n_files_str}")
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
+            # Evaluate using the EMA model, not the live G.
+            # Save live weights first, then swap in EMA, then restore.
+            live_G_state = copy.deepcopy(G.state_dict())
+            G.load_state_dict({k: v.to(device) for k, v in ema_G_state.items()})
             mmd_val, recall_val, combined_val = evaluate_metrics(
                 G, val_tensor, cfg.mmd_samples, cfg.timestep, device,
                 recovery=R if latent_ae else None,
             )
-            log += f"  MMD²={mmd_val:.5f}  recall={recall_val:.3f}  comb={combined_val:.5f}"
+            G.load_state_dict(live_G_state)   # restore live weights for training
+            log += f"  EMA MMD²={mmd_val:.5f}  recall={recall_val:.3f}  comb={combined_val:.5f}"
             # Save best.pt on combined score (MMD² + 0.2*(1-recall)) to avoid
             # saving high-MMD²/high-recall checkpoints over lower-MMD²/mode-collapse ones.
             if combined_val < best_combined:
                 best_combined = combined_val
                 ckpt_data = {
                     "epoch": epoch,
-                    "G": G.state_dict(),
+                    "G": live_G_state,         # live weights (for resuming training)
+                    "G_ema": ema_G_state,       # EMA weights (for inference/generation)
                     "C": C.state_dict(),
                     "opt_G": opt_G.state_dict(),
                     "opt_C": opt_C.state_dict(),
@@ -648,6 +680,7 @@ def train(cfg: Config) -> None:
             ckpt_data = {
                 "epoch": epoch,
                 "G": G.state_dict(),
+                "G_ema": ema_G_state,
                 "C": C.state_dict(),
                 "opt_G": opt_G.state_dict(),
                 "opt_C": opt_C.state_dict(),
@@ -732,6 +765,10 @@ def parse_args() -> Config:
     p.add_argument("--grad-clip",              type=float, default=1.0,
                    help="Gradient norm clip for G and C (0 = off). Prevents "
                         "critic from dominating when LSTM weights are unconstrained.")
+    p.add_argument("--ema-decay",              type=float, default=0.999,
+                   help="EMA decay for generator weights (default 0.999). "
+                        "EMA model is used for evaluation and generation; "
+                        "smooths GAN oscillations. 0 = use live weights.")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -777,6 +814,7 @@ def parse_args() -> Config:
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip
+    cfg.ema_decay                   = args.ema_decay
     cfg.gp_lambda                   = args.gp_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim

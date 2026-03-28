@@ -23,6 +23,7 @@ class Config:
     lr_g: float = 0.0001
     lr_d: float = 0.00005       # slower critic: two-timescale GDA (JMLR 2025)
     grad_clip: float = 1.0      # gradient norm clip for G and C (0 = off)
+    ema_decay: float = 0.999    # EMA decay for generator weights (0 = off / use live G)
     device: str = "cuda"        # falls back to mps/cpu if unavailable
 
     # Data — single file

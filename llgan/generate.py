@@ -46,7 +46,11 @@ def generate(
 
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=latent_dim).to(device)
-    G.load_state_dict(ckpt["G"])
+    # Prefer EMA weights for generation: they are the time-averaged model that
+    # has been smoothed over recent training oscillations and consistently
+    # produce better samples than the instantaneous live weights.
+    g_weights = ckpt.get("G_ema", ckpt["G"])
+    G.load_state_dict({k: v.to(device) for k, v in g_weights.items()})
     G.eval()
 
     R = None
