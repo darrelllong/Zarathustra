@@ -174,6 +174,10 @@ def train(cfg: Config) -> None:
             print("[warn] wgan-gp requires second-order LSTM gradients; "
                   "MPS does not support lstm_mps_backward. Falling back to wgan-sn.")
             cfg.loss = "wgan-sn"
+        if cfg.r1_lambda > 0:
+            print("[warn] r1-lambda requires create_graph=True through LSTM critic; "
+                  "not supported on MPS. Disabling R1.")
+            cfg.r1_lambda = 0.0
         if cfg.r2_lambda > 0:
             print("[warn] r2-lambda requires create_graph=True through LSTM critic; "
                   "not supported on MPS. Disabling R2.")
@@ -519,8 +523,8 @@ def train(cfg: Config) -> None:
                     if cfg.loss == "wgan-gp":
                         # Gradient penalty: enforce 1-Lipschitz on all critic
                         # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
-                        # Works on MPS (create_graph=True is supported since
-                        # PyTorch 2.0) — previously assumed CUDA-only in error.
+                        # Requires create_graph=True through the LSTM; CUDA only
+                        # (MPS falls back to wgan-sn at device selection time).
                         eps = torch.rand(B, 1, 1, device=device)
                         x_hat = (eps * H_real.detach() +
                                  (1 - eps) * H_fake).requires_grad_(True)
@@ -530,6 +534,18 @@ def train(cfg: Config) -> None:
                             create_graph=True)[0]           # (B, T, latent_dim)
                         gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
                         c_loss = c_loss + cfg.gp_lambda * gp
+                    # R1 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                    # real samples. Penalises |∇C(x_real)|² → 0, preventing the
+                    # critic from memorising real data via large local gradients.
+                    # Effective under wgan-sn too (not restricted to wgan-gp).
+                    if cfg.r1_lambda > 0:
+                        H_real_r1 = H_real.detach().clone().requires_grad_(True)
+                        d_real_r1 = C(H_real_r1)
+                        grads_r1 = torch.autograd.grad(
+                            outputs=d_real_r1.sum(), inputs=H_real_r1,
+                            create_graph=True)[0]
+                        r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
+                        c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
                     # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
                     # fake samples. Complements WGAN-GP's 1-centered interpolated-
                     # point penalty — together they provide full convergence guarantees.
@@ -884,6 +900,8 @@ def parse_args() -> Config:
                    help="η: supervisor consistency weight in joint training")
     p.add_argument("--supervisor-steps",   type=int,   default=1,
                    help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--r1-lambda",          type=float, default=0.0,
+                   help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
                    help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
@@ -921,6 +939,7 @@ def parse_args() -> Config:
     cfg.ema_decay                   = args.ema_decay
     cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
+    cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
