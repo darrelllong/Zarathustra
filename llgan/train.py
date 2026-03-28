@@ -245,6 +245,11 @@ def train(cfg: Config) -> None:
     # it operates directly on feature sequences.
     critic_input_dim = cfg.latent_dim if latent_ae else prep.num_cols
 
+    # Column index of obj_id in the feature vector (used by locality loss).
+    obj_id_col = (prep.col_names.index("obj_id")
+                  if hasattr(prep, "col_names") and "obj_id" in prep.col_names
+                  else 1)
+
     # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
     # redundant and can interfere with the penalty gradient computation.
     use_sn = (cfg.loss != "wgan-gp")
@@ -693,6 +698,41 @@ def train(cfg: Config) -> None:
                     acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
                 g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
 
+            # L_loc: object reuse rate matching.
+            # In real block I/O ~40-50% of requests hit an object seen earlier
+            # in the same short window; models trained only on Wasserstein loss
+            # generate <1% reuse.  For each position t we measure the minimum
+            # distance (in normalised obj_id space) to every earlier position
+            # in the same window; a soft sigmoid gate at eps≈0 converts that
+            # into a differentiable "reuse" indicator.  The loss penalises the
+            # squared gap between generated and real mean reuse rates.
+            if cfg.locality_loss_weight > 0:
+                obj_fake = fake_decoded[:, :, obj_id_col]    # (B, T)
+                obj_real = real_batch[:, :, obj_id_col]
+
+                def _soft_reuse_rate(obj_seq: torch.Tensor) -> torch.Tensor:
+                    B, T = obj_seq.shape
+                    # (B, T, T) pairwise absolute distances
+                    diff = (obj_seq.unsqueeze(2) - obj_seq.unsqueeze(1)).abs()
+                    # Zero out upper triangle so only s < t positions count;
+                    # add large offset to s >= t so they never win the min.
+                    causal = torch.tril(
+                        torch.ones(T, T, device=obj_seq.device), diagonal=-1
+                    )
+                    diff = diff + (1.0 - causal) * 1e6
+                    min_dist = diff.min(dim=2).values  # (B, T): min dist to any prior
+                    # Soft reuse: sigmoid centred at eps with steep slope.
+                    # Exact repeats (dist=0) give sigmoid(+inf)≈1; non-repeats≈0.
+                    eps = 0.02        # ~1% of the [-1,1] normalised obj_id range
+                    reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.1))
+                    return reuse.mean()
+
+                fake_reuse = _soft_reuse_rate(obj_fake)
+                with torch.no_grad():
+                    real_reuse = _soft_reuse_rate(obj_real)
+                loss_loc = (fake_reuse - real_reuse).pow(2)
+                g_loss = g_loss + cfg.locality_loss_weight * loss_loc
+
             g_loss.backward()
             if cfg.grad_clip > 0:
                 nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
@@ -900,6 +940,8 @@ def parse_args() -> Config:
                    help="η: supervisor consistency weight in joint training")
     p.add_argument("--supervisor-steps",   type=int,   default=1,
                    help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--locality-loss-weight", type=float, default=0.0,
+                   help="L_loc: object reuse rate matching within windows (0=off; try 1.0)")
     p.add_argument("--r1-lambda",          type=float, default=0.0,
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
@@ -939,6 +981,7 @@ def parse_args() -> Config:
     cfg.ema_decay                   = args.ema_decay
     cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
+    cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim

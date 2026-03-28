@@ -51,6 +51,7 @@ class Config:
     acf_loss_weight: float = 0.1      # L_ACF: lag-1..5 autocorrelation matching (0 = off)
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
+    locality_loss_weight: float = 0.0  # L_loc: object reuse rate matching within windows (0 = off)
     r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
