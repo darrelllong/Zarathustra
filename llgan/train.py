@@ -753,6 +753,37 @@ def train(cfg: Config) -> None:
                         acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
                     g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
 
+                # L_cov: lag-1 cross-feature covariance loss.
+                #
+                # Why this directly targets DMD-GEN:
+                # Dynamic Mode Decomposition estimates a linear operator
+                # A ≈ C · Σ⁻¹ where:
+                #   C  = E[x_{t+1} ⊗ x_t]  (d×d lag-1 cross-covariance)
+                #   Σ  = E[x_t ⊗ x_t]       (d×d auto-covariance)
+                # DMD-GEN measures how far the dominant eigenvectors of A_real
+                # are from A_fake on the Grassmann manifold.
+                # All existing losses match per-feature statistics (L_V: diag of Σ;
+                # L_ACF: diagonal of C).  None match the off-diagonal cross-feature
+                # entries — e.g. how obj_size at time t predicts opcode at time t+1.
+                # Matching the full d×d C matrix directly constraints A, which is
+                # exactly what DMD-GEN measures.
+                if cfg.cross_cov_loss_weight > 0:
+                    def _lag1_cross_cov(X: torch.Tensor) -> torch.Tensor:
+                        # X: (B, T, d) → (d, d) cross-covariance matrix
+                        X0 = X[:, :-1, :]   # states at time t
+                        X1 = X[:, 1:, :]    # states at time t+1
+                        # Centre over batch and time to remove mean bias
+                        X0c = X0 - X0.mean(dim=(0, 1), keepdim=True)
+                        X1c = X1 - X1.mean(dim=(0, 1), keepdim=True)
+                        N = X.shape[0] * (X.shape[1] - 1)
+                        return torch.einsum("bti,btj->ij", X0c, X1c) / N  # (d, d)
+
+                    fake_cov = _lag1_cross_cov(fake_decoded)
+                    with torch.no_grad():
+                        real_cov = _lag1_cross_cov(real_batch)
+                    loss_cov = nn.functional.mse_loss(fake_cov, real_cov)
+                    g_loss = g_loss + cfg.cross_cov_loss_weight * loss_cov
+
                 # L_loc: object reuse rate matching.
                 # In real block I/O ~40-50% of requests hit an object seen earlier
                 # in the same short window; models trained only on Wasserstein loss
@@ -1024,6 +1055,11 @@ def parse_args() -> Config:
                    help="Weight for lag-1..5 autocorrelation matching loss (0 = off). "
                         "Targets DMD-GEN failure: supervisor loss only enforces 1-step "
                         "prediction; ACF loss directly penalises multi-lag temporal structure.")
+    p.add_argument("--cross-cov-loss-weight", type=float, default=0.0,
+                   help="Weight for lag-1 cross-feature covariance loss (0 = off; try 0.5–2.0). "
+                        "Matches the full d×d matrix E[x_{t,i}·x_{t+1,j}] — the linear dynamics "
+                        "operator that DMD-GEN estimates.  ACF only matches the diagonal; this "
+                        "adds off-diagonal cross-feature terms, directly targeting DMD-GEN.")
     p.add_argument("--fide-alpha",         type=float, default=1.0,
                    help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
@@ -1101,6 +1137,7 @@ def parse_args() -> Config:
     cfg.fft_loss_weight             = args.fft_loss_weight
     cfg.quantile_loss_weight        = args.quantile_loss_weight
     cfg.acf_loss_weight             = args.acf_loss_weight
+    cfg.cross_cov_loss_weight       = args.cross_cov_loss_weight
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip

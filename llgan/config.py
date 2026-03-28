@@ -48,7 +48,12 @@ class Config:
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
     quantile_loss_weight: float = 0.2  # L_Q: per-feature quantile matching at p50/90/95/99 (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
-    acf_loss_weight: float = 0.1      # L_ACF: lag-1..5 autocorrelation matching (0 = off)
+    acf_loss_weight: float = 0.1      # L_ACF: lag-1..5 per-feature autocorrelation matching (0 = off)
+    cross_cov_loss_weight: float = 0.0  # L_cov: lag-1 cross-feature covariance matrix matching (0 = off).
+                                         # Matches the full d×d matrix E[x_{t,i}·x_{t+1,j}] — the linear
+                                         # dynamics operator that DMD-GEN estimates.  ACF only matches the
+                                         # diagonal; this adds the off-diagonal cross-feature terms.
+                                         # Directly targets DMD-GEN > 0.3.  Try 0.5–2.0.
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
     amp: bool = False                  # AMP fp16 forward passes for 2-3× CUDA speedup (CUDA only; incompatible with wgan-gp/r1/r2)
