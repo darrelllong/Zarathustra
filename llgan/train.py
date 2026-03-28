@@ -183,7 +183,16 @@ def train(cfg: Config) -> None:
                   "not supported on MPS. Disabling R2.")
             cfg.r2_lambda = 0.0
 
-    print(f"Device: {device}  Loss: {cfg.loss}")
+    # AMP: float16 LSTM forward passes for 2-3× speedup and halved VRAM on CUDA.
+    # Incompatible with create_graph=True (wgan-gp, r1, r2) because dynamo can't
+    # differentiate through autocast LSTM kernels at second order.
+    use_amp = (device.type == "cuda" and cfg.amp
+               and cfg.loss != "wgan-gp"
+               and cfg.r1_lambda == 0.0
+               and cfg.r2_lambda == 0.0)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+
+    print(f"Device: {device}  Loss: {cfg.loss}  AMP: {use_amp}")
 
     multifile = bool(cfg.trace_dir)
     n_workers = 0 if platform.system() == "Darwin" else 4
@@ -408,9 +417,11 @@ def train(cfg: Config) -> None:
             for xb in loader:
                 xb = xb.to(device)
                 opt_AE.zero_grad()
-                loss_ae = nn.functional.mse_loss(R(E(xb)), xb)
-                loss_ae.backward()
-                opt_AE.step()
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    loss_ae = nn.functional.mse_loss(R(E(xb)), xb)
+                scaler.scale(loss_ae).backward()
+                scaler.step(opt_AE)
+                scaler.update()
                 ae_losses.append(loss_ae.item())
             ae_mean = sum(ae_losses) / len(ae_losses)
             if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
@@ -441,13 +452,15 @@ def train(cfg: Config) -> None:
                 with torch.no_grad():
                     H = E(xb)                               # (B, T, latent_dim)
                 opt_S.zero_grad()
-                S_out = S(H)                                # (B, T, latent_dim)
-                # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
-                # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
-                k = cfg.supervisor_steps
-                loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
-                loss_sup.backward()
-                opt_S.step()
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    S_out = S(H)                                # (B, T, latent_dim)
+                    # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
+                    # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
+                    k = cfg.supervisor_steps
+                    loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
+                scaler.scale(loss_sup).backward()
+                scaler.step(opt_S)
+                scaler.update()
                 sup_losses.append(loss_sup.item())
             sup_mean = sum(sup_losses) / len(sup_losses)
             if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
@@ -486,15 +499,17 @@ def train(cfg: Config) -> None:
                 B_pre = xb.size(0)
                 z_g = torch.randn(B_pre, cfg.noise_dim, device=device)
                 z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
-                H_fake = G(z_g, z_l)
-                with torch.no_grad():
-                    S_out = S(H_fake)
-                # Consistency: G(z)[t+k] ≈ S(G(z))[t]; k = supervisor_steps
-                k = cfg.supervisor_steps
-                loss_g_sup = nn.functional.mse_loss(H_fake[:, k:, :], S_out[:, :-k, :])
                 opt_G.zero_grad()
-                loss_g_sup.backward()
-                opt_G.step()
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    H_fake = G(z_g, z_l)
+                    with torch.no_grad():
+                        S_out = S(H_fake)
+                    # Consistency: G(z)[t+k] ≈ S(G(z))[t]; k = supervisor_steps
+                    k = cfg.supervisor_steps
+                    loss_g_sup = nn.functional.mse_loss(H_fake[:, k:, :], S_out[:, :-k, :])
+                scaler.scale(loss_g_sup).backward()
+                scaler.step(opt_G)
+                scaler.update()
                 g_sup_losses.append(loss_g_sup.item())
             g_sup_mean = sum(g_sup_losses) / len(g_sup_losses)
             if (pre_ep + 1) % 10 == 0 or pre_ep == 0:
@@ -553,56 +568,57 @@ def train(cfg: Config) -> None:
                 H_fake = G(z_g, z_l).detach()
 
                 opt_C.zero_grad()
-                if cfg.loss in ("wgan-sn", "wgan-gp"):
-                    # Separate W estimate from penalty terms so the log shows
-                    # the true Wasserstein distance (W > 0 = critic winning;
-                    # oscillating W = GAN cycling).
-                    c_base = (C(H_fake) - C(H_real)).mean()
-                    w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
-                    c_loss = c_base
-                    if cfg.loss == "wgan-gp":
-                        # Gradient penalty: enforce 1-Lipschitz on all critic
-                        # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
-                        # Requires create_graph=True through the LSTM; CUDA only
-                        # (MPS falls back to wgan-sn at device selection time).
-                        eps = torch.rand(B, 1, 1, device=device)
-                        x_hat = (eps * H_real.detach() +
-                                 (1 - eps) * H_fake).requires_grad_(True)
-                        d_hat = C(x_hat)
-                        grads = torch.autograd.grad(
-                            outputs=d_hat.sum(), inputs=x_hat,
-                            create_graph=True)[0]           # (B, T, latent_dim)
-                        gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
-                        c_loss = c_loss + cfg.gp_lambda * gp
-                    # R1 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
-                    # real samples. Penalises |∇C(x_real)|² → 0, preventing the
-                    # critic from memorising real data via large local gradients.
-                    # Effective under wgan-sn too (not restricted to wgan-gp).
-                    if cfg.r1_lambda > 0:
-                        H_real_r1 = H_real.detach().clone().requires_grad_(True)
-                        d_real_r1 = C(H_real_r1)
-                        grads_r1 = torch.autograd.grad(
-                            outputs=d_real_r1.sum(), inputs=H_real_r1,
-                            create_graph=True)[0]
-                        r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
-                        c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
-                    # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
-                    # fake samples. Complements WGAN-GP's 1-centered interpolated-
-                    # point penalty — together they provide full convergence guarantees.
-                    if cfg.r2_lambda > 0:
-                        H_fake_r2 = H_fake.clone().requires_grad_(True)
-                        d_fake_r2 = C(H_fake_r2)
-                        grads_r2 = torch.autograd.grad(
-                            outputs=d_fake_r2.sum(), inputs=H_fake_r2,
-                            create_graph=True)[0]
-                        r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
-                        c_loss = c_loss + cfg.r2_lambda * r2
-                else:  # bce
-                    real_labels = torch.ones(B, 1, device=device)
-                    fake_labels = torch.zeros(B, 1, device=device)
-                    c_loss = (bce(C(H_real), real_labels) +
-                              bce(C(H_fake), fake_labels))
-                c_loss.backward()
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    if cfg.loss in ("wgan-sn", "wgan-gp"):
+                        # Separate W estimate from penalty terms so the log shows
+                        # the true Wasserstein distance (W > 0 = critic winning;
+                        # oscillating W = GAN cycling).
+                        c_base = (C(H_fake) - C(H_real)).mean()
+                        w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
+                        c_loss = c_base
+                        if cfg.loss == "wgan-gp":
+                            # Gradient penalty: enforce 1-Lipschitz on all critic
+                            # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
+                            # Requires create_graph=True through the LSTM; CUDA only
+                            # (MPS falls back to wgan-sn at device selection time).
+                            eps = torch.rand(B, 1, 1, device=device)
+                            x_hat = (eps * H_real.detach() +
+                                     (1 - eps) * H_fake).requires_grad_(True)
+                            d_hat = C(x_hat)
+                            grads = torch.autograd.grad(
+                                outputs=d_hat.sum(), inputs=x_hat,
+                                create_graph=True)[0]           # (B, T, latent_dim)
+                            gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
+                            c_loss = c_loss + cfg.gp_lambda * gp
+                        # R1 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                        # real samples. Penalises |∇C(x_real)|² → 0, preventing the
+                        # critic from memorising real data via large local gradients.
+                        # Effective under wgan-sn too (not restricted to wgan-gp).
+                        if cfg.r1_lambda > 0:
+                            H_real_r1 = H_real.detach().clone().requires_grad_(True)
+                            d_real_r1 = C(H_real_r1)
+                            grads_r1 = torch.autograd.grad(
+                                outputs=d_real_r1.sum(), inputs=H_real_r1,
+                                create_graph=True)[0]
+                            r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
+                            c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
+                        # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                        # fake samples. Complements WGAN-GP's 1-centered interpolated-
+                        # point penalty — together they provide full convergence guarantees.
+                        if cfg.r2_lambda > 0:
+                            H_fake_r2 = H_fake.clone().requires_grad_(True)
+                            d_fake_r2 = C(H_fake_r2)
+                            grads_r2 = torch.autograd.grad(
+                                outputs=d_fake_r2.sum(), inputs=H_fake_r2,
+                                create_graph=True)[0]
+                            r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
+                            c_loss = c_loss + cfg.r2_lambda * r2
+                    else:  # bce
+                        real_labels = torch.ones(B, 1, device=device)
+                        fake_labels = torch.zeros(B, 1, device=device)
+                        c_loss = (bce(C(H_real), real_labels) +
+                                  bce(C(H_fake), fake_labels))
+                scaler.scale(c_loss).backward()
                 if cfg.grad_clip > 0:
                     # Gradient clipping is the primary Lipschitz constraint on
                     # the LSTM weights, which spectral norm does not reach.
@@ -611,167 +627,173 @@ def train(cfg: Config) -> None:
                     # weights grew monotonically.  Clip at 1.0 (Pascanu et al.
                     # 2013 recommendation for RNNs) prevents this without
                     # requiring gradient penalty computation.
+                    scaler.unscale_(opt_C)
                     nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
-                opt_C.step()
+                scaler.step(opt_C)
+                scaler.update()
                 c_losses.append(c_loss.item())
 
             # --- Generator step ---
             z_g = torch.randn(B, cfg.noise_dim, device=device)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-            H_fake = G(z_g, z_l)
 
             opt_G.zero_grad()
-            if cfg.loss in ("wgan-sn", "wgan-gp"):
-                g_score, feat_fake = C(H_fake, return_features=True)
-                g_loss = -g_score.mean()
-            else:  # bce
-                real_labels = torch.ones(B, 1, device=device)
-                g_score, feat_fake = C(H_fake, return_features=True)
-                g_loss = bce(g_score, real_labels)
+            with torch.amp.autocast(device.type, enabled=use_amp):
+                H_fake = G(z_g, z_l)
 
-            # Feature matching (Salimans et al. 2016): match the mean of the
-            # critic's internal representation for real vs fake.  Penalising
-            # the L2 distance between batch-mean features forces the generator
-            # to cover all modes the critic can "see", fixing mode collapse.
-            if cfg.feature_matching_weight > 0:
-                with torch.no_grad():
-                    _, feat_real = C(H_real, return_features=True)
-                loss_fm = nn.functional.mse_loss(
-                    feat_fake.mean(0), feat_real.mean(0))
-                g_loss = g_loss + cfg.feature_matching_weight * loss_fm
+                if cfg.loss in ("wgan-sn", "wgan-gp"):
+                    g_score, feat_fake = C(H_fake, return_features=True)
+                    g_loss = -g_score.mean()
+                else:  # bce
+                    real_labels = torch.ones(B, 1, device=device)
+                    g_score, feat_fake = C(H_fake, return_features=True)
+                    g_loss = bce(g_score, real_labels)
 
-            if latent_ae:
-                # Supervisor consistency: S(H_fake)[t] should predict H_fake[t+1].
-                # This forces the generator to produce temporally coherent latents
-                # that obey the same autoregressive dynamics as real data.
-                S_on_fake = S(H_fake)
-                k = cfg.supervisor_steps
-                loss_sup = nn.functional.mse_loss(
-                    S_on_fake[:, :-k, :], H_fake[:, k:, :])
-                g_loss = g_loss + cfg.supervisor_loss_weight * loss_sup
-
-                # Decode generated latents to feature space for auxiliary losses
-                fake_decoded = R(H_fake)
-            else:
-                fake_decoded = H_fake
-
-            # --- Auxiliary losses (in feature space) ---
-            # Moment matching (L_V): penalise differences in per-feature mean
-            # and std so the generator cannot ignore distributional shape.
-            if cfg.moment_loss_weight > 0:
-                loss_V = (
-                    nn.functional.l1_loss(fake_decoded.mean(0), real_batch.mean(0)) +
-                    nn.functional.l1_loss(fake_decoded.std(0),  real_batch.std(0))
-                )
-                g_loss = g_loss + cfg.moment_loss_weight * loss_V
-
-            # Fourier spectral loss (L_FFT): penalise differences in frequency
-            # content along the time axis — captures burst periodicity.
-            # FIDE (NeurIPS 2024): upweight bins where the real spectrum has high
-            # amplitude so rare/extreme I/O events (burst opcodes, large obj_size)
-            # are not washed out by the flat MSE average.
-            if cfg.fft_loss_weight > 0:
-                real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
-                fake_fft = torch.fft.rfft(fake_decoded.float(), dim=1).abs()
-                if cfg.fide_alpha > 0:
-                    weight_f = 1.0 + cfg.fide_alpha * (
-                        real_fft / (real_fft.mean(dim=1, keepdim=True) + 1e-8))
-                    loss_fft = (weight_f * (fake_fft - real_fft).pow(2)).mean()
-                else:
-                    loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
-                g_loss = g_loss + cfg.fft_loss_weight * loss_fft
-
-            # Quantile matching (L_Q): penalise per-feature distribution mismatch
-            # across the full range (p1…p99).  We need BOTH tails:
-            #   Upper tail (p90-p99): rare long-IAT quiet periods and large I/O
-            #     bursts that moment loss misses because zero-IAT mass dominates.
-            #   Lower tail (p1-p10): near-zero obj_id deltas = repeat/sequential
-            #     access.  Without lower quantiles, the model ignores object reuse
-            #     (generates random seeks instead of the 40-50% repeat-access rate
-            #     seen in real block storage).  p5 on obj_id_delta in signed-log
-            #     space corresponds to deltas of a few blocks — exactly the
-            #     sequential-stride pattern that drives cache hit rate.
-            if cfg.quantile_loss_weight > 0:
-                q_levels = torch.tensor(
-                    [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
-                    device=device,
-                )
-                fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
-                rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
-                with torch.no_grad():
-                    q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (9, d)
-                q_fake = torch.quantile(fd_flat, q_levels, dim=0)
-                loss_Q = nn.functional.mse_loss(q_fake, q_real)
-                g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
-
-            # Autocorrelation matching (L_ACF): penalise per-feature lag-1..5 ACF
-            # mismatch between real and generated sequences.
-            #
-            # Why this matters: the supervisor loss enforces 1-step temporal
-            # consistency (h_t → h_{t+1}) in latent space.  The FFT loss captures
-            # the power spectrum.  Neither directly penalises multi-lag temporal
-            # correlation structure, which is exactly what the DMD-GEN metric
-            # (Grassmannian distance of dominant DMD subspaces) measures.
-            # On v9/best.pt: DMD-GEN=0.674 despite MMD²=0.010 — the model learns
-            # good marginal distributions but wrong sequential law.
-            #
-            # ACF at lag k for feature j: E[(x_t - μ)(x_{t+k} - μ)] / σ²
-            # We use the unnormalised version (just the cross-product mean) since
-            # the sequences are already in [-1, 1] and normalisation by σ² would
-            # require computing it over the batch, adding noise to the gradient.
-            # Mean is subtracted per-feature per-sequence to remove DC offset.
-            if cfg.acf_loss_weight > 0:
-                # Centre each sequence so the cross-product is a pure correlation
-                # (not contaminated by mean level differences).
-                fd_c = fake_decoded - fake_decoded.mean(dim=1, keepdim=True)
-                rb_c = real_batch   - real_batch.mean(dim=1, keepdim=True)
-                acf_loss = torch.zeros(1, device=device)
-                for lag in range(1, 6):      # lags 1..5
-                    fake_acf = (fd_c[:, :-lag, :] * fd_c[:, lag:, :]).mean(dim=1)
+                # Feature matching (Salimans et al. 2016): match the mean of the
+                # critic's internal representation for real vs fake.  Penalising
+                # the L2 distance between batch-mean features forces the generator
+                # to cover all modes the critic can "see", fixing mode collapse.
+                if cfg.feature_matching_weight > 0:
                     with torch.no_grad():
-                        real_acf = (rb_c[:, :-lag, :] * rb_c[:, lag:, :]).mean(dim=1)
-                    acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
-                g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
+                        _, feat_real = C(H_real, return_features=True)
+                    loss_fm = nn.functional.mse_loss(
+                        feat_fake.mean(0), feat_real.mean(0))
+                    g_loss = g_loss + cfg.feature_matching_weight * loss_fm
 
-            # L_loc: object reuse rate matching.
-            # In real block I/O ~40-50% of requests hit an object seen earlier
-            # in the same short window; models trained only on Wasserstein loss
-            # generate <1% reuse.  For each position t we measure the minimum
-            # distance (in normalised obj_id space) to every earlier position
-            # in the same window; a soft sigmoid gate at eps≈0 converts that
-            # into a differentiable "reuse" indicator.  The loss penalises the
-            # squared gap between generated and real mean reuse rates.
-            if cfg.locality_loss_weight > 0:
-                obj_fake = fake_decoded[:, :, obj_id_col]    # (B, T)
-                obj_real = real_batch[:, :, obj_id_col]
+                if latent_ae:
+                    # Supervisor consistency: S(H_fake)[t] should predict H_fake[t+1].
+                    # This forces the generator to produce temporally coherent latents
+                    # that obey the same autoregressive dynamics as real data.
+                    S_on_fake = S(H_fake)
+                    k = cfg.supervisor_steps
+                    loss_sup = nn.functional.mse_loss(
+                        S_on_fake[:, :-k, :], H_fake[:, k:, :])
+                    g_loss = g_loss + cfg.supervisor_loss_weight * loss_sup
 
-                def _soft_reuse_rate(obj_seq: torch.Tensor) -> torch.Tensor:
-                    B, T = obj_seq.shape
-                    # (B, T, T) pairwise absolute distances
-                    diff = (obj_seq.unsqueeze(2) - obj_seq.unsqueeze(1)).abs()
-                    # Zero out upper triangle so only s < t positions count;
-                    # add large offset to s >= t so they never win the min.
-                    causal = torch.tril(
-                        torch.ones(T, T, device=obj_seq.device), diagonal=-1
+                    # Decode generated latents to feature space for auxiliary losses
+                    fake_decoded = R(H_fake)
+                else:
+                    fake_decoded = H_fake
+
+                # --- Auxiliary losses (in feature space) ---
+                # Moment matching (L_V): penalise differences in per-feature mean
+                # and std so the generator cannot ignore distributional shape.
+                if cfg.moment_loss_weight > 0:
+                    loss_V = (
+                        nn.functional.l1_loss(fake_decoded.mean(0), real_batch.mean(0)) +
+                        nn.functional.l1_loss(fake_decoded.std(0),  real_batch.std(0))
                     )
-                    diff = diff + (1.0 - causal) * 1e6
-                    min_dist = diff.min(dim=2).values  # (B, T): min dist to any prior
-                    # Soft reuse: sigmoid centred at eps with steep slope.
-                    # Exact repeats (dist=0) give sigmoid(+inf)≈1; non-repeats≈0.
-                    eps = 0.02        # ~1% of the [-1,1] normalised obj_id range
-                    reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.1))
-                    return reuse.mean()
+                    g_loss = g_loss + cfg.moment_loss_weight * loss_V
 
-                fake_reuse = _soft_reuse_rate(obj_fake)
-                with torch.no_grad():
-                    real_reuse = _soft_reuse_rate(obj_real)
-                loss_loc = (fake_reuse - real_reuse).pow(2)
-                g_loss = g_loss + cfg.locality_loss_weight * loss_loc
+                # Fourier spectral loss (L_FFT): penalise differences in frequency
+                # content along the time axis — captures burst periodicity.
+                # FIDE (NeurIPS 2024): upweight bins where the real spectrum has high
+                # amplitude so rare/extreme I/O events (burst opcodes, large obj_size)
+                # are not washed out by the flat MSE average.
+                if cfg.fft_loss_weight > 0:
+                    real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
+                    fake_fft = torch.fft.rfft(fake_decoded.float(), dim=1).abs()
+                    if cfg.fide_alpha > 0:
+                        weight_f = 1.0 + cfg.fide_alpha * (
+                            real_fft / (real_fft.mean(dim=1, keepdim=True) + 1e-8))
+                        loss_fft = (weight_f * (fake_fft - real_fft).pow(2)).mean()
+                    else:
+                        loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
+                    g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
-            g_loss.backward()
+                # Quantile matching (L_Q): penalise per-feature distribution mismatch
+                # across the full range (p1…p99).  We need BOTH tails:
+                #   Upper tail (p90-p99): rare long-IAT quiet periods and large I/O
+                #     bursts that moment loss misses because zero-IAT mass dominates.
+                #   Lower tail (p1-p10): near-zero obj_id deltas = repeat/sequential
+                #     access.  Without lower quantiles, the model ignores object reuse
+                #     (generates random seeks instead of the 40-50% repeat-access rate
+                #     seen in real block storage).  p5 on obj_id_delta in signed-log
+                #     space corresponds to deltas of a few blocks — exactly the
+                #     sequential-stride pattern that drives cache hit rate.
+                if cfg.quantile_loss_weight > 0:
+                    q_levels = torch.tensor(
+                        [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
+                        device=device,
+                    )
+                    fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
+                    rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
+                    with torch.no_grad():
+                        q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (9, d)
+                    q_fake = torch.quantile(fd_flat, q_levels, dim=0)
+                    loss_Q = nn.functional.mse_loss(q_fake, q_real)
+                    g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
+
+                # Autocorrelation matching (L_ACF): penalise per-feature lag-1..5 ACF
+                # mismatch between real and generated sequences.
+                #
+                # Why this matters: the supervisor loss enforces 1-step temporal
+                # consistency (h_t → h_{t+1}) in latent space.  The FFT loss captures
+                # the power spectrum.  Neither directly penalises multi-lag temporal
+                # correlation structure, which is exactly what the DMD-GEN metric
+                # (Grassmannian distance of dominant DMD subspaces) measures.
+                # On v9/best.pt: DMD-GEN=0.674 despite MMD²=0.010 — the model learns
+                # good marginal distributions but wrong sequential law.
+                #
+                # ACF at lag k for feature j: E[(x_t - μ)(x_{t+k} - μ)] / σ²
+                # We use the unnormalised version (just the cross-product mean) since
+                # the sequences are already in [-1, 1] and normalisation by σ² would
+                # require computing it over the batch, adding noise to the gradient.
+                # Mean is subtracted per-feature per-sequence to remove DC offset.
+                if cfg.acf_loss_weight > 0:
+                    # Centre each sequence so the cross-product is a pure correlation
+                    # (not contaminated by mean level differences).
+                    fd_c = fake_decoded - fake_decoded.mean(dim=1, keepdim=True)
+                    rb_c = real_batch   - real_batch.mean(dim=1, keepdim=True)
+                    acf_loss = torch.zeros(1, device=device)
+                    for lag in range(1, 6):      # lags 1..5
+                        fake_acf = (fd_c[:, :-lag, :] * fd_c[:, lag:, :]).mean(dim=1)
+                        with torch.no_grad():
+                            real_acf = (rb_c[:, :-lag, :] * rb_c[:, lag:, :]).mean(dim=1)
+                        acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
+                    g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
+
+                # L_loc: object reuse rate matching.
+                # In real block I/O ~40-50% of requests hit an object seen earlier
+                # in the same short window; models trained only on Wasserstein loss
+                # generate <1% reuse.  For each position t we measure the minimum
+                # distance (in normalised obj_id space) to every earlier position
+                # in the same window; a soft sigmoid gate at eps≈0 converts that
+                # into a differentiable "reuse" indicator.  The loss penalises the
+                # squared gap between generated and real mean reuse rates.
+                if cfg.locality_loss_weight > 0:
+                    obj_fake = fake_decoded[:, :, obj_id_col]    # (B, T)
+                    obj_real = real_batch[:, :, obj_id_col]
+
+                    def _soft_reuse_rate(obj_seq: torch.Tensor) -> torch.Tensor:
+                        B, T = obj_seq.shape
+                        # (B, T, T) pairwise absolute distances
+                        diff = (obj_seq.unsqueeze(2) - obj_seq.unsqueeze(1)).abs()
+                        # Zero out upper triangle so only s < t positions count;
+                        # add large offset to s >= t so they never win the min.
+                        causal = torch.tril(
+                            torch.ones(T, T, device=obj_seq.device), diagonal=-1
+                        )
+                        diff = diff + (1.0 - causal) * 1e6
+                        min_dist = diff.min(dim=2).values  # (B, T): min dist to any prior
+                        # Soft reuse: sigmoid centred at eps with steep slope.
+                        # Exact repeats (dist=0) give sigmoid(+inf)≈1; non-repeats≈0.
+                        eps = 0.02        # ~1% of the [-1,1] normalised obj_id range
+                        reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.1))
+                        return reuse.mean()
+
+                    fake_reuse = _soft_reuse_rate(obj_fake)
+                    with torch.no_grad():
+                        real_reuse = _soft_reuse_rate(obj_real)
+                    loss_loc = (fake_reuse - real_reuse).pow(2)
+                    g_loss = g_loss + cfg.locality_loss_weight * loss_loc
+
+            scaler.scale(g_loss).backward()
             if cfg.grad_clip > 0:
+                scaler.unscale_(opt_G)
                 nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
-            opt_G.step()
+            scaler.step(opt_G)
+            scaler.update()
             g_losses.append(g_loss.item())
 
             # EMA update: blend live weights toward EMA state.
@@ -784,19 +806,21 @@ def train(cfg: Config) -> None:
             # Fine-tunes the autoencoder during GAN training to keep the latent
             # space consistent with the generator's output distribution.
             if latent_ae:
-                H_real_grad = E(real_batch)
-                X_hat = R(H_real_grad)
-                # Reconstruction loss only: supervisor (S) is frozen after
-                # pretraining and has no optimizer in Phase 3.  The previous
-                # supervisor term here was a no-op — both its input
-                # (H_real_grad.detach()) and target were detached, so no
-                # gradient flowed and no parameter in opt_ER was updated by it.
-                # (Per peer review: freeze S after pretraining rather than
-                # silently running a dead term.)
-                er_loss = nn.functional.mse_loss(X_hat, real_batch)
                 opt_ER.zero_grad()
-                er_loss.backward()
-                opt_ER.step()
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    H_real_grad = E(real_batch)
+                    X_hat = R(H_real_grad)
+                    # Reconstruction loss only: supervisor (S) is frozen after
+                    # pretraining and has no optimizer in Phase 3.  The previous
+                    # supervisor term here was a no-op — both its input
+                    # (H_real_grad.detach()) and target were detached, so no
+                    # gradient flowed and no parameter in opt_ER was updated by it.
+                    # (Per peer review: freeze S after pretraining rather than
+                    # silently running a dead term.)
+                    er_loss = nn.functional.mse_loss(X_hat, real_batch)
+                scaler.scale(er_loss).backward()
+                scaler.step(opt_ER)
+                scaler.update()
 
         c_mean = sum(c_losses) / len(c_losses)
         g_mean = sum(g_losses) / len(g_losses)
@@ -1007,6 +1031,9 @@ def parse_args() -> Config:
                    help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
                    help="Learning rate for encoder + recovery")
+    p.add_argument("--amp",                  action="store_true", default=False,
+                   help="Enable AMP fp16 for 2-3× CUDA speedup (CUDA only; "
+                        "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     args = p.parse_args()
 
     cfg = Config()
@@ -1053,6 +1080,7 @@ def parse_args() -> Config:
     cfg.supervisor_loss_weight  = args.supervisor_loss_weight
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
+    cfg.amp                     = args.amp
     return cfg
 
 

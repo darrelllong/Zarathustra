@@ -51,6 +51,7 @@ class Config:
     acf_loss_weight: float = 0.1      # L_ACF: lag-1..5 autocorrelation matching (0 = off)
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
+    amp: bool = False                  # AMP fp16 forward passes for 2-3× CUDA speedup (CUDA only; incompatible with wgan-gp/r1/r2)
     compile: bool = False              # torch.compile models for ~20-40% CUDA speedup (CUDA only)
     minibatch_std: bool = True         # append per-batch std channel to critic input (StyleGAN2)
     locality_loss_weight: float = 0.0  # L_loc: object reuse rate matching within windows (0 = off)
