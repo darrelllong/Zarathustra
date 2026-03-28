@@ -859,10 +859,11 @@ def train(cfg: Config) -> None:
             g_losses.append(g_loss.item())
 
             # EMA update: blend live weights toward EMA state.
-            # Done in-place on the CPU-side state dict to avoid GPU memory overhead.
+            # ema_G_state lives on the same device as G (deepcopy of G.state_dict()).
+            # Use v.detach() — NOT v.cpu() — to avoid a device mismatch on MPS.
             with torch.no_grad():
                 for k, v in G.state_dict().items():
-                    ema_G_state[k].mul_(ema_decay).add_(v.cpu(), alpha=1.0 - ema_decay)
+                    ema_G_state[k].mul_(ema_decay).add_(v.detach(), alpha=1.0 - ema_decay)
 
             # --- Encoder + Recovery joint step (latent AE mode only) ---
             # Fine-tunes the autoencoder during GAN training to keep the latent
