@@ -762,24 +762,31 @@ def train(cfg: Config) -> None:
                 # into a differentiable "reuse" indicator.  The loss penalises the
                 # squared gap between generated and real mean reuse rates.
                 if cfg.locality_loss_weight > 0:
+                    # L_loc: stride-repetition rate matching.
+                    # Measures the fraction of timesteps whose delta-encoded obj_id value
+                    # matches a prior value in the same window — a proxy for sequential-
+                    # access stride repetition.  (obj_id is delta-encoded + signed-log, so
+                    # we cannot recover absolute identities; instead we match the statistical
+                    # property that the same stride / seek-pattern recurs within a window.)
+                    # Real Tencent Block data: ~20-25% stride repetition rate.
+                    # Generator without L_loc: ~0% (pure random-seeking output).
                     obj_fake = fake_decoded[:, :, obj_id_col]    # (B, T)
                     obj_real = real_batch[:, :, obj_id_col]
 
                     def _soft_reuse_rate(obj_seq: torch.Tensor) -> torch.Tensor:
                         B, T = obj_seq.shape
-                        # (B, T, T) pairwise absolute distances
+                        # (B, T, T) pairwise absolute distances between delta values
                         diff = (obj_seq.unsqueeze(2) - obj_seq.unsqueeze(1)).abs()
-                        # Zero out upper triangle so only s < t positions count;
-                        # add large offset to s >= t so they never win the min.
+                        # Only compare position t to EARLIER positions s < t
                         causal = torch.tril(
                             torch.ones(T, T, device=obj_seq.device), diagonal=-1
                         )
                         diff = diff + (1.0 - causal) * 1e6
-                        min_dist = diff.min(dim=2).values  # (B, T): min dist to any prior
-                        # Soft reuse: sigmoid centred at eps with steep slope.
-                        # Exact repeats (dist=0) give sigmoid(+inf)≈1; non-repeats≈0.
-                        eps = 0.02        # ~1% of the [-1,1] normalised obj_id range
-                        reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.1))
+                        min_dist = diff.min(dim=2).values  # (B, T): nearest prior match
+                        # Soft indicator: sigmoid centred at eps with moderate slope.
+                        # eps=0.04 (2% of [-1,1] range) catches near-exact repeats.
+                        eps = 0.04
+                        reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.2))
                         return reuse.mean()
 
                     fake_reuse = _soft_reuse_rate(obj_fake)
@@ -787,6 +794,30 @@ def train(cfg: Config) -> None:
                         real_reuse = _soft_reuse_rate(obj_real)
                     loss_loc = (fake_reuse - real_reuse).pow(2)
                     g_loss = g_loss + cfg.locality_loss_weight * loss_loc
+
+                # L_div: MSGAN mode-seeking diversity loss.
+                # For two independently sampled noise pairs, maximise the ratio of
+                # output distance to input distance — directly combats mode collapse
+                # (when the generator maps very different noise to the same output).
+                # Reference: Mao et al., CVPR 2019, "Mode Seeking GAN".
+                # Set diversity_loss_weight > 0 (try 0.5–2.0) when β-recall < 0.5.
+                if cfg.diversity_loss_weight > 0:
+                    B2 = B // 2
+                    z_g1 = torch.randn(B2, cfg.noise_dim, device=device)
+                    z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
+                    z_g2 = torch.randn(B2, cfg.noise_dim, device=device)
+                    z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
+                    f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
+                    f2 = G(z_g2, z_l2)
+                    # L2 distance in noise and output spaces
+                    z_dist = (
+                        (z_g1 - z_g2).pow(2).sum(-1) +
+                        (z_l1 - z_l2).pow(2).sum(dim=(-1, -2))
+                    ).sqrt().clamp(min=1e-8)     # (B2,)
+                    x_dist = (f1 - f2).pow(2).sum(dim=(-1, -2)).sqrt()  # (B2,)
+                    # Negative because we want to MAXIMISE diversity
+                    loss_div = -(x_dist / z_dist).mean()
+                    g_loss = g_loss + cfg.diversity_loss_weight * loss_div
 
             scaler.scale(g_loss).backward()
             if cfg.grad_clip > 0:
@@ -1024,7 +1055,13 @@ def parse_args() -> Config:
     p.add_argument("--supervisor-steps",   type=int,   default=1,
                    help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
     p.add_argument("--locality-loss-weight", type=float, default=0.0,
-                   help="L_loc: object reuse rate matching within windows (0=off; try 1.0)")
+                   help="L_loc: stride-repetition rate matching within windows (0=off; try 1.0). "
+                        "Matches the fraction of obj_id deltas that repeat within a window — "
+                        "a proxy for sequential-access consistency.")
+    p.add_argument("--diversity-loss-weight", type=float, default=0.0,
+                   help="L_div: MSGAN mode-seeking loss — maximises output/noise distance ratio "
+                        "across random pairs; combats mode collapse (low β-recall). "
+                        "Requires a second G forward pass. Try 0.5–2.0.")
     p.add_argument("--r1-lambda",          type=float, default=0.0,
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
@@ -1071,6 +1108,7 @@ def parse_args() -> Config:
     cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
     cfg.locality_loss_weight        = args.locality_loss_weight
+    cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim

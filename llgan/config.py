@@ -54,7 +54,13 @@ class Config:
     amp: bool = False                  # AMP fp16 forward passes for 2-3× CUDA speedup (CUDA only; incompatible with wgan-gp/r1/r2)
     compile: bool = False              # torch.compile models for ~20-40% CUDA speedup (CUDA only)
     minibatch_std: bool = True         # append per-batch std channel to critic input (StyleGAN2)
-    locality_loss_weight: float = 0.0  # L_loc: object reuse rate matching within windows (0 = off)
+    locality_loss_weight: float = 0.0  # L_loc: stride-repetition rate matching within windows (0 = off).
+                                       # Measures fraction of positions whose obj_id DELTA matches a prior
+                                       # delta in the window — captures sequential-access strides, not raw
+                                       # object identity (delta encoding precludes direct ID comparison).
+    diversity_loss_weight: float = 0.0  # L_div: MSGAN mode-seeking loss — maximises |G(z1)-G(z2)|/|z1-z2|
+                                        # across random noise pairs; directly combats β-recall mode collapse.
+                                        # Requires a second G forward pass per step. Try 0.5–2.0.
     r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 

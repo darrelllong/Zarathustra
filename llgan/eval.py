@@ -431,11 +431,16 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     E = _load_encoder(ckpt, device)
     cfid = context_fid(real_seqs, fake_seqs, E, device) if E is not None else None
 
-    # Reuse rate: fraction of positions (t>0) whose obj_id exactly matches
-    # a prior position within the same window.  Real block I/O: ~40-50%.
+    # Stride-repetition rate: fraction of positions (t>0) whose obj_id DELTA value
+    # matches (within 1e-6) a prior delta in the same window.  Because obj_id is
+    # delta-encoded (signed-log of consecutive-access differences), this measures
+    # how often the same stride / seek-size recurs in a window — a proxy for
+    # sequential-access consistency, NOT raw object identity (which is not
+    # recoverable from delta-encoded output without cumsum inverse-transform).
+    # Real Tencent Block: ~20-25%.  Generator without L_loc: ~0%.
     def _reuse_rate(seqs: np.ndarray) -> float:
-        # seqs: (N, T, d); obj_id is column 1
-        obj = seqs[:, :, 1]          # (N, T)
+        # seqs: (N, T, d); obj_id delta is column 1
+        obj = seqs[:, :, 1]          # (N, T) — delta-encoded obj_id
         hits = 0
         for t in range(1, obj.shape[1]):
             hits += (np.abs(obj[:, :t] - obj[:, t:t+1]) < 1e-6).any(axis=1).sum()
@@ -454,8 +459,8 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     print(f"  AutoCorr     : {ac_score:.4f}  (lag-1..5 ACF diff; 0=perfect)")
     if cfid is not None:
         print(f"  Context-FID  : {cfid:.2f}  (Fréchet in encoder latent space; <10 good)")
-    print(f"  reuse rate   : real={real_reuse:.3f}  fake={fake_reuse:.3f}"
-          f"  {'⚠ locality gap' if abs(real_reuse - fake_reuse) > 0.1 else ''}")
+    print(f"  stride-repeat: real={real_reuse:.3f}  fake={fake_reuse:.3f}"
+          f"  {'⚠ stride gap (L_loc=0?)' if abs(real_reuse - fake_reuse) > 0.1 else ''}")
     print(f"{'─'*40}")
 
     if baseline_path:
