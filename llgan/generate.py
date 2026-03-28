@@ -37,7 +37,7 @@ def generate(
     else:
         device = torch.device("cpu")
 
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     cfg = ckpt["config"]
     prep = ckpt["prep"]
 
