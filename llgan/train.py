@@ -344,6 +344,7 @@ def train(cfg: Config) -> None:
 
     best_combined      = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
     epochs_no_improve  = 0              # consecutive MMD evals without improvement
+    mmd_history: list  = []             # [(epoch, mmd, recall, combined), ...]
 
     # Resume
     start_epoch = 0
@@ -378,6 +379,12 @@ def train(cfg: Config) -> None:
                 for _ in range(start_epoch):
                     sched_G.step()
                     sched_C.step()
+        # Restore mmd_history so the curve is continuous across restarts
+        if "mmd_history" in ckpt:
+            mmd_history = ckpt["mmd_history"]
+        # Restore best_combined so early stopping doesn't misfire
+        if "combined" in ckpt:
+            best_combined = ckpt["combined"]
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
@@ -806,6 +813,7 @@ def train(cfg: Config) -> None:
                 recovery=R if latent_ae else None,
             )
             G.load_state_dict(live_G_state)   # restore live weights for training
+            mmd_history.append((epoch, mmd_val, recall_val, combined_val))
             log += f"  EMA MMD²={mmd_val:.5f}  recall={recall_val:.3f}  comb={combined_val:.5f}"
             # Save best.pt on combined score (MMD² + 0.2*(1-recall)) to avoid
             # saving high-MMD²/high-recall checkpoints over lower-MMD²/mode-collapse ones.
@@ -824,6 +832,7 @@ def train(cfg: Config) -> None:
                     "mmd": mmd_val,
                     "recall": recall_val,
                     "combined": combined_val,
+                    "mmd_history": mmd_history,
                 }
                 if latent_ae:
                     ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
@@ -866,6 +875,7 @@ def train(cfg: Config) -> None:
             if latent_ae:
                 ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
                                   "S": S.state_dict()})
+            ckpt_data["mmd_history"] = mmd_history
             torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
 
