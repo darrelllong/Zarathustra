@@ -481,6 +481,8 @@ def train(cfg: Config) -> None:
                     c_loss = (bce(C(H_real), real_labels) +
                               bce(C(H_fake), fake_labels))
                 c_loss.backward()
+                if cfg.grad_clip > 0:
+                    nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
                 opt_C.step()
                 c_losses.append(c_loss.item())
 
@@ -551,6 +553,8 @@ def train(cfg: Config) -> None:
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
             g_loss.backward()
+            if cfg.grad_clip > 0:
+                nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
             opt_G.step()
             g_losses.append(g_loss.item())
 
@@ -698,6 +702,9 @@ def parse_args() -> Config:
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
                    help="Weight for critic feature matching loss (0 = off; "
                         "fixes mode collapse by matching critic internal features)")
+    p.add_argument("--grad-clip",              type=float, default=1.0,
+                   help="Gradient norm clip for G and C (0 = off). Prevents "
+                        "critic from dominating when LSTM weights are unconstrained.")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -742,6 +749,7 @@ def parse_args() -> Config:
     cfg.fft_loss_weight             = args.fft_loss_weight
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
+    cfg.grad_clip                   = args.grad_clip
     cfg.gp_lambda                   = args.gp_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim

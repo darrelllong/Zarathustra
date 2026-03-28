@@ -19,9 +19,10 @@ class Config:
     batch_size: int = 64
     epochs: int = 200
     g_rounds: int = 3           # used only for bce mode
-    n_critic: int = 5           # critic steps per generator step
-    lr_g: float = 0.0001        # WGAN-GP uses lower, equal LRs
-    lr_d: float = 0.0001
+    n_critic: int = 3           # critic steps per generator step
+    lr_g: float = 0.0001
+    lr_d: float = 0.00005       # slower critic: two-timescale GDA (JMLR 2025)
+    grad_clip: float = 1.0      # gradient norm clip for G and C (0 = off)
     device: str = "cuda"        # falls back to mps/cpu if unavailable
 
     # Data — single file
