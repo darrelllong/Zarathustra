@@ -596,19 +596,25 @@ def train(cfg: Config) -> None:
                     loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
-            # Quantile matching (L_Q): penalise per-feature tail mismatch at
-            # p50/p90/p95/p99.  Moment loss (mean+std) is dominated by the
-            # zero-IAT mass (>50% of samples); the rare 6-second quiet periods
-            # contribute almost nothing to the gradient.  Quantile matching
-            # directly forces the generator to reproduce the tail — small
-            # differences at p95/p99 map directly to large burst-latency errors
-            # in replay benchmarks.
+            # Quantile matching (L_Q): penalise per-feature distribution mismatch
+            # across the full range (p1…p99).  We need BOTH tails:
+            #   Upper tail (p90-p99): rare long-IAT quiet periods and large I/O
+            #     bursts that moment loss misses because zero-IAT mass dominates.
+            #   Lower tail (p1-p10): near-zero obj_id deltas = repeat/sequential
+            #     access.  Without lower quantiles, the model ignores object reuse
+            #     (generates random seeks instead of the 40-50% repeat-access rate
+            #     seen in real block storage).  p5 on obj_id_delta in signed-log
+            #     space corresponds to deltas of a few blocks — exactly the
+            #     sequential-stride pattern that drives cache hit rate.
             if cfg.quantile_loss_weight > 0:
-                q_levels = torch.tensor([0.5, 0.9, 0.95, 0.99], device=device)
+                q_levels = torch.tensor(
+                    [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
+                    device=device,
+                )
                 fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
                 rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
                 with torch.no_grad():
-                    q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (4, d)
+                    q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (9, d)
                 q_fake = torch.quantile(fd_flat, q_levels, dim=0)
                 loss_Q = nn.functional.mse_loss(q_fake, q_real)
                 g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
