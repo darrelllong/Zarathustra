@@ -19,9 +19,11 @@ class Config:
     batch_size: int = 64
     epochs: int = 200
     g_rounds: int = 3           # used only for bce mode
-    n_critic: int = 5           # critic steps per generator step
-    lr_g: float = 0.0001        # WGAN-GP uses lower, equal LRs
-    lr_d: float = 0.0001
+    n_critic: int = 3           # critic steps per generator step
+    lr_g: float = 0.0001
+    lr_d: float = 0.00005       # slower critic: two-timescale GDA (JMLR 2025)
+    grad_clip: float = 1.0      # gradient norm clip for G and C (0 = off)
+    ema_decay: float = 0.999    # EMA decay for generator weights (0 = off / use live G)
     device: str = "cuda"        # falls back to mps/cpu if unavailable
 
     # Data — single file
@@ -44,7 +46,9 @@ class Config:
     # Auxiliary generator losses
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
+    fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
+    r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
     # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).
@@ -53,6 +57,7 @@ class Config:
     pretrain_sup_epochs: int = 50     # Phase 2: pretrain supervisor on real latents
     pretrain_g_epochs: int = 100      # Phase 2.5: generator warm-up via supervisor
     supervisor_loss_weight: float = 10.0  # η: supervisor term in joint generator loss
+    supervisor_steps: int = 1         # 1 = 1-step supervisor; 2 = 2-step (SeriesGAN)
     lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
 
     # Evaluation

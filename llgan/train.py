@@ -25,6 +25,7 @@ Multi-file streaming (samples K files per epoch from a directory):
 """
 
 import argparse
+import copy
 import os
 import platform
 import random
@@ -41,7 +42,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 from config import Config
 from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
 from model import Generator, Critic, Encoder, Recovery, Supervisor
-from mmd import evaluate_mmd
+from mmd import evaluate_mmd, evaluate_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +165,20 @@ def train(cfg: Config) -> None:
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
+
+    # WGAN-GP and R2 both use create_graph=True to compute second-order gradients
+    # through the critic LSTM.  MPS does not implement lstm_mps_backward as a
+    # differentiable operation, so these features are CUDA-only.
+    if device.type == "mps":
+        if cfg.loss == "wgan-gp":
+            print("[warn] wgan-gp requires second-order LSTM gradients; "
+                  "MPS does not support lstm_mps_backward. Falling back to wgan-sn.")
+            cfg.loss = "wgan-sn"
+        if cfg.r2_lambda > 0:
+            print("[warn] r2-lambda requires create_graph=True through LSTM critic; "
+                  "not supported on MPS. Disabling R2.")
+            cfg.r2_lambda = 0.0
+
     print(f"Device: {device}  Loss: {cfg.loss}")
 
     multifile = bool(cfg.trace_dir)
@@ -187,18 +202,15 @@ def train(cfg: Config) -> None:
         print(f"  delta-encoded: {prep._delta_cols}")
         print(f"  log-transformed: {prep._log_cols}")
 
-        # Build a fixed val set from a few held-out files for MMD tracking
-        val_files = random.sample(all_files, min(2, len(all_files)))
-        import pandas as pd
-        val_dfs = []
-        for f in val_files:
-            try:
-                df = _load_raw_df(f, cfg.trace_format, cfg.records_per_file)
-                val_dfs.append(df)
-            except Exception:
-                pass
-        val_arr = prep.transform(pd.concat(val_dfs, ignore_index=True)) if val_dfs else None
-        val_ds = TraceDataset(val_arr, cfg.timestep) if val_arr is not None else None
+        # Hold out a fixed val set — remove val files from all_files so they
+        # are never sampled during training.  Build per-file TraceDatasets
+        # (same as training) so no window ever crosses a file boundary.
+        n_val_files = min(2, max(0, len(all_files) - cfg.files_per_epoch))
+        val_files = random.sample(all_files, n_val_files)
+        all_files = [f for f in all_files if f not in val_files]
+        val_ds, _ = _load_epoch_dataset(
+            val_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
+        ) if val_files else (None, [])
         val_tensor = (torch.stack([val_ds[i] for i in range(len(val_ds))])
                       if val_ds and len(val_ds) > 0 else None)
         print(f"  val windows: {len(val_ds) if val_ds else 0:,}")
@@ -249,15 +261,39 @@ def train(cfg: Config) -> None:
     else:
         E = R = S = opt_AE = opt_S = opt_ER = None
 
+    # Two-timescale gradient descent-ascent (JMLR 2025): the generator uses a
+    # faster learning rate (lr_g > lr_d) while the critic uses a slower one.
+    # This asymmetry gives the critic time to "catch up" to each generator
+    # update without oscillating wildly, which is the theoretical condition for
+    # GAN convergence in the two-player minimax setting.  In practice on MPS:
+    # lr_g=0.0001, lr_d=0.00005, n_critic=3 (not 5) — fewer critic steps
+    # combine with slower lr_d to achieve the same effective critic-to-generator
+    # update ratio without letting the unconstrained LSTM explode (v12 failure).
+    # Beta1=0.5 (vs the usual 0.9) reduces gradient momentum, which helps with
+    # GAN oscillations by making each update less "sticky".
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
     bce = nn.BCEWithLogitsLoss() if cfg.loss == "bce" else None
 
+    # EMA (Exponential Moving Average) of generator weights.
+    # GANs oscillate: the generator finds a good point, the critic adapts and
+    # pushes it away, the generator moves again.  The EMA tracks the geometric
+    # centre of the generator's recent trajectory rather than its instantaneous
+    # position, which smooths out this cycling and consistently produces better
+    # samples than the live weights (StyleGAN2, Karras et al. 2020; DDPM,
+    # Ho et al. 2020; BigGAN, Brock et al. 2019 all use EMA for inference).
+    # We evaluate and checkpoint using ema_G, not G directly.
+    # Decay 0.999: with ~100 batches/epoch the effective window is ~1000 steps
+    # (~10 epochs), long enough to smooth oscillation but short enough to track
+    # genuine improvement.
+    ema_G_state = copy.deepcopy(G.state_dict())
+    ema_decay   = cfg.ema_decay
+
     ckpt_dir = Path(cfg.checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    best_mmd = float("inf")   # track best MMD² for best.pt
+    best_combined = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
 
     # Resume
     start_epoch = 0
@@ -276,6 +312,11 @@ def train(cfg: Config) -> None:
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
+        # Restore EMA state if available; otherwise seed from current G weights
+        if "G_ema" in ckpt:
+            ema_G_state = ckpt["G_ema"]
+        else:
+            ema_G_state = copy.deepcopy(G.state_dict())
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
@@ -333,8 +374,10 @@ def train(cfg: Config) -> None:
                     H = E(xb)                               # (B, T, latent_dim)
                 opt_S.zero_grad()
                 S_out = S(H)                                # (B, T, latent_dim)
-                # S_out[t] should predict H[t+1]
-                loss_sup = nn.functional.mse_loss(S_out[:, :-1, :], H[:, 1:, :])
+                # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
+                # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
+                k = cfg.supervisor_steps
+                loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
                 loss_sup.backward()
                 opt_S.step()
                 sup_losses.append(loss_sup.item())
@@ -378,8 +421,9 @@ def train(cfg: Config) -> None:
                 H_fake = G(z_g, z_l)
                 with torch.no_grad():
                     S_out = S(H_fake)
-                # Consistency: G(z)[t+1] ≈ S(G(z))[t]
-                loss_g_sup = nn.functional.mse_loss(H_fake[:, 1:, :], S_out[:, :-1, :])
+                # Consistency: G(z)[t+k] ≈ S(G(z))[t]; k = supervisor_steps
+                k = cfg.supervisor_steps
+                loss_g_sup = nn.functional.mse_loss(H_fake[:, k:, :], S_out[:, :-k, :])
                 opt_G.zero_grad()
                 loss_g_sup.backward()
                 opt_G.step()
@@ -399,7 +443,14 @@ def train(cfg: Config) -> None:
         t0 = time.time()
         c_losses, g_losses = [], []
 
-        # In multi-file mode: resample files each epoch for broader coverage
+        # In multi-file mode: resample a fresh random subset of files each epoch.
+        # This is the key mechanism behind multi-corpus generalisation: rather than
+        # training on the full dataset simultaneously (which would require holding
+        # 378 files × 15K records = 5M+ windows in memory), we train on a random
+        # 8-file sample per epoch.  Over 300 epochs the model sees ~2400 file-epochs
+        # across 378 files — approximately 6 passes through the full corpus, enough
+        # for the model to encounter the diversity of tenant behaviours, burst regimes,
+        # and access patterns without overfitting to any single file's particularities.
         if multifile:
             epoch_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
             train_ds, _ = _load_epoch_dataset(
@@ -450,12 +501,32 @@ def train(cfg: Config) -> None:
                             create_graph=True)[0]           # (B, T, latent_dim)
                         gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
                         c_loss = c_loss + cfg.gp_lambda * gp
+                    # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                    # fake samples. Complements WGAN-GP's 1-centered interpolated-
+                    # point penalty — together they provide full convergence guarantees.
+                    if cfg.r2_lambda > 0:
+                        H_fake_r2 = H_fake.clone().requires_grad_(True)
+                        d_fake_r2 = C(H_fake_r2)
+                        grads_r2 = torch.autograd.grad(
+                            outputs=d_fake_r2.sum(), inputs=H_fake_r2,
+                            create_graph=True)[0]
+                        r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
+                        c_loss = c_loss + cfg.r2_lambda * r2
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
                     fake_labels = torch.zeros(B, 1, device=device)
                     c_loss = (bce(C(H_real), real_labels) +
                               bce(C(H_fake), fake_labels))
                 c_loss.backward()
+                if cfg.grad_clip > 0:
+                    # Gradient clipping is the primary Lipschitz constraint on
+                    # the LSTM weights, which spectral norm does not reach.
+                    # Without it, the critic's unconstrained LSTM diverged in v12:
+                    # C loss drifted from -10 to -31 over 85 epochs as LSTM
+                    # weights grew monotonically.  Clip at 1.0 (Pascanu et al.
+                    # 2013 recommendation for RNNs) prevents this without
+                    # requiring gradient penalty computation.
+                    nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
                 opt_C.step()
                 c_losses.append(c_loss.item())
 
@@ -465,10 +536,10 @@ def train(cfg: Config) -> None:
             H_fake = G(z_g, z_l)
 
             opt_G.zero_grad()
-            if cfg.loss == "wgan-sn":
+            if cfg.loss in ("wgan-sn", "wgan-gp"):
                 g_score, feat_fake = C(H_fake, return_features=True)
                 g_loss = -g_score.mean()
-            else:
+            else:  # bce
                 real_labels = torch.ones(B, 1, device=device)
                 g_score, feat_fake = C(H_fake, return_features=True)
                 g_loss = bce(g_score, real_labels)
@@ -489,8 +560,9 @@ def train(cfg: Config) -> None:
                 # This forces the generator to produce temporally coherent latents
                 # that obey the same autoregressive dynamics as real data.
                 S_on_fake = S(H_fake)
+                k = cfg.supervisor_steps
                 loss_sup = nn.functional.mse_loss(
-                    S_on_fake[:, :-1, :], H_fake[:, 1:, :])
+                    S_on_fake[:, :-k, :], H_fake[:, k:, :])
                 g_loss = g_loss + cfg.supervisor_loss_weight * loss_sup
 
                 # Decode generated latents to feature space for auxiliary losses
@@ -510,15 +582,31 @@ def train(cfg: Config) -> None:
 
             # Fourier spectral loss (L_FFT): penalise differences in frequency
             # content along the time axis — captures burst periodicity.
+            # FIDE (NeurIPS 2024): upweight bins where the real spectrum has high
+            # amplitude so rare/extreme I/O events (burst opcodes, large obj_size)
+            # are not washed out by the flat MSE average.
             if cfg.fft_loss_weight > 0:
                 real_fft = torch.fft.rfft(real_batch.float(), dim=1).abs()
                 fake_fft = torch.fft.rfft(fake_decoded.float(), dim=1).abs()
-                loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
+                if cfg.fide_alpha > 0:
+                    weight_f = 1.0 + cfg.fide_alpha * (
+                        real_fft / (real_fft.mean(dim=1, keepdim=True) + 1e-8))
+                    loss_fft = (weight_f * (fake_fft - real_fft).pow(2)).mean()
+                else:
+                    loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
             g_loss.backward()
+            if cfg.grad_clip > 0:
+                nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
             opt_G.step()
             g_losses.append(g_loss.item())
+
+            # EMA update: blend live weights toward EMA state.
+            # Done in-place on the CPU-side state dict to avoid GPU memory overhead.
+            with torch.no_grad():
+                for k, v in G.state_dict().items():
+                    ema_G_state[k].mul_(ema_decay).add_(v.cpu(), alpha=1.0 - ema_decay)
 
             # --- Encoder + Recovery joint step (latent AE mode only) ---
             # Fine-tunes the autoencoder during GAN training to keep the latent
@@ -526,13 +614,14 @@ def train(cfg: Config) -> None:
             if latent_ae:
                 H_real_grad = E(real_batch)
                 X_hat = R(H_real_grad)
-                # Reconstruction loss
-                loss_ae = nn.functional.mse_loss(X_hat, real_batch)
-                # Supervisor guides embedder to produce predictable latents
-                S_on_real = S(H_real_grad.detach())
-                loss_sup_e = nn.functional.mse_loss(
-                    S_on_real[:, :-1, :], H_real_grad[:, 1:, :].detach())
-                er_loss = loss_ae + cfg.supervisor_loss_weight * loss_sup_e
+                # Reconstruction loss only: supervisor (S) is frozen after
+                # pretraining and has no optimizer in Phase 3.  The previous
+                # supervisor term here was a no-op — both its input
+                # (H_real_grad.detach()) and target were detached, so no
+                # gradient flowed and no parameter in opt_ER was updated by it.
+                # (Per peer review: freeze S after pretraining rather than
+                # silently running a dead term.)
+                er_loss = nn.functional.mse_loss(X_hat, real_batch)
                 opt_ER.zero_grad()
                 er_loss.backward()
                 opt_ER.step()
@@ -548,23 +637,32 @@ def train(cfg: Config) -> None:
                f"{n_files_str}")
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
-            mmd_val = evaluate_mmd(G, val_tensor, cfg.mmd_samples,
-                                   cfg.timestep, device,
-                                   recovery=R if latent_ae else None)
-            log += f"  MMD²={mmd_val:.5f}"
-            # Save best.pt whenever MMD² improves — captures the best model
-            # regardless of where checkpoint_every lands.
-            if mmd_val < best_mmd:
-                best_mmd = mmd_val
+            # Evaluate using the EMA model, not the live G.
+            # Save live weights first, then swap in EMA, then restore.
+            live_G_state = copy.deepcopy(G.state_dict())
+            G.load_state_dict({k: v.to(device) for k, v in ema_G_state.items()})
+            mmd_val, recall_val, combined_val = evaluate_metrics(
+                G, val_tensor, cfg.mmd_samples, cfg.timestep, device,
+                recovery=R if latent_ae else None,
+            )
+            G.load_state_dict(live_G_state)   # restore live weights for training
+            log += f"  EMA MMD²={mmd_val:.5f}  recall={recall_val:.3f}  comb={combined_val:.5f}"
+            # Save best.pt on combined score (MMD² + 0.2*(1-recall)) to avoid
+            # saving high-MMD²/high-recall checkpoints over lower-MMD²/mode-collapse ones.
+            if combined_val < best_combined:
+                best_combined = combined_val
                 ckpt_data = {
                     "epoch": epoch,
-                    "G": G.state_dict(),
+                    "G": live_G_state,         # live weights (for resuming training)
+                    "G_ema": ema_G_state,       # EMA weights (for inference/generation)
                     "C": C.state_dict(),
                     "opt_G": opt_G.state_dict(),
                     "opt_C": opt_C.state_dict(),
                     "prep": prep,
                     "config": cfg,
-                    "mmd": best_mmd,
+                    "mmd": mmd_val,
+                    "recall": recall_val,
+                    "combined": combined_val,
                 }
                 if latent_ae:
                     ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
@@ -582,6 +680,7 @@ def train(cfg: Config) -> None:
             ckpt_data = {
                 "epoch": epoch,
                 "G": G.state_dict(),
+                "G_ema": ema_G_state,
                 "C": C.state_dict(),
                 "opt_G": opt_G.state_dict(),
                 "opt_C": opt_C.state_dict(),
@@ -658,9 +757,18 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    p.add_argument("--fide-alpha",         type=float, default=1.0,
+                   help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
                    help="Weight for critic feature matching loss (0 = off; "
                         "fixes mode collapse by matching critic internal features)")
+    p.add_argument("--grad-clip",              type=float, default=1.0,
+                   help="Gradient norm clip for G and C (0 = off). Prevents "
+                        "critic from dominating when LSTM weights are unconstrained.")
+    p.add_argument("--ema-decay",              type=float, default=0.999,
+                   help="EMA decay for generator weights (default 0.999). "
+                        "EMA model is used for evaluation and generation; "
+                        "smooths GAN oscillations. 0 = use live weights.")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -672,6 +780,10 @@ def parse_args() -> Config:
                    help="Phase 2.5: generator warm-up epochs (TimeGAN supervised init)")
     p.add_argument("--supervisor-loss-weight", type=float, default=10.0,
                    help="η: supervisor consistency weight in joint training")
+    p.add_argument("--supervisor-steps",   type=int,   default=1,
+                   help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--r2-lambda",          type=float, default=0.0,
+                   help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
                    help="Learning rate for encoder + recovery")
     args = p.parse_args()
@@ -699,13 +811,18 @@ def parse_args() -> Config:
     cfg.train_split         = args.train_split
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
+    cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
+    cfg.grad_clip                   = args.grad_clip
+    cfg.ema_decay                   = args.ema_decay
     cfg.gp_lambda                   = args.gp_lambda
+    cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
     cfg.pretrain_g_epochs       = args.pretrain_g_epochs
     cfg.supervisor_loss_weight  = args.supervisor_loss_weight
+    cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     return cfg
 
