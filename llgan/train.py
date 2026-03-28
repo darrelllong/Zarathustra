@@ -648,6 +648,35 @@ def train(cfg: Config) -> None:
                 loss_Q = nn.functional.mse_loss(q_fake, q_real)
                 g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
 
+            # Autocorrelation matching (L_ACF): penalise per-feature lag-1..5 ACF
+            # mismatch between real and generated sequences.
+            #
+            # Why this matters: the supervisor loss enforces 1-step temporal
+            # consistency (h_t → h_{t+1}) in latent space.  The FFT loss captures
+            # the power spectrum.  Neither directly penalises multi-lag temporal
+            # correlation structure, which is exactly what the DMD-GEN metric
+            # (Grassmannian distance of dominant DMD subspaces) measures.
+            # On v9/best.pt: DMD-GEN=0.674 despite MMD²=0.010 — the model learns
+            # good marginal distributions but wrong sequential law.
+            #
+            # ACF at lag k for feature j: E[(x_t - μ)(x_{t+k} - μ)] / σ²
+            # We use the unnormalised version (just the cross-product mean) since
+            # the sequences are already in [-1, 1] and normalisation by σ² would
+            # require computing it over the batch, adding noise to the gradient.
+            # Mean is subtracted per-feature per-sequence to remove DC offset.
+            if cfg.acf_loss_weight > 0:
+                # Centre each sequence so the cross-product is a pure correlation
+                # (not contaminated by mean level differences).
+                fd_c = fake_decoded - fake_decoded.mean(dim=1, keepdim=True)
+                rb_c = real_batch   - real_batch.mean(dim=1, keepdim=True)
+                acf_loss = torch.zeros(1, device=device)
+                for lag in range(1, 6):      # lags 1..5
+                    fake_acf = (fd_c[:, :-lag, :] * fd_c[:, lag:, :]).mean(dim=1)
+                    with torch.no_grad():
+                        real_acf = (rb_c[:, :-lag, :] * rb_c[:, lag:, :]).mean(dim=1)
+                    acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
+                g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
+
             g_loss.backward()
             if cfg.grad_clip > 0:
                 nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
@@ -821,6 +850,10 @@ def parse_args() -> Config:
     p.add_argument("--quantile-loss-weight", type=float, default=0.2,
                    help="Weight for per-feature quantile matching at p50/90/95/99 (0 = off); "
                         "directly fixes tail/burst IAT mismatch that moment loss misses")
+    p.add_argument("--acf-loss-weight",    type=float, default=0.1,
+                   help="Weight for lag-1..5 autocorrelation matching loss (0 = off). "
+                        "Targets DMD-GEN failure: supervisor loss only enforces 1-step "
+                        "prediction; ACF loss directly penalises multi-lag temporal structure.")
     p.add_argument("--fide-alpha",         type=float, default=1.0,
                    help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
@@ -881,6 +914,7 @@ def parse_args() -> Config:
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
     cfg.quantile_loss_weight        = args.quantile_loss_weight
+    cfg.acf_loss_weight             = args.acf_loss_weight
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip
