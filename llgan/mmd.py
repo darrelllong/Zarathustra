@@ -1,17 +1,42 @@
 """
 Maximum Mean Discrepancy (MMD) with RBF kernel, plus multi-metric evaluation.
 
-Lower MMD → generated distribution is closer to real.
-LLGAN targets 0.015–0.05 per the paper.
+Why MMD²?
+---------
+MMD² is the squared maximum mean discrepancy: it measures how different two
+distributions are by comparing their kernel-mean embeddings. A value of 0
+means the generator is perfect; higher = worse.
 
-evaluate_metrics() returns both MMD² and β-recall (PRDC) so that best.pt
-is selected on a combined score that penalises mode collapse (low recall)
-as well as distributional mismatch (high MMD²):
+We use a multi-scale RBF kernel (σ ∈ {0.1, 0.5, 1.0, 2.0, 5.0}) rather than
+a single bandwidth. A single σ is sensitive to the choice: too small → the
+kernel saturates at 1 for close points and underestimates distance between
+distributions; too large → distant points look similar. The multi-scale
+average is more robust across the mixed-scale features of I/O traces (IATs
+vary from microseconds to minutes; object sizes vary from 512B to 128MB).
 
-    combined = MMD² + 0.2 * (1 − recall)
+Why evaluate_metrics() instead of evaluate_mmd()?
+--------------------------------------------------
+MMD² alone cannot distinguish two failure modes with similar MMD² scores:
 
-Both metrics are computed in flat feature space (flattened windows) so they
-are directly comparable across checkpoints regardless of architecture.
+  (a) Low MMD², high recall: the generator covers most of the real distribution
+      — this is the desired outcome.
+  (b) Low MMD², low recall: the generator has collapsed onto the most common
+      mode (e.g., "small read at typical IAT") and achieves low distributional
+      distance by nailing the mode, while missing burst events, writes, and
+      large sequential reads entirely.
+
+β-recall (from PRDC) measures the fraction of real samples that fall within
+the k-NN ball of at least one generated sample — directly quantifying mode
+coverage. A model with recall < 0.3 is typically mode-collapsed.
+
+The combined score weights them:
+    combined = MMD² + 0.2 × (1 − recall)
+
+At recall=0 (total collapse) the penalty is +0.2, which is larger than the
+MMD² improvement we'd expect from memorising the mode. At recall=1 the penalty
+vanishes. The weight 0.2 was chosen so that the recall term is a secondary
+tiebreaker (doesn't override a large MMD² improvement) but blocks saving a
+mode-collapsed checkpoint over a well-covered one.
 """
 
 import numpy as np

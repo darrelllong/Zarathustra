@@ -206,9 +206,39 @@ class TracePreprocessor:
     """
     Fit on training data; transform train + val to [-1, 1].
 
-    Timestamp columns are delta-encoded before normalization so the model
-    learns inter-arrival time distributions rather than absolute time values.
-    The first absolute timestamp is stored for reconstruction.
+    The three non-trivial preprocessing choices are explained here because
+    they directly affect what the model can learn:
+
+    (1) Timestamps → inter-arrival times (IAT / delta encoding)
+        Absolute timestamps are non-stationary: trace A runs from 0–3600s,
+        trace B from 0–7200s, so the same value means different things.
+        Delta-encoding the timestamps produces inter-arrival times (IATs),
+        which *are* stationary: the distribution of gaps between I/Os is
+        roughly the same whether we're at second 100 or second 3000 of the
+        trace. This is the right quantity for an LSTM to model because it
+        can then be trained across files without the model memorising
+        absolute clock values.  Clipping negative deltas to 0 handles the
+        rare out-of-order timestamps in some trace formats.
+
+    (2) Object/LBA IDs → signed-log delta encoding
+        Raw object IDs are meaningless as continuous numbers: Tencent block
+        IDs are 17-digit hashes where Euclidean closeness has no physical
+        meaning.  The *delta* (change in ID from one request to the next)
+        captures the access pattern: small delta = sequential access,
+        large delta = random seek, negative delta = backward seek.
+        The signed-log transform (sign(d)*log1p(|d|)) compresses the
+        roughly 10-decade range of deltas (from 0 for sequential hits to
+        10^10 for full-disk random seeks) so that both ends of the range
+        are representable with tanh output and normalisation within [-1, 1].
+
+    (3) Sizes and IATs → log1p before min-max normalisation
+        I/O sizes and inter-arrival times follow approximate power-law
+        (Pareto) distributions: most accesses are small and frequent,
+        but there are rare large / slow outliers.  Without log-transform,
+        the bulk of the distribution (say, 4 KB accesses arriving every
+        1 ms) is squashed into a tiny sliver of the normalised range and
+        the model spends capacity learning the rare outliers.  Log1p
+        approximately Gaussianises these distributions.
     """
 
     def __init__(self):

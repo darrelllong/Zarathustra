@@ -1,4 +1,50 @@
-"""LLGAN model: LSTM generator + LSTM critic (WGAN-SN) + latent AE components."""
+"""
+LLGAN model components.
+
+Architecture overview
+---------------------
+Training follows a four-phase curriculum adapted from TimeGAN/SeriesGAN:
+
+  Phase 1 — Autoencoder pretrain:
+    Encoder (E) and Recovery (R) are trained jointly on real sequences to
+    build a smooth latent space. Once this space is learned, the generator
+    only needs to produce points in it — a much easier task than directly
+    generating raw features with their mixed scales and co-dependencies.
+
+  Phase 2 — Supervisor pretrain:
+    Supervisor (S) is trained on real latent trajectories to predict
+    H_{t+1} from H_t. This distils the real temporal dynamics into S's
+    weights before GAN training begins, giving the generator a meaningful
+    target for its temporal structure.
+
+  Phase 2.5 — Generator warm-up:
+    Generator (G) is trained to fool S (minimise |S(G(z)) - G(z)[1:]|),
+    not the critic. This seeds G into the same latent space as real data
+    before the adversarial signal is introduced.
+
+  Phase 3 — Joint GAN:
+    All five components train together. G produces latent sequences that
+    R decodes to features for the critic. The critic's gradient signal
+    (WGAN) is now layered on top of the supervisor consistency term.
+
+Why this phasing? Direct GAN training from scratch in a high-dimensional
+feature space (5 correlated features spanning 10 decades of dynamic range)
+is notoriously unstable. The AE reduces the problem to a smooth low-dim
+latent space; the supervisor provides a useful training signal before the
+discriminator is competent enough to give meaningful gradients.
+
+GRU vs LSTM choices
+--------------------
+E, R, S use GRU: fewer parameters than LSTM, no cell state. The AE task
+(compression + reconstruction) is essentially a denoising problem; GRU's
+simpler gating is sufficient and faster to train. The supervisor's 1-step
+prediction task also does not require LSTM's long-range cell memory.
+
+G and C use LSTM: the generator needs to maintain workload identity over an
+entire window (which regime is this trace in? bursty or idle?). LSTM's
+explicit cell state is better at carrying this "global context" signal
+across many timesteps without it leaking out through the forget gate.
+"""
 
 from typing import Optional, Tuple
 
@@ -16,8 +62,10 @@ class Encoder(nn.Module):
 
     (batch, timestep, num_cols) → (batch, timestep, latent_dim) ∈ [0, 1]
 
-    Sigmoid output keeps latents bounded, matching the generator's output
-    range and stabilising training of the recovery and supervisor.
+    The output range [0, 1] (Sigmoid) is intentional: it matches the
+    Generator's output range so that real and generated latents live in the
+    same bounded space, which stabilises the supervisor and prevents the
+    Recovery from needing to handle out-of-range inputs.
     """
 
     def __init__(self, num_cols: int, hidden_size: int, latent_dim: int):
@@ -43,7 +91,11 @@ class Recovery(nn.Module):
 
     (batch, timestep, latent_dim) → (batch, timestep, num_cols) ∈ [-1, 1]
 
-    Tanh output matches the [-1, 1] range of the normalised input features.
+    Tanh matches the [-1, 1] range of the preprocessor's min-max
+    normalisation. Recovery is the bridge between the latent and feature
+    worlds; keeping its output range consistent with training data prevents
+    the critic from learning a trivial "real inputs are in [-1,1], fake
+    inputs might not be" shortcut.
     """
 
     def __init__(self, latent_dim: int, hidden_size: int, num_cols: int):
@@ -65,13 +117,21 @@ class Recovery(nn.Module):
 
 class Supervisor(nn.Module):
     """
-    GRU supervisor: predicts H_{t+1} from H_t.
+    GRU supervisor: predicts next latent H_{t+1} from current latent H_t.
 
-    Trained on real latent sequences to capture temporal dynamics.
-    During joint training it acts as a consistency regulariser for the
-    generator: output[t] ≈ input[t+1], so S(G(z))[:, :-1, :] ≈ G(z)[:, 1:, :].
+    Pre-training on real latents makes S into a learned "physics" of the
+    workload's temporal dynamics: if H_t represents "idle" then S(H_t)
+    should predict "still idle" or "transitioning to burst". This signal
+    is then used as an auxiliary loss for the generator (§ 4.5 of the paper)
+    to enforce temporal coherence in generated traces.
 
-    (batch, timestep, latent_dim) → (batch, timestep, latent_dim) ∈ [0, 1]
+    The supervisor loss weight η controls how strongly temporal coherence
+    is enforced relative to the adversarial signal. Too high (η ≫ 1) →
+    the generator satisfies the supervisor trivially by outputting constant
+    latents (the zero vector is always consistent with itself). Too low →
+    the adversarial signal dominates and temporal structure is ignored.
+    The v11 collapse at η=10 with 100 warm-up epochs illustrates the first
+    failure mode; v13 uses η=10 but only 50 warm-up epochs to avoid it.
     """
 
     def __init__(self, latent_dim: int, hidden_size: int):
@@ -99,19 +159,36 @@ class Generator(nn.Module):
     """
     LSTM generator with split-latent noise design.
 
-    Noise is split into two independent components:
-      z_global (batch, noise_dim)           — encodes workload identity;
-                                              projected to LSTM initial state.
-      z_local  (batch, timestep, noise_dim) — per-step innovation noise;
-                                              fed as LSTM input at each step.
+    The noise is decomposed into two orthogonal components rather than a
+    single flat vector:
 
-    When latent_dim is set (latent AE mode):
-      Output is (batch, timestep, latent_dim) ∈ [0, 1] via Sigmoid —
-      compatible with the Encoder's output range. The Recovery module
-      decodes to feature space.
+      z_global (batch, noise_dim)
+        Encodes workload identity — which tenant, what access regime, what
+        diurnal phase. Projected to the LSTM's initial (h_0, c_0) state,
+        so every timestep "knows" which workload it belongs to. Two windows
+        with the same z_global will have similar high-level structure (same
+        burst frequency, similar working set) but different event-level noise.
 
-    When latent_dim is None (legacy direct mode):
-      Output is (batch, timestep, num_cols) ∈ (-1, 1) via Tanh.
+      z_local (batch, timestep, noise_dim)
+        Per-step innovation noise — drives the stochasticity within a single
+        window. Because it is fed as the LSTM input at each step, the LSTM
+        can modulate how much of the local noise bleeds through based on the
+        current hidden state (i.e., the workload context set by z_global).
+
+    This split is critical for multi-stream generation: each stream gets its
+    own fixed z_global (sampled once at stream start) but independent z_local
+    per window, producing traces that are globally coherent but locally varied.
+    Without this split, every window would be statistically independent and
+    the long-range burst structure of the real traces would be lost.
+
+    Latent AE mode (latent_dim > 0):
+      Output is (batch, timestep, latent_dim) ∈ [0, 1] via Sigmoid. The
+      Recovery module then decodes to feature space. This decouples generation
+      from preprocessing: the generator never sees raw features and does not
+      need to learn the complex non-linear preprocessing pipeline in reverse.
+
+    Legacy direct mode (latent_dim = None):
+      Output is (batch, timestep, num_cols) ∈ (-1, 1) via Tanh. Used by v4/v5.
     """
 
     def __init__(
@@ -125,11 +202,15 @@ class Generator(nn.Module):
         self.noise_dim   = noise_dim
         self.num_cols    = num_cols
         self.hidden_size = hidden_size
-        self.latent_dim  = latent_dim  # None → legacy feature-space output
+        self.latent_dim  = latent_dim
 
         out_dim = latent_dim if latent_dim is not None else num_cols
 
-        # Project global code → initial LSTM hidden and cell states
+        # Separate projections for h_0 and c_0 give the model two degrees of
+        # freedom to encode workload context: h_0 sets the initial output gate
+        # bias, c_0 sets the long-term memory content. In practice this lets
+        # z_global influence both "what the generator is doing now" (h) and
+        # "what it will tend to do over the window" (c).
         self.z_to_h0 = nn.Linear(noise_dim, hidden_size)
         self.z_to_c0 = nn.Linear(noise_dim, hidden_size)
 
@@ -140,7 +221,6 @@ class Generator(nn.Module):
             batch_first=True,
         )
         self.fc      = nn.Linear(hidden_size, out_dim)
-        # Sigmoid matches Encoder range [0,1]; Tanh for legacy feature output
         self.out_act = nn.Sigmoid() if latent_dim is not None else nn.Tanh()
         self._init_weights()
 
@@ -159,20 +239,17 @@ class Generator(nn.Module):
         return_hidden: bool = False,
     ):
         """
-        z_global: (batch, noise_dim)           — workload identity code;
-                  used to initialise hidden state when `hidden` is None.
-        z_local:  (batch, timestep, noise_dim) — per-step innovation noise.
-        hidden:   optional (h, c) tuple to continue from a previous window;
-                  if None, h0/c0 are derived from z_global.
-        return_hidden: if True, return (output, hidden) instead of output.
-
-        Returns: (batch, timestep, out_dim),
-                 or ((batch, timestep, out_dim), (h_n, c_n)) when return_hidden.
-        out_dim is latent_dim (Sigmoid) in latent AE mode, num_cols (Tanh) otherwise.
+        z_global : (batch, noise_dim) — workload code, used to set h_0/c_0.
+        z_local  : (batch, timestep, noise_dim) — per-step innovation noise.
+        hidden   : (h, c) tuple to continue generation across windows.
+                   Pass the previous window's final hidden state here to
+                   maintain temporal coherence across window boundaries
+                   (used by generate.py for long trace synthesis).
+        return_hidden : pass True when generating multi-window traces.
         """
         if hidden is None:
             h0 = self.z_to_h0(z_global).unsqueeze(0)   # (1, batch, hidden)
-            c0 = self.z_to_c0(z_global).unsqueeze(0)   # (1, batch, hidden)
+            c0 = self.z_to_c0(z_global).unsqueeze(0)
             hidden = (h0, c0)
         h, hidden_out = self.lstm(z_local, hidden)
         out = self.out_act(self.fc(h))
@@ -193,6 +270,10 @@ class Generator(nn.Module):
         z_local  = torch.randn(n_windows, timestep, self.noise_dim, device=device)
         out = self(z_global, z_local)
         if opcode_col >= 0:
+            # Hard-binarise opcode: the continuous generator output is a soft
+            # interpolation between read and write; applying a threshold here
+            # ensures the synthetic trace contains only valid opcodes, not
+            # fractional values that have no physical meaning.
             out[:, :, opcode_col] = (out[:, :, opcode_col] >= 0).float() * 2 - 1
         return out
 
@@ -201,37 +282,60 @@ class Critic(nn.Module):
     """
     LSTM critic for Wasserstein training (WGAN-SN variant).
 
-    Outputs an unbounded real score (no sigmoid) — higher = more "real".
-    Lipschitz constraint is partially enforced via spectral normalisation on
-    the output linear layer only. The LSTM weights are unconstrained — a known
-    weakness. Full enforcement (WGAN-GP gradient penalty or SN on all weights)
-    requires CUDA and will be added once the NVIDIA box is available.
+    Outputs an unbounded real-valued score — the Wasserstein distance
+    estimator. No sigmoid: a sigmoid-bounded discriminator saturates when the
+    generator is far from real, producing near-zero gradients and stalling
+    training. Wasserstein loss provides useful gradients even when the
+    distributions are disjoint (which is typical early in training).
 
-    Temporal pooling uses learned attention instead of mean-pooling.
-    Mean-pooling washes out short bursts, sudden regime changes, and rare
-    write-heavy segments; attention lets the critic weight the most
-    discriminative timesteps.
+    Lipschitz constraint: we apply spectral normalisation to the output
+    linear layer only. True Lipschitz enforcement (WGAN-GP gradient penalty
+    or SN on all LSTM weight matrices) requires CUDA because MPS does not
+    implement lstm_mps_backward as a differentiable operation. On MPS we
+    instead use gradient clipping (clip_grad_norm_ at 1.0) to prevent the
+    unconstrained LSTM weights from growing without bound — which caused
+    training collapse in v12 (C loss -10 → -31 over 85 epochs).
+
+    Temporal pooling via learned attention (not mean pooling):
+    Mean pooling treats all timesteps identically. For I/O workloads this
+    is wrong: a 1-timestep burst (sudden IOPS spike) is the most
+    discriminative feature of a bursty workload, but mean pooling dilutes
+    it across the other 11 idle timesteps. The attention module learns to
+    up-weight the timesteps that best distinguish real from fake, which
+    makes the critic sensitive to burst structure and regime transitions —
+    exactly what the DMD-GEN metric shows we need to improve.
+
+    Feature matching:
+    The pooled hidden state (before the final linear) is returned when
+    return_features=True. The generator uses this to minimise the
+    discrepancy between real and fake critic representations, which
+    empirically reduces mode collapse by providing a smoother training
+    signal than the Wasserstein loss alone.
     """
 
     def __init__(self, num_cols: int, hidden_size: int,
                  use_spectral_norm: bool = True):
         super().__init__()
 
-        # Spectral norm on the output projection only — applying it to LSTM
-        # weight matrices is prohibitively slow due to per-step power iteration.
-        # When using WGAN-GP the gradient penalty already enforces the Lipschitz
-        # constraint, so spectral norm is optional (and can slightly interfere
-        # with GP by normalising weights before the penalty gradient is computed).
         self.lstm = nn.LSTM(
             input_size=num_cols,
             hidden_size=hidden_size,
             num_layers=1,
             batch_first=True,
         )
-        # Learned attention scorer: maps each hidden state → scalar weight
+        # A single linear layer maps each LSTM hidden state to a scalar
+        # attention weight. Softmax across the time dimension gives a
+        # probability distribution over timesteps, letting the critic
+        # focus on the most informative moments in the sequence.
         self.attn = nn.Linear(hidden_size, 1)
+
         fc = nn.Linear(hidden_size, 1)
         if use_spectral_norm:
+            # SN bounds the Lipschitz constant of this layer alone.
+            # The LSTM remains unconstrained — gradient clipping handles
+            # that indirectly. Applying SN to individual LSTM matrices
+            # requires ~4× more power-iteration steps per forward pass
+            # and was not worth the overhead on MPS hardware.
             from torch.nn.utils import spectral_norm
             fc = spectral_norm(fc)
         self.fc = fc
@@ -246,12 +350,7 @@ class Critic(nn.Module):
 
     def forward(self, x: torch.Tensor,
                 return_features: bool = False):
-        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score.
-
-        return_features: if True, also return the attention-pooled hidden state
-            (batch, hidden_size) before the final linear.  Used for feature
-            matching in the generator step to improve mode coverage.
-        """
+        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score."""
         h, _ = self.lstm(x)                                    # (B, T, H)
         attn_w = torch.softmax(self.attn(h), dim=1)            # (B, T, 1)
         pooled = (attn_w * h).sum(dim=1)                       # (B, H)

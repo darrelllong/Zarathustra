@@ -260,6 +260,16 @@ def train(cfg: Config) -> None:
     else:
         E = R = S = opt_AE = opt_S = opt_ER = None
 
+    # Two-timescale gradient descent-ascent (JMLR 2025): the generator uses a
+    # faster learning rate (lr_g > lr_d) while the critic uses a slower one.
+    # This asymmetry gives the critic time to "catch up" to each generator
+    # update without oscillating wildly, which is the theoretical condition for
+    # GAN convergence in the two-player minimax setting.  In practice on MPS:
+    # lr_g=0.0001, lr_d=0.00005, n_critic=3 (not 5) — fewer critic steps
+    # combine with slower lr_d to achieve the same effective critic-to-generator
+    # update ratio without letting the unconstrained LSTM explode (v12 failure).
+    # Beta1=0.5 (vs the usual 0.9) reduces gradient momentum, which helps with
+    # GAN oscillations by making each update less "sticky".
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
@@ -413,7 +423,14 @@ def train(cfg: Config) -> None:
         t0 = time.time()
         c_losses, g_losses = [], []
 
-        # In multi-file mode: resample files each epoch for broader coverage
+        # In multi-file mode: resample a fresh random subset of files each epoch.
+        # This is the key mechanism behind multi-corpus generalisation: rather than
+        # training on the full dataset simultaneously (which would require holding
+        # 378 files × 15K records = 5M+ windows in memory), we train on a random
+        # 8-file sample per epoch.  Over 300 epochs the model sees ~2400 file-epochs
+        # across 378 files — approximately 6 passes through the full corpus, enough
+        # for the model to encounter the diversity of tenant behaviours, burst regimes,
+        # and access patterns without overfitting to any single file's particularities.
         if multifile:
             epoch_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
             train_ds, _ = _load_epoch_dataset(
@@ -482,6 +499,13 @@ def train(cfg: Config) -> None:
                               bce(C(H_fake), fake_labels))
                 c_loss.backward()
                 if cfg.grad_clip > 0:
+                    # Gradient clipping is the primary Lipschitz constraint on
+                    # the LSTM weights, which spectral norm does not reach.
+                    # Without it, the critic's unconstrained LSTM diverged in v12:
+                    # C loss drifted from -10 to -31 over 85 epochs as LSTM
+                    # weights grew monotonically.  Clip at 1.0 (Pascanu et al.
+                    # 2013 recommendation for RNNs) prevents this without
+                    # requiring gradient penalty computation.
                     nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
                 opt_C.step()
                 c_losses.append(c_loss.item())
