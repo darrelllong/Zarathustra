@@ -322,7 +322,8 @@ def _load_checkpoint(path: str, device):
     return ckpt
 
 
-def _sample_fake(ckpt, n_samples: int, device) -> np.ndarray:
+def _sample_fake(ckpt, n_samples: int, device,
+                 batch_size: int = 256) -> np.ndarray:
     from model import Generator, Recovery
     cfg  = ckpt["config"]
     prep = ckpt["prep"]
@@ -331,7 +332,10 @@ def _sample_fake(ckpt, n_samples: int, device) -> np.ndarray:
 
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=latent_dim).to(device)
-    G.load_state_dict(ckpt["G"])
+    # Prefer EMA weights: smoother, less oscillated, consistently produces
+    # better samples than the instantaneous live weights at any given epoch.
+    g_weights = ckpt.get("G_ema", ckpt["G"])
+    G.load_state_dict({k: v.to(device) for k, v in g_weights.items()})
     G.eval()
 
     R = None
@@ -340,13 +344,18 @@ def _sample_fake(ckpt, n_samples: int, device) -> np.ndarray:
         R.load_state_dict(ckpt["R"])
         R.eval()
 
+    chunks = []
     with torch.no_grad():
-        z_g = torch.randn(n_samples, cfg.noise_dim, device=device)
-        z_l = torch.randn(n_samples, cfg.timestep, cfg.noise_dim, device=device)
-        fake = G(z_g, z_l)
-        if R is not None:
-            fake = R(fake)
-    return fake.cpu().numpy().reshape(n_samples, -1)
+        for start in range(0, n_samples, batch_size):
+            n = min(batch_size, n_samples - start)
+            z_g = torch.randn(n, cfg.noise_dim, device=device)
+            z_l = torch.randn(n, cfg.timestep, cfg.noise_dim, device=device)
+            out = G(z_g, z_l)
+            if R is not None:
+                out = R(out)
+            chunks.append(out.cpu().numpy())
+    fake = np.concatenate(chunks, axis=0)   # (n_samples, T, d)
+    return fake.reshape(n_samples, -1)
 
 
 def _load_encoder(ckpt, device):
@@ -420,11 +429,20 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
 
     # Context-FID: Fréchet distance in the Encoder's latent space
     E = _load_encoder(ckpt, device)
-    cfid = None
-    if E is not None:
-        real_t = torch.tensor(real_seqs, dtype=torch.float32)
-        fake_t = torch.tensor(fake_seqs, dtype=torch.float32)
-        cfid = context_fid(real_seqs, fake_seqs, E, device)
+    cfid = context_fid(real_seqs, fake_seqs, E, device) if E is not None else None
+
+    # Reuse rate: fraction of positions (t>0) whose obj_id exactly matches
+    # a prior position within the same window.  Real block I/O: ~40-50%.
+    def _reuse_rate(seqs: np.ndarray) -> float:
+        # seqs: (N, T, d); obj_id is column 1
+        obj = seqs[:, :, 1]          # (N, T)
+        hits = 0
+        for t in range(1, obj.shape[1]):
+            hits += (np.abs(obj[:, :t] - obj[:, t:t+1]) < 1e-6).any(axis=1).sum()
+        return hits / (obj.shape[0] * (obj.shape[1] - 1))
+
+    real_reuse = _reuse_rate(real_seqs)
+    fake_reuse = _reuse_rate(fake_seqs)
 
     print(f"\n{'─'*40}")
     print(f"  MMD²         : {mmd:.5f}")
@@ -436,6 +454,8 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     print(f"  AutoCorr     : {ac_score:.4f}  (lag-1..5 ACF diff; 0=perfect)")
     if cfid is not None:
         print(f"  Context-FID  : {cfid:.2f}  (Fréchet in encoder latent space; <10 good)")
+    print(f"  reuse rate   : real={real_reuse:.3f}  fake={fake_reuse:.3f}"
+          f"  {'⚠ locality gap' if abs(real_reuse - fake_reuse) > 0.1 else ''}")
     print(f"{'─'*40}")
 
     if baseline_path:
