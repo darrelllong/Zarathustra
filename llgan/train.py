@@ -509,7 +509,7 @@ def train(cfg: Config) -> None:
     for epoch in range(start_epoch, cfg.epochs):
         G.train(); C.train()
         t0 = time.time()
-        c_losses, g_losses = [], []
+        c_losses, g_losses, w_dists = [], [], []
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -554,7 +554,12 @@ def train(cfg: Config) -> None:
 
                 opt_C.zero_grad()
                 if cfg.loss in ("wgan-sn", "wgan-gp"):
-                    c_loss = (C(H_fake) - C(H_real)).mean()
+                    # Separate W estimate from penalty terms so the log shows
+                    # the true Wasserstein distance (W > 0 = critic winning;
+                    # oscillating W = GAN cycling).
+                    c_base = (C(H_fake) - C(H_real)).mean()
+                    w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
+                    c_loss = c_base
                     if cfg.loss == "wgan-gp":
                         # Gradient penalty: enforce 1-Lipschitz on all critic
                         # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
@@ -795,12 +800,13 @@ def train(cfg: Config) -> None:
 
         c_mean = sum(c_losses) / len(c_losses)
         g_mean = sum(g_losses) / len(g_losses)
+        w_mean = sum(w_dists)  / len(w_dists) if w_dists else float("nan")
         elapsed = time.time() - t0
 
         n_files_str = (f"  files={len(epoch_files)}" if multifile else
                        f"  windows={len(train_ds):,}")
         log = (f"Epoch {epoch+1:4d}/{cfg.epochs}  "
-               f"C={c_mean:.4f}  G={g_mean:.4f}  t={elapsed:.1f}s"
+               f"W={w_mean:+.4f}  C={c_mean:.4f}  G={g_mean:.4f}  t={elapsed:.1f}s"
                f"{n_files_str}")
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
