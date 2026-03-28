@@ -14,10 +14,17 @@ spc          : ASU, LBA, Size(512B), Opcode(r/w), Timestamp(s)
 msr          : Timestamp(100ns), Hostname, DiskNumber, Type, Offset, Size, ResponseTime
 k5cloud      : StorageVolumeId, Timestamp, Opcode(R/W), Offset, Size(1024B)
 systor       : Timestamp, ResponseTime, Opcode(R/W), LUN, Offset, Size(512B)
-oracle_general: libCacheSim binary format (24 bytes/record):
+oracle_general: libCacheSim oracleGeneral binary format (24 bytes/record):
                 uint32 ts, uint64 obj_id, uint32 obj_size,
                 int32 next_access_vtime, int16 op, int16 tenant_id
                 obj_id is delta-encoded with signed-log (not raw) — see _OBJ_DELTA_COLS.
+lcs          : libCacheSim native binary format (.lcs.zst), versioned header.
+                Header: 8192 bytes (magic + version + trace stats).
+                v1 (24 bytes/record): uint32 ts, uint64 obj_id, uint32 obj_size,
+                                      int64 next_access_vtime  [no op/tenant]
+                v2 (28 bytes/record): same + packed uint32 (op:8 bits | tenant:24 bits)
+                op: OP_READ=12, OP_WRITE=13 (libCacheSim enum.h; remapped to r/w internally)
+                Covers: tencentBlock, alibabaBlock LCS corpuses (4,900+ files, ~1 TB)
 exchange_etw : Windows ETW .csv.gz (MSR Exchange Server traces, SNIA IOTTA):
                DiskRead/DiskWrite completion events only;
                ts(µs), opcode, offset(bytes), size(bytes), response_time(µs), disk
@@ -113,6 +120,115 @@ def _read_oracle_general(path: str, max_records: int) -> pd.DataFrame:
     return df
 
 
+def _read_lcs(path: str, max_records: int) -> pd.DataFrame:
+    """
+    libCacheSim native LCS binary format (.lcs or .lcs.zst).
+
+    File layout (from libCacheSim/traceReader/customizedReader/lcs.h):
+      Header : 8192 bytes
+        [0:8]   start_magic (0x123456789abcdef0 LE)
+        [8:16]  version     (uint64: 1, 2, 3, …)
+        [16:]   trace stats (n_req, n_obj, size histograms, …) — not used here
+      Records : after the 8192-byte header, one struct per I/O request
+
+    Record structs:
+      v1 (24 bytes): uint32 ts | uint64 obj_id | uint32 obj_size | int64 vtime
+      v2 (28 bytes): same + packed uint32 (bits 0-7 = op, bits 8-31 = tenant)
+      v3+ : larger records (int64 obj_size, ttl, feature fields) — not yet supported
+
+    op encoding (libCacheSim enum.h): OP_READ=12, OP_WRITE=13.
+    Ops 1-11 are cache-protocol ops (GET/SET/CAS/etc.) treated as reads.
+    We remap 13→'w', else→'r' before returning so the standard opcode encoder applies.
+
+    The next_access_vtime field is a forward pointer (index of next request to the
+    same object, -1 if last) — a derived annotation used by cache simulators,
+    not a workload field.  It is dropped before returning.
+    """
+    import subprocess
+
+    LCS_MAGIC   = 0x123456789abcdef0
+    LCS_HEADER  = 8192
+
+    # --- decompress or open ---
+    if path.endswith(".zst"):
+        proc = subprocess.Popen(
+            ["zstd", "-d", "-c", path],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        header_raw = proc.stdout.read(LCS_HEADER)
+    elif path.endswith(".gz"):
+        import gzip
+        f = gzip.open(path, "rb")
+        header_raw = f.read(LCS_HEADER)
+    else:
+        f = open(path, "rb")
+        header_raw = f.read(LCS_HEADER)
+
+    # Validate magic and read version
+    import struct
+    if len(header_raw) < 16:
+        raise ValueError(f"LCS file too short for header: {path}")
+    magic, version = struct.unpack_from("<QQ", header_raw, 0)
+    if magic != LCS_MAGIC:
+        raise ValueError(
+            f"LCS magic mismatch in {path}: got 0x{magic:016x}, "
+            f"expected 0x{LCS_MAGIC:016x}"
+        )
+
+    if version == 1:
+        rec_size = 24
+        dt = np.dtype([
+            ("ts",       "<u4"),
+            ("obj_id",   "<u8"),
+            ("obj_size", "<u4"),
+            ("vtime",    "<i8"),   # int64 next_access_vtime (dropped below)
+        ])
+    elif version == 2:
+        rec_size = 28
+        dt = np.dtype([
+            ("ts",       "<u4"),
+            ("obj_id",   "<u8"),
+            ("obj_size", "<u4"),
+            ("packed",   "<u4"),   # bits 0-7 = op, bits 8-31 = tenant
+            ("vtime",    "<i8"),
+        ])
+    else:
+        raise ValueError(
+            f"LCS version {version} not yet supported (only v1 and v2). "
+            f"File: {path}"
+        )
+
+    # Read only as many record bytes as needed
+    n_bytes = max_records * rec_size
+    if path.endswith(".zst"):
+        raw = proc.stdout.read(n_bytes)
+        proc.stdout.close()
+        proc.wait()
+    else:
+        raw = f.read(n_bytes)
+        f.close()
+
+    n = min(len(raw) // rec_size, max_records)
+    arr = np.frombuffer(raw[:n * rec_size], dtype=dt)
+    df = pd.DataFrame(arr)
+    df.drop(columns=["vtime"], inplace=True)
+
+    if version == 1:
+        # No op/tenant in v1; default to read (most block traces are read-dominant)
+        df["opcode"] = "r"
+    else:
+        # Unpack op (low 8 bits) and tenant (high 24 bits) from packed field.
+        # libCacheSim op_e enum (enum.h): OP_READ=12, OP_WRITE=13.
+        # Keys 1-11 are cache ops (GET/SET/etc.) which we treat as reads since
+        # they are cache lookups, not block writes.
+        op_raw = arr["packed"] & 0xFF
+        df["opcode"] = np.where(op_raw == 13, "w", "r")
+        df["tenant"] = (arr["packed"] >> 8).astype(np.int32)
+        df.drop(columns=["packed"], inplace=True)
+
+    return df
+
+
 def _read_csv(path: str, max_records: int) -> pd.DataFrame:
     df = pd.read_csv(path, nrows=max_records)
     return df
@@ -173,6 +289,7 @@ _READERS = {
     "k5cloud": _read_k5cloud,
     "systor": _read_systor,
     "oracle_general": _read_oracle_general,
+    "lcs": _read_lcs,
     "exchange_etw": _read_exchange_etw,
     "csv": _read_csv,
 }
@@ -441,8 +558,10 @@ def load_trace(
         raise ValueError(f"Unknown trace format '{fmt}'. "
                          f"Choose from: {list(_READERS)}")
 
-    # oracle_general handles its own decompression; others go through pandas
-    if fmt != "oracle_general" and str(path).endswith(".zst"):
+    # oracle_general and lcs handle their own decompression (binary format with
+    # fixed-width records; streaming avoids loading the full file into memory);
+    # all other formats go through pandas after a full zstd decompress.
+    if fmt not in ("oracle_general", "lcs") and str(path).endswith(".zst"):
         import subprocess, tempfile, os
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
         subprocess.run(["zstd", "-d", path, "-o", tmp.name, "-f"], check=True)

@@ -49,35 +49,53 @@ Rather than training on a single trace file, Zarathustra samples a random subset
 
 ### Trace corpus
 
-Training data comes from the [libCacheSim cache-datasets](https://github.com/1a1a11a/libCacheSim) corpus in `oracleGeneral` binary format, hosted in a public AWS S3 bucket.  See [**Downloading the traces**](#downloading-the-traces) below for instructions.
+Training data comes from the [libCacheSim cache-datasets](https://github.com/1a1a11a/libCacheSim) corpus, hosted in a public AWS S3 bucket.  Both `oracleGeneral` and native `lcs` binary formats are supported.  See [**Downloading the traces**](#downloading-the-traces) below for instructions.
 
 ### Evaluation
 
-Quality is tracked during training using **Maximum Mean Discrepancy (MMD²)** against a held-out validation set. Lower MMD² indicates the generated distribution is closer to real. The target is statistical indistinguishability — MMD² near zero across all marginal and joint distributions of the trace fields.
+Quality is tracked during training using **Maximum Mean Discrepancy (MMD²)** combined with **β-recall** (mode coverage) against a held-out validation set.  The combined score `MMD² + 0.2·(1−recall)` is used for checkpoint selection, which prevents saving mode-collapsed checkpoints that achieve low MMD² by ignoring rare burst events.  Lower is better; the target is statistical indistinguishability.
 
 ## Downloading the traces
 
 The training data is part of the public **libCacheSim cache-dataset** corpus, maintained by Juncheng Yang et al. and hosted in a public AWS S3 bucket.  No account or credentials are required.
 
-| Dataset | Period | Volumes | Size (oracleGeneral) | Character |
-|---------|--------|---------|----------------------|-----------|
-| **Tencent Block 2020** | 9 days (217 h) | ~4,995 | ~152 GB | 512B–32KB, 83–94% reads |
-| **Alibaba Block 2020** | 31 days (744 h) | ~1,001 | ~93 GB | 4KB-aligned, mixed read ratio |
+### Available datasets
 
-Each volume is a separate `.oracleGeneral.zst` file (zstd-compressed 24-byte binary records).  Volumes are bucketed by the number of unique objects into subdirectories `1K/`, `10K/`, `100K/`, `1M/`.
+| Dataset | Period | Format files | Size | Character |
+|---------|--------|-------------|------|-----------|
+| **Tencent Block 2020** | 9 days | 382 oracleGeneral | 152 GB | 512B–32KB blocks, 83–94% reads |
+| **Alibaba Block 2020** | 31 days | 242 oracleGeneral | 93 GB | 4KB-aligned, mixed read/write |
+| **Tencent Photo 2018** | — | 2 oracleGeneral | 52 GB | Object store, large objects |
+| **Twitter 2020** | — | 54 oracleGeneral | 142 GB | CDN/KV cache, high fan-out |
+| **Meta KV 2022** | — | 3 oracleGeneral | 29 GB | Key-value cache, TTL-heavy |
+| **CloudPhysics 2015** | — | 106 oracleGeneral | 8.6 GB | VM disk I/O, varied workloads |
+| **MSR Cambridge 2007** | — | 14 oracleGeneral | 1.5 GB | Enterprise disk traces |
+| **Meta CDN 2022** | — | 3 oracleGeneral | 2.1 GB | CDN edge cache |
+| **Tencent Block LCS** | 9 days | 4,482 lcs | 662 GB | Same corpus, native LCS format |
+| **Alibaba Block LCS** | 31 days | 428 lcs | 292 GB | Same corpus, native LCS format |
+
+The `oracleGeneral` format (24 bytes/record) is the quickest to get started with.  The `lcs` files contain the same workloads with richer metadata (op codes, tenant IDs) and are split into more files, giving finer-grained per-volume models.
 
 ### Quick start (AWS CLI)
 
 ```bash
 # Install AWS CLI if needed:  brew install awscli  or  pip install awscli
 
-# Tencent Block 2020 — all volumes (~152 GB)
+# Tencent Block 2020 — oracleGeneral format (~152 GB)
 aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/ \
     ./traces/2020_tencentBlock/ --no-sign-request
 
-# Alibaba Block 2020 — all volumes (~93 GB)
+# Alibaba Block 2020 — oracleGeneral format (~93 GB)
 aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/ \
     ./traces/2020_alibabaBlock/ --no-sign-request
+
+# Twitter 2020 — oracleGeneral format (~142 GB; CDN workload, very different character)
+aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_twitter/ \
+    ./traces/2020_twitter/ --no-sign-request
+
+# Tencent Block — native LCS format (~662 GB; 4,482 files, more per-volume detail)
+aws s3 sync s3://cache-datasets/cache_dataset_lcs/tencentBlock/ \
+    ./traces/lcs/tencentBlock/ --no-sign-request
 ```
 
 If you only want a manageable sample to get started, download one size bucket:
@@ -86,52 +104,53 @@ If you only want a manageable sample to get started, download one size bucket:
 # ~10–20 GB subset: volumes with 100K–1M unique objects
 aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/ \
     ./traces/2020_tencentBlock/ --no-sign-request
-
-aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1M/ \
-    ./traces/2020_alibabaBlock/ --no-sign-request
 ```
 
-### Alternative: single concatenated files
+### S3 format prefixes
 
-The full corpora are also available as single pre-concatenated files (useful for quick experiments but bypass the multi-file streaming training mode):
+| S3 prefix | Format flag | Notes |
+|-----------|-------------|-------|
+| `s3://cache-datasets/cache_dataset_oracleGeneral/` | `oracle_general` | 24-byte binary; fastest to load |
+| `s3://cache-datasets/cache_dataset_lcs/` | `lcs` | Versioned binary with op/tenant; 4× more files |
+| `s3://cache-datasets/cache_dataset_txt/` | `csv` | Plain-text; largest on disk |
+| `s3://cache-datasets/cache_dataset_parquet/` | — | Parquet; not yet supported |
 
-```bash
-# Single-file versions (HTTPS, no AWS CLI needed)
-wget https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/other/tencent_block.oracleGeneral.zst
-wget https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/other/alibaba_block2020.oracleGeneral.zst
+### File formats
+
+**oracleGeneral** (24 bytes/record):
 ```
-
-### Browsing the full file list
-
-A TSV manifest of all available files and their URLs is at:
-
-```
-https://s3.amazonaws.com/cache-datasets/cache_dataset_oracleGeneral/
-```
-
-The same data is available in alternative formats under separate prefixes:
-
-| S3 prefix | Format |
-|-----------|--------|
-| `s3://cache-datasets/cache_dataset_oracleGeneral/` | 24-byte binary (oracleGeneral); used by this project |
-| `s3://cache-datasets/cache_dataset_lcs/` | libCacheSim `.lcs.zst` |
-| `s3://cache-datasets/cache_dataset_txt/` | plain-text CSV |
-| `s3://cache-datasets/cache_dataset_parquet/` | Parquet |
-
-### Reading oracleGeneral files
-
-The `oracleGeneral` format is a fixed-width binary format defined by libCacheSim.  Each 24-byte record contains:
-
-```
-uint32  timestamp        (seconds)
-uint64  object_id
-uint32  object_size      (bytes)
-int32   next_access_vtime
-int16   op               (1=read, 2=write, …)
+uint32  timestamp            (seconds since epoch)
+uint64  object_id            (hash of key or LBA)
+uint32  object_size          (bytes)
+int32   next_access_vtime    (forward pointer; dropped at load time)
+int16   op                   (0=read, 1=write)
 int16   tenant_id
 ```
 
-Zarathustra's `dataset.py` reads this format directly (format flag `--fmt oracle_general`); no external tools are needed.  For other analysis the [libCacheSim](https://github.com/1a1a11a/libCacheSim) C library and Python bindings provide a full reader.
+**lcs** (native libCacheSim binary, versioned):
+```
+Header: 8192 bytes
+  [0:8]   magic   = 0x123456789abcdef0
+  [8:16]  version (uint64: 1 or 2; determines record size)
+  [16:]   trace statistics (n_req, n_obj, size histograms, …)
+
+v1 record (24 bytes):
+  uint32  clock_time   (seconds)
+  uint64  obj_id
+  uint32  obj_size     (bytes)
+  int64   next_access_vtime   (dropped at load time)
+
+v2 record (28 bytes, adds op and tenant):
+  uint32  clock_time
+  uint64  obj_id
+  uint32  obj_size
+  uint32  packed       (bits 0-7 = op, bits 8-31 = tenant_id)
+  int64   next_access_vtime
+
+op codes (libCacheSim enum.h): OP_READ=12, OP_WRITE=13
+```
+
+Zarathustra's `dataset.py` reads both formats natively (flags `--fmt oracle_general` and `--fmt lcs`); no external tools needed.  For other analysis the [libCacheSim](https://github.com/1a1a11a/libCacheSim) C library and Python bindings provide a full reader.
 
 ### Citation
 
@@ -161,13 +180,23 @@ python train.py \
 ### Training (multi-file streaming, recommended)
 
 ```bash
+# oracleGeneral format (fastest; 382 files for tencentBlock)
 python train.py \
-    --trace-dir /Volumes/Archive/Traces/s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock \
+    --trace-dir /path/to/cache_dataset_oracleGeneral/2020_tencentBlock \
     --fmt oracle_general \
     --files-per-epoch 8 \
     --records-per-file 15000 \
     --epochs 300 \
-    --checkpoint-dir checkpoints/tencent_multifile
+    --checkpoint-dir checkpoints/tencent_v14
+
+# LCS format (richer metadata; 4,482 files for tencentBlock)
+python train.py \
+    --trace-dir /path/to/cache_dataset_lcs/tencentBlock \
+    --fmt lcs \
+    --files-per-epoch 8 \
+    --records-per-file 15000 \
+    --epochs 300 \
+    --checkpoint-dir checkpoints/tencent_lcs_v1
 ```
 
 ### Generating synthetic traces
@@ -183,11 +212,13 @@ python generate.py \
 
 | Format | Description |
 |--------|-------------|
-| `oracle_general` | libCacheSim 24-byte binary (oracleGeneral) |
+| `oracle_general` | libCacheSim 24-byte binary (oracleGeneral); fastest |
+| `lcs` | libCacheSim native binary v1/v2 (.lcs.zst); includes op codes and tenant |
 | `spc` | ASU SPC-1 CSV |
 | `msr` | Microsoft Research Cambridge traces |
 | `k5cloud` | K5Cloud block traces |
 | `systor` | Systor block traces |
+| `exchange_etw` | Windows ETW disk traces (.csv.gz; MSR SNIA Exchange Server) |
 | `csv` | Generic CSV (numeric columns auto-detected) |
 
 ## Repository layout
