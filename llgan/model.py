@@ -314,11 +314,15 @@ class Critic(nn.Module):
     """
 
     def __init__(self, num_cols: int, hidden_size: int,
-                 use_spectral_norm: bool = True):
+                 use_spectral_norm: bool = True,
+                 minibatch_std: bool = True):
         super().__init__()
-
+        self.minibatch_std = minibatch_std
+        # One extra input feature when minibatch_std is on: the mean per-step
+        # standard deviation across the batch, appended as a scalar channel.
+        lstm_input = num_cols + (1 if minibatch_std else 0)
         self.lstm = nn.LSTM(
-            input_size=num_cols,
+            input_size=lstm_input,
             hidden_size=hidden_size,
             num_layers=1,
             batch_first=True,
@@ -351,6 +355,17 @@ class Critic(nn.Module):
     def forward(self, x: torch.Tensor,
                 return_features: bool = False):
         """x: (batch, timestep, num_cols) → (batch, 1) unbounded score."""
+        if self.minibatch_std:
+            # Minibatch standard deviation (Karras et al., ProGAN/StyleGAN2).
+            # Compute the per-feature std across the batch at each timestep,
+            # average across features, and append as a single extra channel.
+            # This gives the critic direct access to within-batch diversity:
+            # when the generator collapses, all rows look alike, std ≈ 0, and
+            # the critic learns to score low-diversity batches as fake.
+            std_per_step = x.std(dim=0, keepdim=True)           # (1, T, D)
+            std_scalar   = std_per_step.mean(dim=-1, keepdim=True)  # (1, T, 1)
+            std_channel  = std_scalar.expand(x.shape[0], -1, -1)    # (B, T, 1)
+            x = torch.cat([x, std_channel], dim=-1)             # (B, T, D+1)
         h, _ = self.lstm(x)                                    # (B, T, H)
         attn_w = torch.softmax(self.attn(h), dim=1)            # (B, T, 1)
         pooled = (attn_w * h).sum(dim=1)                       # (B, H)

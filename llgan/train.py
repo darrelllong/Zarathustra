@@ -256,7 +256,8 @@ def train(cfg: Config) -> None:
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=cfg.latent_dim if latent_ae else None).to(device)
     C = Critic(critic_input_dim, cfg.hidden_size,
-               use_spectral_norm=use_sn).to(device)
+               use_spectral_norm=use_sn,
+               minibatch_std=cfg.minibatch_std).to(device)
 
     if latent_ae:
         E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim).to(device)
@@ -883,6 +884,8 @@ def parse_args() -> Config:
     p.add_argument("--timestep",         type=int,   default=12)
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--hidden-size",      type=int,   default=256)
+    p.add_argument("--no-minibatch-std", action="store_true", default=False,
+                   help="Disable minibatch std channel in critic (on by default)")
     p.add_argument("--lr-g",             type=float, default=0.0001)
     p.add_argument("--lr-d",             type=float, default=0.0001)
     p.add_argument("--n-critic",         type=int,   default=5)
@@ -960,6 +963,7 @@ def parse_args() -> Config:
     cfg.timestep         = args.timestep
     cfg.noise_dim        = args.noise_dim
     cfg.hidden_size      = args.hidden_size
+    cfg.minibatch_std    = not args.no_minibatch_std
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
     cfg.n_critic         = args.n_critic
