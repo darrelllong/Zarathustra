@@ -22,13 +22,14 @@ class Config:
     n_critic: int = 3           # critic steps per generator step
     lr_g: float = 0.0001
     lr_d: float = 0.00005       # slower critic: two-timescale GDA (JMLR 2025)
+    lr_cosine_decay: float = 0.05  # cosine anneal eta_min = lr * this (0 = constant LR)
     grad_clip: float = 1.0      # gradient norm clip for G and C (0 = off)
     ema_decay: float = 0.999    # EMA decay for generator weights (0 = off / use live G)
     device: str = "cuda"        # falls back to mps/cpu if unavailable
 
     # Data — single file
     trace_path: str = ""
-    trace_format: str = "spc"   # spc | msr | k5cloud | systor | oracle_general | csv
+    trace_format: str = "spc"   # spc | msr | k5cloud | systor | oracle_general | lcs | csv
     max_records: int = 60_000   # max records in single-file mode
     train_split: float = 0.8
 
@@ -45,9 +46,12 @@ class Config:
 
     # Auxiliary generator losses
     moment_loss_weight: float = 0.1   # L_V: per-feature mean+std matching (0 = off)
+    quantile_loss_weight: float = 0.2  # L_Q: per-feature quantile matching at p50/90/95/99 (0 = off)
     fft_loss_weight: float = 0.05     # L_FFT: frequency-domain matching (0 = off)
+    acf_loss_weight: float = 0.1      # L_ACF: lag-1..5 autocorrelation matching (0 = off)
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
+    r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)

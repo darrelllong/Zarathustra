@@ -174,6 +174,10 @@ def train(cfg: Config) -> None:
             print("[warn] wgan-gp requires second-order LSTM gradients; "
                   "MPS does not support lstm_mps_backward. Falling back to wgan-sn.")
             cfg.loss = "wgan-sn"
+        if cfg.r1_lambda > 0:
+            print("[warn] r1-lambda requires create_graph=True through LSTM critic; "
+                  "not supported on MPS. Disabling R1.")
+            cfg.r1_lambda = 0.0
         if cfg.r2_lambda > 0:
             print("[warn] r2-lambda requires create_graph=True through LSTM critic; "
                   "not supported on MPS. Disabling R2.")
@@ -274,6 +278,24 @@ def train(cfg: Config) -> None:
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
+    # Cosine annealing: decay lr from initial → eta_min over cfg.epochs steps.
+    # In the second half of training the generator and critic are close to
+    # equilibrium — large gradient steps cause them to perpetually overshoot
+    # each other (GAN cycling oscillation).  Cosine annealing damps those steps
+    # smoothly without a hard schedule boundary.  EMA handles the weight-space
+    # noise; cosine annealing handles the training-dynamics noise.
+    # eta_min = lr * lr_cosine_decay (default 0.05 = 5% of initial LR).
+    # Set lr_cosine_decay=0 to disable (constant LR, backward-compatible).
+    if cfg.lr_cosine_decay > 0:
+        sched_G = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt_G, T_max=cfg.epochs, eta_min=cfg.lr_g * cfg.lr_cosine_decay
+        )
+        sched_C = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt_C, T_max=cfg.epochs, eta_min=cfg.lr_d * cfg.lr_cosine_decay
+        )
+    else:
+        sched_G = sched_C = None
+
     bce = nn.BCEWithLogitsLoss() if cfg.loss == "bce" else None
 
     # EMA (Exponential Moving Average) of generator weights.
@@ -317,6 +339,17 @@ def train(cfg: Config) -> None:
             ema_G_state = ckpt["G_ema"]
         else:
             ema_G_state = copy.deepcopy(G.state_dict())
+        # Restore scheduler state if present; otherwise fast-forward to the
+        # correct position so the LR matches start_epoch (handles old checkpoints
+        # that predate scheduler support without silently using the wrong LR).
+        if sched_G is not None:
+            if "sched_G" in ckpt:
+                sched_G.load_state_dict(ckpt["sched_G"])
+                sched_C.load_state_dict(ckpt["sched_C"])
+            else:
+                for _ in range(start_epoch):
+                    sched_G.step()
+                    sched_C.step()
         print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
@@ -490,8 +523,8 @@ def train(cfg: Config) -> None:
                     if cfg.loss == "wgan-gp":
                         # Gradient penalty: enforce 1-Lipschitz on all critic
                         # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
-                        # Works on MPS (create_graph=True is supported since
-                        # PyTorch 2.0) — previously assumed CUDA-only in error.
+                        # Requires create_graph=True through the LSTM; CUDA only
+                        # (MPS falls back to wgan-sn at device selection time).
                         eps = torch.rand(B, 1, 1, device=device)
                         x_hat = (eps * H_real.detach() +
                                  (1 - eps) * H_fake).requires_grad_(True)
@@ -501,6 +534,18 @@ def train(cfg: Config) -> None:
                             create_graph=True)[0]           # (B, T, latent_dim)
                         gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
                         c_loss = c_loss + cfg.gp_lambda * gp
+                    # R1 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
+                    # real samples. Penalises |∇C(x_real)|² → 0, preventing the
+                    # critic from memorising real data via large local gradients.
+                    # Effective under wgan-sn too (not restricted to wgan-gp).
+                    if cfg.r1_lambda > 0:
+                        H_real_r1 = H_real.detach().clone().requires_grad_(True)
+                        d_real_r1 = C(H_real_r1)
+                        grads_r1 = torch.autograd.grad(
+                            outputs=d_real_r1.sum(), inputs=H_real_r1,
+                            create_graph=True)[0]
+                        r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
+                        c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
                     # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
                     # fake samples. Complements WGAN-GP's 1-centered interpolated-
                     # point penalty — together they provide full convergence guarantees.
@@ -596,6 +641,58 @@ def train(cfg: Config) -> None:
                     loss_fft = nn.functional.mse_loss(fake_fft, real_fft)
                 g_loss = g_loss + cfg.fft_loss_weight * loss_fft
 
+            # Quantile matching (L_Q): penalise per-feature distribution mismatch
+            # across the full range (p1…p99).  We need BOTH tails:
+            #   Upper tail (p90-p99): rare long-IAT quiet periods and large I/O
+            #     bursts that moment loss misses because zero-IAT mass dominates.
+            #   Lower tail (p1-p10): near-zero obj_id deltas = repeat/sequential
+            #     access.  Without lower quantiles, the model ignores object reuse
+            #     (generates random seeks instead of the 40-50% repeat-access rate
+            #     seen in real block storage).  p5 on obj_id_delta in signed-log
+            #     space corresponds to deltas of a few blocks — exactly the
+            #     sequential-stride pattern that drives cache hit rate.
+            if cfg.quantile_loss_weight > 0:
+                q_levels = torch.tensor(
+                    [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
+                    device=device,
+                )
+                fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
+                rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
+                with torch.no_grad():
+                    q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (9, d)
+                q_fake = torch.quantile(fd_flat, q_levels, dim=0)
+                loss_Q = nn.functional.mse_loss(q_fake, q_real)
+                g_loss = g_loss + cfg.quantile_loss_weight * loss_Q
+
+            # Autocorrelation matching (L_ACF): penalise per-feature lag-1..5 ACF
+            # mismatch between real and generated sequences.
+            #
+            # Why this matters: the supervisor loss enforces 1-step temporal
+            # consistency (h_t → h_{t+1}) in latent space.  The FFT loss captures
+            # the power spectrum.  Neither directly penalises multi-lag temporal
+            # correlation structure, which is exactly what the DMD-GEN metric
+            # (Grassmannian distance of dominant DMD subspaces) measures.
+            # On v9/best.pt: DMD-GEN=0.674 despite MMD²=0.010 — the model learns
+            # good marginal distributions but wrong sequential law.
+            #
+            # ACF at lag k for feature j: E[(x_t - μ)(x_{t+k} - μ)] / σ²
+            # We use the unnormalised version (just the cross-product mean) since
+            # the sequences are already in [-1, 1] and normalisation by σ² would
+            # require computing it over the batch, adding noise to the gradient.
+            # Mean is subtracted per-feature per-sequence to remove DC offset.
+            if cfg.acf_loss_weight > 0:
+                # Centre each sequence so the cross-product is a pure correlation
+                # (not contaminated by mean level differences).
+                fd_c = fake_decoded - fake_decoded.mean(dim=1, keepdim=True)
+                rb_c = real_batch   - real_batch.mean(dim=1, keepdim=True)
+                acf_loss = torch.zeros(1, device=device)
+                for lag in range(1, 6):      # lags 1..5
+                    fake_acf = (fd_c[:, :-lag, :] * fd_c[:, lag:, :]).mean(dim=1)
+                    with torch.no_grad():
+                        real_acf = (rb_c[:, :-lag, :] * rb_c[:, lag:, :]).mean(dim=1)
+                    acf_loss = acf_loss + nn.functional.mse_loss(fake_acf, real_acf)
+                g_loss = g_loss + cfg.acf_loss_weight * (acf_loss / 5)
+
             g_loss.backward()
             if cfg.grad_clip > 0:
                 nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
@@ -687,11 +784,20 @@ def train(cfg: Config) -> None:
                 "prep": prep,
                 "config": cfg,
             }
+            if sched_G is not None:
+                ckpt_data["sched_G"] = sched_G.state_dict()
+                ckpt_data["sched_C"] = sched_C.state_dict()
             if latent_ae:
                 ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
                                   "S": S.state_dict()})
             torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
+
+        # Step cosine scheduler at end of epoch (after checkpoint) so the LR
+        # in the saved opt state matches the epoch that was just trained.
+        if sched_G is not None:
+            sched_G.step()
+            sched_C.step()
 
     final_path = ckpt_dir / "final.pt"
     final_data = {
@@ -757,6 +863,13 @@ def parse_args() -> Config:
                    help="Weight for per-feature moment matching loss (0 = off)")
     p.add_argument("--fft-loss-weight",    type=float, default=0.05,
                    help="Weight for Fourier spectral loss (0 = off)")
+    p.add_argument("--quantile-loss-weight", type=float, default=0.2,
+                   help="Weight for per-feature quantile matching at p50/90/95/99 (0 = off); "
+                        "directly fixes tail/burst IAT mismatch that moment loss misses")
+    p.add_argument("--acf-loss-weight",    type=float, default=0.1,
+                   help="Weight for lag-1..5 autocorrelation matching loss (0 = off). "
+                        "Targets DMD-GEN failure: supervisor loss only enforces 1-step "
+                        "prediction; ACF loss directly penalises multi-lag temporal structure.")
     p.add_argument("--fide-alpha",         type=float, default=1.0,
                    help="FIDE frequency inflation weight; 0 = flat FFT loss (NeurIPS 2024)")
     p.add_argument("--feature-matching-weight", type=float, default=1.0,
@@ -769,6 +882,11 @@ def parse_args() -> Config:
                    help="EMA decay for generator weights (default 0.999). "
                         "EMA model is used for evaluation and generation; "
                         "smooths GAN oscillations. 0 = use live weights.")
+    p.add_argument("--lr-cosine-decay",        type=float, default=0.05,
+                   help="Cosine annealing: eta_min = lr * this factor over training "
+                        "(default 0.05 = decay to 5%% of initial LR). "
+                        "Damps GAN oscillations in the second half of training "
+                        "where G and C are near equilibrium. 0 = constant LR.")
     # Latent AE + supervisor
     p.add_argument("--latent-dim",           type=int,   default=24,
                    help="Latent space dim for AE+supervisor mode; 0 = legacy direct mode")
@@ -782,6 +900,8 @@ def parse_args() -> Config:
                    help="η: supervisor consistency weight in joint training")
     p.add_argument("--supervisor-steps",   type=int,   default=1,
                    help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--r1-lambda",          type=float, default=0.0,
+                   help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
                    help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
@@ -811,11 +931,15 @@ def parse_args() -> Config:
     cfg.train_split         = args.train_split
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
+    cfg.quantile_loss_weight        = args.quantile_loss_weight
+    cfg.acf_loss_weight             = args.acf_loss_weight
     cfg.fide_alpha                  = args.fide_alpha
     cfg.feature_matching_weight     = args.feature_matching_weight
     cfg.grad_clip                   = args.grad_clip
     cfg.ema_decay                   = args.ema_decay
+    cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
+    cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
