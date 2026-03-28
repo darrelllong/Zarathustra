@@ -69,3 +69,4 @@ class Config:
     # Evaluation
     mmd_every: int = 5
     mmd_samples: int = 1000
+    early_stop_patience: int = 0    # evals without improvement before stopping (0 = off)

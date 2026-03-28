@@ -321,7 +321,8 @@ def train(cfg: Config) -> None:
     ckpt_dir = Path(cfg.checkpoint_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    best_combined = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
+    best_combined      = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
+    epochs_no_improve  = 0              # consecutive MMD evals without improvement
 
     # Resume
     start_epoch = 0
@@ -788,7 +789,8 @@ def train(cfg: Config) -> None:
             # Save best.pt on combined score (MMD² + 0.2*(1-recall)) to avoid
             # saving high-MMD²/high-recall checkpoints over lower-MMD²/mode-collapse ones.
             if combined_val < best_combined:
-                best_combined = combined_val
+                best_combined     = combined_val
+                epochs_no_improve = 0
                 ckpt_data = {
                     "epoch": epoch,
                     "G": live_G_state,         # live weights (for resuming training)
@@ -807,11 +809,23 @@ def train(cfg: Config) -> None:
                                       "S": S.state_dict()})
                 torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
+            else:
+                epochs_no_improve += 1
             G.train()
             if latent_ae:
                 E.train(); R.train(); S.train()
 
         print(log, flush=True)
+
+        # Early stopping: halt when combined score has not improved for
+        # patience × mmd_every epochs.  0 = disabled.
+        if (cfg.early_stop_patience > 0
+                and epochs_no_improve >= cfg.early_stop_patience):
+            print(f"Early stop: no improvement for "
+                  f"{epochs_no_improve * cfg.mmd_every} epochs "
+                  f"(patience={cfg.early_stop_patience} × mmd_every={cfg.mmd_every}).",
+                  flush=True)
+            break
 
         if (epoch + 1) % cfg.checkpoint_every == 0:
             ckpt_path = ckpt_dir / f"epoch_{epoch+1:04d}.pt"
@@ -901,6 +915,8 @@ def parse_args() -> Config:
     p.add_argument("--checkpoint-every", type=int,   default=10)
     p.add_argument("--mmd-every",        type=int,   default=5)
     p.add_argument("--mmd-samples",      type=int,   default=1000)
+    p.add_argument("--early-stop-patience", type=int, default=0,
+                   help="Stop after N consecutive MMD evals without improvement (0=off)")
     p.add_argument("--train-split",      type=float, default=0.8)
     p.add_argument("--moment-loss-weight", type=float, default=0.1,
                    help="Weight for per-feature moment matching loss (0 = off)")
@@ -972,8 +988,9 @@ def parse_args() -> Config:
     cfg.records_per_file = args.records_per_file
     cfg.checkpoint_dir   = args.checkpoint_dir
     cfg.checkpoint_every = args.checkpoint_every
-    cfg.mmd_every           = args.mmd_every
-    cfg.mmd_samples         = args.mmd_samples
+    cfg.mmd_every              = args.mmd_every
+    cfg.mmd_samples            = args.mmd_samples
+    cfg.early_stop_patience    = args.early_stop_patience
     cfg.train_split         = args.train_split
     cfg.moment_loss_weight          = args.moment_loss_weight
     cfg.fft_loss_weight             = args.fft_loss_weight
