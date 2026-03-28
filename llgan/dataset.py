@@ -28,6 +28,26 @@ lcs          : libCacheSim native binary format (.lcs.zst), versioned header.
 exchange_etw : Windows ETW .csv.gz (MSR Exchange Server traces, SNIA IOTTA):
                DiskRead/DiskWrite completion events only;
                ts(µs), opcode, offset(bytes), size(bytes), response_time(µs), disk
+baleen24     : Microsoft Baleen 2024 storage traces (ASPLOS '24).
+               Space-separated text, 8 columns, no header:
+               block_id io_offset io_size op_time op_name pipeline user_namespace user_name
+               op_name: 1=read, 2=write, 3=flush, 4=discard, 5=other (3-5 mapped to 'r').
+               op_time is Unix epoch float (seconds).
+               Path may be a plain text file or a member of a .tar.gz tarball.
+               Canonical mapping: ts=op_time, obj_id=io_offset, obj_size=io_size,
+               opcode=op_name, tenant=pipeline.
+               Files: /Volumes/Archive/Traces/Baleen24/storage_*.tar.gz on wigner.
+tencent_cloud_disk: Tencent Cloud Disk aggregate statistics (ASPLOS '25, TELA paper).
+               CSV, 6 columns, no header, 300-second sampling interval:
+               timestamp, read_iops, read_bw_kbps, write_iops, write_bw_kbps, disk_usage_mb
+               16,297 disks; UUID-named files inside a zip archive.
+               NOTE: This is AGGREGATE per-disk stats (not request-level traces) — the
+               data model is fundamentally different from oracle_general/lcs.  Use for
+               workload characterization and utilization modeling, not for generating
+               synthetic request sequences.  Model must be trained separately from
+               oracle_general models.
+               Path: plain CSV file extracted from the zip, OR the zip path (reads first
+               matching UUID entry via 'unzip -p').
 csv          : generic — infer numeric cols; opcode col named 'opcode'/'type'/'rw'
 """
 
@@ -229,6 +249,146 @@ def _read_lcs(path: str, max_records: int) -> pd.DataFrame:
     return df
 
 
+def _read_baleen24(path: str, max_records: int) -> pd.DataFrame:
+    """
+    Microsoft Baleen 2024 storage traces (ASPLOS '24).
+
+    Format: space-separated text, no header, 8 columns per line:
+      block_id  io_offset  io_size  op_time  op_name  pipeline  user_namespace  user_name
+    where:
+      block_id      – integer disk/volume identifier (not stored as a feature)
+      io_offset     – byte offset within the block device → used as obj_id
+      io_size       – bytes transferred → obj_size
+      op_time       – Unix epoch timestamp (float seconds) → ts
+      op_name       – 1=read, 2=write, 3=flush, 4=discard, 5=other (3-5 → 'r')
+      pipeline      – Baleen pipeline tag → tenant
+      user_namespace – not used
+      user_name     – not used
+
+    `path` may be:
+      (a) a plain text file (extracted member),
+      (b) a .tar.gz archive — reads the first non-directory member, or
+      (c) a .tar.gz path with a member suffix "archive.tar.gz::member/name"
+          (separate the member name with '::').
+    """
+    import io
+    import tarfile
+
+    lines: list[bytes] = []
+
+    if ".tar.gz" in path or ".tgz" in path:
+        # Support "archive.tar.gz::member" syntax for targeting a specific member.
+        if "::" in path:
+            archive_path, member_name = path.split("::", 1)
+        else:
+            archive_path, member_name = path, None
+
+        with tarfile.open(archive_path, "r:gz") as tar:
+            if member_name:
+                f = tar.extractfile(member_name)
+                if f is None:
+                    raise ValueError(f"Member '{member_name}' is not a regular file in {archive_path}")
+            else:
+                # Prefer .trace files (Baleen24 tarball layout); fall back to any
+                # regular file large enough to contain at least a few records.
+                f = None
+                for member in tar.getmembers():
+                    if member.isfile() and member.name.endswith(".trace"):
+                        f = tar.extractfile(member)
+                        break
+                if f is None:
+                    for member in tar.getmembers():
+                        if member.isfile() and member.size > 1024:
+                            f = tar.extractfile(member)
+                            break
+                if f is None:
+                    raise ValueError(f"No data files found in tarball: {archive_path}")
+            raw = f.read()
+        lines = raw.splitlines()
+    else:
+        with open(path, "rb") as f:
+            lines = f.read().splitlines()
+
+    rows = []
+    for line in lines:
+        if len(rows) >= max_records:
+            break
+        line_s = line.decode("utf-8", errors="replace").strip()
+        if not line_s or line_s.startswith("#"):
+            continue
+        parts = line_s.split()
+        if len(parts) < 6:
+            continue
+        try:
+            # block_id = int(parts[0])  — disk identifier; not used as a feature
+            io_offset   = int(parts[1])
+            io_size     = int(parts[2])
+            op_time     = float(parts[3])
+            op_name_int = int(parts[4])
+            pipeline    = int(parts[5])
+        except (ValueError, IndexError):
+            continue
+        opcode = 'w' if op_name_int == 2 else 'r'
+        rows.append({
+            'ts':       op_time,
+            'obj_id':   io_offset,
+            'obj_size': io_size,
+            'opcode':   opcode,
+            'tenant':   pipeline,
+        })
+
+    if not rows:
+        raise ValueError(f"No valid Baleen24 records found in {path}")
+
+    return pd.DataFrame(rows)
+
+
+def _read_tencent_cloud_disk(path: str, max_records: int) -> pd.DataFrame:
+    """
+    Tencent Cloud Disk aggregate performance statistics (ASPLOS '25, TELA paper).
+
+    Format: CSV, no header, 6 columns, 300-second sampling interval:
+      timestamp      – Unix epoch seconds (integer)
+      read_iops      – read operations per second (aggregate over 300s window)
+      read_bw_kbps   – read bandwidth in KB/s
+      write_iops     – write operations per second
+      write_bw_kbps  – write bandwidth in KB/s
+      disk_usage_mb  – disk utilization in MB (snapshot at end of window)
+
+    Each file (UUID-named) is one cloud disk's full time series.
+
+    IMPORTANT: This is NOT a request-level trace.  Each row is a 5-minute aggregate
+    for one disk.  The model trained on this data produces synthetic utilization time
+    series, not synthetic I/O request sequences.  Do not mix with oracle_general models.
+
+    `path` may be:
+      (a) a plain CSV file (extracted from the zip),
+      (b) "zipfile.zip::member/name" — extracts that member via 'unzip -p'.
+    """
+    import subprocess
+    import io
+
+    if "::" in path:
+        zip_path, member_name = path.split("::", 1)
+        proc = subprocess.run(
+            ["unzip", "-p", zip_path, member_name],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        raw = proc.stdout
+    else:
+        with open(path, "rb") as f:
+            raw = f.read()
+
+    col_names = ["ts", "read_iops", "read_bw_kbps", "write_iops", "write_bw_kbps", "disk_usage_mb"]
+    df = pd.read_csv(
+        io.BytesIO(raw) if isinstance(raw, bytes) else io.StringIO(raw.decode()),
+        header=None,
+        names=col_names,
+        nrows=max_records,
+    )
+    return df
+
+
 def _read_csv(path: str, max_records: int) -> pd.DataFrame:
     df = pd.read_csv(path, nrows=max_records)
     return df
@@ -291,6 +451,8 @@ _READERS = {
     "oracle_general": _read_oracle_general,
     "lcs": _read_lcs,
     "exchange_etw": _read_exchange_etw,
+    "baleen24": _read_baleen24,
+    "tencent_cloud_disk": _read_tencent_cloud_disk,
     "csv": _read_csv,
 }
 
@@ -559,16 +721,19 @@ def load_trace(
                          f"Choose from: {list(_READERS)}")
 
     # oracle_general and lcs handle their own decompression (binary format with
-    # fixed-width records; streaming avoids loading the full file into memory);
-    # all other formats go through pandas after a full zstd decompress.
-    if fmt not in ("oracle_general", "lcs") and str(path).endswith(".zst"):
+    # fixed-width records; streaming avoids loading the full file into memory).
+    # baleen24 and tencent_cloud_disk handle their own archive formats (.tar.gz / .zip).
+    # All other formats go through pandas after a full zstd decompress.
+    path_s = str(path)
+    self_decompressing = fmt in ("oracle_general", "lcs", "baleen24", "tencent_cloud_disk")
+    if not self_decompressing and path_s.endswith(".zst"):
         import subprocess, tempfile, os
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        subprocess.run(["zstd", "-d", path, "-o", tmp.name, "-f"], check=True)
+        subprocess.run(["zstd", "-d", path_s, "-o", tmp.name, "-f"], check=True)
         df = reader(tmp.name, max_records)
         os.unlink(tmp.name)
     else:
-        df = reader(str(path), max_records)
+        df = reader(path_s, max_records)
 
     n_train = int(len(df) * train_split)
     df_train = df.iloc[:n_train].reset_index(drop=True)
