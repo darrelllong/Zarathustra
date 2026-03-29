@@ -138,3 +138,24 @@ Killed at epoch 21.
 Back to v14c config (n_critic=1). The v14c 40-epoch stagnation was oscillation, not collapse.
 v14c had recall 0.157-0.269 at epochs 5-30 -- vastly better than v14d's 0.044-0.057.
 With 380 epochs remaining, n_critic=1 gives the best chance to break past 0.046 MMD2.
+
+---
+
+### v14e post-mortem (killed epoch 31, 2026-03-29)
+
+Worse than v14c at every eval: epoch 30 MMD2=0.077/recall=0.209 vs v14c 0.046/0.269.
+G loss escalated to +8-10 by epoch 17, W spike +0.63 at epoch 30.
+Same root cause as v14c stagnation: hot-start from v14/epoch_0030.pt loads generator
+weights tuned for unconstrained critic; fresh SN-LSTM normalization creates asymmetry.
+
+### v14f (hot-start from v14c/epoch_0030.pt, 2026-03-29)
+
+Key changes vs v14c/v14e:
+- **Resume from tencent_v14c/epoch_0030.pt** (not v14/epoch_0030.pt). The v14c checkpoint
+  has SN-LSTM u/v buffers already converged. Avoids the fresh-SN-on-old-weights asymmetry.
+- **diversity-loss-weight=0.5**: MSGAN mode-seeking loss. Directly combats the recall decline
+  seen in v14c (0.269->0.140 over 44 epochs). L_div = -|G(z1)-G(z2)| / |z1-z2| penalises
+  the generator for producing similar outputs across different noise inputs.
+- n_critic=1, all other hyperparameters identical to v14c.
+
+Starting from v14c best: MMD2=0.046, recall=0.269.
