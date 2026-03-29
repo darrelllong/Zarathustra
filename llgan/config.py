@@ -40,6 +40,8 @@ class Config:
 
     # Output
     checkpoint_dir: str = "checkpoints"
+    resume_from: Optional[str] = None   # specific checkpoint path; None = auto-detect latest
+    reset_optimizer: bool = False       # load weights only, fresh optimizers at new LR
     checkpoint_every: int = 10
     generated_path: str = "generated.csv"
     num_generate: int = 1_000_000

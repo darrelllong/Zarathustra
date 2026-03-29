@@ -356,19 +356,28 @@ def train(cfg: Config) -> None:
     mmd_history: list  = []             # [(epoch, mmd, recall, combined), ...]
 
     # Resume
+    # --resume-from <path>  : load a specific checkpoint file (overrides auto-detect)
+    # --reset-optimizer     : load model weights only; fresh optimizers + schedulers
+    #                         at the current --lr-g / --lr-d values.  Use with
+    #                         --resume-from to hot-start from a good checkpoint with
+    #                         different hyperparameters after a collapse.
     start_epoch = 0
-    latest = sorted(ckpt_dir.glob("epoch_*.pt"))
-    if latest:
-        ckpt = torch.load(latest[-1], map_location=device)
+    resume_path = None
+    if cfg.resume_from:
+        resume_path = Path(cfg.resume_from)
+    else:
+        latest = sorted(ckpt_dir.glob("epoch_*.pt"))
+        if latest:
+            resume_path = latest[-1]
+
+    if resume_path is not None:
+        ckpt = torch.load(resume_path, map_location=device, weights_only=False)
         G.load_state_dict(ckpt["G"])
         C.load_state_dict(ckpt["C"])
-        opt_G.load_state_dict(ckpt["opt_G"])
-        opt_C.load_state_dict(ckpt["opt_C"])
         if latent_ae and "E" in ckpt:
             E.load_state_dict(ckpt["E"])
             R.load_state_dict(ckpt["R"])
             S.load_state_dict(ckpt["S"])
-        start_epoch = ckpt["epoch"] + 1
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
@@ -377,24 +386,35 @@ def train(cfg: Config) -> None:
             ema_G_state = ckpt["G_ema"]
         else:
             ema_G_state = copy.deepcopy(G.state_dict())
-        # Restore scheduler state if present; otherwise fast-forward to the
-        # correct position so the LR matches start_epoch (handles old checkpoints
-        # that predate scheduler support without silently using the wrong LR).
-        if sched_G is not None:
-            if "sched_G" in ckpt:
-                sched_G.load_state_dict(ckpt["sched_G"])
-                sched_C.load_state_dict(ckpt["sched_C"])
-            else:
-                for _ in range(start_epoch):
-                    sched_G.step()
-                    sched_C.step()
-        # Restore mmd_history so the curve is continuous across restarts
-        if "mmd_history" in ckpt:
-            mmd_history = ckpt["mmd_history"]
-        # Restore best_combined so early stopping doesn't misfire
-        if "combined" in ckpt:
-            best_combined = ckpt["combined"]
-        print(f"Resumed from {latest[-1]} (epoch {start_epoch})")
+
+        if cfg.reset_optimizer:
+            # Fresh optimizers at new LR — do NOT restore optimizer state, scheduler,
+            # mmd_history, best_combined, or start_epoch.  Training restarts from
+            # epoch 0 with the loaded model weights and the new hyperparameters.
+            print(f"Hot-start from {resume_path} with reset optimizer "
+                  f"(lr_g={cfg.lr_g:.2e}, lr_d={cfg.lr_d:.2e}, n_critic={cfg.n_critic})")
+        else:
+            opt_G.load_state_dict(ckpt["opt_G"])
+            opt_C.load_state_dict(ckpt["opt_C"])
+            start_epoch = ckpt["epoch"] + 1
+            # Restore scheduler state if present; otherwise fast-forward to the
+            # correct position so the LR matches start_epoch (handles old checkpoints
+            # that predate scheduler support without silently using the wrong LR).
+            if sched_G is not None:
+                if "sched_G" in ckpt:
+                    sched_G.load_state_dict(ckpt["sched_G"])
+                    sched_C.load_state_dict(ckpt["sched_C"])
+                else:
+                    for _ in range(start_epoch):
+                        sched_G.step()
+                        sched_C.step()
+            # Restore mmd_history so the curve is continuous across restarts
+            if "mmd_history" in ckpt:
+                mmd_history = ckpt["mmd_history"]
+            # Restore best_combined so early stopping doesn't misfire
+            if "combined" in ckpt:
+                best_combined = ckpt["combined"]
+            print(f"Resumed from {resume_path} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
     # Phase 1: Autoencoder pretraining  (latent AE mode only)
@@ -1041,6 +1061,13 @@ def parse_args() -> Config:
                    help="Records loaded from each file per epoch")
     # Output / checkpointing
     p.add_argument("--checkpoint-dir",   default="checkpoints")
+    p.add_argument("--resume-from",      default=None,
+                   help="Path to a specific checkpoint .pt file to resume from "
+                        "(overrides auto-detect of latest epoch_NNNN.pt in checkpoint-dir)")
+    p.add_argument("--reset-optimizer",  action="store_true",
+                   help="Load model weights from checkpoint but start with fresh "
+                        "optimizers and schedulers at the current --lr-g/--lr-d values. "
+                        "Use with --resume-from to hot-start after a collapse.")
     p.add_argument("--checkpoint-every", type=int,   default=10)
     p.add_argument("--mmd-every",        type=int,   default=5)
     p.add_argument("--mmd-samples",      type=int,   default=1000)
@@ -1131,6 +1158,8 @@ def parse_args() -> Config:
     cfg.files_per_epoch  = args.files_per_epoch
     cfg.records_per_file = args.records_per_file
     cfg.checkpoint_dir   = args.checkpoint_dir
+    cfg.resume_from      = args.resume_from
+    cfg.reset_optimizer  = args.reset_optimizer
     cfg.checkpoint_every = args.checkpoint_every
     cfg.mmd_every              = args.mmd_every
     cfg.mmd_samples            = args.mmd_samples
