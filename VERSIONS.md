@@ -122,3 +122,19 @@ Killed v14c after 44-epoch regression (epoch 30 best 0.046 → epoch 70: 0.062, 
 - Recall declined 0.269 (ep30) -> 0.140 (ep70) over 40 epochs: slow mode narrowing
 - No W drift (max 0.09), no collapse — just stuck in local optimum
 - Best epoch was 30: MMD2=0.046, recall=0.269
+
+---
+
+### v14d post-mortem (killed epoch 21, 2026-03-29)
+
+Mode collapse immediately: recall 0.046-0.057 across epochs 5-20, MMD2 0.317-0.440.
+n_critic=2 was too aggressive for a hot-start from a non-SN-LSTM checkpoint (v14/epoch_0030.pt).
+The extra critic step caused the critic to overpower the generator before it could adapt.
+SN u/v vectors were freshly initialized on old weights; 2 critic steps per G step too fast.
+Killed at epoch 21.
+
+### v14e (hot-start from v14 epoch 30, 2026-03-29, n_critic=1)
+
+Back to v14c config (n_critic=1). The v14c 40-epoch stagnation was oscillation, not collapse.
+v14c had recall 0.157-0.269 at epochs 5-30 -- vastly better than v14d's 0.044-0.057.
+With 380 epochs remaining, n_critic=1 gives the best chance to break past 0.046 MMD2.
