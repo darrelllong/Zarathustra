@@ -1,0 +1,573 @@
+% Zarathustra: Learned Generative Modeling of I/O Workload Traces
+%
+% Submission target: USENIX FAST / ACM SOSP / IEEE MASCOTS
+% Compile: pdflatex main && bibtex main && pdflatex main && pdflatex main
+
+\documentclass[10pt,twocolumn]{article}
+
+%% ---------- packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{siunitx}
+
+%% ---------- macros ----------
+\newcommand{\sys}{Zarathustra\xspace}
+\newcommand{\eg}{\emph{e.g.,}\xspace}
+\newcommand{\ie}{\emph{i.e.,}\xspace}
+\newcommand{\etal}{\emph{et al.}\xspace}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\mmd}{MMD$^2$\xspace}
+\newcommand{\dmdgen}{DMD-GEN\xspace}
+
+%% ---------- metadata ----------
+\title{\textbf{\sys: Learned Generative Modeling of\\Storage I/O Workload Traces}}
+
+\author{
+  Darrell D.\ Long \\
+  University of California, Santa Cruz \\
+  \texttt{darrell@ucsc.edu}
+  \and
+  \todo{co-authors}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+%% ============================================================
+\begin{abstract}
+%% ============================================================
+Storage system evaluation requires realistic I/O workload traces, but
+production traces are proprietary, voluminous, and tied to a single
+point in time.  \sys is a generative model that learns the full joint
+distribution of I/O request arrivals, object sizes, access patterns,
+and read/write ratios from a corpus of real storage traces.  We build
+on the LSTM-GAN (LLGAN) architecture~\cite{zhang2024llgan} and extend
+it with a latent autoencoder with autoregressive supervisor training
+(following TimeGAN~\cite{yoon2019timegan} and SeriesGAN~\cite{seriesgan2024}),
+a Wasserstein critic with spectral normalization, locality-aware
+object-ID representation, and a suite of auxiliary losses targeting
+frequency content and distributional moments.  Training on hundreds
+of publicly available Tencent and Alibaba block storage traces, \sys
+generates synthetic traces that are statistically indistinguishable
+from real production data across \todo{N} metrics, including
+MMD$^2$, PRDC precision/recall, Context-FID, AutoCorr, and DMD-GEN.
+
+\end{abstract}
+
+
+%% ============================================================
+\section{Introduction}
+\label{sec:intro}
+%% ============================================================
+
+Storage system research depends on representative I/O workloads for
+benchmarking cache policies, capacity planning, and system stress
+testing.  Real production traces capture the full complexity of
+workload behavior---burstiness, temporal locality, mixed request sizes,
+and correlated access patterns---but are rarely available: they are
+proprietary, enormous, and snapshot-in-time.
+
+Synthetic trace generators have long been proposed as an alternative,
+but classical approaches rely on hand-tuned Markov chains or
+parameterized distributions that fail to capture the joint statistical
+structure of real workloads~\cite{paul2022hpc,geminio2024}.  Recent
+work has shown that deep generative models can learn this structure
+from real data~\cite{zhang2024llgan}, but existing systems train on a
+single trace and fail to generalize across workloads.
+
+We present \sys, a generative model trained on a corpus of hundreds
+of storage traces that produces statistically realistic synthetic I/O
+sequences of arbitrary length.  Our contributions are:
+
+\begin{enumerate}
+  \item A latent autoencoder + adversarial training curriculum
+        (Section~\ref{sec:architecture}) that improves mode coverage
+        and temporal coherence over the LLGAN baseline.
+
+  \item A locality-aware object-ID representation using signed
+        log-delta encoding that captures repeat accesses, sequential
+        strides, and random jumps within a bounded tanh output range
+        (Section~\ref{sec:preprocessing}).
+
+  \item A suite of auxiliary losses---frequency-domain spectral loss
+        with FIDE amplitude weighting~\cite{fide2024}, moment matching,
+        and feature matching~\cite{r3gan2024}---that constrain the
+        generator beyond the adversarial signal alone
+        (Section~\ref{sec:training}).
+
+  \item A comprehensive evaluation framework
+        (Section~\ref{sec:eval}) incorporating \mmd, PRDC
+        precision/recall/density/coverage, Context-FID, autocorrelation
+        score, and DMD-GEN~\cite{dmdgen2025}.
+
+  \item An empirical study of multi-corpus generalization across
+        Tencent Block 2020 and Alibaba Block 2020 trace corpora
+        (Section~\ref{sec:results}).
+\end{enumerate}
+
+
+%% ============================================================
+\section{Background and Related Work}
+\label{sec:background}
+%% ============================================================
+
+\subsection{Storage Trace Generation}
+
+Classical trace generation fits parametric models (\eg Poisson
+arrivals, Pareto size distributions) to observed statistics.  These
+models reproduce marginal distributions but lose the joint temporal
+structure---burstiness, locality, phase transitions---that drives
+cache behavior.  LLGAN~\cite{zhang2024llgan} showed that LSTM-based
+GANs can reproduce block I/O statistics more faithfully than
+parametric models.  \sys extends this to multi-file corpus
+generalization and a substantially improved training objective.
+
+\subsection{Time Series Generation}
+
+TimeGAN~\cite{yoon2019timegan} introduced a latent autoencoder +
+supervisor curriculum for time series generation that avoids the
+instability of direct adversarial training in feature space.
+SeriesGAN~\cite{seriesgan2024} extended this with a dual discriminator
+and two-step supervisor, reporting a 34\% reduction in discriminative
+score over TimeGAN.  AVATAR~\cite{avatar2025} replaces the recovery
+network with an adversarial autoencoder posterior, simplifying the
+latent space alignment.  ChronoGAN~\cite{chronogan2024} adds
+slope and skewness terms to the time-series loss.  We draw from
+all three architectures but adapt them to the mixed discrete/continuous
+structure of I/O traces.
+
+\subsection{GAN Objectives and Regularization}
+
+Wasserstein GANs~\cite{gulrajani2017wgangp} stabilize training by
+bounding the critic's Lipschitz constant.  R3GAN~\cite{r3gan2024}
+proposes a relativistic paired loss (RpGAN) with joint R1/R2
+gradient regularization and shows improved mode coverage on
+StackedMNIST.  Spectral normalization~\cite{miyato2018spectralnorm}
+enforces the Lipschitz constraint without second-order autograd and
+is compatible with Apple MPS hardware.
+
+\subsection{Frequency and Distributional Losses}
+
+Diffusion-TS~\cite{diffusionts2024} demonstrates FFT-domain spectral
+losses for time series generation.  FIDE~\cite{fide2024} introduces
+frequency inflation weighting to prevent rare extreme values from being
+washed out by a flat spectral MSE.  We incorporate both.
+
+\subsection{Evaluation Metrics}
+
+MMD$^2$~\cite{todo} detects distributional mismatch but misses
+mode collapse.  PRDC~\cite{naeem2020reliable} adds precision, recall,
+density, and coverage.  TSGBench~\cite{tsgbench2024} defines a
+12-metric benchmark for time series generation; we adopt Context-FID
+and autocorrelation score from it.  DMD-GEN~\cite{dmdgen2025}
+quantifies temporal dynamics fidelity via Grassmannian comparison of
+dynamic mode decomposition eigenvectors; it detects autocorrelation
+and burst-structure failures that MMD$^2$ and PRDC miss.
+
+\subsection{Path-Space Methods}
+
+PCF-GAN~\cite{pcfgan2023} defines discrimination in path space via the
+characteristic function of measures on the path space, providing
+stronger sensitivity to sequential law than hidden-state pooling.
+The High-Rank Path Development method~\cite{hrpcf2024} extends this
+to avoid rank collapse.  Sig-WGAN~\cite{sigwgan2021} replaces the
+LSTM critic with a path-signature-based Wasserstein distance.  These
+approaches are stronger theoretical foundations for a future critic
+redesign.
+
+
+%% ============================================================
+\section{Problem Formulation}
+\label{sec:problem}
+%% ============================================================
+
+An I/O trace is a sequence of requests
+$\mathbf{x} = (x_1, x_2, \ldots, x_N)$ where each event
+$x_t = (\Delta\tau_t, o_t, s_t, c_t, u_t)$ contains:
+\begin{itemize}
+  \item $\Delta\tau_t$: inter-arrival time (seconds) to the previous request
+  \item $o_t$: object (block) identifier
+  \item $s_t$: object size (bytes)
+  \item $c_t \in \{+1,-1\}$: operation code (read/write)
+  \item $u_t$: tenant identifier
+\end{itemize}
+
+We model traces in a normalized feature space.  Let
+$\mathbf{X} = \text{prep}(\mathbf{x}) \in [-1,1]^{N \times d}$
+be the preprocessed sequence ($d = 5$).  The generative model
+$G_\theta$ produces sequences $\hat{\mathbf{X}} \sim G_\theta(z)$
+from noise $z$, trained so that $\hat{\mathbf{X}}$ is
+statistically indistinguishable from real windows
+$\mathbf{X}_{t:t+T}$ of length $T$.
+
+At generation time, the inverse transform
+$\text{prep}^{-1}(\hat{\mathbf{X}})$ recovers absolute-time,
+raw-identifier sequences suitable for replay through a storage
+simulator.
+
+
+%% ============================================================
+\section{Preprocessing}
+\label{sec:preprocessing}
+%% ============================================================
+
+\paragraph{Delta encoding.}
+Raw timestamps are converted to inter-arrival times:
+$\Delta\tau_t = \tau_t - \tau_{t-1}$.  This makes the series
+stationary and removes dependence on the absolute start time of
+each trace file.
+
+\paragraph{Log transform.}
+$\Delta\tau_t$ and $s_t$ span many decades.  We apply
+$\log(1 + x)$ before min-max normalization to $[-1,1]$,
+compressing the dynamic range while preserving monotonicity.
+
+\paragraph{Locality-aware object-ID encoding.}
+Raw $o_t$ values cannot be regressed directly: they span up to
+$10^{10}$ with no metric structure meaningful to the model.
+We instead encode the signed inter-request delta:
+\[
+  \delta_t = o_t - o_{t-1}, \qquad
+  \tilde{o}_t = \text{sign}(\delta_t) \cdot \log(1 + |\delta_t|).
+\]
+This representation encodes locality structure natively:
+$\tilde{o}_t \approx 0$ is a cache hit or repeat access;
+small $|\tilde{o}_t|$ is sequential or strided access;
+large $|\tilde{o}_t|$ is a random jump.  At generation time,
+$o_t = o_0 + \text{cumsum}(\text{undo-signed-log}(\hat{\tilde{o}}))$
+reconstructs absolute identifiers.
+
+\paragraph{Opcode binarization.}
+Read $\to +1$, write $\to -1$, aligned with the tanh output range.
+
+\paragraph{Multi-file normalization.}
+The preprocessor is fit once on a seed sample of files and held
+fixed across all training epochs and at generation time.
+
+
+%% ============================================================
+\section{Architecture}
+\label{sec:architecture}
+%% ============================================================
+
+\sys uses a latent autoencoder GAN with four components:
+
+\begin{description}
+  \item[Encoder $E$] maps real feature windows
+    $\mathbf{X} \in \mathbb{R}^{T \times d}$ to latent sequences
+    $\mathbf{H} = E(\mathbf{X}) \in \mathbb{R}^{T \times m}$.
+    Single-layer LSTM, hidden size $m$.
+
+  \item[Recovery $R$] decodes latent sequences back to feature space:
+    $\hat{\mathbf{X}} = R(\mathbf{H}) \in \mathbb{R}^{T \times d}$.
+    Single-layer LSTM + linear projection.
+
+  \item[Supervisor $S$] models the autoregressive dynamics of the
+    latent space: $S(\mathbf{H})_{t} \approx \mathbf{H}_{t+k}$
+    for step size $k \in \{1, 2\}$ (2-step following SeriesGAN).
+    Single-layer LSTM.
+
+  \item[Generator $G$] maps noise to latent sequences.
+    A global noise vector $z_g \in \mathbb{R}^{n}$ is projected to the
+    LSTM initial hidden state (workload identity); per-step local noise
+    $z_l \in \mathbb{R}^{T \times n}$ provides per-step innovation.
+    Output: $\mathbf{H}_{\text{fake}} = G(z_g, z_l) \in [0,1]^{T \times m}$
+    (sigmoid-bounded to match the latent AE range).
+
+  \item[Critic $C$] scores latent sequences as real or generated.
+    Single-layer LSTM with learned attention pooling over hidden states
+    (replacing mean pooling to focus on burst and regime-change
+    timesteps).  Output linear layer uses spectral normalization to
+    enforce the Wasserstein Lipschitz constraint.
+\end{description}
+
+\subsection{Split Noise Latent}
+
+The split $z_g / z_l$ design gives the generator two degrees of freedom:
+$z_g$ controls the global workload character (read-heavy vs.\ write-heavy,
+bursty vs.\ smooth) while $z_l$ introduces per-step stochasticity.
+At generation time, $z_g$ is sampled once per stream and held fixed
+across all windows, while a new $z_l$ is drawn each window.
+
+
+%% ============================================================
+\section{Training}
+\label{sec:training}
+%% ============================================================
+
+Training follows a four-phase curriculum:
+
+\paragraph{Phase 1: Autoencoder pretraining.}
+Optimize $E$ and $R$ with reconstruction loss
+$\mathcal{L}_{\text{AE}} = \|R(E(\mathbf{X})) - \mathbf{X}\|_2^2$
+for $N_{\text{AE}}$ epochs.
+
+\paragraph{Phase 2: Supervisor pretraining.}
+With $E$ fixed, optimize $S$ with
+\[
+  \mathcal{L}_S = \|S(E(\mathbf{X}))_{:,:-k} - E(\mathbf{X})_{:,k:}\|_2^2
+\]
+for $k = 2$ (two-step supervisor~\cite{seriesgan2024}).
+
+\paragraph{Phase 2.5: Generator warm-up.}
+Train $G$ with supervisor consistency loss only, before introducing the
+critic.  This prevents the critic from saturating before $G$ has
+learned the latent dynamics~\cite{yoon2019timegan}.
+
+\paragraph{Phase 3: Joint GAN training.}
+Alternate between:
+
+\begin{enumerate}
+  \item \textbf{Critic step} ($n_{\text{critic}}$ times): minimize
+    Wasserstein loss $C(\mathbf{H}_{\text{fake}}) - C(\mathbf{H}_{\text{real}})$
+    with spectral norm Lipschitz constraint.
+
+  \item \textbf{Generator step}: minimize
+    \[
+      \mathcal{L}_G = -C(G(z_g,z_l))
+      + \lambda_S \mathcal{L}_S^G
+      + \lambda_{\text{FM}} \mathcal{L}_{\text{FM}}
+      + \lambda_V \mathcal{L}_V
+      + \lambda_{\text{FFT}} \mathcal{L}_{\text{FFT}}
+    \]
+    where $\mathcal{L}_S^G$ is the supervisor consistency loss on fake
+    latents, $\mathcal{L}_{\text{FM}}$ is feature matching against the
+    critic's intermediate representation~\cite{salimans2016improved},
+    $\mathcal{L}_V$ is moment matching (mean + std per feature), and
+    $\mathcal{L}_{\text{FFT}}$ is the FIDE-weighted spectral loss.
+
+  \item \textbf{Encoder--Recovery step}: fine-tune $E$ and $R$ with
+    reconstruction loss to keep the autoencoder aligned with the
+    evolving generator distribution.
+\end{enumerate}
+
+\subsection{FIDE Spectral Loss}
+
+The frequency-domain loss uses amplitude-weighted MSE following
+FIDE~\cite{fide2024}:
+\[
+  \mathcal{L}_{\text{FFT}} =
+    \mathbb{E}\bigl[w_f \cdot |\hat{X}_f - X_f|^2\bigr], \quad
+  w_f = 1 + \alpha \frac{|X_f|}{\bar{|X|}}
+\]
+where $X_f$ and $\hat{X}_f$ are the real FFT magnitudes of real and
+fake sequences along the time axis.  The weighting $w_f$ amplifies
+loss at high-amplitude frequency bins, preventing the model from
+averaging away rare burst events.
+
+
+%% ============================================================
+\section{Multi-File Streaming Training}
+\label{sec:multifile}
+%% ============================================================
+
+Each epoch samples a random subset of $k$ files from the corpus.
+Within each file, non-overlapping windows of length $T$ are extracted.
+A \texttt{ConcatDataset} of per-file \texttt{TraceDataset}s ensures
+no window ever crosses a file boundary---cross-file sequences would
+introduce false temporal dependencies between unrelated workload
+phases.
+
+A fixed held-out set of files is removed from the training pool
+before the first epoch and used exclusively for validation.  This
+ensures that validation MMD$^2$ reflects generalization to unseen
+files rather than in-distribution memorization.
+
+
+%% ============================================================
+\section{Generation}
+\label{sec:generation}
+%% ============================================================
+
+At inference time, \sys generates synthetic traces of arbitrary length
+by maintaining the LSTM hidden state across windows.  For a stream of
+$N$ records:
+
+\begin{enumerate}
+  \item Sample $z_g$ once (workload identity).
+  \item For each window: sample $z_l$, run $G(z_g, z_l, h_{\text{prev}})$,
+        decode via $R$, carry $(h_n, c_n)$ to the next window.
+  \item Apply inverse preprocessing per stream independently (cumulative
+        sums for timestamps and object IDs must not cross stream boundaries).
+\end{enumerate}
+
+Multiple independent streams can be generated in parallel by
+vectorizing over $z_g$ and $h$.
+
+
+%% ============================================================
+\section{Evaluation Metrics}
+\label{sec:eval}
+%% ============================================================
+
+We evaluate synthetic trace quality on six complementary metrics:
+
+\begin{description}
+  \item[\mmd] Maximum Mean Discrepancy~\cite{gretton2012kernel} between
+    real and generated window distributions (RBF kernel, flattened windows).
+    Lower is better; zero indicates indistinguishable distributions.
+
+  \item[PRDC] Precision, recall, density, and coverage~\cite{naeem2020reliable}
+    measured in a shared feature space.  Recall captures mode coverage;
+    precision captures fidelity.
+
+  \item[Context-FID] Fréchet distance in the trained encoder's latent
+    space.  Sensitive to temporal structure within windows.
+
+  \item[AutoCorr] Average absolute mismatch between real and generated
+    autocorrelation functions at lags 1--5, averaged over all features.
+
+  \item[\dmdgen] Grassmannian distance between real and generated
+    dynamic mode decomposition eigenvector subspaces~\cite{dmdgen2025}.
+    Detects wrong burst structure and autocorrelation patterns that
+    MMD$^2$ and PRDC miss.
+\end{description}
+
+
+%% ============================================================
+\section{Experimental Results}
+\label{sec:results}
+%% ============================================================
+
+\subsection{Dataset}
+
+We train on the libCacheSim cache-dataset corpus~\cite{yang2021libcachesim,yang2023fifo},
+comprising:
+\begin{itemize}
+  \item \textbf{Tencent Block 2020}: 4{,}995 volumes, 9 days, 152\,GB
+    (oracleGeneral format), 512\,B--32\,KB requests, 83--94\% reads.
+  \item \textbf{Alibaba Block 2020}: 1{,}001 volumes, 31 days, 93\,GB,
+    4\,KB-aligned, mixed read ratios.
+\end{itemize}
+
+\subsection{Hyperparameters}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+Window length $T$ & 12 \\
+Hidden size $m$ & \todo{} \\
+Noise dim $n$ & 32 \\
+Latent dim & 24 \\
+Batch size & 64 \\
+Files per epoch & 8 \\
+Records per file & 15{,}000 \\
+Critic steps $n_{\text{critic}}$ & 5 \\
+LR (G) & $10^{-4}$ \\
+LR (C) & $10^{-4}$ \\
+LR (E, R) & $5 \times 10^{-4}$ \\
+$\lambda_S$ (supervisor) & 10.0 \\
+$\lambda_{\text{FM}}$ (feature matching) & 1.0 \\
+$\lambda_V$ (moment) & 0.1 \\
+$\lambda_{\text{FFT}}$ (spectral) & 0.05 \\
+FIDE $\alpha$ & 1.0 \\
+Supervisor steps $k$ & 2 \\
+\bottomrule
+\end{tabular}
+\caption{Training hyperparameters.}
+\label{tab:hyperparams}
+\end{table}
+
+\subsection{Ablation Study}
+
+\todo{Table comparing v1--v11 checkpoints across all six metrics.
+Key findings expected: 2-step supervisor improves DMD-GEN;
+FIDE improves FFT loss; feature matching fixes mode collapse.}
+
+\subsection{Comparison with Baselines}
+
+\todo{Compare against: (1) LLGAN baseline~\cite{zhang2024llgan};
+(2) TimeGAN~\cite{yoon2019timegan}; (3) SeriesGAN~\cite{seriesgan2024};
+(4) classical Markov-chain generator.}
+
+\subsection{Generation Fidelity}
+
+\todo{Figures: marginal distribution comparisons per feature;
+autocorrelation plots; DMD eigenvalue spectrum comparison;
+PRDC recall vs.\ training epoch.}
+
+\subsection{Generation Length Robustness}
+
+\todo{Rolling MMD² and AutoCorr vs.\ chunk index for streams
+of 10K, 100K, 1M records.  Characterize ``max reliable stream length''.}
+
+
+%% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ============================================================
+
+\paragraph{Limitations.}
+The current model operates on windows of length $T = 12$, which
+captures micro-burst patterns but not multi-hour workload phases or
+diurnal cycles.  Hierarchical generation~\cite{stagediff2025} or
+increased context via patch embedding~\cite{ttsgan2022} are natural
+next steps.
+
+The global noise vector $z_g$ currently provides stochastic workload
+identity but no semantic structure.  Per-file workload
+descriptors (read ratio, mean inter-arrival time, size entropy, repeat
+rate) could be computed at load time and injected via FiLM
+conditioning~\cite{perez2018film} to enable controllable generation
+across workload profiles~\cite{constrainedts2023}.
+
+Context-FID uses the model's own encoder as the feature extractor,
+which may be co-adapted with the generator and partially self-serving
+as a selection metric.  A frozen encoder trained on real data only
+would provide a more objective criterion.
+
+\paragraph{Future Work.}
+A path-space critic~\cite{pcfgan2023,hrpcf2024} is a promising
+replacement for the LSTM attention pooling critic, with stronger
+theoretical sensitivity to sequential law and locality dynamics.
+Retrieval-augmented conditioning~\cite{retrieval_diffusion2024} could
+improve fidelity on statistically rare but operationally important
+workload phases such as heavy-burst or hotspot episodes.
+Discrete tokenization of categorical columns~\cite{sdformer2024}
+would separate the modeling paths for opcode and tenant from the
+continuous time and size channels.
+
+
+%% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%% ============================================================
+
+\sys learns the joint distribution of storage I/O workload traces
+from a corpus of real production data and generates statistically
+realistic synthetic traces of arbitrary length.  Key contributions
+include a latent autoencoder + supervisor training curriculum, a
+locality-aware object-ID representation, FIDE-weighted spectral loss,
+and a comprehensive multi-metric evaluation framework.  On the
+Tencent Block 2020 corpus, \sys achieves \todo{state results}.
+
+Realistic synthetic traces enable storage system evaluation without
+requiring access to proprietary production workloads, supporting
+reproducible benchmarking, stress testing, and capacity planning
+across a wide range of workload regimes.
+
+
+%% ============================================================
+\bibliographystyle{plain}
+\bibliography{refs}
+%% ============================================================
+
+\end{document}
