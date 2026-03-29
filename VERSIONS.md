@@ -102,3 +102,23 @@ New capabilities enabled by CUDA (not available on MPS):
 - **L_cov (cross-covariance, planned v15)**: Full d×d lag-1 cross-feature covariance.
   Directly targets DMD-GEN (the linear dynamics operator is estimated from this matrix).
 - **L_div (diversity, planned v15)**: MSGAN mode-seeking. Not yet tested.
+
+---
+
+### v14d (hot-start from v14 epoch 30, 2026-03-28 23:13)
+
+Hot-start from tencent_v14/epoch_0030.pt (MMD2=0.041, recall=0.618).
+Killed v14c after 44-epoch regression (epoch 30 best 0.046 → epoch 70: 0.062, recall 0.140).
+
+**What changed vs v14c:**
+- **n_critic=2** (was 1): v14c's G loss was persistently +2 to +4, meaning the critic
+  dominated. With W max of 0.09 over 50 epochs, SN-LSTM proved we have headroom for more
+  critic steps. n_critic=2 gives G stronger gradients to learn from.
+- Everything else identical to v14c.
+
+**v14c notes (what went wrong):**
+- n_critic=1 was too conservative: critic stayed too strong relative to G
+- G loss persistently positive (+2-4): critic correctly identified fakes but G couldn't learn
+- Recall declined 0.269 (ep30) -> 0.140 (ep70) over 40 epochs: slow mode narrowing
+- No W drift (max 0.09), no collapse — just stuck in local optimum
+- Best epoch was 30: MMD2=0.046, recall=0.269
