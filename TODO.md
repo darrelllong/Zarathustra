@@ -104,21 +104,18 @@ Items marked ✓ are done and in the repo.
 
 ### Quick wins (< 1 day each)
 
-- [ ] **FIDE frequency inflation in FFT loss** (`train.py`) — NeurIPS 2024
-  Upweight high-frequency bins in the existing FFT loss to prevent rare/extreme
-  I/O events (burst opcodes, large obj_size) from being washed out.
-  `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. ~10 lines.
+- ✓ **FIDE frequency inflation in FFT loss** (`train.py`) — NeurIPS 2024
+  `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. Added `--fide-alpha`
+  (default 1.0). Upweights high-amplitude bins so rare I/O events are not averaged away.
 
 - [ ] **Adaptive Gradient Penalty (AGP)** (`train.py`) — MDPI Math 2025
   Replace fixed `gp_lambda=10` with a PI controller that adjusts λ dynamically
   based on `‖∇D‖ − 1`. Removes a fragile hyperparameter.
   `λ_{t+1} = λ_t + Kp*(‖∇D‖ − 1) + Ki*Σ(‖∇D‖ − 1)`. ~20 lines.
 
-- [ ] **R2 regularization on fake samples** (`train.py`) — R3GAN, NeurIPS 2024
-  Already have R1 via WGAN-GP (penalty on interpolated points). Add R2:
-  zero-centered gradient penalty on fake samples.
-  `L_R2 = λ₂ * E[‖∇_x̃ D(x̃)‖²]`. Improves mode coverage with convergence
-  guarantees R1 alone can't provide. ~5 lines.
+- ✓ **R2 regularization on fake samples** (`train.py`) — R3GAN, NeurIPS 2024
+  Added `--r2-lambda` (default 0; enable for v11 ablation). Zero-centered GP on fake
+  samples. Complements WGAN-GP's interpolated-point penalty.
 
 ### Medium-term (1–2 days each)
 
@@ -152,10 +149,10 @@ Items marked ✓ are done and in the repo.
   encoder and decoder share a VAE-style latent space enforced by adversarial loss.
   Priority: HIGH — directly addresses our latent space quality issues.
 
-- [ ] **2-step supervisor (SeriesGAN variant)** (`model.py`, `train.py`) — BigData 2024
-  Supervisor predicts `h_t` from `h_{t-2}` instead of `h_{t-1}`. Forces longer
-  temporal context capture. Expected: −34% discriminative score vs 1-step supervisor.
-  DMD-GEN score 0.739 on v9 suggests temporal dynamics are wrong — this is a direct fix.
+- ✓ **2-step supervisor** (`train.py`) — SeriesGAN, BigData 2024
+  Added `--supervisor-steps 1|2` (default 1). 2-step: S(h_t) predicts h_{t+2}.
+  Forces longer temporal context. DMD-GEN=0.739 on v9 is the main motivation.
+  Use `--supervisor-steps 2` in v11 run.
 
 - [ ] **TIMED-style masked attention in critic** (`model.py`) — arXiv 2509.19638
   Diffusion + autoregressive supervisor + Wasserstein critic with masked self-attention.
@@ -174,6 +171,27 @@ Items marked ✓ are done and in the repo.
   uses diffusion; we could use GAN with LSTM at each stage.
 
 ### Evaluation / diagnostics
+
+- [ ] **File-to-file fidelity tool** (`compare.py`) — NEW
+  Given one real log file and one synthetic log file, compute the full metric
+  suite (MMD², PRDC, DMD-GEN, AutoCorr, Context-FID) and report a human-readable
+  summary. Separate from eval.py (no checkpoint needed — takes two CSV/oracleGeneral
+  files directly). Use case: Prof. Amer runs compare.py on a trace pair to verify
+  generation quality without needing the training code.
+  Implementation: thin wrapper around eval.py metrics; `python compare.py real.csv synth.csv`.
+
+- [ ] **Generation drift / length stress test** (`generate.py`, `compare.py`)
+  Determine how long a synthetic stream can run before statistics diverge from real.
+  Method: generate one stream of length L, divide into chunks of length W, compute
+  rolling MMD² and AutoCorr per chunk vs real baseline.  Plot metric vs chunk index.
+  Expected failure modes: timestamp delta cumsum drift, obj_size distribution shift,
+  burst structure decay. Helps set a practical "max reliable stream length" bound.
+  Implementation: `python generate.py --n-streams 1 --n-events 100000` then rolling
+  eval on the output file.
+
+- ✓ **Context-FID + AutoCorr metrics** (`eval.py`) — TSGBench VLDB 2024
+  Fréchet distance in encoder latent space (Context-FID) + lag-1..5 ACF mismatch
+  (AutoCorr). v9/best.pt baselines: Context-FID=0.27, AutoCorr=0.049.
 
 - ✓ **DMD-GEN temporal dynamics metric** (`eval.py`) — NeurIPS 2025 (arXiv 2412.11292)
   Code not yet released — implemented from paper. Runs Dynamic Mode Decomposition
@@ -209,8 +227,10 @@ Items marked ✓ are done and in the repo.
   Compare per-corpus vs mixed-corpus models once Alibaba download finishes.
 
 - [ ] **Re-train on NVIDIA GPU once box arrives**
-  1. ✓ WGAN-GP enabled on MPS (create_graph=True works — CUDA-only assumption was wrong)
-  2. Apply spectral norm to LSTM weight matrices (currently too slow on MPS)
+  1. WGAN-GP on MPS: FAILS for LSTM critic — `lstm_mps_backward` is not differentiable
+     (create_graph=True hits second-order LSTM grad). train.py now auto-falls-back to
+     wgan-sn on MPS. WGAN-GP is CUDA-only for LSTM-based critics.
+  2. ✓ Apply spectral norm to LSTM weight matrices -- done in v14c (weight_ih_l0 + weight_hh_l0; MPS-compatible via torch.nn.utils.spectral_norm)
   3. Increase `hidden_size`, `num_layers`, `batch_size`, `files_per_epoch`
   4. Benchmark full-corpus training time
 
