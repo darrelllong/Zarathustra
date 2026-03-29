@@ -43,6 +43,7 @@ class Config:
     resume_from: Optional[str] = None   # specific checkpoint path; None = auto-detect latest
     reset_optimizer: bool = False       # load weights only, fresh optimizers at new LR
     sn_lstm: bool = True                # spectral norm on critic LSTM weight matrices
+    patch_embed: bool = False           # Conv1d patch embedding before critic LSTM (TTS-GAN)
     checkpoint_every: int = 10
     generated_path: str = "generated.csv"
     num_generate: int = 1_000_000

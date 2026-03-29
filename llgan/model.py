@@ -315,14 +315,35 @@ class Critic(nn.Module):
     def __init__(self, num_cols: int, hidden_size: int,
                  use_spectral_norm: bool = True,
                  sn_lstm: bool = True,
-                 minibatch_std: bool = True):
+                 minibatch_std: bool = True,
+                 patch_embed: bool = False):
         super().__init__()
         self.minibatch_std = minibatch_std
+        self.patch_embed   = patch_embed
         # One extra input feature when minibatch_std is on: the mean per-step
         # standard deviation across the batch, appended as a scalar channel.
         lstm_input = num_cols + (1 if minibatch_std else 0)
+
+        if patch_embed:
+            # Patch embedding (TTS-GAN): Conv1d with kernel=stride=3 folds the
+            # 12-step window into 4 non-overlapping 3-step patch tokens.  Each
+            # patch sees a short local segment (≈1 burst event at 12-step windows)
+            # rather than a single raw timestep, giving the critic a richer
+            # inductive bias for detecting bursty patterns.
+            # Input:  (B, T=12, D) → transpose → (B, D, 12)
+            # After conv: (B, hidden_size, 4) → transpose → (B, 4, hidden_size)
+            # The LSTM then operates on 4 patch tokens instead of 12 raw steps,
+            # reducing sequence length and encouraging attention to episode-level
+            # structure rather than individual timestep noise.
+            self.patch_conv = nn.Conv1d(
+                lstm_input, hidden_size, kernel_size=3, stride=3
+            )
+            lstm_in = hidden_size
+        else:
+            lstm_in = lstm_input
+
         self.lstm = nn.LSTM(
-            input_size=lstm_input,
+            input_size=lstm_in,
             hidden_size=hidden_size,
             num_layers=1,
             batch_first=True,
@@ -374,7 +395,11 @@ class Critic(nn.Module):
             std_scalar   = std_per_step.mean(dim=-1, keepdim=True)  # (1, T, 1)
             std_channel  = std_scalar.expand(x.shape[0], -1, -1)    # (B, T, 1)
             x = torch.cat([x, std_channel], dim=-1)             # (B, T, D+1)
-        h, _ = self.lstm(x)                                    # (B, T, H)
+        if self.patch_embed:
+            # Fold raw timesteps into patch tokens before LSTM.
+            # (B, T, D) → (B, D, T) → conv1d → (B, H, T//3) → (B, T//3, H)
+            x = self.patch_conv(x.transpose(1, 2)).transpose(1, 2)
+        h, _ = self.lstm(x)                                    # (B, T or T//3, H)
         attn_w = torch.softmax(self.attn(h), dim=1)            # (B, T, 1)
         pooled = (attn_w * h).sum(dim=1)                       # (B, H)
         score = self.fc(pooled)                                 # (B, 1)

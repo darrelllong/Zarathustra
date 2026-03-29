@@ -267,7 +267,8 @@ def train(cfg: Config) -> None:
     C = Critic(critic_input_dim, cfg.hidden_size,
                use_spectral_norm=use_sn,
                sn_lstm=cfg.sn_lstm,
-               minibatch_std=cfg.minibatch_std).to(device)
+               minibatch_std=cfg.minibatch_std,
+               patch_embed=cfg.patch_embed).to(device)
 
     if latent_ae:
         E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim).to(device)
@@ -1063,6 +1064,10 @@ def parse_args() -> Config:
     p.add_argument("--no-sn-lstm",       action="store_true", default=False,
                    help="Disable spectral norm on critic LSTM weight matrices "
                         "(on by default; prevents W-distance drift and mode collapse)")
+    p.add_argument("--patch-embed",      action="store_true", default=False,
+                   help="Conv1d patch embedding before critic LSTM: folds 12-step window "
+                        "into 4 patch tokens (kernel=stride=3). TTS-GAN style. "
+                        "Gives critic local-pattern inductive bias for burst detection.")
     p.add_argument("--lr-g",             type=float, default=0.0001)
     p.add_argument("--lr-d",             type=float, default=0.0001)
     p.add_argument("--n-critic",         type=int,   default=5)
@@ -1166,6 +1171,7 @@ def parse_args() -> Config:
     cfg.compile          = args.compile
     cfg.minibatch_std    = not args.no_minibatch_std
     cfg.sn_lstm          = not args.no_sn_lstm
+    cfg.patch_embed      = args.patch_embed
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
     cfg.n_critic         = args.n_critic
