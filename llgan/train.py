@@ -892,8 +892,10 @@ def train(cfg: Config) -> None:
 
         n_files_str = (f"  files={len(epoch_files)}" if multifile else
                        f"  windows={len(train_ds):,}")
+        lr_now = opt_G.param_groups[0]["lr"]
         log = (f"Epoch {epoch+1:4d}/{cfg.epochs}  "
-               f"W={w_mean:+.4f}  C={c_mean:.4f}  G={g_mean:.4f}  t={elapsed:.1f}s"
+               f"W={w_mean:+.4f}  C={c_mean:.4f}  G={g_mean:.4f}  "
+               f"lr={lr_now:.2e}  t={elapsed:.1f}s"
                f"{n_files_str}")
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
