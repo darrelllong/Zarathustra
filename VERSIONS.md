@@ -159,3 +159,38 @@ Key changes vs v14c/v14e:
 - n_critic=1, all other hyperparameters identical to v14c.
 
 Starting from v14c best: MMD2=0.046, recall=0.269.
+
+---
+
+### v14f post-mortem (killed epoch 190, 2026-03-29)
+
+Stable but plateaued. Best: epoch 50 MMD2=0.048, recall=0.234 (training eval with EMA, 1000 samples).
+Full eval.py on v14c/epoch_0030.pt revealed the real picture:
+  MMD2=0.048, alpha-precision=0.489, beta-recall=0.021 (!!), DMD-GEN=0.703
+  Context-FID=0.07 (good), AutoCorr=0.058, reuse-rate fake=0.000 vs real=0.124
+Key finding: beta-recall in training log (0.269) vs eval.py (0.021) diverge because
+training uses EMA weights + 1000 samples; full eval uses live checkpoint + 2000 samples.
+Reuse rate=0 despite L_loc loss: generator never repeats obj_id within window.
+
+GAN cycling pattern (underdamped oscillation) prevented sustained improvement.
+W occasionally spiked to 1.19 (epoch 174) but SN-LSTM always recovered.
+Killed to start fresh training.
+
+### v14g (fresh from scratch, 2026-03-29, ~08:30)
+
+First CLEAN run with SN-LSTM from epoch 0. All prior hot-starts carried generator weights
+tuned for an unconstrained critic, creating a permanent asymmetry. Key changes:
+- Fresh pretraining: AE 50ep + Supervisor 50ep (supervisor_steps=2) + G warmup 50ep
+- supervisor_steps=2: 2-step temporal prediction (SeriesGAN) instead of 1-step
+- cross_cov_loss_weight=0.5: full d*d lag-1 cross-feature covariance matching (DMD-GEN fix)
+- diversity_loss_weight=0.5: MSGAN mode-seeking (recall fix)
+- lr_g=1e-4, lr_d=5e-5 (back to original v13 LRs; hot-starts used 5e-5/2.5e-5)
+- lr_cosine_decay=0.05 (faster decay than v14f's 0.02)
+- Everything else same as v14f
+
+### New: Patch embedding in critic (2026-03-29)
+
+Implemented Conv1d(lstm_input, hidden_size, kernel=stride=3) before critic LSTM.
+Folds 12-step window into 4 patch tokens. TTS-GAN (AIME 2022) style.
+Enabled with --patch-embed flag (off by default; v14g does NOT use it yet).
+Will test in v15 on NVIDIA where we can run full hyperparameter search.
