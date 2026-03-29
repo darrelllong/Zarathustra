@@ -95,13 +95,19 @@ def _opcode_to_binary(series: pd.Series) -> np.ndarray:
     Convert opcode column to binary float: 0.0 = read, 1.0 = write.
     Handles: int 0/1, float 0.0/1.0, strings 'r'/'w'/'read'/'write',
     and the ±1 encoding used internally by TracePreprocessor.
+
+    The preprocessor encodes read=+1.0, write=-1.0 (opposite of the natural
+    convention) because it maps "0" (read) → 1.0 and "1" (write) → -1.0 via
+    _encode_opcode.  Synthetic CSVs from generate.py + inverse_transform
+    therefore have opcode ∈ {+1.0, -1.0} where +1.0 means read, -1.0 write.
     """
     if pd.api.types.is_numeric_dtype(series):
         v = series.to_numpy(dtype=float)
-        # ±1 encoding: -1 → read (0), +1 → write (1)
         if v.min() < -0.5:
-            return (v > 0).astype(float)
-        # 0/1 encoding
+            # ±1 encoding (TracePreprocessor convention): +1=read, -1=write
+            # → write = (v < 0)
+            return (v < 0).astype(float)
+        # 0/1 encoding (raw trace files): 0=read, 1=write
         return (v > 0.5).astype(float)
     # String encoding
     s = series.astype(str).str.lower()
