@@ -92,6 +92,7 @@ def _fit_prep_on_files(
     files: List[Path],
     fmt: str,
     records_per_file: int,
+    obj_size_granularity: int = 0,
 ) -> TracePreprocessor:
     """Fit a TracePreprocessor on a sample of files."""
     import pandas as pd
@@ -106,7 +107,7 @@ def _fit_prep_on_files(
     if not dfs:
         raise RuntimeError("No files could be loaded for fitting preprocessor.")
     combined = pd.concat(dfs, ignore_index=True)
-    prep = TracePreprocessor()
+    prep = TracePreprocessor(obj_size_granularity=obj_size_granularity)
     prep.fit(combined)
     return prep
 
@@ -210,9 +211,11 @@ def train(cfg: Config) -> None:
         n_seed = min(max(cfg.files_per_epoch, 4), len(all_files))
         seed_files = random.sample(all_files, n_seed)
         print(f"Fitting preprocessor on {n_seed} seed files …")
-        prep = _fit_prep_on_files(seed_files, cfg.trace_format, cfg.records_per_file)
+        prep = _fit_prep_on_files(seed_files, cfg.trace_format, cfg.records_per_file,
+                                   obj_size_granularity=cfg.obj_size_granularity)
         print(f"  columns ({prep.num_cols}): {prep.col_names}")
         print(f"  delta-encoded: {prep._delta_cols}")
+        print(f"  locality-split: {prep._obj_locality_cols}")
         print(f"  log-transformed: {prep._log_cols}")
 
         # Hold out a fixed val set — remove val files from all_files so they
@@ -238,9 +241,11 @@ def train(cfg: Config) -> None:
         train_ds, val_ds, prep = load_trace(
             cfg.trace_path, cfg.trace_format, cfg.max_records,
             cfg.timestep, cfg.train_split,
+            obj_size_granularity=cfg.obj_size_granularity,
         )
         print(f"  columns ({prep.num_cols}): {prep.col_names}")
         print(f"  delta-encoded: {prep._delta_cols}")
+        print(f"  locality-split: {prep._obj_locality_cols}")
         print(f"  log-transformed: {prep._log_cols}")
         print(f"  train windows: {len(train_ds):,}  val: {len(val_ds):,}")
         val_tensor = torch.stack([val_ds[i] for i in range(len(val_ds))])
@@ -254,9 +259,11 @@ def train(cfg: Config) -> None:
     # it operates directly on feature sequences.
     critic_input_dim = cfg.latent_dim if latent_ae else prep.num_cols
 
-    # Column index of obj_id in the feature vector (used by locality loss).
-    obj_id_col = (prep.col_names.index("obj_id")
-                  if hasattr(prep, "col_names") and "obj_id" in prep.col_names
+    # Column index of obj_id_reuse in the feature vector (used by locality loss).
+    # v15+: obj_id is split into obj_id_reuse (+1=reuse, -1=seek) and obj_id_stride.
+    obj_id_col = (prep.col_names.index("obj_id_reuse")
+                  if hasattr(prep, "col_names") and "obj_id_reuse" in prep.col_names
+                  else prep.col_names.index("obj_id") if "obj_id" in prep.col_names
                   else 1)
 
     # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
@@ -825,36 +832,19 @@ def train(cfg: Config) -> None:
                 # into a differentiable "reuse" indicator.  The loss penalises the
                 # squared gap between generated and real mean reuse rates.
                 if cfg.locality_loss_weight > 0:
-                    # L_loc: stride-repetition rate matching.
-                    # Measures the fraction of timesteps whose delta-encoded obj_id value
-                    # matches a prior value in the same window — a proxy for sequential-
-                    # access stride repetition.  (obj_id is delta-encoded + signed-log, so
-                    # we cannot recover absolute identities; instead we match the statistical
-                    # property that the same stride / seek-pattern recurs within a window.)
-                    # Real Tencent Block data: ~20-25% stride repetition rate.
-                    # Generator without L_loc: ~0% (pure random-seeking output).
-                    obj_fake = fake_decoded[:, :, obj_id_col]    # (B, T)
-                    obj_real = real_batch[:, :, obj_id_col]
-
-                    def _soft_reuse_rate(obj_seq: torch.Tensor) -> torch.Tensor:
-                        B, T = obj_seq.shape
-                        # (B, T, T) pairwise absolute distances between delta values
-                        diff = (obj_seq.unsqueeze(2) - obj_seq.unsqueeze(1)).abs()
-                        # Only compare position t to EARLIER positions s < t
-                        causal = torch.tril(
-                            torch.ones(T, T, device=obj_seq.device), diagonal=-1
-                        )
-                        diff = diff + (1.0 - causal) * 1e6
-                        min_dist = diff.min(dim=2).values  # (B, T): nearest prior match
-                        # Soft indicator: sigmoid centred at eps with moderate slope.
-                        # eps=0.04 (2% of [-1,1] range) catches near-exact repeats.
-                        eps = 0.04
-                        reuse = torch.sigmoid((eps - min_dist[:, 1:]) / (eps * 0.2))
-                        return reuse.mean()
-
-                    fake_reuse = _soft_reuse_rate(obj_fake)
+                    # L_loc: reuse rate matching.
+                    # v15+: obj_id_reuse is an explicit ±1 binary feature (+1=same object,
+                    # -1=different object). Convert to [0,1] probability and match means.
+                    # This replaces the old pairwise soft-distance computation over
+                    # delta-encoded obj_id, which was unable to detect reuse because
+                    # delta=0 is a zero-measure point in continuous space (v14g root cause).
+                    # Real Tencent Block: ~40-50% of accesses are reuses within a window.
+                    obj_fake_reuse = fake_decoded[:, :, obj_id_col]   # (B, T) in [-1, 1]
+                    obj_real_reuse = real_batch[:, :, obj_id_col]
+                    # (x + 1) / 2 maps ±1 → [0, 1]
+                    fake_reuse = ((obj_fake_reuse + 1) / 2).mean()
                     with torch.no_grad():
-                        real_reuse = _soft_reuse_rate(obj_real)
+                        real_reuse = ((obj_real_reuse + 1) / 2).mean()
                     loss_loc = (fake_reuse - real_reuse).pow(2)
                     g_loss = g_loss + cfg.locality_loss_weight * loss_loc
 

@@ -17,7 +17,8 @@ systor       : Timestamp, ResponseTime, Opcode(R/W), LUN, Offset, Size(512B)
 oracle_general: libCacheSim oracleGeneral binary format (24 bytes/record):
                 uint32 ts, uint64 obj_id, uint32 obj_size,
                 int32 next_access_vtime, int16 op, int16 tenant_id
-                obj_id is delta-encoded with signed-log (not raw) — see _OBJ_DELTA_COLS.
+                obj_id is split into obj_id_reuse (±1) + obj_id_stride (signed-log delta)
+                — see _OBJ_LOCALITY_COLS.
 lcs          : libCacheSim native binary format (.lcs.zst), versioned header.
                 Header: 8192 bytes (magic + version + trace stats).
                 v1 (24 bytes/record): uint32 ts, uint64 obj_id, uint32 obj_size,
@@ -459,13 +460,23 @@ _READERS = {
 # Timestamp column names — will be delta-encoded (deltas clipped to ≥ 0)
 _TS_COLS = {"ts", "timestamp"}
 
-# Object-ID column names — delta-encoded WITHOUT clipping (seeks can be negative),
-# then signed-log transformed: sign(d)*log1p(|d|).
-# Raw obj_id values are meaningless as continuous numbers (e.g. 17-digit Tencent
-# object IDs); Euclidean closeness of IDs ≠ access-structure closeness.
-# Delta-encoding captures sequential (small Δ), strided (regular Δ), and random
-# (large Δ) access patterns; signed-log compresses the 10-decade dynamic range.
-_OBJ_DELTA_COLS = {"obj_id"}
+# Object-ID column names — locality-aware two-feature split (v15+).
+# Each obj_id column is replaced with two derived columns:
+#   {col}_reuse : ±1 binary — +1 if same object as previous (delta==0), -1 otherwise.
+#                 The generator can learn this as a discrete binary feature; outputting
+#                 exactly 0 in continuous delta-space to produce reuse is impossible
+#                 in practice (v14g root cause: reuse_rate=0).
+#   {col}_stride: signed-log delta for non-reuse accesses: sign(Δ)·log1p(|Δ|).
+#                 Set to 0 when reuse=+1 (stride is undefined for same-object access).
+#                 Preserves sequential (small Δ), strided (regular Δ), random (large Δ)
+#                 and backward-seek (negative Δ) patterns.
+# Raw obj_id values are meaningless as continuous numbers — the delta still captures
+# the access structure. The split just makes reuse a learnable binary classification
+# target rather than a zero-measure point in continuous space.
+_OBJ_LOCALITY_COLS = {"obj_id"}
+
+# Legacy: kept empty so no columns fall through the old signed-log delta path.
+_OBJ_DELTA_COLS: set = set()
 
 # Columns whose raw values are read/write opcodes
 _OPCODE_COLS = {"opcode", "type", "rw", "op"}
@@ -499,16 +510,17 @@ class TracePreprocessor:
         absolute clock values.  Clipping negative deltas to 0 handles the
         rare out-of-order timestamps in some trace formats.
 
-    (2) Object/LBA IDs → signed-log delta encoding
-        Raw object IDs are meaningless as continuous numbers: Tencent block
-        IDs are 17-digit hashes where Euclidean closeness has no physical
-        meaning.  The *delta* (change in ID from one request to the next)
-        captures the access pattern: small delta = sequential access,
-        large delta = random seek, negative delta = backward seek.
-        The signed-log transform (sign(d)*log1p(|d|)) compresses the
-        roughly 10-decade range of deltas (from 0 for sequential hits to
-        10^10 for full-disk random seeks) so that both ends of the range
-        are representable with tanh output and normalisation within [-1, 1].
+    (2) Object/LBA IDs → locality-aware two-feature split (v15+)
+        Raw object IDs are meaningless as continuous numbers.  The delta
+        captures access structure, but the old approach of passing delta=0
+        through signed-log gave reuse a single point (0.0) in continuous
+        space — a zero-measure set the generator could never reliably hit
+        (v14g root cause: reuse_rate=0.000 throughout 400 epochs).
+        v15 splits obj_id into two features:
+          obj_id_reuse  ±1 binary: +1 same object, -1 different object.
+          obj_id_stride signed-log(Δ) for seeks; 0 for reuse.
+        Now reuse is a learnable binary classification target instead of an
+        exact zero in continuous regression space.
 
     (3) Sizes and IATs → log1p before min-max normalisation
         I/O sizes and inter-arrival times follow approximate power-law
@@ -520,28 +532,41 @@ class TracePreprocessor:
         approximately Gaussianises these distributions.
     """
 
-    def __init__(self):
+    def __init__(self, obj_size_granularity: int = 0):
+        """
+        obj_size_granularity: snap obj_size to this multiple before encoding
+            (0 = off, 4096 = page-aligned, 512 = sector-aligned).
+            Real block traces have sizes drawn from a small discrete set
+            (powers of 2 × sector size); quantizing before log-transform
+            concentrates the distribution onto the real support and helps
+            the generator learn the correct size distribution.
+        """
         self.col_names: List[str] = []
         self.num_cols: int = 0
         self._stats: Dict[str, dict] = {}
         self._cat_maps: Dict[str, dict] = {}
-        self._delta_cols: List[str] = []       # timestamp cols: delta, clip ≥ 0
-        self._first_vals: Dict[str, float] = {}  # for inverse cumsum (ts + obj_id)
-        self._log_cols: List[str] = []         # log1p-transformed cols (non-negative)
-        self._obj_delta_cols: List[str] = []   # obj_id cols: delta, no clip, signed-log
+        self._delta_cols: List[str] = []           # timestamp cols: delta, clip ≥ 0
+        self._first_vals: Dict[str, float] = {}    # for inverse cumsum (ts)
+        self._log_cols: List[str] = []             # log1p-transformed cols (non-negative)
+        self._obj_delta_cols: List[str] = []       # legacy (now empty)
+        self._obj_locality_cols: List[str] = []    # obj_id cols → reuse + stride split
+        self._obj_locality_first: Dict[str, float] = {}  # first abs value for cumsum
+        self._obj_size_granularity: int = obj_size_granularity
 
     # ------------------------------------------------------------------
     def fit(self, df: pd.DataFrame) -> "TracePreprocessor":
         df = df.copy()
         self._delta_cols = [c for c in df.columns if c.lower() in _TS_COLS]
-        self._obj_delta_cols = [c for c in df.columns if c.lower() in _OBJ_DELTA_COLS]
+        self._obj_delta_cols = []  # unused in v15+
+        self._obj_locality_cols = [c for c in df.columns if c.lower() in _OBJ_LOCALITY_COLS]
+        df = self._quantize_obj_size(df)
         df = self._apply_deltas(df, fit=True)
-        df = self._apply_obj_deltas(df, fit=True)
+        df = self._apply_obj_locality(df, fit=True)
         df = self._encode_categoricals(df, fit=True)
         # Identify log-transform columns: heavy-tailed continuous columns.
         # Applied after delta-encoding so ts_delta (inter-arrival times) is
         # also log-transformed, which is the right thing — IAT is power-law.
-        # obj_id is excluded: it gets signed-log via _apply_obj_deltas.
+        # obj_id_reuse and obj_id_stride are excluded (handled by _apply_obj_locality).
         self._log_cols = [
             c for c in df.columns
             if c.lower() in _LOG_COLS and c not in self._cat_maps
@@ -557,8 +582,9 @@ class TracePreprocessor:
 
     def transform(self, df: pd.DataFrame) -> np.ndarray:
         df = df.copy()
+        df = self._quantize_obj_size(df)
         df = self._apply_deltas(df, fit=False)
-        df = self._apply_obj_deltas(df, fit=False)
+        df = self._apply_obj_locality(df, fit=False)
         df = self._encode_categoricals(df, fit=False)
         df = self._apply_log(df)
         out = np.zeros((len(df), self.num_cols), dtype=np.float32)
@@ -579,9 +605,6 @@ class TracePreprocessor:
             # Undo log1p transform before any other post-processing
             if col in self._log_cols:
                 vals = np.expm1(np.clip(vals, 0, None))
-            # Undo signed-log transform: sign(v)*expm1(|v|)
-            if col in self._obj_delta_cols:
-                vals = np.sign(vals) * np.expm1(np.abs(vals))
             if col in self._cat_maps:
                 inv_map = {v: k for k, v in self._cat_maps[col].items()}
                 vals = np.array([inv_map.get(int(round(v)), v) for v in vals])
@@ -589,25 +612,77 @@ class TracePreprocessor:
 
         df = pd.DataFrame(data)
 
-        # Undo delta encoding: cumsum of deltas + start restores absolute timestamps.
+        # Undo timestamp delta encoding: cumsum of IATs + start restores absolute times.
         # The first delta is 0 by construction (_apply_deltas uses prepend=vals[0]),
         # so cumsum gives [0, d1, d1+d2, ...] and adding start gives the correct series.
-        # Previous code did concatenate([[start], deltas[:-1]]).cumsum() which shifted
-        # the series by one position and duplicated the first timestamp — now fixed.
         for col in self._delta_cols:
             if col in df.columns:
                 start = self._first_vals.get(col, 0.0)
                 df[col] = start + np.cumsum(df[col].values)
 
-        # Undo obj_id delta encoding (no clipping — deltas can be negative)
-        for col in self._obj_delta_cols:
-            if col in df.columns:
-                start = self._first_vals.get(col, 0.0)
-                df[col] = start + np.cumsum(df[col].values)
+        # Undo obj_id locality split: reconstruct absolute obj_id from reuse + stride.
+        # obj_id_reuse > 0 means same object (delta=0); otherwise use signed-log inverse.
+        for col in self._obj_locality_cols:
+            reuse_col  = f"{col}_reuse"
+            stride_col = f"{col}_stride"
+            if reuse_col in df.columns and stride_col in df.columns:
+                s = df[stride_col].values
+                stride_raw = np.sign(s) * np.expm1(np.abs(s))  # undo signed-log
+                r = df[reuse_col].values
+                delta = np.where(r > 0, 0.0, stride_raw)
+                start = self._obj_locality_first.get(col, 0.0)
+                df[col] = start + np.cumsum(delta)
+                df.drop(columns=[reuse_col, stride_col], inplace=True)
 
         return df
 
     # ------------------------------------------------------------------
+    def _quantize_obj_size(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Snap obj_size to the nearest multiple of obj_size_granularity.
+
+        Block I/O sizes are drawn from a small discrete set (multiples of the
+        storage sector or page size). Training on the raw continuous values
+        causes the generator to produce non-quantized sizes; training on the
+        quantized values concentrates the distribution onto the real support.
+        Applied before log-transform so the log distribution has the same
+        discrete peaks as the real data.
+        """
+        if self._obj_size_granularity > 0 and "obj_size" in df.columns:
+            df = df.copy()
+            g = self._obj_size_granularity
+            raw = df["obj_size"].values.astype(np.float64)
+            # Floor to multiple of g, with a floor of g itself (no zero-size records).
+            df["obj_size"] = np.maximum(raw // g, 1.0) * g
+        return df
+
+    def _apply_obj_locality(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
+        """Replace each obj_id column with a (reuse, stride) pair.
+
+        obj_id_reuse  : ±1 binary — +1 if delta==0 (same object), -1 otherwise.
+        obj_id_stride : signed-log delta for seeks; 0 when reuse=+1.
+
+        This replaces the old signed-log delta single-feature approach.  The
+        old approach required the generator to output exactly 0 in continuous
+        space to produce a reuse — a zero-measure event it never learned.
+        With a binary reuse feature the generator can classify reuse vs seek,
+        which is a learnable sigmoid output in [-1, 1].
+        """
+        df = df.copy()
+        for col in self._obj_locality_cols:
+            if col not in df.columns:
+                continue
+            vals = df[col].values.astype(np.float64)
+            if fit:
+                self._obj_locality_first[col] = float(vals[0])
+            deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
+            reuse  = np.where(deltas == 0, 1.0, -1.0)
+            stride = np.sign(deltas) * np.log1p(np.abs(deltas))
+            stride[deltas == 0] = 0.0  # reuse: stride undefined → 0
+            df.drop(columns=[col], inplace=True)
+            df[f"{col}_reuse"]  = reuse
+            df[f"{col}_stride"] = stride
+        return df
+
     def _apply_deltas(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
         for col in self._delta_cols:
             if col not in df.columns:
@@ -618,25 +693,6 @@ class TracePreprocessor:
             deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
             # Clip negative deltas (out-of-order timestamps) to 0
             deltas = np.clip(deltas, 0, None)
-            df = df.copy()
-            df[col] = deltas
-        return df
-
-    def _apply_obj_deltas(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
-        """
-        Delta-encode object-ID columns without clipping negative deltas.
-        Negative deltas (backward seeks) are valid and meaningful.
-        Applies sign(d)*log1p(|d|) to compress the ~10-decade dynamic range.
-        """
-        for col in self._obj_delta_cols:
-            if col not in df.columns:
-                continue
-            vals = df[col].values.astype(np.float64)
-            if fit:
-                self._first_vals[col] = float(vals[0])
-            deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
-            # Signed-log: preserves sign, compresses magnitude
-            deltas = np.sign(deltas) * np.log1p(np.abs(deltas))
             df = df.copy()
             df[col] = deltas
         return df
@@ -713,6 +769,7 @@ def load_trace(
     max_records: int,
     timestep: int,
     train_split: float = 0.8,
+    obj_size_granularity: int = 0,
 ) -> Tuple[TraceDataset, TraceDataset, TracePreprocessor]:
     """Load, preprocess, and split a trace file."""
     reader = _READERS.get(fmt)
@@ -739,7 +796,7 @@ def load_trace(
     df_train = df.iloc[:n_train].reset_index(drop=True)
     df_val   = df.iloc[n_train:].reset_index(drop=True)
 
-    prep = TracePreprocessor()
+    prep = TracePreprocessor(obj_size_granularity=obj_size_granularity)
     prep.fit(df_train)
 
     train_arr = prep.transform(df_train)

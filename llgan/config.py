@@ -60,8 +60,8 @@ class Config:
                                          # Directly targets DMD-GEN > 0.3.  Try 0.5–2.0.
     fide_alpha: float = 1.0           # FIDE: frequency inflation weight (NeurIPS 2024)
     feature_matching_weight: float = 1.0  # L_FM: critic feature matching (0 = off)
-    amp: bool = False                  # AMP fp16 forward passes for 2-3× CUDA speedup (CUDA only; incompatible with wgan-gp/r1/r2)
-    compile: bool = False              # torch.compile models for ~20-40% CUDA speedup (CUDA only)
+    amp: bool = True                   # AMP fp16 forward passes for 2-3× CUDA speedup (CUDA only; incompatible with wgan-gp/r1/r2)
+    compile: bool = True               # torch.compile models for ~20-40% CUDA speedup (CUDA only)
     minibatch_std: bool = True         # append per-batch std channel to critic input (StyleGAN2)
     locality_loss_weight: float = 0.0  # L_loc: stride-repetition rate matching within windows (0 = off).
                                        # Measures fraction of positions whose obj_id DELTA matches a prior
@@ -72,6 +72,11 @@ class Config:
                                         # Requires a second G forward pass per step. Try 0.5–2.0.
     r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
+
+    # v15 data representation
+    obj_size_granularity: int = 4096  # snap obj_size to this byte multiple before encoding
+                                      # (0 = off; 4096 = page-aligned; matches real block traces
+                                      # where sizes are multiples of 4KB)
 
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
     # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).
