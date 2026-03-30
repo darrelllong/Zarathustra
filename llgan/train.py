@@ -756,8 +756,8 @@ def train(cfg: Config) -> None:
                         [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
                         device=device,
                     )
-                    fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1])
-                    rb_flat = real_batch.reshape(-1, real_batch.shape[-1])
+                    fd_flat = fake_decoded.reshape(-1, fake_decoded.shape[-1]).float()
+                    rb_flat = real_batch.reshape(-1, real_batch.shape[-1]).float()
                     with torch.no_grad():
                         q_real = torch.quantile(rb_flat, q_levels, dim=0)  # (9, d)
                     q_fake = torch.quantile(fd_flat, q_levels, dim=0)
