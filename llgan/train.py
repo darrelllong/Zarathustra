@@ -53,7 +53,7 @@ def _collect_files(trace_dir: str, fmt: str) -> List[Path]:
     """Return all candidate trace files in a directory."""
     d = Path(trace_dir)
     # Collect everything and filter to likely trace files by suffix
-    candidates = [p for p in d.iterdir() if p.is_file()]
+    candidates = [p for p in d.iterdir() if p.is_file() and not p.name.startswith(".")]
     # For oracle_general, prefer .zst / .gz / binary-looking files
     # For csv-like formats, prefer .csv
     # Fall back to all files so user doesn't need to rename things.
