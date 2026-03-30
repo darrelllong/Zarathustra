@@ -300,13 +300,14 @@ def train(cfg: Config) -> None:
                     and cfg.r2_lambda == 0.0)
     if _can_compile:
         try:
-            G = torch.compile(G)
-            C = torch.compile(C)
+            G = torch.compile(G, fullgraph=False)
+            C = torch.compile(C, fullgraph=False)
             if latent_ae:
-                E = torch.compile(E)
-                R = torch.compile(R)
-                S = torch.compile(S)
-            print("[info] torch.compile: models compiled (CUDA).")
+                E = torch.compile(E, fullgraph=False)
+                R = torch.compile(R, fullgraph=False)
+                S = torch.compile(S, fullgraph=False)
+            print("[info] torch.compile: models compiled (CUDA). "
+                  "Triton kernels will JIT on first forward pass.")
         except Exception as exc:
             print(f"[warn] torch.compile failed, running eager: {exc}")
 
