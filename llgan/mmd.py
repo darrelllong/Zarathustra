@@ -159,18 +159,23 @@ def evaluate_metrics(
     if recovery is not None:
         recovery.eval()
 
-    idx = torch.randperm(len(val_data))[:n_samples]
-    real = val_data[idx].to(device)
-    real_flat = real.view(n_samples, -1).cpu().numpy().astype(np.float32)
+    try:
+        idx = torch.randperm(len(val_data))[:n_samples]
+        real = val_data[idx].to(device)
+        real_flat = real.view(n_samples, -1).cpu().numpy().astype(np.float32)
 
-    z_global = torch.randn(n_samples, generator.noise_dim, device=device)
-    z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
-    fake = generator(z_global, z_local)
-    if recovery is not None:
-        fake = recovery(fake)
-    fake_flat = fake.view(n_samples, -1).cpu().numpy().astype(np.float32)
+        z_global = torch.randn(n_samples, generator.noise_dim, device=device)
+        z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
+        fake = generator(z_global, z_local)
+        if recovery is not None:
+            fake = recovery(fake)
+        fake_flat = fake.view(n_samples, -1).cpu().numpy().astype(np.float32)
 
-    mmd2_val  = mmd(torch.tensor(real_flat), torch.tensor(fake_flat))
-    recall    = _recall_np(real_flat, fake_flat, k=k)
-    combined  = mmd2_val + 0.2 * (1.0 - recall)
-    return float(mmd2_val), float(recall), float(combined)
+        mmd2_val  = mmd(torch.tensor(real_flat), torch.tensor(fake_flat))
+        recall    = _recall_np(real_flat, fake_flat, k=k)
+        combined  = mmd2_val + 0.2 * (1.0 - recall)
+        return float(mmd2_val), float(recall), float(combined)
+    finally:
+        generator.train()
+        if recovery is not None:
+            recovery.train()
