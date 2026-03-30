@@ -1046,9 +1046,11 @@ def parse_args() -> Config:
     p.add_argument("--timestep",         type=int,   default=12)
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--hidden-size",      type=int,   default=256)
-    p.add_argument("--compile",          action="store_true", default=False,
+    p.add_argument("--compile",          action="store_true", default=True,
                    help="torch.compile models for ~20-40%% CUDA speedup "
-                        "(CUDA only; incompatible with wgan-gp/r1/r2)")
+                        "(CUDA only; incompatible with wgan-gp/r1/r2; default on)")
+    p.add_argument("--no-compile",       dest="compile", action="store_false",
+                   help="Disable torch.compile")
     p.add_argument("--no-minibatch-std", action="store_true", default=False,
                    help="Disable minibatch std channel in critic (on by default)")
     p.add_argument("--no-sn-lstm",       action="store_true", default=False,
@@ -1143,9 +1145,11 @@ def parse_args() -> Config:
                    help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--lr-er",                type=float, default=0.0005,
                    help="Learning rate for encoder + recovery")
-    p.add_argument("--amp",                  action="store_true", default=False,
-                   help="Enable AMP fp16 for 2-3× CUDA speedup (CUDA only; "
+    p.add_argument("--amp",                  action="store_true", default=True,
+                   help="Enable AMP fp16 for 2-3× CUDA speedup (CUDA only; default on; "
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
+    p.add_argument("--no-amp",               dest="amp", action="store_false",
+                   help="Disable AMP (useful for debugging)")
     args = p.parse_args()
 
     cfg = Config()

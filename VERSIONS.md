@@ -194,3 +194,62 @@ Implemented Conv1d(lstm_input, hidden_size, kernel=stride=3) before critic LSTM.
 Folds 12-step window into 4 patch tokens. TTS-GAN (AIME 2022) style.
 Enabled with --patch-embed flag (off by default; v14g does NOT use it yet).
 Will test in v15 on NVIDIA where we can run full hyperparameter search.
+
+---
+
+## v14g Summary (completed 2026-03-30)
+
+Best full eval (ep90): MMD²=0.018, α-precision=0.910, β-recall=0.372, DMD-GEN=0.700, Context-FID=0.03
+Training eval peak (ep395): MMD²=0.113, β-recall=0.469 (EMA+1000 samples — ~3-4× optimistic vs full eval)
+Checkpoint: /Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt (ep90)
+
+**Root causes identified from generation test:**
+- **reuse_rate=0.000**: delta-encoding makes obj_id reuse (delta=0) a zero-measure event
+  in continuous space. Generator never outputs exactly 0.0 in the normalized delta space.
+- **DMD-GEN stuck at 0.700**: cross_cov loss matches C (numerator) but not A=C·Σ⁻¹.
+  Supervisor loss weight (5.0) overpowers cross_cov weight (0.5) by 10×.
+- **obj_size non-quantized**: Generated sizes are continuous; real traces have discrete
+  multiples of 4096 bytes.
+
+---
+
+## v15 (vinge/GB10 CUDA, started 2026-03-30)
+
+First run on NVIDIA GB10 with AMP + torch.compile (2-3× speedup expected).
+
+**P0 architectural fixes from v14g root cause analysis:**
+
+1. **obj_id locality split** (dataset.py): Replace delta-encoded obj_id (single float)
+   with two features:
+   - `obj_id_reuse` (±1): +1 if same object as previous (delta=0), -1 otherwise.
+     Generator can now learn reuse as a binary classification target.
+   - `obj_id_stride` (signed-log delta): Seek magnitude for non-reuse accesses (0 when reuse).
+   This is the direct fix for reuse_rate=0: the generator had to output exactly 0.0 in
+   continuous space to produce a reuse — a zero-measure event. Now it classifies ±1.
+
+2. **obj_size quantization** (dataset.py): Snap to nearest 4096-byte multiple before
+   log-transform. Concentrates the distribution onto real discrete support.
+
+**CUDA-only features enabled:**
+- AMP fp16 (2-3× speedup)
+- torch.compile (additional ~20-40%)
+- 6 input features (was 5): ts, obj_size, opcode, tenant, obj_id_reuse, obj_id_stride
+
+**Training command:**
+```
+~/llgan-env/bin/python train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 600 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v15 --checkpoint-every 10 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 60 \
+  --locality-loss-weight 1.0 --acf-loss-weight 0.2 \
+  --moment-loss-weight 0.1 --fft-loss-weight 0.05 \
+  --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \
+  --cross-cov-loss-weight 0.5 --ema-decay 0.999 \
+  --lr-cosine-decay 0.05 --grad-clip 1.0 --n-critic 3 \
+  --hidden-size 256 --latent-dim 24 \
+  --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
+  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 5e-5
+```
+Log: vinge:~/train_v15.log
+PID: 13560 (started 2026-03-30)
