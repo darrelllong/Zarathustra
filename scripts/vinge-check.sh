@@ -71,9 +71,10 @@ echo "=== Best checkpoint: $BEST_PT ==="
 ssh "$VINGE" "
 cd ~/llgan 2>/dev/null || cd ~/Zarathustra/llgan
 ~/llgan-env/bin/python3 -c \"
-import torch, sys
+import torch, sys, os
 try:
-    ck = torch.load('$BEST_PT', map_location='cpu', weights_only=False)
+    # expanduser so Python handles the ~ in the path (it doesn't expand it natively)
+    ck = torch.load(os.path.expanduser('$BEST_PT'), map_location='cpu', weights_only=False)
     print(f'  epoch:    {ck.get(\\\"epoch\\\", \\\"?\\\") + 1}')
     print(f'  MMD²:     {ck.get(\\\"mmd\\\", \\\"?\\\"):.5f}')
     print(f'  recall:   {ck.get(\\\"recall\\\", \\\"?\\\"):.3f}')
