@@ -49,9 +49,11 @@ echo "=== vinge training status: $VERSION ==="
 echo
 
 # Check if the training process is alive.
-# pgrep searches by pattern in the full command line. The checkpoint dir name
-# uniquely identifies which version is running, even if multiple pythons exist.
-PID=$(ssh "$VINGE" "pgrep -f 'tencent_${VERSION}' 2>/dev/null | head -1 || true")
+# The bracket trick (tencent[_]v16) matches the literal string "tencent_v16" in
+# running processes but does NOT match the pgrep command itself — the pgrep cmdline
+# contains the bracket form, which glob-expands differently. Without this, pgrep -f
+# always reports itself as a match when run over SSH, giving false "RUNNING" results.
+PID=$(ssh "$VINGE" "pgrep -f 'tencent[_]${VERSION}' 2>/dev/null | head -1 || true")
 if [[ -n "$PID" ]]; then
     echo "Process: RUNNING (PID $PID)"
 else
