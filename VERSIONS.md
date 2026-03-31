@@ -4,41 +4,26 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v16
+## Current Run: v17
 
-**Status**: Running on vinge (GB10 CUDA, AMP fp16, no compile)
-- PID: 150086
-- Log: `vinge:~/train_v16.log`
-- Checkpoints: `vinge:~/checkpoints/tencent_v16/`
-- Started: 2026-03-30
+**Status**: Planning — not yet launched.
 
-**What changed vs v15:**
-1. `--diversity-loss-weight 0.5` (was 0): Restores MSGAN recall-boosting loss from v14g.
-   v14g recall=0.372 had it; v15 recall=0.294 didn't. Direct fix for recall gap.
-2. `--cross-cov-loss-weight 2.0` (was 0.5): Reduces supervisor dominance from 10:1 to 2.5:1.
-3. `--n-critic 2` (was 3): Between v14c (too conservative) and v15 (underdamped oscillation).
-4. `--lr-d 2.5e-5` (was 5e-5): Lower critic LR to further damp oscillation.
-5. `--epochs 150`: Short ablation — no point running 600ep if cycling kills improvement by ep110.
+**Hypothesis**: v16 proved that reducing lr_d below v14g's level makes recall *worse*, not better.
+The core problem is supervisor dominance: supervisor_loss_weight=5.0 makes G learn to replay
+real sequences rather than generate new ones. Reducing it is the highest-priority lever for v17.
 
-**Training command:**
-```
-~/llgan-env/bin/python -u train.py \
-  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 150 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v16 --checkpoint-every 5 \
-  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --locality-loss-weight 1.0 --acf-loss-weight 0.2 \
-  --moment-loss-weight 0.1 --fft-loss-weight 0.05 \
-  --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \
-  --cross-cov-loss-weight 2.0 --diversity-loss-weight 0.5 \
-  --ema-decay 0.999 --lr-cosine-decay 0.05 \
-  --grad-clip 1.0 --n-critic 2 \
-  --hidden-size 256 --latent-dim 24 \
-  --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
-  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5 --no-compile
-```
+**What to change vs v16:**
+1. `--supervisor-loss-weight 1.0` (was 5.0): The 5.0 value was set for pretraining stability.
+   During GAN phase it over-constrains G — G gradient is dominated by "look like the supervisor
+   predicted" rather than "fool the critic." Reducing to 1.0 gives cross_cov, diversity, and
+   adversarial losses room to compete.
+2. `--lr-d 5e-5` (was 2.5e-5, restore to v14g level): v14g with 5e-5 got recall=0.372;
+   v16 with 2.5e-5 got 0.228. Lower lr_d created a stable-but-permanent critic advantage.
+3. `--diversity-loss-weight 1.0` (was 0.5): More direct pressure on recall since we expect
+   supervisor reduction to destabilize slightly. Extra diversity gradient compensates.
+4. `--epochs 200` (was 150): v16 improved late (ep100→130) as LR decayed. Give more room.
 
-**Abort criteria**: recall=0 for 2+ evals, OR W>15, OR no MMD² improvement over 40 evals AND worse than v14g (0.018).
+Everything else unchanged from v16 (n_critic=2, lr_g=1e-4, cross_cov=2.0, hidden=256, latent=24).
 
 ---
 
@@ -56,6 +41,7 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 | v14f | 0.048 | 0.021 | 50 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14f/ | Stable but plateaued; first diversity_loss test |
 | v14g | **0.018** | **0.372** | 90 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt | Best MMD²–recall trade-off; full eval reuse_rate=0 |
 | v15 | 0.029 | 0.294 | 100 | vinge:~/checkpoints/tencent_v15/best.pt | GAN cycling ep110; missing diversity_loss |
+| v16 | 0.042 | 0.228 | 130 | vinge:~/checkpoints/tencent_v16/best.pt | Diversity+cross_cov restored; critic still dominant; worse than v14g |
 
 ---
 
@@ -96,6 +82,46 @@ First clean run with SN-LSTM from epoch 0. Key changes vs v14f:
 3. obj_size non-quantized: generated sizes are continuous; real traces are multiples of 4096 bytes.
    Fix: snap to 4096-byte multiples before log-transform (v15).
 
+### v16 (vinge/GB10, completed ep150, 2026-03-31)
+
+Applied diversity_loss=0.5 (absent in v15), cross_cov=2.0, n_critic=2, lr_d=2.5e-5.
+Training ran cleanly to ep150 with no cycling spikes. Best checkpoint: ep130.
+
+**Full eval (ep130)**:
+| Metric | v16 | v14g | Δ |
+|--------|-----|------|---|
+| MMD² | 0.042 | 0.018 | +0.024 worse |
+| α-precision | 0.833 | 0.910 | −0.077 |
+| β-recall | 0.228 | 0.372 | −0.144 (mode collapse) |
+| DMD-GEN | 0.744 | 0.700 | +0.044 worse |
+| Context-FID | 0.15 | 0.03 | +0.12 worse |
+| reuse rate | 0.004 | 0.000 | tiny improvement |
+
+**What worked:**
+- Stable training through ep150: no GAN cycling, W stayed <2.1 (vs ep110 spike in v15).
+- Late improvement: best improved ep100→ep130 as LR decayed, G briefly went negative (ep132–133).
+- reuse_rate 0.004 > v14g 0.000: obj_id_reuse binary feature is registering, barely.
+
+**What went wrong:**
+1. **Lower lr_d (2.5e-5 vs v14g 5e-5) made recall worse**, not better (0.228 vs 0.372).
+   Hypothesis: slower critic is more stable but maintains a *permanent* moderate advantage.
+   In v14g the faster critic was in more active competition with G, which forced G to improve.
+2. **cross_cov_loss_weight=2.0 didn't improve DMD-GEN** (0.744 vs 0.700).
+   The 2.5:1 ratio (cross_cov 2.0 : supervisor 5.0) still not enough to rebalance signal.
+   Supervisor at 5.0 dominates G's loss landscape; G learns to reproduce sequences, not generate.
+3. **Context-FID 5× worse than v14g**: latent space quality degraded. Likely because
+   the 6-feature AE (v15+) has a harder compression task than v14g's 5-feature AE,
+   and the pretrain wasn't extended to compensate.
+4. **Reuse rate still near-zero (0.004)**: Binary obj_id_reuse feature isn't learned well
+   from a continuous latent with per-step noise. Needs architectural support, not just features.
+
+**Root causes for v17:**
+1. `supervisor_loss_weight=5.0` too high: dominates G gradient → G learns replay, not generation.
+   Fix: reduce to 1.0–2.0.
+2. `lr_d=2.5e-5` too low: stable but asymmetric equilibrium. Fix: restore to `5e-5` (v14g level).
+3. Locality learning requires more than a binary input feature. Architectural fix (task #19)
+   needed eventually; for v17 at minimum try higher diversity_loss to compensate.
+
 ### v15 (vinge/GB10, killed ep143, 2026-03-30)
 
 First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
@@ -131,13 +157,14 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v15 | Target | Description |
-|--------|-----|------|-----|--------|-------------|
-| MMD² | 0.00818 | 0.018 | 0.029 | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.294 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | — | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | ~0.700 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| reuse-rate | 0.124 | 0.000 | TBD | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v15 | v16 | Target | Description |
+|--------|-----|------|-----|-----|--------|-------------|
+| MMD² | 0.00818 | 0.018 | 0.029 | 0.042 | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.294 | 0.228 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | — | 0.833 | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | ~0.700 | 0.744 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | — | 0.03 | — | 0.15 | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.124 | 0.000 | TBD | 0.004 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
 Note: v14g had better MMD² than v13 despite lower β-recall. v14g is the best MMD²–recall trade-off
 we have achieved. All new runs must beat v14g's combined score (0.018 MMD² + 0.2×(1-0.372) = 0.144).
