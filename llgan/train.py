@@ -672,8 +672,8 @@ def train(cfg: Config) -> None:
                     scaler.unscale_(opt_C)
                     nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
                 scaler.step(opt_C)
-                scaler.update()
                 c_losses.append(c_loss.item())
+            scaler.update()   # once per batch, not once per critic step
 
             # --- Generator step ---
             z_g = torch.randn(B, cfg.noise_dim, device=device)
@@ -706,7 +706,11 @@ def train(cfg: Config) -> None:
                     # Supervisor consistency: S(H_fake)[t] should predict H_fake[t+1].
                     # This forces the generator to produce temporally coherent latents
                     # that obey the same autoregressive dynamics as real data.
-                    S_on_fake = S(H_fake)
+                    # S is a frozen teacher: use no_grad so gradients only flow back
+                    # to G through H_fake[:, k:, :] (the prediction target), not
+                    # through S itself.  Matches the G-warmup phase pattern.
+                    with torch.no_grad():
+                        S_on_fake = S(H_fake)
                     k = cfg.supervisor_steps
                     loss_sup = nn.functional.mse_loss(
                         S_on_fake[:, :-k, :], H_fake[:, k:, :])
