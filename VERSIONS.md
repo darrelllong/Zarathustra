@@ -2,318 +2,23 @@
 
 All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless noted.
 
-## Completed Runs
-
-| Version | Best MMD² | Best Recall | Best Epoch | Notes |
-|---------|-----------|-------------|------------|-------|
-| v3–v8 | ~0.07+ | 0.022–0.143 | varies | Pre-latent-AE; mode collapse |
-| v9 | ~0.025 | 0.351 | ~60 | First with latent AE + supervisor + feature matching |
-| v13 | **0.00818** | 0.455 | 130 | 3234 files, multi-file streaming; 171 wasted epochs (GAN cycling) |
-| v14 | 0.041 | 0.618 | 30 | Collapsed epoch ~100 (W→31, recall→0) — see v14 notes |
-
-Checkpoint locations (all on wigner):
-- v9: ~/Zarathustra/llgan/checkpoints/tencent_v9/best.pt
-- v13: /Volumes/Archive/Traces/checkpoints/tencent_v13/best.pt
-- v14: /Volumes/Archive/Traces/checkpoints/tencent_v14/best.pt (epoch 30)
-- v14c: /Volumes/Archive/Traces/checkpoints/tencent_v14c/ (in progress)
-
 ---
 
-## In Progress
-
-### v14c (hot-start from v14 epoch 30, 2026-03-28)
-
-Hot-start from tencent_v14/epoch_0030.pt (MMD2=0.041, recall=0.618).
-
-**What changed vs v14:**
-- **Spectral norm on critic LSTM** (weight_ih_l0, weight_hh_l0) — v14 had SN only on
-  the FC output layer; LSTM drifted unconstrained, W went to 31, recall to 0 at epoch 100.
-- **Lower LR**: lr_g=5e-5, lr_d=2.5e-5 (50% reduction on lr_d)
-- **n_critic=1** (was 3): one critic step per generator step to slow W drift
-- **lr_cosine_decay=0.02** (was 0.05): decays to 2% of initial LR
-
-**v14 notes (what went wrong):**
-- WGAN-SN without LSTM SN: only FC output layer was Lipschitz-constrained
-- W distance grew 2.7 to 16.4 by epoch 36, drifted to ~31 by epoch 100
-- Recall hit 0.000 at epoch 100 — complete mode collapse
-- Best checkpoint was epoch 30 (first evaluation): MMD2=0.041, recall=0.618
-
----
-
-## Planned
-
-### v15 (NVIDIA GPU, ETA ~2026-03-30)
-
-New capabilities enabled by CUDA (not available on MPS):
-- --amp: AMP fp16 gives 2-3x speed
-- --compile: torch.compile gives ~20-40% additional speedup
-- --cross-cov-loss-weight 1.0: full d×d lag-1 cross-feature covariance matching.
-  DMD-GEN estimates linear dynamics operator A from the cross-covariance matrix; previous
-  losses only matched the diagonal (per-feature ACF). Main DMD-GEN hypothesis.
-- --diversity-loss-weight 1.0: MSGAN loss — maximises |G(z1)-G(z2)|/|z1-z2|; combats
-  beta-recall mode collapse; requires 2nd G forward pass per step.
-- --sn-lstm (now default): spectral norm on critic LSTM (fixed in v14c)
-
----
-
-## Key Metrics (v13 baseline targets)
-
-| Metric | v13 | Target | Description |
-|--------|-----|--------|-------------|
-| MMD2 | 0.00818 | < 0.005 | Kernel distribution distance |
-| beta-recall | 0.455 | > 0.7 | Coverage: fraction of real modes covered |
-| alpha-precision | 0.812 | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-
----
-
-## What We Have Tried and Learned
-
-### Architectural choices
-- **GRU for AE/supervisor, LSTM for G+C**: GRU is simpler + faster for compression/prediction;
-  LSTM cell state needed for G's long-range workload context and C's burst detection.
-- **Split noise (z_global + z_local)**: z_global maps to LSTM h0/c0 (workload identity);
-  z_local feeds per-step input (event noise). Without this, every window is independent.
-- **Latent AE (TimeGAN/SeriesGAN)**: Direct feature-space GAN is unstable in a 5-feature
-  correlated space spanning 10 decades. AE reduces to smooth 24-dim latent space.
-- **Attention pooling in critic**: Mean pooling dilutes burst spikes. Attention up-weights
-  the most discriminative timesteps.
-- **Minibatch std in critic (StyleGAN2)**: Collapsed G produces identical rows, std near 0.
-  This channel gives the critic a diversity signal before collapse happens.
-
-### Training stability
-- **sn_lstm=True (v14c)**: SN on LSTM weight matrices essential. SN on FC output only
-  allows LSTM to drift; W grows unboundedly and training collapses.
-- **n_critic=1 vs 3**: More critic steps per G step causes faster W drift on MPS.
-- **Cosine LR annealing**: lr_cosine_decay=0.02-0.05 damps GAN cycling at 200+ epochs.
-- **supervisor_loss_weight=5.0** (halved from 10.0): eta=10 with 100 pretrain G epochs
-  caused trivial latent collapse. eta=5 with 50 pretrain epochs avoids it.
-- **pretrain_g_epochs=50** (halved from 100): longer warm-up increases collapse risk.
-
-### Losses
-- **L_ACF**: Lag-1..5 autocorrelation matching. Effective for temporal structure.
-- **L_loc**: Stride-repetition rate (fraction of delta-obj_id repeats). Captures
-  sequential-access patterns that ACF misses.
-- **L_FFT**: Frequency-domain matching. Low weight (0.05); complements ACF.
-- **L_V (moment)**: Per-feature mean+std. Cheap, always-on baseline.
-- **L_Q (quantile)**: p50/90/95/99 matching. Helps with heavy-tailed distributions.
-- **L_FM (feature matching)**: Critic pooled-hidden-state MSE between real and fake.
-  Smoother training signal than Wasserstein alone; reduces mode collapse.
-- **L_cov (cross-covariance, planned v15)**: Full d×d lag-1 cross-feature covariance.
-  Directly targets DMD-GEN (the linear dynamics operator is estimated from this matrix).
-- **L_div (diversity, planned v15)**: MSGAN mode-seeking. Not yet tested.
-
----
-
-### v14d (hot-start from v14 epoch 30, 2026-03-28 23:13)
-
-Hot-start from tencent_v14/epoch_0030.pt (MMD2=0.041, recall=0.618).
-Killed v14c after 44-epoch regression (epoch 30 best 0.046 → epoch 70: 0.062, recall 0.140).
-
-**What changed vs v14c:**
-- **n_critic=2** (was 1): v14c's G loss was persistently +2 to +4, meaning the critic
-  dominated. With W max of 0.09 over 50 epochs, SN-LSTM proved we have headroom for more
-  critic steps. n_critic=2 gives G stronger gradients to learn from.
-- Everything else identical to v14c.
-
-**v14c notes (what went wrong):**
-- n_critic=1 was too conservative: critic stayed too strong relative to G
-- G loss persistently positive (+2-4): critic correctly identified fakes but G couldn't learn
-- Recall declined 0.269 (ep30) -> 0.140 (ep70) over 40 epochs: slow mode narrowing
-- No W drift (max 0.09), no collapse — just stuck in local optimum
-- Best epoch was 30: MMD2=0.046, recall=0.269
-
----
-
-### v14d post-mortem (killed epoch 21, 2026-03-29)
-
-Mode collapse immediately: recall 0.046-0.057 across epochs 5-20, MMD2 0.317-0.440.
-n_critic=2 was too aggressive for a hot-start from a non-SN-LSTM checkpoint (v14/epoch_0030.pt).
-The extra critic step caused the critic to overpower the generator before it could adapt.
-SN u/v vectors were freshly initialized on old weights; 2 critic steps per G step too fast.
-Killed at epoch 21.
-
-### v14e (hot-start from v14 epoch 30, 2026-03-29, n_critic=1)
-
-Back to v14c config (n_critic=1). The v14c 40-epoch stagnation was oscillation, not collapse.
-v14c had recall 0.157-0.269 at epochs 5-30 -- vastly better than v14d's 0.044-0.057.
-With 380 epochs remaining, n_critic=1 gives the best chance to break past 0.046 MMD2.
-
----
-
-### v14e post-mortem (killed epoch 31, 2026-03-29)
-
-Worse than v14c at every eval: epoch 30 MMD2=0.077/recall=0.209 vs v14c 0.046/0.269.
-G loss escalated to +8-10 by epoch 17, W spike +0.63 at epoch 30.
-Same root cause as v14c stagnation: hot-start from v14/epoch_0030.pt loads generator
-weights tuned for unconstrained critic; fresh SN-LSTM normalization creates asymmetry.
-
-### v14f (hot-start from v14c/epoch_0030.pt, 2026-03-29)
-
-Key changes vs v14c/v14e:
-- **Resume from tencent_v14c/epoch_0030.pt** (not v14/epoch_0030.pt). The v14c checkpoint
-  has SN-LSTM u/v buffers already converged. Avoids the fresh-SN-on-old-weights asymmetry.
-- **diversity-loss-weight=0.5**: MSGAN mode-seeking loss. Directly combats the recall decline
-  seen in v14c (0.269->0.140 over 44 epochs). L_div = -|G(z1)-G(z2)| / |z1-z2| penalises
-  the generator for producing similar outputs across different noise inputs.
-- n_critic=1, all other hyperparameters identical to v14c.
-
-Starting from v14c best: MMD2=0.046, recall=0.269.
-
----
-
-### v14f post-mortem (killed epoch 190, 2026-03-29)
-
-Stable but plateaued. Best: epoch 50 MMD2=0.048, recall=0.234 (training eval with EMA, 1000 samples).
-Full eval.py on v14c/epoch_0030.pt revealed the real picture:
-  MMD2=0.048, alpha-precision=0.489, beta-recall=0.021 (!!), DMD-GEN=0.703
-  Context-FID=0.07 (good), AutoCorr=0.058, reuse-rate fake=0.000 vs real=0.124
-Key finding: beta-recall in training log (0.269) vs eval.py (0.021) diverge because
-training uses EMA weights + 1000 samples; full eval uses live checkpoint + 2000 samples.
-Reuse rate=0 despite L_loc loss: generator never repeats obj_id within window.
-
-GAN cycling pattern (underdamped oscillation) prevented sustained improvement.
-W occasionally spiked to 1.19 (epoch 174) but SN-LSTM always recovered.
-Killed to start fresh training.
-
-### v14g (fresh from scratch, 2026-03-29, ~08:30)
-
-First CLEAN run with SN-LSTM from epoch 0. All prior hot-starts carried generator weights
-tuned for an unconstrained critic, creating a permanent asymmetry. Key changes:
-- Fresh pretraining: AE 50ep + Supervisor 50ep (supervisor_steps=2) + G warmup 50ep
-- supervisor_steps=2: 2-step temporal prediction (SeriesGAN) instead of 1-step
-- cross_cov_loss_weight=0.5: full d*d lag-1 cross-feature covariance matching (DMD-GEN fix)
-- diversity_loss_weight=0.5: MSGAN mode-seeking (recall fix)
-- lr_g=1e-4, lr_d=5e-5 (back to original v13 LRs; hot-starts used 5e-5/2.5e-5)
-- lr_cosine_decay=0.05 (faster decay than v14f's 0.02)
-- Everything else same as v14f
-
-### New: Patch embedding in critic (2026-03-29)
-
-Implemented Conv1d(lstm_input, hidden_size, kernel=stride=3) before critic LSTM.
-Folds 12-step window into 4 patch tokens. TTS-GAN (AIME 2022) style.
-Enabled with --patch-embed flag (off by default; v14g does NOT use it yet).
-Will test in v15 on NVIDIA where we can run full hyperparameter search.
-
----
-
-## v14g Summary (completed 2026-03-30)
-
-Best full eval (ep90): MMD²=0.018, α-precision=0.910, β-recall=0.372, DMD-GEN=0.700, Context-FID=0.03
-Training eval peak (ep395): MMD²=0.113, β-recall=0.469 (EMA+1000 samples — ~3-4× optimistic vs full eval)
-Checkpoint: /Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt (ep90)
-
-**Root causes identified from generation test:**
-- **reuse_rate=0.000**: delta-encoding makes obj_id reuse (delta=0) a zero-measure event
-  in continuous space. Generator never outputs exactly 0.0 in the normalized delta space.
-- **DMD-GEN stuck at 0.700**: cross_cov loss matches C (numerator) but not A=C·Σ⁻¹.
-  Supervisor loss weight (5.0) overpowers cross_cov weight (0.5) by 10×.
-- **obj_size non-quantized**: Generated sizes are continuous; real traces have discrete
-  multiples of 4096 bytes.
-
----
-
-## v15 (vinge/GB10 CUDA, started 2026-03-30)
-
-First run on NVIDIA GB10 with AMP + torch.compile (2-3× speedup expected).
-
-**P0 architectural fixes from v14g root cause analysis:**
-
-1. **obj_id locality split** (dataset.py): Replace delta-encoded obj_id (single float)
-   with two features:
-   - `obj_id_reuse` (±1): +1 if same object as previous (delta=0), -1 otherwise.
-     Generator can now learn reuse as a binary classification target.
-   - `obj_id_stride` (signed-log delta): Seek magnitude for non-reuse accesses (0 when reuse).
-   This is the direct fix for reuse_rate=0: the generator had to output exactly 0.0 in
-   continuous space to produce a reuse — a zero-measure event. Now it classifies ±1.
-
-2. **obj_size quantization** (dataset.py): Snap to nearest 4096-byte multiple before
-   log-transform. Concentrates the distribution onto real discrete support.
-
-**CUDA-only features enabled:**
-- AMP fp16 (2-3× speedup)
-- torch.compile (additional ~20-40%)
-- 6 input features (was 5): ts, obj_size, opcode, tenant, obj_id_reuse, obj_id_stride
-
-**Training command:**
-```
-~/llgan-env/bin/python train.py \
-  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 600 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v15 --checkpoint-every 10 \
-  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 60 \
-  --locality-loss-weight 1.0 --acf-loss-weight 0.2 \
-  --moment-loss-weight 0.1 --fft-loss-weight 0.05 \
-  --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \
-  --cross-cov-loss-weight 0.5 --ema-decay 0.999 \
-  --lr-cosine-decay 0.05 --grad-clip 1.0 --n-critic 3 \
-  --hidden-size 256 --latent-dim 24 \
-  --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
-  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 5e-5
-```
-Log: vinge:~/train_v15.log
-PID: 90561 (restarted 2026-03-30, killed 2026-03-30)
-
----
-
-## v15 Post-Mortem (killed epoch 143, 2026-03-30)
-
-**Best checkpoint**: epoch 100 — MMD²=0.029, β-recall=0.294, combined=0.170
-**Abort reason**: 43 epochs without improvement; best MMD²=0.029 is 60% worse than v14g (0.018).
-
-### What went wrong
-
-**1. Missing diversity loss (root cause of recall gap)**
-v14g had `diversity_loss_weight=0.5`; v15 dropped it. v14g recall=0.372 vs v15 recall=0.294.
-The MSGAN diversity loss directly penalises G for collapsing similar z to similar outputs.
-Without it, the generator narrows onto high-frequency modes.
-
-**2. GAN cycling / underdamped oscillation (same pattern as v13)**
-After epoch 100 best, G loss jumped from -1.2 to +3.5 at epoch 110, MMD² spiked from 0.029 to 0.111.
-Partial recovery to 0.044 by epoch 140 but never regained best. Same cycling pattern as v13 (171 wasted epochs).
-Root cause: n_critic=3 with lr_d=5e-5 gives the critic too much pressure — G overshoots,
-critic wins decisively, G then overshoots back. Underdamped.
-
-**3. cross_cov still overpowered 10:1 by supervisor**
-`supervisor_loss_weight=5.0` vs `cross_cov_loss_weight=0.5` → 10:1 ratio.
-DMD-GEN stayed at ~0.700 (same as v14g). Not the immediate abort cause but limits ceiling.
-
-### Bugs fixed during v15 run (all now in codebase)
-- `torch.quantile` fp16 crash → `.float()` cast (e3ad770)
-- `evaluate_metrics()` left G/R in `.eval()` mode → `try/finally` restore (01a797f)
-- E/R/S left in `.eval()` from pretrain phases → explicit `.train()` at GAN loop start (ba356d5)
-- `scaler.update()` called 3× per critic loop → moved outside loop (f5c63b7)
-- Supervisor gradient leak in G step → `torch.no_grad()` around `S(H_fake)` (f5c63b7)
-- EMA seeded from random init (not post-warmup G) → seed after Phase 2.5 (f5c63b7)
-- rsync temp file spam → `not p.name.startswith(".")` filter (0ca6f49)
-
-### v15 eval history
-| Epoch | MMD² | Recall | Combined | Notes |
-|-------|------|--------|----------|-------|
-| 5 | 0.0652 | 0.198 | 0.226 | |
-| 55 | 0.0360 | 0.298 | 0.176 | |
-| 80 | 0.0341 | 0.296 | 0.175 | |
-| 100 | 0.0291 | 0.294 | 0.170 | ★ best.pt |
-| 110 | 0.1109 | 0.183 | 0.274 | cycling crash |
-| 140 | 0.0435 | 0.307 | 0.182 | partial recovery |
-
----
-
-## v16 (vinge/GB10, 2026-03-30)
-
-Short 150-epoch ablation targeting the two root causes of v15 underperformance.
-Reuses v15 `pretrain_complete.pt` (same 6-feature architecture) to skip 35-min pretrain.
-
-**Changes vs v15:**
-
-1. **`--diversity-loss-weight 0.5`** (was 0): Restore MSGAN loss from v14g. Direct fix for recall gap.
-   v14g recall=0.372 had it; v15 recall=0.294 didn't.
-2. **`--cross-cov-loss-weight 2.0`** (was 0.5): 4× increase to fix DMD-GEN. Reduces supervisor
-   dominance from 10:1 to 2.5:1 ratio.
-3. **`--n-critic 2`** (was 3): Reduce critic pressure to damp GAN cycling.
-   n_critic=1 (v14c) was too conservative; n_critic=3 (v15) caused underdamped oscillation.
-4. **`--lr-d 2.5e-5`** (was 5e-5): Lower critic LR to further reduce oscillation amplitude.
-5. **`--epochs 150`**: Short ablation. No point running 600ep if cycling kills improvement by ep110.
+## Current Run: v16
+
+**Status**: Running on vinge (GB10 CUDA, AMP fp16, no compile)
+- PID: 150086
+- Log: `vinge:~/train_v16.log`
+- Checkpoints: `vinge:~/checkpoints/tencent_v16/`
+- Started: 2026-03-30
+
+**What changed vs v15:**
+1. `--diversity-loss-weight 0.5` (was 0): Restores MSGAN recall-boosting loss from v14g.
+   v14g recall=0.372 had it; v15 recall=0.294 didn't. Direct fix for recall gap.
+2. `--cross-cov-loss-weight 2.0` (was 0.5): Reduces supervisor dominance from 10:1 to 2.5:1.
+3. `--n-critic 2` (was 3): Between v14c (too conservative) and v15 (underdamped oscillation).
+4. `--lr-d 2.5e-5` (was 5e-5): Lower critic LR to further damp oscillation.
+5. `--epochs 150`: Short ablation — no point running 600ep if cycling kills improvement by ep110.
 
 **Training command:**
 ```
@@ -330,6 +35,166 @@ Reuses v15 `pretrain_complete.pt` (same 6-feature architecture) to skip 35-min p
   --grad-clip 1.0 --n-critic 2 \
   --hidden-size 256 --latent-dim 24 \
   --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
-  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5
+  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5 --no-compile
 ```
-Log: vinge:~/train_v16.log
+
+**Abort criteria**: recall=0 for 2+ evals, OR W>15, OR no MMD² improvement over 40 evals AND worse than v14g (0.018).
+
+---
+
+## Completed Runs
+
+| Version | Best MMD² | Best Recall | Best Epoch | Checkpoint | Notes |
+|---------|-----------|-------------|------------|------------|-------|
+| v3–v8 | ~0.07+ | 0.022–0.143 | varies | wigner archive | Pre-latent-AE; mode collapse |
+| v9 | ~0.025 | 0.351 | ~60 | wigner archive | First latent AE + supervisor + FM |
+| v13 | **0.00818** | 0.455 | 130 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v13/best.pt | 3234 files; 171 wasted GAN-cycling epochs |
+| v14 | 0.041 | 0.618 | 30 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14/best.pt (ep30) | Collapsed ep~100: no LSTM SN, W→31 |
+| v14c | 0.046 | 0.269 | 30 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14c/ | n_critic=1 too conservative; stagnated |
+| v14d | 0.317 | 0.046 | — | discarded | Immediate collapse; n_critic=2 on non-SN checkpoint |
+| v14e | 0.077 | 0.209 | 30 | discarded | Worse than v14c; same hot-start asymmetry |
+| v14f | 0.048 | 0.021 | 50 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14f/ | Stable but plateaued; first diversity_loss test |
+| v14g | **0.018** | **0.372** | 90 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt | Best MMD²–recall trade-off; full eval reuse_rate=0 |
+| v15 | 0.029 | 0.294 | 100 | vinge:~/checkpoints/tencent_v15/best.pt | GAN cycling ep110; missing diversity_loss |
+
+---
+
+## Version Notes
+
+### v14 (killed, 2026-03-28)
+WGAN-SN without spectral norm on the critic LSTM: only the FC output layer was Lipschitz-constrained.
+LSTM weights drifted unconstrained — W grew from 2.7 to 31 by epoch 100, recall hit 0.
+Best was epoch 30 (first eval) before the drift began.
+
+### v14c–v14e (hot-starts from v14/epoch_0030.pt, 2026-03-28–29)
+All failed because loading a generator trained against an unconstrained critic into a freshly
+SN-normalised critic creates a permanent power asymmetry. The SN u/v buffers are initialised
+randomly; the critic wins decisively until they converge, by which point G is stuck.
+**Lesson**: never hot-start from a checkpoint whose critic had different Lipschitz constraints.
+
+### v14f (hot-start from v14c/epoch_0030.pt, killed ep190, 2026-03-29)
+First test with diversity_loss_weight=0.5. Stable but plateaued. Full eval revealed that
+training-log β-recall (0.269) and eval.py β-recall (0.021) diverge by ~13×:
+training uses EMA weights + 1000 samples, eval uses live checkpoint + 2000 samples.
+**Lesson**: training-log recall numbers are ~3–4× optimistic; trust full eval.py only.
+
+### v14g (fresh from scratch, 2026-03-29–30)
+
+First clean run with SN-LSTM from epoch 0. Key changes vs v14f:
+- Fresh pretraining: AE 50ep + supervisor 50ep (supervisor_steps=2) + G warmup 50ep
+- diversity_loss_weight=0.5: MSGAN recall fix (present in v14f, kept)
+- cross_cov_loss_weight=0.5: full d×d lag-1 cross-feature covariance (new; targets DMD-GEN)
+- lr_g=1e-4, lr_d=5e-5 (original v13 LRs; hot-starts used 5e-5/2.5e-5)
+
+**Full eval (ep90)**: MMD²=0.018, α-precision=0.910, β-recall=0.372, DMD-GEN=0.700, Context-FID=0.03
+
+**Root causes identified (fixed in v15):**
+1. `reuse_rate=0.000`: delta-encoding makes obj_id reuse a zero-measure event in continuous space.
+   Fix: split obj_id into `obj_id_reuse` (±1 binary) + `obj_id_stride` (signed-log delta).
+2. DMD-GEN stuck at 0.700: supervisor_loss_weight (5.0) overpowers cross_cov_loss_weight (0.5) by 10×.
+   Fix: raise cross_cov_loss_weight to 2.0 (v16).
+3. obj_size non-quantized: generated sizes are continuous; real traces are multiples of 4096 bytes.
+   Fix: snap to 4096-byte multiples before log-transform (v15).
+
+### v15 (vinge/GB10, killed ep143, 2026-03-30)
+
+First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
+AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so link issue).
+
+**Best (ep100)**: MMD²=0.029, β-recall=0.294, combined=0.170
+
+**What went wrong:**
+1. **Missing diversity_loss** (was in v14g, dropped from v15): direct cause of recall gap.
+2. **GAN cycling (n_critic=3 too aggressive)**: ep100 best → ep110 MMD²=0.111 spike → never recovered.
+3. **cross_cov still 10:1 drowned**: DMD-GEN stayed at ~0.700.
+
+**Bugs found and fixed during v15 (all committed):**
+- `torch.quantile` fp16 crash: cast to `.float()` before quantile (e3ad770)
+- `evaluate_metrics()` left G/R in `.eval()`: `try/finally` restore in mmd.py (01a797f)
+- E/R/S left in `.eval()` from pretrain phases: explicit `.train()` at GAN loop start (ba356d5)
+- Supervisor gradient leak in G step: `torch.no_grad()` around `S(H_fake)` (f5c63b7)
+- EMA seeded from random init: seed from post-warmup G after Phase 2.5 (f5c63b7)
+- GradScaler called n_critic+2 times per batch instead of once: now called once per optimizer step (638ee24)
+- rsync temp files in trace dir: `not p.name.startswith(".")` filter in `_collect_files` (0ca6f49)
+
+**v15 eval history:**
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|----------|
+| 5 | 0.0652 | 0.198 | 0.226 |
+| 55 | 0.0360 | 0.298 | 0.176 |
+| 80 | 0.0341 | 0.296 | 0.175 |
+| 100 | 0.0291 | 0.294 | 0.170 ★ |
+| 110 | 0.1109 | 0.183 | 0.274 (cycling) |
+| 140 | 0.0435 | 0.307 | 0.182 |
+
+---
+
+## Key Metrics and Targets
+
+| Metric | v13 | v14g | v15 | Target | Description |
+|--------|-----|------|-----|--------|-------------|
+| MMD² | 0.00818 | 0.018 | 0.029 | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.294 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | — | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | ~0.700 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| reuse-rate | 0.124 | 0.000 | TBD | > 0.1 | Fraction of obj_id repeats (sequential access) |
+
+Note: v14g had better MMD² than v13 despite lower β-recall. v14g is the best MMD²–recall trade-off
+we have achieved. All new runs must beat v14g's combined score (0.018 MMD² + 0.2×(1-0.372) = 0.144).
+
+---
+
+## What We Have Learned
+
+### Architecture
+- **GRU for AE/supervisor, LSTM for G+C**: GRU is simpler + faster for compression/prediction;
+  LSTM cell state captures long-range context needed for G and burst detection in C.
+- **Split noise (z_global + z_local)**: z_global maps to LSTM h0/c0 (workload identity);
+  z_local feeds per-step input (event noise). Without this, every window is independent.
+- **Latent AE (TimeGAN/SeriesGAN)**: Direct feature-space GAN is unstable in a 6-feature
+  correlated space spanning 10 decades. AE reduces to smooth 24-dim latent space.
+- **Minibatch std in critic (StyleGAN2)**: Collapsed G produces identical rows; std→0.
+  This channel gives the critic a diversity signal before collapse propagates.
+- **sn_lstm=True**: SN on LSTM weight matrices essential (not just FC output).
+  FC-only SN allows LSTM to drift; W grows unboundedly and training collapses (v14).
+
+### Training stability
+- **GAN cycling / underdamped oscillation**: When critic pressure is too high (n_critic=3,
+  high lr_d), G overshoots → critic wins decisively → G overshoots back. Seen in v13 (171
+  wasted epochs) and v15. Damp with: lower n_critic, lower lr_d, cosine LR decay.
+- **Hot-start asymmetry**: Never hot-start from a checkpoint with different Lipschitz constraints.
+  Fresh SN u/v buffers + generator tuned for old critic → critic overpowers immediately.
+- **Phase train/eval mode**: Each pretrain phase explicitly sets eval on modules it doesn't train.
+  Must restore `.train()` on ALL modules at GAN loop start, or cuDNN RNN backward crashes.
+- **GradScaler with n_critic > 1**: `scaler.unscale_(optimizer)` can only be called once
+  per optimizer between `scaler.update()` calls. With n_critic > 1 and grad clipping,
+  call `scaler.update()` after each `scaler.step(opt_C)` within the critic loop.
+- **EMA**: Seed ema_G_state from post-warmup G weights (not random init). Random seed means
+  first GAN evals use near-random EMA, skewing best.pt selection.
+
+### Losses
+- **L_FM (feature matching)**: Smoother gradient signal than Wasserstein alone; reduces collapse.
+- **L_div (diversity, MSGAN)**: Directly combats β-recall mode collapse. Required in v14g
+  (recall=0.372) vs v15 without it (recall=0.294). Weight 0.5 works; try 0.5–1.0.
+- **L_cov (cross-covariance)**: Targets DMD-GEN directly. Needs weight ≥ 2.0 to overcome
+  supervisor dominance at weight 5.0 (otherwise 10:1 ratio drowns cross_cov signal).
+- **L_loc**: Stride-repetition rate — replaced by obj_id_reuse binary feature in v15+.
+  Still active as auxiliary loss but its role is partly absorbed by the locality split.
+- **L_ACF, L_FFT**: Effective for temporal structure; keep at current weights.
+- **L_V, L_Q**: Cheap distributional anchors; always-on.
+
+### Data representation
+- **obj_id delta → locality split (v15)**: Raw delta-encoding makes reuse a zero-measure event.
+  `obj_id_reuse` (±1 binary) + `obj_id_stride` (signed-log delta) gives G a learnable
+  binary classification target for sequential access patterns.
+- **obj_size quantization (v15)**: Snap to 4096-byte multiples before log-transform.
+  Real block traces have discrete sizes; continuous representation wastes capacity.
+- **Training-log recall is ~3–4× optimistic vs full eval** (EMA weights + 1000 samples
+  vs live checkpoint + 2000 samples). Never abort based on training-log recall alone.
+
+### Infrastructure notes
+- **torch.compile**: Broken on vinge's GB10 (Triton can't find libcuda.so.1). Use `--no-compile`.
+- **AMP fp16**: Works correctly. `torch.quantile` requires `.float()` cast before call.
+- **pretrain_complete.pt**: State dict keys have no `_orig_mod.` prefix (saved without compile).
+  Load into non-compiled models only (`--no-compile`). Avoids 35-min pretrain on restart.
+- **SSH to vinge**: `ssh vinge.local` (RSA key, no passphrase). `-A` flag for git pull on GitHub.
