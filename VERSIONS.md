@@ -6,7 +6,15 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v17
 
-**Status**: Planning — not yet launched.
+**Status**: RUNNING on vinge (GB10 CUDA, AMP fp16, no compile) — ep66/200
+
+**Current best: ep60 — MMD²=0.01159, recall=0.367, combined=0.138** ← beat this.
+
+**What changed vs v16:**
+1. `--supervisor-loss-weight 1.0` (was 5.0): removes supervisor dominance over G gradient.
+2. `--lr-d 5e-5` (was 2.5e-5): restores v14g level; lower lr_d hurt recall in v16.
+3. `--diversity-loss-weight 1.0` (was 0.5): more recall pressure.
+4. `--epochs 200` (was 150): room for late LR-decay improvement.
 
 **Hypothesis**: v16 proved that reducing lr_d below v14g's level makes recall *worse*, not better.
 The core problem is supervisor dominance: supervisor_loss_weight=5.0 makes G learn to replay
