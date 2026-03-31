@@ -69,9 +69,10 @@ ssh "$VINGE" "
     TRACE_DIR=\$HOME/traces/tencent_block_1M
 
     # Kill any existing training for this version only.
-    # Using the checkpoint dir name as the match pattern is safe: it uniquely
-    # identifies this version's process without risk of killing unrelated python jobs.
-    EXISTING=\$(pgrep -f 'tencent_${VERSION}' 2>/dev/null || true)
+    # -P 1: only match the nohup'd root process (parent PID = 1), not DataLoader
+    # worker subprocesses that fork from it and share its cmdline. Killing the
+    # parent is sufficient — workers exit automatically when the parent dies.
+    EXISTING=\$(pgrep -P 1 -f 'tencent[_]${VERSION}' 2>/dev/null || true)
     if [[ -n \"\$EXISTING\" ]]; then
         echo 'Killing existing ${VERSION} training (PIDs: '\$EXISTING')'
         kill \$EXISTING || true

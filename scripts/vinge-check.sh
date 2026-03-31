@@ -49,11 +49,11 @@ echo "=== vinge training status: $VERSION ==="
 echo
 
 # Check if the training process is alive.
-# The bracket trick (tencent[_]v16) matches the literal string "tencent_v16" in
-# running processes but does NOT match the pgrep command itself — the pgrep cmdline
-# contains the bracket form, which glob-expands differently. Without this, pgrep -f
-# always reports itself as a match when run over SSH, giving false "RUNNING" results.
-PID=$(ssh "$VINGE" "pgrep -f 'tencent[_]${VERSION}' 2>/dev/null | head -1 || true")
+# -P 1: only match processes whose parent is PID 1 (i.e. the nohup'd root process).
+# Without this, DataLoader worker subprocesses also match — they fork from the parent
+# and inherit its full cmdline, so pgrep sees 4-8 "duplicates" of the same run.
+# The bracket trick (tencent[_]vNN) prevents pgrep from matching its own cmdline.
+PID=$(ssh "$VINGE" "pgrep -P 1 -f 'tencent[_]${VERSION}' 2>/dev/null | head -1 || true")
 if [[ -n "$PID" ]]; then
     echo "Process: RUNNING (PID $PID)"
 else
