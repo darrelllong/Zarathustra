@@ -437,9 +437,32 @@ def train(cfg: Config) -> None:
             print(f"Resumed from {resume_path} (epoch {start_epoch})")
 
     # -----------------------------------------------------------------------
+    # Pretrain checkpoint: skip phases 1–2.5 if a prior run already completed
+    # them.  Saved after Phase 2.5 finishes.  Stores all model weights, the
+    # fitted preprocessor, and the val_tensor so that normalization is
+    # consistent with what E/R/S/G were trained on.
+    # -----------------------------------------------------------------------
+    pretrain_ckpt_path = ckpt_dir / "pretrain_complete.pt"
+    pretrain_done = False
+    if latent_ae and start_epoch == 0 and pretrain_ckpt_path.exists():
+        print(f"Loading pretrain checkpoint ({pretrain_ckpt_path}); skipping phases 1–2.5.")
+        pc = torch.load(pretrain_ckpt_path, map_location=device, weights_only=False)
+        E.load_state_dict(pc["E"])
+        R.load_state_dict(pc["R"])
+        S.load_state_dict(pc["S"])
+        G.load_state_dict(pc["G"])
+        ema_G_state = {k: v.to(device) for k, v in pc["G_ema"].items()}
+        opt_G.load_state_dict(pc["opt_G"])
+        prep = pc["prep"]
+        if pc.get("val_tensor") is not None:
+            val_tensor = pc["val_tensor"].to(device)
+        pretrain_done = True
+        print("  Pretrain checkpoint loaded.")
+
+    # -----------------------------------------------------------------------
     # Phase 1: Autoencoder pretraining  (latent AE mode only)
     # -----------------------------------------------------------------------
-    if latent_ae and start_epoch == 0:
+    if latent_ae and start_epoch == 0 and not pretrain_done:
         print(f"\n--- Phase 1: Autoencoder pretraining ({cfg.pretrain_ae_epochs} epochs) ---")
         for pre_ep in range(cfg.pretrain_ae_epochs):
             E.train(); R.train()
@@ -471,7 +494,7 @@ def train(cfg: Config) -> None:
     # -----------------------------------------------------------------------
     # Phase 2: Supervisor pretraining  (latent AE mode only)
     # -----------------------------------------------------------------------
-    if latent_ae and start_epoch == 0:
+    if latent_ae and start_epoch == 0 and not pretrain_done:
         print(f"\n--- Phase 2: Supervisor pretraining ({cfg.pretrain_sup_epochs} epochs) ---")
         E.eval()  # freeze encoder during supervisor pretraining
         for pre_ep in range(cfg.pretrain_sup_epochs):
@@ -519,7 +542,7 @@ def train(cfg: Config) -> None:
     # saturates immediately and provides no useful gradient signal.
     # (TimeGAN §3.3 "joint training initialisation")
     # -----------------------------------------------------------------------
-    if latent_ae and start_epoch == 0 and cfg.pretrain_g_epochs > 0:
+    if latent_ae and start_epoch == 0 and not pretrain_done and cfg.pretrain_g_epochs > 0:
         print(f"\n--- Phase 2.5: Generator warm-up ({cfg.pretrain_g_epochs} epochs) ---")
         S.eval()   # supervisor is frozen; only G is updated
         for pre_ep in range(cfg.pretrain_g_epochs):
@@ -556,7 +579,24 @@ def train(cfg: Config) -> None:
                 print(f"  G warm-up  {pre_ep+1:3d}/{cfg.pretrain_g_epochs}  "
                       f"sup={g_sup_mean:.5f}", flush=True)
 
-        print(f"\n--- Phase 3: Joint GAN training ({cfg.epochs} epochs) ---")
+        # Save pretrain checkpoint so future restarts skip phases 1–2.5.
+        # ema_G_state is seeded from G's post-warmup weights (not random init)
+        # so the first GAN evals use a meaningful EMA baseline.
+        ema_G_state = copy.deepcopy(G.state_dict())
+        pretrain_ckpt = {
+            "E": E.state_dict(),
+            "R": R.state_dict(),
+            "S": S.state_dict(),
+            "G": G.state_dict(),
+            "G_ema": ema_G_state,
+            "opt_G": opt_G.state_dict(),
+            "prep": prep,
+            "val_tensor": val_tensor.cpu() if val_tensor is not None else None,
+        }
+        torch.save(pretrain_ckpt, pretrain_ckpt_path)
+        print(f"Pretrain checkpoint saved → {pretrain_ckpt_path}", flush=True)
+
+    print(f"\n--- Phase 3: Joint GAN training ({cfg.epochs} epochs) ---", flush=True)
 
     # -----------------------------------------------------------------------
     # Epoch loop
