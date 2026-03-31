@@ -30,17 +30,25 @@ the k-NN ball of at least one generated sample — directly quantifying mode
 coverage. A model with recall < 0.3 is typically mode-collapsed.
 
 The combined score weights them:
-    combined = MMD² + 0.2 × (1 − recall)
+    combined = MMD² + 0.2 × (1 − recall) + dmd_weight × DMD-GEN
 
 At recall=0 (total collapse) the penalty is +0.2, which is larger than the
 MMD² improvement we'd expect from memorising the mode. At recall=1 the penalty
 vanishes. The weight 0.2 was chosen so that the recall term is a secondary
 tiebreaker (doesn't override a large MMD² improvement) but blocks saving a
 mode-collapsed checkpoint over a well-covered one.
+
+DMD-GEN (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292) measures the
+Grassmannian distance between dominant temporal modes of real and generated
+sequences. It is stuck at ~0.71 across all versions and is not improved by
+MMD/recall-only checkpoint selection. Including it in combined with a small
+weight (e.g. 0.05) makes the selector prefer checkpoints with better temporal
+dynamics as a tiebreaker, without overriding large MMD² improvements.
 """
 
 import numpy as np
 import torch
+from scipy.linalg import subspace_angles
 
 
 def _rbf_kernel(x: torch.Tensor, y: torch.Tensor, sigma: float) -> torch.Tensor:
@@ -138,6 +146,70 @@ def _recall_np(real: np.ndarray, fake: np.ndarray, k: int = 5) -> float:
     return float(covered.mean())
 
 
+# ---------------------------------------------------------------------------
+# DMD-GEN: Grassmannian distance between dominant temporal modes
+# (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292)
+# Implemented here (not in eval.py) so training-time checkpoint selection
+# can include it without importing eval.py (which imports train.py artifacts).
+# eval.py imports dmdgen from here to avoid duplication.
+# ---------------------------------------------------------------------------
+
+def _dmd_subspace(X: np.ndarray, r: int) -> np.ndarray:
+    """
+    Truncated DMD on a data matrix.
+
+    X: (T, N) where T = timesteps, N = batch_size * num_features
+    r: number of DMD modes to retain
+
+    Returns Q: (N, r_eff) orthonormal basis for the DMD subspace (Grassmann point).
+    """
+    X1 = X[:-1, :]
+    X2 = X[1:, :]
+    r_eff = min(r, min(X1.shape) - 1)
+    U, s, Vh = np.linalg.svd(X1, full_matrices=False)
+    U_r, S_r, Vh_r = U[:, :r_eff], s[:r_eff], Vh[:r_eff, :]
+    A_tilde = U_r.T @ X2 @ Vh_r.T @ np.diag(1.0 / S_r)
+    _, W = np.linalg.eig(A_tilde)
+    Phi = (X2 @ Vh_r.T @ np.diag(1.0 / S_r) @ W).real
+    Q, _ = np.linalg.qr(Phi)
+    return Q[:, :r_eff]
+
+
+def dmdgen(
+    real_seqs: np.ndarray,
+    fake_seqs: np.ndarray,
+    r: int = 4,
+    n_batches: int = 10,
+    batch_size: int = 64,
+    rng: np.random.Generator = None,
+) -> float:
+    """
+    DMD-GEN metric: mean Grassmannian distance between real and generated
+    DMD subspaces over n_batches random mini-batches.
+
+    real_seqs / fake_seqs: (N, T, d) arrays.
+    Returns scalar ≥ 0; lower = dynamics closer to real. nan if degenerate.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+    T, d = real_seqs.shape[1], real_seqs.shape[2]
+    angle_distances = []
+    for _ in range(n_batches):
+        ri = rng.choice(len(real_seqs), min(batch_size, len(real_seqs)), replace=False)
+        fi = rng.choice(len(fake_seqs), min(batch_size, len(fake_seqs)), replace=False)
+        Xr = real_seqs[ri].transpose(1, 0, 2).reshape(T, -1)
+        Xf = fake_seqs[fi].transpose(1, 0, 2).reshape(T, -1)
+        try:
+            Ur = _dmd_subspace(Xr, r)
+            Uf = _dmd_subspace(Xf, r)
+            r_eff = min(Ur.shape[1], Uf.shape[1])
+            angles = subspace_angles(Ur[:, :r_eff], Uf[:, :r_eff])
+            angle_distances.append(float(np.mean(angles)))
+        except np.linalg.LinAlgError:
+            pass
+    return float(np.mean(angle_distances)) if angle_distances else float("nan")
+
+
 @torch.no_grad()
 def evaluate_metrics(
     generator,
@@ -147,11 +219,17 @@ def evaluate_metrics(
     device: torch.device,
     recovery=None,
     k: int = 5,
+    dmd_weight: float = 0.0,
 ) -> tuple[float, float, float]:
     """
     Compute MMD², β-recall, and combined score for checkpoint selection.
 
-    combined = MMD² + 0.2 * (1 − recall)
+    combined = MMD² + 0.2*(1−recall) + dmd_weight*DMD-GEN
+
+    dmd_weight=0.0 (default) skips DMD-GEN computation (backward compatible).
+    Use 0.05 to add a temporal-dynamics tiebreaker without overriding MMD²
+    improvements (reviewer rec: "do not let best.pt be chosen without a
+    temporal law penalty").
 
     Returns (mmd2, recall, combined).
     """
@@ -174,6 +252,17 @@ def evaluate_metrics(
         mmd2_val  = mmd(torch.tensor(real_flat), torch.tensor(fake_flat))
         recall    = _recall_np(real_flat, fake_flat, k=k)
         combined  = mmd2_val + 0.2 * (1.0 - recall)
+
+        if dmd_weight > 0.0:
+            num_cols = real_flat.shape[1] // timestep
+            real_seqs = real_flat.reshape(-1, timestep, num_cols)
+            fake_seqs = fake_flat.reshape(-1, timestep, num_cols)
+            # Use 5 batches (vs eval.py's 20) for speed during training.
+            dmd_val = dmdgen(real_seqs, fake_seqs, r=4, n_batches=5,
+                             batch_size=min(64, n_samples // 4))
+            if not np.isnan(dmd_val):
+                combined += dmd_weight * dmd_val
+
         return float(mmd2_val), float(recall), float(combined)
     finally:
         generator.train()

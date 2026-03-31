@@ -976,6 +976,7 @@ def train(cfg: Config) -> None:
             mmd_val, recall_val, combined_val = evaluate_metrics(
                 G, val_tensor, cfg.mmd_samples, cfg.timestep, device,
                 recovery=R if latent_ae else None,
+                dmd_weight=cfg.dmd_ckpt_weight,
             )
             G.load_state_dict(live_G_state)   # restore live weights for training
             mmd_history.append((epoch, mmd_val, recall_val, combined_val))
@@ -1191,6 +1192,10 @@ def parse_args() -> Config:
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
                    help="R2 zero-centered GP on fake samples (R3GAN NeurIPS 2024; 0=off)")
+    p.add_argument("--dmd-ckpt-weight",    type=float, default=0.0,
+                   help="Weight for DMD-GEN in checkpoint selection combined score (0=off; try 0.05). "
+                        "combined = MMD² + 0.2*(1-recall) + dmd_ckpt_weight*DMD-GEN. "
+                        "Adds ~5s per eval (5 DMD mini-batches). Recommended for v19+.")
     p.add_argument("--lr-er",                type=float, default=0.0005,
                    help="Learning rate for encoder + recovery")
     p.add_argument("--amp",                  action="store_true", default=True,
@@ -1243,6 +1248,7 @@ def parse_args() -> Config:
     cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
+    cfg.dmd_ckpt_weight             = args.dmd_ckpt_weight
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs

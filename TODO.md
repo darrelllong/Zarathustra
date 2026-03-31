@@ -32,6 +32,14 @@ Items marked ✓ are done and in the repo.
 - ✓ **Fourier spectral auxiliary loss** (`train.py`, `--fft-loss-weight`)
 - ✓ **Moment matching loss L_V** (`train.py`, `--moment-loss-weight`)
 
+- ✓ **Add DMD-GEN to checkpoint selection combined score** (`mmd.py`, `train.py`)
+  `combined = MMD² + 0.2*(1−recall) + dmd_ckpt_weight*DMD-GEN`.
+  `dmdgen` moved from `eval.py` to `mmd.py` as the canonical implementation.
+  `--dmd-ckpt-weight 0.05` recommended for v19+. Default 0.0 = off (backward compatible).
+  Reviewer: "Do not let the best checkpoint be chosen without a temporal law penalty."
+  Adds ~5s/eval (5 DMD mini-batches). DMD-GEN stuck at ~0.71 across all versions;
+  without this selector, best.pt is chosen purely on distributional metrics.
+
 - ✓ **Add coverage (β-recall) and α-precision metrics** to evaluation (`eval.py`)
   MMD² alone cannot detect mode collapse. Implemented full PRDC evaluation in `eval.py`
   (uses `prdc` package with numpy fallback).
@@ -83,11 +91,30 @@ Items marked ✓ are done and in the repo.
 
 - [ ] **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
   Second lightweight critic on raw decoded output. Latent critic = stable early gradients;
-  feature critic = catches artifacts latent critic misses.
+  feature critic = catches artifacts latent critic misses. Reviewer: "Once the generator
+  gets good at the latent game, decoded-space artifacts become the next natural blind spot."
+  Add a smaller critic on `R(H_fake)` vs `real_batch` as a supporting critic.
 
 - [ ] **Add patch embedding to critic** (`model.py`)
   `Conv1d(num_cols, embed_dim, kernel_size=3, stride=3)` before LSTM critic compresses
   12-step window into 4 patch tokens. (TTS-GAN)
+
+- [ ] **Make z_global a real workload descriptor, not pure noise** (`dataset.py`, `model.py`, `train.py`)
+  *Top priority per peer review.* Currently `z_global = torch.randn(B, noise_dim)` projected
+  to LSTM h0/c0. Replace with per-file descriptors: read_ratio, mean/log-mean IAT, IAT quantiles,
+  mean size, size quantiles, reuse rate, sequential fraction, stride histogram.
+  Feed these alongside a stochastic latent (conditional rather than free-floating).
+  Makes the model useful as a controllable workload generator, not just a sampler.
+  Directly addresses mixed-corpus training quality.
+  Prerequisite: compute descriptors in `dataset.py` at fit time; extend `Generator.__init__`
+  to accept `cond_dim`; modify `train.py`/`generate.py` to pass descriptors at inference.
+
+- [ ] **Add training-time chunk-continuity loss** (`train.py`)
+  `generate.py` carries hidden state across windows; training is still local-window only.
+  Add a continuity loss penalising distributional mismatch at adjacent window boundaries.
+  Or move toward a two-level generator: slow regime state + fast event generator.
+  Reviewer: "The model is asked to generate long coherent traces at inference time
+  without being trained on a directly chunk-continuous objective."
 
 - [ ] **Add workload conditioning** (`model.py`, `train.py`)
   Embed `c = [tenant_id, read_ratio, obj_size_bucket]` via MLP into generator hidden
@@ -97,6 +124,14 @@ Items marked ✓ are done and in the repo.
   Current MMD val set is 2 random files (may overlap conceptually with training) and
   MMD is flattened-window RBF — weak signal. Switch to: designated held-out files,
   replay/locality metrics (stack distance CDF, reuse distance), per-column KS tests.
+
+- [ ] **Promote locality to first-class checkpoint target** (`train.py`, `eval.py`, `compare.py`)
+  The `obj_id_reuse` + `obj_id_stride` split captures locality, but it is not in checkpoint
+  selection or summary output. Add locality metrics (reuse rate, stride distribution) to
+  checkpoint summaries and use as a tiebreaker or soft selector term.
+  Reviewer: "For storage workloads, locality is not one feature among many — it is one
+  of the reasons the trace matters at all. If the model gets locality wrong, good MMD²
+  is still a false comfort."
 
 ---
 
@@ -263,3 +298,9 @@ Items marked ✓ are done and in the repo.
 | SMOGAN, 2025 | GAN + MMD for imbalanced regression; relevant for heavy-tailed obj_size |
 | Stage-Diff, 2025 | Staged diffusion for long sequences; validates hierarchical design |
 | TIMED, 2025 | Diffusion + autoregressive supervisor + masked Wasserstein critic |
+| NetSSM, arXiv 2504.05598 | Network simulation foundation model; explicit regime/state decomposition |
+| Compositional SSMs, arXiv 2504.01349 | Synthetic trace gen via compositional state-space models; most architecturally relevant |
+| WaveStitch, arXiv 2503.06231 | Chunk stitching + condition-aware continuity; supports training-time continuity objective |
+| PCF-GAN, NeurIPS 2023 | Path-space critic via characteristic function; more faithful sequential-law test than LSTM critic |
+| High-Rank Path Dev, NeurIPS 2024 | Path signatures for deep sequential generative modeling; upgrade to path-space critic |
+| Constrained TS Gen, NeurIPS 2023 | Guidance under explicit numeric constraints; foundation for controllable workload generation |

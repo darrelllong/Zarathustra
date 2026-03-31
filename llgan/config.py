@@ -92,3 +92,7 @@ class Config:
     mmd_every: int = 5
     mmd_samples: int = 1000
     early_stop_patience: int = 0    # evals without improvement before stopping (0 = off)
+    dmd_ckpt_weight: float = 0.0    # weight for DMD-GEN in combined checkpoint score (0 = off).
+                                    # combined = MMD² + 0.2*(1-recall) + dmd_ckpt_weight*DMD-GEN.
+                                    # Use 0.05 to add a temporal-dynamics tiebreaker. Adds ~5s/eval
+                                    # (5 mini-batches of DMD at batch_size=32).
