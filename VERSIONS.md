@@ -252,4 +252,84 @@ First run on NVIDIA GB10 with AMP + torch.compile (2-3× speedup expected).
   --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 5e-5
 ```
 Log: vinge:~/train_v15.log
-PID: 13560 (started 2026-03-30)
+PID: 90561 (restarted 2026-03-30, killed 2026-03-30)
+
+---
+
+## v15 Post-Mortem (killed epoch 143, 2026-03-30)
+
+**Best checkpoint**: epoch 100 — MMD²=0.029, β-recall=0.294, combined=0.170
+**Abort reason**: 43 epochs without improvement; best MMD²=0.029 is 60% worse than v14g (0.018).
+
+### What went wrong
+
+**1. Missing diversity loss (root cause of recall gap)**
+v14g had `diversity_loss_weight=0.5`; v15 dropped it. v14g recall=0.372 vs v15 recall=0.294.
+The MSGAN diversity loss directly penalises G for collapsing similar z to similar outputs.
+Without it, the generator narrows onto high-frequency modes.
+
+**2. GAN cycling / underdamped oscillation (same pattern as v13)**
+After epoch 100 best, G loss jumped from -1.2 to +3.5 at epoch 110, MMD² spiked from 0.029 to 0.111.
+Partial recovery to 0.044 by epoch 140 but never regained best. Same cycling pattern as v13 (171 wasted epochs).
+Root cause: n_critic=3 with lr_d=5e-5 gives the critic too much pressure — G overshoots,
+critic wins decisively, G then overshoots back. Underdamped.
+
+**3. cross_cov still overpowered 10:1 by supervisor**
+`supervisor_loss_weight=5.0` vs `cross_cov_loss_weight=0.5` → 10:1 ratio.
+DMD-GEN stayed at ~0.700 (same as v14g). Not the immediate abort cause but limits ceiling.
+
+### Bugs fixed during v15 run (all now in codebase)
+- `torch.quantile` fp16 crash → `.float()` cast (e3ad770)
+- `evaluate_metrics()` left G/R in `.eval()` mode → `try/finally` restore (01a797f)
+- E/R/S left in `.eval()` from pretrain phases → explicit `.train()` at GAN loop start (ba356d5)
+- `scaler.update()` called 3× per critic loop → moved outside loop (f5c63b7)
+- Supervisor gradient leak in G step → `torch.no_grad()` around `S(H_fake)` (f5c63b7)
+- EMA seeded from random init (not post-warmup G) → seed after Phase 2.5 (f5c63b7)
+- rsync temp file spam → `not p.name.startswith(".")` filter (0ca6f49)
+
+### v15 eval history
+| Epoch | MMD² | Recall | Combined | Notes |
+|-------|------|--------|----------|-------|
+| 5 | 0.0652 | 0.198 | 0.226 | |
+| 55 | 0.0360 | 0.298 | 0.176 | |
+| 80 | 0.0341 | 0.296 | 0.175 | |
+| 100 | 0.0291 | 0.294 | 0.170 | ★ best.pt |
+| 110 | 0.1109 | 0.183 | 0.274 | cycling crash |
+| 140 | 0.0435 | 0.307 | 0.182 | partial recovery |
+
+---
+
+## v16 (vinge/GB10, 2026-03-30)
+
+Short 150-epoch ablation targeting the two root causes of v15 underperformance.
+Reuses v15 `pretrain_complete.pt` (same 6-feature architecture) to skip 35-min pretrain.
+
+**Changes vs v15:**
+
+1. **`--diversity-loss-weight 0.5`** (was 0): Restore MSGAN loss from v14g. Direct fix for recall gap.
+   v14g recall=0.372 had it; v15 recall=0.294 didn't.
+2. **`--cross-cov-loss-weight 2.0`** (was 0.5): 4× increase to fix DMD-GEN. Reduces supervisor
+   dominance from 10:1 to 2.5:1 ratio.
+3. **`--n-critic 2`** (was 3): Reduce critic pressure to damp GAN cycling.
+   n_critic=1 (v14c) was too conservative; n_critic=3 (v15) caused underdamped oscillation.
+4. **`--lr-d 2.5e-5`** (was 5e-5): Lower critic LR to further reduce oscillation amplitude.
+5. **`--epochs 150`**: Short ablation. No point running 600ep if cycling kills improvement by ep110.
+
+**Training command:**
+```
+~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 150 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v16 --checkpoint-every 5 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --locality-loss-weight 1.0 --acf-loss-weight 0.2 \
+  --moment-loss-weight 0.1 --fft-loss-weight 0.05 \
+  --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \
+  --cross-cov-loss-weight 2.0 --diversity-loss-weight 0.5 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 \
+  --grad-clip 1.0 --n-critic 2 \
+  --hidden-size 256 --latent-dim 24 \
+  --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
+  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5
+```
+Log: vinge:~/train_v16.log
