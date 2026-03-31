@@ -144,6 +144,17 @@ supervisor_loss_weight→1.0, lr_d→5e-5, diversity_loss→1.0, 200 epochs. Use
 **v18 direction**: Keep v17 hyperparameters. Address DMD-GEN with higher cross_cov (try 5.0)
 and longer training (250 epochs). α-precision may improve naturally with more epochs.
 
+**v19 direction** (planned): Same hyperparameters as v17 (supervisor=1.0, diversity=1.0,
+lr_d=5e-5) plus new `--dmd-ckpt-weight 0.05` flag (implemented in 66f581b). This makes the
+checkpoint selector dynamics-aware: `combined = MMD² + 0.2*(1-recall) + 0.05*DMD-GEN`.
+Hypothesis: best.pt will shift toward an epoch with better temporal dynamics without
+sacrificing much on MMD²/recall. cross_cov setting depends on v18 outcome.
+Launch command (after v18 completes):
+```bash
+./scripts/vinge-launch.sh --version v19 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 250
+```
+
 ### v15 (vinge/GB10, killed ep143, 2026-03-30)
 
 First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
