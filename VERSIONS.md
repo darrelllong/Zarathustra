@@ -8,7 +8,7 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Status**: RUNNING on vinge (GB10 CUDA, AMP fp16, no compile) — ep66/200
 
-**Current best: ep60 — MMD²=0.01159, recall=0.367, combined=0.138** ← beat this.
+**Current best: ep70 — MMD²=0.01041, recall=0.394, combined=0.132** ← beat this.
 
 **What changed vs v16:**
 1. `--supervisor-loss-weight 1.0` (was 5.0): removes supervisor dominance over G gradient.
