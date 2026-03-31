@@ -712,8 +712,9 @@ def train(cfg: Config) -> None:
                     scaler.unscale_(opt_C)
                     nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
                 scaler.step(opt_C)
+                scaler.update()   # must reset scaler state per critic step so
+                                  # unscale_() can be called again next iteration
                 c_losses.append(c_loss.item())
-            scaler.update()   # once per batch, not once per critic step
 
             # --- Generator step ---
             z_g = torch.randn(B, cfg.noise_dim, device=device)
