@@ -4,32 +4,11 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v17
+## Current Run: v18
 
-**Status**: RUNNING on vinge (GB10 CUDA, AMP fp16, no compile) — ep66/200
+**Status**: Planning — not yet launched.
 
-**Current best: ep145 — MMD²=0.00727, recall=0.446, combined=0.118** ← beat this.
-
-**What changed vs v16:**
-1. `--supervisor-loss-weight 1.0` (was 5.0): removes supervisor dominance over G gradient.
-2. `--lr-d 5e-5` (was 2.5e-5): restores v14g level; lower lr_d hurt recall in v16.
-3. `--diversity-loss-weight 1.0` (was 0.5): more recall pressure.
-4. `--epochs 200` (was 150): room for late LR-decay improvement.
-
-**Hypothesis**: v16 proved that reducing lr_d below v14g's level makes recall *worse*, not better.
-The core problem is supervisor dominance: supervisor_loss_weight=5.0 makes G learn to replay
-real sequences rather than generate new ones. Reducing it is the highest-priority lever for v17.
-
-**What to change vs v16:**
-1. `--supervisor-loss-weight 1.0` (was 5.0): The 5.0 value was set for pretraining stability.
-   During GAN phase it over-constrains G — G gradient is dominated by "look like the supervisor
-   predicted" rather than "fool the critic." Reducing to 1.0 gives cross_cov, diversity, and
-   adversarial losses room to compete.
-2. `--lr-d 5e-5` (was 2.5e-5, restore to v14g level): v14g with 5e-5 got recall=0.372;
-   v16 with 2.5e-5 got 0.228. Lower lr_d created a stable-but-permanent critic advantage.
-3. `--diversity-loss-weight 1.0` (was 0.5): More direct pressure on recall since we expect
-   supervisor reduction to destabilize slightly. Extra diversity gradient compensates.
-4. `--epochs 200` (was 150): v16 improved late (ep100→130) as LR decayed. Give more room.
+**Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
 Everything else unchanged from v16 (n_critic=2, lr_g=1e-4, cross_cov=2.0, hidden=256, latent=24).
 
@@ -50,6 +29,7 @@ Everything else unchanged from v16 (n_critic=2, lr_g=1e-4, cross_cov=2.0, hidden
 | v14g | **0.018** | **0.372** | 90 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt | Best MMD²–recall trade-off; full eval reuse_rate=0 |
 | v15 | 0.029 | 0.294 | 100 | vinge:~/checkpoints/tencent_v15/best.pt | GAN cycling ep110; missing diversity_loss |
 | v16 | 0.042 | 0.228 | 130 | vinge:~/checkpoints/tencent_v16/best.pt | Diversity+cross_cov restored; critic still dominant; worse than v14g |
+| **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | New all-time best. supervisor→1.0, lr_d=5e-5, diversity→1.0 |
 
 ---
 
@@ -130,6 +110,40 @@ Training ran cleanly to ep150 with no cycling spikes. Best checkpoint: ep130.
 3. Locality learning requires more than a binary input feature. Architectural fix (task #19)
    needed eventually; for v17 at minimum try higher diversity_loss to compensate.
 
+### v17 (vinge/GB10, completed ep200, 2026-03-31)
+
+supervisor_loss_weight→1.0, lr_d→5e-5, diversity_loss→1.0, 200 epochs. Used v16 pretrain checkpoint.
+
+**Full eval (ep190 best)**:
+| Metric | v17 | v14g | v13 | Δ vs v14g |
+|--------|-----|------|-----|-----------|
+| MMD² | **0.00697** | 0.018 | 0.01335 | 2.6× better |
+| α-precision | 0.826 | 0.910 | 0.812 | −0.084 |
+| β-recall | **0.521** | 0.372 | 0.455 | +0.149 |
+| DMD-GEN | 0.714 | 0.700 | 0.771 | similar |
+| AutoCorr | 0.032 | — | 0.044 | better |
+| Context-FID | **0.03** | 0.03 | 0.05 | same |
+| reuse rate | 0.006 | 0.000 | 0.000 | still near-zero |
+
+**What worked:**
+- `supervisor_loss_weight=1.0` was the decisive change. G competed freely from epoch 1 (G<0 at ep1).
+- Late LR-decay delivered sustained improvement: best kept improving through ep190/200.
+- β-recall=0.521 breaks v13's 0.455 record. MMD²=0.00697 is new all-time low.
+- Combined score 0.114 beats v14g (0.144) by 21%.
+
+**Remaining problems:**
+1. **DMD-GEN=0.714** (target <0.30): temporal dynamics unchanged across all versions.
+   cross_cov_loss_weight=2.0 vs supervisor_loss_weight=1.0 gives 2:1 ratio, but DMD-GEN
+   doesn't respond. The cross-covariance loss may not be targeting the right structure.
+2. **reuse rate fake=0.006** (target >0.1): Binary obj_id_reuse feature is learned at ~1% of
+   real rate. The latent space doesn't naturally encode temporal address correlations.
+   Requires architectural change (task #19).
+3. **α-precision=0.826** (target >0.85): Fidelity slightly below target; diversity
+   pressure (diversity_loss=1.0) may be pushing G slightly off the real manifold.
+
+**v18 direction**: Keep v17 hyperparameters. Address DMD-GEN with higher cross_cov (try 5.0)
+and longer training (250 epochs). α-precision may improve naturally with more epochs.
+
 ### v15 (vinge/GB10, killed ep143, 2026-03-30)
 
 First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
@@ -165,14 +179,14 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v15 | v16 | Target | Description |
-|--------|-----|------|-----|-----|--------|-------------|
-| MMD² | 0.00818 | 0.018 | 0.029 | 0.042 | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.294 | 0.228 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | — | 0.833 | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | ~0.700 | 0.744 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | — | 0.03 | — | 0.15 | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.124 | 0.000 | TBD | 0.004 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | **v17** | Target | Description |
+|--------|-----|------|-----|---------|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
 Note: v14g had better MMD² than v13 despite lower β-recall. v14g is the best MMD²–recall trade-off
 we have achieved. All new runs must beat v14g's combined score (0.018 MMD² + 0.2×(1-0.372) = 0.144).
