@@ -563,6 +563,8 @@ def train(cfg: Config) -> None:
     # -----------------------------------------------------------------------
     for epoch in range(start_epoch, cfg.epochs):
         G.train(); C.train()
+        if latent_ae:
+            E.train(); R.train(); S.train()
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
 
