@@ -13,14 +13,15 @@
 #
 # What it shows:
 #   - Whether the training process is alive
-#   - Last 30 lines of the training log (MMD evals, epoch progress)
+#   - Last 40 lines of the training log (MMD evals, epoch progress)
 #   - Best checkpoint so far (if any)
 
 set -euo pipefail
 
 VINGE="vinge.local"
-LOG_DIR="~"
-CKPT_DIR="~/checkpoints"
+REMOTE_HOME="\$HOME"          # expands on vinge, not locally
+LOG_DIR="${REMOTE_HOME}"
+CKPT_DIR="${REMOTE_HOME}/checkpoints"
 
 usage() {
     sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
@@ -33,15 +34,15 @@ VERSION="${1:-}"
 
 if [[ -z "$VERSION" ]]; then
     # Find the most recently modified training log
-    LOG_FILE=$(ssh "$VINGE" 'ls -t ~/train_v*.log 2>/dev/null | head -1')
+    LOG_FILE=$(ssh "$VINGE" "ls -t \$HOME/train_v*.log 2>/dev/null | head -1")
     if [[ -z "$LOG_FILE" ]]; then
         echo "No training logs found on vinge." >&2
         exit 1
     fi
-    # Extract version from filename (e.g., train_v16.log → v16)
+    # Extract version from filename (e.g., /home/darrell/train_v16.log → v16)
     VERSION=$(basename "$LOG_FILE" .log | sed 's/train_//')
 else
-    LOG_FILE="~/train_${VERSION}.log"
+    LOG_FILE="${LOG_DIR}/train_${VERSION}.log"
 fi
 
 echo "=== vinge training status: $VERSION ==="
@@ -69,12 +70,11 @@ echo
 BEST_PT="${CKPT_DIR}/tencent_${VERSION}/best.pt"
 echo "=== Best checkpoint: $BEST_PT ==="
 ssh "$VINGE" "
-cd ~/llgan 2>/dev/null || cd ~/Zarathustra/llgan
-~/llgan-env/bin/python3 -c \"
-import torch, sys, os
+cd \$HOME/llgan 2>/dev/null || cd \$HOME/Zarathustra/llgan
+\$HOME/llgan-env/bin/python3 -c \"
+import torch, sys
 try:
-    # expanduser so Python handles the ~ in the path (it doesn't expand it natively)
-    ck = torch.load(os.path.expanduser('$BEST_PT'), map_location='cpu', weights_only=False)
+    ck = torch.load('${CKPT_DIR}/tencent_${VERSION}/best.pt', map_location='cpu', weights_only=False)
     print(f'  epoch:    {ck.get(\\\"epoch\\\", \\\"?\\\") + 1}')
     print(f'  MMD²:     {ck.get(\\\"mmd\\\", \\\"?\\\"):.5f}')
     print(f'  recall:   {ck.get(\\\"recall\\\", \\\"?\\\"):.3f}')

@@ -27,7 +27,6 @@
 set -euo pipefail
 
 VINGE="vinge.local"
-CKPT_BASE="~/checkpoints"
 
 usage() {
     sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
@@ -55,33 +54,33 @@ if [[ -z "$FROM_VERSION" || -z "$TO_VERSION" ]]; then
     exit 1
 fi
 
-FROM_DIR="${CKPT_BASE}/tencent_${FROM_VERSION}"
-TO_DIR="${CKPT_BASE}/tencent_${TO_VERSION}"
-
 echo "=== Creating pretrain checkpoint: $FROM_VERSION → $TO_VERSION ==="
 
 ssh "$VINGE" "
     set -e
-    mkdir -p $TO_DIR
+
+    FROM_DIR=\$HOME/checkpoints/tencent_${FROM_VERSION}
+    TO_DIR=\$HOME/checkpoints/tencent_${TO_VERSION}
+    mkdir -p \$TO_DIR
 
     # Prefer pretrain_complete.pt if it exists (it has exactly the right keys).
     # Fall back to epoch_NNNN.pt which has the same weights plus C and optimizer
     # for the critic (which we don't need for the destination).
-    if [[ -f ${FROM_DIR}/pretrain_complete.pt ]]; then
-        SRC='${FROM_DIR}/pretrain_complete.pt'
+    if [[ -f \$FROM_DIR/pretrain_complete.pt ]]; then
+        SRC=\$FROM_DIR/pretrain_complete.pt
         echo 'Source: pretrain_complete.pt (ideal)'
-    elif [[ -f ${FROM_DIR}/epoch_${EPOCH}.pt ]]; then
-        SRC='${FROM_DIR}/epoch_${EPOCH}.pt'
+    elif [[ -f \$FROM_DIR/epoch_${EPOCH}.pt ]]; then
+        SRC=\$FROM_DIR/epoch_${EPOCH}.pt
         echo \"Source: epoch_${EPOCH}.pt (extracting E/R/S/G/G_ema/opt_G/prep)\"
     else
-        echo 'Error: neither pretrain_complete.pt nor epoch_${EPOCH}.pt found in $FROM_DIR' >&2
+        echo \"Error: neither pretrain_complete.pt nor epoch_${EPOCH}.pt found in \$FROM_DIR\" >&2
         exit 1
     fi
 
-    cd ~/llgan
-    ~/llgan-env/bin/python3 -c \"
-import torch, sys
-sys.path.insert(0, '/home/darrell/llgan')
+    cd \$HOME/llgan
+    \$HOME/llgan-env/bin/python3 -c \"
+import torch, sys, os
+sys.path.insert(0, os.path.expanduser('~') + '/llgan')
 
 src = torch.load('\$SRC', map_location='cpu', weights_only=False)
 print('Source keys:', list(src.keys()))
@@ -108,7 +107,7 @@ if first_E_key.startswith('_orig_mod.'):
     print('Cannot use with --no-compile. Start pretrain fresh instead.')
     sys.exit(1)
 
-out = '${TO_DIR}/pretrain_complete.pt'
+out = os.path.expanduser('~') + '/checkpoints/tencent_${TO_VERSION}/pretrain_complete.pt'
 torch.save(dst, out)
 print(f'Saved: {out}')
 print(f'E sample key: {first_E_key}')

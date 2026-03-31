@@ -29,10 +29,6 @@
 set -euo pipefail
 
 VINGE="vinge.local"
-PYTHON="~/llgan-env/bin/python"
-TRAIN="~/llgan/train.py"
-TRACE_DIR="~/traces/tencent_block_1M"
-LOG_DIR="~"
 
 usage() {
     sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
@@ -57,56 +53,57 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
-CKPT_DIR="~/checkpoints/tencent_${VERSION}"
-LOG_FILE="${LOG_DIR}/train_${VERSION}.log"
-
 echo "=== Launching training $VERSION on vinge ==="
-echo "  Checkpoint dir: $CKPT_DIR"
-echo "  Log: $LOG_FILE"
+echo "  Checkpoint dir: \$HOME/checkpoints/tencent_${VERSION}"
+echo "  Log: \$HOME/train_${VERSION}.log"
 echo "  Extra args: ${EXTRA_ARGS[*]:-none}"
 echo
 
-# Build the command. All defaults are here; pass extra flags after to override.
-# Note: --no-compile is always set. torch.compile requires Triton to build CUDA
-# kernels via gcc, and the libcuda.so.1 symlink is broken on the GB10 system.
-# AMP fp16 still works (it uses cuBLAS directly, not Triton).
-CMD="$PYTHON -u $TRAIN \
-  --trace-dir $TRACE_DIR --fmt oracle_general \
-  --epochs 150 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir $CKPT_DIR --checkpoint-every 5 \
-  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --locality-loss-weight 1.0 --acf-loss-weight 0.2 \
-  --moment-loss-weight 0.1 --fft-loss-weight 0.05 \
-  --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \
-  --cross-cov-loss-weight 2.0 --diversity-loss-weight 0.5 \
-  --ema-decay 0.999 --lr-cosine-decay 0.05 \
-  --grad-clip 1.0 --n-critic 2 \
-  --hidden-size 256 --latent-dim 24 \
-  --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \
-  --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5 \
-  --no-compile \
-  ${EXTRA_ARGS[*]:-}"
-
 ssh "$VINGE" "
     set -e
+
+    CKPT_DIR=\$HOME/checkpoints/tencent_${VERSION}
+    LOG_FILE=\$HOME/train_${VERSION}.log
+    PYTHON=\$HOME/llgan-env/bin/python
+    TRAIN=\$HOME/llgan/train.py
+    TRACE_DIR=\$HOME/traces/tencent_block_1M
 
     # Kill any existing training for this version only.
     # Using the checkpoint dir name as the match pattern is safe: it uniquely
     # identifies this version's process without risk of killing unrelated python jobs.
     EXISTING=\$(pgrep -f 'tencent_${VERSION}' 2>/dev/null || true)
     if [[ -n \"\$EXISTING\" ]]; then
-        echo 'Killing existing $VERSION training (PIDs: '\$EXISTING')'
+        echo 'Killing existing ${VERSION} training (PIDs: '\$EXISTING')'
         kill \$EXISTING || true
         sleep 2
     fi
 
-    mkdir -p $CKPT_DIR
+    mkdir -p \$CKPT_DIR
 
-    nohup $CMD > $LOG_FILE 2>&1 &
+    # Note: --no-compile is always set. torch.compile requires Triton to build CUDA
+    # kernels via gcc, and the libcuda.so.1 symlink is broken on the GB10 system.
+    # AMP fp16 still works (it uses cuBLAS directly, not Triton).
+    nohup \$PYTHON -u \$TRAIN \\
+      --trace-dir \$TRACE_DIR --fmt oracle_general \\
+      --epochs 150 --files-per-epoch 12 --records-per-file 15000 \\
+      --checkpoint-dir \$CKPT_DIR --checkpoint-every 5 \\
+      --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \\
+      --locality-loss-weight 1.0 --acf-loss-weight 0.2 \\
+      --moment-loss-weight 0.1 --fft-loss-weight 0.05 \\
+      --quantile-loss-weight 0.2 --feature-matching-weight 1.0 \\
+      --cross-cov-loss-weight 2.0 --diversity-loss-weight 0.5 \\
+      --ema-decay 0.999 --lr-cosine-decay 0.05 \\
+      --grad-clip 1.0 --n-critic 2 \\
+      --hidden-size 256 --latent-dim 24 \\
+      --pretrain-ae-epochs 50 --pretrain-sup-epochs 50 --pretrain-g-epochs 100 \\
+      --supervisor-loss-weight 5.0 --lr-g 1e-4 --lr-d 2.5e-5 \\
+      --no-compile \\
+      ${EXTRA_ARGS[*]:-} \\
+      > \$LOG_FILE 2>&1 &
     PID=\$!
     echo \"Launched PID \$PID\"
     sleep 10
     echo
-    echo '=== First lines of $LOG_FILE ==='
-    tail -20 $LOG_FILE
+    echo '=== First 20 lines of log ==='
+    tail -20 \$LOG_FILE
 "
