@@ -4,13 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v18
+## Current Run: v19
 
-**Status**: Planning — not yet launched.
+**Status**: RUNNING on vinge.
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
-Everything else unchanged from v16 (n_critic=2, lr_g=1e-4, cross_cov=2.0, hidden=256, latent=24).
+v19 hyperparameters: v17 base (supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_cov=2.0) + new
+`--dmd-ckpt-weight 0.05` flag (dynamics-aware checkpoint selection). cross_cov reverted from 5.0
+(v18 showed 5.0 did not improve DMD-GEN and slightly hurt recall).
+
+- Log: vinge:~/train_v19.log
+- Checkpoints: vinge:~/checkpoints/tencent_v19/
 
 ---
 
@@ -29,7 +34,8 @@ Everything else unchanged from v16 (n_critic=2, lr_g=1e-4, cross_cov=2.0, hidden
 | v14g | **0.018** | **0.372** | 90 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt | Best MMD²–recall trade-off; full eval reuse_rate=0 |
 | v15 | 0.029 | 0.294 | 100 | vinge:~/checkpoints/tencent_v15/best.pt | GAN cycling ep110; missing diversity_loss |
 | v16 | 0.042 | 0.228 | 130 | vinge:~/checkpoints/tencent_v16/best.pt | Diversity+cross_cov restored; critic still dominant; worse than v14g |
-| **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | New all-time best. supervisor→1.0, lr_d=5e-5, diversity→1.0 |
+| **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | **All-time best.** supervisor→1.0, lr_d=5e-5, diversity→1.0 |
+| v18 | 0.01105 | 0.418 | 205 | vinge:~/checkpoints/tencent_v18/best.pt | cross_cov→5.0; did NOT beat v17; see post-mortem |
 
 ---
 
@@ -144,12 +150,45 @@ supervisor_loss_weight→1.0, lr_d→5e-5, diversity_loss→1.0, 200 epochs. Use
 **v18 direction**: Keep v17 hyperparameters. Address DMD-GEN with higher cross_cov (try 5.0)
 and longer training (250 epochs). α-precision may improve naturally with more epochs.
 
-**v19 direction** (planned): Same hyperparameters as v17 (supervisor=1.0, diversity=1.0,
-lr_d=5e-5) plus new `--dmd-ckpt-weight 0.05` flag (implemented in 66f581b). This makes the
-checkpoint selector dynamics-aware: `combined = MMD² + 0.2*(1-recall) + 0.05*DMD-GEN`.
-Hypothesis: best.pt will shift toward an epoch with better temporal dynamics without
-sacrificing much on MMD²/recall. cross_cov setting depends on v18 outcome.
-Launch command (after v18 completes):
+---
+
+### v18 (vinge/GB10, completed ep250, 2026-03-31)
+
+Key change vs v17: `cross_cov_loss_weight` 2.0 → **5.0**, epochs 200 → **250**.
+
+**Best (ep205, full eval with n_samples=2000)**:
+
+| Metric | v18 | v17 | Target |
+|--------|-----|-----|--------|
+| MMD² | 0.01105 | **0.00697** | <0.005 |
+| α-precision | **0.845** | 0.826 | >0.80 |
+| β-recall | 0.418 | **0.521** | >0.70 |
+| DMD-GEN | 0.760 | **0.714** | <0.30 |
+| AutoCorr | 0.042 | — | <0.02 |
+| Context-FID | 0.06 | **0.03** | <10 |
+| reuse rate | 0.004 | 0.006 | ~0.827 |
+
+**Did NOT beat v17.** v17 remains all-time best.
+
+**What went wrong:**
+1. **cross_cov=5.0 did not improve DMD-GEN**: DMD-GEN worsened from 0.714 → 0.760. Higher
+   weight likely interfered with the generator during early training (similar mechanism to
+   how supervisor_loss_weight=5.0 hurt v16). The cross-covariance loss matches the lag-1
+   covariance structure but apparently the dominant DMD modes are driven by higher-order
+   dynamics that L_cov cannot constrain at this weight.
+2. **recall ceiling at ~0.47 (EMA) / 0.42 (full eval)**: v17 reached 0.521 full eval; v18 fell
+   short. The higher cross_cov weight may have constrained generator diversity, counteracting
+   diversity_loss=1.0. cross_cov and diversity_loss are in tension: one pushes G toward real
+   temporal structure, the other pushes G away from similar outputs.
+3. **EMA vs full eval gap**: EMA combined score during training (0.116) appeared close to
+   v17's (0.114), but full eval combined = 0.128 vs v17's ~0.103. The fixed val_tensor
+   (23,976 windows) is easier to cover than a fresh 2000-sample draw.
+4. **W instability late training**: W spiked to 4.5+ at ep232, ep237, ep245 — highest seen
+   in any run. Likely caused by the high cross_cov loss making G's gradient landscape rougher.
+
+**v19 direction**: Revert cross_cov to 2.0 (v17 level). Add `--dmd-ckpt-weight 0.05`
+(dynamics-aware checkpoint selection, implemented in 66f581b). Keep all v17 winners:
+supervisor=1.0, lr_d=5e-5, diversity=1.0, epochs=250.
 ```bash
 ./scripts/vinge-launch.sh --version v19 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 250
