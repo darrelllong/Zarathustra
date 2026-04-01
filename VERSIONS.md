@@ -4,17 +4,15 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v20
+## Current Run: v21
 
-**Status**: RUNNING on vinge.
+**Status**: PENDING — vinge reboot required before launch.
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
-v20 hyperparameters: same as v19 + extended to 300 epochs. v19 peaked late (ep225/250); extending
-gives the model more time to converge on MMD². DMD-GEN improved in v19 — keep dmd_ckpt_weight=0.05.
-
-- Log: vinge:~/train_v20.log
-- Checkpoints: vinge:~/checkpoints/tencent_v20/
+v21 plan: address EMA/full-eval gap. Either save EMA weights as checkpoint or evaluate against
+a more representative val set. Keep v20 hyperparams (supervisor=1.0, lr_d=5e-5, diversity=1.0,
+cross_cov=2.0, dmd_ckpt_weight=0.05, epochs=300).
 
 ---
 
@@ -36,6 +34,7 @@ gives the model more time to converge on MMD². DMD-GEN improved in v19 — keep
 | **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | **All-time best.** supervisor→1.0, lr_d=5e-5, diversity→1.0 |
 | v18 | 0.01105 | 0.418 | 205 | vinge:~/checkpoints/tencent_v18/best.pt | cross_cov→5.0; did NOT beat v17; see post-mortem |
 | v19 | 0.01094 | 0.518 | 225 | vinge:~/checkpoints/tencent_v19/best.pt | cross_cov→2.0, dmd_ckpt_weight=0.05; recall≈v17 but MMD² worse; see post-mortem |
+| v20 | 0.03215 | 0.407 | 210 | vinge:~/checkpoints/tencent_v20/best.pt | 300 epochs; EMA looked great (0.00755/0.549) but full eval diverged 4×; see post-mortem |
 
 ---
 
@@ -255,6 +254,73 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
 ```
 
+---
+
+### v20 (vinge/GB10, completed ep300, 2026-04-02)
+
+Key changes vs v19: extended to **300 epochs** (v19 peaked late at ep225/250).
+Hyperparameters identical: supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_cov=2.0, dmd_ckpt_weight=0.05.
+
+**Best (ep210, full eval with n_samples=2000)**:
+
+| Metric | v20 | v17 | v19 | Target |
+|--------|-----|-----|-----|--------|
+| MMD² | 0.03215 | **0.00697** | 0.01094 | <0.005 |
+| α-precision | 0.826 | 0.826 | 0.835 | >0.80 |
+| β-recall | 0.407 | **0.521** | 0.518 | >0.70 |
+| DMD-GEN | 0.719 | 0.714 | **0.688** | <0.30 |
+| AutoCorr | 0.049 | 0.032 | 0.037 | <0.02 |
+| Context-FID | 0.14 | **0.03** | 0.13 | <0.05 |
+| reuse rate | 0.004 | 0.006 | 0.005 | ~0.806 |
+
+**EMA (training-time) vs full eval divergence — the critical finding:**
+| Metric | EMA ep210 | Full eval | Ratio |
+|--------|-----------|-----------|-------|
+| MMD² | 0.00755 | 0.03215 | 4.3× worse |
+| β-recall | 0.549 | 0.407 | 25% lower |
+
+**Did NOT beat v17.** v17 remains all-time best.
+
+**What worked:**
+1. **EMA metrics were best-ever**: EMA ep210 showed MMD²=0.00755 and recall=0.549, both
+   individually better than v17 (0.00697, 0.521). Training-time trajectory was genuinely
+   better than any prior run at this stage.
+2. **Early trajectory**: best ep50 combined (0.158) and ep100 combined (0.154) were the best
+   ever seen, confirming 300 epochs was the right direction.
+3. **Recall hit 0.539 (ep195 EMA)** — new all-time EMA high.
+
+**What went wrong — EMA/full-eval gap is now the primary problem:**
+1. **4.3× MMD² divergence**: EMA 0.00755 → full eval 0.03215. This is the largest
+   EMA/full-eval gap observed (v14f was noted at 3–4×; v20 matches/exceeds that).
+2. **Root cause — checkpoint saves LIVE weights, not EMA weights**: The combined score used
+   for checkpoint selection is computed from EMA model metrics. But `best.pt` saves the
+   live (non-EMA) G weights at that epoch. The EMA weights are smoothed across hundreds
+   of epochs; the live weights at ep210 reflect only recent gradient updates, which may
+   be noisier. The late W instability (W=6.1 at ep271, 5.7 at ep295) suggests the live
+   weights were being aggressively updated while EMA stayed smooth.
+3. **Fixed val_tensor may be too easy**: Training eval draws from the same 23,976 windows
+   every time. Full eval draws 2000 fresh windows from the full 3234-file corpus. The
+   fixed val set may be unrepresentative of the full distribution.
+4. **W instability late training (ep271–295)**: W repeatedly spiked above 4.0 in the final
+   30 epochs. This indicates the critic was dominating, degrading G's live weights even
+   while EMA remained smooth.
+
+**v21 direction — fix the EMA/full-eval gap:**
+Primary fix: **save EMA weights as `best.pt`**, not live weights. The checkpoint selection
+already uses EMA metrics; the checkpoint should store the same weights that were evaluated.
+This requires a small change to `train.py`: when saving `best.pt`, write `ema_G_state`
+instead of `G.state_dict()`.
+
+Secondary: Consider a fresh random val draw (rather than fixed val_tensor) for training-time
+eval, to reduce the divergence between training eval and full eval.
+
+Keep same hyperparams pending the EMA-save fix.
+```bash
+# After implementing EMA save fix in train.py:
+./scripts/vinge-launch.sh --version v21 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
+```
+
 ### v15 (vinge/GB10, killed ep143, 2026-03-30)
 
 First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
@@ -290,17 +356,17 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | Target | Description |
-|--------|-----|------|-----|---------|-----|-----|--------|-------------|
-| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | **0.835** | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | Target | Description |
+|--------|-----|------|-----|---------|-----|-----|-----|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | **0.835** | 0.826 | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
-Note: v17 is all-time best on combined (MMD² + 0.2×(1−recall)). v19 matched v17's recall
-(0.518 vs 0.521) but not MMD² (0.011 vs 0.007). DMD-GEN first improved in v19 (0.688 vs 0.714).
+Note: v17 is all-time best on full eval. v20 EMA metrics were best-ever (MMD²=0.00755,
+recall=0.549) but full eval diverged 4.3×. Critical fix for v21: save EMA weights as best.pt.
 
 ---
 
