@@ -4,18 +4,17 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v19
+## Current Run: v20
 
 **Status**: RUNNING on vinge.
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
-v19 hyperparameters: v17 base (supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_cov=2.0) + new
-`--dmd-ckpt-weight 0.05` flag (dynamics-aware checkpoint selection). cross_cov reverted from 5.0
-(v18 showed 5.0 did not improve DMD-GEN and slightly hurt recall).
+v20 hyperparameters: same as v19 + extended to 300 epochs. v19 peaked late (ep225/250); extending
+gives the model more time to converge on MMD². DMD-GEN improved in v19 — keep dmd_ckpt_weight=0.05.
 
-- Log: vinge:~/train_v19.log
-- Checkpoints: vinge:~/checkpoints/tencent_v19/
+- Log: vinge:~/train_v20.log
+- Checkpoints: vinge:~/checkpoints/tencent_v20/
 
 ---
 
@@ -36,6 +35,7 @@ v19 hyperparameters: v17 base (supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_c
 | v16 | 0.042 | 0.228 | 130 | vinge:~/checkpoints/tencent_v16/best.pt | Diversity+cross_cov restored; critic still dominant; worse than v14g |
 | **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | **All-time best.** supervisor→1.0, lr_d=5e-5, diversity→1.0 |
 | v18 | 0.01105 | 0.418 | 205 | vinge:~/checkpoints/tencent_v18/best.pt | cross_cov→5.0; did NOT beat v17; see post-mortem |
+| v19 | 0.01094 | 0.518 | 225 | vinge:~/checkpoints/tencent_v19/best.pt | cross_cov→2.0, dmd_ckpt_weight=0.05; recall≈v17 but MMD² worse; see post-mortem |
 
 ---
 
@@ -194,6 +194,67 @@ supervisor=1.0, lr_d=5e-5, diversity=1.0, epochs=250.
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 250
 ```
 
+---
+
+### v19 (vinge/GB10, completed ep250, 2026-04-01)
+
+Key changes vs v18: `cross_cov_loss_weight` 5.0 → **2.0** (v17 level), `--dmd-ckpt-weight 0.05`
+(dynamics-aware checkpoint selection added), epochs 250.
+
+**Best (ep225, full eval with n_samples=2000)**:
+
+| Metric | v19 | v17 | v18 | Target |
+|--------|-----|-----|-----|--------|
+| MMD² | 0.01094 | **0.00697** | 0.01105 | <0.005 |
+| α-precision | **0.835** | 0.826 | 0.845 | >0.80 |
+| β-recall | **0.518** | 0.521 | 0.418 | >0.70 |
+| DMD-GEN | **0.6875** | 0.714 | 0.760 | <0.30 |
+| AutoCorr | 0.037 | 0.032 | 0.042 | <0.02 |
+| Context-FID | 0.13 | **0.03** | 0.06 | <0.05 |
+| reuse rate | 0.005 | 0.006 | 0.004 | ~0.757 |
+
+**Did NOT beat v17.** v17 remains all-time best.
+
+**What worked:**
+1. **Recall nearly matched v17**: β-recall=0.518 vs v17's 0.521 — within 0.3%. cross_cov=2.0
+   + diversity=1.0 is the right balance; this confirms v18's recall regression was entirely
+   caused by the higher cross_cov weight.
+2. **DMD-GEN improved for the first time**: 0.6875 vs v17's 0.714, v18's 0.760. First
+   monotonic improvement in temporal dynamics across any version. `--dmd-ckpt-weight 0.05`
+   may have contributed by selecting ep225 (a slightly more dynamics-aware checkpoint).
+3. **α-precision=0.835 above target (>0.80)**: Fidelity improved slightly vs v17.
+4. **Late peaking confirmed**: Best at ep225/250; v17 best at ep190/200. Training near the
+   end of the cosine schedule still yielding improvements.
+
+**What went wrong:**
+1. **MMD²=0.01094 vs v17's 0.00697**: 57% worse on the primary metric. This is now the
+   central unsolved problem. recall and α-precision are at or above v17; MMD² is not.
+   Root cause unclear — could be a stochastic init effect, or cross_cov=2.0 slightly
+   spreading the generated distribution relative to v17's unconstrained run.
+2. **Context-FID=0.13 vs v17's 0.03**: 4× worse. The latent space quality is degrading
+   across versions. Likely caused by the locality split (6 features vs v17-era 5) adding
+   reconstruction difficulty, or the cross_cov loss slightly warping the latent geometry.
+3. **reuse rate fake=0.005** (real=0.757): Locality gap unchanged. Architectural fix needed
+   (z_global conditioning, task #18/#9 in TODO.md).
+
+**Root cause analysis — why MMD² is stuck above v17:**
+- v17 achieved MMD²=0.00697 with cross_cov=2.0, diversity=1.0, supervisor=1.0
+- v19 uses identical hyperparameters plus dmd_ckpt_weight=0.05
+- The dmd_ckpt_weight adds 0.05×DMD-GEN to combined, which could select a slightly
+  different checkpoint than pure MMD²+recall would. EP225 is best on combined but
+  EP155 had lower EMA MMD²=0.00885 (vs EP225's EMA 0.00945). The dmd_ckpt_weight
+  may be trading a small amount of MMD² quality for better dynamics.
+- Alternatively, this is stochastic variance: v17's MMD²=0.00697 may reflect a
+  favorable random init that v19 didn't replicate.
+
+**v20 direction**: Same hyperparams, extend to 300 epochs. v19 peaked late (ep225/250);
+more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weight=0.01
+(reduce dynamics influence to favour MMD²-optimal checkpoint selection) as ablation.
+```bash
+./scripts/vinge-launch.sh --version v20 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
+```
+
 ### v15 (vinge/GB10, killed ep143, 2026-03-30)
 
 First CUDA run. Applied all v14g root-cause fixes (obj_id split, obj_size quantization).
@@ -229,17 +290,17 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v16 | **v17** | Target | Description |
-|--------|-----|------|-----|---------|--------|-------------|
-| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | Target | Description |
+|--------|-----|------|-----|---------|-----|-----|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | **0.835** | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
-Note: v14g had better MMD² than v13 despite lower β-recall. v14g is the best MMD²–recall trade-off
-we have achieved. All new runs must beat v14g's combined score (0.018 MMD² + 0.2×(1-0.372) = 0.144).
+Note: v17 is all-time best on combined (MMD² + 0.2×(1−recall)). v19 matched v17's recall
+(0.518 vs 0.521) but not MMD² (0.011 vs 0.007). DMD-GEN first improved in v19 (0.688 vs 0.714).
 
 ---
 

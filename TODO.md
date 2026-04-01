@@ -120,6 +120,31 @@ Items marked ✓ are done and in the repo.
   Embed `c = [tenant_id, read_ratio, obj_size_bucket]` via MLP into generator hidden
   state and at every timestep. Classifier-free guidance style for unconditional fallback.
 
+- [ ] **Run loss-family ablation sweep** (`train.py`)
+  The objective now has 10+ terms; interaction effects are a bigger risk than missing
+  ingredients. Reviewer: "My suspicion is that the next large gain will come from better
+  structure, not from turning on every available auxiliary term."
+  Group by family: (1) adversarial + feature matching, (2) temporal (ACF + cross-cov + FFT),
+  (3) locality, (4) anti-collapse (diversity + minibatch-std). Ablate one family at a time
+  against a minimal baseline. Run before adding more losses.
+
+- [ ] **Masked pretraining on real traces** (`train.py`, `dataset.py`)
+  Mask random chunks or patch spans in real traces; reconstruct in latent or feature space.
+  Self-supervised warm start that fits naturally before the existing AE/supervisor curriculum.
+  Reviewer: "More promising than adding one more scalar GAN regularizer."
+  Ref: PatchFormer (arXiv 2601.20845) — hierarchical masked reconstruction + cross-domain transfer.
+
+- [ ] **Retrieval-conditioned rare-regime generation** (`generate.py`, `dataset.py`)
+  Rare burst regimes and unusual locality phases are hard to cover with noise-only generation.
+  Retrieve real chunks with similar burst/locality descriptors; use as conditioning context.
+  Especially target cases where recall is decent but dynamics/locality remain wrong.
+  Ref: Retrieval-Augmented Diffusion Models for Time Series Forecasting (NeurIPS 2024).
+
+- [ ] **Chunk-stitching training curriculum** (`train.py`)
+  Progressive context-length training: short windows first, then adjacent stitched windows,
+  then longer contexts. Training-time analogue of generate.py's hidden-state carryover.
+  Refs: WaveStitch (arXiv 2503.06231), PatchFormer (arXiv 2601.20845).
+
 - [ ] **Improve validation** (`train.py`, `mmd.py`)
   Current MMD val set is 2 random files (may overlap conceptually with training) and
   MMD is flattened-window RBF — weak signal. Switch to: designated held-out files,
@@ -304,3 +329,7 @@ Items marked ✓ are done and in the repo.
 | PCF-GAN, NeurIPS 2023 | Path-space critic via characteristic function; more faithful sequential-law test than LSTM critic |
 | High-Rank Path Dev, NeurIPS 2024 | Path signatures for deep sequential generative modeling; upgrade to path-space critic |
 | Constrained TS Gen, NeurIPS 2023 | Guidance under explicit numeric constraints; foundation for controllable workload generation |
+| Retrieval-Augmented Diffusion, NeurIPS 2024 | Retrieval-guided rare-mode support; transferable to burst/locality rare-regime generation |
+| FreqMoE, arXiv 2501.15125 | Frequency-decomposition MoE for time series; supports regime-switching generator design |
+| PatchFormer, arXiv 2601.20845 | Hierarchical masked reconstruction + cross-domain transfer; supports masked pretraining curriculum |
+| Flow-Based TS Gen, arXiv 2601.22848 | Equivariance-regularised latent flow; reinforces latent-space generation without image tricks |
