@@ -382,7 +382,7 @@ def train(cfg: Config) -> None:
 
     if resume_path is not None:
         ckpt = torch.load(resume_path, map_location=device, weights_only=False)
-        G.load_state_dict(ckpt["G"])
+        G.load_state_dict(ckpt.get("G_live", ckpt["G"]))  # prefer live weights for training
         # Migrate critic state dict: old checkpoints store plain LSTM weight
         # keys (e.g. "lstm.weight_ih_l0"); new SN-LSTM models expect "_orig"
         # suffixed keys ("lstm.weight_ih_l0_orig").  Rename on load so old
@@ -988,8 +988,9 @@ def train(cfg: Config) -> None:
                 epochs_no_improve = 0
                 ckpt_data = {
                     "epoch": epoch,
-                    "G": live_G_state,         # live weights (for resuming training)
-                    "G_ema": ema_G_state,       # EMA weights (for inference/generation)
+                    "G": {k: v.clone() for k, v in ema_G_state.items()},  # EMA weights (primary)
+                    "G_live": live_G_state,     # live weights (for resuming training)
+                    "G_ema": ema_G_state,       # EMA weights (backward compat)
                     "C": C.state_dict(),
                     "opt_G": opt_G.state_dict(),
                     "opt_C": opt_C.state_dict(),

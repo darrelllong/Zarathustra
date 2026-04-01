@@ -6,13 +6,25 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v21
 
-**Status**: PENDING — vinge reboot required before launch.
+**Status**: RUNNING on vinge (PID 7932, launched 2026-04-01).
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
-v21 plan: address EMA/full-eval gap. Either save EMA weights as checkpoint or evaluate against
-a more representative val set. Keep v20 hyperparams (supervisor=1.0, lr_d=5e-5, diversity=1.0,
-cross_cov=2.0, dmd_ckpt_weight=0.05, epochs=300).
+**Changes from v20:**
+1. **EMA-save fix** (`train.py`): `best.pt` now saves EMA weights as the `G` key (what
+   eval.py and generate.py load). Live weights saved as `G_live` for training resume.
+   Resume logic updated to prefer `G_live` when available. This directly addresses the
+   4.3x EMA/full-eval divergence found in v20.
+2. **Auto-restart on boot**: systemd user service (`llgan-training.service`) + `resume-training.sh`
+   reads hyperparams from checkpoint config and resumes automatically after power cycle.
+
+**Hyperparams** (same as v20): supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_cov=2.0,
+dmd_ckpt_weight=0.05, epochs=300, checkpoint_every=5.
+
+```bash
+./scripts/vinge-launch.sh --version v21 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
+```
 
 ---
 
