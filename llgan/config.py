@@ -88,6 +88,11 @@ class Config:
     supervisor_steps: int = 1         # 1 = 1-step supervisor; 2 = 2-step (SeriesGAN)
     lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
 
+    # AVATAR (Adversarial Autoencoder + Autoregressive Refinement)
+    avatar: bool = False              # Enable AVATAR mode (AAE + autoregressive refinement)
+    dist_loss_weight: float = 1.0     # Distribution loss weight (mean+std matching to N(0,1))
+    latent_disc_weight: float = 1.0   # Latent discriminator adversarial loss weight
+
     # Evaluation
     mmd_every: int = 5
     mmd_samples: int = 1000

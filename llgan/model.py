@@ -66,13 +66,22 @@ class Encoder(nn.Module):
     Generator's output range so that real and generated latents live in the
     same bounded space, which stabilises the supervisor and prevents the
     Recovery from needing to handle out-of-range inputs.
+
+    AVATAR mode (avatar=True): output is unbounded, targeting N(0,1) via
+    the AAE latent discriminator.  BatchNorm1d after GRU stabilises the
+    latent distribution before the FC projection.
     """
 
-    def __init__(self, num_cols: int, hidden_size: int, latent_dim: int):
+    def __init__(self, num_cols: int, hidden_size: int, latent_dim: int,
+                 avatar: bool = False):
         super().__init__()
+        self.avatar = avatar
         self.gru = nn.GRU(num_cols, hidden_size, num_layers=1, batch_first=True)
+        if avatar:
+            self.bn = nn.BatchNorm1d(hidden_size)
         self.fc  = nn.Linear(hidden_size, latent_dim)
-        self.act = nn.Sigmoid()
+        if not avatar:
+            self.act = nn.Sigmoid()
         self._init_weights()
 
     def _init_weights(self):
@@ -82,6 +91,10 @@ class Encoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h, _ = self.gru(x)
+        if self.avatar:
+            B, T, H = h.shape
+            h = self.bn(h.reshape(B * T, H)).reshape(B, T, H)
+            return self.fc(h)
         return self.act(self.fc(h))
 
 
@@ -98,9 +111,13 @@ class Recovery(nn.Module):
     inputs might not be" shortcut.
     """
 
-    def __init__(self, latent_dim: int, hidden_size: int, num_cols: int):
+    def __init__(self, latent_dim: int, hidden_size: int, num_cols: int,
+                 avatar: bool = False):
         super().__init__()
+        self.avatar = avatar
         self.gru = nn.GRU(latent_dim, hidden_size, num_layers=1, batch_first=True)
+        if avatar:
+            self.bn = nn.BatchNorm1d(hidden_size)
         self.fc  = nn.Linear(hidden_size, num_cols)
         self.act = nn.Tanh()
         self._init_weights()
@@ -112,6 +129,9 @@ class Recovery(nn.Module):
 
     def forward(self, h: torch.Tensor) -> torch.Tensor:
         out, _ = self.gru(h)
+        if self.avatar:
+            B, T, H = out.shape
+            out = self.bn(out.reshape(B * T, H)).reshape(B, T, H)
         return self.act(self.fc(out))
 
 
@@ -134,11 +154,16 @@ class Supervisor(nn.Module):
     failure mode; v13 uses η=10 but only 50 warm-up epochs to avoid it.
     """
 
-    def __init__(self, latent_dim: int, hidden_size: int):
+    def __init__(self, latent_dim: int, hidden_size: int,
+                 avatar: bool = False):
         super().__init__()
+        self.avatar = avatar
         self.gru = nn.GRU(latent_dim, hidden_size, num_layers=1, batch_first=True)
+        if avatar:
+            self.bn = nn.BatchNorm1d(hidden_size)
         self.fc  = nn.Linear(hidden_size, latent_dim)
-        self.act = nn.Sigmoid()
+        if not avatar:
+            self.act = nn.Sigmoid()
         self._init_weights()
 
     def _init_weights(self):
@@ -148,7 +173,42 @@ class Supervisor(nn.Module):
 
     def forward(self, h: torch.Tensor) -> torch.Tensor:
         out, _ = self.gru(h)
+        if self.avatar:
+            B, T, H = out.shape
+            out = self.bn(out.reshape(B * T, H)).reshape(B, T, H)
+            return self.fc(out)
         return self.act(self.fc(out))
+
+
+# ---------------------------------------------------------------------------
+# AVATAR: Latent discriminator (AAE component)
+# ---------------------------------------------------------------------------
+
+class LatentDiscriminator(nn.Module):
+    """AAE discriminator: distinguishes encoded latents q(z|x) from prior samples z ~ N(0,1).
+    Simple MLP -- no spectral norm, no BatchNorm (per AVATAR paper S4.3)."""
+
+    def __init__(self, latent_dim: int, hidden_size: int):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(latent_dim, hidden_size),
+            nn.LeakyReLU(0.2),
+            nn.Linear(hidden_size, hidden_size),
+            nn.LeakyReLU(0.2),
+            nn.Linear(hidden_size, 1),
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        for name, p in self.named_parameters():
+            if "weight" in name:
+                nn.init.normal_(p, 0.0, 0.02)
+            elif "bias" in name:
+                nn.init.zeros_(p)
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """z: (N, latent_dim) -> (N, 1) logits."""
+        return self.net(z)
 
 
 # ---------------------------------------------------------------------------
@@ -197,12 +257,14 @@ class Generator(nn.Module):
         num_cols: int,
         hidden_size: int,
         latent_dim: Optional[int] = None,
+        avatar: bool = False,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
         self.num_cols    = num_cols
         self.hidden_size = hidden_size
         self.latent_dim  = latent_dim
+        self.avatar      = avatar
 
         out_dim = latent_dim if latent_dim is not None else num_cols
 
@@ -221,7 +283,11 @@ class Generator(nn.Module):
             batch_first=True,
         )
         self.fc      = nn.Linear(hidden_size, out_dim)
-        self.out_act = nn.Sigmoid() if latent_dim is not None else nn.Tanh()
+        # AVATAR: unbounded output (matching Encoder's unbounded N(0,1) space)
+        if avatar and latent_dim is not None:
+            self.out_act = nn.Identity()
+        else:
+            self.out_act = nn.Sigmoid() if latent_dim is not None else nn.Tanh()
         self._init_weights()
 
     def _init_weights(self):

@@ -41,7 +41,7 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
 from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
-from model import Generator, Critic, Encoder, Recovery, Supervisor
+from model import Generator, Critic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
 
 
@@ -269,8 +269,10 @@ def train(cfg: Config) -> None:
     # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
     # redundant and can interfere with the penalty gradient computation.
     use_sn = (cfg.loss != "wgan-gp")
+    _avatar = cfg.avatar
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
-                  latent_dim=cfg.latent_dim if latent_ae else None).to(device)
+                  latent_dim=cfg.latent_dim if latent_ae else None,
+                  avatar=_avatar).to(device)
     C = Critic(critic_input_dim, cfg.hidden_size,
                use_spectral_norm=use_sn,
                sn_lstm=cfg.sn_lstm,
@@ -278,9 +280,12 @@ def train(cfg: Config) -> None:
                patch_embed=cfg.patch_embed).to(device)
 
     if latent_ae:
-        E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim).to(device)
-        R = Recovery(cfg.latent_dim, cfg.hidden_size, prep.num_cols).to(device)
-        S = Supervisor(cfg.latent_dim, cfg.hidden_size).to(device)
+        E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim,
+                    avatar=_avatar).to(device)
+        R = Recovery(cfg.latent_dim, cfg.hidden_size, prep.num_cols,
+                     avatar=_avatar).to(device)
+        S = Supervisor(cfg.latent_dim, cfg.hidden_size,
+                       avatar=_avatar).to(device)
         opt_AE  = torch.optim.Adam(list(E.parameters()) + list(R.parameters()),
                                    lr=cfg.lr_er, betas=(0.9, 0.999))
         opt_S   = torch.optim.Adam(S.parameters(), lr=cfg.lr_er, betas=(0.9, 0.999))
@@ -288,6 +293,14 @@ def train(cfg: Config) -> None:
                                    lr=cfg.lr_er, betas=(0.9, 0.999))
     else:
         E = R = S = opt_AE = opt_S = opt_ER = None
+
+    # AVATAR: latent discriminator + optimizer
+    if _avatar and latent_ae:
+        LD = LatentDiscriminator(cfg.latent_dim, cfg.hidden_size).to(device)
+        opt_LD = torch.optim.Adam(LD.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
+        bce_ld = nn.BCEWithLogitsLoss()
+    else:
+        LD = opt_LD = bce_ld = None
 
     # torch.compile: fuses CUDA kernels for ~20-40% speedup on NVIDIA hardware.
     # Skipped on MPS/CPU (no benefit) and when create_graph gradients are needed
@@ -306,6 +319,8 @@ def train(cfg: Config) -> None:
                 E = torch.compile(E, fullgraph=False)
                 R = torch.compile(R, fullgraph=False)
                 S = torch.compile(S, fullgraph=False)
+            if LD is not None:
+                LD = torch.compile(LD, fullgraph=False)
             print("[info] torch.compile: models compiled (CUDA). "
                   "Triton kernels will JIT on first forward pass.")
         except Exception as exc:
@@ -395,9 +410,11 @@ def train(cfg: Config) -> None:
         }
         C.load_state_dict(c_sd, strict=False)
         if latent_ae and "E" in ckpt:
-            E.load_state_dict(ckpt["E"])
-            R.load_state_dict(ckpt["R"])
-            S.load_state_dict(ckpt["S"])
+            E.load_state_dict(ckpt["E"], strict=False)
+            R.load_state_dict(ckpt["R"], strict=False)
+            S.load_state_dict(ckpt["S"], strict=False)
+        if LD is not None and "LD" in ckpt:
+            LD.load_state_dict(ckpt["LD"])
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
@@ -456,6 +473,10 @@ def train(cfg: Config) -> None:
         prep = pc["prep"]
         if pc.get("val_tensor") is not None:
             val_tensor = pc["val_tensor"].to(device)
+        if LD is not None and "LD" in pc:
+            LD.load_state_dict(pc["LD"])
+            if "opt_LD" in pc:
+                opt_LD.load_state_dict(pc["opt_LD"])
         pretrain_done = True
         print("  Pretrain checkpoint loaded.")
 
@@ -479,9 +500,44 @@ def train(cfg: Config) -> None:
             ae_losses = []
             for xb in loader:
                 xb = xb.to(device)
-                opt_AE.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
-                    loss_ae = nn.functional.mse_loss(R(E(xb)), xb)
+                    H = E(xb)
+                    X_hat = R(H)
+                    loss_recon = nn.functional.mse_loss(X_hat, xb)
+
+                    if _avatar:
+                        # --- Latent discriminator step (AAE) ---
+                        opt_LD.zero_grad()
+                        z_prior = torch.randn_like(H)
+                        d_real = LD(z_prior.detach().reshape(-1, cfg.latent_dim))
+                        d_fake = LD(H.detach().reshape(-1, cfg.latent_dim))
+                        ones_ld = torch.ones_like(d_real)
+                        zeros_ld = torch.zeros_like(d_fake)
+                        loss_disc = bce_ld(d_real, ones_ld) + bce_ld(d_fake, zeros_ld)
+                    else:
+                        loss_disc = None
+
+                if _avatar:
+                    scaler.scale(loss_disc).backward()
+                    scaler.step(opt_LD)
+                    scaler.update()
+
+                with torch.amp.autocast(device.type, enabled=use_amp):
+                    if _avatar:
+                        # Encoder adversarial loss (fool the discriminator)
+                        d_fake_for_E = LD(H.reshape(-1, cfg.latent_dim))
+                        loss_adv_E = bce_ld(d_fake_for_E, torch.ones_like(d_fake_for_E))
+                        # Distribution loss (moment matching to N(0,1))
+                        loss_mean = sum(H[:, t, :].mean().abs() for t in range(H.size(1)))
+                        loss_std = sum((H[:, t, :].std() - 1.0).abs() for t in range(H.size(1)))
+                        loss_dist = loss_mean + loss_std
+                        loss_ae = (loss_recon
+                                   + cfg.latent_disc_weight * loss_adv_E
+                                   + cfg.dist_loss_weight * loss_dist)
+                    else:
+                        loss_ae = loss_recon
+
+                opt_AE.zero_grad()
                 scaler.scale(loss_ae).backward()
                 scaler.step(opt_AE)
                 scaler.update()
@@ -517,10 +573,16 @@ def train(cfg: Config) -> None:
                 opt_S.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
                     S_out = S(H)                                # (B, T, latent_dim)
-                    # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
-                    # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
-                    k = cfg.supervisor_steps
-                    loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
+                    if _avatar:
+                        # AVATAR Eq 4.4-4.5: always 1-step + 2-step
+                        loss_sup_1 = nn.functional.mse_loss(S_out[:, :-1, :], H[:, 1:, :])
+                        loss_sup_2 = nn.functional.mse_loss(S_out[:, :-2, :], H[:, 2:, :])
+                        loss_sup = loss_sup_1 + loss_sup_2
+                    else:
+                        # S_out[t] predicts H[t+k] where k = supervisor_steps (1 or 2).
+                        # 2-step forces longer temporal context (SeriesGAN, BigData 2024).
+                        k = cfg.supervisor_steps
+                        loss_sup = nn.functional.mse_loss(S_out[:, :-k, :], H[:, k:, :])
                 scaler.scale(loss_sup).backward()
                 scaler.step(opt_S)
                 scaler.update()
@@ -593,6 +655,9 @@ def train(cfg: Config) -> None:
             "prep": prep,
             "val_tensor": val_tensor.cpu() if val_tensor is not None else None,
         }
+        if LD is not None:
+            pretrain_ckpt["LD"] = LD.state_dict()
+            pretrain_ckpt["opt_LD"] = opt_LD.state_dict()
         torch.save(pretrain_ckpt, pretrain_ckpt_path)
         print(f"Pretrain checkpoint saved → {pretrain_ckpt_path}", flush=True)
 
@@ -605,6 +670,8 @@ def train(cfg: Config) -> None:
         G.train(); C.train()
         if latent_ae:
             E.train(); R.train(); S.train()
+        if LD is not None:
+            LD.train()
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
 
@@ -939,18 +1006,46 @@ def train(cfg: Config) -> None:
             # Fine-tunes the autoencoder during GAN training to keep the latent
             # space consistent with the generator's output distribution.
             if latent_ae:
+                if _avatar:
+                    # --- AVATAR: update latent discriminator in joint phase ---
+                    opt_LD.zero_grad()
+                    with torch.amp.autocast(device.type, enabled=use_amp):
+                        H_real_ld = E(real_batch)
+                        z_prior = torch.randn_like(H_real_ld)
+                        d_real_j = LD(z_prior.detach().reshape(-1, cfg.latent_dim))
+                        d_fake_j = LD(H_real_ld.detach().reshape(-1, cfg.latent_dim))
+                        ones_j = torch.ones_like(d_real_j)
+                        zeros_j = torch.zeros_like(d_fake_j)
+                        loss_ld_j = bce_ld(d_real_j, ones_j) + bce_ld(d_fake_j, zeros_j)
+                    scaler.scale(loss_ld_j).backward()
+                    scaler.step(opt_LD)
+                    scaler.update()
+
                 opt_ER.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
                     H_real_grad = E(real_batch)
                     X_hat = R(H_real_grad)
-                    # Reconstruction loss only: supervisor (S) is frozen after
-                    # pretraining and has no optimizer in Phase 3.  The previous
-                    # supervisor term here was a no-op — both its input
-                    # (H_real_grad.detach()) and target were detached, so no
-                    # gradient flowed and no parameter in opt_ER was updated by it.
-                    # (Per peer review: freeze S after pretraining rather than
-                    # silently running a dead term.)
                     er_loss = nn.functional.mse_loss(X_hat, real_batch)
+
+                    if _avatar:
+                        # Supervisor-assisted reconstruction (AVATAR Eq 4.10)
+                        X_sup_recon = R(S(H_real_grad))
+                        er_loss = er_loss + nn.functional.mse_loss(X_sup_recon, real_batch)
+
+                        # Adversarial loss on encoder (fool latent discriminator)
+                        d_fake_for_E_j = LD(H_real_grad.reshape(-1, cfg.latent_dim))
+                        loss_adv_E_j = bce_ld(d_fake_for_E_j,
+                                              torch.ones_like(d_fake_for_E_j))
+                        # Distribution loss
+                        loss_mean_j = sum(H_real_grad[:, t, :].mean().abs()
+                                          for t in range(H_real_grad.size(1)))
+                        loss_std_j = sum((H_real_grad[:, t, :].std() - 1.0).abs()
+                                         for t in range(H_real_grad.size(1)))
+                        loss_dist_j = loss_mean_j + loss_std_j
+                        er_loss = (er_loss
+                                   + cfg.latent_disc_weight * loss_adv_E_j
+                                   + cfg.dist_loss_weight * loss_dist_j)
+
                 scaler.scale(er_loss).backward()
                 scaler.step(opt_ER)
                 scaler.update()
@@ -1004,6 +1099,8 @@ def train(cfg: Config) -> None:
                 if latent_ae:
                     ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
                                       "S": S.state_dict()})
+                if LD is not None:
+                    ckpt_data["LD"] = LD.state_dict()
                 torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
             else:
@@ -1011,6 +1108,8 @@ def train(cfg: Config) -> None:
             G.train()
             if latent_ae:
                 E.train(); R.train(); S.train()
+            if LD is not None:
+                LD.train()
 
         print(log, flush=True)
 
@@ -1042,6 +1141,8 @@ def train(cfg: Config) -> None:
             if latent_ae:
                 ckpt_data.update({"E": E.state_dict(), "R": R.state_dict(),
                                   "S": S.state_dict()})
+            if LD is not None:
+                ckpt_data["LD"] = LD.state_dict()
             ckpt_data["mmd_history"] = mmd_history
             torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
@@ -1065,6 +1166,8 @@ def train(cfg: Config) -> None:
     if latent_ae:
         final_data.update({"E": E.state_dict(), "R": R.state_dict(),
                            "S": S.state_dict()})
+    if LD is not None:
+        final_data["LD"] = LD.state_dict()
     torch.save(final_data, final_path)
     print(f"Training complete → {final_path}")
 
@@ -1181,6 +1284,13 @@ def parse_args() -> Config:
                    help="η: supervisor consistency weight in joint training")
     p.add_argument("--supervisor-steps",   type=int,   default=1,
                    help="1 = 1-step supervisor; 2 = 2-step (SeriesGAN BigData 2024)")
+    p.add_argument("--avatar",              action="store_true", default=False,
+                   help="Enable AVATAR mode: AAE latent discriminator + autoregressive refinement. "
+                        "Replaces Sigmoid with unbounded latents targeting N(0,1).")
+    p.add_argument("--dist-loss-weight",   type=float, default=1.0,
+                   help="AVATAR: distribution loss weight (moment matching to N(0,1))")
+    p.add_argument("--latent-disc-weight", type=float, default=1.0,
+                   help="AVATAR: latent discriminator adversarial loss weight")
     p.add_argument("--locality-loss-weight", type=float, default=0.0,
                    help="L_loc: stride-repetition rate matching within windows (0=off; try 1.0). "
                         "Matches the fraction of obj_id deltas that repeat within a window — "
@@ -1258,6 +1368,12 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.avatar                  = args.avatar
+    cfg.dist_loss_weight        = args.dist_loss_weight
+    cfg.latent_disc_weight      = args.latent_disc_weight
+    # AVATAR forces 2-step supervisor
+    if cfg.avatar:
+        cfg.supervisor_steps = 2
     return cfg
 
 

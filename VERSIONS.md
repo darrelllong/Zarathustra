@@ -4,19 +4,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v26
+## Current Runs: v26 + v27 (parallel)
 
-**Status**: RUNNING on vinge (PID 36460, launched 2026-04-02).
+**v26**: RUNNING (PID 36460). `diversity_loss_weight` 1.0→2.0 to push recall past 0.52.
+Same recipe otherwise (v16 pretrain, dmd_ckpt_weight=0, 200ep).
 
-**Current all-time best: v17 ep190 (full eval combined=0.103) / v24 ep170 (EMA combined=0.097)**
-
-**Change**: `diversity_loss_weight` 1.0 → **2.0**. Recall is the biggest gap to target
-(0.50 vs 0.70). Diversity loss directly pushes mode coverage. Everything else unchanged
-(v16 pretrain, dmd_ckpt_weight=0, 200 epochs).
+**v27**: RUNNING (PID 38971). **AVATAR architecture** — fresh pretrain required.
+Adversarial Autoencoder (latent discriminator enforcing N(0,1) prior) + distribution loss
++ supervisor-assisted reconstruction + BatchNorm GRU. Major architectural change.
 
 ```bash
+# v26
 ./scripts/vinge-launch.sh --version v26 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 2.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
+# v27
+./scripts/vinge-launch.sh --version v27 --avatar --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
 ```
 ```
 
