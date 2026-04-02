@@ -4,19 +4,11 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v25
+## Current Run: v26
 
-**Status**: RUNNING on vinge (PID 21142, launched 2026-04-02).
+**Status**: PENDING — awaiting direction.
 
 **Current all-time best: v17 ep190 (full eval combined=0.103) / v24 ep170 (EMA combined=0.097)**
-
-Same recipe as v24: v16 pretrain, dmd_ckpt_weight=0, 200 epochs. Different random seed.
-v24 missed v17 by 4% on full eval — another seed may close the gap.
-
-```bash
-./scripts/vinge-launch.sh --version v25 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
-```
 ```
 
 ---
@@ -44,6 +36,7 @@ v24 missed v17 by 4% on full eval — another seed may close the gap.
 | v22 | 0.01751 | 0.471 | 190 | vinge:~/checkpoints/tencent_v22/best.pt | v16 pretrain hypothesis confirmed; α-precision=0.927 new ATB; see post-mortem |
 | v23 | 0.01967 | 0.357 | 165 | vinge:~/checkpoints/tencent_v23/best.pt | Weaker seed; late surge ep165 but below v22; DMD-GEN=0.699 best ever; aborted ep187 |
 | **v24** | **0.00798** | **0.503** | 170 | vinge:~/checkpoints/tencent_v24/best.pt | **Near-ATB.** dmd_ckpt_weight=0; MMD²=0.008 (2nd best ever); EMA beat v17; see post-mortem |
+| v25 | 0.01272 | 0.359 | 50 | vinge:~/checkpoints/tencent_v25/best.pt | Weak seed; W collapsed ep55; aborted ep59 |
 
 ---
 
@@ -262,6 +255,19 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
 ./scripts/vinge-launch.sh --version v20 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
 ```
+
+---
+
+### v25 (vinge/GB10, aborted ep59, 2026-04-02)
+
+Same recipe as v24: v16 pretrain, dmd_ckpt_weight=0, 200 epochs. Different seed.
+
+**Best (ep50, full eval)**: MMD²=0.01272, α-precision=0.803, β-recall=0.359, DMD-GEN=0.758.
+
+**Did NOT beat v17.** Weak seed — recall stuck at 0.18–0.28 for 50 epochs, W collapsed to
+0.15 at ep55 (critic lost leverage). Aborted early. With v16 pretrain and dmd_ckpt_weight=0,
+seed variance remains large: v24 got combined=0.107, v25 got ~0.169. Rolling dice isn't
+enough — time to try structural changes.
 
 ---
 
