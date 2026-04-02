@@ -434,9 +434,12 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 | Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | < 0.05 | Fréchet in encoder latent space |
 | reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
-Note: v17 is all-time best on full eval. v21 confirmed EMA-save fix works (full eval MMD²
-0.01485 < EMA 0.02163 — gap inverted vs v20's 4.3× problem). But v21 stagnated early (ep35)
-and never matched v17's late-training surge.
+Note: v17 is all-time best on full eval. v17's full eval correctly used G_ema weights
+(eval.py has `ckpt.get("G_ema", ckpt["G"])`) — its results were not affected by the EMA-save
+bug. The EMA-save fix in v21 ensures consistency for tools that only read the `G` key, but
+was NOT the reason v18–v21 failed to match v17. The real differentiator was the **v16 pretrain
+checkpoint** — v22 using v16's pretrain (same as v17) restored v17-class performance, while
+v18–v21 using later pretrains all stagnated. This is the key finding of the v18–v22 series.
 
 ---
 
