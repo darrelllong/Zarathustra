@@ -4,21 +4,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v23
+## Current Run: v24
 
-**Status**: RUNNING on vinge (PID 57499, launched 2026-04-02).
+**Status**: RUNNING on vinge.
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
 
-Same recipe as v22: v16 pretrain, 200 epochs, identical hyperparams. Different random seed.
-Testing whether v17's MMD²=0.007 is reproducible or whether v22's 0.018 is the typical outcome
-with this configuration. Note: will be paused at 10 AM Apr 3 for UPS installation, then
-auto-resumes on boot via systemd service.
+**Hypothesis**: v17 didn't have `dmd_ckpt_weight` (feature added in v19). v22/v23 both used
+0.05, which changes checkpoint selection — possibly selecting worse MMD²/recall in exchange
+for dynamics. v24 removes it to exactly replicate v17's setup.
 
 ```bash
-./scripts/vinge-make-pretrain.sh --from v16 --to v23
-./scripts/vinge-launch.sh --version v23 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 200
+./scripts/vinge-make-pretrain.sh --from v16 --to v24
+./scripts/vinge-launch.sh --version v24 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
 ```
 
 ---
@@ -44,6 +43,7 @@ auto-resumes on boot via systemd service.
 | v20 | 0.03215 | 0.407 | 210 | vinge:~/checkpoints/tencent_v20/best.pt | 300 epochs; EMA looked great (0.00755/0.549) but full eval diverged 4×; see post-mortem |
 | v21 | 0.01485 | 0.366 | 35 | vinge:~/checkpoints/tencent_v21/best.pt | EMA-save fix confirmed (gap inverted); early-stopped ep235; stagnated from ep35; see post-mortem |
 | v22 | 0.01751 | 0.471 | 190 | vinge:~/checkpoints/tencent_v22/best.pt | v16 pretrain hypothesis confirmed; α-precision=0.927 new ATB; see post-mortem |
+| v23 | 0.01967 | 0.357 | 165 | vinge:~/checkpoints/tencent_v23/best.pt | Weaker seed; late surge ep165 but below v22; DMD-GEN=0.699 best ever; aborted ep187 |
 
 ---
 
@@ -265,6 +265,44 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
 
 ---
 
+### v23 (vinge/GB10, aborted ep187, 2026-04-02)
+
+Same recipe as v22: v16 pretrain, 200 epochs, identical hyperparams, different random seed.
+
+**Best (ep165, full eval with n_samples=2000)**:
+
+| Metric | v23 | v22 | v17 | Target |
+|--------|-----|-----|-----|--------|
+| MMD² | 0.01967 | 0.01751 | **0.00697** | <0.005 |
+| α-precision | 0.766 | **0.927** | 0.826 | >0.80 |
+| β-recall | 0.357 | 0.471 | **0.521** | >0.70 |
+| DMD-GEN | **0.699** | 0.757 | 0.714 | <0.30 |
+| Context-FID | 0.05 | 0.09 | **0.03** | <0.05 |
+| reuse rate | 0.006 | 0.002 | 0.006 | ~0.850 |
+
+**Did NOT beat v17.** Weaker than v22 on most metrics. Aborted at ep187 (not worth finishing).
+
+**What worked:**
+1. **DMD-GEN=0.699** — new all-time best, first run below 0.700. May be stochastic but
+   suggests this seed found slightly better temporal dynamics despite weaker overall quality.
+2. **Late surge at ep165**: recall jumped from 0.27→0.38 and MMD² dropped to 0.014.
+   Confirms the late-LR-decay improvement pattern seen in v17/v22 is real, not version-specific.
+
+**What went wrong:**
+1. **Recall stuck at 0.15–0.25 for 130 epochs**: Unlike v22 (which had recall >0.30 by ep40),
+   v23 was trapped in a low-diversity mode for most of training. The ep165 spike to 0.379
+   was a brief escape, not sustained.
+2. **α-precision=0.766** — worst since v16 (0.833). This seed produced lower-quality samples.
+
+**Conclusion**: With v16 pretrain and identical hyperparams, random seed variance is large.
+v17=0.114, v22=0.154, v23=0.169 on combined score. The pretrain is necessary but not
+sufficient — good seeds matter.
+
+**v24 direction**: v17 didn't have `dmd_ckpt_weight` (feature added post-v17). v22/v23 used
+0.05. Try `dmd_ckpt_weight=0` to exactly replicate v17's checkpoint selection logic.
+
+---
+
 ### v22 (vinge/GB10, completed ep200, 2026-04-02)
 
 Key change vs v21: **v16 pretrain checkpoint** (same as v17 used), 200 epochs (v17's schedule).
@@ -483,14 +521,14 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | v21 | v22 | Target | Description |
-|--------|-----|------|-----|---------|-----|-----|-----|-----|-----|--------|-------------|
-| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | **0.927** | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | v21 | v22 | v23 | Target | Description |
+|--------|-----|------|-----|---------|-----|-----|-----|-----|-----|-----|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | 0.01967 | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | 0.357 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | **0.927** | 0.766 | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | **0.699** | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | 0.05 | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | 0.006 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
 Note: v17 is all-time best on full eval. v17's full eval correctly used G_ema weights
 (eval.py has `ckpt.get("G_ema", ckpt["G"])`) — its results were not affected by the EMA-save
