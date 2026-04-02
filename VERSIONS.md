@@ -6,9 +6,17 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v25
 
-**Status**: PENDING — launching after v24 post-mortem.
+**Status**: RUNNING on vinge (PID 21142, launched 2026-04-02).
 
-**Current all-time best: v24 ep170 (EMA) / v17 ep190 (full eval)** — see post-mortem.
+**Current all-time best: v17 ep190 (full eval combined=0.103) / v24 ep170 (EMA combined=0.097)**
+
+Same recipe as v24: v16 pretrain, dmd_ckpt_weight=0, 200 epochs. Different random seed.
+v24 missed v17 by 4% on full eval — another seed may close the gap.
+
+```bash
+./scripts/vinge-launch.sh --version v25 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
+```
 ```
 
 ---
