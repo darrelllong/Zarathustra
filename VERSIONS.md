@@ -6,9 +6,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v22
 
-**Status**: PENDING — launching after v21 post-mortem.
+**Status**: RUNNING on vinge (PID 34596, launched 2026-04-01).
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
+
+**Hypothesis being tested**: v17's pretrain checkpoint (from v16) was the key ingredient.
+v18–v21 all used later pretrains and all failed to match v17. v22 uses v16's pretrain
+(the same one v17 used) with 200 epochs (v17's schedule) instead of 300.
+
+**Hyperparams** (same as v17): supervisor=1.0, lr_d=5e-5, diversity=1.0, cross_cov=2.0,
+dmd_ckpt_weight=0.05, epochs=200, checkpoint_every=5. Pretrain: v16.
+
+```bash
+./scripts/vinge-make-pretrain.sh --from v16 --to v22
+./scripts/vinge-launch.sh --version v22 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 200
+```
 
 ---
 
