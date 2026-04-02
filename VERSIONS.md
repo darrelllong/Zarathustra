@@ -6,9 +6,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v23
 
-**Status**: PENDING — launching after v22 post-mortem.
+**Status**: RUNNING on vinge (PID 57499, launched 2026-04-02).
 
 **Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
+
+Same recipe as v22: v16 pretrain, 200 epochs, identical hyperparams. Different random seed.
+Testing whether v17's MMD²=0.007 is reproducible or whether v22's 0.018 is the typical outcome
+with this configuration. Note: will be paused at 10 AM Apr 3 for UPS installation, then
+auto-resumes on boot via systemd service.
+
+```bash
+./scripts/vinge-make-pretrain.sh --from v16 --to v23
+./scripts/vinge-launch.sh --version v23 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 200
+```
 
 ---
 
