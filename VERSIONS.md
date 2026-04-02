@@ -4,22 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Runs: v26 + v27 (parallel)
+## Current Run: v26
 
-**v26**: RUNNING (PID 36460). `diversity_loss_weight` 1.0→2.0 to push recall past 0.52.
-Same recipe otherwise (v16 pretrain, dmd_ckpt_weight=0, 200ep).
+**Status**: RUNNING on vinge (PID 36460).
 
-**v27**: RUNNING (PID 38971). **AVATAR architecture** — fresh pretrain required.
-Adversarial Autoencoder (latent discriminator enforcing N(0,1) prior) + distribution loss
-+ supervisor-assisted reconstruction + BatchNorm GRU. Major architectural change.
+`diversity_loss_weight` 1.0→2.0 to push recall past 0.52. v16 pretrain, dmd_ckpt_weight=0, 200ep.
+Best so far: ep65, MMD²=0.015, recall=0.421, combined=0.131 — best early trajectory ever.
+
+v27 (AVATAR) aborted at ep38 — critic overpowered generator, W=4.5+, metrics worsening.
 
 ```bash
-# v26
 ./scripts/vinge-launch.sh --version v26 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 2.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
-# v27
-./scripts/vinge-launch.sh --version v27 --avatar --supervisor-loss-weight 1.0 --lr-d 5e-5 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
 ```
 ```
 
@@ -267,6 +263,34 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
 ./scripts/vinge-launch.sh --version v20 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
 ```
+
+---
+
+### v27 (vinge/GB10, AVATAR, aborted ep38, 2026-04-02)
+
+**AVATAR architecture**: AAE (latent discriminator + distribution loss) + supervisor-assisted
+reconstruction + BatchNorm GRU. Fresh pretrain. First major architectural departure from TimeGAN.
+
+**Best (ep20)**: MMD²=0.055, recall=0.172, combined=0.221.
+
+**FAILED.** Aborted at ep38 — critic overpowered generator from the start.
+
+**What went wrong:**
+1. **W=3.5–4.7 from epoch 1** — the unbounded latent space (no Sigmoid) gave the critic
+   a much easier discrimination task. The critic immediately dominated.
+2. **MMD² worsened over training**: 0.055 (ep20) → 0.074 (ep30) → 0.077 (ep35). Going backwards.
+3. **G loss approaching zero** (-0.39 at ep36) — generator losing the adversarial game badly.
+4. **G warmup supervisor loss diverged** (0.31 → 0.72 over 100 epochs) — the unbounded latent
+   space may have made the supervisor's prediction task harder.
+
+**Root cause**: Removing the Sigmoid bound from Encoder/Generator output created a latent space
+that's too easy for the critic to exploit. The AAE latent discriminator was supposed to
+regularize this, but the sequence-level critic (LSTM+attention) is much more powerful than
+the per-timestep latent discriminator (MLP), creating an asymmetry.
+
+**What to try next time**: Keep the Sigmoid-bounded [0,1] latent space but add the AAE
+discriminator as an auxiliary loss (force q(z|x) toward a Beta distribution or truncated
+Gaussian in [0,1]). This keeps the critic's job equally hard while adding latent regularization.
 
 ---
 
