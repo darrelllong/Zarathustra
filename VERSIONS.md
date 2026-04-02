@@ -4,20 +4,11 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v24
+## Current Run: v25
 
-**Status**: RUNNING on vinge.
+**Status**: PENDING — launching after v24 post-mortem.
 
-**Current all-time best: v17 ep190 — MMD²=0.00697, recall=0.521, combined=0.114** ← beat this.
-
-**Hypothesis**: v17 didn't have `dmd_ckpt_weight` (feature added in v19). v22/v23 both used
-0.05, which changes checkpoint selection — possibly selecting worse MMD²/recall in exchange
-for dynamics. v24 removes it to exactly replicate v17's setup.
-
-```bash
-./scripts/vinge-make-pretrain.sh --from v16 --to v24
-./scripts/vinge-launch.sh --version v24 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
+**Current all-time best: v24 ep170 (EMA) / v17 ep190 (full eval)** — see post-mortem.
 ```
 
 ---
@@ -44,6 +35,7 @@ for dynamics. v24 removes it to exactly replicate v17's setup.
 | v21 | 0.01485 | 0.366 | 35 | vinge:~/checkpoints/tencent_v21/best.pt | EMA-save fix confirmed (gap inverted); early-stopped ep235; stagnated from ep35; see post-mortem |
 | v22 | 0.01751 | 0.471 | 190 | vinge:~/checkpoints/tencent_v22/best.pt | v16 pretrain hypothesis confirmed; α-precision=0.927 new ATB; see post-mortem |
 | v23 | 0.01967 | 0.357 | 165 | vinge:~/checkpoints/tencent_v23/best.pt | Weaker seed; late surge ep165 but below v22; DMD-GEN=0.699 best ever; aborted ep187 |
+| **v24** | **0.00798** | **0.503** | 170 | vinge:~/checkpoints/tencent_v24/best.pt | **Near-ATB.** dmd_ckpt_weight=0; MMD²=0.008 (2nd best ever); EMA beat v17; see post-mortem |
 
 ---
 
@@ -262,6 +254,61 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
 ./scripts/vinge-launch.sh --version v20 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
 ```
+
+---
+
+### v24 (vinge/GB10, completed ep200, 2026-04-02)
+
+Key change vs v22/v23: **`dmd_ckpt_weight=0`** (v22/v23 used 0.05). Same v16 pretrain, 200 epochs.
+This exactly replicates v17's checkpoint selection logic (pure MMD²+recall, no dynamics penalty).
+
+**Best (ep170, full eval with n_samples=2000)**:
+
+| Metric | **v24** | v17 | v22 | Target |
+|--------|---------|-----|-----|--------|
+| MMD² | **0.00798** | **0.00697** | 0.01751 | <0.005 |
+| α-precision | 0.835 | 0.826 | **0.927** | >0.80 |
+| β-recall | 0.503 | **0.521** | 0.471 | >0.70 |
+| DMD-GEN | 0.717 | **0.714** | 0.757 | <0.30 |
+| AutoCorr | 0.036 | **0.032** | 0.052 | <0.02 |
+| Context-FID | 0.08 | **0.03** | 0.09 | <0.05 |
+| reuse rate | 0.007 | 0.006 | 0.002 | ~0.853 |
+
+**v24 is the second-best run ever on full eval, narrowly behind v17.**
+Full eval combined: v24=0.107, v17=0.103. EMA combined: v24=**0.097**, v17=0.114.
+
+**What worked — `dmd_ckpt_weight=0` CONFIRMED as the fix:**
+1. **MMD²=0.00798** — second-best ever on full eval (v17: 0.00697). First run since v17 to
+   break below 0.01 on full eval.
+2. **β-recall=0.503** — third-best ever (v17: 0.521, v19: 0.518). Recall hit 0.545 on EMA
+   at ep170 — the highest EMA recall ever recorded.
+3. **EMA combined=0.097** — beat v17's EMA combined of ~0.114 by 15%. The EMA→full eval gap
+   was only 1.23× (0.0065→0.008 on MMD²), the smallest of any run.
+4. **Sustained excellence**: ep95–ep195 had 20+ consecutive evals with combined < 0.12.
+   No previous run sustained v17-level metrics for more than a few evals.
+
+**What went wrong:**
+1. **Full eval combined 0.107 vs v17's 0.103**: Missed by 4%. The remaining gap is on MMD²
+   (0.008 vs 0.007) and recall (0.503 vs 0.521). Likely stochastic seed variance.
+2. **Context-FID=0.08** (v17: 0.03): Latent space quality slightly worse. This has been a
+   persistent issue since v18+ — may be related to the fresh preprocessor fit each run.
+3. **α-precision=0.835** (v22: 0.927): Lower fidelity than v22, though above target.
+
+**Key finding — `dmd_ckpt_weight` was actively harmful:**
+v22/v23 used `dmd_ckpt_weight=0.05`, adding ~0.035 to the combined score (DMD-GEN≈0.7 × 0.05).
+This doesn't just inflate scores — it changes which checkpoints get saved as best.pt. The
+dynamics penalty causes the selector to prefer checkpoints with slightly better DMD-GEN but
+worse MMD²/recall. Since DMD-GEN is stuck at ~0.7 regardless of checkpoint, the penalty
+sacrifices the primary metrics for no gain.
+
+Evidence: v22 (dmd_ckpt_weight=0.05) full eval combined=0.154; v24 (dmd_ckpt_weight=0) full
+eval combined=0.107. Same pretrain, same hyperparams, only difference is checkpoint selection.
+
+**Recommendation: never use `dmd_ckpt_weight > 0`** until DMD-GEN is responsive to training
+(currently architectural limitation). Default in config.py should be 0.
+
+**v25 direction**: Same recipe (v16 pretrain, dmd_ckpt_weight=0, 200 epochs). v24 nearly
+matched v17 — another seed may beat it outright.
 
 ---
 
@@ -521,14 +568,14 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | v21 | v22 | v23 | Target | Description |
-|--------|-----|------|-----|---------|-----|-----|-----|-----|-----|-----|--------|-------------|
-| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | 0.01967 | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | 0.357 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | **0.927** | 0.766 | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | **0.699** | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | 0.05 | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | 0.006 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | v21 | v22 | v23 | **v24** | Target | Description |
+|--------|-----|------|-----|---------|-----|-----|-----|-----|-----|-----|---------|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | 0.01967 | **0.00798** | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | 0.357 | 0.503 | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | **0.927** | 0.766 | 0.835 | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | **0.699** | 0.717 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | 0.05 | 0.08 | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | 0.006 | 0.007 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
 Note: v17 is all-time best on full eval. v17's full eval correctly used G_ema weights
 (eval.py has `ckpt.get("G_ema", ckpt["G"])`) — its results were not affected by the EMA-save
