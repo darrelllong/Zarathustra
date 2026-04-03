@@ -716,7 +716,7 @@ def train(cfg: Config) -> None:
         if LD is not None:
             LD.train()
         t0 = time.time()
-        c_losses, g_losses, w_dists, cont_losses = [], [], [], []
+        c_losses, g_losses, w_dists = [], [], []
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1030,38 +1030,6 @@ def train(cfg: Config) -> None:
                     loss_div = -(x_dist / z_dist).mean()
                     g_loss = g_loss + cfg.diversity_loss_weight * loss_div
 
-                # L_cont: chunk-continuity loss.
-                # Generate two adjacent windows carrying LSTM hidden state (same
-                # as generate.py does at inference) and penalise distributional
-                # mismatch at the boundary.  This closes the train/inference gap
-                # that keeps DMD-GEN stuck: the model has never been trained on
-                # multi-window sequences, yet eval measures temporal dynamics
-                # across long traces produced by carrying hidden state.
-                if cfg.continuity_loss_weight > 0:
-                    z_g_cont = _make_z_global(B, cfg, device, real_features=real_batch)
-                    z_l1 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-                    z_l2 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-                    # Window 1: get hidden state
-                    H_cont_1, h_carry = G(z_g_cont, z_l1, return_hidden=True)
-                    # Window 2: carry hidden state from window 1
-                    H_cont_2 = G(z_g_cont, z_l2, hidden=h_carry)
-                    # Decode to feature space if using latent AE
-                    if latent_ae:
-                        feat_cont_1 = R(H_cont_1)
-                        feat_cont_2 = R(H_cont_2)
-                    else:
-                        feat_cont_1 = H_cont_1
-                        feat_cont_2 = H_cont_2
-                    # Boundary region: last k steps of window 1 vs first k of window 2
-                    k_cont = min(3, cfg.timestep // 4)
-                    tail = feat_cont_1[:, -k_cont:, :]  # (B, k, d)
-                    head = feat_cont_2[:, :k_cont, :]   # (B, k, d)
-                    loss_cont_mean = (tail.mean(dim=1) - head.mean(dim=1)).pow(2).mean()
-                    loss_cont_std  = (tail.std(dim=1) - head.std(dim=1)).pow(2).mean()
-                    loss_cont = loss_cont_mean + loss_cont_std
-                    g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
-                    cont_losses.append(loss_cont.item())
-
             scaler.scale(g_loss).backward()
             if cfg.grad_clip > 0:
                 scaler.unscale_(opt_G)
@@ -1133,13 +1101,10 @@ def train(cfg: Config) -> None:
         n_files_str = (f"  files={len(epoch_files)}" if multifile else
                        f"  windows={len(train_ds):,}")
         lr_now = opt_G.param_groups[0]["lr"]
-        cont_mean = sum(cont_losses) / len(cont_losses) if cont_losses else 0.0
         log = (f"Epoch {epoch+1:4d}/{cfg.epochs}  "
                f"W={w_mean:+.4f}  C={c_mean:.4f}  G={g_mean:.4f}  "
                f"lr={lr_now:.2e}  t={elapsed:.1f}s"
                f"{n_files_str}")
-        if cont_losses:
-            log += f"  L_cont={cont_mean:.4f}"
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             # Evaluate using the EMA model, not the live G.
@@ -1381,10 +1346,6 @@ def parse_args() -> Config:
                    help="L_div: MSGAN mode-seeking loss — maximises output/noise distance ratio "
                         "across random pairs; combats mode collapse (low β-recall). "
                         "Requires a second G forward pass. Try 0.5–2.0.")
-    p.add_argument("--continuity-loss-weight", type=float, default=0.0,
-                   help="L_cont: boundary-continuity loss for multi-window coherence. "
-                        "Generates two adjacent windows with carried LSTM hidden state "
-                        "and penalises boundary mismatch. Targets DMD-GEN. Try 0.5–1.0.")
     p.add_argument("--r1-lambda",          type=float, default=0.0,
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
@@ -1445,7 +1406,6 @@ def parse_args() -> Config:
     cfg.gp_lambda                   = args.gp_lambda
     cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.diversity_loss_weight       = args.diversity_loss_weight
-    cfg.continuity_loss_weight      = args.continuity_loss_weight
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.dmd_ckpt_weight             = args.dmd_ckpt_weight
