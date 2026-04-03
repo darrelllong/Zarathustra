@@ -4,34 +4,31 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v29
+## Current Run: v30
 
 **Status**: RUNNING on vinge (launched 2026-04-01).
 
-**Recipe**: conditioning (cond_dim=10) + full proven loss stack. Uses v28's pretrain
-(architecture identical: cond_dim=10). Restores all auxiliary losses that v28 stripped:
-cross_cov=2.0, acf=0.2, fft=0.05, moment=0.1, quantile=0.2.
-
-**Hypothesis**: v28 showed conditioning is a breakthrough (combined=0.110 at ep70, best-ever
-early trajectory) but stripping auxiliary losses caused GAN cycling at ep79. v29 combines
-the conditioning architecture with the proven v17-era loss recipe to get the best of both.
+**Recipe**: Back to proven unconditional recipe (v16 pretrain, no conditioning, dmd_ckpt_weight=0,
+diversity_loss=1.0) but with **n_critic=3** (up from 2). The conditioning experiment (v28/v29)
+proved the architecture CAN produce recall>0.60 — the information is in the latent space.
+Stronger critic pressure may extract it without conditioning's instability.
 
 ```bash
 ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v29 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v30 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --cond-dim 10 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --n-critic 3 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
   --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
   --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
-  --locality-loss-weight 0 --dmd-ckpt-weight 0 \
-  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 --n-critic 2 \
+  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v29.log 2>&1 &"
+  > ~/train_v30.log 2>&1 &"
 ```
 
 ---
@@ -63,6 +60,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v26 | 0.00795 | 0.401 | 190 | vinge:~/checkpoints/tencent_v26/best.pt | diversity_loss=2.0; MMD² tied 2nd best; DMD-GEN=0.710 best ever; EMA recall inflated |
 | v27 | 0.055 | 0.172 | 20 | discarded | AVATAR architecture; critic overpowered from ep1; aborted ep38 |
 | v28 | 0.01183 | 0.508 | 70 | vinge:~/checkpoints/tencent_v28/best.pt | **First conditional run (cond_dim=10)**; combined=0.110 best-ever early trajectory; GAN cycling crash ep79 from stripped losses |
+| v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
 
 ---
 
@@ -333,6 +331,56 @@ architectural changes (z_global conditioning), not loss weight tuning.
 
 **v28 direction**: TBD. The v16-pretrain + dmd_ckpt_weight=0 recipe has been thoroughly
 explored (v24/v25/v26). v17 remains ATB after 9 subsequent runs. Time for structural changes.
+
+---
+
+### v29 (vinge/GB10, crashed ep96, 2026-04-01)
+
+**Recipe**: cond_dim=10 + full loss recipe (cross_cov=2.0, acf=0.2, fft=0.05, moment=0.1,
+quantile=0.2). Used v28 pretrain (cond_dim=10 compatible). n_critic=2.
+
+**EMA best (ep20)**: MMD²=0.00971, recall=0.674, combined=0.075
+
+**Full eval (ep20 best, with real descriptors)**: MMD²=0.021, α-precision=0.882,
+β-recall=0.384, DMD-GEN=0.702, Context-FID=0.08
+
+| Metric | v29 (full eval) | v29 (EMA) | v17 | Target |
+|--------|-----------------|-----------|-----|--------|
+| MMD² | 0.021 | **0.00971** | **0.00697** | <0.005 |
+| β-recall | 0.384 | **0.674** | **0.521** | >0.70 |
+| combined | 0.144 | **0.075** | **0.103** | — |
+| α-precision | **0.882** | — | 0.826 | >0.80 |
+| DMD-GEN | **0.702** | — | 0.714 | <0.30 |
+
+Full eval combined: 0.021 + 0.2*(1-0.384) = 0.144. **Did NOT beat v17.**
+
+**GAN cycling crash**: W=2.5 at ep88 → 13.1 at ep95 → 17.3 at ep96 (abort triggered).
+Auxiliary losses delayed cycling vs v28 (ep96 vs ep79) but did not prevent it.
+
+**Key findings:**
+
+1. **Conditioning produces phenomenal EMA metrics** — recall=0.674 and combined=0.075 are
+   both all-time records by a wide margin. The conditioning mechanism genuinely helps G
+   learn the data distribution faster and more completely.
+
+2. **Massive EMA→full eval gap**: recall 0.674→0.384 (43% drop), MMD² 0.00971→0.021 (2.2×).
+   The model overfits to conditioning descriptors — generates well for training-time
+   descriptors but doesn't generalize to fresh eval descriptors.
+
+3. **DMD-GEN=0.702 on full eval is best ever** (v17: 0.714). Conditioning may help temporal
+   dynamics by giving G a workload identity signal.
+
+4. **GAN cycling still happens WITH auxiliary losses** — just delayed vs v28 (ep96 vs ep79).
+   The conditioning creates instability that the current training setup can't handle.
+   Neither loss recipe stabilization (v29) nor loss stripping (v28) prevents it.
+
+**Conditioning verdict**: Powerful but currently unusable. Two problems must be solved:
+(a) GAN cycling (W explosion) — may need CFG dropout or lower lr_g;
+(b) EMA→full eval gap (descriptor overfitting) — may need CFG or descriptor augmentation.
+
+**v30 direction**: Step back from conditioning. Return to proven unconditional recipe (v16
+pretrain, no conditioning, dmd_ckpt_weight=0) but try n_critic=3 (up from 2) to give the
+critic more power. Quick experiment, no code changes needed.
 
 ---
 
