@@ -4,25 +4,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v31
+## Current Run: v32
 
 **Status**: RUNNING on vinge (launched 2026-04-01).
 
-**Recipe**: **Conditioning + Classifier-Free Guidance (CFG)** — the fix for v28/v29's
-descriptor overfitting and GAN cycling. cond_dim=10 with cond_drop_prob=0.15 (drop
-conditioning 15% of the time so the model learns both conditional and unconditional
-generation). Full loss recipe, n_critic=2 (proven), v28 pretrain (cond_dim=10 compatible),
-dmd_ckpt_weight=0, 200 epochs.
-
-CFG dropout addresses both v28/v29 failure modes:
-- **GAN cycling**: unconditional training steps prevent critic from exploiting conditioning
-- **EMA-full eval gap**: model can generate without conditioning, reducing descriptor overfitting
+**Recipe**: Same as v31 (the new ATB) but with **250 epochs** (up from 200). v31 peaked at
+ep70 but sustained excellence through ep150 — more epochs may push further. v28 pretrain,
+cond_dim=10, cond_drop_prob=0.15, full losses, n_critic=2, dmd_ckpt_weight=0.
 
 ```bash
 ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v31 --checkpoint-every 5 \
+  --epochs 250 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v32 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.15 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
@@ -34,7 +28,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v31.log 2>&1 &"
+  > ~/train_v32.log 2>&1 &"
 ```
 
 ---
@@ -54,7 +48,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v14g | **0.018** | **0.372** | 90 | wigner:/Volumes/Archive/Traces/checkpoints/tencent_v14g/best.pt | Best MMD²–recall trade-off; full eval reuse_rate=0 |
 | v15 | 0.029 | 0.294 | 100 | vinge:~/checkpoints/tencent_v15/best.pt | GAN cycling ep110; missing diversity_loss |
 | v16 | 0.042 | 0.228 | 130 | vinge:~/checkpoints/tencent_v16/best.pt | Diversity+cross_cov restored; critic still dominant; worse than v14g |
-| **v17** | **0.00697** | **0.521** | 190 | vinge:~/checkpoints/tencent_v17/best.pt | **All-time best.** supervisor→1.0, lr_d=5e-5, diversity→1.0 |
+| v17 | 0.00697 | 0.521 | 190 | vinge:~/checkpoints/tencent_v17/best.pt | Former ATB (v3–v30). supervisor→1.0, lr_d=5e-5, diversity→1.0 |
 | v18 | 0.01105 | 0.418 | 205 | vinge:~/checkpoints/tencent_v18/best.pt | cross_cov→5.0; did NOT beat v17; see post-mortem |
 | v19 | 0.01094 | 0.518 | 225 | vinge:~/checkpoints/tencent_v19/best.pt | cross_cov→2.0, dmd_ckpt_weight=0.05; recall≈v17 but MMD² worse; see post-mortem |
 | v20 | 0.03215 | 0.407 | 210 | vinge:~/checkpoints/tencent_v20/best.pt | 300 epochs; EMA looked great (0.00755/0.549) but full eval diverged 4×; see post-mortem |
@@ -68,10 +62,79 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v28 | 0.01183 | 0.508 | 70 | vinge:~/checkpoints/tencent_v28/best.pt | **First conditional run (cond_dim=10)**; combined=0.110 best-ever early trajectory; GAN cycling crash ep79 from stripped losses |
 | v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
 | v30 | 0.01640 | 0.468 | 25(EMA) | vinge:~/checkpoints/tencent_v30/best.pt | n_critic=3; α-precision=0.929 (tied ATB); aborted ep54 — recall falling, W→2.8; n_critic=3 too aggressive |
+| **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **NEW ALL-TIME BEST. CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
 
 ---
 
 ## Version Notes
+
+### v31 — NEW ALL-TIME BEST (vinge/GB10, completed ep200, 2026-04-01)
+
+**Recipe**: cond_dim=10 + CFG dropout (cond_drop_prob=0.15) + full loss recipe + n_critic=2 +
+v28 pretrain (cond_dim=10 compatible) + dmd_ckpt_weight=0. 200 epochs.
+
+**EMA best (ep70)**: MMD²=0.01167, recall=0.591, combined=0.094
+
+**Full eval (ep70 best)**:
+
+| Metric | **v31** | v17 | v24 | Target |
+|--------|---------|-----|-----|--------|
+| MMD² | **0.00769** | 0.00697 | 0.00798 | <0.005 |
+| α-precision | **0.953** | 0.826 | 0.835 | >0.80 |
+| β-recall | **0.596** | 0.521 | 0.503 | >0.70 |
+| DMD-GEN | 0.723 | **0.714** | 0.717 | <0.30 |
+| AutoCorr | **0.032** | 0.032 | 0.036 | <0.02 |
+| Context-FID | **0.03** | 0.03 | 0.08 | <0.05 |
+| reuse rate | 0.005 | 0.006 | 0.007 | >0.1 |
+
+**Full eval combined = 0.008 + 0.2*(1-0.596) = 0.089. BEATS v17 (0.103) by 14%.**
+
+**What worked — CFG solved the overfitting problem:**
+
+1. **EMA-full eval gap INVERTED**: EMA recall 0.591 → full eval 0.596. This is the first
+   conditional run where full eval recall *exceeds* EMA recall. CFG dropout forces the model
+   to learn both conditional and unconditional generation, eliminating the descriptor overfitting
+   that plagued v28 (crashed ep79) and v29 (43% recall drop on full eval).
+
+2. **α-precision=0.953 — new ATB by a wide margin** (previous: v22=0.927, v30=0.929).
+   Conditioning tells G exactly what workload to produce; CFG dropout prevents overfitting
+   while preserving the fidelity benefit.
+
+3. **β-recall=0.596 — new ATB by 14%** (v17=0.521). The 0.596 barrier was never even
+   approached by unconditional runs. Conditioning provides a coverage mechanism that
+   diversity_loss alone could not achieve: G explicitly targets different workload types
+   instead of hoping noise diversity maps to mode coverage.
+
+4. **MMD²=0.00769** — 2nd best ever (v17=0.00697). With recall at 0.596 (vs v17's 0.521),
+   this represents a much better Pareto trade-off: v31 covers 14% more modes while only
+   giving up 0.001 on MMD².
+
+5. **Late W spike (ep186-192, W up to 9.0) didn't matter** — EMA captured best at ep70,
+   and the model recovered. The W spike is the same conditioning instability seen in v28/v29,
+   but CFG dropout delayed it from ep79/ep96 to ep186, well past the useful training region.
+
+6. **Combined=0.089** — first run below 0.100. This is 14% better than v17 (0.103) and
+   17% better than v24 (0.107), the previous #2.
+
+**The winning recipe**:
+- v28 pretrain (cond_dim=10 architecture) — NOT v16 pretrain (unconditional architecture)
+- cond_dim=10 + cond_drop_prob=0.15 (CFG dropout)
+- Full auxiliary losses (cross_cov=2.0, acf=0.2, fft=0.05, moment=0.1, quantile=0.2, locality=1.0)
+- n_critic=2, supervisor=1.0, diversity=1.0, lr_g=1e-4, lr_d=5e-5
+- dmd_ckpt_weight=0
+- ema_decay=0.999, lr_cosine_decay=0.05, grad_clip=1.0
+
+**Remaining problems:**
+1. **DMD-GEN=0.723** (target <0.30): Still stubbornly above 0.70. Conditioning improved
+   fidelity and coverage but did not help temporal dynamics. This remains architectural.
+2. **reuse rate=0.005** (target >0.1): Locality/sequential access still unlearned.
+3. **Late W spike**: CFG delayed but did not prevent conditioning instability. Longer runs
+   need either lower lr_g or adaptive n_critic to handle late-stage W growth.
+
+**v32 direction**: Same recipe, 250 epochs. v31 peaked at ep70 but sustained excellence
+through ep150. Extended cosine decay may allow further convergence before the W spike zone.
+
+---
 
 ### v14 (killed, 2026-03-28)
 WGAN-SN without spectral norm on the critic LSTM: only the FC output layer was Lipschitz-constrained.
@@ -828,16 +891,16 @@ AMP fp16 enabled. torch.compile attempted but Triton broken on GB10 (libcuda.so 
 
 ## Key Metrics and Targets
 
-| Metric | v13 | v14g | v16 | **v17** | v18 | v19 | v20 | v21 | v22 | v23 | **v24** | Target | Description |
-|--------|-----|------|-----|---------|-----|-----|-----|-----|-----|-----|---------|--------|-------------|
-| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | 0.01967 | **0.00798** | < 0.005 | Kernel distribution distance |
-| β-recall | 0.455 | 0.372 | 0.228 | **0.521** | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | 0.357 | 0.503 | > 0.7 | Coverage: fraction of real modes covered |
-| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | **0.927** | 0.766 | 0.835 | > 0.85 | Fidelity: fraction of generated that is realistic |
-| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | **0.699** | 0.717 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
-| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | 0.05 | 0.08 | < 0.05 | Fréchet in encoder latent space |
-| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | 0.006 | 0.007 | > 0.1 | Fraction of obj_id repeats (sequential access) |
+| Metric | v13 | v14g | v16 | v17 | v18 | v19 | v20 | v21 | v22 | v23 | v24 | **v31** | Target | Description |
+|--------|-----|------|-----|-----|-----|-----|-----|-----|-----|-----|-----|---------|--------|-------------|
+| MMD² | 0.01335 | 0.018 | 0.042 | **0.00697** | 0.01105 | 0.01094 | 0.03215 | 0.01485 | 0.01751 | 0.01967 | 0.00798 | **0.00769** | < 0.005 | Kernel distribution distance |
+| β-recall | 0.455 | 0.372 | 0.228 | 0.521 | 0.418 | 0.518 | 0.407 | 0.366 | 0.471 | 0.357 | 0.503 | **0.596** | > 0.7 | Coverage: fraction of real modes covered |
+| α-precision | 0.812 | 0.910 | 0.833 | 0.826 | 0.845 | 0.835 | 0.826 | 0.873 | 0.927 | 0.766 | 0.835 | **0.953** | > 0.85 | Fidelity: fraction of generated that is realistic |
+| DMD-GEN | 0.771 | 0.700 | 0.744 | 0.714 | 0.760 | **0.688** | 0.719 | 0.720 | 0.757 | **0.699** | 0.717 | 0.723 | < 0.3 | Temporal dynamics divergence (0 = perfect) |
+| Context-FID | 0.05 | 0.03 | 0.15 | **0.03** | 0.06 | 0.13 | 0.14 | **0.03** | 0.09 | 0.05 | 0.08 | **0.03** | < 0.05 | Fréchet in encoder latent space |
+| reuse-rate | 0.000 | 0.000 | 0.004 | 0.006 | 0.004 | 0.005 | 0.004 | 0.007 | 0.002 | 0.006 | 0.007 | 0.005 | > 0.1 | Fraction of obj_id repeats (sequential access) |
 
-Note: v17 is all-time best on full eval. v17's full eval correctly used G_ema weights
+Note: **v31 is the all-time best on full eval** (combined=0.089), dethroning v17 (0.103) after 14 subsequent runs. v17's full eval correctly used G_ema weights
 (eval.py has `ckpt.get("G_ema", ckpt["G"])`) — its results were not affected by the EMA-save
 bug. The EMA-save fix in v21 ensures consistency for tools that only read the `G` key, but
 was NOT the reason v18–v21 failed to match v17. The real differentiator was the **v16 pretrain
