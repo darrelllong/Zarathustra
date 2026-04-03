@@ -233,15 +233,28 @@ def _load_checkpoint(path: str, device):
 
 
 def _sample_fake(ckpt, n_samples: int, device,
-                 batch_size: int = 256) -> np.ndarray:
+                 batch_size: int = 256,
+                 real_windows: np.ndarray = None) -> np.ndarray:
+    """Generate fake samples.
+
+    When cond_dim > 0, conditioning descriptors are computed from randomly
+    sampled real_windows (instead of random noise), so the generated
+    distribution matches the real workload descriptor distribution.
+
+    Args:
+        real_windows: (N, T, d) numpy array of real windows.  Required when
+            cond_dim > 0; ignored otherwise.
+    """
     from model import Generator, Recovery
+    from dataset import compute_window_descriptors
     cfg  = ckpt["config"]
     prep = ckpt["prep"]
     latent_ae = "R" in ckpt
     latent_dim = getattr(cfg, "latent_dim", 0) if latent_ae else None
 
+    cond_dim = getattr(cfg, "cond_dim", 0)
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
-                  latent_dim=latent_dim).to(device)
+                  latent_dim=latent_dim, cond_dim=cond_dim).to(device)
     # Prefer EMA weights: smoother, less oscillated, consistently produces
     # better samples than the instantaneous live weights at any given epoch.
     g_weights = ckpt.get("G_ema", ckpt["G"])
@@ -254,11 +267,23 @@ def _sample_fake(ckpt, n_samples: int, device,
         R.load_state_dict(ckpt["R"])
         R.eval()
 
+    if cond_dim > 0 and real_windows is None:
+        raise ValueError("real_windows required when cond_dim > 0")
+
     chunks = []
     with torch.no_grad():
         for start in range(0, n_samples, batch_size):
             n = min(batch_size, n_samples - start)
-            z_g = torch.randn(n, cfg.noise_dim, device=device)
+            noise = torch.randn(n, cfg.noise_dim, device=device)
+            if cond_dim > 0:
+                # Sample real windows and compute their descriptors
+                idx = np.random.choice(len(real_windows), n, replace=True)
+                rw = torch.tensor(real_windows[idx], dtype=torch.float32,
+                                  device=device)
+                cond = compute_window_descriptors(rw)  # (n, cond_dim)
+                z_g = torch.cat([cond, noise], dim=1)
+            else:
+                z_g = noise
             z_l = torch.randn(n, cfg.timestep, cfg.noise_dim, device=device)
             out = G(z_g, z_l)
             if R is not None:
@@ -320,13 +345,17 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
 
     print(f"\nSampling {n_samples} real and fake windows …")
     real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples)
-    fake_flat = _sample_fake(ckpt, n_samples, device)
 
     cfg  = ckpt["config"]
     timestep  = cfg.timestep
     num_cols  = ckpt["prep"].num_cols
     # Reshape flat (N, T*d) → (N, T, d) for sequence-aware metrics
     real_seqs = real_flat.reshape(-1, timestep, num_cols)
+
+    # Pass real windows to _sample_fake so conditioning uses real descriptors
+    cond_dim = getattr(cfg, "cond_dim", 0)
+    fake_flat = _sample_fake(ckpt, n_samples, device,
+                             real_windows=real_seqs if cond_dim > 0 else None)
     fake_seqs = fake_flat.reshape(-1, timestep, num_cols)
 
     mmd  = mmd2_numpy(real_flat, fake_flat)

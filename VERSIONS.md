@@ -4,25 +4,34 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v28
+## Current Run: v29
 
-**Status**: RUNNING on vinge (PID 121344, launched 2026-04-02).
+**Status**: RUNNING on vinge (launched 2026-04-01).
 
-**Two major changes:**
-1. **z_global workload conditioning** (`--cond-dim 10`): Generator receives per-window
-   descriptors (ts mean/std, obj_size mean/std, opcode mean, tenant mean, reuse mean,
-   stride mean/std, burstiness) concatenated with noise. Makes the model conditional —
-   it learns to generate traces that match workload characteristics, not just random modes.
-   Fresh pretrain required (architecture change).
-2. **Loss ablation**: Stripped to WGAN + FM + supervisor + diversity only. Zeroed out FFT,
-   moment, quantile, ACF, cross_cov, locality. Tests whether 6 auxiliary losses were
-   creating gradient noise that hurt the primary metrics.
+**Recipe**: conditioning (cond_dim=10) + full proven loss stack. Uses v28's pretrain
+(architecture identical: cond_dim=10). Restores all auxiliary losses that v28 stripped:
+cross_cov=2.0, acf=0.2, fft=0.05, moment=0.1, quantile=0.2.
+
+**Hypothesis**: v28 showed conditioning is a breakthrough (combined=0.110 at ep70, best-ever
+early trajectory) but stripping auxiliary losses caused GAN cycling at ep79. v29 combines
+the conditioning architecture with the proven v17-era loss recipe to get the best of both.
 
 ```bash
-./scripts/vinge-launch.sh --version v28 --cond-dim 10 --supervisor-loss-weight 1.0 \
-  --lr-d 5e-5 --diversity-loss-weight 1.0 --dmd-ckpt-weight 0 --epochs 200 \
-  --cross-cov-loss-weight 0 --fft-loss-weight 0 --moment-loss-weight 0 \
-  --quantile-loss-weight 0 --acf-loss-weight 0 --locality-loss-weight 0
+ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v29 --checkpoint-every 5 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 \
+  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
+  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
+  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
+  --locality-loss-weight 0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 --n-critic 2 \
+  --hidden-size 256 --latent-dim 24 \
+  --no-compile \
+  > ~/train_v29.log 2>&1 &"
 ```
 
 ---
@@ -52,6 +61,8 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 | **v24** | **0.00798** | **0.503** | 170 | vinge:~/checkpoints/tencent_v24/best.pt | **Near-ATB.** dmd_ckpt_weight=0; MMD²=0.008 (2nd best ever); EMA beat v17; see post-mortem |
 | v25 | 0.01272 | 0.359 | 50 | vinge:~/checkpoints/tencent_v25/best.pt | Weak seed; W collapsed ep55; aborted ep59 |
 | v26 | 0.00795 | 0.401 | 190 | vinge:~/checkpoints/tencent_v26/best.pt | diversity_loss=2.0; MMD² tied 2nd best; DMD-GEN=0.710 best ever; EMA recall inflated |
+| v27 | 0.055 | 0.172 | 20 | discarded | AVATAR architecture; critic overpowered from ep1; aborted ep38 |
+| v28 | 0.01183 | 0.508 | 70 | vinge:~/checkpoints/tencent_v28/best.pt | **First conditional run (cond_dim=10)**; combined=0.110 best-ever early trajectory; GAN cycling crash ep79 from stripped losses |
 
 ---
 
@@ -322,6 +333,52 @@ architectural changes (z_global conditioning), not loss weight tuning.
 
 **v28 direction**: TBD. The v16-pretrain + dmd_ckpt_weight=0 recipe has been thoroughly
 explored (v24/v25/v26). v17 remains ATB after 9 subsequent runs. Time for structural changes.
+
+---
+
+### v28 (vinge/GB10, crashed ep79, 2026-04-02)
+
+**Two major changes**: z_global workload conditioning (`--cond-dim 10`) + loss ablation
+(stripped to WGAN + FM + supervisor + diversity only; zeroed FFT, moment, quantile, ACF,
+cross_cov, locality). Fresh pretrain required (architecture change).
+
+**EMA best (ep70)**: MMD²=0.01183, recall=0.508, combined=0.110
+
+**Full eval (ep70, with random conditioning N(0,0.5))**: MMD²=0.026, α-precision=0.594,
+β-recall=0.340, DMD-GEN=0.715, Context-FID=0.44
+
+**Note**: Full eval numbers are unreliable — eval.py used random N(0,0.5) conditioning
+instead of real workload descriptors. Fixed in eval.py post-v28 (now computes descriptors
+from real val windows when cond_dim > 0).
+
+| Metric | v28 (EMA) | v17 | v24 | Target |
+|--------|-----------|-----|-----|--------|
+| MMD² | **0.01183** | **0.00697** | 0.00798 | <0.005 |
+| β-recall | **0.508** | 0.521 | 0.503 | >0.70 |
+| combined | **0.110** | 0.114 | 0.107 | — |
+
+**BREAKTHROUGH — conditioning is the path forward:**
+1. **combined=0.110 at ep70** — best-ever early trajectory. v17 didn't reach 0.114 until ep190.
+   At the same training stage, v28 was already outperforming every previous run. Conditioning
+   gives the generator a massive head start by telling it *what kind* of workload to produce.
+2. **Recall hit 0.526 at ep75** — briefly beat v17's all-time record of 0.521. First run to
+   ever exceed v17 on recall (albeit EMA, not full eval).
+
+**FAILURE — loss ablation caused GAN cycling crash:**
+1. **W spiked to 2.67 at ep79** and training diverged. Without cross_cov, ACF, FFT, moment,
+   and quantile losses, the generator had no auxiliary gradients to stabilize against critic
+   overpowering. These losses act as implicit regularizers on G's output distribution.
+2. The ablation was too aggressive — stripping ALL auxiliary losses at once made it impossible
+   to isolate which ones matter. v29 restores the full proven loss recipe.
+
+**Full eval was wrong (now fixed):**
+eval.py used `torch.randn(n, cond_dim) * 0.5` as conditioning — random noise that doesn't
+match the real workload descriptor distribution. This made α-precision=0.594 (G produces
+"workloads" that don't exist) and inflated MMD². Fixed: eval.py now computes descriptors
+from real val windows via `compute_window_descriptors()`.
+
+**v29 direction**: Keep cond_dim=10 + restore full loss recipe (cross_cov=2.0, acf=0.2,
+fft=0.05, moment=0.1, quantile=0.2). Use v28 pretrain (same architecture).
 
 ---
 
