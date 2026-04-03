@@ -208,6 +208,14 @@ Items marked ✓ are done and in the repo.
   + autoregressive supervisor. Cleaner alternative to TimeGAN: no separate Recovery net;
   encoder and decoder share a VAE-style latent space enforced by adversarial loss.
   Priority: HIGH — directly addresses our latent space quality issues.
+  **v27 attempted full AVATAR (removed Sigmoid → unbounded latent) — FAILED.** Critic
+  overpowered generator from ep1 (W=3.5–4.7). Root cause: unbounded latent space made
+  critic's job trivially easy.
+  **Next attempt: AVATAR-lite** — keep [0,1] Sigmoid-bounded latent space, add ONLY the
+  latent discriminator + distribution loss as auxiliary losses during Phase 1 and Phase 3.
+  No architecture change, just extra regularization pushing q(z|x) toward Beta/uniform in
+  [0,1]. Combines cleanly with z_global conditioning and stripped losses. The `--avatar`
+  flag and LatentDiscriminator class are already in the code from v27.
 
 - ✓ **2-step supervisor** (`train.py`) — SeriesGAN, BigData 2024
   Added `--supervisor-steps 1|2` (default 1). 2-step: S(h_t) predicts h_{t+2}.
