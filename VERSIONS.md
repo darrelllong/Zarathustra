@@ -4,9 +4,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v32
+## Current Run: v33
 
-**Status**: RUNNING on vinge (launched 2026-04-01).
+**Status**: PENDING — launching with chunk-continuity loss to target DMD-GEN.
 
 **Recipe**: Same as v31 (the new ATB) but with **250 epochs** (up from 200). v31 peaked at
 ep70 but sustained excellence through ep150 — more epochs may push further. v28 pretrain,
@@ -62,6 +62,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v28 | 0.01183 | 0.508 | 70 | vinge:~/checkpoints/tencent_v28/best.pt | **First conditional run (cond_dim=10)**; combined=0.110 best-ever early trajectory; GAN cycling crash ep79 from stripped losses |
 | v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
 | v30 | 0.01640 | 0.468 | 25(EMA) | vinge:~/checkpoints/tencent_v30/best.pt | n_critic=3; α-precision=0.929 (tied ATB); aborted ep54 — recall falling, W→2.8; n_critic=3 too aggressive |
+| v32 | 0.00797 | 0.441 | 110 | vinge:~/checkpoints/tencent_v32/best.pt | Same recipe as v31 250ep; W→0 at ep110 (critic lost signal); reuse=0.055 (10× improvement); aborted ep144 |
 | **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **NEW ALL-TIME BEST. CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
 
 ---
