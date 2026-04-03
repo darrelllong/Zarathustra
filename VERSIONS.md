@@ -4,20 +4,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v26
+## Current Run: v28
 
-**Status**: RUNNING on vinge (PID 36460).
-
-`diversity_loss_weight` 1.0→2.0 to push recall past 0.52. v16 pretrain, dmd_ckpt_weight=0, 200ep.
-Best so far: ep65, MMD²=0.015, recall=0.421, combined=0.131 — best early trajectory ever.
-
-v27 (AVATAR) aborted at ep38 — critic overpowered generator, W=4.5+, metrics worsening.
-
-```bash
-./scripts/vinge-launch.sh --version v26 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
-  --diversity-loss-weight 2.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0 --epochs 200
-```
-```
+**Status**: PENDING. User will decide next experiment.
 
 ---
 
@@ -45,6 +34,7 @@ v27 (AVATAR) aborted at ep38 — critic overpowered generator, W=4.5+, metrics w
 | v23 | 0.01967 | 0.357 | 165 | vinge:~/checkpoints/tencent_v23/best.pt | Weaker seed; late surge ep165 but below v22; DMD-GEN=0.699 best ever; aborted ep187 |
 | **v24** | **0.00798** | **0.503** | 170 | vinge:~/checkpoints/tencent_v24/best.pt | **Near-ATB.** dmd_ckpt_weight=0; MMD²=0.008 (2nd best ever); EMA beat v17; see post-mortem |
 | v25 | 0.01272 | 0.359 | 50 | vinge:~/checkpoints/tencent_v25/best.pt | Weak seed; W collapsed ep55; aborted ep59 |
+| v26 | 0.00795 | 0.401 | 190 | vinge:~/checkpoints/tencent_v26/best.pt | diversity_loss=2.0; MMD² tied 2nd best; DMD-GEN=0.710 best ever; EMA recall inflated |
 
 ---
 
@@ -263,6 +253,58 @@ more epochs may allow MMD² to converge further. Consider setting dmd_ckpt_weigh
 ./scripts/vinge-launch.sh --version v20 --supervisor-loss-weight 1.0 --lr-d 5e-5 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 --dmd-ckpt-weight 0.05 --epochs 300
 ```
+
+---
+
+### v26 (vinge/GB10, completed ep200, 2026-04-02)
+
+Key change vs v24: **`diversity_loss_weight` 1.0 → 2.0** to push recall past 0.52. v16 pretrain, dmd_ckpt_weight=0, 200 epochs.
+
+**EMA best (ep190)**: MMD²=0.01255, recall=0.521, combined=0.108
+
+**Best (ep190, full eval with n_samples=2000)**:
+
+| Metric | **v26** | v17 | v24 | Target |
+|--------|---------|-----|-----|--------|
+| MMD² | **0.00795** | **0.00697** | 0.00798 | <0.005 |
+| α-precision | 0.887 | 0.826 | 0.835 | >0.80 |
+| β-recall | 0.401 | **0.521** | 0.503 | >0.70 |
+| DMD-GEN | **0.710** | 0.714 | 0.717 | <0.30 |
+| AutoCorr | 0.049 | **0.032** | 0.036 | <0.02 |
+| Context-FID | 0.04 | **0.03** | 0.08 | <0.05 |
+| reuse rate | 0.002 | 0.006 | 0.007 | ~0.853 |
+
+Full eval combined: v26=0.128, v17=0.103, v24=0.107. **Did NOT beat v17 or v24.**
+
+**What worked:**
+1. **MMD²=0.00795** — tied with v24 (0.00798) as 2nd best ever on full eval. Three runs (v17/v24/v26) now below 0.01.
+2. **α-precision=0.887** — 2nd best ever (v22: 0.927). diversity_loss=2.0 did NOT hurt fidelity.
+3. **DMD-GEN=0.710** — best ever on full eval (v17: 0.714, v24: 0.717). First run below 0.714.
+4. **Context-FID=0.04** — 2nd best ever (v17: 0.03). Much better than v24's 0.08.
+
+**What went wrong — diversity_loss=2.0 inflated EMA recall without translating to full eval:**
+1. **EMA recall=0.521 → full eval recall=0.401**: 23% drop. This is the worst EMA→full eval
+   recall gap since v20. diversity_loss=2.0 pushes G to produce more diverse outputs on the
+   fixed val_tensor, but these diverse outputs don't cover the full distribution well.
+2. **β-recall=0.401** (v17: 0.521, v24: 0.503): Worst recall of any v16-pretrain run with
+   dmd_ckpt_weight=0. diversity_loss=2.0 appears counterproductive for actual coverage.
+3. **Full eval combined=0.128** — worse than both v17 (0.103) and v24 (0.107). The recall
+   regression dominates the combined score despite improvements on every other metric.
+
+**Root cause — diversity_loss mechanism mismatch:**
+The MSGAN diversity loss penalizes G for producing similar outputs for different latent
+inputs. At weight=2.0, this pushes G to spread outputs farther apart, which inflates recall
+on the fixed val_tensor (fixed set of 23,976 windows is easier to cover with spread-out
+samples). But the *directions* of spread are not aligned with the real data manifold — G
+spreads into low-density regions that don't match any real traces. Full eval with fresh
+2000-sample draws exposes this: coverage of the actual distribution is worse.
+
+**Key finding**: diversity_loss_weight=1.0 is the sweet spot. Lower hurts diversity (v14f),
+higher inflates EMA recall without improving full eval. Future diversity improvements need
+architectural changes (z_global conditioning), not loss weight tuning.
+
+**v28 direction**: TBD. The v16-pretrain + dmd_ckpt_weight=0 recipe has been thoroughly
+explored (v24/v25/v26). v17 remains ATB after 9 subsequent runs. Time for structural changes.
 
 ---
 
