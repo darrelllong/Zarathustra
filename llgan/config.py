@@ -72,6 +72,11 @@ class Config:
     diversity_loss_weight: float = 0.0  # L_div: MSGAN mode-seeking loss — maximises |G(z1)-G(z2)|/|z1-z2|
                                         # across random noise pairs; directly combats β-recall mode collapse.
                                         # Requires a second G forward pass per step. Try 0.5–2.0.
+    continuity_loss_weight: float = 0.0  # L_cont: boundary-continuity loss for multi-window coherence.
+                                          # Generates two adjacent windows with carried LSTM hidden state
+                                          # and penalises mean/std mismatch at the boundary (last k ↔ first k
+                                          # steps).  Directly targets DMD-GEN by training G on the same
+                                          # carry-state generation task used at inference.  Try 0.5–1.0.
     r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
