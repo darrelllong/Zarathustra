@@ -6,7 +6,24 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v28
 
-**Status**: PENDING. User will decide next experiment.
+**Status**: RUNNING on vinge (PID 121344, launched 2026-04-02).
+
+**Two major changes:**
+1. **z_global workload conditioning** (`--cond-dim 10`): Generator receives per-window
+   descriptors (ts mean/std, obj_size mean/std, opcode mean, tenant mean, reuse mean,
+   stride mean/std, burstiness) concatenated with noise. Makes the model conditional —
+   it learns to generate traces that match workload characteristics, not just random modes.
+   Fresh pretrain required (architecture change).
+2. **Loss ablation**: Stripped to WGAN + FM + supervisor + diversity only. Zeroed out FFT,
+   moment, quantile, ACF, cross_cov, locality. Tests whether 6 auxiliary losses were
+   creating gradient noise that hurt the primary metrics.
+
+```bash
+./scripts/vinge-launch.sh --version v28 --cond-dim 10 --supervisor-loss-weight 1.0 \
+  --lr-d 5e-5 --diversity-loss-weight 1.0 --dmd-ckpt-weight 0 --epochs 200 \
+  --cross-cov-loss-weight 0 --fft-loss-weight 0 --moment-loss-weight 0 \
+  --quantile-loss-weight 0 --acf-loss-weight 0 --locality-loss-weight 0
+```
 
 ---
 

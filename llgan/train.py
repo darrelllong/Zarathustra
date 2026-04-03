@@ -40,9 +40,37 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
-from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS
+from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS, compute_window_descriptors
 from model import Generator, Critic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
+
+
+# ---------------------------------------------------------------------------
+# Conditioning helper
+# ---------------------------------------------------------------------------
+
+def _make_z_global(
+    B: int, cfg, device: torch.device,
+    real_features: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Build z_global, optionally prepending workload descriptors.
+
+    Args:
+        B: batch size
+        cfg: Config with noise_dim and cond_dim
+        device: target device
+        real_features: (B, T, num_cols) real feature-space windows.
+            Required when cfg.cond_dim > 0.
+
+    Returns:
+        (B, noise_dim) when cond_dim == 0,
+        (B, cond_dim + noise_dim) when cond_dim > 0.
+    """
+    noise = torch.randn(B, cfg.noise_dim, device=device)
+    if cfg.cond_dim > 0:
+        cond = compute_window_descriptors(real_features)  # (B, cond_dim)
+        return torch.cat([cond, noise], dim=1)
+    return noise
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +300,8 @@ def train(cfg: Config) -> None:
     _avatar = cfg.avatar
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=cfg.latent_dim if latent_ae else None,
-                  avatar=_avatar).to(device)
+                  avatar=_avatar,
+                  cond_dim=cfg.cond_dim).to(device)
     C = Critic(critic_input_dim, cfg.hidden_size,
                use_spectral_norm=use_sn,
                sn_lstm=cfg.sn_lstm,
@@ -622,7 +651,8 @@ def train(cfg: Config) -> None:
             g_sup_losses = []
             for xb in loader:
                 B_pre = xb.size(0)
-                z_g = torch.randn(B_pre, cfg.noise_dim, device=device)
+                xb_dev = xb.to(device)
+                z_g = _make_z_global(B_pre, cfg, device, real_features=xb_dev)
                 z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
                 opt_G.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
@@ -712,7 +742,7 @@ def train(cfg: Config) -> None:
 
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
-                z_g = torch.randn(B, cfg.noise_dim, device=device)
+                z_g = _make_z_global(B, cfg, device, real_features=real_batch)
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
                 H_fake = G(z_g, z_l).detach()
 
@@ -784,7 +814,7 @@ def train(cfg: Config) -> None:
                 c_losses.append(c_loss.item())
 
             # --- Generator step ---
-            z_g = torch.randn(B, cfg.noise_dim, device=device)
+            z_g = _make_z_global(B, cfg, device, real_features=real_batch)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
 
             opt_G.zero_grad()
@@ -971,9 +1001,9 @@ def train(cfg: Config) -> None:
                 # Set diversity_loss_weight > 0 (try 0.5–2.0) when β-recall < 0.5.
                 if cfg.diversity_loss_weight > 0:
                     B2 = B // 2
-                    z_g1 = torch.randn(B2, cfg.noise_dim, device=device)
+                    z_g1 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2])
                     z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
-                    z_g2 = torch.randn(B2, cfg.noise_dim, device=device)
+                    z_g2 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2])
                     z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
                     f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
                     f2 = G(z_g2, z_l2)
@@ -1198,6 +1228,8 @@ def parse_args() -> Config:
     p.add_argument("--batch-size",       type=int,   default=64)
     p.add_argument("--timestep",         type=int,   default=12)
     p.add_argument("--noise-dim",        type=int,   default=10)
+    p.add_argument("--cond-dim",         type=int,   default=0,
+                   help="Workload conditioning dim (0=unconditional; 10=per-window descriptors)")
     p.add_argument("--hidden-size",      type=int,   default=256)
     p.add_argument("--compile",          action="store_true", default=True,
                    help="torch.compile models for ~20-40%% CUDA speedup "
@@ -1325,6 +1357,7 @@ def parse_args() -> Config:
     cfg.batch_size       = args.batch_size
     cfg.timestep         = args.timestep
     cfg.noise_dim        = args.noise_dim
+    cfg.cond_dim         = args.cond_dim
     cfg.hidden_size      = args.hidden_size
     cfg.compile          = args.compile
     cfg.minibatch_std    = not args.no_minibatch_std

@@ -60,6 +60,51 @@ from typing import Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
+# Per-window workload descriptors (z_global conditioning)
+# ---------------------------------------------------------------------------
+
+def compute_window_descriptors(windows: torch.Tensor) -> torch.Tensor:
+    """Compute per-window workload descriptors from preprocessed windows.
+
+    Args:
+        windows: (B, T, 6) tensor with columns [ts, obj_size, opcode,
+                 tenant, obj_id_reuse, obj_id_stride], already normalized
+                 to [-1, 1].
+
+    Returns:
+        (B, 10) tensor of descriptors (same device as input):
+          ts_mean, ts_std, obj_size_mean, obj_size_std, opcode_mean,
+          tenant_mean, obj_id_reuse_mean, obj_id_stride_mean, obj_id_stride_std
+        ... wait, that's 9.  We add a 10th: ts inter-arrival std-of-diff
+        (second-order burstiness).
+
+    All computed from normalized values; no inversion needed.
+    """
+    # Ensure float32 for stability under AMP
+    w = windows.float()
+    ts       = w[:, :, 0]  # (B, T)
+    obj_size = w[:, :, 1]
+    opcode   = w[:, :, 2]
+    tenant   = w[:, :, 3]
+    reuse    = w[:, :, 4]
+    stride   = w[:, :, 5]
+
+    descs = torch.stack([
+        ts.mean(dim=1),                          # 0: ts mean
+        ts.std(dim=1).clamp(min=1e-6),           # 1: ts std
+        obj_size.mean(dim=1),                    # 2: obj_size mean
+        obj_size.std(dim=1).clamp(min=1e-6),     # 3: obj_size std
+        opcode.mean(dim=1),                      # 4: opcode mean (read ratio proxy)
+        tenant.mean(dim=1),                      # 5: tenant mean
+        reuse.mean(dim=1),                       # 6: obj_id_reuse mean
+        stride.mean(dim=1),                      # 7: obj_id_stride mean
+        stride.std(dim=1).clamp(min=1e-6),       # 8: obj_id_stride std
+        ts.diff(dim=1).std(dim=1).clamp(min=1e-6),  # 9: ts diff-of-diff std (burstiness)
+    ], dim=1)  # (B, 10)
+    return descs
+
+
+# ---------------------------------------------------------------------------
 # Format readers  →  returns a raw DataFrame with canonical column names
 # ---------------------------------------------------------------------------
 

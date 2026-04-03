@@ -44,8 +44,10 @@ def generate(
     latent_ae = "R" in ckpt  # latent AE checkpoint includes recovery weights
     latent_dim = getattr(cfg, "latent_dim", 0) if latent_ae else None
 
+    cond_dim = getattr(cfg, "cond_dim", 0)
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
-                  latent_dim=latent_dim).to(device)
+                  latent_dim=latent_dim,
+                  cond_dim=cond_dim).to(device)
     # Prefer EMA weights for generation: they are the time-averaged model that
     # has been smoothed over recent training oscillations and consistently
     # produce better samples than the instantaneous live weights.
@@ -81,7 +83,13 @@ def generate(
         # Each stream is an independent long trace.
         # z_global is fixed per stream (workload identity); LSTM hidden state
         # is carried across windows so long-range burst structure is coherent.
-        z_global = torch.randn(n_streams, cfg.noise_dim, device=device)
+        noise = torch.randn(n_streams, cfg.noise_dim, device=device)
+        if cond_dim > 0:
+            # Default: generic conditioning from N(0, 0.5)
+            cond = torch.randn(n_streams, cond_dim, device=device) * 0.5
+            z_global = torch.cat([cond, noise], dim=1)
+        else:
+            z_global = noise
         hidden = None   # initialised from z_global on first window
 
         for _ in range(windows_per_stream):
@@ -129,6 +137,8 @@ def parse_args():
                    help="Number of parallel independent trace streams to generate")
     p.add_argument("--device", default="cuda")
     p.add_argument("--no-binarize-opcode", action="store_true")
+    p.add_argument("--cond-random", action="store_true",
+                   help="Use random conditioning N(0,0.5) for conditional checkpoints (default)")
     return p.parse_args()
 
 

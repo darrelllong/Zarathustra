@@ -7,6 +7,7 @@ from typing import Optional
 class Config:
     # Model
     noise_dim: int = 10
+    cond_dim: int = 0               # per-window workload descriptor dim (0 = unconditional)
     hidden_size: int = 256
     timestep: int = 12          # window length; paper optimal: 10–15
 

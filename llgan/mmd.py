@@ -242,7 +242,13 @@ def evaluate_metrics(
         real = val_data[idx].to(device)
         real_flat = real.view(n_samples, -1).cpu().numpy().astype(np.float32)
 
-        z_global = torch.randn(n_samples, generator.noise_dim, device=device)
+        noise = torch.randn(n_samples, generator.noise_dim, device=device)
+        if getattr(generator, 'cond_dim', 0) > 0:
+            from dataset import compute_window_descriptors
+            cond = compute_window_descriptors(real)
+            z_global = torch.cat([cond, noise], dim=1)
+        else:
+            z_global = noise
         z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
         fake = generator(z_global, z_local)
         if recovery is not None:

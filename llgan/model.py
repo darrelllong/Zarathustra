@@ -258,6 +258,7 @@ class Generator(nn.Module):
         hidden_size: int,
         latent_dim: Optional[int] = None,
         avatar: bool = False,
+        cond_dim: int = 0,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -265,6 +266,7 @@ class Generator(nn.Module):
         self.hidden_size = hidden_size
         self.latent_dim  = latent_dim
         self.avatar      = avatar
+        self.cond_dim    = cond_dim
 
         out_dim = latent_dim if latent_dim is not None else num_cols
 
@@ -273,8 +275,9 @@ class Generator(nn.Module):
         # bias, c_0 sets the long-term memory content. In practice this lets
         # z_global influence both "what the generator is doing now" (h) and
         # "what it will tend to do over the window" (c).
-        self.z_to_h0 = nn.Linear(noise_dim, hidden_size)
-        self.z_to_c0 = nn.Linear(noise_dim, hidden_size)
+        z_input_dim = noise_dim + cond_dim
+        self.z_to_h0 = nn.Linear(z_input_dim, hidden_size)
+        self.z_to_c0 = nn.Linear(z_input_dim, hidden_size)
 
         self.lstm = nn.LSTM(
             input_size=noise_dim,
@@ -330,9 +333,17 @@ class Generator(nn.Module):
         timestep: int,
         device: torch.device,
         opcode_col: int = -1,
+        cond: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         self.eval()
-        z_global = torch.randn(n_windows, self.noise_dim, device=device)
+        noise = torch.randn(n_windows, self.noise_dim, device=device)
+        if self.cond_dim > 0:
+            if cond is None:
+                # Generic conditioning: mild values from N(0, 0.5)
+                cond = torch.randn(n_windows, self.cond_dim, device=device) * 0.5
+            z_global = torch.cat([cond, noise], dim=1)
+        else:
+            z_global = noise
         z_local  = torch.randn(n_windows, timestep, self.noise_dim, device=device)
         out = self(z_global, z_local)
         if opcode_col >= 0:
