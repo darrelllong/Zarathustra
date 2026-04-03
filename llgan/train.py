@@ -52,15 +52,23 @@ from mmd import evaluate_mmd, evaluate_metrics
 def _make_z_global(
     B: int, cfg, device: torch.device,
     real_features: Optional[torch.Tensor] = None,
+    training: bool = True,
 ) -> torch.Tensor:
     """Build z_global, optionally prepending workload descriptors.
 
+    Classifier-free guidance (CFG): when cfg.cond_drop_prob > 0 and training,
+    randomly replace descriptor vectors with zeros with the given probability.
+    This forces the generator to learn both conditional and unconditional
+    generation, preventing overfitting to specific descriptor values and
+    improving generalization at eval time.
+
     Args:
         B: batch size
-        cfg: Config with noise_dim and cond_dim
+        cfg: Config with noise_dim, cond_dim, and cond_drop_prob
         device: target device
         real_features: (B, T, num_cols) real feature-space windows.
             Required when cfg.cond_dim > 0.
+        training: if True, apply CFG dropout; if False (eval), always condition.
 
     Returns:
         (B, noise_dim) when cond_dim == 0,
@@ -69,6 +77,11 @@ def _make_z_global(
     noise = torch.randn(B, cfg.noise_dim, device=device)
     if cfg.cond_dim > 0:
         cond = compute_window_descriptors(real_features)  # (B, cond_dim)
+        # Classifier-free guidance: randomly drop conditioning during training
+        drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
+        if training and drop_prob > 0:
+            mask = (torch.rand(B, 1, device=device) > drop_prob).float()
+            cond = cond * mask  # zero out entire descriptor vector per sample
         return torch.cat([cond, noise], dim=1)
     return noise
 
@@ -1230,6 +1243,8 @@ def parse_args() -> Config:
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--cond-dim",         type=int,   default=0,
                    help="Workload conditioning dim (0=unconditional; 10=per-window descriptors)")
+    p.add_argument("--cond-drop-prob",   type=float, default=0.0,
+                   help="Classifier-free guidance: drop conditioning with this probability (0=always condition)")
     p.add_argument("--hidden-size",      type=int,   default=256)
     p.add_argument("--compile",          action="store_true", default=True,
                    help="torch.compile models for ~20-40%% CUDA speedup "
@@ -1358,6 +1373,7 @@ def parse_args() -> Config:
     cfg.timestep         = args.timestep
     cfg.noise_dim        = args.noise_dim
     cfg.cond_dim         = args.cond_dim
+    cfg.cond_drop_prob   = args.cond_drop_prob
     cfg.hidden_size      = args.hidden_size
     cfg.compile          = args.compile
     cfg.minibatch_std    = not args.no_minibatch_std
