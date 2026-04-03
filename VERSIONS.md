@@ -4,23 +4,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v30
+## Current Run: v31
 
 **Status**: RUNNING on vinge (launched 2026-04-01).
 
-**Recipe**: Back to proven unconditional recipe (v16 pretrain, no conditioning, dmd_ckpt_weight=0,
-diversity_loss=1.0) but with **n_critic=3** (up from 2). The conditioning experiment (v28/v29)
-proved the architecture CAN produce recall>0.60 — the information is in the latent space.
-Stronger critic pressure may extract it without conditioning's instability.
+**Recipe**: **Conditioning + Classifier-Free Guidance (CFG)** — the fix for v28/v29's
+descriptor overfitting and GAN cycling. cond_dim=10 with cond_drop_prob=0.15 (drop
+conditioning 15% of the time so the model learns both conditional and unconditional
+generation). Full loss recipe, n_critic=2 (proven), v28 pretrain (cond_dim=10 compatible),
+dmd_ckpt_weight=0, 200 epochs.
+
+CFG dropout addresses both v28/v29 failure modes:
+- **GAN cycling**: unconditional training steps prevent critic from exploiting conditioning
+- **EMA-full eval gap**: model can generate without conditioning, reducing descriptor overfitting
 
 ```bash
 ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v30 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v31 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 --cond-drop-prob 0.15 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
-  --n-critic 3 \
+  --n-critic 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
   --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
   --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
@@ -28,7 +34,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v30.log 2>&1 &"
+  > ~/train_v31.log 2>&1 &"
 ```
 
 ---
@@ -61,6 +67,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v27 | 0.055 | 0.172 | 20 | discarded | AVATAR architecture; critic overpowered from ep1; aborted ep38 |
 | v28 | 0.01183 | 0.508 | 70 | vinge:~/checkpoints/tencent_v28/best.pt | **First conditional run (cond_dim=10)**; combined=0.110 best-ever early trajectory; GAN cycling crash ep79 from stripped losses |
 | v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
+| v30 | 0.01640 | 0.468 | 25(EMA) | vinge:~/checkpoints/tencent_v30/best.pt | n_critic=3; α-precision=0.929 (tied ATB); aborted ep54 — recall falling, W→2.8; n_critic=3 too aggressive |
 
 ---
 
@@ -331,6 +338,45 @@ architectural changes (z_global conditioning), not loss weight tuning.
 
 **v28 direction**: TBD. The v16-pretrain + dmd_ckpt_weight=0 recipe has been thoroughly
 explored (v24/v25/v26). v17 remains ATB after 9 subsequent runs. Time for structural changes.
+
+---
+
+### v30 (vinge/GB10, aborted ep54, 2026-04-01)
+
+Key change vs v24: **`n_critic` 2 → 3** to give critic more power. Unconditional, v16 pretrain,
+dmd_ckpt_weight=0, standard losses.
+
+**EMA best (ep25)**: MMD²=0.01386, recall=0.370, combined=0.140
+
+**Full eval (ep25 best)**:
+
+| Metric | v30 | v17 | v24 | Target |
+|--------|-----|-----|-----|--------|
+| MMD² | 0.01640 | **0.00697** | 0.00798 | <0.005 |
+| α-precision | **0.929** | 0.826 | 0.835 | >0.80 |
+| β-recall | 0.468 | **0.521** | 0.503 | >0.70 |
+| DMD-GEN | 0.751 | **0.714** | 0.717 | <0.30 |
+| Context-FID | 0.17 | **0.03** | 0.08 | <0.05 |
+
+Full eval combined: 0.016 + 0.2*(1-0.468) = 0.123. **Did NOT beat v17.**
+
+Aborted at ep54 — recall falling (0.37→0.30), W trending to 2.8.
+
+**Key findings:**
+
+1. **α-precision=0.929 tied all-time best** (v22: 0.927). n_critic=3 produces extremely
+   high-fidelity outputs — the stronger critic forces G to stay close to the real manifold.
+
+2. **Full eval recall (0.468) > EMA recall (0.370)** — gap inverted for the first time.
+   n_critic=3 makes EMA pessimistic: the extra critic steps create a harder adversary that
+   the EMA-smoothed generator handles less well than the live weights during training.
+
+3. **n_critic=3 is too aggressive** — the stronger critic suppresses diversity/recall in
+   favour of fidelity. Recall peaked at 0.37 (EMA) and was falling by ep54. W trending
+   upward (2.8) suggests impending cycling.
+
+**Verdict**: n_critic=2 confirmed as the right balance. n_critic=3 trades recall for fidelity,
+which is the wrong trade-off (recall is the binding constraint, not precision).
 
 ---
 
