@@ -165,6 +165,16 @@ Items marked ✓ are done and in the repo.
   `weight_f = 1 + α * (|freq_f_real| / mean(|freq_real|))`. Added `--fide-alpha`
   (default 1.0). Upweights high-amplitude bins so rare I/O events are not averaged away.
 
+- ✓ **Projection discriminator** (`model.py`, `train.py`) — Miyato & Koyama, ICLR 2018
+  `score += inner(cond_proj(cond), pooled_features)`. Critic evaluates "is this realistic
+  for this workload type?" rather than aggregate realism. --proj-critic flag. Requires
+  --cond-dim > 0; best with --char-file for stable conditioning.
+
+- ✓ **PacGAN window packing** (`train.py`) — Lin et al. NeurIPS 2018
+  Critic scores packs of m windows (concatenated along time axis). Fake packs under mode
+  collapse look identical; real packs are diverse. Gives explicit diversity signal beyond
+  minibatch_std. --pack-size N flag (1=off, 2=pairs). Use in v39.
+
 - [ ] **Adaptive Gradient Penalty (AGP)** (`train.py`) — MDPI Math 2025
   Replace fixed `gp_lambda=10` with a PI controller that adjusts λ dynamically
   based on `‖∇D‖ − 1`. Removes a fragile hyperparameter.
