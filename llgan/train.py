@@ -758,7 +758,8 @@ def train(cfg: Config) -> None:
             if multifile:
                 ep_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
                 pre_ds, _ = _load_epoch_dataset(
-                    ep_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep)
+                    ep_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
+                    char_lookup=char_lookup)
             else:
                 pre_ds = train_ds
             if pre_ds is None or len(pre_ds) == 0:
@@ -766,10 +767,16 @@ def train(cfg: Config) -> None:
             loader = DataLoader(pre_ds, batch_size=cfg.batch_size, shuffle=True,
                                 num_workers=n_workers, drop_last=True)
             g_sup_losses = []
-            for xb in loader:
+            for batch_pre in loader:
+                # char_lookup active → DataLoader returns (window, file_cond) tuples
+                if isinstance(batch_pre, (list, tuple)) and len(batch_pre) == 2:
+                    xb, fc_pre = batch_pre[0].to(device), batch_pre[1].to(device)
+                else:
+                    xb, fc_pre = batch_pre.to(device), None
                 B_pre = xb.size(0)
-                xb_dev = xb.to(device)
-                z_g = _make_z_global(B_pre, cfg, device, real_features=xb_dev)
+                xb_dev = xb
+                z_g = _make_z_global(B_pre, cfg, device, real_features=xb_dev,
+                                     file_cond=fc_pre)
                 z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
                 opt_G.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
