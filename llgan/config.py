@@ -54,6 +54,9 @@ class Config:
     proj_critic: bool = False           # projection discriminator (Miyato & Koyama, ICLR 2018);
                                         # adds inner(cond_proj(cond), pooled) to critic score;
                                         # requires cond_dim > 0 and --char-file for full benefit
+    pack_size: int = 1                  # PacGAN packing (Lin et al. NeurIPS 2018): score packs of
+                                        # m windows jointly; critic detects low-diversity packs
+                                        # (mode collapse signature). 1=off, 2=pairs (recommended)
     checkpoint_every: int = 10
     generated_path: str = "generated.csv"
     num_generate: int = 1_000_000

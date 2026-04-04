@@ -47,6 +47,34 @@ from mmd import evaluate_mmd, evaluate_metrics
 
 
 # ---------------------------------------------------------------------------
+# PacGAN packing helper
+# ---------------------------------------------------------------------------
+
+def _pack_windows(
+    x: torch.Tensor,
+    pack_size: int,
+    cond: Optional[torch.Tensor] = None,
+) -> tuple:
+    """Pack consecutive windows for PacGAN-style critics (Lin et al. NeurIPS 2018).
+
+    Packing makes mode collapse detectable: fake packs of m windows look nearly
+    identical (low intra-pack variance), while real packs are diverse.
+    Complements minibatch_std with an explicit sequence-level diversity signal.
+
+    x   : (B, T, D) → (B//m, m*T, D)
+    cond: (B, C) → (B//m, C)  — take first of each pack for projection critic
+    Returns (x_packed, cond_packed).
+    """
+    if pack_size <= 1:
+        return x, cond
+    B, T, D = x.shape
+    n = (B // pack_size) * pack_size
+    x_packed = x[:n].reshape(n // pack_size, T * pack_size, D)
+    cond_packed = cond[:n:pack_size] if cond is not None else None
+    return x_packed, cond_packed
+
+
+# ---------------------------------------------------------------------------
 # Conditioning helper
 # ---------------------------------------------------------------------------
 
@@ -839,17 +867,20 @@ def train(cfg: Config) -> None:
 
                 opt_C.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
-                    # cond to critic: activates projection discriminator when
-                    # proj_critic=True and file_cond_batch is available.
-                    _c_cond = file_cond_batch
+                    # PacGAN packing: pack consecutive windows to give critic
+                    # explicit intra-pack diversity signal (helps detect mode collapse).
+                    _pack_sz = getattr(cfg, "pack_size", 1)
+                    H_real_c, _c_cond = _pack_windows(H_real, _pack_sz, file_cond_batch)
+                    H_fake_c, _    = _pack_windows(H_fake, _pack_sz, file_cond_batch)
+
                     if cfg.loss == "rpgan":
                         # Relativistic Paired GAN (R3GAN, NeurIPS 2024).
                         # Critic judges: "is real more real than fake?" for paired
                         # samples. Unlike WGAN, the relativistic loss forces the
                         # generator to simultaneously improve and maintain mode coverage.
                         # D_loss = -E[log σ(C(x_r) - C(x_f))] (BCE with target=1)
-                        c_real = C(H_real, cond=_c_cond)       # (B, 1)
-                        c_fake = C(H_fake, cond=_c_cond)       # (B, 1) already detached
+                        c_real = C(H_real_c, cond=_c_cond)     # (B_p, 1)
+                        c_fake = C(H_fake_c, cond=_c_cond)     # (B_p, 1) already detached
                         rel = c_real - c_fake
                         c_loss = nn.functional.softplus(-rel).mean()
                         w_dists.append(rel.mean().item())      # positive = critic winning
@@ -857,7 +888,7 @@ def train(cfg: Config) -> None:
                         # Separate W estimate from penalty terms so the log shows
                         # the true Wasserstein distance (W > 0 = critic winning;
                         # oscillating W = GAN cycling).
-                        c_base = (C(H_fake, cond=_c_cond) - C(H_real, cond=_c_cond)).mean()
+                        c_base = (C(H_fake_c, cond=_c_cond) - C(H_real_c, cond=_c_cond)).mean()
                         w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
                         c_loss = c_base
                         if cfg.loss == "wgan-gp":
@@ -900,8 +931,8 @@ def train(cfg: Config) -> None:
                     else:  # bce
                         real_labels = torch.ones(B, 1, device=device)
                         fake_labels = torch.zeros(B, 1, device=device)
-                        c_loss = (bce(C(H_real, cond=_c_cond), real_labels) +
-                                  bce(C(H_fake, cond=_c_cond), fake_labels))
+                        c_loss = (bce(C(H_real_c, cond=_c_cond), real_labels[:H_real_c.size(0)]) +
+                                  bce(C(H_fake_c, cond=_c_cond), fake_labels[:H_fake_c.size(0)]))
                 scaler.scale(c_loss).backward()
                 if cfg.grad_clip > 0:
                     # Gradient clipping is the primary Lipschitz constraint on
@@ -1386,6 +1417,11 @@ def parse_args() -> Config:
                         "Conditions critic on workload descriptors so it evaluates "
                         "'is this realistic for THIS workload?' Requires --cond-dim > 0. "
                         "Best used with --char-file for stable conditioning.")
+    p.add_argument("--pack-size",        type=int, default=1,
+                   help="PacGAN window packing (Lin et al. NeurIPS 2018): critic scores packs "
+                        "of m consecutive windows concatenated along time axis. "
+                        "1=off (default), 2=pairs. Gives critic explicit diversity signal: "
+                        "fake packs look identical under mode collapse, real packs are diverse.")
     p.add_argument("--lr-g",             type=float, default=0.0001)
     p.add_argument("--lr-d",             type=float, default=0.0001)
     p.add_argument("--n-critic",         type=int,   default=5)
@@ -1515,6 +1551,7 @@ def parse_args() -> Config:
     cfg.sn_lstm          = not args.no_sn_lstm
     cfg.patch_embed      = args.patch_embed
     cfg.proj_critic      = args.proj_critic
+    cfg.pack_size        = args.pack_size
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
     cfg.n_critic         = args.n_critic
