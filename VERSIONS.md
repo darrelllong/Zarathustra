@@ -75,6 +75,38 @@ workload-specific modes → higher recall. Combined effect > either alone.
 
 ---
 
+## Queued: v39 — Full stack: char-file + proj_critic + RpGAN + PacGAN
+
+**When to launch**: After v38 completes or is killed (assess at ep100).
+Reuse v38 pretrain_complete.pt.
+
+**Recipe**: v38 recipe + RpGAN loss + PacGAN pack_size=2.
+- RpGAN: relativistic paired loss directly targets mode coverage (--loss rpgan)
+- PacGAN: critic scores pairs of windows, catching identical fake pairs (--pack-size 2)
+
+```bash
+ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v39 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v39/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v39 --checkpoint-every 5 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
+  --char-file ~/traces/characterization/trace_characterizations.jsonl \
+  --proj-critic --pack-size 2 --loss rpgan \
+  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --n-critic 2 --supervisor-steps 2 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
+  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
+  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
+  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
+  --hidden-size 256 --latent-dim 24 \
+  --no-compile \
+  > ~/train_v39.log 2>&1 &"
+```
+
+---
+
 ## Completed Runs
 
 | Version | Best MMD² | Best Recall | Best Epoch | Checkpoint | Notes |
