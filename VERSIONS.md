@@ -4,22 +4,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v35
+## Current Run: v36
 
-**Status**: RUNNING — push CFG dropout even higher (0.30) after v34 confirmed 0.25 > 0.15.
+**Status**: RUNNING — same v34 recipe (cond_drop_prob=0.25), different seed. v34 tied v31 at
+combined=0.089; trying another seed to break through to 0.08x.
 
-**Recipe**: Same as v31/v34 but with **cond_drop_prob=0.30** (up from v34's 0.25). v34 confirmed
-that higher CFG dropout improves generalization: EMA recall 0.630 → full eval 0.608 (only 3.5%
-drop vs v33's 24% drop with 0.15). Testing whether 0.30 pushes even further. v28 pretrain,
-cond_dim=10, full losses, n_critic=2, 200 epochs.
+**Recipe**: Identical to v34 (cond_drop_prob=0.25, cond_dim=10, full losses, n_critic=2, v28
+pretrain, 200 epochs). v35 showed 0.30 is too aggressive; 0.25 confirmed as sweet spot.
 
 ```bash
 ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v35 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v36 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --cond-dim 10 --cond-drop-prob 0.30 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -29,7 +28,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v35.log 2>&1 &"
+  > ~/train_v36.log 2>&1 &"
 ```
 
 ---
@@ -64,6 +63,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
 | v30 | 0.01640 | 0.468 | 25(EMA) | vinge:~/checkpoints/tencent_v30/best.pt | n_critic=3; α-precision=0.929 (tied ATB); aborted ep54 — recall falling, W→2.8; n_critic=3 too aggressive |
 | v32 | 0.00797 | 0.441 | 110 | vinge:~/checkpoints/tencent_v32/best.pt | Same recipe as v31 250ep; W→0 at ep110 (critic lost signal); reuse=0.055 (10× improvement); aborted ep144 |
+| v35 | 0.01123 | 0.378 | 65(EMA) | vinge:~/checkpoints/tencent_v35/best.pt | CFG 0.30 TOO aggressive; recall collapsed 0.609→0.378 (38% drop); DMD-GEN=0.694 new ATB |
 | **v34** | **0.01119** | **0.608** | **150** | **vinge:~/checkpoints/tencent_v34/best.pt** | **CO-ATB (tied v31). β-recall=0.608 NEW ATB. CFG 0.25 > 0.15 for generalization. Most stable conditioned run.** |
 | v33 | 0.01080 | 0.521 | 70(EMA) | vinge:~/checkpoints/tencent_v33/best.pt | Same v31 recipe, different seed; W spiked ep179; EMA recall 0.683→0.521 full eval (24% drop); Context-FID=0.02 new ATB |
 | **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **CO-ATB (tied v34). CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
@@ -71,6 +71,44 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 ---
 
 ## Version Notes
+
+### v35 — CFG 0.30 too aggressive (vinge/GB10, completed ep200, 2026-04-01)
+
+**Recipe**: Same as v31/v34 but with **cond_drop_prob=0.30** (up from v34's 0.25). v28 pretrain,
+cond_dim=10, full losses, n_critic=2, 200 epochs.
+
+**EMA best (ep65)**: MMD²=0.01330, recall=0.609, combined=0.092
+
+**Full eval**:
+
+| Metric | v35 | v34 | v31 |
+|--------|-----|-----|-----|
+| MMD² | 0.01123 | 0.01119 | **0.00769** |
+| α-precision | 0.881 | **0.903** | **0.953** |
+| β-recall | 0.378 | **0.608** | 0.596 |
+| DMD-GEN | **0.694** | 0.747 | 0.723 |
+| AutoCorr | 0.049 | 0.053 | **0.032** |
+| Context-FID | **0.07** | 0.02 | 0.03 |
+| reuse rate | 0.003 | 0.004 | 0.005 |
+
+**Full eval combined = 0.011 + 0.2*(1-0.378) = 0.136. Did NOT beat v31/v34.**
+
+**Post-mortem**: CFG dropout 0.30 is too aggressive. Dilutes the conditioning signal so much that
+the generator loses mode specificity. Massive EMA→full eval recall drop (0.609→0.378, 38%). The
+one bright spot is DMD-GEN=0.694, the first run below 0.70 — higher unconditional diversity from
+the aggressive dropout, but at the cost of conditional precision.
+
+**CFG dropout sweep conclusion**:
+
+| CFG dropout | Full eval recall | Full eval combined |
+|-------------|-----------------|-------------------|
+| 0.15 (v31) | 0.596 | 0.089 |
+| 0.25 (v34) | 0.608 | 0.089 |
+| 0.30 (v35) | 0.378 | 0.136 |
+
+**Sweet spot confirmed at 0.25.** Future runs should use 0.25 unless architecture changes.
+
+---
 
 ### v34 — CO-ATB, new recall record (vinge/GB10, completed ep200, 2026-04-01)
 
