@@ -451,6 +451,24 @@ def train(cfg: Config) -> None:
     else:
         LD = opt_LD = bce_ld = None
 
+    # Dual discriminator: optional secondary critic in feature space.
+    # The latent critic C operates on E/G latent sequences and provides stable
+    # early gradients; C_feat catches decoded-space artifacts that the latent
+    # critic can miss (e.g. wrong obj_size shape that looks fine in latent space).
+    # Only meaningful in latent-AE mode (R decodes latents to features).
+    _feat_cw = getattr(cfg, "feat_critic_weight", 0.0)
+    if latent_ae and _feat_cw > 0:
+        C_feat = Critic(prep.num_cols, cfg.hidden_size,
+                        use_spectral_norm=use_sn,
+                        sn_lstm=cfg.sn_lstm,
+                        minibatch_std=cfg.minibatch_std,
+                        patch_embed=cfg.patch_embed,
+                        cond_dim=_proj_critic_dim).to(device)
+        opt_C_feat = torch.optim.Adam(C_feat.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
+        print(f"[dual-critic] Feature-space critic enabled (weight={_feat_cw:.2f})")
+    else:
+        C_feat = opt_C_feat = None
+
     # torch.compile: fuses CUDA kernels for ~20-40% speedup on NVIDIA hardware.
     # Skipped on MPS/CPU (no benefit) and when create_graph gradients are needed
     # (WGAN-GP / R1 / R2), because dynamo does not yet fully support
@@ -972,6 +990,24 @@ def train(cfg: Config) -> None:
                                   # unscale_() can be called again next iteration
                 c_losses.append(c_loss.item())
 
+                # --- Feature-space critic step (dual discriminator) ---
+                if C_feat is not None and R is not None:
+                    opt_C_feat.zero_grad()
+                    with torch.amp.autocast(device.type, enabled=use_amp):
+                        with torch.no_grad():
+                            feat_fake_d = R(H_fake)    # decode latents → features (detached)
+                        feat_real_c, _ = _pack_windows(real_batch, _pack_sz, file_cond_batch)
+                        feat_fake_c, _ = _pack_windows(feat_fake_d, _pack_sz, file_cond_batch)
+                        cf_base = (C_feat(feat_fake_c, cond=_c_cond) -
+                                   C_feat(feat_real_c, cond=_c_cond)).mean()
+                        cf_loss = cf_base
+                    scaler.scale(cf_loss).backward()
+                    if cfg.grad_clip > 0:
+                        scaler.unscale_(opt_C_feat)
+                        nn.utils.clip_grad_norm_(C_feat.parameters(), cfg.grad_clip)
+                    scaler.step(opt_C_feat)
+                    scaler.update()
+
             # --- Generator step ---
             z_g = _make_z_global(B, cfg, device, real_features=real_batch,
                                  file_cond=file_cond_batch)
@@ -1201,6 +1237,16 @@ def train(cfg: Config) -> None:
                     # Negative because we want to MAXIMISE diversity
                     loss_div = -(x_dist / z_dist).mean()
                     g_loss = g_loss + cfg.diversity_loss_weight * loss_div
+
+                # Feature-space critic in generator loss (dual discriminator).
+                # C_feat operates in decoded feature space — it sees what the
+                # downstream evaluator sees, preventing the generator from hiding
+                # quality problems in latent space that R glosses over.
+                if C_feat is not None and R is not None and _feat_cw > 0:
+                    feat_fake_g = fake_decoded   # already decoded above (or H_fake if no AE)
+                    feat_fake_gc, _cf_cond = _pack_windows(feat_fake_g, _pack_sz, file_cond_batch)
+                    cf_g_score = C_feat(feat_fake_gc, cond=_cf_cond)
+                    g_loss = g_loss + _feat_cw * (-cf_g_score.mean())
 
             scaler.scale(g_loss).backward()
             if cfg.grad_clip > 0:
@@ -1543,6 +1589,10 @@ def parse_args() -> Config:
                    help="L_div: MSGAN mode-seeking loss — maximises output/noise distance ratio "
                         "across random pairs; combats mode collapse (low β-recall). "
                         "Requires a second G forward pass. Try 0.5–2.0.")
+    p.add_argument("--feat-critic-weight", type=float, default=0.0,
+                   help="Dual discriminator: weight of feature-space critic C_feat in G loss "
+                        "(0=off). Requires latent_dim > 0. C_feat operates on decoded features "
+                        "so it penalises quality problems invisible in latent space. Try 0.5–1.0.")
     p.add_argument("--r1-lambda",          type=float, default=0.0,
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
@@ -1607,6 +1657,7 @@ def parse_args() -> Config:
     cfg.gp_lambda                   = args.gp_lambda
     cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.diversity_loss_weight       = args.diversity_loss_weight
+    cfg.feat_critic_weight          = args.feat_critic_weight
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.dmd_ckpt_weight             = args.dmd_ckpt_weight

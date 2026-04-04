@@ -106,6 +106,12 @@ class Config:
     supervisor_steps: int = 1         # 1 = 1-step supervisor; 2 = 2-step (SeriesGAN)
     lr_er: float = 0.0005             # learning rate for encoder + recovery (joint phase)
 
+    # Dual discriminator (latent-space C + feature-space C_feat)
+    feat_critic_weight: float = 0.0   # weight for feature-space critic in G loss (0 = off).
+                                      # Requires latent_dim > 0.  C_feat operates on decoded
+                                      # features so it penalises quality problems invisible in
+                                      # latent space.  Try 0.5–1.0 alongside normal C.
+
     # AVATAR (Adversarial Autoencoder + Autoregressive Refinement)
     avatar: bool = False              # Enable AVATAR mode (AAE + autoregressive refinement)
     dist_loss_weight: float = 1.0     # Distribution loss weight (mean+std matching to N(0,1))
