@@ -374,11 +374,15 @@ def train(cfg: Config) -> None:
                   latent_dim=cfg.latent_dim if latent_ae else None,
                   avatar=_avatar,
                   cond_dim=cfg.cond_dim).to(device)
+    # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
+    # Only active when both proj_critic config flag is set AND cond_dim > 0.
+    _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
     C = Critic(critic_input_dim, cfg.hidden_size,
                use_spectral_norm=use_sn,
                sn_lstm=cfg.sn_lstm,
                minibatch_std=cfg.minibatch_std,
-               patch_embed=cfg.patch_embed).to(device)
+               patch_embed=cfg.patch_embed,
+               cond_dim=_proj_critic_dim).to(device)
 
     if latent_ae:
         E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim,
@@ -827,14 +831,17 @@ def train(cfg: Config) -> None:
 
                 opt_C.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
+                    # cond to critic: activates projection discriminator when
+                    # proj_critic=True and file_cond_batch is available.
+                    _c_cond = file_cond_batch
                     if cfg.loss == "rpgan":
                         # Relativistic Paired GAN (R3GAN, NeurIPS 2024).
                         # Critic judges: "is real more real than fake?" for paired
                         # samples. Unlike WGAN, the relativistic loss forces the
                         # generator to simultaneously improve and maintain mode coverage.
                         # D_loss = -E[log σ(C(x_r) - C(x_f))] (BCE with target=1)
-                        c_real = C(H_real)                     # (B, 1)
-                        c_fake = C(H_fake)                     # (B, 1) already detached
+                        c_real = C(H_real, cond=_c_cond)       # (B, 1)
+                        c_fake = C(H_fake, cond=_c_cond)       # (B, 1) already detached
                         rel = c_real - c_fake
                         c_loss = nn.functional.softplus(-rel).mean()
                         w_dists.append(rel.mean().item())      # positive = critic winning
@@ -842,7 +849,7 @@ def train(cfg: Config) -> None:
                         # Separate W estimate from penalty terms so the log shows
                         # the true Wasserstein distance (W > 0 = critic winning;
                         # oscillating W = GAN cycling).
-                        c_base = (C(H_fake) - C(H_real)).mean()
+                        c_base = (C(H_fake, cond=_c_cond) - C(H_real, cond=_c_cond)).mean()
                         w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
                         c_loss = c_base
                         if cfg.loss == "wgan-gp":
@@ -853,7 +860,7 @@ def train(cfg: Config) -> None:
                             eps = torch.rand(B, 1, 1, device=device)
                             x_hat = (eps * H_real.detach() +
                                      (1 - eps) * H_fake).requires_grad_(True)
-                            d_hat = C(x_hat)
+                            d_hat = C(x_hat, cond=_c_cond)
                             grads = torch.autograd.grad(
                                 outputs=d_hat.sum(), inputs=x_hat,
                                 create_graph=True)[0]           # (B, T, latent_dim)
@@ -885,8 +892,8 @@ def train(cfg: Config) -> None:
                     else:  # bce
                         real_labels = torch.ones(B, 1, device=device)
                         fake_labels = torch.zeros(B, 1, device=device)
-                        c_loss = (bce(C(H_real), real_labels) +
-                                  bce(C(H_fake), fake_labels))
+                        c_loss = (bce(C(H_real, cond=_c_cond), real_labels) +
+                                  bce(C(H_fake, cond=_c_cond), fake_labels))
                 scaler.scale(c_loss).backward()
                 if cfg.grad_clip > 0:
                     # Gradient clipping is the primary Lipschitz constraint on
@@ -914,16 +921,16 @@ def train(cfg: Config) -> None:
 
                 if cfg.loss == "rpgan":
                     # Generator tries to make fake beat real: -E[log σ(C(x_f) - C(x_r))]
-                    g_score, feat_fake = C(H_fake, return_features=True)
+                    g_score, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
                     with torch.no_grad():
-                        c_real_g = C(H_real)               # (B, 1), no grad through real
+                        c_real_g = C(H_real, cond=file_cond_batch)   # (B, 1), no grad through real
                     g_loss = nn.functional.softplus(-(g_score - c_real_g)).mean()
                 elif cfg.loss in ("wgan-sn", "wgan-gp"):
-                    g_score, feat_fake = C(H_fake, return_features=True)
+                    g_score, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
                     g_loss = -g_score.mean()
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
-                    g_score, feat_fake = C(H_fake, return_features=True)
+                    g_score, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
                     g_loss = bce(g_score, real_labels)
 
                 # Feature matching (Salimans et al. 2016): match the mean of the
@@ -932,7 +939,7 @@ def train(cfg: Config) -> None:
                 # to cover all modes the critic can "see", fixing mode collapse.
                 if cfg.feature_matching_weight > 0:
                     with torch.no_grad():
-                        _, feat_real = C(H_real, return_features=True)
+                        _, feat_real = C(H_real, return_features=True, cond=file_cond_batch)
                     loss_fm = nn.functional.mse_loss(
                         feat_fake.mean(0), feat_real.mean(0))
                     g_loss = g_loss + cfg.feature_matching_weight * loss_fm
@@ -1365,6 +1372,12 @@ def parse_args() -> Config:
                    help="Conv1d patch embedding before critic LSTM: folds 12-step window "
                         "into 4 patch tokens (kernel=stride=3). TTS-GAN style. "
                         "Gives critic local-pattern inductive bias for burst detection.")
+    p.add_argument("--proj-critic",      action="store_true", default=False,
+                   help="Projection discriminator (Miyato & Koyama, ICLR 2018): "
+                        "adds inner(cond_proj(cond), critic_features) to critic score. "
+                        "Conditions critic on workload descriptors so it evaluates "
+                        "'is this realistic for THIS workload?' Requires --cond-dim > 0. "
+                        "Best used with --char-file for stable conditioning.")
     p.add_argument("--lr-g",             type=float, default=0.0001)
     p.add_argument("--lr-d",             type=float, default=0.0001)
     p.add_argument("--n-critic",         type=int,   default=5)
@@ -1493,6 +1506,7 @@ def parse_args() -> Config:
     cfg.minibatch_std    = not args.no_minibatch_std
     cfg.sn_lstm          = not args.no_sn_lstm
     cfg.patch_embed      = args.patch_embed
+    cfg.proj_critic      = args.proj_critic
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
     cfg.n_critic         = args.n_critic

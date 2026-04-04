@@ -393,10 +393,12 @@ class Critic(nn.Module):
                  use_spectral_norm: bool = True,
                  sn_lstm: bool = True,
                  minibatch_std: bool = True,
-                 patch_embed: bool = False):
+                 patch_embed: bool = False,
+                 cond_dim: int = 0):
         super().__init__()
         self.minibatch_std = minibatch_std
         self.patch_embed   = patch_embed
+        self.cond_dim      = cond_dim
         # One extra input feature when minibatch_std is on: the mean per-step
         # standard deviation across the batch, appended as a scalar channel.
         lstm_input = num_cols + (1 if minibatch_std else 0)
@@ -449,6 +451,17 @@ class Critic(nn.Module):
             from torch.nn.utils import spectral_norm
             fc = spectral_norm(fc)
         self.fc = fc
+
+        # Projection discriminator (Miyato & Koyama, ICLR 2018):
+        # score += inner(cond_proj(cond), pooled_features)
+        # Conditions the critic on workload descriptors so it scores
+        # "is this realistic for this workload type?" not just "is this realistic?".
+        # Active when cond_dim > 0; naturally disabled (cond=None) in pretrain phases.
+        if cond_dim > 0:
+            self.cond_proj = nn.Linear(cond_dim, hidden_size, bias=False)
+        else:
+            self.cond_proj = None
+
         self._init_weights()
 
     def _init_weights(self):
@@ -459,8 +472,13 @@ class Critic(nn.Module):
                 nn.init.zeros_(p)
 
     def forward(self, x: torch.Tensor,
-                return_features: bool = False):
-        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score."""
+                return_features: bool = False,
+                cond: Optional[torch.Tensor] = None):
+        """x: (batch, timestep, num_cols) → (batch, 1) unbounded score.
+
+        cond: (batch, cond_dim) workload descriptor for projection discriminator.
+              When provided, adds inner(cond_proj(cond), pooled) to the score.
+        """
         if self.minibatch_std:
             # Minibatch standard deviation (Karras et al., ProGAN/StyleGAN2).
             # Compute the per-feature std across the batch at each timestep,
@@ -480,6 +498,9 @@ class Critic(nn.Module):
         attn_w = torch.softmax(self.attn(h), dim=1)            # (B, T, 1)
         pooled = (attn_w * h).sum(dim=1)                       # (B, H)
         score = self.fc(pooled)                                 # (B, 1)
+        if self.cond_proj is not None and cond is not None:
+            # Projection: score += (cond_proj(cond) * pooled).sum(-1, keepdim=True)
+            score = score + (self.cond_proj(cond) * pooled).sum(-1, keepdim=True)
         if return_features:
             return score, pooled
         return score

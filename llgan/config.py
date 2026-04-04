@@ -51,6 +51,9 @@ class Config:
     reset_optimizer: bool = False       # load weights only, fresh optimizers at new LR
     sn_lstm: bool = True                # spectral norm on critic LSTM weight matrices
     patch_embed: bool = False           # Conv1d patch embedding before critic LSTM (TTS-GAN)
+    proj_critic: bool = False           # projection discriminator (Miyato & Koyama, ICLR 2018);
+                                        # adds inner(cond_proj(cond), pooled) to critic score;
+                                        # requires cond_dim > 0 and --char-file for full benefit
     checkpoint_every: int = 10
     generated_path: str = "generated.csv"
     num_generate: int = 1_000_000
