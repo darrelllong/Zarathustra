@@ -99,15 +99,12 @@ Items marked ✓ are done and in the repo.
   `Conv1d(num_cols, embed_dim, kernel_size=3, stride=3)` before LSTM critic compresses
   12-step window into 4 patch tokens. (TTS-GAN)
 
-- [ ] **Make z_global a real workload descriptor, not pure noise** (`dataset.py`, `model.py`, `train.py`)
-  *Top priority per peer review.* Currently `z_global = torch.randn(B, noise_dim)` projected
-  to LSTM h0/c0. Replace with per-file descriptors: read_ratio, mean/log-mean IAT, IAT quantiles,
-  mean size, size quantiles, reuse rate, sequential fraction, stride histogram.
-  Feed these alongside a stochastic latent (conditional rather than free-floating).
-  Makes the model useful as a controllable workload generator, not just a sampler.
-  Directly addresses mixed-corpus training quality.
-  Prerequisite: compute descriptors in `dataset.py` at fit time; extend `Generator.__init__`
-  to accept `cond_dim`; modify `train.py`/`generate.py` to pass descriptors at inference.
+- ✓ **Make z_global a real workload descriptor, not pure noise** (`dataset.py`, `model.py`, `train.py`)
+  *Top priority per peer review.* Window-level CFG conditioning implemented in v31/v34 (cond_dim=10,
+  cond_drop_prob=0.25). Full precharacterized file-level conditioning implemented for v38:
+  `profile_to_cond_vector()` + `load_file_characterizations()` in `dataset.py`; `--char-file`
+  flag in `train.py` and `generate.py`. Stable full-trace stats replace noisy 12-step estimates.
+  Targets EMA→full eval gap and multi-corpus training quality.
 
 - [ ] **Add training-time chunk-continuity loss** (`train.py`)
   `generate.py` carries hidden state across windows; training is still local-window only.
@@ -179,11 +176,10 @@ Items marked ✓ are done and in the repo.
 
 ### Medium-term (1–2 days each)
 
-- [ ] **ChronoGAN slope + skewness TS loss terms** (`train.py`) — ICMLA 2024
-  Add slope (linear regression of each sequence over time) and skewness to the
-  TS loss alongside existing moment matching. Skewness directly penalises
-  mismatch in heavy-tailed distributions (obj_size). GRU+LSTM hybrid backbone
-  is a further option but 2-day effort.
+- ✓ **ChronoGAN slope + skewness TS loss terms** (`train.py`) — ICMLA 2024
+  Added to moment loss (L_V) alongside mean/std. Slope = per-feature linear trend;
+  skewness = third standardized moment (weighted 0.5×). Both activated when
+  `--moment-loss-weight > 0`. GRU+LSTM hybrid backbone is a further option but 2-day effort.
 
 - [ ] **SeriesGAN dual discriminator + 2-step supervisor** (`model.py`, `train.py`)
   — BigData 2024 (also in Medium-term section above)
@@ -191,10 +187,10 @@ Items marked ✓ are done and in the repo.
   Expected: −34% discriminative score vs TimeGAN. Already have latent AE so
   mostly wiring.
 
-- [ ] **Relativistic paired GAN loss (RpGAN)** (`train.py`) — R3GAN, NeurIPS 2024
-  Discriminator simultaneously judges "is real more real than fake?" and vice
-  versa in a single forward pass. Shown to achieve full mode coverage on
-  StackedMNIST where standard WGAN misses modes. Replace current WGAN objective.
+- ✓ **Relativistic paired GAN loss (RpGAN)** (`train.py`) — R3GAN, NeurIPS 2024
+  Implemented as `--loss rpgan`. D_loss = -E[log σ(C(x_r) - C(x_f))];
+  G_loss = -E[log σ(C(x_f) - C(x_r))]. MPS-compatible (no second-order gradients).
+  Targets β-recall mode collapse. Pending first run to evaluate.
 
 - [ ] **FiLM conditioning for tenant/workload** (`model.py`) — survey, 2024
   Feature-wise Linear Modulation: learn per-condition scale+shift for generator
