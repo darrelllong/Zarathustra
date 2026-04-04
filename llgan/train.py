@@ -939,13 +939,32 @@ def train(cfg: Config) -> None:
                     fake_decoded = H_fake
 
                 # --- Auxiliary losses (in feature space) ---
-                # Moment matching (L_V): penalise differences in per-feature mean
-                # and std so the generator cannot ignore distributional shape.
+                # Moment matching (L_V): penalise differences in per-feature mean,
+                # std, slope, and skewness (ChronoGAN, ICMLA 2024).
+                # Slope and skewness directly target heavy-tailed obj_size distribution.
                 if cfg.moment_loss_weight > 0:
                     loss_V = (
                         nn.functional.l1_loss(fake_decoded.mean(0), real_batch.mean(0)) +
                         nn.functional.l1_loss(fake_decoded.std(0),  real_batch.std(0))
                     )
+                    # Slope: linear trend per feature per sequence
+                    _T = fake_decoded.shape[1]
+                    _t = torch.arange(_T, device=device, dtype=fake_decoded.dtype)
+                    _t = _t - _t.mean()
+                    _t_var = (_t ** 2).mean() + 1e-8
+                    _x_c = fake_decoded - fake_decoded.mean(dim=1, keepdim=True)
+                    _r_c = real_batch   - real_batch.mean(dim=1, keepdim=True)
+                    fake_slope = (_t.view(1, _T, 1) * _x_c).mean(1) / _t_var
+                    real_slope = (_t.view(1, _T, 1) * _r_c).mean(1) / _t_var
+                    loss_V = loss_V + nn.functional.l1_loss(fake_slope.mean(0), real_slope.mean(0))
+                    # Skewness: third standardized moment (penalises distributional tail mismatch)
+                    _fx_mu = fake_decoded.mean(dim=1, keepdim=True)
+                    _rx_mu = real_batch.mean(dim=1, keepdim=True)
+                    _fx_s  = fake_decoded.std(dim=1, keepdim=True) + 1e-8
+                    _rx_s  = real_batch.std(dim=1, keepdim=True) + 1e-8
+                    fake_skew = ((fake_decoded - _fx_mu) / _fx_s).pow(3).mean(dim=1).mean(0)
+                    real_skew = ((real_batch   - _rx_mu) / _rx_s).pow(3).mean(dim=1).mean(0)
+                    loss_V = loss_V + 0.5 * nn.functional.l1_loss(fake_skew, real_skew)
                     g_loss = g_loss + cfg.moment_loss_weight * loss_V
 
                 # Fourier spectral loss (L_FFT): penalise differences in frequency
