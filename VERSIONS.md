@@ -35,16 +35,17 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u 
 
 ---
 
-## Queued: v38 — Precharacterized file-level conditioning
+## Queued: v38 — Precharacterized conditioning + Projection Discriminator
 
-**When to launch**: When v37 completes or is killed. Reuse v37 pretrain_complete.pt if
-architecture unchanged (it is: same hidden_size=256, latent_dim=24, num_cols, cond_dim=10).
+**When to launch**: When v37 completes or is killed. Reuse v37 pretrain_complete.pt.
+(Critic weights not in pretrain; proj_critic adds cond_proj layer only, won't break E/R/S/G weights.)
 
-**Recipe**: v37 recipe (supervisor-steps 2) + `--char-file` for precharacterized conditioning.
-Full-trace statistics replace noisy 12-step window-level z_global descriptors.
+**Recipe**: v37 recipe (supervisor-steps 2) + `--char-file` + `--proj-critic`.
+- Precharacterized conditioning: stable full-trace stats replace noisy 12-step window descriptors
+- Projection discriminator: critic conditions on same workload vector (Miyato & Koyama, ICLR 2018)
 
 ```bash
-ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh -i ~/.ssh/id_rsa vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
   --checkpoint-dir ~/checkpoints/tencent_v38 --checkpoint-every 5 \
@@ -52,6 +53,7 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u 
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
+  --proj-critic \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 2 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -64,9 +66,9 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u 
   > ~/train_v38.log 2>&1 &"
 ```
 
-**Hypothesis**: Stable file-level conditioning closes EMA→full eval gap by eliminating
-noisy window-level descriptor estimates. With better conditioning signal, G learns
-distinct modes for different workload types → higher recall.
+**Hypothesis**: Stable file-level conditioning closes EMA→full eval gap. Projection
+discriminator scores "is this realistic for this workload type?" forcing G to cover
+workload-specific modes → higher recall. Combined effect > either alone.
 
 ---
 
