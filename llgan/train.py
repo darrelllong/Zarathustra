@@ -315,7 +315,12 @@ def train(cfg: Config) -> None:
                and cfg.loss != "wgan-gp"
                and cfg.r1_lambda == 0.0
                and cfg.r2_lambda == 0.0)
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    # proj_critic adds a gradient term O(hidden_size) larger than the base
+    # WGAN gradient, pushing scaled fp16 gradients above 65504 at the default
+    # init_scale=2**16=65536.  Use 2**14=16384 when proj_critic is enabled to
+    # give 4× more fp16 headroom before overflow; the scaler will grow back up.
+    _amp_init_scale = 2**14 if getattr(cfg, "proj_critic", False) else 2**16
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp, init_scale=_amp_init_scale)
 
     print(f"Device: {device}  Loss: {cfg.loss}  AMP: {use_amp}")
 

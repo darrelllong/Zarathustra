@@ -4,52 +4,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v37
+## Current Run: v38
 
-**Status**: RUNNING — v34 recipe + `--supervisor-steps 2` (SeriesGAN 2-step supervisor).
-Targets DMD-GEN plateau (stuck at 0.72+). 2-step forces longer temporal context.
-v28 pretrain reused (supervisor architecture unchanged; loss target only).
+**Status**: RUNNING — v37 recipe + `--char-file` + `--proj-critic`. fp32 mode (--no-amp).
+AMP+proj_critic AMP overflow: proj_critic backward gradient O(1) × scale 65536 → fp16 overflow.
+Fixed in code (init_scale=2^14 when proj_critic), but v38 already launched with --no-amp.
 
-**ep60 EMA checkpoint**: combined=0.09226, recall=0.577, MMD²=0.00756 — new EMA best.
-Only 3.6% from ATB (0.089). If full eval recall ≥ 0.58, this beats ATB.
-Watching for W-spike pattern (currently W oscillating 0.5-2.3).
+Launched 2026-04-04. Pretrain_complete.pt reused from v37 (E/R/S/G weights).
 
 ```bash
-ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
-  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v37 --checkpoint-every 5 \
-  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --cond-dim 10 --cond-drop-prob 0.25 \
-  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
-  --n-critic 2 --supervisor-steps 2 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
-  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
-  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
-  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
-  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
-  --hidden-size 256 --latent-dim 24 \
-  --no-compile \
-  > ~/train_v37.log 2>&1 &"
-```
-
----
-
-## Queued: v38 — Precharacterized conditioning + Projection Discriminator
-
-**When to launch**: When v37 completes or is killed. Reuse v37 pretrain_complete.pt.
-(Critic weights not in pretrain; proj_critic adds cond_proj layer only, won't break E/R/S/G weights.)
-
-**Recipe**: v37 recipe (supervisor-steps 2) + `--char-file` + `--proj-critic`.
-- Precharacterized conditioning: stable full-trace stats replace noisy 12-step window descriptors
-- Projection discriminator: critic conditions on same workload vector (Miyato & Koyama, ICLR 2018)
-
-```bash
-# Step 1: copy pretrain checkpoint to v38 dir (auto-detection picks it up)
-ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v38 && cp ~/checkpoints/tencent_v37/pretrain_complete.pt ~/checkpoints/tencent_v38/pretrain_complete.pt"
-
-# Step 2: launch training
-ssh -i ~/.ssh/id_rsa vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
   --checkpoint-dir ~/checkpoints/tencent_v38 --checkpoint-every 5 \
@@ -65,13 +29,29 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bi
   --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
-  --no-compile \
+  --no-compile --no-amp \
   > ~/train_v38.log 2>&1 &"
 ```
 
 **Hypothesis**: Stable file-level conditioning closes EMA→full eval gap. Projection
-discriminator scores "is this realistic for this workload type?" forcing G to cover
-workload-specific modes → higher recall. Combined effect > either alone.
+discriminator forces G to cover workload-specific modes → higher recall.
+
+---
+
+## Post-Mortem: v37 — 2-step supervisor (killed ep75, 2026-04-04)
+
+**Recipe**: v34 recipe + `--supervisor-steps 2`. v28 pretrain reused.
+**Best**: ep60 EMA combined=0.09226, recall=0.577. Did NOT beat ATB (0.089).
+**Trend after ep60**: ep65=0.10159, ep70=0.09929, ep75=0.11546 (declining recall, 0.577→0.486).
+**Killed**: recall in consistent decline, 125 epochs remaining offered no recovery path.
+**Lesson**: 2-step supervisor alone insufficient; conditional stability needed (→ v38 char-file).
+
+---
+
+## Queued: v39 — Full stack: char-file + proj_critic + RpGAN + PacGAN
+
+**When to launch**: After v38 completes or is killed (assess at ep100).
+Reuse v38 pretrain_complete.pt.
 
 ---
 
@@ -104,6 +84,8 @@ ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v39 && cp ~/che
   --no-compile \
   > ~/train_v39.log 2>&1 &"
 ```
+
+Note: AMP is now safe with proj_critic (init_scale lowered to 2^14 in code). No --no-amp needed.
 
 ---
 
