@@ -320,7 +320,15 @@ def train(cfg: Config) -> None:
     # init_scale=2**16=65536.  Use 2**14=16384 when proj_critic is enabled to
     # give 4× more fp16 headroom before overflow; the scaler will grow back up.
     _amp_init_scale = 2**14 if getattr(cfg, "proj_critic", False) else 2**16
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp, init_scale=_amp_init_scale)
+    # Use SEPARATE scalers for critic (C) and generator (G) to prevent
+    # scale collapse.  With n_critic > 1, the single-scaler design calls
+    # scaler.update() once per critic step, so the scale halves n_critic times
+    # per batch during any overflow period.  At 2 critic steps × 250 batches/epoch
+    # the scale reaches 0 within 2–3 epochs (2^14 / 2^1500 ≈ 0), after which
+    # unscale_() computes grad / 0 = NaN.  Separate scalers give each component
+    # its own scale trajectory so G's scaler stays healthy even if C's overflows.
+    scaler   = torch.amp.GradScaler("cuda", enabled=use_amp, init_scale=_amp_init_scale)  # G and pretrain
+    scaler_C = torch.amp.GradScaler("cuda", enabled=use_amp, init_scale=_amp_init_scale)  # critic C only
 
     print(f"Device: {device}  Loss: {cfg.loss}  AMP: {use_amp}")
 
@@ -1009,7 +1017,7 @@ def train(cfg: Config) -> None:
                         fake_labels = torch.zeros(B, 1, device=device)
                         c_loss = (bce(C(H_real_c, cond=_c_cond), real_labels[:H_real_c.size(0)]) +
                                   bce(C(H_fake_c, cond=_c_cond), fake_labels[:H_fake_c.size(0)]))
-                scaler.scale(c_loss).backward()
+                scaler_C.scale(c_loss).backward()
                 if cfg.grad_clip > 0:
                     # Gradient clipping is the primary Lipschitz constraint on
                     # the LSTM weights, which spectral norm does not reach.
@@ -1018,11 +1026,11 @@ def train(cfg: Config) -> None:
                     # weights grew monotonically.  Clip at 1.0 (Pascanu et al.
                     # 2013 recommendation for RNNs) prevents this without
                     # requiring gradient penalty computation.
-                    scaler.unscale_(opt_C)
+                    scaler_C.unscale_(opt_C)
                     nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
-                scaler.step(opt_C)
-                scaler.update()   # must reset scaler state per critic step so
-                                  # unscale_() can be called again next iteration
+                scaler_C.step(opt_C)
+                scaler_C.update()   # C-only scaler; decoupled from G scaler so
+                                    # C overflow doesn't cascade into G's scale
                 c_losses.append(c_loss.item())
 
                 # --- Feature-space critic step (dual discriminator) ---
@@ -1036,12 +1044,12 @@ def train(cfg: Config) -> None:
                         cf_base = (C_feat(feat_fake_c, cond=_c_cond) -
                                    C_feat(feat_real_c, cond=_c_cond)).mean()
                         cf_loss = cf_base
-                    scaler.scale(cf_loss).backward()
+                    scaler_C.scale(cf_loss).backward()
                     if cfg.grad_clip > 0:
-                        scaler.unscale_(opt_C_feat)
+                        scaler_C.unscale_(opt_C_feat)
                         nn.utils.clip_grad_norm_(C_feat.parameters(), cfg.grad_clip)
-                    scaler.step(opt_C_feat)
-                    scaler.update()
+                    scaler_C.step(opt_C_feat)
+                    scaler_C.update()
 
             # --- Generator step ---
             z_g = _make_z_global(B, cfg, device, real_features=real_batch,

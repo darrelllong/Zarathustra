@@ -4,16 +4,43 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v38
+## Post-Mortem: v38 — char-file + proj_critic (killed ep8, 2026-04-04)
 
-**Status**: RUNNING — v37 recipe + `--char-file` + `--proj-critic`. fp32 mode (--no-amp).
-AMP+proj_critic AMP overflow: proj_critic backward gradient O(1) × scale 65536 → fp16 overflow.
-Fixed in code (init_scale=2^14 when proj_critic), but v38 already launched with --no-amp.
+**Recipe**: Fresh pretraining (phases 1/2/2.5 with char-file + proj_critic) → Phase 3 with same.
+**Best**: ep5 EMA combined=0.18832, recall=0.290. Did NOT beat ATB (0.089).
+**W explosion**: ep1=0.98 → ep4=29.8 → ep7=54.0 → ep8=52.9 (diverging).
+**Root cause**: G was Phase-2.5 warmed-up on supervisor only (no critic). Phase 3 introduced
+proj_critic which directly uses char-file conditioning. The pretrained G output doesn't match
+char-file workload descriptors yet → critic can trivially distinguish using inner(cond_proj(cond),
+pooled). The critic quickly saturates (W→∞), G gets useless gradients.
+**Lesson**: proj_critic requires G to first learn char-file conditioning BEFORE the critic uses it
+for discrimination. Either: (1) train Phase 3 first without proj_critic then fine-tune with it,
+(2) use RpGAN which uses relativistic loss and resists saturation, (3) use lower n_critic=1.
+→ v39: char-file + RpGAN + PacGAN (NO proj_critic). Reserve proj_critic for v41+ after G
+has learned char-file conditional distribution.
 
-Launched 2026-04-04. Pretrain_complete.pt reused from v37 (E/R/S/G weights).
+---
 
+## KILLED: v38 Phase 3 (W explosion)
+
+**Status**: RUNNING — fresh pretraining (all phases use char-file conditioning). AMP disabled
+(--no-amp). AMP NaN root cause: with n_critic=2, scaler.update() is called twice/batch; on any
+overflow the scale halves twice; 2 halvings × 250 batches × 3 epochs → scale→0 → unscale_(grad/0)=NaN.
+Fix (in code, for v39+): separate scaler_C for critic, scaler for G; C's scale collapse doesn't
+cascade into G's scaler.
+
+**What happened**: v38 was initially launched with stale pretrain_complete.pt from v37 (window-level
+conditioning) → W-distance explosion at Phase 3 (G didn't know char-file conditioning). Fixed by
+deleting stale pretrain and rerunning fresh. Then stale vinge code (v18 era) missing AMP init_scale
+fix was synced. Monitor script (~/restart_v38_phase3.sh) will kill Phase 2.5 process when
+pretrain_complete.pt appears and restart Phase 3 with updated code (AMP fix + val-file cond_pool +
+cross-workload diversity loss).
+
+Launched fresh 2026-04-04. Phase 2.5 G-warmup at ep40/100 as of 13:58 UTC.
+
+**Phase 3 launch command** (auto-triggered by monitor script):
 ```bash
-ssh vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh darrell@192.168.86.30 "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
   --checkpoint-dir ~/checkpoints/tencent_v38 --checkpoint-every 5 \
@@ -29,12 +56,13 @@ ssh vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train
   --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
-  --no-compile --no-amp \
-  > ~/train_v38.log 2>&1 &"
+  --no-compile \
+  >> ~/train_v38.log 2>&1 &"
 ```
 
 **Hypothesis**: Stable file-level conditioning closes EMA→full eval gap. Projection
-discriminator forces G to cover workload-specific modes → higher recall.
+discriminator forces G to cover workload-specific modes → higher recall. Cross-workload
+diversity loss (pairs use different file conditioning) pushes G across workload boundaries.
 
 ---
 
@@ -48,31 +76,67 @@ discriminator forces G to cover workload-specific modes → higher recall.
 
 ---
 
-## Queued: v39 — Full stack: char-file + proj_critic + RpGAN + PacGAN
+## Current Run: v39 — char-file + RpGAN + PacGAN (NO proj_critic)
 
-**When to launch**: After v38 completes or is killed (assess at ep100).
-Reuse v38 pretrain_complete.pt.
+**Status**: RUNNING — 2026-04-04. Reusing v38's pretrain_complete.pt.
 
----
+**Why no proj_critic**: v38 showed that proj_critic causes W-distance explosion when combined
+with a freshly pretrained G. The G was warmed up with supervisor only; proj_critic immediately
+gave the critic a conditioning-based shortcut. Reserve proj_critic for v41+ after G has
+learned the char-file conditional distribution.
 
-## Queued: v39 — Full stack: char-file + proj_critic + RpGAN + PacGAN
-
-**When to launch**: After v38 completes or is killed (assess at ep100).
-Reuse v38 pretrain_complete.pt.
-
-**Recipe**: v38 recipe + RpGAN loss + PacGAN pack_size=2.
+**Recipe**:
 - RpGAN: relativistic paired loss directly targets mode coverage (--loss rpgan)
-- PacGAN: critic scores pairs of windows, catching identical fake pairs (--pack-size 2)
+- PacGAN pack_size=2: critic scores pairs of windows, detecting low-diversity fakes
+- char-file conditioning in G only (--cond-dim 10 --char-file)
+- NO proj_critic
 
 ```bash
-ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v39 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v39/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v39 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v39/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
   --checkpoint-dir ~/checkpoints/tencent_v39 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
+  --pack-size 2 --loss rpgan \
+  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --n-critic 2 --supervisor-steps 2 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
+  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
+  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
+  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
+  --hidden-size 256 --latent-dim 24 \
+  --no-compile --no-amp \
+  > ~/train_v39.log 2>&1 &"
+```
+
+Note: --no-amp needed (AMP separate-scaler fix is in code but untested; safe to enable in v40 tests).
+
+---
+
+## Queued: v40 — v39 + FiLM conditioning + dual discriminator
+
+**When to launch**: After v39 completes or is killed (assess at ep100).
+Reuse v38 pretrain_complete.pt (all phases trained with char-file conditioning).
+
+**Recipe**: v39 recipe + FiLM conditioning in G + feat-critic-weight.
+- FiLM: re-injects workload conditioning at each LSTM timestep → prevents signal fade
+  through forget gates (NeurIPS 2018). Zero-init → backward compatible.
+- feat-critic-weight=0.5: second critic in decoded feature space catches artifacts
+  invisible in latent space (dual discriminator from SeriesGAN).
+
+```bash
+ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v40 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v40/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v40 --checkpoint-every 5 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
+  --char-file ~/traces/characterization/trace_characterizations.jsonl \
   --proj-critic --pack-size 2 --loss rpgan \
+  --film-cond --feat-critic-weight 0.5 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 2 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -82,10 +146,8 @@ ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v39 && cp ~/che
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v39.log 2>&1 &"
+  > ~/train_v40.log 2>&1 &"
 ```
-
-Note: AMP is now safe with proj_critic (init_scale lowered to 2^14 in code). No --no-amp needed.
 
 ---
 
