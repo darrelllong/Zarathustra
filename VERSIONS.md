@@ -76,30 +76,58 @@ diversity loss (pairs use different file conditioning) pushes G across workload 
 
 ---
 
-## Current Run: v39 — char-file + RpGAN + PacGAN (NO proj_critic)
+## Post-Mortem: v39 — char-file + RpGAN + PacGAN (killed ep30, 2026-04-04)
 
-**Status**: RUNNING — 2026-04-04. Reusing v38's pretrain_complete.pt.
+**Recipe**: v38 pretrain + char-file + RpGAN (--loss rpgan) + PacGAN (--pack-size 2) + NO proj_critic. --no-amp.
+**Best**: ep25 EMA combined=0.198, recall=0.218. Did NOT beat ATB (0.089).
 
-**Why no proj_critic**: v38 showed that proj_critic causes W-distance explosion when combined
-with a freshly pretrained G. The G was warmed up with supervisor only; proj_critic immediately
-gave the critic a conditioning-based shortcut. Reserve proj_critic for v41+ after G has
-learned the char-file conditional distribution.
+**Eval progression**:
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|---------|
+| 5  | 0.052 | 0.150 | 0.222 |
+| 10 | 0.050 | 0.147 | 0.221 |
+| 15 | 0.046 | 0.191 | 0.208 |
+| 20 | 0.040 | 0.194 | 0.201 |
+| 25 | 0.042 | 0.218 | 0.198 |
+| 30 | 0.056 | 0.178 | 0.221 (regression, no ★) |
 
-**Recipe**:
-- RpGAN: relativistic paired loss directly targets mode coverage (--loss rpgan)
-- PacGAN pack_size=2: critic scores pairs of windows, detecting low-diversity fakes
-- char-file conditioning in G only (--cond-dim 10 --char-file)
-- NO proj_critic
+**Root cause**: RpGAN caused C_loss→0 by epoch 7. Relativistic loss became too easy to satisfy:
+critic immediately achieved near-perfect separation of real/fake, leaving G with minimal gradient.
+Recall never broke 0.22 and oscillated instead of improving. The W→19 and then slight regression
+at ep30 confirmed the training was cycling, not converging.
+
+**Lesson**: RpGAN + char-file + PacGAN is NOT the right combo. The WGAN-SN loss from v31/v34
+kept the critic training signal alive (W grew steadily to 9, then spiked late). RpGAN saturates
+too quickly with char-file conditioning injected. Go back to WGAN-SN.
+
+→ v40: v34 recipe (WGAN-SN) + char-file only. The simplest possible change from the ATB.
+
+---
+
+## Current Run: v40 — v34 recipe + char-file conditioning (WGAN-SN)
+
+**Status**: RUNNING — 2026-04-04. PID 601737 on vinge. Reusing v38's pretrain_complete.pt.
+
+**Hypothesis**: v31/v34 achieved ATB=0.089 with WGAN-SN + noisy window-level z_global. The only
+known weakness was EMA→full eval gap (from noisy conditioning). Replacing window-level z_global
+with stable char-file stats should close this gap and potentially allow even higher recall.
+
+**Recipe**: Identical to v34 except:
+- char-file conditioning (--char-file) replaces noisy window-level z_global descriptors
+- v38 pretrain (char-file conditioned from Phase 1)
+- --no-amp (AMP separate-scaler fix in code but untested)
+- WGAN-SN loss (default, NOT rpgan)
+- No PacGAN (not in v31/v34)
+- No proj_critic
 
 ```bash
-ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v39 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v39/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v40 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v40/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v39 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v40 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
-  --pack-size 2 --loss rpgan \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 2 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -109,45 +137,10 @@ ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v39 && cp ~/checkpoint
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile --no-amp \
-  > ~/train_v39.log 2>&1 &"
-```
-
-Note: --no-amp needed (AMP separate-scaler fix is in code but untested; safe to enable in v40 tests).
-
----
-
-## Queued: v40 — v39 + FiLM conditioning + dual discriminator
-
-**When to launch**: After v39 completes or is killed (assess at ep100).
-Reuse v38 pretrain_complete.pt (all phases trained with char-file conditioning).
-
-**Recipe**: v39 recipe + FiLM conditioning in G + feat-critic-weight.
-- FiLM: re-injects workload conditioning at each LSTM timestep → prevents signal fade
-  through forget gates (NeurIPS 2018). Zero-init → backward compatible.
-- feat-critic-weight=0.5: second critic in decoded feature space catches artifacts
-  invisible in latent space (dual discriminator from SeriesGAN).
-
-```bash
-ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v40 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v40/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
-  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v40 --checkpoint-every 5 \
-  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --cond-dim 10 --cond-drop-prob 0.25 \
-  --char-file ~/traces/characterization/trace_characterizations.jsonl \
-  --proj-critic --pack-size 2 --loss rpgan \
-  --film-cond --feat-critic-weight 0.5 \
-  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
-  --n-critic 2 --supervisor-steps 2 \
-  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
-  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
-  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
-  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
-  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
-  --hidden-size 256 --latent-dim 24 \
-  --no-compile \
   > ~/train_v40.log 2>&1 &"
 ```
+
+## Queued: v41 — v40 + proj_critic (after G has learned char-file conditioning for 200ep)
 
 ---
 
@@ -185,6 +178,8 @@ ssh darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v40 && cp ~/checkpoint
 | **v34** | **0.01119** | **0.608** | **150** | **vinge:~/checkpoints/tencent_v34/best.pt** | **CO-ATB (tied v31). β-recall=0.608 NEW ATB. CFG 0.25 > 0.15 for generalization. Most stable conditioned run.** |
 | v33 | 0.01080 | 0.521 | 70(EMA) | vinge:~/checkpoints/tencent_v33/best.pt | Same v31 recipe, different seed; W spiked ep179; EMA recall 0.683→0.521 full eval (24% drop); Context-FID=0.02 new ATB |
 | **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **CO-ATB (tied v34). CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
+| v39 | 0.040 | 0.218 | 25 | vinge:~/checkpoints/tencent_v39/epoch_0025.pt | char-file + RpGAN + PacGAN; C_loss→0 ep7; recall oscillated 0.15–0.22; regression at ep30; killed ep30 |
+| v38 | — | 0.290 | 5(EMA) | — | char-file + proj_critic; W explosion ep1→52 (proj_critic shortcut); killed ep8 |
 | v36 | 0.01023 | 0.471 | 100(EMA) | vinge:~/checkpoints/tencent_v36/best.pt | Same v34 recipe, different seed; EMA claimed recall=0.613/combined=0.087 but full eval: recall=0.471, combined=0.116 (23% gap); W spike ep178; killed ep182 |
 
 ---
