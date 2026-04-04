@@ -509,11 +509,13 @@ def train(cfg: Config) -> None:
         # checkpoints work with the new architecture.  strict=False skips the
         # newly added _u/_v power-iteration buffers (initialised randomly and
         # updated on the first forward pass).
-        c_sd = {
-            (k + "_orig" if k in ("lstm.weight_ih_l0", "lstm.weight_hh_l0") else k): v
-            for k, v in ckpt["C"].items()
-        }
-        C.load_state_dict(c_sd, strict=False)
+        # pretrain_complete.pt may not contain "C" (Critic trained only in Phase 3).
+        if "C" in ckpt:
+            c_sd = {
+                (k + "_orig" if k in ("lstm.weight_ih_l0", "lstm.weight_hh_l0") else k): v
+                for k, v in ckpt["C"].items()
+            }
+            C.load_state_dict(c_sd, strict=False)
         if latent_ae and "E" in ckpt:
             E.load_state_dict(ckpt["E"], strict=False)
             R.load_state_dict(ckpt["R"], strict=False)
@@ -536,9 +538,15 @@ def train(cfg: Config) -> None:
             print(f"Hot-start from {resume_path} with reset optimizer "
                   f"(lr_g={cfg.lr_g:.2e}, lr_d={cfg.lr_d:.2e}, n_critic={cfg.n_critic})")
         else:
-            opt_G.load_state_dict(ckpt["opt_G"])
-            opt_C.load_state_dict(ckpt["opt_C"])
-            start_epoch = ckpt["epoch"] + 1
+            # pretrain_complete.pt only has opt_G (critic not trained yet).
+            # Gracefully skip opt states that aren't present.
+            if "opt_G" in ckpt:
+                opt_G.load_state_dict(ckpt["opt_G"])
+            if "opt_C" in ckpt:
+                opt_C.load_state_dict(ckpt["opt_C"])
+            # pretrain_complete.pt has no "epoch" key; leave start_epoch=0.
+            if "epoch" in ckpt:
+                start_epoch = ckpt["epoch"] + 1
             # Restore scheduler state if present; otherwise fast-forward to the
             # correct position so the LR matches start_epoch (handles old checkpoints
             # that predate scheduler support without silently using the wrong LR).

@@ -45,11 +45,14 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u 
 - Projection discriminator: critic conditions on same workload vector (Miyato & Koyama, ICLR 2018)
 
 ```bash
+# Step 1: copy pretrain checkpoint to v38 dir (auto-detection picks it up)
+ssh -i ~/.ssh/id_rsa vinge.local "mkdir -p ~/checkpoints/tencent_v38 && cp ~/checkpoints/tencent_v37/pretrain_complete.pt ~/checkpoints/tencent_v38/pretrain_complete.pt"
+
+# Step 2: launch training
 ssh -i ~/.ssh/id_rsa vinge.local "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
   --checkpoint-dir ~/checkpoints/tencent_v38 --checkpoint-every 5 \
-  --resume-from ~/checkpoints/tencent_v37/pretrain_complete.pt \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
