@@ -51,6 +51,10 @@ class Config:
     reset_optimizer: bool = False       # load weights only, fresh optimizers at new LR
     sn_lstm: bool = True                # spectral norm on critic LSTM weight matrices
     patch_embed: bool = False           # Conv1d patch embedding before critic LSTM (TTS-GAN)
+    film_cond: bool = False             # FiLM conditioning in G (NeurIPS 2018): applies
+                                        # (1+γ(z_global))*h + β(z_global) after LSTM at each
+                                        # timestep, re-injecting workload cond; requires cond_dim>0;
+                                        # zero-init → backward compatible with existing checkpoints.
     proj_critic: bool = False           # projection discriminator (Miyato & Koyama, ICLR 2018);
                                         # adds inner(cond_proj(cond), pooled) to critic score;
                                         # requires cond_dim > 0 and --char-file for full benefit

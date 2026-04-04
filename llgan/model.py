@@ -259,6 +259,7 @@ class Generator(nn.Module):
         latent_dim: Optional[int] = None,
         avatar: bool = False,
         cond_dim: int = 0,
+        film_cond: bool = False,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -267,6 +268,7 @@ class Generator(nn.Module):
         self.latent_dim  = latent_dim
         self.avatar      = avatar
         self.cond_dim    = cond_dim
+        self.film_cond   = film_cond and (cond_dim > 0)
 
         out_dim = latent_dim if latent_dim is not None else num_cols
 
@@ -291,6 +293,24 @@ class Generator(nn.Module):
             self.out_act = nn.Identity()
         else:
             self.out_act = nn.Sigmoid() if latent_dim is not None else nn.Tanh()
+
+        # FiLM conditioning (Feature-wise Linear Modulation, NeurIPS 2018):
+        # After LSTM, reproject z_global into scale γ and shift β and apply
+        #   h_t = (1 + γ) * h_t + β
+        # This reinjects the workload conditioning at every timestep so it
+        # cannot fade through the LSTM forget gate.  Zero-init ensures the
+        # module is initially transparent (backward compatible with old ckpts).
+        if self.film_cond:
+            self.film_gamma = nn.Linear(z_input_dim, hidden_size, bias=True)
+            self.film_beta  = nn.Linear(z_input_dim, hidden_size, bias=True)
+            nn.init.zeros_(self.film_gamma.weight)
+            nn.init.zeros_(self.film_gamma.bias)
+            nn.init.zeros_(self.film_beta.weight)
+            nn.init.zeros_(self.film_beta.bias)
+        else:
+            self.film_gamma = None
+            self.film_beta  = None
+
         self._init_weights()
 
     def _init_weights(self):
@@ -321,6 +341,13 @@ class Generator(nn.Module):
             c0 = self.z_to_c0(z_global).unsqueeze(0)
             hidden = (h0, c0)
         h, hidden_out = self.lstm(z_local, hidden)
+        # FiLM: reinject workload conditioning at every timestep so it cannot
+        # fade through the LSTM forget gate over the T-step window.
+        # (1 + γ) * h + β; zero-init → initially transparent (identity).
+        if self.film_gamma is not None and z_global is not None:
+            gamma = self.film_gamma(z_global).unsqueeze(1)  # (B, 1, H)
+            beta  = self.film_beta(z_global).unsqueeze(1)
+            h = (1.0 + gamma) * h + beta
         out = self.out_act(self.fc(h))
         if return_hidden:
             return out, hidden_out

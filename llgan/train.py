@@ -422,7 +422,8 @@ def train(cfg: Config) -> None:
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
                   latent_dim=cfg.latent_dim if latent_ae else None,
                   avatar=_avatar,
-                  cond_dim=cfg.cond_dim).to(device)
+                  cond_dim=cfg.cond_dim,
+                  film_cond=getattr(cfg, "film_cond", False)).to(device)
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
@@ -1533,6 +1534,12 @@ def parse_args() -> Config:
                         "Conditions critic on workload descriptors so it evaluates "
                         "'is this realistic for THIS workload?' Requires --cond-dim > 0. "
                         "Best used with --char-file for stable conditioning.")
+    p.add_argument("--film-cond",        action="store_true", default=False,
+                   help="FiLM conditioning in G (NeurIPS 2018): applies "
+                        "(1+γ(z_global))*h_t + β(z_global) after LSTM at each timestep, "
+                        "re-injecting workload conditioning so it cannot fade through "
+                        "the LSTM forget gate. Zero-init → backward compatible. "
+                        "Requires --cond-dim > 0. Planned for v40+.")
     p.add_argument("--pack-size",        type=int, default=1,
                    help="PacGAN window packing (Lin et al. NeurIPS 2018): critic scores packs "
                         "of m consecutive windows concatenated along time axis. "
@@ -1671,6 +1678,7 @@ def parse_args() -> Config:
     cfg.sn_lstm          = not args.no_sn_lstm
     cfg.patch_embed      = args.patch_embed
     cfg.proj_critic      = args.proj_critic
+    cfg.film_cond        = args.film_cond
     cfg.pack_size        = args.pack_size
     cfg.seed             = args.seed
     cfg.lr_g             = args.lr_g
