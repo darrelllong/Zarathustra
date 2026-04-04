@@ -1256,9 +1256,18 @@ def train(cfg: Config) -> None:
                 # Set diversity_loss_weight > 0 (try 0.5–2.0) when β-recall < 0.5.
                 if cfg.diversity_loss_weight > 0:
                     B2 = B // 2
-                    z_g1 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2])
+                    # When char-file conditioning is available, use DIFFERENT
+                    # file conditioning vectors for the two halves of the batch.
+                    # This measures cross-workload diversity (does G produce
+                    # different outputs for different workload types?), directly
+                    # targeting the mode coverage gaps in recall.
+                    _fc1 = file_cond_batch[:B2] if file_cond_batch is not None else None
+                    _fc2 = file_cond_batch[B2:B2*2] if file_cond_batch is not None else None
+                    z_g1 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2],
+                                          file_cond=_fc1)
                     z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
-                    z_g2 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2])
+                    z_g2 = _make_z_global(B2, cfg, device, real_features=real_batch[B2:B2*2],
+                                          file_cond=_fc2)
                     z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
                     f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
                     f2 = G(z_g2, z_l2)
