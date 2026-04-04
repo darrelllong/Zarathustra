@@ -46,6 +46,8 @@ weight (e.g. 0.05) makes the selector prefer checkpoints with better temporal
 dynamics as a tiebreaker, without overriding large MMD² improvements.
 """
 
+from typing import Optional
+
 import numpy as np
 import torch
 from scipy.linalg import subspace_angles
@@ -220,6 +222,7 @@ def evaluate_metrics(
     recovery=None,
     k: int = 5,
     dmd_weight: float = 0.0,
+    cond_pool: "Optional[torch.Tensor]" = None,
 ) -> tuple[float, float, float]:
     """
     Compute MMD², β-recall, and combined score for checkpoint selection.
@@ -230,6 +233,12 @@ def evaluate_metrics(
     Use 0.05 to add a temporal-dynamics tiebreaker without overriding MMD²
     improvements (reviewer rec: "do not let best.pt be chosen without a
     temporal law penalty").
+
+    cond_pool: optional (N, cond_dim) tensor of pre-computed conditioning
+        vectors to sample from for generation (e.g., char-file file-level
+        stats).  When provided, overrides compute_window_descriptors so that
+        EMA eval uses the same conditioning distribution as training.  Each
+        generated sample draws a random row from cond_pool.
 
     Returns (mmd2, recall, combined).
     """
@@ -244,8 +253,14 @@ def evaluate_metrics(
 
         noise = torch.randn(n_samples, generator.noise_dim, device=device)
         if getattr(generator, 'cond_dim', 0) > 0:
-            from dataset import compute_window_descriptors
-            cond = compute_window_descriptors(real)
+            if cond_pool is not None:
+                # Char-file conditioning: sample from the pool of file-level
+                # stats so EMA eval uses the same distribution as training.
+                cidx = torch.randint(len(cond_pool), (n_samples,))
+                cond = cond_pool[cidx].to(device)
+            else:
+                from dataset import compute_window_descriptors
+                cond = compute_window_descriptors(real)
             z_global = torch.cat([cond, noise], dim=1)
         else:
             z_global = noise

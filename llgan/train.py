@@ -851,6 +851,16 @@ def train(cfg: Config) -> None:
 
     print(f"\n--- Phase 3: Joint GAN training ({cfg.epochs} epochs) ---", flush=True)
 
+    # Build a cond_pool from char_lookup (all training-file conditioning vectors
+    # stacked into a tensor).  Passed to evaluate_metrics so EMA eval uses the
+    # same file-level conditioning distribution as training, instead of the
+    # noisier window-level descriptors (compute_window_descriptors fallback).
+    # Without this, char-file training inflates EMA recall vs full eval because
+    # the EMA eval conditions G on the wrong distribution.
+    _eval_cond_pool: Optional[torch.Tensor] = None
+    if char_lookup is not None and cfg.cond_dim > 0:
+        _eval_cond_pool = torch.stack(list(char_lookup.values())).to(device)
+
     # -----------------------------------------------------------------------
     # Epoch loop
     # -----------------------------------------------------------------------
@@ -1338,6 +1348,7 @@ def train(cfg: Config) -> None:
                 G, val_tensor, cfg.mmd_samples, cfg.timestep, device,
                 recovery=R if latent_ae else None,
                 dmd_weight=cfg.dmd_ckpt_weight,
+                cond_pool=_eval_cond_pool,
             )
             G.load_state_dict(live_G_state)   # restore live weights for training
             mmd_history.append((epoch, mmd_val, recall_val, combined_val))
