@@ -272,6 +272,17 @@ def _load_epoch_dataset(
 # ---------------------------------------------------------------------------
 
 def train(cfg: Config) -> None:
+    # Seed control for reproducibility.  Set before any random operations so
+    # model init, file shuffling, and batch ordering are all deterministic.
+    seed = getattr(cfg, "seed", -1)
+    if seed >= 0:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        print(f"[seed] {seed} — training is deterministic")
+
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -1402,6 +1413,9 @@ def parse_args() -> Config:
                    help="Gradient penalty coefficient for wgan-gp (standard: 10)")
     p.add_argument("--epochs",           type=int,   default=200)
     p.add_argument("--batch-size",       type=int,   default=64)
+    p.add_argument("--seed",             type=int,   default=-1,
+                   help="Random seed for reproducibility (-1 = random). "
+                        "Sets Python/NumPy/PyTorch seeds before model init.")
     p.add_argument("--timestep",         type=int,   default=12)
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--cond-dim",         type=int,   default=0,
@@ -1564,6 +1578,7 @@ def parse_args() -> Config:
     cfg.patch_embed      = args.patch_embed
     cfg.proj_critic      = args.proj_critic
     cfg.pack_size        = args.pack_size
+    cfg.seed             = args.seed
     cfg.lr_g             = args.lr_g
     cfg.lr_d             = args.lr_d
     cfg.n_critic         = args.n_critic
