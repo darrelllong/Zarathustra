@@ -40,7 +40,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
-from dataset import load_trace, TracePreprocessor, TraceDataset, _READERS, compute_window_descriptors
+from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
+                     compute_window_descriptors, load_file_characterizations)
 from model import Generator, Critic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
 
@@ -52,6 +53,7 @@ from mmd import evaluate_mmd, evaluate_metrics
 def _make_z_global(
     B: int, cfg, device: torch.device,
     real_features: Optional[torch.Tensor] = None,
+    file_cond: Optional[torch.Tensor] = None,
     training: bool = True,
 ) -> torch.Tensor:
     """Build z_global, optionally prepending workload descriptors.
@@ -67,7 +69,11 @@ def _make_z_global(
         cfg: Config with noise_dim, cond_dim, and cond_drop_prob
         device: target device
         real_features: (B, T, num_cols) real feature-space windows.
-            Required when cfg.cond_dim > 0.
+            Used as fallback when file_cond is None and cfg.cond_dim > 0.
+        file_cond: (B, cond_dim) precharacterized per-file conditioning vectors.
+            When provided, used instead of computing from real_features windows.
+            More stable than window-level descriptors; enables multi-corpus
+            conditioning keyed on full-file statistics.
         training: if True, apply CFG dropout; if False (eval), always condition.
 
     Returns:
@@ -76,7 +82,14 @@ def _make_z_global(
     """
     noise = torch.randn(B, cfg.noise_dim, device=device)
     if cfg.cond_dim > 0:
-        cond = compute_window_descriptors(real_features)  # (B, cond_dim)
+        if file_cond is not None:
+            # Ground-truth file-level conditioning: stable stats from the full
+            # trace (write_ratio, reuse_ratio, burstiness, etc.) rather than
+            # noisy window-level estimates.
+            cond = file_cond.to(device)   # (B, cond_dim)
+        else:
+            # Fallback: estimate conditioning from current real windows.
+            cond = compute_window_descriptors(real_features)  # (B, cond_dim)
         # Classifier-free guidance: randomly drop conditioning during training
         drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
         if training and drop_prob > 0:
@@ -159,6 +172,7 @@ def _load_epoch_dataset(
     records_per_file: int,
     prep: TracePreprocessor,
     timestep: int,
+    char_lookup: Optional[dict] = None,
 ) -> Tuple[Optional[ConcatDataset], Optional[np.ndarray]]:
     """
     Load records_per_file from each file, transform with fitted prep, and
@@ -167,10 +181,18 @@ def _load_epoch_dataset(
     Critically: each file gets its own TraceDataset so sliding windows are
     never formed across file boundaries (last event of file A → first event
     of file B would be causally meaningless and poison a sequence model).
+
+    When char_lookup is provided, each TraceDataset is tagged with the
+    precharacterized per-file conditioning vector looked up by filename.
+    Files not found in the lookup get a zero vector (unconditional path).
+    TraceDatasets then return (window, file_cond) tuples from __getitem__.
     """
     import pandas as pd
     train_datasets = []
     val_arrays = []
+
+    # Determine cond_dim from the lookup (all entries share the same dim)
+    cond_dim = next(iter(char_lookup.values())).shape[0] if char_lookup else 0
 
     for f in files:
         try:
@@ -182,8 +204,29 @@ def _load_epoch_dataset(
             n_train = int(len(arr) * 0.8)
             train_arr = arr[:n_train]
             val_arr   = arr[n_train:]
+
+            # Look up precharacterized conditioning vector for this file.
+            # Try full basename first, then strip .zst/.gz.
+            file_cond = None
+            if char_lookup:
+                fname = f.name
+                file_cond = char_lookup.get(fname)
+                if file_cond is None:
+                    for ext in (".zst", ".gz"):
+                        if fname.endswith(ext):
+                            file_cond = char_lookup.get(fname[: -len(ext)])
+                            if file_cond is not None:
+                                break
+                if file_cond is None:
+                    # File not characterized: zero vector = unconditional path.
+                    # Under CFG training the model already handles this case
+                    # (dropout zeros are indistinguishable from unknown files).
+                    file_cond = torch.zeros(cond_dim)
+
             if len(train_arr) > timestep:
-                train_datasets.append(TraceDataset(train_arr, timestep))
+                train_datasets.append(
+                    TraceDataset(train_arr, timestep, file_cond=file_cond)
+                )
             if len(val_arr) > 0:
                 val_arrays.append(val_arr)
         except Exception as e:
@@ -259,6 +302,20 @@ def train(cfg: Config) -> None:
         print(f"  locality-split: {prep._obj_locality_cols}")
         print(f"  log-transformed: {prep._log_cols}")
 
+        # Load precharacterized per-file conditioning vectors if provided.
+        # Keys are filenames (basename); values are (cond_dim,) float32 tensors.
+        char_lookup: Optional[dict] = None
+        if cfg.char_file:
+            print(f"Loading trace characterizations from {cfg.char_file} …")
+            char_lookup = load_file_characterizations(cfg.char_file, cfg.cond_dim)
+            n_matched = sum(1 for f in all_files if (
+                char_lookup.get(f.name) is not None or
+                any(char_lookup.get(f.name[:-len(e)]) is not None
+                    for e in (".zst", ".gz") if f.name.endswith(e))
+            ))
+            print(f"  {len(char_lookup)} characterizations loaded; "
+                  f"{n_matched}/{len(all_files)} training files matched")
+
         # Hold out a fixed val set — remove val files from all_files so they
         # are never sampled during training.  Build per-file TraceDatasets
         # (same as training) so no window ever crosses a file boundary.
@@ -278,6 +335,7 @@ def train(cfg: Config) -> None:
             cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
         )
     else:
+        char_lookup = None  # single-file mode: no per-file lookup
         print(f"Loading: {cfg.trace_path}")
         train_ds, val_ds, prep = load_trace(
             cfg.trace_path, cfg.trace_format, cfg.max_records,
@@ -730,6 +788,7 @@ def train(cfg: Config) -> None:
             epoch_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
             train_ds, _ = _load_epoch_dataset(
                 epoch_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
+                char_lookup=char_lookup,
             )
             if train_ds is None or len(train_ds) == 0:
                 print(f"Epoch {epoch+1}: no data loaded, skipping.")
@@ -741,8 +800,13 @@ def train(cfg: Config) -> None:
             drop_last=True,
         )
 
-        for real_batch in train_loader:
-            real_batch = real_batch.to(device)
+        for batch in train_loader:
+            # When char_lookup is active, TraceDataset returns (window, file_cond)
+            # tuples; DataLoader collates them into a 2-element list.
+            if isinstance(batch, (list, tuple)) and len(batch) == 2:
+                real_batch, file_cond_batch = batch[0].to(device), batch[1].to(device)
+            else:
+                real_batch, file_cond_batch = batch.to(device), None
             B = real_batch.size(0)
 
             # In latent AE mode the critic operates on latent sequences.
@@ -755,7 +819,8 @@ def train(cfg: Config) -> None:
 
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
-                z_g = _make_z_global(B, cfg, device, real_features=real_batch)
+                z_g = _make_z_global(B, cfg, device, real_features=real_batch,
+                                     file_cond=file_cond_batch)
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
                 H_fake = G(z_g, z_l).detach()
 
@@ -827,7 +892,8 @@ def train(cfg: Config) -> None:
                 c_losses.append(c_loss.item())
 
             # --- Generator step ---
-            z_g = _make_z_global(B, cfg, device, real_features=real_batch)
+            z_g = _make_z_global(B, cfg, device, real_features=real_batch,
+                                 file_cond=file_cond_batch)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
 
             opt_G.zero_grad()
@@ -1270,6 +1336,15 @@ def parse_args() -> Config:
                    help="Files sampled per epoch in --trace-dir mode")
     p.add_argument("--records-per-file", type=int,   default=15_000,
                    help="Records loaded from each file per epoch")
+    p.add_argument("--char-file",        default="",
+                   metavar="JSONL",
+                   help="Path to trace_characterizations.jsonl. When set, each "
+                        "training file's z_global conditioning vector is looked "
+                        "up from precharacterized full-trace statistics (write_ratio, "
+                        "reuse_ratio, burstiness_cv, etc.) instead of being estimated "
+                        "from noisy 12-step windows. Files not found in the lookup "
+                        "receive a zero vector (unconditional path). "
+                        "Use: --char-file /path/to/trace_characterizations.jsonl")
     # Output / checkpointing
     p.add_argument("--checkpoint-dir",   default="checkpoints")
     p.add_argument("--resume-from",      default=None,
@@ -1385,6 +1460,7 @@ def parse_args() -> Config:
     cfg.max_records      = args.max_records
     cfg.files_per_epoch  = args.files_per_epoch
     cfg.records_per_file = args.records_per_file
+    cfg.char_file        = args.char_file or ""
     cfg.checkpoint_dir   = args.checkpoint_dir
     cfg.resume_from      = args.resume_from
     cfg.reset_optimizer  = args.reset_optimizer

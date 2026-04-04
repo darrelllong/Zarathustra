@@ -15,10 +15,13 @@ Usage
 
 import argparse
 import math
+from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
 
+from dataset import load_file_characterizations
 from model import Generator, Recovery
 
 
@@ -29,6 +32,8 @@ def generate(
     n_streams: int = 1,
     device_str: str = "cuda",
     binarize_opcode: bool = True,
+    char_file: str = "",
+    source_trace: str = "",
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -79,14 +84,36 @@ def generate(
     # each stream's sequence boundary.
     stream_windows: list[list[np.ndarray]] = [[] for _ in range(n_streams)]
 
+    # Build conditioning vector for generation.
+    # Priority: (1) lookup source_trace in char_file, (2) random N(0,0.5).
+    cond_vec: Optional[torch.Tensor] = None
+    if cond_dim > 0 and char_file and source_trace:
+        lookup = load_file_characterizations(char_file, cond_dim)
+        key = Path(source_trace).name
+        cond_vec = lookup.get(key)
+        if cond_vec is None:
+            for ext in (".zst", ".gz"):
+                if key.endswith(ext):
+                    cond_vec = lookup.get(key[: -len(ext)])
+                    if cond_vec is not None:
+                        break
+        if cond_vec is not None:
+            print(f"Using precharacterized conditioning for {key}")
+            cond_vec = cond_vec.unsqueeze(0).expand(n_streams, -1).to(device)
+        else:
+            print(f"[warn] {key} not found in {char_file}; using random conditioning")
+
     with torch.no_grad():
         # Each stream is an independent long trace.
         # z_global is fixed per stream (workload identity); LSTM hidden state
         # is carried across windows so long-range burst structure is coherent.
         noise = torch.randn(n_streams, cfg.noise_dim, device=device)
         if cond_dim > 0:
-            # Default: generic conditioning from N(0, 0.5)
-            cond = torch.randn(n_streams, cond_dim, device=device) * 0.5
+            if cond_vec is not None:
+                cond = cond_vec
+            else:
+                # Default: generic conditioning from N(0, 0.5)
+                cond = torch.randn(n_streams, cond_dim, device=device) * 0.5
             z_global = torch.cat([cond, noise], dim=1)
         else:
             z_global = noise
@@ -139,6 +166,14 @@ def parse_args():
     p.add_argument("--no-binarize-opcode", action="store_true")
     p.add_argument("--cond-random", action="store_true",
                    help="Use random conditioning N(0,0.5) for conditional checkpoints (default)")
+    p.add_argument("--char-file", default="",
+                   metavar="JSONL",
+                   help="Path to trace_characterizations.jsonl. Used with --source-trace "
+                        "to condition generation on a specific workload's characteristics.")
+    p.add_argument("--source-trace", default="",
+                   metavar="FILE",
+                   help="Trace filename (basename) whose precharacterized stats are used "
+                        "as the conditioning vector. Requires --char-file.")
     return p.parse_args()
 
 
@@ -151,4 +186,6 @@ if __name__ == "__main__":
         args.n_streams,
         args.device,
         not args.no_binarize_opcode,
+        char_file=args.char_file,
+        source_trace=args.source_trace,
     )

@@ -52,6 +52,7 @@ tencent_cloud_disk: Tencent Cloud Disk aggregate statistics (ASPLOS '25, TELA pa
 csv          : generic — infer numeric cols; opcode col named 'opcode'/'type'/'rw'
 """
 
+import math
 import numpy as np
 import pandas as pd
 import torch
@@ -60,7 +61,130 @@ from typing import Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
-# Per-window workload descriptors (z_global conditioning)
+# Precharacterized file-level conditioning (z_global)
+# ---------------------------------------------------------------------------
+#
+# These functions load per-file workload statistics from the trace
+# characterization JSONL (traces/characterization/trace_characterizations.jsonl)
+# and convert them to a normalized cond_dim-vector for the Generator.
+#
+# This replaces the window-level compute_window_descriptors() approach: instead
+# of estimating workload character from a noisy 12-step window, we look up
+# stable ground-truth statistics measured from the full trace file.
+#
+# Normalization clip ranges derived empirically from 13,732 request_sequence
+# traces across all characterized families (see traces/analysis/trace_rollup.py).
+#
+# 10-dim vector layout (matches current cond_dim=10 default):
+#   0: write_ratio             linear [0, 1]
+#   1: log(reuse_ratio+0.001)  log-offset, clipped [-7, 0]
+#   2: log(burstiness_cv)      log, clipped [0, 4.5]
+#   3: log1p(iat_q50)          log1p, clipped [0, 12.5]
+#   4: log(obj_size_q50)       log, clipped [6, 15]
+#   5: opcode_switch_ratio     linear [0, 0.5]
+#   6: iat_lag1_autocorr       identity [-1, 1]
+#   7: log(tenant_unique)      log, clipped [0, 6.5]
+#   8: forward_seek_ratio      linear [0, 1]
+#   9: backward_seek_ratio     linear [0, 1]
+# All output values are in [-1, 1].
+
+
+def _cn(val: float, lo: float, hi: float) -> float:
+    """Clip-normalize val from [lo, hi] to [-1, 1]."""
+    span = hi - lo
+    if span <= 0:
+        return 0.0
+    return max(-1.0, min(1.0, (val - lo) / span * 2.0 - 1.0))
+
+
+def profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> List[float]:
+    """Convert a trace characterization profile dict to a normalized cond vector.
+
+    Args:
+        profile: the 'profile' sub-dict from a trace_characterizations.jsonl row.
+        cond_dim: length of output vector (default 10; padded/truncated as needed).
+
+    Returns:
+        List of cond_dim floats in [-1, 1]. Missing fields default to 0.
+    """
+    iat = profile.get("iat_stats") or {}
+    obj = profile.get("obj_size_stats") or {}
+    ten = profile.get("tenant_summary") or {}
+
+    write_ratio         = float(profile.get("write_ratio") or 0.0)
+    reuse_ratio         = float(profile.get("reuse_ratio") or 0.0)
+    burstiness_cv       = float(profile.get("burstiness_cv") or 1.0)
+    iat_q50             = float(iat.get("q50") or 0.0)
+    obj_size_q50        = float(obj.get("q50") or 4096.0)
+    opcode_switch_ratio = float(profile.get("opcode_switch_ratio") or 0.0)
+    iat_lag1_autocorr   = float(profile.get("iat_lag1_autocorr") or 0.0)
+    tenant_unique       = float(ten.get("unique") or 1.0)
+    forward_seek_ratio  = float(profile.get("forward_seek_ratio") or 0.5)
+    backward_seek_ratio = float(profile.get("backward_seek_ratio") or 0.0)
+
+    vec = [
+        _cn(write_ratio,                                    0.0,   1.0),   # 0
+        _cn(math.log(max(reuse_ratio, 0.0) + 0.001),       -7.0,  0.0),   # 1
+        _cn(math.log(max(burstiness_cv, 1e-6)),             0.0,  4.5),   # 2
+        _cn(math.log1p(max(iat_q50, 0.0)),                  0.0, 12.5),   # 3
+        _cn(math.log(max(obj_size_q50, 1.0)),               6.0, 15.0),   # 4
+        _cn(opcode_switch_ratio,                            0.0,  0.5),   # 5
+        _cn(max(-1.0, min(1.0, iat_lag1_autocorr)),        -1.0,  1.0),   # 6
+        _cn(math.log(max(tenant_unique, 1.0)),              0.0,  6.5),   # 7
+        _cn(forward_seek_ratio,                             0.0,  1.0),   # 8
+        _cn(backward_seek_ratio,                            0.0,  1.0),   # 9
+    ]
+
+    if len(vec) < cond_dim:
+        vec.extend([0.0] * (cond_dim - len(vec)))
+    return vec[:cond_dim]
+
+
+def load_file_characterizations(
+    jsonl_path: str,
+    cond_dim: int = 10,
+) -> Dict[str, torch.Tensor]:
+    """Load trace characterizations and return a filename→cond_vector lookup.
+
+    Keyed by basename (e.g. 'tencentBlock_10007.oracleGeneral.zst') and also
+    by the de-suffixed name (e.g. 'tencentBlock_10007.oracleGeneral') for
+    flexible matching against compressed/uncompressed variants.
+
+    Args:
+        jsonl_path: path to trace_characterizations.jsonl
+        cond_dim:   dimension of each conditioning vector (default 10)
+
+    Returns:
+        dict mapping filename strings to (cond_dim,) float32 tensors.
+    """
+    import json
+    from pathlib import Path
+
+    lookup: Dict[str, torch.Tensor] = {}
+    with open(jsonl_path) as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not row.get("profile"):
+                continue
+            rel = row.get("rel_path", "")
+            if not rel:
+                continue
+            basename = Path(rel).name
+            vec = profile_to_cond_vector(row["profile"], cond_dim)
+            t = torch.tensor(vec, dtype=torch.float32)
+            lookup[basename] = t
+            # Also index without .zst or .gz so we match either variant
+            for ext in (".zst", ".gz"):
+                if basename.endswith(ext):
+                    lookup[basename[: -len(ext)]] = t
+    return lookup
+
+
+# ---------------------------------------------------------------------------
+# Per-window workload descriptors (z_global conditioning, fallback)
 # ---------------------------------------------------------------------------
 
 def compute_window_descriptors(windows: torch.Tensor) -> torch.Tensor:
@@ -789,19 +913,34 @@ class TracePreprocessor:
 class TraceDataset(Dataset):
     """
     Sliding-window dataset over a normalized trace array.
-    Each item is a (timestep, num_cols) float32 tensor in [-1, 1].
+
+    When file_cond is provided (a precharacterized per-file conditioning
+    vector), __getitem__ returns (window, file_cond) tuples so the DataLoader
+    can batch both together.  When file_cond is None, returns plain windows
+    for backward compatibility.
     """
 
-    def __init__(self, data: np.ndarray, timestep: int):
+    def __init__(
+        self,
+        data: np.ndarray,
+        timestep: int,
+        file_cond: Optional[torch.Tensor] = None,
+    ):
         self.data = torch.from_numpy(data)
         self.timestep = timestep
         self.n_windows = max(0, len(data) - timestep)
+        # file_cond: (cond_dim,) float32 tensor, same for every window in this
+        # file.  None = fall back to window-level compute_window_descriptors().
+        self.file_cond = file_cond
 
     def __len__(self) -> int:
         return self.n_windows
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        return self.data[idx: idx + self.timestep]
+    def __getitem__(self, idx: int):
+        window = self.data[idx: idx + self.timestep]
+        if self.file_cond is not None:
+            return window, self.file_cond
+        return window
 
 
 # ---------------------------------------------------------------------------
@@ -815,6 +954,7 @@ def load_trace(
     timestep: int,
     train_split: float = 0.8,
     obj_size_granularity: int = 0,
+    file_cond: Optional[torch.Tensor] = None,
 ) -> Tuple[TraceDataset, TraceDataset, TracePreprocessor]:
     """Load, preprocess, and split a trace file."""
     reader = _READERS.get(fmt)
@@ -847,7 +987,7 @@ def load_trace(
     train_arr = prep.transform(df_train)
     val_arr   = prep.transform(df_val)
 
-    train_ds = TraceDataset(train_arr, timestep)
-    val_ds   = TraceDataset(val_arr,   timestep)
+    train_ds = TraceDataset(train_arr, timestep, file_cond=file_cond)
+    val_ds   = TraceDataset(val_arr,   timestep)  # val never needs cond
 
     return train_ds, val_ds, prep

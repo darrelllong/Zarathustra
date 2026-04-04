@@ -39,6 +39,9 @@ class Config:
     trace_dir: str = ""          # directory of trace files (mutually exclusive with trace_path)
     files_per_epoch: int = 8     # files sampled per epoch
     records_per_file: int = 15_000  # records loaded from each file per epoch
+    char_file: str = ""          # path to trace_characterizations.jsonl for precharacterized
+                                 # per-file conditioning vectors; when set, replaces noisy
+                                 # window-level z_global descriptors with stable full-trace stats
 
     # Output
     checkpoint_dir: str = "checkpoints"
