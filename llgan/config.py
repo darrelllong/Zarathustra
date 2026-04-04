@@ -15,8 +15,10 @@ class Config:
     # Training
     loss: str = "wgan-sn"       # "wgan-sn": Wasserstein + spectral norm (output layer only)
                                 # "wgan-gp": Wasserstein + gradient penalty (true Lipschitz;
-                                #   works on MPS — create_graph=True confirmed supported)
+                                #   CUDA only — create_graph=True through LSTM not supported on MPS)
                                 # "bce": original GAN cross-entropy
+                                # "rpgan": relativistic paired GAN (R3GAN, NeurIPS 2024);
+                                #   MPS-compatible; improves mode coverage / β-recall
     gp_lambda: float = 10.0     # gradient penalty coefficient (WGAN-GP; standard value)
     batch_size: int = 64
     epochs: int = 200

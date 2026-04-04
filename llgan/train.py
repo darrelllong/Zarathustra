@@ -259,6 +259,7 @@ def train(cfg: Config) -> None:
             print("[warn] wgan-gp requires second-order LSTM gradients; "
                   "MPS does not support lstm_mps_backward. Falling back to wgan-sn.")
             cfg.loss = "wgan-sn"
+        # rpgan uses only first-order gradients and is MPS-compatible.
         if cfg.r1_lambda > 0:
             print("[warn] r1-lambda requires create_graph=True through LSTM critic; "
                   "not supported on MPS. Disabling R1.")
@@ -826,7 +827,18 @@ def train(cfg: Config) -> None:
 
                 opt_C.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
-                    if cfg.loss in ("wgan-sn", "wgan-gp"):
+                    if cfg.loss == "rpgan":
+                        # Relativistic Paired GAN (R3GAN, NeurIPS 2024).
+                        # Critic judges: "is real more real than fake?" for paired
+                        # samples. Unlike WGAN, the relativistic loss forces the
+                        # generator to simultaneously improve and maintain mode coverage.
+                        # D_loss = -E[log σ(C(x_r) - C(x_f))] (BCE with target=1)
+                        c_real = C(H_real)                     # (B, 1)
+                        c_fake = C(H_fake)                     # (B, 1) already detached
+                        rel = c_real - c_fake
+                        c_loss = nn.functional.softplus(-rel).mean()
+                        w_dists.append(rel.mean().item())      # positive = critic winning
+                    elif cfg.loss in ("wgan-sn", "wgan-gp"):
                         # Separate W estimate from penalty terms so the log shows
                         # the true Wasserstein distance (W > 0 = critic winning;
                         # oscillating W = GAN cycling).
@@ -900,7 +912,13 @@ def train(cfg: Config) -> None:
             with torch.amp.autocast(device.type, enabled=use_amp):
                 H_fake = G(z_g, z_l)
 
-                if cfg.loss in ("wgan-sn", "wgan-gp"):
+                if cfg.loss == "rpgan":
+                    # Generator tries to make fake beat real: -E[log σ(C(x_f) - C(x_r))]
+                    g_score, feat_fake = C(H_fake, return_features=True)
+                    with torch.no_grad():
+                        c_real_g = C(H_real)               # (B, 1), no grad through real
+                    g_loss = nn.functional.softplus(-(g_score - c_real_g)).mean()
+                elif cfg.loss in ("wgan-sn", "wgan-gp"):
                     g_score, feat_fake = C(H_fake, return_features=True)
                     g_loss = -g_score.mean()
                 else:  # bce
@@ -1316,10 +1334,12 @@ def parse_args() -> Config:
     p.add_argument("--fmt",              default="spc",
                    choices=["spc","msr","k5cloud","systor","oracle_general","csv"])
     p.add_argument("--loss",             default="wgan-sn",
-                   choices=["wgan-sn", "wgan-gp", "bce"],
+                   choices=["wgan-sn", "wgan-gp", "bce", "rpgan"],
                    help="wgan-sn: Wasserstein + spectral norm; "
-                        "wgan-gp: Wasserstein + gradient penalty (true Lipschitz, "
-                        "works on MPS); bce: original GAN cross-entropy")
+                        "wgan-gp: Wasserstein + gradient penalty (true Lipschitz, CUDA only); "
+                        "bce: original GAN cross-entropy; "
+                        "rpgan: relativistic paired GAN (R3GAN, NeurIPS 2024; MPS-compatible, "
+                        "improves mode coverage / β-recall)")
     p.add_argument("--gp-lambda",        type=float, default=10.0,
                    help="Gradient penalty coefficient for wgan-gp (standard: 10)")
     p.add_argument("--epochs",           type=int,   default=200)
