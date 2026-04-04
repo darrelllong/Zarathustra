@@ -4,23 +4,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v36
+## Current Run: v37
 
-**Status**: RUNNING — same v34 recipe (cond_drop_prob=0.25), different seed. v34 tied v31 at
-combined=0.089; trying another seed to break through to 0.08x.
-
-**Recipe**: Identical to v34 (cond_drop_prob=0.25, cond_dim=10, full losses, n_critic=2, v28
-pretrain, 200 epochs). v35 showed 0.30 is too aggressive; 0.25 confirmed as sweet spot.
+**Status**: RUNNING — v34 recipe + `--supervisor-steps 2` (SeriesGAN 2-step supervisor).
+Targets DMD-GEN plateau (stuck at 0.72+). 2-step forces longer temporal context.
+v28 pretrain reused (supervisor architecture unchanged; loss target only).
 
 ```bash
-ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v36 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v37 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
-  --n-critic 2 \
+  --n-critic 2 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
   --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
   --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
@@ -28,7 +26,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v36.log 2>&1 &"
+  > ~/train_v37.log 2>&1 &"
 ```
 
 ---
@@ -67,10 +65,51 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | **v34** | **0.01119** | **0.608** | **150** | **vinge:~/checkpoints/tencent_v34/best.pt** | **CO-ATB (tied v31). β-recall=0.608 NEW ATB. CFG 0.25 > 0.15 for generalization. Most stable conditioned run.** |
 | v33 | 0.01080 | 0.521 | 70(EMA) | vinge:~/checkpoints/tencent_v33/best.pt | Same v31 recipe, different seed; W spiked ep179; EMA recall 0.683→0.521 full eval (24% drop); Context-FID=0.02 new ATB |
 | **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **CO-ATB (tied v34). CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
+| v36 | 0.01023 | 0.471 | 100(EMA) | vinge:~/checkpoints/tencent_v36/best.pt | Same v34 recipe, different seed; EMA claimed recall=0.613/combined=0.087 but full eval: recall=0.471, combined=0.116 (23% gap); W spike ep178; killed ep182 |
 
 ---
 
 ## Version Notes
+
+### v36 — Bad seed, EMA inflation again (vinge/GB10, killed ep182, 2026-04-04)
+
+**Recipe**: Identical to v34 (cond_drop_prob=0.25, cond_dim=10, full losses, n_critic=2, v28
+pretrain, 200 epochs). Different random seed.
+
+**EMA best (ep100)**: MMD²=0.00956, recall=0.613, combined=0.087
+
+**Full eval (ep100)**:
+
+| Metric | v36 | v34 | v31 |
+|--------|-----|-----|-----|
+| MMD² | 0.01023 | 0.01119 | **0.00769** |
+| α-precision | 0.879 | **0.903** | **0.953** |
+| β-recall | 0.471 | **0.608** | 0.596 |
+| DMD-GEN | 0.775 | 0.747 | **0.723** |
+| AutoCorr | 0.070 | 0.053 | **0.032** |
+| Context-FID | **0.01** | 0.02 | 0.03 |
+| reuse rate | 0.005 | 0.004 | 0.005 |
+
+**Full eval combined = 0.010 + 0.2*(1−0.471) = 0.116. Did NOT beat ATB.**
+
+**Post-mortem**: Third bad-seed run in the v34 recipe family. EMA recall 0.613 → full eval 0.471
+(23% gap). Same W-spike pattern as v33 (ep179) and v31 (ep186): W→10 at ep178, recall collapsed
+to 0.27, killed at ep182.
+
+Key findings:
+1. **Seed variance dominates**: v34 was a lucky seed (3.5% EMA gap); v33 and v36 are unlucky
+   (23-24% gap). Two of three runs with the same recipe fail to transfer EMA quality to full eval.
+2. **EMA→full eval gap persists despite CFG 0.25**: CFG improved the gap vs unconditioned runs
+   (v20 had 4× divergence) but does not solve it — just moves from catastrophic to merely bad.
+3. **DMD-GEN=0.775 worst yet** for CFG runs: same recipe, worse temporal dynamics than v34.
+   Confirms temporal dynamics are not addressed by conditioning or CFG alone.
+4. **Context-FID=0.01 new ATB** (vs v34's 0.02): latent space quality is good; the problem is
+   distributional coverage (recall=0.471), not encoding fidelity.
+
+**Direction**: Structural change needed. v37 tries `--supervisor-steps 2` (SeriesGAN) to target
+DMD-GEN directly. The repeated-seed approach has exhausted its value with 0.25.
+
+---
 
 ### v35 — CFG 0.30 too aggressive (vinge/GB10, completed ep200, 2026-04-01)
 
