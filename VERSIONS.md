@@ -4,21 +4,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v33
+## Current Run: v34
 
-**Status**: PENDING — launching with chunk-continuity loss to target DMD-GEN.
+**Status**: RUNNING — higher CFG dropout to reduce EMA→full eval gap.
 
-**Recipe**: Same as v31 (the new ATB) but with **250 epochs** (up from 200). v31 peaked at
-ep70 but sustained excellence through ep150 — more epochs may push further. v28 pretrain,
-cond_dim=10, cond_drop_prob=0.15, full losses, n_critic=2, dmd_ckpt_weight=0.
+**Recipe**: Same as v31 but with **cond_drop_prob=0.25** (up from 0.15). v33 showed seed
+variance is still large and EMA recall spikes (0.683) don't reliably translate to full eval
+(→0.521, 24% drop). Higher CFG dropout should force more unconditional training, reducing
+overfitting. v28 pretrain, cond_dim=10, full losses, n_critic=2, 200 epochs.
 
 ```bash
 ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
-  --epochs 250 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v32 --checkpoint-every 5 \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v34 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
-  --cond-dim 10 --cond-drop-prob 0.15 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -28,7 +29,7 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile \
-  > ~/train_v32.log 2>&1 &"
+  > ~/train_v34.log 2>&1 &"
 ```
 
 ---
@@ -63,11 +64,48 @@ ssh 192.168.86.30 "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
 | v29 | 0.021 | 0.384 | 20 | vinge:~/checkpoints/tencent_v29/best.pt | cond_dim=10 + full losses; EMA phenomenal (recall=0.674, combined=0.075) but massive EMA gap; GAN cycling crash ep96 |
 | v30 | 0.01640 | 0.468 | 25(EMA) | vinge:~/checkpoints/tencent_v30/best.pt | n_critic=3; α-precision=0.929 (tied ATB); aborted ep54 — recall falling, W→2.8; n_critic=3 too aggressive |
 | v32 | 0.00797 | 0.441 | 110 | vinge:~/checkpoints/tencent_v32/best.pt | Same recipe as v31 250ep; W→0 at ep110 (critic lost signal); reuse=0.055 (10× improvement); aborted ep144 |
+| v33 | 0.01080 | 0.521 | 70(EMA) | vinge:~/checkpoints/tencent_v33/best.pt | Same v31 recipe, different seed; W spiked ep179; EMA recall 0.683→0.521 full eval (24% drop); Context-FID=0.02 new ATB |
 | **v31** | **0.00769** | **0.596** | **70** | **vinge:~/checkpoints/tencent_v31/best.pt** | **NEW ALL-TIME BEST. CFG (cond_drop_prob=0.15) + cond_dim=10 + v28 pretrain. Beats v17 by 14%.** |
 
 ---
 
 ## Version Notes
+
+### v33 — Seed variance confirmation (vinge/GB10, completed ep197, 2026-04-01)
+
+**Recipe**: Identical to v31 (cond_dim=10, cond_drop_prob=0.15, full losses, n_critic=2, v28
+pretrain, 200 epochs). Note: continuity_loss_weight was 0 despite plan saying 0.5 (incompatible
+with AMP).
+
+**EMA best (ep70)**: MMD²=0.01551, recall=0.683, combined=0.079
+
+**Full eval**:
+
+| Metric | v33 | v31 | v17 |
+|--------|-----|-----|-----|
+| MMD² | 0.01080 | **0.00769** | **0.00697** |
+| α-precision | 0.886 | **0.953** | 0.826 |
+| β-recall | 0.521 | **0.596** | 0.521 |
+| DMD-GEN | 0.727 | 0.723 | **0.714** |
+| Context-FID | **0.02** | 0.03 | 0.03 |
+| reuse rate | 0.001 | 0.005 | 0.006 |
+
+**Full eval combined = 0.011 + 0.2*(1-0.521) = 0.107. Did NOT beat v31 (0.089).**
+
+**Late crash**: W spiked to 10.6 at ep179/197, recall crashed to 0.022.
+
+**Key findings**:
+1. **Seed variance is large**: Same recipe as v31 but 20% worse combined (0.107 vs 0.089).
+2. **EMA recall spikes don't hold**: EMA recall 0.683 (best ever seen) dropped 24% to 0.521
+   on full eval. Compare v31 where EMA recall 0.591 actually *improved* to 0.596 on full eval.
+   Rapid EMA recall climbs may indicate overfitting to conditioning descriptors.
+3. **Context-FID=0.02 is new ATB** — only bright spot.
+4. **Confirms CFG value**: Even the "bad seed" run still matched v17's recall (0.521) and
+   beat it on α-precision (0.886 vs 0.826). Pre-CFG conditional runs (v28, v29) crashed hard.
+
+**Direction**: Higher CFG dropout (cond_drop_prob=0.25) in v34 to reduce EMA→full eval gap.
+
+---
 
 ### v31 — NEW ALL-TIME BEST (vinge/GB10, completed ep200, 2026-04-01)
 
