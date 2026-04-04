@@ -857,9 +857,28 @@ def train(cfg: Config) -> None:
     # noisier window-level descriptors (compute_window_descriptors fallback).
     # Without this, char-file training inflates EMA recall vs full eval because
     # the EMA eval conditions G on the wrong distribution.
+    # Prefer val-file conditioning vectors so EMA eval matches the conditioning
+    # distribution of the val set.  Fall back to all training files if char_lookup
+    # doesn't cover the val files.
     _eval_cond_pool: Optional[torch.Tensor] = None
     if char_lookup is not None and cfg.cond_dim > 0:
-        _eval_cond_pool = torch.stack(list(char_lookup.values())).to(device)
+        if multifile:
+            _val_cond_vecs = []
+            for _vf in val_files:
+                _vc = char_lookup.get(_vf.name)
+                if _vc is None:
+                    for _ext in (".zst", ".gz"):
+                        if _vf.name.endswith(_ext):
+                            _vc = char_lookup.get(_vf.name[:-len(_ext)])
+                            break
+                if _vc is not None:
+                    _val_cond_vecs.append(_vc)
+            if _val_cond_vecs:
+                _eval_cond_pool = torch.stack(_val_cond_vecs).to(device)
+            else:
+                _eval_cond_pool = torch.stack(list(char_lookup.values())).to(device)
+        else:
+            _eval_cond_pool = torch.stack(list(char_lookup.values())).to(device)
 
     # -----------------------------------------------------------------------
     # Epoch loop
