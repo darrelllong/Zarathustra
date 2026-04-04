@@ -10,6 +10,10 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 Targets DMD-GEN plateau (stuck at 0.72+). 2-step forces longer temporal context.
 v28 pretrain reused (supervisor architecture unchanged; loss target only).
 
+**ep60 EMA checkpoint**: combined=0.09226, recall=0.577, MMD²=0.00756 — new EMA best.
+Only 3.6% from ATB (0.089). If full eval recall ≥ 0.58, this beats ATB.
+Watching for W-spike pattern (currently W oscillating 0.5-2.3).
+
 ```bash
 ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
@@ -28,6 +32,41 @@ ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u 
   --no-compile \
   > ~/train_v37.log 2>&1 &"
 ```
+
+---
+
+## Queued: v38 — Precharacterized file-level conditioning
+
+**When to launch**: When v37 completes or is killed. Reuse v37 pretrain_complete.pt if
+architecture unchanged (it is: same hidden_size=256, latent_dim=24, num_cols, cond_dim=10).
+
+**Recipe**: v37 recipe (supervisor-steps 2) + `--char-file` for precharacterized conditioning.
+Full-trace statistics replace noisy 12-step window-level z_global descriptors.
+
+```bash
+ssh -i ~/.ssh/id_rsa vinge.local "cd ~/llgan && nohup ~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v38 --checkpoint-every 5 \
+  --resume-from ~/checkpoints/tencent_v37/pretrain_complete.pt \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
+  --char-file ~/traces/characterization/trace_characterizations.jsonl \
+  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --n-critic 2 --supervisor-steps 2 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
+  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
+  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
+  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
+  --hidden-size 256 --latent-dim 24 \
+  --no-compile \
+  > ~/train_v38.log 2>&1 &"
+```
+
+**Hypothesis**: Stable file-level conditioning closes EMA→full eval gap by eliminating
+noisy window-level descriptor estimates. With better conditioning signal, G learns
+distinct modes for different workload types → higher recall.
 
 ---
 
