@@ -348,15 +348,20 @@ def train(cfg: Config) -> None:
         # Hold out a fixed val set — remove val files from all_files so they
         # are never sampled during training.  Build per-file TraceDatasets
         # (same as training) so no window ever crosses a file boundary.
-        n_val_files = min(2, max(0, len(all_files) - cfg.files_per_epoch))
-        val_files = random.sample(all_files, n_val_files)
-        all_files = [f for f in all_files if f not in val_files]
+        # Use 10 val files (up from 2) with a deterministic shuffle for
+        # reproducible validation across restarts and version comparisons.
+        all_files_sorted = sorted(all_files)   # deterministic order
+        rng_val = random.Random(42)            # fixed seed → same split every run
+        rng_val.shuffle(all_files_sorted)
+        n_val_files = min(10, max(0, len(all_files_sorted) - cfg.files_per_epoch))
+        val_files = all_files_sorted[:n_val_files]
+        all_files = all_files_sorted[n_val_files:]
         val_ds, _ = _load_epoch_dataset(
             val_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
         ) if val_files else (None, [])
         val_tensor = (torch.stack([val_ds[i] for i in range(len(val_ds))])
                       if val_ds and len(val_ds) > 0 else None)
-        print(f"  val windows: {len(val_ds) if val_ds else 0:,}")
+        print(f"  val windows: {len(val_ds) if val_ds else 0:,} ({n_val_files} files, seed=42)")
 
         # For the first epoch, also build an initial train dataset
         train_ds, _ = _load_epoch_dataset(
