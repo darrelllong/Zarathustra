@@ -89,11 +89,12 @@ Items marked ✓ are done and in the repo.
   Supervisor loss: MSE(G(z)[:,1:,:], S(G(z))[:,:-1,:]) — temporal coherence.
   v6 stuck at MMD²≈0.97 — critic saturated before G warmed up. Fixed in v7.
 
-- [ ] **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
+- ✓ **Add dual discriminators (latent + feature space)** — *depends on latent AE above*
   Second lightweight critic on raw decoded output. Latent critic = stable early gradients;
   feature critic = catches artifacts latent critic misses. Reviewer: "Once the generator
   gets good at the latent game, decoded-space artifacts become the next natural blind spot."
   Add a smaller critic on `R(H_fake)` vs `real_batch` as a supporting critic.
+  Implemented: `--feat-critic-weight` (default 0.0; try 0.5–1.0). Pending first run.
 
 - [ ] **Add patch embedding to critic** (`model.py`)
   `Conv1d(num_cols, embed_dim, kernel_size=3, stride=3)` before LSTM critic compresses
@@ -113,9 +114,12 @@ Items marked ✓ are done and in the repo.
   Reviewer: "The model is asked to generate long coherent traces at inference time
   without being trained on a directly chunk-continuous objective."
 
-- [ ] **Add workload conditioning** (`model.py`, `train.py`)
-  Embed `c = [tenant_id, read_ratio, obj_size_bucket]` via MLP into generator hidden
-  state and at every timestep. Classifier-free guidance style for unconditional fallback.
+- [ ] **FiLM conditioning for workload** (`model.py`) — cleaner than current z_global init-only conditioning
+  Feature-wise Linear Modulation: `h_t = (1 + γ(cond)) * h_t + β(cond)` at each LSTM timestep.
+  Prevents conditioning signal from fading through forget gates over T=12 steps.
+  Zero-init of γ, β ensures backward compatibility with existing checkpoints.
+  Ref: FiLM (NeurIPS 2018); cleaner than concatenation-based conditioning.
+  Add `--film-cond` flag. Planned for v40.
 
 - [ ] **Run loss-family ablation sweep** (`train.py`)
   The objective now has 10+ terms; interaction effects are a bigger risk than missing
