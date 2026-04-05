@@ -673,8 +673,11 @@ def train(cfg: Config) -> None:
         missing, unexpected = G.load_state_dict(pc["G"], strict=False)
         if missing:
             print(f"  New G params (freshly initialised): {missing}")
-        ema_G_state = {k: v.to(device) for k, v in pc["G_ema"].items()}
-        # New params not in pretrain EMA (cond_encoder, gmm_prior) — seed from live G
+        # Filter to only keys present in G (drops stale keys like cond_encoder.* when
+        # loading an old pretrain into a model without var_cond, or vice-versa).
+        _g_keys = set(G.state_dict().keys())
+        ema_G_state = {k: v.to(device) for k, v in pc["G_ema"].items() if k in _g_keys}
+        # New params not in pretrain EMA (e.g. gmm_prior) — seed from live G
         for k, v in G.state_dict().items():
             if k not in ema_G_state:
                 ema_G_state[k] = v.clone().to(device)
