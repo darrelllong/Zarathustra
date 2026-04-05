@@ -215,6 +215,62 @@ class LatentDiscriminator(nn.Module):
 # Generator and Critic
 # ---------------------------------------------------------------------------
 
+class GMMPrior(nn.Module):
+    """
+    Gaussian Mixture Model prior for the generator's noise vector.
+
+    Replaces the flat N(0,I) noise prior with a conditioning-aware mixture:
+
+        π_k = softmax(MLP(cond))          # (B, K) soft component weights
+        μ_z = Σ_k π_k * μ_k               # (B, noise_dim) weighted mean
+        σ_z = Σ_k π_k * exp(λ_k)          # (B, noise_dim) weighted std
+        noise = μ_z + σ_z * ε,  ε ~ N(0,I)
+
+    Each of the K mixture components has its own learnable mean μ_k and
+    log-std λ_k in noise space.  A small MLP maps the conditioning vector
+    to soft component weights π_k, so different workload types (burst,
+    sequential, random-read, write-heavy) get their own distinct region of
+    noise space.  Random ε still drives per-sample diversity within each mode.
+
+    Why this helps: when all samples share a single N(0,I) prior, the
+    diversity loss fights against the prior to spread G across workload modes.
+    A GMM prior makes multi-modal coverage structural — each workload type
+    has a dedicated noise region — removing the tension between quality and
+    diversity.
+    """
+
+    def __init__(self, noise_dim: int, cond_dim: int, K: int = 8):
+        super().__init__()
+        self.noise_dim = noise_dim
+        self.K = K
+
+        # Learnable mixture component parameters
+        self.means    = nn.Parameter(torch.randn(K, noise_dim) * 0.5)
+        self.log_stds = nn.Parameter(torch.zeros(K, noise_dim))
+
+        # Small MLP: cond → K logits (component selector)
+        hidden = max(K * 2, 16)
+        self.selector = nn.Sequential(
+            nn.Linear(cond_dim, hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, K),
+        )
+
+    def forward(self, cond: torch.Tensor) -> torch.Tensor:
+        """
+        Sample noise conditioned on workload descriptor.
+
+        Args:
+            cond: (B, cond_dim) conditioning vectors
+        Returns:
+            noise: (B, noise_dim) — GMM-sampled, reparameterized
+        """
+        pi   = torch.softmax(self.selector(cond), dim=-1)   # (B, K)
+        mu_z = pi @ self.means                               # (B, noise_dim)
+        std_z = pi @ torch.exp(self.log_stds)                # (B, noise_dim)
+        return mu_z + std_z * torch.randn_like(mu_z)
+
+
 class Generator(nn.Module):
     """
     LSTM generator with split-latent noise design.
@@ -260,6 +316,7 @@ class Generator(nn.Module):
         avatar: bool = False,
         cond_dim: int = 0,
         film_cond: bool = False,
+        gmm_components: int = 0,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -269,6 +326,13 @@ class Generator(nn.Module):
         self.avatar      = avatar
         self.cond_dim    = cond_dim
         self.film_cond   = film_cond and (cond_dim > 0)
+
+        # GMM prior: replaces flat N(0,I) noise with a conditioning-aware
+        # mixture.  Only active when gmm_components > 0 and cond_dim > 0.
+        if gmm_components > 0 and cond_dim > 0:
+            self.gmm_prior = GMMPrior(noise_dim, cond_dim, K=gmm_components)
+        else:
+            self.gmm_prior = None
 
         out_dim = latent_dim if latent_dim is not None else num_cols
 
@@ -313,11 +377,30 @@ class Generator(nn.Module):
 
         self._init_weights()
 
+    def sample_noise(
+        self,
+        B: int,
+        device: torch.device,
+        cond: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Sample z_global noise, using GMM prior when available.
+
+        Args:
+            B: batch size
+            device: target device
+            cond: (B, cond_dim) conditioning vectors; required for GMM prior.
+        Returns:
+            (B, noise_dim) noise tensor
+        """
+        if self.gmm_prior is not None and cond is not None:
+            return self.gmm_prior(cond.to(device))
+        return torch.randn(B, self.noise_dim, device=device)
+
     def _init_weights(self):
         for name, p in self.named_parameters():
-            if "weight" in name:
+            if "weight" in name and "gmm_prior" not in name:
                 nn.init.normal_(p, 0.0, 0.02)
-            elif "bias" in name:
+            elif "bias" in name and "gmm_prior" not in name:
                 nn.init.zeros_(p)
 
     def forward(
@@ -363,13 +446,13 @@ class Generator(nn.Module):
         cond: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         self.eval()
-        noise = torch.randn(n_windows, self.noise_dim, device=device)
         if self.cond_dim > 0:
             if cond is None:
-                # Generic conditioning: mild values from N(0, 0.5)
                 cond = torch.randn(n_windows, self.cond_dim, device=device) * 0.5
+            noise = self.sample_noise(n_windows, device, cond=cond)
             z_global = torch.cat([cond, noise], dim=1)
         else:
+            noise = self.sample_noise(n_windows, device)
             z_global = noise
         z_local  = torch.randn(n_windows, timestep, self.noise_dim, device=device)
         out = self(z_global, z_local)

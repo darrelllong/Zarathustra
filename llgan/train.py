@@ -83,6 +83,7 @@ def _make_z_global(
     real_features: Optional[torch.Tensor] = None,
     file_cond: Optional[torch.Tensor] = None,
     training: bool = True,
+    G=None,
 ) -> torch.Tensor:
     """Build z_global, optionally prepending workload descriptors.
 
@@ -103,28 +104,34 @@ def _make_z_global(
             More stable than window-level descriptors; enables multi-corpus
             conditioning keyed on full-file statistics.
         training: if True, apply CFG dropout; if False (eval), always condition.
+        G: Generator instance; when provided and G.gmm_prior is not None, noise
+            is sampled from the GMM prior conditioned on the workload descriptor
+            rather than from flat N(0,I).
 
     Returns:
         (B, noise_dim) when cond_dim == 0,
         (B, cond_dim + noise_dim) when cond_dim > 0.
     """
-    noise = torch.randn(B, cfg.noise_dim, device=device)
     if cfg.cond_dim > 0:
         if file_cond is not None:
-            # Ground-truth file-level conditioning: stable stats from the full
-            # trace (write_ratio, reuse_ratio, burstiness, etc.) rather than
-            # noisy window-level estimates.
-            cond = file_cond.to(device)   # (B, cond_dim)
+            cond = file_cond.to(device)
         else:
-            # Fallback: estimate conditioning from current real windows.
-            cond = compute_window_descriptors(real_features)  # (B, cond_dim)
+            cond = compute_window_descriptors(real_features)
         # Classifier-free guidance: randomly drop conditioning during training
         drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
         if training and drop_prob > 0:
             mask = (torch.rand(B, 1, device=device) > drop_prob).float()
-            cond = cond * mask  # zero out entire descriptor vector per sample
+            cond = cond * mask
+        # GMM prior: sample noise from conditioning-aware mixture.  Uses the
+        # raw (pre-CFG-dropout) conditioning so each workload type always maps
+        # to its own noise region, even when CFG zeros the conditioning for G.
+        if G is not None and getattr(G, "gmm_prior", None) is not None:
+            raw_cond = file_cond.to(device) if file_cond is not None else                        compute_window_descriptors(real_features)
+            noise = G.sample_noise(B, device, cond=raw_cond)
+        else:
+            noise = torch.randn(B, cfg.noise_dim, device=device)
         return torch.cat([cond, noise], dim=1)
-    return noise
+    return torch.randn(B, cfg.noise_dim, device=device)
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +438,8 @@ def train(cfg: Config) -> None:
                   latent_dim=cfg.latent_dim if latent_ae else None,
                   avatar=_avatar,
                   cond_dim=cfg.cond_dim,
-                  film_cond=getattr(cfg, "film_cond", False)).to(device)
+                  film_cond=getattr(cfg, "film_cond", False),
+                  gmm_components=getattr(cfg, "gmm_components", 0)).to(device)
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
@@ -819,7 +827,7 @@ def train(cfg: Config) -> None:
                 B_pre = xb.size(0)
                 xb_dev = xb
                 z_g = _make_z_global(B_pre, cfg, device, real_features=xb_dev,
-                                     file_cond=fc_pre)
+                                     file_cond=fc_pre, G=G)
                 z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
                 opt_G.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
@@ -945,7 +953,7 @@ def train(cfg: Config) -> None:
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
                 z_g = _make_z_global(B, cfg, device, real_features=real_batch,
-                                     file_cond=file_cond_batch)
+                                     file_cond=file_cond_batch, G=G)
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
                 H_fake = G(z_g, z_l).detach()
 
@@ -1053,7 +1061,7 @@ def train(cfg: Config) -> None:
 
             # --- Generator step ---
             z_g = _make_z_global(B, cfg, device, real_features=real_batch,
-                                 file_cond=file_cond_batch)
+                                 file_cond=file_cond_batch, G=G)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
 
             opt_G.zero_grad()
@@ -1273,10 +1281,10 @@ def train(cfg: Config) -> None:
                     _fc1 = file_cond_batch[:B2] if file_cond_batch is not None else None
                     _fc2 = file_cond_batch[B2:B2*2] if file_cond_batch is not None else None
                     z_g1 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2],
-                                          file_cond=_fc1)
+                                          file_cond=_fc1, G=G)
                     z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
                     z_g2 = _make_z_global(B2, cfg, device, real_features=real_batch[B2:B2*2],
-                                          file_cond=_fc2)
+                                          file_cond=_fc2, G=G)
                     z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
                     f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
                     f2 = G(z_g2, z_l2)
@@ -1519,6 +1527,10 @@ def parse_args() -> Config:
     p.add_argument("--noise-dim",        type=int,   default=10)
     p.add_argument("--cond-dim",         type=int,   default=0,
                    help="Workload conditioning dim (0=unconditional; 10=per-window descriptors)")
+    p.add_argument("--gmm-components",   type=int,   default=0,
+                   help="GMM prior: K mixture components in noise space (0=flat N(0,I)). "
+                        "When >0 and --cond-dim>0, replaces N(0,I) with a conditioning-aware "
+                        "mixture so each workload type gets its own noise region. Try 8.")
     p.add_argument("--cond-drop-prob",   type=float, default=0.0,
                    help="Classifier-free guidance: drop conditioning with this probability (0=always condition)")
     p.add_argument("--hidden-size",      type=int,   default=256)

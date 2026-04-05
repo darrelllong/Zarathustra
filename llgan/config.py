@@ -100,6 +100,14 @@ class Config:
                                       # (0 = off; 4096 = page-aligned; matches real block traces
                                       # where sizes are multiples of 4KB)
 
+    # GMM prior on generator noise
+    gmm_components: int = 0              # K mixture components in noise prior (0 = flat N(0,I)).
+                                         # When > 0 and cond_dim > 0, replaces N(0,I) with a
+                                         # conditioning-aware mixture: each workload type gets its
+                                         # own region of noise space.  Directly targets recall
+                                         # ceiling from unimodal prior fighting multimodal data.
+                                         # Recommended: 8 (try 4–16).
+
     # Latent autoencoder + supervisor (TimeGAN/SeriesGAN architecture)
     # Set latent_dim > 0 to enable; 0 = legacy direct-to-feature mode (v4/v5).
     latent_dim: int = 24              # latent space dimensionality
