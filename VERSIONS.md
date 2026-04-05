@@ -4,6 +4,34 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Current Run: v46 — Tencent + GMM K=8 + CFG 0.20 + cond_dim=10 + n_critic=1
+
+**Status**: RUNNING — 2026-04-05. PID 732258 on vinge.
+**Hypothesis**: GMM + CFG combo — ATB runs (v31/v34) used CFG with cond_dim=10; v45 showed GMM helps recall.
+**Recipe**: WGAN-SN + GMM K=8 + cond_dim=10 + char-file + cond_drop_prob=0.20 + n_critic=1 + lr_d=5e-5.
+**Pretrain**: v45/pretrain_complete.pt (GMM K=8 architecture, cond_dim=10).
+**Goal**: Beat ATB (0.089) by combining GMM (recall lift) with CFG (coverage regularizer).
+
+---
+
+## Post-Mortem: v45 — Tencent + GMM K=8, no CFG (KILLED ep131, 2026-04-05)
+
+**Status**: KILLED ep131. Plateaued — best not improved for 11 epochs.
+**Best**: ep120 EMA combined=0.119★, recall=0.483.
+**Recipe**: WGAN-SN + GMM K=8 + cond_dim=10 + char-file + n_critic=1 + lr_d=5e-5. NO CFG.
+
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 120   | 0.483  | 0.119 ★  |
+| 125   | 0.474  | 0.137    |
+| 130   | 0.437  | 0.129    |
+
+**Finding**: GMM K=8 helps vs v43 (0.117→0.119, recall 0.476→0.483) but not enough to beat ATB.
+Recall stuck at ~0.48; ATB needs ~0.60+. Adding CFG is the next logical step (v46).
+
+---
+
 ## Current Run: alibaba_v5 — Alibaba + GMM K=8 + var-cond + FULL explosion guard + n_critic=1
 
 **Status**: RUNNING — 2026-04-05. PID 726415 on vinge.
