@@ -104,9 +104,72 @@ too quickly with char-file conditioning injected. Go back to WGAN-SN.
 
 ---
 
-## Current Run: v40 — v34 recipe + char-file conditioning (WGAN-SN)
+## Post-Mortem: v40 — v34 recipe + char-file (killed ep64, 2026-04-04)
 
-**Status**: RUNNING — 2026-04-04. PID 601737 on vinge. Reusing v38's pretrain_complete.pt.
+**Status**: KILLED ep64.
+**Best**: ep30 EMA combined=0.140, recall=0.402. Did NOT beat ATB (0.089).
+
+**Eval progression**:
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|---------|
+| 10 | 0.036 | 0.301 | 0.176 |
+| 20 | 0.026 | 0.394 | 0.147 |
+| 30 | 0.020 | 0.402 | 0.140 ★ |
+| 40 | 0.019 | 0.367 | 0.146 |
+| 50 | 0.018 | 0.344 | 0.150 |
+| 60 | 0.024 | 0.343 | 0.155 |
+
+**Root cause**: Recall locked in 0.34–0.40 band for 40 epochs with no upward trend. v31 was at
+recall≈0.59 by ep64; v40 peaked at 0.402. Stable char-file conditioning produces precise but
+narrow distributions — removes the accidental mixture behavior that noisy z_global gave v31/v34.
+MMD² bottomed at 0.019 (excellent) but recall ceiling hard to break without multimodal prior.
+
+**Lesson**: char-file conditioning alone is insufficient. Need structural multimodality in the
+prior. → v41: WGAN-SN + char-file + GMM prior (K=8 mixture components in noise space).
+
+---
+
+## Current Run: v41 — WGAN-SN + char-file + GMM prior (K=8)
+
+**Status**: RUNNING — 2026-04-04. PID 609936 on vinge. Reusing v38's pretrain_complete.pt.
+
+**Hypothesis**: v40's recall ceiling (0.40) is caused by the unimodal N(0,I) prior fighting a
+multimodal workload distribution. GMM prior gives each workload type its own noise region:
+  π_k = softmax(MLP(char_file_cond))     # (B, K) soft component weights
+  μ_z = Σ_k π_k * μ_k                   # (B, noise_dim) mixture mean
+  σ_z = Σ_k π_k * exp(λ_k)              # (B, noise_dim) mixture std
+  noise = μ_z + σ_z * ε,  ε ~ N(0,I)
+The GMM prior is the structural equivalent of what v31/v34's noisy window-level z_global
+accidentally provided — mode separation in noise space.
+
+**Recipe**: v40 + --gmm-components 8
+
+```bash
+ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v41 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v41/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+  --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
+  --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
+  --checkpoint-dir ~/checkpoints/tencent_v41 --checkpoint-every 5 \
+  --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
+  --cond-dim 10 --cond-drop-prob 0.25 \
+  --char-file ~/traces/characterization/trace_characterizations.jsonl \
+  --gmm-components 8 \
+  --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
+  --n-critic 2 --supervisor-steps 2 \
+  --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
+  --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
+  --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
+  --locality-loss-weight 1.0 --dmd-ckpt-weight 0 \
+  --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
+  --hidden-size 256 --latent-dim 24 \
+  --no-compile --no-amp \
+  > ~/train_v41.log 2>&1 &"
+```
+
+---
+
+## Archived: v40 launch command
+
+**Status**: KILLED. See post-mortem above.
 
 **Hypothesis**: v31/v34 achieved ATB=0.089 with WGAN-SN + noisy window-level z_global. The only
 known weakness was EMA→full eval gap (from noisy conditioning). Replacing window-level z_global
