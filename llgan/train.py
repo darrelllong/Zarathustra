@@ -1339,13 +1339,22 @@ def train(cfg: Config) -> None:
                 if _kl_w > 0:
                     g_loss = g_loss + _kl_w * kl_loss
 
-            scaler.scale(g_loss).backward()
-            if cfg.grad_clip > 0:
-                scaler.unscale_(opt_G)
-                nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
-            scaler.step(opt_G)
-            scaler.update()
-            g_losses.append(g_loss.item())
+            # Guard against NaN/inf G_loss (can occur with extreme conditioning vectors,
+            # e.g. Alibaba traces + var_cond CondEncoder edge cases).  Skip the backward
+            # pass entirely — EMA weights are not touched, so generation quality is
+            # preserved.  The skipped step is logged but does not corrupt G.
+            if not torch.isfinite(g_loss):
+                opt_G.zero_grad()
+                scaler.update()
+                g_losses.append(0.0)
+            else:
+                scaler.scale(g_loss).backward()
+                if cfg.grad_clip > 0:
+                    scaler.unscale_(opt_G)
+                    nn.utils.clip_grad_norm_(G.parameters(), cfg.grad_clip)
+                scaler.step(opt_G)
+                scaler.update()
+                g_losses.append(g_loss.item())
 
             # EMA update: blend live weights toward EMA state.
             # ema_G_state lives on the same device as G (deepcopy of G.state_dict()).
