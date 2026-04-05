@@ -1339,11 +1339,11 @@ def train(cfg: Config) -> None:
                 if _kl_w > 0:
                     g_loss = g_loss + _kl_w * kl_loss
 
-            # Guard against NaN/inf G_loss (can occur with extreme conditioning vectors,
-            # e.g. Alibaba traces + var_cond CondEncoder edge cases).  Skip the backward
-            # pass entirely — EMA weights are not touched, so generation quality is
-            # preserved.  The skipped step is logged but does not corrupt G.
-            if not torch.isfinite(g_loss):
+            # Guard against NaN/inf/explosion G_loss (can occur with extreme conditioning
+            # vectors, e.g. Alibaba traces + var_cond CondEncoder edge cases).  The
+            # explosions (~1.8T) are large but *finite*, so isfinite() alone is not enough.
+            # Skip the backward pass entirely — EMA weights are not touched.
+            if not torch.isfinite(g_loss) or g_loss.abs() > 1e6:
                 opt_G.zero_grad()
                 scaler.update()
                 g_losses.append(0.0)
