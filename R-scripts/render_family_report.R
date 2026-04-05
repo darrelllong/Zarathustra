@@ -1,76 +1,162 @@
 #!/usr/bin/env Rscript
 
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0) y else x
+}
+
 format_number <- function(x, digits = 3) {
-  if (is.null(x) || length(x) == 0 || !is.finite(x)) {
+  if (is.null(x) || length(x) == 0) {
     return("N/A")
   }
-  format(round(x, digits), trim = TRUE, scientific = FALSE)
+  val <- suppressWarnings(as.numeric(x[[1]]))
+  if (!is.finite(val)) {
+    return("N/A")
+  }
+  format(round(val, digits), trim = TRUE, scientific = FALSE)
+}
+
+safe_read_csv <- function(path) {
+  tryCatch(
+    read.csv(path, stringsAsFactors = FALSE),
+    error = function(e) data.frame()
+  )
+}
+
+analysis_table_to_df <- function(x) {
+  if (is.null(x) || length(x) == 0) {
+    return(data.frame())
+  }
+  if (is.data.frame(x)) {
+    return(x)
+  }
+  if (is.list(x) && !is.null(names(x))) {
+    lengths <- vapply(x, length, integer(1))
+    if (length(unique(lengths)) == 1 && unique(lengths) >= 1) {
+      return(data.frame(lapply(x, function(v) unlist(v, use.names = FALSE)), stringsAsFactors = FALSE))
+    }
+  }
+  if (is.list(x)) {
+    rows <- lapply(x, function(item) {
+      if (is.data.frame(item)) {
+        item
+      } else {
+        as.data.frame(item, stringsAsFactors = FALSE)
+      }
+    })
+    return(do.call(rbind, rows))
+  }
+  data.frame()
 }
 
 render_family_report <- function(features_path, analysis_path, out_path) {
-  safe_read_csv <- function(path) {
-    tryCatch(
-      read.csv(path, stringsAsFactors = FALSE),
-      error = function(e) data.frame()
-    )
-  }
-
   df <- safe_read_csv(features_path)
   analysis <- jsonlite::fromJSON(analysis_path, simplifyVector = FALSE)
   metric_summary_path <- file.path(dirname(analysis_path), "metric_summary.csv")
-  metric_summary <- if (file.exists(metric_summary_path) && file.info(metric_summary_path)$size > 0) {
-    safe_read_csv(metric_summary_path)
-  } else {
-    data.frame()
-  }
+  metric_summary <- if (file.exists(metric_summary_path) && file.info(metric_summary_path)$size > 0) safe_read_csv(metric_summary_path) else data.frame()
 
   lines <- c(
     paste("#", analysis$dataset, "/", analysis$family),
     "",
     paste("- Files:", analysis$files),
-    paste("- Bytes:", format(if ("size_bytes" %in% names(df)) sum(df$size_bytes, na.rm = TRUE) else analysis$bytes %||% 0, scientific = FALSE, trim = TRUE)),
-    paste("- Formats:", paste(sort(unique(if ("format" %in% names(df)) df$format else unlist(analysis$formats))), collapse = ", ")),
-    paste("- Parsers:", paste(sort(unique(if ("parser" %in% names(df)) df$parser else unlist(analysis$parsers))), collapse = ", ")),
+    paste("- Bytes:", format(analysis$bytes %||% 0, scientific = FALSE, trim = TRUE)),
+    paste("- Formats:", paste(unlist(analysis$formats), collapse = ", ")),
+    paste("- Parsers:", paste(unlist(analysis$parsers), collapse = ", ")),
+    paste("- ML Use Cases:", paste(unlist(analysis$ml_use_cases %||% "unknown"), collapse = ", ")),
+    paste("- Heterogeneity Score:", format_number(analysis$heterogeneity_score)),
+    paste("- Suggested GAN Modes:", analysis$suggested_modes %||% 1),
+    paste("- Split By Format:", if (isTRUE(analysis$split_by_format)) "yes" else "no"),
     ""
   )
 
   lines <- c(lines, "## Observations", "")
-  for (note in unlist(analysis$observations)) {
-    lines <- c(lines, paste("- ", note, sep = ""))
-  }
-  lines <- c(lines, "", "## Format Breakdown", "", "| Format | Files | Parsers |", "|---|---:|---|")
-  for (fmt in sort(unique(if ("format" %in% names(df)) df$format else unlist(analysis$formats)))) {
-    subset <- df[df$format == fmt, , drop = FALSE]
-    parser_values <- if ("parser" %in% names(subset)) paste(sort(unique(subset$parser)), collapse = ", ") else paste(sort(unique(unlist(analysis$parsers))), collapse = ", ")
-    lines <- c(lines, paste0("| ", fmt, " | ", nrow(subset), " | ", parser_values, " |"))
+  for (note in unlist(analysis$observations %||% "No observations generated.")) {
+    lines <- c(lines, paste0("- ", note))
   }
 
-  lines <- c(lines, "", "## Metrics", "", "| Metric | Mean | Median | Min | Max | SD |", "|---|---:|---:|---:|---:|---:|")
+  lines <- c(lines, "", "## GAN Guidance", "")
+  for (note in unlist(analysis$gan_guidance %||% "No GAN guidance generated.")) {
+    lines <- c(lines, paste0("- ", note))
+  }
+
+  lines <- c(lines, "", "## Format Breakdown", "", "| Format | Files | Parsers |", "|---|---:|---|")
+  if (nrow(df) > 0 && "format" %in% names(df)) {
+    for (fmt in sort(unique(df$format))) {
+      subset <- df[df$format == fmt, , drop = FALSE]
+      parser_values <- if ("parser" %in% names(subset)) paste(sort(unique(subset$parser)), collapse = ", ") else ""
+      lines <- c(lines, paste0("| ", fmt, " | ", nrow(subset), " | ", parser_values, " |"))
+    }
+  }
+
+  lines <- c(lines, "", "## Clustering And Regimes", "", "| Item | Value |", "|---|---|")
+  if (!is.null(analysis$clusters$mclust$components)) {
+    lines <- c(lines, paste0("| Mclust components | ", analysis$clusters$mclust$components, " |"))
+  }
+  if (!is.null(analysis$clusters$dbscan$clusters)) {
+    lines <- c(lines, paste0("| DBSCAN clusters | ", analysis$clusters$dbscan$clusters, " |"))
+    lines <- c(lines, paste0("| DBSCAN noise fraction | ", format_number(analysis$clusters$dbscan$noise_fraction), " |"))
+  }
+  if (!is.null(analysis$regimes$changepoint_count)) {
+    lines <- c(lines, paste0("| Ordered PC1 changepoints | ", analysis$regimes$changepoint_count, " |"))
+  }
+  if (!is.null(analysis$pca$pc1_variance)) {
+    lines <- c(lines, paste0("| PCA variance explained by PC1 | ", format_number(analysis$pca$pc1_variance), " |"))
+  }
+
+  lines <- c(lines, "", "## Strongest Correlations", "", "| Metric A | Metric B | Correlation |", "|---|---|---:|")
+  corr_df <- analysis_table_to_df(analysis$top_correlations)
+  if (nrow(corr_df) > 0) {
+    for (i in seq_len(nrow(corr_df))) {
+      row <- corr_df[i, , drop = FALSE]
+      lines <- c(lines, paste0("| ", row$metric_a, " | ", row$metric_b, " | ", format_number(row$correlation), " |"))
+    }
+  } else {
+    lines <- c(lines, "| N/A | N/A | N/A |")
+  }
+
+  lines <- c(lines, "", "## Metrics", "", "| Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|")
   if (nrow(metric_summary) > 0) {
-    for (i in seq_len(nrow(metric_summary))) {
-      row <- metric_summary[i, ]
+    display_metrics <- metric_summary[order(metric_summary$missing_frac, -abs(metric_summary$cv)), , drop = FALSE]
+    display_metrics <- head(display_metrics, 18)
+    for (i in seq_len(nrow(display_metrics))) {
+      row <- display_metrics[i, , drop = FALSE]
       lines <- c(
         lines,
         paste0(
           "| ", row$metric,
           " | ", format_number(row$mean),
           " | ", format_number(row$median),
-          " | ", format_number(row$min),
-          " | ", format_number(row$max),
-          " | ", format_number(row$sd),
+          " | ", format_number(row$cv),
+          " | ", format_number(row$skewness),
+          " | ", format_number(row$kurtosis),
+          " | ", format_number(row$missing_frac),
+          " | ", format_number(row$q10),
+          " | ", format_number(row$q90),
           " |"
         )
       )
     }
   }
 
-  lines <- c(lines, "", "## Notable Files", "", "| rel_path | format | write_ratio | reuse_ratio | burstiness_cv |", "|---|---|---:|---:|---:|")
-  if (nrow(df) > 0 && all(c("rel_path", "format", "write_ratio", "reuse_ratio", "burstiness_cv") %in% names(df))) {
+  lines <- c(lines, "", "## Outlier Files", "", "| rel_path | outlier_score |", "|---|---:|")
+  outlier_df <- analysis_table_to_df(analysis$outliers)
+  if (nrow(outlier_df) > 0) {
+    for (i in seq_len(min(8, nrow(outlier_df)))) {
+      row <- outlier_df[i, , drop = FALSE]
+      lines <- c(lines, paste0("| ", row$rel_path, " | ", format_number(row$outlier_score), " |"))
+    }
+  } else {
+    lines <- c(lines, "| N/A | N/A |")
+  }
+
+  lines <- c(lines, "", "## Notable Files", "", "| rel_path | format | write_ratio | reuse_ratio | burstiness_cv | ts_duration |", "|---|---|---:|---:|---:|---:|")
+  if (nrow(df) > 0 && all(c("rel_path", "format") %in% names(df))) {
     sortable <- df
-    sortable$burstiness_cv[!is.finite(sortable$burstiness_cv)] <- -Inf
-    sortable <- sortable[order(sortable$burstiness_cv, decreasing = TRUE), ]
-    for (i in seq_len(min(5, nrow(sortable)))) {
-      row <- sortable[i, ]
+    if ("burstiness_cv" %in% names(sortable)) {
+      sortable$burstiness_cv[!is.finite(sortable$burstiness_cv)] <- -Inf
+      sortable <- sortable[order(sortable$burstiness_cv, decreasing = TRUE), , drop = FALSE]
+    }
+    for (i in seq_len(min(8, nrow(sortable)))) {
+      row <- sortable[i, , drop = FALSE]
       lines <- c(
         lines,
         paste0(
@@ -79,12 +165,13 @@ render_family_report <- function(features_path, analysis_path, out_path) {
           " | ", format_number(row$write_ratio),
           " | ", format_number(row$reuse_ratio),
           " | ", format_number(row$burstiness_cv),
+          " | ", format_number(row$ts_duration),
           " |"
         )
       )
     }
   } else {
-    lines <- c(lines, "| No per-file rows available | | | | |")
+    lines <- c(lines, "| N/A | N/A | N/A | N/A | N/A | N/A |")
   }
 
   dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)

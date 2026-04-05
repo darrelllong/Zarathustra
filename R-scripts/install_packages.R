@@ -3,7 +3,25 @@
 args <- commandArgs(trailingOnly = TRUE)
 user_lib <- Sys.getenv("R_LIBS_USER", unset = "~/R/library")
 repos <- "https://cloud.r-project.org"
-packages <- c("jsonlite")
+packages <- c(
+  "jsonlite",
+  "readr",
+  "dplyr",
+  "tidyr",
+  "stringr",
+  "ggplot2",
+  "patchwork",
+  "corrplot",
+  "moments",
+  "e1071",
+  "changepoint",
+  "strucchange",
+  "forecast",
+  "tsfeatures",
+  "dbscan",
+  "mclust",
+  "factoextra"
+)
 
 dir.create(path.expand(user_lib), recursive = TRUE, showWarnings = FALSE)
 .libPaths(c(path.expand(user_lib), .libPaths()))

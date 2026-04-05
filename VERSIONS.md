@@ -27,9 +27,14 @@ Temperature annealed τ: 1.0 → 0.1.
 | 30    | 0.421  | 0.136    |
 | 35    | 0.484  | 0.124    |
 
-ep20 combined=0.119★, recall=0.509 — new ATB for this run. W-distance rising steadily (0.7→1.2),
-critic getting stronger. Recall fluctuating 0.42-0.51 in ep20-35 range. On track to challenge
-ATB (0.089) if recall pushes past 0.55-0.60 in ep50-70 window.
+| 40    | 0.401  | 0.147    |
+| 45    | 0.456  | 0.132    |
+| 50    | 0.457  | 0.135    |
+| 55    | 0.486  | 0.123    |
+| 60    | 0.488  | 0.121    |
+
+Recall flat at 0.40-0.51 for 45 epochs. MMD²=0.019 (lowest ever) but recall won't break 0.51.
+2nd best combined scores ever (only ATB 0.089 is better) but no recall surge occurring.
 
 ### alibaba_v15 — Alibaba + regime sampler (RUNNING)
 
@@ -47,10 +52,17 @@ Log: ~/train_alibaba_v15.log.
 | 10    | 0.172  | 0.257 ★  |
 | 15    | 0.188  | 0.225 ★  |
 | 20    | 0.255  | 0.189 ★  |
+| 25    | 0.250  | 0.206    |
+| 30    | 0.276  | 0.194    |
+| 35    | 0.193  | 0.220    |
+| 40    | 0.284  | 0.189 ★  |
+| 45    | 0.302  | 0.204    |
+| 50    | 0.306  | 0.184 ★  |
+| 55    | 0.331  | 0.169 ★  |
 
-Every eval is a new best. ep20 combined=0.189★ is AHEAD of both alibaba_v13 (0.208) and
-alibaba_v5 ATB (0.197) at the same epoch. Regime sampler working on Alibaba too.
-MMD² dropping fast: 0.236→0.040. W-distance stable 0.21-0.50.
+**SURGING.** Recall dipped at ep35 (0.193) then exploded: 0.284→0.306→0.331. Combined
+hitting new ★ every eval since ep40. G_loss dropped to -3.6 (ep48-52), W-distance jumped
+0.17→0.98. Pace: +0.07 recall/5ep. If sustained, recall~0.50 by ep70, combined near ATB.
 
 ---
 

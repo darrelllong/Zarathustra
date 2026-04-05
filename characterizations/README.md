@@ -1,37 +1,37 @@
 # Trace Family Characterizations
 
 **Total logical families:** 30  
-**Total trace files summarized:** 30628  
+**Families suggesting multiple GAN modes:** 14  
 
-| Family | Dataset | Files | Size | write_ratio | reuse_ratio | burstiness_cv | iat_q50 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| alibaba | alibaba | 1000 | 93.8 GB | 0 | 0 | 3.833 | 0 |
-| Baleen24 | Baleen24 | 374 | 29.2 GB | 0.646 | 0.311 | 1.415 | 1 |
-| exchange | MSR | 96 | 1.4 GB | 0.786 | 0.003 | 4.495 | 115.5 |
-| 2007_msr | s3-cache-datasets | 14 | 1.5 GB | 0 | 0.004 | 6.699 | 0 |
-| 2007_wiki | s3-cache-datasets | 4 | 36.4 GB | N/A | 0.027 | 40.529 | 0 |
-| 2015_cloudphysics | s3-cache-datasets | 106 | 8.4 GB | 0 | 0.001 | 5.393 | 0 |
-| 2016_wiki | s3-cache-datasets | 2 | 24.8 GB | N/A | N/A | N/A | N/A |
-| 2017_docker | s3-cache-datasets | 7 | 0.6 GB | N/A | N/A | N/A | N/A |
-| 2017_systor | s3-cache-datasets | 6 | 32.6 GB | 0.479 | 0.001 | 2.943 | 0.001 |
-| 2018_tencentPhoto | s3-cache-datasets | 4 | 151.9 GB | 0 | 0.009 | 28.601 | 0 |
-| 2019_wiki | s3-cache-datasets | 6 | 74 GB | 0 | 0.001 | 28.439 | 0 |
-| 2020_alibabaBlock | s3-cache-datasets | 1001 | 234 GB | 0 | 0 | 3.828 | 0 |
-| 2020_tencentBlock | s3-cache-datasets | 4996 | 279.8 GB | 0 | 0.01 | 2.958 | 0 |
-| 2020_twitter | s3-cache-datasets | 54 | 141.8 GB | 0 | 0.037 | 18.446 | 0 |
-| 2020_twr_cdn | s3-cache-datasets | 3 | 488.8 GB | N/A | N/A | N/A | N/A |
-| 2022_metaCDN | s3-cache-datasets | 3 | 2.1 GB | 0 | 0.084 | 26.064 | 0 |
-| 2022_metaKV | s3-cache-datasets | 28 | 140.5 GB | 0 | 0.894 | 21.307 | 0 |
-| 2022_metaStorage | s3-cache-datasets | 5 | 0.6 GB | 0 | 0.242 | 7.272 | 0 |
-| 2023_metaCDN | s3-cache-datasets | 3 | 3.5 GB | N/A | N/A | N/A | N/A |
-| 2023_metaStorage | s3-cache-datasets | 6 | 2.7 GB | N/A | N/A | N/A | N/A |
-| 2024_google | s3-cache-datasets | 192 | 171.8 GB | N/A | N/A | N/A | N/A |
-| 2026-alibaba-thinkahead | s3-cache-datasets | 45 | 14.3 GB | 0 | 0.027 | 26.106 | 0 |
-| alibaba | s3-cache-datasets | 1000 | 444.4 GB | 0.976 | 0.001 | 6.399 | 0 |
-| cache_trace_twitter_memcache | s3-cache-datasets | 226 | 3892.5 GB | 0 | 0.033 | 16.492 | 0 |
-| cloudphysics | s3-cache-datasets | 107 | 59.9 GB | 0.852 | 0.003 | 8.924 | 0 |
-| metaKV | s3-cache-datasets | 11 | 31 GB | 0.044 | 0.755 | 10.118 | 0 |
-| msr | s3-cache-datasets | 36 | 7.6 GB | 0.906 | 0 | 8.633 | 0 |
-| other | s3-cache-datasets | 2 | 359.8 GB | 0.016 | 0.025 | 63.984 | 0 |
-| tencentBlock | s3-cache-datasets | 4995 | 761 GB | 0.98 | 0.004 | 4.514 | 0 |
-| cloud_disk | tencent | 16296 | 6.8 GB | N/A | N/A | N/A | N/A |
+| Family | Dataset | Files | Size | Heterogeneity | Modes | Split Format | Guidance |
+|---|---|---:|---:|---:|---:|---|---|
+| cloud_disk | tencent | 16296 | 6.8 GB | 5.572 | 8 | no | High cross-file heterogeneity; favor regime conditioning or multiple family-specific GAN runs over a single unconditional model. Ordered PC1 changepoints suggest 666 regimes when files are ordered by trace start time. Strongest feature coupling in this pass: disk_usage_mean vs disk_usage_q50 (corr=0.99). |
+| 2015_cloudphysics | s3-cache-datasets | 106 | 8.4 GB | 2.14 | 8 | no | Ordered PC1 changepoints suggest 9 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1). |
+| alibaba | alibaba | 1000 | 93.8 GB | 2.043 | 8 | no | Ordered PC1 changepoints suggest 22 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Strongest feature coupling in this pass: iat_mean vs iat_q90 (corr=1). |
+| 2020_tencentBlock | s3-cache-datasets | 4996 | 279.8 GB | 2.006 | 8 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Ordered PC1 changepoints suggest 24 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. |
+| tencentBlock | s3-cache-datasets | 4995 | 761 GB | 1.328 | 8 | no | Ordered PC1 changepoints suggest 17 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. Strongest feature coupling in this pass: iat_std vs iat_q99 (corr=0.98). |
+| 2020_alibabaBlock | s3-cache-datasets | 1001 | 234 GB | 1.322 | 8 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Ordered PC1 changepoints suggest 22 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. |
+| alibaba | s3-cache-datasets | 1000 | 444.4 GB | 1.302 | 8 | no | Ordered PC1 changepoints suggest 23 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. Strongest feature coupling in this pass: iat_mean vs iat_q90 (corr=0.99). |
+| msr | s3-cache-datasets | 36 | 7.6 GB | 1.057 | 6 | no | Ordered PC1 changepoints suggest 6 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. Strongest feature coupling in this pass: sample_records vs iat_q99 (corr=-1). |
+| 2007_msr | s3-cache-datasets | 14 | 1.5 GB | 1.047 | 3 | no | Ordered PC1 changepoints suggest 3 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1). |
+| cache_trace_twitter_memcache | s3-cache-datasets | 226 | 3892.5 GB | 0.991 | 6 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Ordered PC1 changepoints suggest 6 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. |
+| cloudphysics | s3-cache-datasets | 107 | 59.9 GB | 0.895 | 3 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Ordered PC1 changepoints suggest 3 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. |
+| metaKV | s3-cache-datasets | 11 | 31 GB | 0.768 | 1 | no | Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Reuse/locality is a major axis here; locality-aware losses and conditioning should matter. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| 2022_metaKV | s3-cache-datasets | 28 | 140.5 GB | 0.656 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Reuse/locality is a major axis here; locality-aware losses and conditioning should matter. |
+| 2020_twitter | s3-cache-datasets | 54 | 141.8 GB | 0.634 | 1 | no | Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. Strongest feature coupling in this pass: ts_duration vs iat_zero_ratio (corr=-1). |
+| 2026-alibaba-thinkahead | s3-cache-datasets | 45 | 14.3 GB | 0.425 | 8 | no | Ordered PC1 changepoints suggest 8 regimes when files are ordered by trace start time. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| Baleen24 | Baleen24 | 374 | 29.2 GB | 0.423 | 8 | no | Ordered PC1 changepoints suggest 36 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. Tenant diversity is high; tenant/context conditioning is likely useful. |
+| exchange | MSR | 96 | 1.4 GB | 0.398 | 8 | no | Ordered PC1 changepoints suggest 8 regimes when files are ordered by trace start time. Write pressure is material; preserve write bursts and opcode transitions in conditioning. Tenant diversity is high; tenant/context conditioning is likely useful. |
+| 2017_systor | s3-cache-datasets | 6 | 32.6 GB | 0.352 | 1 | no | Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
+| 2019_wiki | s3-cache-datasets | 6 | 74 GB | 0.323 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| 2007_wiki | s3-cache-datasets | 4 | 36.4 GB | 0.286 | 1 | no | Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. Strongest feature coupling in this pass: ts_duration vs iat_zero_ratio (corr=-1). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
+| 2022_metaCDN | s3-cache-datasets | 3 | 2.1 GB | 0.195 | 1 | no | Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| 2023_metaCDN | s3-cache-datasets | 3 | 3.5 GB | 0.146 | 1 | no | Family looks comparatively homogeneous in the extracted feature space. |
+| other | s3-cache-datasets | 2 | 359.8 GB | 0.09 | 1 | no | Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| 2020_twr_cdn | s3-cache-datasets | 3 | 488.8 GB | 0.079 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. |
+| 2022_metaStorage | s3-cache-datasets | 5 | 0.6 GB | 0.018 | 1 | no | Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
+| 2018_tencentPhoto | s3-cache-datasets | 4 | 151.9 GB | 0.001 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior. Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted. |
+| 2016_wiki | s3-cache-datasets | 2 | 24.8 GB | 0 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. |
+| 2017_docker | s3-cache-datasets | 7 | 0.6 GB | 0 | 1 | no | Strongest feature coupling in this pass: size_bytes vs schema_high_cardinality_cols (corr=0.93). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
+| 2023_metaStorage | s3-cache-datasets | 6 | 2.7 GB | 0 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Strongest feature coupling in this pass: first_numeric_diff_mean vs first_numeric_diff_std (corr=0.73). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
+| 2024_google | s3-cache-datasets | 192 | 171.8 GB | 0 | 1 | yes | Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants. Strongest feature coupling in this pass: size_bytes vs schema_high_cardinality_cols (corr=0.03). A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection. |
