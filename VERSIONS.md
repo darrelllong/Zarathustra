@@ -19,12 +19,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 | 10    | 0.287  | 0.192 ★  |
 | 20    | 0.318  | 0.179 ★  |
 
-### alibaba_v7 — Alibaba + n_critic=2 + CFG 0.25 + var_cond
+### alibaba_v8 — Alibaba + v5 recipe + CFG 0.25 (hot-start from v5/ep50)
 
-**Status**: RUNNING — 2026-04-05. PID 755136 on vinge. Just launched.
-**Recipe**: WGAN-SN + n_critic=2 + CFG cond_drop=0.25 + var_cond + cond_dim=10 + lr_d=2.5e-5. NO GMM.
-**Pretrain**: alibaba_v1/pretrain_complete.pt.
-**Goal**: Beat alibaba_v5 best (0.108★/0.560). Apply n_critic=2 insight from v47 to Alibaba.
+**Status**: RUNNING — 2026-04-05. PID 758919 on vinge. Just launched.
+**Recipe**: GMM K=8 + var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=5e-5.
+**Pretrain**: alibaba_v5/epoch_0050.pt used as pretrain_complete.pt (best Alibaba weights).
+**Key**: Fresh critic (pretrain loader skips C/opt_C). CFG is new on top of v5's recipe.
+**Goal**: Push recall from 0.560 toward 0.65+ to beat ATB (0.089).
+
+---
+
+## Post-Mortem: alibaba_v7 — n_critic=2 + CFG + var_cond (KILLED ep20, 2026-04-05)
+
+**Best**: ep20 recall=0.180, combined=0.210 — far below v1 ep20 (recall=0.441).
+**Root cause**: n_critic=2 + var_cond too aggressive for Alibaba. Stronger critic + conditioning noise.
+**Lesson**: n_critic=2 helps Tencent (no var_cond) but hurts Alibaba (with var_cond). Keep n_critic=1.
 
 ---
 
