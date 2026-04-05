@@ -19,14 +19,33 @@ Temperature annealed τ: 1.0 → 0.1.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.200  | 0.203 ★  |
+| 10    | 0.487  | 0.121 ★  |
+| 15    | 0.458  | 0.132    |
 
-### alibaba_v13 — Alibaba + pure v5 recipe, fresh seed
+ep10 combined=0.121★ — BEST early-epoch result EVER. Recall 0.487 at ep10 is extraordinary
+(v31 didn't reach 0.487 until ~ep60). Regime sampler appears to be recreating the mixture
+structure that made ATB possible. G_loss very negative (-2.8 to -3.8), W-distance healthy (0.5-0.7).
 
-**Status**: RUNNING — 2026-04-05. PID 846562 on vinge.
-**Recipe**: GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5 + supervisor_loss_weight=1.0 + char-file.
-**Pretrain**: alibaba_v1/pretrain_complete.pt.
-**Rationale**: alibaba_v5 achieved ATB=0.108 with this exact recipe. Fresh seed retry.
+### alibaba_v15 — Alibaba + regime sampler (RUNNING)
 
+**Status**: RUNNING — 2026-04-05. PID 891332 on vinge.
+**Recipe**: var_cond + GMM K=8 + `--n-regimes 8` + `--cond-drop-prob 0.25` + `--w-stop-threshold 3.0` +
+n_critic=1 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
+**Pretrain**: alibaba_v13/pretrain_complete.pt (regime_sampler params initialized fresh, optimizer rebuilt).
+**Hypothesis**: If regime sampler works spectacularly on Tencent (v54 ep10: combined=0.121★), it
+should work on Alibaba too. Same Gumbel-Softmax K=8 approach + var_cond/GMM from Alibaba ATB recipe.
+Log: ~/train_alibaba_v15.log.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+
+---
+
+## Post-Mortem: alibaba_v13 — Alibaba + pure v5 recipe, fresh seed (KILLED ep54, 2026-04-05)
+
+**Best**: ep25 recall=0.287, combined=0.178★ (MMD²=0.035).
+**Eval progression**:
 | Epoch | Recall | Combined |
 |-------|--------|----------|
 | 5     | 0.110  | 0.241 ★  |
@@ -35,14 +54,22 @@ Temperature annealed τ: 1.0 → 0.1.
 | 20    | 0.228  | 0.208 ★  |
 | 25    | 0.287  | 0.178 ★  |
 | 30    | 0.207  | 0.208    |
+| 35    | 0.262  | 0.193    |
+| 40    | 0.215  | 0.205    |
+| 45    | 0.216  | 0.194    |
+| 50    | 0.221  | 0.184    |
 
-ep25 combined=0.178★ beats alibaba_v5 at ep25 (0.197). Tracking ahead of v5's trajectory. Key milestone: ep40-50 where v5 had its recall surge (0.24→0.56).
+**Why killed**: Peaked at ep25. Recall declined from 0.287→0.221 over 30 epochs. G_loss oscillated
+wildly between -4.5 and +4.6 (ep36-54). W-distance collapsed to 0.05-0.10. No path to alibaba
+ATB (0.108). The ep40-50 recall surge that alibaba_v5 had did NOT repeat — bad seed.
 
-### alibaba_v14 — Alibaba + mixed-type Recovery (PRETRAIN RUNNING)
+---
 
-**Status**: PRETRAIN — 2026-04-05. On vinge.
-**Recipe**: Same as alibaba_v13 + `--mixed-type-recovery` (idea #7 for Alibaba).
-Log: ~/train_alibaba_v14_pretrain.log.
+## Post-Mortem: alibaba_v14 — Alibaba + mixed-type Recovery (KILLED pretrain ep60, 2026-04-05)
+
+**Why killed**: Mixed-type Recovery was disproven in v53 (Tencent: MMD²=0.034, worse than baseline 0.020).
+Binary columns are NOT the MMD² bottleneck. Killed at Phase 2.5 ep60/100 to free GPU for alibaba_v15
+(regime sampler), which mirrors v54's spectacular early results.
 
 ---
 
