@@ -8,12 +8,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ### v49 — Tencent + BayesGAN M=5 + v28 pretrain + ATB recipe
 
-**Status**: RUNNING — 2026-04-05. PID 780011 on vinge.
+**Status**: MONITORING ep35 — 2026-04-05. PID 780011 on vinge.
 **Recipe**: BayesGAN M=5 particles + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
 **Pretrain**: v28/pretrain_complete.pt.
-**Key**: 5 critic particles, each updated with SGLD (Adam + Gaussian noise). G loss = mean across particles.
-**Goal**: BayesGAN posterior over critics prevents mode collapse by eliminating single-boundary exploitation.
-Epoch timing: ~175s/epoch (5× critic compute). ATB at ep65-70.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
@@ -21,32 +18,41 @@ Epoch timing: ~175s/epoch (5× critic compute). ATB at ep65-70.
 | 10    | 0.370  | 0.152 ★  |
 | 15    | 0.305  | 0.163    |
 | 20    | 0.336  | 0.160    |
+| 25    | 0.322  | 0.174    |
+| 30    | 0.234  | 0.179    |
 
-ep10 recall=0.370 unprecedented. ep15 dip normal; ep20 recovering (0.336). Oscillating in 0.152-0.173 band.
-G_loss positive throughout — critics providing genuine signal. ATB zone ep65-70.
+ep30 recall=0.234 declining. Best still ep10 (0.152★). Kill if ep35 recall < 0.30.
 
-### alibaba_v11 — Alibaba + BayesGAN M=5 + v5 recipe (GMM K=8, var_cond, no CFG)
+### v50 — Tencent + exact v34 recipe + seed=42
 
-**Status**: RUNNING — 2026-04-05. PID 781593 on vinge.
-**Recipe**: BayesGAN M=5 + GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5. NO CFG.
-**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only).
-**Key**: v5's recipe (which got recall=0.560) + BayesGAN. Multiple critic particles prevent the
-post-ep50 single-critic dominance that caused v5 to degrade after its peak.
-**Goal**: Reproduce v5's recall=0.560 but sustain it past ep50 by distributing critic power.
+**Status**: RUNNING — 2026-04-05. PID 792739 on vinge.
+**Recipe**: CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO BayesGAN.
+**Pretrain**: v28/pretrain_complete.pt. **Seed**: 42 (deterministic).
+**Goal**: Seed variance test. v33 (random seed, ATB recipe) → 0.107. v31/v34 (random seeds) → 0.089.
+Is seed=42 a lucky seed?
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
-| 5     | 0.165  | 0.227 ★  |
-| 10    | 0.154  | 0.235    |
-| 15    | 0.247  | 0.189 ★  |
-| 20    | 0.197  | 0.202    |
-| 25    | 0.225  | 0.188 ★  |
-| 30    | 0.256  | 0.183 ★  |
-| 35    | 0.340  | 0.168 ★  |
-| 40    | 0.257  | 0.183    |
 
-First Alibaba run with sustained climbing recall (no explosion). ep35 recall=0.340 is Alibaba milestone.
-G_loss mostly positive; W-dist 0.15-0.44. Compare alibaba_v5 (recall→0.560 by ep50).
+### alibaba_v12 — Alibaba + BayesGAN M=2 + v5 recipe
+
+**Status**: RUNNING — 2026-04-05. PID 793128 on vinge.
+**Recipe**: BayesGAN M=2 + GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5. NO CFG.
+**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only).
+**Key**: M=5 (v11) capped recall at 0.340 — too many critics averaging G signal. M=2 (1 extra particle)
+is closer to single-critic dynamics while still providing some diversity to prevent post-ep50 collapse.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------| 
+
+---
+
+## Post-Mortem: alibaba_v11 — Alibaba + BayesGAN M=5 + v5 recipe (KILLED ep55, 2026-04-05)
+
+**Best**: ep35 combined=0.168★, recall=0.340. Peaked ep35, stuck 0.238-0.287 through ep55.
+**Finding**: M=5 critics prevented v5's post-ep50 explosion but also capped recall at 0.340 — too
+conservative. 5 particles averaging G signal reduced the gradient quality G needs to climb.
+**Lesson**: BayesGAN M=5 over-regularizes for Alibaba. Try M=2 (alibaba_v12).
 
 ---
 
