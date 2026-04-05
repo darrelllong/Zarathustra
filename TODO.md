@@ -21,8 +21,9 @@ Items marked ✓ are done and in the repo.
 
 - ✓ **Loss named "wgan-gp" without gradient penalty** (`config.py`, `train.py`, `model.py`)
   Spectral norm applied only to the critic's final linear layer — LSTM weights are
-  unconstrained. Renamed to `wgan-sn` throughout. True WGAN-GP requires second-order
-  autograd (CUDA only; deferred to NVIDIA GPU task).
+  unconstrained. Renamed to `wgan-sn` throughout. True WGAN-GP is CUDA-only for
+  LSTM-based critics (requires `torch.backends.cudnn.flags(enabled=False)` around
+  critic forward to allow double-backward; implemented in train.py).
 
 ---
 
@@ -114,12 +115,11 @@ Items marked ✓ are done and in the repo.
   Reviewer: "The model is asked to generate long coherent traces at inference time
   without being trained on a directly chunk-continuous objective."
 
-- [ ] **FiLM conditioning for workload** (`model.py`) — cleaner than current z_global init-only conditioning
+- ✓ **FiLM conditioning for workload** (`model.py`) — cleaner than current z_global init-only conditioning
   Feature-wise Linear Modulation: `h_t = (1 + γ(cond)) * h_t + β(cond)` at each LSTM timestep.
   Prevents conditioning signal from fading through forget gates over T=12 steps.
   Zero-init of γ, β ensures backward compatibility with existing checkpoints.
-  Ref: FiLM (NeurIPS 2018); cleaner than concatenation-based conditioning.
-  Add `--film-cond` flag. Planned for v40.
+  Ref: FiLM (NeurIPS 2018). Implemented as `--film-cond` flag (not used in recent best runs).
 
 - [ ] **Run loss-family ablation sweep** (`train.py`)
   The objective now has 10+ terms; interaction effects are a bigger risk than missing
@@ -195,21 +195,17 @@ Items marked ✓ are done and in the repo.
   skewness = third standardized moment (weighted 0.5×). Both activated when
   `--moment-loss-weight > 0`. GRU+LSTM hybrid backbone is a further option but 2-day effort.
 
-- [ ] **SeriesGAN dual discriminator + 2-step supervisor** (`model.py`, `train.py`)
-  — BigData 2024 (also in Medium-term section above)
-  2-step supervisor predicts `h_t` from `h_{t-2}` instead of `h_{t-1}`.
-  Expected: −34% discriminative score vs TimeGAN. Already have latent AE so
-  mostly wiring.
+- ✓ **SeriesGAN dual discriminator + 2-step supervisor** (`model.py`, `train.py`)
+  — BigData 2024. Implemented: `--supervisor-steps 2` (default in all recent runs v37+).
+  Dual discriminator: `--feat-critic-weight` (latent + feature-space critics).
 
 - ✓ **Relativistic paired GAN loss (RpGAN)** (`train.py`) — R3GAN, NeurIPS 2024
   Implemented as `--loss rpgan`. D_loss = -E[log σ(C(x_r) - C(x_f))];
   G_loss = -E[log σ(C(x_f) - C(x_r))]. MPS-compatible (no second-order gradients).
   Targets β-recall mode collapse. Pending first run to evaluate.
 
-- [ ] **FiLM conditioning for tenant/workload** (`model.py`) — survey, 2024
-  Feature-wise Linear Modulation: learn per-condition scale+shift for generator
-  hidden states. Cleaner than concatenation for conditioning on tenant_id,
-  read_ratio, obj_size_bucket. Prerequisite for workload conditioning (#9 above).
+- ✓ **FiLM conditioning for tenant/workload** (`model.py`) — survey, 2024
+  Implemented as `--film-cond` flag. See Medium-term section above.
 
 ### Architecture improvements (from second survey)
 
@@ -300,17 +296,15 @@ Items marked ✓ are done and in the repo.
   The FFT and moment losses are compensating for this missing temporal context.
 
 - [ ] **Train separate models per workload class** (Tencent vs Alibaba)
-  Tencent: 9-day, 512B–32KB mixed, 83–94% reads.
-  Alibaba: 31-day, 4KB-aligned, more variable read ratios.
-  Compare per-corpus vs mixed-corpus models once Alibaba download finishes.
+  Tencent: 9-day, 512B–32KB mixed, 83–94% reads — currently training on vinge (GB10).
+  Alibaba: 31-day, 4KB-aligned, more variable read ratios — traces not yet downloaded.
+  Compare per-corpus vs mixed-corpus models once Alibaba traces are acquired.
 
-- [ ] **Re-train on NVIDIA GPU once box arrives**
-  1. WGAN-GP on MPS: FAILS for LSTM critic — `lstm_mps_backward` is not differentiable
-     (create_graph=True hits second-order LSTM grad). train.py now auto-falls-back to
-     wgan-sn on MPS. WGAN-GP is CUDA-only for LSTM-based critics.
-  2. ✓ Apply spectral norm to LSTM weight matrices -- done in v14c (weight_ih_l0 + weight_hh_l0; MPS-compatible via torch.nn.utils.spectral_norm)
-  3. Increase `hidden_size`, `num_layers`, `batch_size`, `files_per_epoch`
-  4. Benchmark full-corpus training time
+- [ ] **Scale up model on vinge GB10** (NVIDIA box is vinge.local — GB10, 124GB unified memory)
+  1. ✓ WGAN-GP on CUDA available (cuDNN double-backward fix in train.py); MPS still falls back to wgan-sn.
+  2. ✓ Spectral norm on LSTM weight matrices (weight_ih_l0 + weight_hh_l0).
+  3. Try larger `hidden_size` (512), more `files_per_epoch` (24+), larger `batch_size` (128).
+  4. Benchmark: v43 runs ~35–120s/epoch on GB10 with hidden_size=256, files_per_epoch=12.
 
 ---
 
