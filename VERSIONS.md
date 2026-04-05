@@ -219,36 +219,67 @@ with GMM actually active.
 
 ---
 
-## Current Run: v44 — WGAN-SN + char-file + GMM K=8 (fixed) + var-cond + n_critic=1
+## Post-Mortem: v44 — WGAN-SN + char-file + GMM K=8 (fixed) + var-cond + n_critic=1 (KILLED ep72, 2026-04-04)
 
-**Status**: RUNNING — 2026-04-04. PID 652427 on vinge. Reusing v38's pretrain_complete.pt.
+**Status**: KILLED ep72.
+**Best**: ep50 EMA combined=0.132, recall=0.402. Did NOT beat ATB (0.089).
+
+**Eval progression**:
+| Epoch | MMD²    | Recall | Combined |
+|-------|---------|--------|----------|
+| 10    | 0.02124 | 0.326  | 0.156 ★  |
+| 20    | 0.02298 | 0.344  | 0.154 ★  |
+| 35    | 0.01660 | 0.343  | 0.148 ★  |
+| 40    | 0.01586 | 0.357  | 0.144 ★  |
+| 45    | 0.01604 | 0.390  | 0.138 ★  |
+| 50    | 0.01279 | 0.402  | 0.132 ★  |
+| 55    | 0.01538 | 0.366  | 0.142    |
+| 60    | 0.01845 | 0.334  | 0.152    |
+| 65    | 0.01573 | 0.362  | 0.143    |
+| 70    | 0.01436 | 0.338  | 0.147    |
+
+**Root cause**: var_cond (CondEncoder) is the culprit. v43 (identical recipe, no var_cond, no real GMM)
+reached best=0.117 at ep75 with recall=0.476. v44 with real GMM + var_cond peaked at 0.132/0.402 —
+significantly worse. The variational conditioning adds noise during training that hurts convergence.
+The CondEncoder's logvar=-6 (σ≈0.05) wasn't zero enough; subtle perturbation to conditioning
+disrupted char-file signal that previously worked well.
+
+**What worked**: W stable through ep72 (n_critic=1 fix still working). GMM K=8 architecture loads
+fine from v43 pretrain. The underlying issue is var_cond, not GMM.
+
+**Lesson**: var_cond hurts (at least with KL weight=0.001 and this architecture). Need to test GMM K=8
+ALONE (without var_cond) vs v43 baseline to isolate GMM's true contribution.
+
+→ v45: v43 recipe + GMM K=8 (no var_cond). Reusing v43 pretrain_complete.pt.
+
+---
+
+## Current Run: v45 — WGAN-SN + char-file + GMM K=8 + n_critic=1 (no var-cond)
+
+**Status**: RUNNING — 2026-04-04. PID 680333 on vinge. Reusing v43 pretrain_complete.pt.
 
 **What's new vs v43**:
-1. GMM K=8 now actually active (cfg bug fixed: cfg.gmm_components = args.gmm_components)
-2. Variational conditioning (--var-cond): char-file vector → N(μ,σ²) → sampled at train,
-   deterministic μ at eval. Makes G robust to conditioning noise; adds KL loss (weight=0.001).
-3. Pretrain loading fixed: strict=False + EMA seeded with new params + opt_G try/except.
+- GMM K=8 now truly active (cfg bug fixed in v44 remains fixed)
+- NO var_cond (removed — v44 proved it hurts, best 0.132 vs v43's 0.117)
+- Fresh GMM params initialized over v43 pretrain (strict=False auto-detected new gmm_prior.* keys)
 
-**Recipe**: v43 + --gmm-components 8 (bug fixed) + --var-cond --var-cond-kl-weight 0.001
+**Recipe**: identical to v43 except `--gmm-components 8` is now actually applied.
+This is the TRUE test of whether GMM K=8 improves on v43's best of combined=0.117, recall=0.476.
 
 **Early training**:
 ```
-Epoch 1: W=+0.1098  G=-1.2750  t=40.5s
-Epoch 2: W=+0.2298  G=-1.9791  t=38.8s
-Epoch 3: W=+0.5451  G=-2.3602  t=39.1s
-Epoch 4: W=+0.3321  G=-3.8973  t=39.1s
+Epoch 1: W=+0.1656  G=-0.9577  t=78s
 ```
-G_loss strongly negative (healthy). W growing. Epoch time ~39s (faster than v43's ~60s).
 
 ```bash
 ssh -i ~/.ssh/id_rsa darrell@192.168.86.30 "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v44 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v45 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
-  --gmm-components 8 --var-cond --var-cond-kl-weight 0.001 \
+  --gmm-components 8 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 1 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -258,7 +289,7 @@ ssh -i ~/.ssh/id_rsa darrell@192.168.86.30 "cd ~/Zarathustra/llgan && nohup ~/ll
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile --no-amp \
-  > ~/train_v44.log 2>&1 &"
+  > ~/train_v45.log 2>&1 &"
 ```
 
 ---
