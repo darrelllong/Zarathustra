@@ -4,20 +4,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: alibaba_v4 — Alibaba + GMM K=8 + var-cond + NaN-skip guard + n_critic=1
+## Current Run: alibaba_v5 — Alibaba + GMM K=8 + var-cond + FULL explosion guard + n_critic=1
 
-**Status**: RUNNING — 2026-04-05. PID 708908 on vinge.
-**What's new vs alibaba_v1**: NaN/inf guard on G_loss — skip backward if non-finite (train.py).
-Does NOT clamp CondEncoder output (that hurt recall in alibaba_v3).
-**Pretrain**: reusing alibaba_v1/pretrain_complete.pt (identical architecture).
-**Goal**: reach alibaba_v1's ep25 trajectory (0.122★/0.509) but continue stably past ep35.
+**Status**: RUNNING — 2026-04-05. PID 726415 on vinge.
+**What's new vs alibaba_v4**: Fixed explosion guard — also skip when `g_loss.abs() > 1e6`
+(torch.isfinite() only catches NaN/inf; alibaba explosions are ~1.8T which is large but finite).
+**Pretrain**: reusing alibaba_v1/pretrain_complete.pt.
+**Goal**: reach alibaba_v1's ep25 best (0.122★/0.509) and continue improving stably.
 
-**Early training** (promising — no ep6 explosion unlike v1/v3!):
-| Epoch | G_loss | Notes |
-|-------|--------|-------|
-| 5     | -0.665 | EMA combined=0.290★, recall=0.112 (early/slow) |
-| 6     | -0.601 | NO explosion (G_loss finite) |
-| 7     | -0.518 | Clean |
+---
+
+## Post-Mortem: alibaba_v4 — Alibaba + GMM K=8 + var-cond + incomplete NaN guard (KILLED ep25, 2026-04-05)
+
+**Status**: KILLED ep25. Damaged by ep24 explosion (guard was insufficient).
+**Best early**: ep5 combined=0.290, ep6 clean (G finite), ep7 clean.
+**Damage**: ep24 G_loss=1.9T passed the `isfinite()` guard (finite number!) → corrupted G weights.
+ep25 eval: combined=0.192, recall=0.281 — much worse than alibaba_v1 ep25 (0.122/0.509).
+
+**Root cause of guard failure**: The guard was `if not torch.isfinite(g_loss)` but 1.9T is a
+valid float64. `isfinite(1.9e12)` returns True. Need `abs() > 1e6` check in addition.
+
+**Fix applied**: `if not torch.isfinite(g_loss) or g_loss.abs() > 1e6:` in train.py (committed).
+
+→ alibaba_v5: exact same recipe, corrected guard.
 
 ---
 
