@@ -129,32 +129,92 @@ prior. → v41: WGAN-SN + char-file + GMM prior (K=8 mixture components in noise
 
 ---
 
-## Current Run: v41 — WGAN-SN + char-file + GMM prior (K=8)
+## Post-Mortem: v41 — WGAN-SN + char-file + GMM prior K=8 (W-collapse ep50, 2026-04-04)
 
-**Status**: RUNNING — 2026-04-04. PID 609936 on vinge. Reusing v38's pretrain_complete.pt.
+**Status**: KILLED ep50 (W-collapse).
+**Best**: ep35 EMA combined=0.136, recall=0.406. Did NOT beat ATB (0.089).
 
-**Hypothesis**: v40's recall ceiling (0.40) is caused by the unimodal N(0,I) prior fighting a
-multimodal workload distribution. GMM prior gives each workload type its own noise region:
-  π_k = softmax(MLP(char_file_cond))     # (B, K) soft component weights
-  μ_z = Σ_k π_k * μ_k                   # (B, noise_dim) mixture mean
-  σ_z = Σ_k π_k * exp(λ_k)              # (B, noise_dim) mixture std
-  noise = μ_z + σ_z * ε,  ε ~ N(0,I)
-The GMM prior is the structural equivalent of what v31/v34's noisy window-level z_global
-accidentally provided — mode separation in noise space.
+**Eval progression**:
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|---------|
+| 5  | 0.041 | 0.228 | 0.227 |
+| 10 | 0.027 | 0.320 | 0.191 |
+| 20 | 0.021 | 0.384 | 0.144 |
+| 30 | 0.021 | 0.401 | 0.141 |
+| 35 | 0.020 | 0.406 | 0.136 ★ |
+| 40 | 0.019 | 0.384 | 0.146 |
+| 45 | 0.023 | 0.249 | 0.173 (W declining) |
+| 50 | 0.055 | 0.100 | 0.235 (W=0.07, collapse) |
 
-**Recipe**: v40 + --gmm-components 8
+**Root cause**: W-distance collapsed at ep50 (W=0.07, down from 1.46 at ep40). Critic over-trained
+at lr_d=5e-5 — the same failure mode as v32. With n_critic=2 and 200+ files/epoch, the critic
+accumulated enough gradient updates to dominate G. After collapse G gets no useful signal.
+
+**GMM note**: The GMM prior (zero-init means) began to show separation by ep20 (recall crossed 0.384,
+same as v40's peak). By ep35 it had clearly pushed past the v40 ceiling (0.406 vs 0.402). The GMM
+is working — it's the W-collapse that killed it.
+
+**Lesson**: lr_d=5e-5 + n_critic=2 + GMM leads to W-collapse at ep50 just like v32. Halve lr_d to
+2e-5 to slow the critic.
+
+→ v42: v41 recipe + lr_d=2e-5.
+
+---
+
+## Post-Mortem: v42 — WGAN-SN + char-file + GMM K=8 + lr_d=2e-5 (weak critic, killed ep25, 2026-04-04)
+
+**Status**: KILLED ep25.
+**Best**: ep5 EMA combined=0.174, recall=0.291. Did NOT beat ATB (0.089).
+
+**Eval progression**:
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|---------|
+| 5  | 0.032 | 0.291 | 0.174 ★ |
+| 10 | 0.038 | 0.240 | 0.190 |
+| 15 | 0.041 | 0.215 | 0.198 |
+| 20 | 0.028 | 0.247 | 0.179 |
+| 25 | 0.029 | 0.224 | 0.184 |
+
+**Root cause**: lr_d=2e-5 produced a permanently under-trained critic. W stuck at 0.13–0.37 for all
+25 epochs (vs v41's W growing to 1.46 by ep40). With such a weak critic G received minimal
+adversarial gradient and relied entirely on aux losses, pushing toward safe averages. Recall
+oscillated 0.21–0.29, well below v41's 0.384 at ep20.
+
+**Lesson**: lr_d=2e-5 is too conservative. The sweet spot is between 2e-5 (too weak) and 5e-5
+(W-collapse at ep50). Try: lr_d=5e-5 but n_critic=1 (halve D:G update ratio → same per-step
+sharpness but half the total critic updates → delayed W-collapse).
+
+→ v43: v41 recipe + n_critic=1 (was 2).
+
+---
+
+## Current Run: v43 — WGAN-SN + char-file + GMM K=8 + n_critic=1
+
+**Status**: RUNNING — 2026-04-04. PID 634817 on vinge. Reusing v38's pretrain_complete.pt.
+
+**Hypothesis**: v41 (n_critic=2, lr_d=5e-5) had the right critic strength but W-collapsed at ep50
+from too many D updates. v42 (lr_d=2e-5) proved the cure was worse than the disease — the critic
+became too weak. n_critic=1 with lr_d=5e-5 halves total D updates while keeping per-step
+gradient quality; should delay W-collapse without sacrificing adversarial signal.
+
+**Recipe**: v41 + n_critic=1 (was 2), keeping lr_d=5e-5
+
+**Early training**:
+```
+Epoch 1: W=+0.2035  G=-0.5417  t=86.9s
+```
 
 ```bash
-ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v41 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v41/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v43 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v43/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v41 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v43 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
   --gmm-components 8 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
-  --n-critic 2 --supervisor-steps 2 \
+  --n-critic 1 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
   --feature-matching-weight 1.0 --moment-loss-weight 0.1 \
   --fft-loss-weight 0.05 --quantile-loss-weight 0.2 --acf-loss-weight 0.2 \
@@ -162,7 +222,7 @@ ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile --no-amp \
-  > ~/train_v41.log 2>&1 &"
+  > ~/train_v43.log 2>&1 &"
 ```
 
 ---
