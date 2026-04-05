@@ -4,13 +4,27 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: alibaba_v3 — Alibaba + GMM K=8 + var-cond (clamped) + n_critic=1
+## Current Run: alibaba_v4 — Alibaba + GMM K=8 + var-cond + NaN-skip guard + n_critic=1
 
-**Status**: RUNNING — 2026-04-05. PID 704715 on vinge.
-**What's new vs alibaba_v1**: CondEncoder output clamped — mu.clamp(-20,20), encoded.clamp(-10,10).
-Prevents the ~1.8T G_loss explosions that crashed alibaba_v1 at ep6/24/28/34.
-**Pretrain**: reusing alibaba_v1/pretrain_complete.pt (identical architecture: GMM+var_cond).
-**Goal**: reach alibaba_v1's ep25 performance (0.122★/0.509) stably and continue improving.
+**Status**: RUNNING — 2026-04-05. PID 708908 on vinge.
+**What's new vs alibaba_v1**: NaN/inf guard on G_loss — skip backward if non-finite (train.py).
+Does NOT clamp CondEncoder output (that hurt recall in alibaba_v3).
+**Pretrain**: reusing alibaba_v1/pretrain_complete.pt (identical architecture).
+**Goal**: reach alibaba_v1's ep25 trajectory (0.122★/0.509) but continue stably past ep35.
+
+---
+
+## Post-Mortem: alibaba_v3 — Alibaba + GMM K=8 + var-cond (CondEncoder clamped) (KILLED ep10, 2026-04-05)
+
+**Status**: KILLED ep10.
+**Best**: ep10 EMA combined=0.206, recall=0.152. WORSE than alibaba_v1.
+
+**Root cause**: CondEncoder output clamp (mu.clamp(-20,20), encoded.clamp(-10,10)) interfered
+with normal training. ep5 recall=0.095 vs alibaba_v1 ep5=0.206. The clamp didn't prevent the
+ep6 explosion (G=1.8T still occurred) but DID harm the gradient signal for normal epochs.
+
+**Lesson**: Don't clamp CondEncoder outputs. Use NaN-skip guard in train.py instead — it doesn't
+touch forward pass behavior, only skips the backward step when loss is non-finite.
 
 ---
 
