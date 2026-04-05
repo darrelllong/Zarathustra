@@ -16,17 +16,36 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.271  | 0.198 ★  |
+| 10    | 0.220  | 0.218    |
+| 15    | 0.278  | 0.178 ★  |
+| 20    | 0.309  | 0.161 ★  |
+
+Note: ep20 combined=0.161 already BETTER than v47 ep20 (0.179). v28 pretrain hypothesis supported.
 
 ### alibaba_v9 — Alibaba + v1 pretrain + lower lr_d (2.5e-5) + GMM+var_cond+CFG
 
-**Status**: RUNNING — 2026-04-05. PID 767572 on vinge.
-**Recipe**: GMM K=8 + var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=2.5e-5. Clean start.
-**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only; same starting point as v5).
-**Key**: lr_d halved from v5 (5e-5→2.5e-5) to prevent post-ep50 critic dominance that degraded v5.
-**Goal**: Match/exceed alibaba_v5 ep50 (0.108★, recall=0.560) without post-peak decay.
+**Status**: KILLED ep25 — 2026-04-05. Recall stuck at 0.106-0.108 from ep10 to ep25. lr_d too low.
+
+### alibaba_v10 — Alibaba + v1 recipe + CFG 0.25, no GMM, lr_d=5e-5
+
+**Status**: RUNNING — 2026-04-05. PID 772133 on vinge.
+**Recipe**: var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=5e-5. NO GMM.
+**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only).
+**Key**: Returns to v1 lr_d (5e-5) but adds CFG 0.25. CFG may prevent var_cond explosion spiral
+by regularizing G against conditioning noise.
+**Goal**: alibaba_v1 (no CFG) got 0.122★/0.509. CFG should stabilize and potentially improve.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+
+---
+
+## Post-Mortem: alibaba_v9 — Alibaba lr_d=2.5e-5 (KILLED ep25, 2026-04-05)
+
+**Best**: ep25 recall=0.106, combined=0.281. Recall flat from ep10 to ep25.
+**Root cause**: lr_d=2.5e-5 made the critic too weak. W-dist stayed at 0.08-0.12 throughout — no gradient signal to G.
+**Lesson**: Alibaba needs lr_d=5e-5 for stable training. The post-ep50 decline in v5 was critic dominance, not lr_d being too high.
 
 ---
 
