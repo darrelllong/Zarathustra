@@ -170,6 +170,9 @@ class Config:
     mmd_every: int = 5
     mmd_samples: int = 1000
     early_stop_patience: int = 0    # evals without improvement before stopping (0 = off)
+    w_stop_threshold: float = 0.0   # W-distance spike guard: stop if W > this for 3 consecutive
+                                    # epochs (0 = off). Catches conditioning instability collapse
+                                    # (v33: W→10.6 ep179, v36: W→10 ep178). Recommended: 3.0.
     dmd_ckpt_weight: float = 0.0    # weight for DMD-GEN in combined checkpoint score (0 = off).
                                     # combined = MMD² + 0.2*(1-recall) + dmd_ckpt_weight*DMD-GEN.
                                     # Use 0.05 to add a temporal-dynamics tiebreaker. Adds ~5s/eval

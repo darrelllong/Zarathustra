@@ -26,6 +26,7 @@ Multi-file streaming (samples K files per epoch from a directory):
 
 import argparse
 import copy
+import math
 import os
 import platform
 import random
@@ -619,6 +620,7 @@ def train(cfg: Config) -> None:
     best_combined      = float("inf")   # combined = MMD² + 0.2*(1-recall), for best.pt
     epochs_no_improve  = 0              # consecutive MMD evals without improvement
     mmd_history: list  = []             # [(epoch, mmd, recall, combined), ...]
+    w_spike_epochs     = 0             # consecutive epochs with W-dist above w_stop_threshold
 
     # Resume
     # --resume-from <path>  : load a specific checkpoint file (overrides auto-detect)
@@ -1566,6 +1568,23 @@ def train(cfg: Config) -> None:
                   flush=True)
             break
 
+        # W-distance spike guard: halt when W-dist exceeds threshold for 3+
+        # consecutive epochs.  Catches the conditioning instability collapse
+        # seen in v33 (W→10.6 ep179) and v36 (W→10 ep178) which happened well
+        # after the EMA best was saved — best.pt is safe to use after stopping.
+        # 0 = disabled.  Recommended: 3.0 (good runs rarely exceed 2.0).
+        _w_thresh = getattr(cfg, "w_stop_threshold", 0.0)
+        if _w_thresh > 0 and not math.isnan(w_mean):
+            if w_mean > _w_thresh:
+                w_spike_epochs += 1
+            else:
+                w_spike_epochs = 0
+            if w_spike_epochs >= 3:
+                print(f"W-spike guard: W={w_mean:.2f} > {_w_thresh} for "
+                      f"{w_spike_epochs} consecutive epochs. Stopping — best.pt preserved.",
+                      flush=True)
+                break
+
         if (epoch + 1) % cfg.checkpoint_every == 0:
             ckpt_path = ckpt_dir / f"epoch_{epoch+1:04d}.pt"
             ckpt_data = {
@@ -1814,6 +1833,11 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--w-stop-threshold",     type=float, default=0.0,
+                   help="W-distance spike guard: stop training if W-dist exceeds this value "
+                        "for 3 consecutive epochs (0=off). Prevents the conditioning collapse "
+                        "seen in v33/v36 (W→10 at ep178-179, well after EMA best was saved). "
+                        "Recommended: 3.0. Good runs rarely exceed 2.0.")
     p.add_argument("--multi-scale-critic",   action="store_true", default=False,
                    help="Multi-resolution critic (IDEAS.md idea #8, HiFi-GAN style): "
                         "3 independent LSTM critics at T, T//2, T//4 temporal scales. "
@@ -1898,6 +1922,7 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.w_stop_threshold        = args.w_stop_threshold
     cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery
     cfg.bayes_critics           = args.bayes_critics

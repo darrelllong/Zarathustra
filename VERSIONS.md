@@ -49,6 +49,16 @@ added complexity (BayesGAN, etc.) and got worse. Fresh seed to retry the proven 
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.110  | 0.241 ★  |
+| 10    | 0.184  | 0.209 ★  |
+| 15    | 0.184  | 0.220    |
+
+### alibaba_v14 — Alibaba + mixed-type Recovery (PRETRAIN RUNNING)
+
+**Status**: PRETRAIN — 2026-04-05. On vinge.
+**Recipe**: Same as alibaba_v13 + `--mixed-type-recovery` (idea #7 for Alibaba).
+**Goal**: Mixed-type heads for Alibaba's binary cols → sharper ±1 values → lower MMD².
+Log: ~/train_alibaba_v14_pretrain.log.
 
 ---
 
