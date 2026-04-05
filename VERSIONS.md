@@ -19,9 +19,10 @@ Epoch timing: ~175s/epoch (5× critic compute). ATB at ep65-70.
 |-------|--------|----------|
 | 5     | 0.320  | 0.173 ★  |
 | 10    | 0.370  | 0.152 ★  |
+| 15    | 0.305  | 0.163    |
 
-**EXCEPTIONAL**: recall=0.370 at ep10 — unprecedented. All prior runs were 0.220-0.290 at ep10.
-BayesGAN is breaking the recall ceiling. ATB peaked ep65-70; trajectory highly promising.
+ep10 recall=0.370 unprecedented (all prior runs 0.220-0.290 at ep10). ep15 dip normal oscillation.
+G_loss positive throughout (0.16-1.4) — critics providing genuine signal. ATB peaked ep65-70.
 
 ### alibaba_v11 — Alibaba + BayesGAN M=5 + v5 recipe (GMM K=8, var_cond, no CFG)
 
@@ -37,8 +38,10 @@ post-ep50 single-critic dominance that caused v5 to degrade after its peak.
 | 5     | 0.165  | 0.227 ★  |
 | 10    | 0.154  | 0.235    |
 | 15    | 0.247  | 0.189 ★  |
+| 20    | 0.197  | 0.202    |
+| 25    | 0.225  | 0.188 ★  |
 
-G_loss positive + stable (0.2-0.9); W-dist healthy (0.15-0.38). No explosion signs.
+G_loss positive throughout (0.1-0.9); W-dist 0.15-0.38. No explosions. Slow upward trend.
 
 ---
 
