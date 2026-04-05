@@ -991,7 +991,8 @@ def train(cfg: Config) -> None:
                             eps = torch.rand(B, 1, 1, device=device)
                             x_hat = (eps * H_real.detach() +
                                      (1 - eps) * H_fake).requires_grad_(True)
-                            d_hat = C(x_hat, cond=_c_cond)
+                            with torch.backends.cudnn.flags(enabled=False):
+                                d_hat = C(x_hat, cond=_c_cond)
                             grads = torch.autograd.grad(
                                 outputs=d_hat.sum(), inputs=x_hat,
                                 create_graph=True)[0]           # (B, T, latent_dim)
@@ -1001,9 +1002,12 @@ def train(cfg: Config) -> None:
                         # real samples. Penalises |∇C(x_real)|² → 0, preventing the
                         # critic from memorising real data via large local gradients.
                         # Effective under wgan-sn too (not restricted to wgan-gp).
+                        # cuDNN LSTM does not support double-backward; disable cuDNN
+                        # for the critic forward so autograd can differentiate through it.
                         if cfg.r1_lambda > 0:
                             H_real_r1 = H_real.detach().clone().requires_grad_(True)
-                            d_real_r1 = C(H_real_r1)
+                            with torch.backends.cudnn.flags(enabled=False):
+                                d_real_r1 = C(H_real_r1)
                             grads_r1 = torch.autograd.grad(
                                 outputs=d_real_r1.sum(), inputs=H_real_r1,
                                 create_graph=True)[0]
@@ -1014,7 +1018,8 @@ def train(cfg: Config) -> None:
                         # point penalty — together they provide full convergence guarantees.
                         if cfg.r2_lambda > 0:
                             H_fake_r2 = H_fake.clone().requires_grad_(True)
-                            d_fake_r2 = C(H_fake_r2)
+                            with torch.backends.cudnn.flags(enabled=False):
+                                d_fake_r2 = C(H_fake_r2)
                             grads_r2 = torch.autograd.grad(
                                 outputs=d_fake_r2.sum(), inputs=H_fake_r2,
                                 create_graph=True)[0]
