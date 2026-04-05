@@ -22,10 +22,14 @@ Temperature annealed τ: 1.0 → 0.1.
 | 5     | 0.200  | 0.203 ★  |
 | 10    | 0.487  | 0.121 ★  |
 | 15    | 0.458  | 0.132    |
+| 20    | 0.509  | 0.119 ★  |
+| 25    | 0.448  | 0.134    |
+| 30    | 0.421  | 0.136    |
+| 35    | 0.484  | 0.124    |
 
-ep10 combined=0.121★ — BEST early-epoch result EVER. Recall 0.487 at ep10 is extraordinary
-(v31 didn't reach 0.487 until ~ep60). Regime sampler appears to be recreating the mixture
-structure that made ATB possible. G_loss very negative (-2.8 to -3.8), W-distance healthy (0.5-0.7).
+ep20 combined=0.119★, recall=0.509 — new ATB for this run. W-distance rising steadily (0.7→1.2),
+critic getting stronger. Recall fluctuating 0.42-0.51 in ep20-35 range. On track to challenge
+ATB (0.089) if recall pushes past 0.55-0.60 in ep50-70 window.
 
 ### alibaba_v15 — Alibaba + regime sampler (RUNNING)
 
@@ -39,6 +43,14 @@ Log: ~/train_alibaba_v15.log.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.119  | 0.412 ★  |
+| 10    | 0.172  | 0.257 ★  |
+| 15    | 0.188  | 0.225 ★  |
+| 20    | 0.255  | 0.189 ★  |
+
+Every eval is a new best. ep20 combined=0.189★ is AHEAD of both alibaba_v13 (0.208) and
+alibaba_v5 ATB (0.197) at the same epoch. Regime sampler working on Alibaba too.
+MMD² dropping fast: 0.236→0.040. W-distance stable 0.21-0.50.
 
 ---
 
