@@ -20,9 +20,10 @@ Epoch timing: ~175s/epoch (5× critic compute). ATB at ep65-70.
 | 5     | 0.320  | 0.173 ★  |
 | 10    | 0.370  | 0.152 ★  |
 | 15    | 0.305  | 0.163    |
+| 20    | 0.336  | 0.160    |
 
-ep10 recall=0.370 unprecedented (all prior runs 0.220-0.290 at ep10). ep15 dip normal oscillation.
-G_loss positive throughout (0.16-1.4) — critics providing genuine signal. ATB peaked ep65-70.
+ep10 recall=0.370 unprecedented. ep15 dip normal; ep20 recovering (0.336). Oscillating in 0.152-0.173 band.
+G_loss positive throughout — critics providing genuine signal. ATB zone ep65-70.
 
 ### alibaba_v11 — Alibaba + BayesGAN M=5 + v5 recipe (GMM K=8, var_cond, no CFG)
 
@@ -40,8 +41,12 @@ post-ep50 single-critic dominance that caused v5 to degrade after its peak.
 | 15    | 0.247  | 0.189 ★  |
 | 20    | 0.197  | 0.202    |
 | 25    | 0.225  | 0.188 ★  |
+| 30    | 0.256  | 0.183 ★  |
+| 35    | 0.340  | 0.168 ★  |
+| 40    | 0.257  | 0.183    |
 
-G_loss positive throughout (0.1-0.9); W-dist 0.15-0.38. No explosions. Slow upward trend.
+First Alibaba run with sustained climbing recall (no explosion). ep35 recall=0.340 is Alibaba milestone.
+G_loss mostly positive; W-dist 0.15-0.44. Compare alibaba_v5 (recall→0.560 by ep50).
 
 ---
 
