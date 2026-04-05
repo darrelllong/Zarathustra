@@ -4,6 +4,34 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Current Run: alibaba_v1 — Alibaba traces + v44 recipe (GMM K=8 + var-cond + n_critic=1)
+
+**Status**: RUNNING — 2026-04-04. PID 664211 on vinge.
+**Data**: /tiamat/zarathustra/traces/alibaba (237/239 files matched), oracle_general .zst.
+**Char-file**: /tiamat/zarathustra/analysis/out/trace_characterizations.jsonl (237 files matched).
+**Recipe**: Identical to v44 (GMM K=8 + var-cond + n_critic=1) but on Alibaba data.
+  Shortened pretrain: ae=30, sup=30, g=50 epochs.
+
+**Eval progression**:
+| Epoch | MMD²    | Recall | Combined |
+|-------|---------|--------|----------|
+| 5     | 0.05534 | 0.206  | 0.214 ★  |
+| 10    | 0.03629 | 0.350  | 0.166 ★  |
+| 15    | 0.04074 | 0.354  | 0.170    |
+| 20    | 0.02392 | 0.441  | 0.136 ★  |
+| 25    | 0.02397 | 0.509  | 0.122 ★  |
+
+**Notable**: Combined=0.122 at ep25 matches v43's Tencent best (0.117 at ep75) — achieved 3× faster!
+Recall=0.509 is near v34 ATB territory (0.608). Strong upward trajectory.
+
+**Warning**: Recurring G_loss explosions (ep6, ep24, ep28: ~1.8 trillion each).
+Self-recovering via EMA/grad_clip. Root cause: var_cond CondEncoder + extreme Alibaba conditioning
+vectors. Frequency increasing (ep24 and ep28 are 4 epochs apart). Monitor closely.
+
+---
+
+---
+
 ## Post-Mortem: v38 — char-file + proj_critic (killed ep8, 2026-04-04)
 
 **Recipe**: Fresh pretraining (phases 1/2/2.5 with char-file + proj_critic) → Phase 3 with same.
