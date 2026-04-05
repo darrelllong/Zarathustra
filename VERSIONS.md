@@ -188,31 +188,67 @@ sharpness but half the total critic updates → delayed W-collapse).
 
 ---
 
-## Current Run: v43 — WGAN-SN + char-file + GMM K=8 + n_critic=1
+## Post-Mortem: v43 — WGAN-SN + char-file + GMM K=8 + n_critic=1 (plateau ep75, killed ep100, 2026-04-04)
 
-**Status**: RUNNING — 2026-04-04. PID 634817 on vinge. Reusing v38's pretrain_complete.pt.
+**Status**: KILLED ep100.
+**Best**: ep75 EMA combined=0.117, recall=0.476. Did NOT beat ATB (0.089).
 
-**Hypothesis**: v41 (n_critic=2, lr_d=5e-5) had the right critic strength but W-collapsed at ep50
-from too many D updates. v42 (lr_d=2e-5) proved the cure was worse than the disease — the critic
-became too weak. n_critic=1 with lr_d=5e-5 halves total D updates while keeping per-step
-gradient quality; should delay W-collapse without sacrificing adversarial signal.
+**Eval progression**:
+| Epoch | MMD² | Recall | Combined |
+|-------|------|--------|---------|
+| 20 | 0.018 | 0.418 | 0.135 ★ |
+| 35 | 0.022 | 0.463 | 0.130 ★ |
+| 45 | 0.014 | 0.420 | 0.130 ★ |
+| 60 | 0.011 | 0.447 | 0.122 ★ |
+| 75 | 0.012 | 0.476 | 0.117 ★ |
+| 80 | 0.013 | 0.451 | 0.123 |
+| 90 | 0.020 | 0.398 | 0.140 |
+| 100 | 0.011 | 0.449 | 0.122 |
 
-**Recipe**: v41 + n_critic=1 (was 2), keeping lr_d=5e-5
+**Root cause**: Plateau at combined≈0.117 after ep75. 5 consecutive evals without improvement.
+No W-collapse (W stable 0.2–0.5 through ep100 — n_critic=1 fix worked perfectly).
+The recall ceiling at 0.47–0.48 is the new bottleneck. Need structural multimodality beyond
+what the zero-init GMM provides (GMM was silently disabled by cfg bug — see v44 note).
+
+**Critical discovery**: `cfg.gmm_components` was never assigned from `args.gmm_components` —
+the `--gmm-components 8` flag was silently ignored in v41–v43. All three ran WITHOUT GMM.
+The recall improvements (0.40→0.48) came from n_critic tuning alone. v44 is the first run
+with GMM actually active.
+
+→ v44: same recipe + fix cfg bug (GMM truly active) + variational conditioning (--var-cond).
+
+---
+
+## Current Run: v44 — WGAN-SN + char-file + GMM K=8 (fixed) + var-cond + n_critic=1
+
+**Status**: RUNNING — 2026-04-04. PID 652427 on vinge. Reusing v38's pretrain_complete.pt.
+
+**What's new vs v43**:
+1. GMM K=8 now actually active (cfg bug fixed: cfg.gmm_components = args.gmm_components)
+2. Variational conditioning (--var-cond): char-file vector → N(μ,σ²) → sampled at train,
+   deterministic μ at eval. Makes G robust to conditioning noise; adds KL loss (weight=0.001).
+3. Pretrain loading fixed: strict=False + EMA seeded with new params + opt_G try/except.
+
+**Recipe**: v43 + --gmm-components 8 (bug fixed) + --var-cond --var-cond-kl-weight 0.001
 
 **Early training**:
 ```
-Epoch 1: W=+0.2035  G=-0.5417  t=86.9s
+Epoch 1: W=+0.1098  G=-1.2750  t=40.5s
+Epoch 2: W=+0.2298  G=-1.9791  t=38.8s
+Epoch 3: W=+0.5451  G=-2.3602  t=39.1s
+Epoch 4: W=+0.3321  G=-3.8973  t=39.1s
 ```
+G_loss strongly negative (healthy). W growing. Epoch time ~39s (faster than v43's ~60s).
 
 ```bash
-ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p ~/checkpoints/tencent_v43 && cp ~/checkpoints/tencent_v38/pretrain_complete.pt ~/checkpoints/tencent_v43/pretrain_complete.pt && cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
+ssh -i ~/.ssh/id_rsa darrell@192.168.86.30 "cd ~/Zarathustra/llgan && nohup ~/llgan-env/bin/python -u train.py \
   --trace-dir ~/traces/tencent_block_1M --fmt oracle_general \
   --epochs 200 --files-per-epoch 12 --records-per-file 15000 \
-  --checkpoint-dir ~/checkpoints/tencent_v43 --checkpoint-every 5 \
+  --checkpoint-dir ~/checkpoints/tencent_v44 --checkpoint-every 5 \
   --mmd-every 5 --mmd-samples 2000 --early-stop-patience 40 \
   --cond-dim 10 --cond-drop-prob 0.25 \
   --char-file ~/traces/characterization/trace_characterizations.jsonl \
-  --gmm-components 8 \
+  --gmm-components 8 --var-cond --var-cond-kl-weight 0.001 \
   --supervisor-loss-weight 1.0 --lr-g 1e-4 --lr-d 5e-5 \
   --n-critic 1 --supervisor-steps 2 \
   --diversity-loss-weight 1.0 --cross-cov-loss-weight 2.0 \
@@ -222,7 +258,7 @@ ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no darrell@192.168.86.30 "mkdir -p
   --ema-decay 0.999 --lr-cosine-decay 0.05 --grad-clip 1.0 \
   --hidden-size 256 --latent-dim 24 \
   --no-compile --no-amp \
-  > ~/train_v43.log 2>&1 &"
+  > ~/train_v44.log 2>&1 &"
 ```
 
 ---
