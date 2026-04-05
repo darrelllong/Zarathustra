@@ -667,8 +667,17 @@ def train(cfg: Config) -> None:
         E.load_state_dict(pc["E"])
         R.load_state_dict(pc["R"])
         S.load_state_dict(pc["S"])
-        G.load_state_dict(pc["G"])
+        # strict=False: allows new modules (cond_encoder, gmm_prior) that were
+        # added after the pretrain checkpoint was saved; their weights are
+        # freshly initialised by _init_weights / CondEncoder.__init__.
+        missing, unexpected = G.load_state_dict(pc["G"], strict=False)
+        if missing:
+            print(f"  New G params (freshly initialised): {missing}")
         ema_G_state = {k: v.to(device) for k, v in pc["G_ema"].items()}
+        # New params not in pretrain EMA (cond_encoder, gmm_prior) — seed from live G
+        for k, v in G.state_dict().items():
+            if k not in ema_G_state:
+                ema_G_state[k] = v.clone().to(device)
         opt_G.load_state_dict(pc["opt_G"])
         prep = pc["prep"]
         if pc.get("val_tensor") is not None:
