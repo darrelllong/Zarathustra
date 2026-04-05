@@ -297,8 +297,8 @@ Items marked ✓ are done and in the repo.
 
 - [ ] **Train separate models per workload class** (Tencent vs Alibaba)
   Tencent: 9-day, 512B–32KB mixed, 83–94% reads — currently training on vinge (GB10).
-  Alibaba: 31-day, 4KB-aligned, more variable read ratios — traces not yet downloaded.
-  Compare per-corpus vs mixed-corpus models once Alibaba traces are acquired.
+  Alibaba: 244 files at `/tiamat/zarathustra/traces/alibaba/` (oracle_general format, .zst).
+  Compare per-corpus vs mixed-corpus models.
 
 - [ ] **Scale up model on vinge GB10** (NVIDIA box is vinge.local — GB10, 124GB unified memory)
   1. ✓ WGAN-GP on CUDA available (cuDNN double-backward fix in train.py); MPS still falls back to wgan-sn.
