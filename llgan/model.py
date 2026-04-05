@@ -254,11 +254,11 @@ class CondEncoder(nn.Module):
             encoded:  (B, cond_dim) — perturbed at train time, deterministic at eval
             kl:       scalar KL(N(μ,σ²) || N(0,I)) = 0.5*(σ²+μ²-1-log σ²).mean()
         """
-        mu     = self.mu_net(cond)
+        mu     = self.mu_net(cond).clamp(-20, 20)        # guard extreme Alibaba stats
         logvar = self.logvar_net(cond).clamp(-10, 2)   # σ in [e^-5, e^1]
         if training:
             std     = (0.5 * logvar).exp()
-            encoded = mu + std * torch.randn_like(mu)
+            encoded = (mu + std * torch.randn_like(mu)).clamp(-10, 10)  # prevent G_loss explosion
             kl      = 0.5 * (logvar.exp() + mu.pow(2) - 1.0 - logvar).mean()
         else:
             encoded = mu
