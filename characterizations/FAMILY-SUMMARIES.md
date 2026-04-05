@@ -1,0 +1,32 @@
+# Family Summaries
+
+- `alibaba__alibaba`: very heterogeneous, read-skewed, weak reuse, strong regime structure; start around 8 modes.
+- `Baleen24__Baleen24`: meaningful write pressure, high tenant diversity, many regimes; treat as segmented rather than homogeneous.
+- `MSR__exchange`: write-heavy, weak reuse, regime-heavy, tenant-aware.
+- `s3-cache-datasets__2007_msr`: read-skewed, weak reuse, about 3 modes.
+- `s3-cache-datasets__2007_wiki`: bursty and low-reuse, mostly single-mode with notable outliers.
+- `s3-cache-datasets__2015_cloudphysics`: highly heterogeneous, read-skewed, regime-heavy; around 8 modes.
+- `s3-cache-datasets__2016_wiki`: mixed encodings; split by format before modeling.
+- `s3-cache-datasets__2017_docker`: structured-table family with weak request-level signal from current parser surface.
+- `s3-cache-datasets__2017_systor`: simpler than the largest families, but still has outliers worth checking.
+- `s3-cache-datasets__2018_tencentPhoto`: read-skewed, bursty, mixed encodings; split by format.
+- `s3-cache-datasets__2019_wiki`: read-skewed, bursty, mixed encodings; split by format.
+- `s3-cache-datasets__2020_alibabaBlock`: heterogeneous, regime-heavy, mixed encodings; around 8 modes.
+- `s3-cache-datasets__2020_tencentBlock`: one of the biggest heterogeneous families; mixed encodings and strong regime structure; around 8 modes.
+- `s3-cache-datasets__2020_twitter`: read-skewed and bursty, but less obviously multi-mode than the biggest block families.
+- `s3-cache-datasets__2020_twr_cdn`: mixed encodings; format split matters more than many modes.
+- `s3-cache-datasets__2022_metaCDN`: read-skewed and bursty; likely single-mode but burst-sensitive.
+- `s3-cache-datasets__2022_metaKV`: high locality plus burstiness, mixed encodings; locality-aware conditioning matters.
+- `s3-cache-datasets__2022_metaStorage`: read-skewed and fairly simple overall, with a few outlier traces.
+- `s3-cache-datasets__2023_metaCDN`: comparatively homogeneous structured family.
+- `s3-cache-datasets__2023_metaStorage`: mixed encodings, mostly homogeneous at this feature level; split by format.
+- `s3-cache-datasets__2024_google`: mixed structured encodings; current signal is more schema variation than request behavior.
+- `s3-cache-datasets__2026-alibaba-thinkahead`: read-skewed, bursty, visible regime structure; around 8 modes.
+- `s3-cache-datasets__alibaba`: write-heavy LCS family, weak reuse, strong regime signal; around 8 modes.
+- `s3-cache-datasets__cache_trace_twitter_memcache`: mixed encodings, bursty, read-skewed, regime-heavy; split by format and start around 6 modes.
+- `s3-cache-datasets__cloudphysics`: mixed encodings, write pressure, regime structure; around 3 modes.
+- `s3-cache-datasets__metaKV`: high locality and burstiness; locality-aware GAN conditioning is important.
+- `s3-cache-datasets__msr`: write-heavy, weak reuse, regime-heavy; around 6 modes.
+- `s3-cache-datasets__other`: read-skewed and bursty, but too small to be a primary GAN target.
+- `s3-cache-datasets__tencentBlock`: write-heavy, weak reuse, strong regime structure; around 8 modes.
+- `tencent__cloud_disk`: by far the most heterogeneous family; use regime-aware or segmented modeling, not one simple global model.
