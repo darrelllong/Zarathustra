@@ -778,7 +778,10 @@ class TracePreprocessor:
             lo = self._stats[col]["lo"]
             hi = self._stats[col]["hi"]
             span = hi - lo  # guaranteed > 0 for kept columns
-            out[:, i] = (df[col].values.astype(np.float32) - lo) / span * 2 - 1
+            out[:, i] = np.clip(
+                (df[col].values.astype(np.float32) - lo) / span * 2 - 1,
+                -1.0, 1.0,
+            )
         return out
 
     def inverse_transform(self, arr: np.ndarray) -> pd.DataFrame:

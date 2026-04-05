@@ -34,6 +34,30 @@ auto-drop only fires when a column is truly constant in the training seed data.
 **Impact on active runs:** v54 and alibaba_v15 use old preprocessors (serialized in
 checkpoint). This fix takes effect on the NEXT run launched with fresh preprocessing.
 
+### Clip normalized values to [-1, 1] — poison point defense (2026-04-05)
+
+**Problem:** v54 mode-collapsed at ep100 (G_loss +4.27, recall 0.550→0.364). Root cause
+identified via R outlier analysis: `obj_id_stride` has a massive heavy tail. In tencent_block
+1M, 89 files (2.75%) have stride >5x the median, with the worst at **89x median** (36.2σ).
+In alibaba, **12.2%** of files exceed 5x median stride, worst at 78.6x.
+
+**Mechanism:** The preprocessor fits min/max normalization on 12 seed files. When a non-seed
+file with extreme stride gets sampled (stride=400B vs typical 4.5B), the per-record
+`sign(Δ)·log1p(|Δ|)` values exceed the seed range. After min/max normalization, these values
+land outside [-1, 1]. The generator outputs Tanh ∈ [-1, 1] and CANNOT produce these values.
+The critic learns to use out-of-range values as a free discriminator signal, then when the
+generator can't match them, gradients explode → mode collapse.
+
+**Fix:** `np.clip(..., -1.0, 1.0)` in `TracePreprocessor.transform()`. One line. Values
+beyond the seed range are clamped to the boundary. This is equivalent to Winsorization at
+the seed percentile range and ensures training data always falls within the generator's
+Tanh output range.
+
+**Why this wasn't caught earlier:** The 12-file seed set usually represents the
+population well enough. But with files_per_epoch=12 over 200 epochs, you sample ~2400
+files — statistically guaranteed to hit multiple extreme outliers. The mode collapse
+timing (ep100) is consistent with cumulative destabilization from outlier encounters.
+
 ---
 
 ## Current Runs
