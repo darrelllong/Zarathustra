@@ -18,16 +18,26 @@ ATB seed success rate: 2/4 runs (v31, v34). Bad seeds: v33 (0.107), v36 (0.116).
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.285  | 0.198 ★  |
+| 10    | 0.317  | 0.176 ★  |
+| 15    | 0.238  | 0.191    |
+| 20    | 0.383  | 0.144 ★  |
+| 25    | 0.305  | 0.172    |
 
-### v53 — Tencent + mixed-type Recovery heads (PRETRAIN RUNNING)
+ep20 combined=0.144★ with MMD²=0.020 — strong early signal, W-distance healthy (0.79).
 
-**Status**: PRETRAIN — 2026-04-05. PID 829028 on vinge.
+### v53 — Tencent + mixed-type Recovery heads (RUNNING)
+
+**Status**: RUNNING — 2026-04-05. PID 853089 on vinge.
 **Recipe**: Same ATB recipe as v52 + `--mixed-type-recovery` (IDEAS.md idea #7).
 Binary columns (opcode col 2, obj_id_reuse col 4) use sigmoid→[-1,1] Recovery head + BCE
 Phase 1 reconstruction loss. Continuous cols keep Tanh + MSE.
 **Goal**: Produce sharper ±1 values for binary fields → lower MMD² during evaluation.
-**New pretrain required**: mixed-type head architecture incompatible with v28 pretrain.
-Log: ~/train_v53_pretrain.log.
+**Pretrain**: tencent_v53/pretrain_complete.pt (fresh pretrain, AE recon=0.00001).
+Log: ~/train_v53.log.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------|
 
 ### alibaba_v13 — Alibaba + pure v5 recipe, fresh seed
 
