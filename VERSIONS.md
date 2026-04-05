@@ -12,6 +12,13 @@ Does NOT clamp CondEncoder output (that hurt recall in alibaba_v3).
 **Pretrain**: reusing alibaba_v1/pretrain_complete.pt (identical architecture).
 **Goal**: reach alibaba_v1's ep25 trajectory (0.122★/0.509) but continue stably past ep35.
 
+**Early training** (promising — no ep6 explosion unlike v1/v3!):
+| Epoch | G_loss | Notes |
+|-------|--------|-------|
+| 5     | -0.665 | EMA combined=0.290★, recall=0.112 (early/slow) |
+| 6     | -0.601 | NO explosion (G_loss finite) |
+| 7     | -0.518 | Clean |
+
 ---
 
 ## Post-Mortem: alibaba_v3 — Alibaba + GMM K=8 + var-cond (CondEncoder clamped) (KILLED ep10, 2026-04-05)
