@@ -16,22 +16,17 @@ See post-mortem below.
 **Status**: RUNNING — 2026-04-05. PID 796458 on vinge.
 **Recipe**: BayesGAN M=2 + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
 **Pretrain**: v28/pretrain_complete.pt.
-**Key**: M=5 (v49) had 10 critic updates/G step → over-regularized. M=2 = 4 total updates.
-Epoch timing: ~110s (vs 250s for M=5).
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+| 5     | 0.426  | 0.144 ★  |
+| 10    | 0.315  | 0.172    |
 
-### v50 — Tencent + exact v34 recipe + seed=42
+ep5 recall=0.426 — highest ever at ep5. ep10 dip; watching ep15 for recovery.
 
-**Status**: RUNNING — 2026-04-05. PID 792739 on vinge.
-**Recipe**: CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO BayesGAN.
-**Pretrain**: v28/pretrain_complete.pt. **Seed**: 42 (deterministic).
-**Goal**: Seed variance test. v33 (random seed, ATB recipe) → 0.107. v31/v34 (random seeds) → 0.089.
-Is seed=42 a lucky seed?
+### v50 — Tencent + seed=42 (KILLED ep30)
 
-| Epoch | Recall | Combined |
-|-------|--------|----------|
+**Best**: ep15 recall=0.310, combined=0.185★. Oscillating through ep30, seed=42 not lucky. Killed.
 
 ### alibaba_v12 — Alibaba + BayesGAN M=2 + v5 recipe
 
@@ -42,7 +37,22 @@ Is seed=42 a lucky seed?
 is closer to single-critic dynamics while still providing some diversity to prevent post-ep50 collapse.
 
 | Epoch | Recall | Combined |
-|-------|--------|----------| 
+|-------|--------|----------|
+| 5     | 0.136  | 0.262 ★  |
+| 10    | 0.205  | 0.250 ★  |
+| 15    | 0.210  | 0.231 ★  |
+| 20    | 0.187  | 0.211 ★  |
+| 25    | 0.288  | 0.182 ★  |
+| 30    | 0.358  | 0.156 ★  |
+
+Steadily climbing recall. Best Alibaba since v5. G_loss healthy. No explosions through ep30.
+
+---
+
+## Post-Mortem: v50 — Tencent + seed=42 (KILLED ep30, 2026-04-05)
+
+**Best**: ep15 combined=0.185★, recall=0.310. Identical plateau to all single-critic runs.
+**Lesson**: Seed=42 is not lucky. Random seed variance ≈ ±0.020 combined — not exploitable by choice.
 
 ---
 
