@@ -110,6 +110,15 @@ class Config:
                                          # Small (0.001) lets σ grow slowly; try 0.01 for
                                          # stronger regularization toward unit Gaussian.
 
+    # Mixed-type output heads in Recovery (IDEAS.md idea #7, CTGAN-style)
+    mixed_type_recovery: bool = False    # Enable type-aware Recovery output heads: binary columns
+                                         # (opcode, obj_id_reuse) use sigmoid→scaled-to-[-1,1] instead
+                                         # of Tanh; Phase 1 reconstruction uses BCE for these columns.
+                                         # Requires a new pretrain (incompatible with existing ckpts
+                                         # that use the single-fc Recovery architecture).
+                                         # Expected impact: lower MMD² by eliminating soft intermediate
+                                         # values for binary fields during evaluation.
+
     # BayesGAN: posterior over discriminators (Saatci & Wilson, NeurIPS 2017)
     bayes_critics: int = 0               # Number of critic particles (0 = standard single critic).
                                          # Each particle is updated with SGLD (Adam + Gaussian noise

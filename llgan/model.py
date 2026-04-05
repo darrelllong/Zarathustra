@@ -46,7 +46,7 @@ explicit cell state is better at carrying this "global context" signal
 across many timesteps without it leaking out through the forget gate.
 """
 
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -104,22 +104,38 @@ class Recovery(nn.Module):
 
     (batch, timestep, latent_dim) → (batch, timestep, num_cols) ∈ [-1, 1]
 
-    Tanh matches the [-1, 1] range of the preprocessor's min-max
-    normalisation. Recovery is the bridge between the latent and feature
-    worlds; keeping its output range consistent with training data prevents
-    the critic from learning a trivial "real inputs are in [-1,1], fake
-    inputs might not be" shortcut.
+    Mixed-type output heads (IDEAS.md idea #7): binary columns (opcode,
+    obj_id_reuse) use a sigmoid head → scaled to [-1, 1] via 2σ-1.  This
+    produces sharp near-±1 values that match the real data distribution,
+    reducing MMD² by eliminating soft intermediate values for binary fields.
+    Continuous columns keep the standard Tanh head.
+
+    When binary_cols is None (legacy), all columns share one Tanh head and
+    the checkpoint is identical to the original architecture (backward compat).
     """
 
     def __init__(self, latent_dim: int, hidden_size: int, num_cols: int,
-                 avatar: bool = False):
+                 avatar: bool = False,
+                 binary_cols: Optional[List[int]] = None):
         super().__init__()
-        self.avatar = avatar
+        self.avatar      = avatar
+        self.num_cols    = num_cols
+        self.binary_cols = sorted(binary_cols) if binary_cols else []
+        self.cont_cols   = [i for i in range(num_cols) if i not in set(self.binary_cols)]
+
         self.gru = nn.GRU(latent_dim, hidden_size, num_layers=1, batch_first=True)
         if avatar:
             self.bn = nn.BatchNorm1d(hidden_size)
-        self.fc  = nn.Linear(hidden_size, num_cols)
-        self.act = nn.Tanh()
+
+        if self.binary_cols:
+            # Separate heads for type-correct activations
+            self.fc_cont   = nn.Linear(hidden_size, len(self.cont_cols))
+            self.fc_binary = nn.Linear(hidden_size, len(self.binary_cols))
+        else:
+            # Legacy: single fc + Tanh (identical to original architecture)
+            self.fc  = nn.Linear(hidden_size, num_cols)
+            self.act = nn.Tanh()
+
         self._init_weights()
 
     def _init_weights(self):
@@ -132,7 +148,17 @@ class Recovery(nn.Module):
         if self.avatar:
             B, T, H = out.shape
             out = self.bn(out.reshape(B * T, H)).reshape(B, T, H)
-        return self.act(self.fc(out))
+
+        if not self.binary_cols:
+            return self.act(self.fc(out))
+
+        # Mixed-type: assemble output in original column order
+        result = torch.empty(*out.shape[:2], self.num_cols,
+                              dtype=out.dtype, device=out.device)
+        result[..., self.cont_cols]   = torch.tanh(self.fc_cont(out))
+        # Sigmoid → [0,1] → scale to [-1,1] for consistency with real data range
+        result[..., self.binary_cols] = torch.sigmoid(self.fc_binary(out)) * 2.0 - 1.0
+        return result
 
 
 class Supervisor(nn.Module):

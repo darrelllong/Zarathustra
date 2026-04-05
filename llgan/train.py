@@ -41,7 +41,8 @@ from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 from config import Config
 from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
-                     compute_window_descriptors, load_file_characterizations)
+                     compute_window_descriptors, load_file_characterizations,
+                     _OPCODE_COLS)
 from model import Generator, Critic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
 
@@ -453,11 +454,24 @@ def train(cfg: Config) -> None:
                patch_embed=cfg.patch_embed,
                cond_dim=_proj_critic_dim).to(device)
 
+    # Identify binary column indices for mixed-type Recovery heads (idea #7).
+    # Opcode columns (±1 read/write) and obj_id_reuse (±1 same-obj indicator)
+    # should use sigmoid activation in Recovery to produce sharp ±1 values.
+    _binary_cols: list = []
+    if getattr(cfg, "mixed_type_recovery", False):
+        for i, col in enumerate(prep.col_names):
+            if col.lower() in _OPCODE_COLS or col.endswith("_reuse"):
+                _binary_cols.append(i)
+        if _binary_cols:
+            print(f"[mixed-type] binary Recovery heads for cols: "
+                  f"{[prep.col_names[i] for i in _binary_cols]} (idx {_binary_cols})")
+
     if latent_ae:
         E = Encoder(prep.num_cols, cfg.hidden_size, cfg.latent_dim,
                     avatar=_avatar).to(device)
         R = Recovery(cfg.latent_dim, cfg.hidden_size, prep.num_cols,
-                     avatar=_avatar).to(device)
+                     avatar=_avatar,
+                     binary_cols=_binary_cols if _binary_cols else None).to(device)
         S = Supervisor(cfg.latent_dim, cfg.hidden_size,
                        avatar=_avatar).to(device)
         opt_AE  = torch.optim.Adam(list(E.parameters()) + list(R.parameters()),
@@ -764,7 +778,20 @@ def train(cfg: Config) -> None:
                 with torch.amp.autocast(device.type, enabled=use_amp):
                     H = E(xb)
                     X_hat = R(H)
-                    loss_recon = nn.functional.mse_loss(X_hat, xb)
+                    if _binary_cols:
+                        # Mixed-type reconstruction: BCE for binary columns (±1 → 0/1 target),
+                        # MSE for continuous columns.  BCE targets: (xb+1)/2 ∈ {0,1}.
+                        # X_hat for binary cols is in (-1,1) from 2σ-1; convert to logit space
+                        # via the inverse: logit(p) = log(p/(1-p)) where p=(x+1)/2.
+                        p_hat = (X_hat[..., _binary_cols] + 1.0).clamp(1e-6, 2.0 - 1e-6) / 2.0
+                        logits = torch.log(p_hat / (1.0 - p_hat))
+                        targets = (xb[..., _binary_cols] + 1.0) / 2.0
+                        loss_bin = nn.functional.binary_cross_entropy_with_logits(logits, targets)
+                        cont = [i for i in range(prep.num_cols) if i not in set(_binary_cols)]
+                        loss_cont = nn.functional.mse_loss(X_hat[..., cont], xb[..., cont])
+                        loss_recon = loss_cont + loss_bin
+                    else:
+                        loss_recon = nn.functional.mse_loss(X_hat, xb)
 
                     if _avatar:
                         # --- Latent discriminator step (AAE) ---
@@ -1784,6 +1811,12 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--mixed-type-recovery",  action="store_true", default=False,
+                   help="Mixed-type output heads in Recovery (IDEAS.md idea #7): "
+                        "binary columns (opcode, obj_id_reuse) use sigmoid→[-1,1] heads "
+                        "with BCE reconstruction loss in Phase 1. Continuous columns keep "
+                        "Tanh heads with MSE loss. Produces sharper ±1 values for binary "
+                        "fields → lower MMD². Requires new pretrain (breaks v28 compat).")
     p.add_argument("--bayes-critics",        type=int, default=0,
                    help="BayesGAN: number of critic particles (0=off, 1=same as 0). "
                         "Each extra particle uses SGLD (Adam + Gaussian noise injection) "
@@ -1857,6 +1890,7 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.mixed_type_recovery     = args.mixed_type_recovery
     cfg.bayes_critics           = args.bayes_critics
     cfg.avatar                  = args.avatar
     cfg.dist_loss_weight        = args.dist_loss_weight

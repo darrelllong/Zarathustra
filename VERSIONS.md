@@ -8,8 +8,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ### v52 — Tencent + pure ATB recipe (no char-file, fresh seed, lr_d=5e-5)
 
-**Status**: RUNNING — 2026-04-05. PID 826973 on vinge.
-**Recipe**: cond_dim=10 + cond_drop_prob=0.25 + NO char-file (window z_global) + n_critic=2 + lr_d=5e-5.
+**Status**: RUNNING — 2026-04-05. PID 828094 on vinge.
+**Recipe**: cond_dim=10 + cond_drop_prob=0.25 + NO char-file (window z_global) + n_critic=2 + lr_d=5e-5
++ supervisor_loss_weight=1.0 + full losses + diversity=1.0.
 **Pretrain**: v28/pretrain_complete.pt.
 **Rationale**: Every run since v40 used char-file, which collapsed the accidental mixture structure
 that gave v31/v34 their ATB recall. This is a direct reproduction attempt with a fresh random seed.
@@ -17,6 +18,16 @@ ATB seed success rate: 2/4 runs (v31, v34). Bad seeds: v33 (0.107), v36 (0.116).
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
+
+### v53 — Tencent + mixed-type Recovery heads (PRETRAIN RUNNING)
+
+**Status**: PRETRAIN — 2026-04-05. PID 829028 on vinge.
+**Recipe**: Same ATB recipe as v52 + `--mixed-type-recovery` (IDEAS.md idea #7).
+Binary columns (opcode col 2, obj_id_reuse col 4) use sigmoid→[-1,1] Recovery head + BCE
+Phase 1 reconstruction loss. Continuous cols keep Tanh + MSE.
+**Goal**: Produce sharper ±1 values for binary fields → lower MMD² during evaluation.
+**New pretrain required**: mixed-type head architecture incompatible with v28 pretrain.
+Log: ~/train_v53_pretrain.log.
 
 ---
 
