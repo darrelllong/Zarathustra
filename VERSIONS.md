@@ -6,38 +6,48 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Runs
 
-### v48 — Tencent + v28 pretrain + ATB recipe (CFG 0.25, n_critic=2)
+### v49 — Tencent + BayesGAN M=5 + v28 pretrain + ATB recipe
 
-**Status**: RUNNING — 2026-04-05. PID 767172 on vinge.
-**Recipe**: WGAN-SN + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO GMM.
-**Pretrain**: v28/pretrain_complete.pt (same pretrain as ATB runs v31/v34).
-**Goal**: Test if v28 pretrain is what made v31/v34 hit ATB=0.089 (v47 used v43 pretrain, best=0.149).
-**Hypothesis**: v47 (v43 pretrain, same recipe) couldn't beat 0.149 vs v43's 0.117 ceiling — v28 pretrain quality may be the missing variable.
+**Status**: RUNNING — 2026-04-05. PID 780011 on vinge.
+**Recipe**: BayesGAN M=5 particles + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
+**Pretrain**: v28/pretrain_complete.pt.
+**Key**: 5 critic particles, each updated with SGLD (Adam + Gaussian noise). G loss = mean across particles.
+**Goal**: BayesGAN posterior over critics prevents mode collapse by eliminating single-boundary exploitation.
+Epoch timing: ~175s/epoch (5× critic compute). ATB at ep65-70.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
-| 5     | 0.271  | 0.198 ★  |
-| 10    | 0.220  | 0.218    |
-| 15    | 0.278  | 0.178 ★  |
-| 20    | 0.309  | 0.161 ★  |
 
-Note: ep20 combined=0.161 already BETTER than v47 ep20 (0.179). v28 pretrain hypothesis supported.
+### alibaba_v11 — Alibaba + BayesGAN M=5 + v5 recipe (GMM K=8, var_cond, no CFG)
 
-### alibaba_v9 — Alibaba + v1 pretrain + lower lr_d (2.5e-5) + GMM+var_cond+CFG
-
-**Status**: KILLED ep25 — 2026-04-05. Recall stuck at 0.106-0.108 from ep10 to ep25. lr_d too low.
-
-### alibaba_v10 — Alibaba + v1 recipe + CFG 0.25, no GMM, lr_d=5e-5
-
-**Status**: RUNNING — 2026-04-05. PID 772133 on vinge.
-**Recipe**: var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=5e-5. NO GMM.
+**Status**: RUNNING — 2026-04-05. PID 781593 on vinge.
+**Recipe**: BayesGAN M=5 + GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5. NO CFG.
 **Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only).
-**Key**: Returns to v1 lr_d (5e-5) but adds CFG 0.25. CFG may prevent var_cond explosion spiral
-by regularizing G against conditioning noise.
-**Goal**: alibaba_v1 (no CFG) got 0.122★/0.509. CFG should stabilize and potentially improve.
+**Key**: v5's recipe (which got recall=0.560) + BayesGAN. Multiple critic particles prevent the
+post-ep50 single-critic dominance that caused v5 to degrade after its peak.
+**Goal**: Reproduce v5's recall=0.560 but sustain it past ep50 by distributing critic power.
 
 | Epoch | Recall | Combined |
-|-------|--------|----------|
+|-------|--------|----------| 
+
+---
+
+## Post-Mortem: alibaba_v10 — Alibaba + var_cond + CFG, no GMM (KILLED ep65, 2026-04-05)
+
+**Best**: ep55 combined=0.163★, recall=0.306. Peaked ep55-60, declining by ep65 (recall=0.284).
+**Pattern**: G_loss large-negative (-3 to -7) from ep35 onward — G winning too easily, same critic
+dominance pattern. CFG prevented explosion (no 1.8T blowup) but couldn't prevent G/C imbalance.
+**Lesson**: CFG alone doesn't fix the G/C balance problem. Need structural solution (BayesGAN).
+
+---
+
+## Post-Mortem: v48 — Tencent + v28 pretrain + ATB recipe (KILLED ep56, 2026-04-05)
+
+**Best**: ep20 combined=0.161★, recall=0.309. Plateau at recall=0.264-0.309 from ep20 to ep55.
+**Finding**: v28 pretrain DID improve early learning (ep20 better than v47 by 0.018 combined).
+But the recall ceiling around 0.30 prevented any trajectory toward ATB's 0.596.
+**Lesson**: Even v28 pretrain + exact ATB recipe can't reproduce ATB in a single run.
+Hypothesis: BayesGAN might break the recall ceiling by preventing single-critic boundary collapse.
 
 ---
 
