@@ -678,7 +678,12 @@ def train(cfg: Config) -> None:
         for k, v in G.state_dict().items():
             if k not in ema_G_state:
                 ema_G_state[k] = v.clone().to(device)
-        opt_G.load_state_dict(pc["opt_G"])
+        try:
+            opt_G.load_state_dict(pc["opt_G"])
+        except (ValueError, KeyError):
+            # G architecture changed since pretrain (e.g. cond_encoder / gmm_prior added);
+            # optimizer param groups no longer match — start fresh (harmless for Phase 3).
+            print("  opt_G state incompatible with new G architecture; using fresh optimizer.")
         prep = pc["prep"]
         if pc.get("val_tensor") is not None:
             val_tensor = pc["val_tensor"].to(device)
