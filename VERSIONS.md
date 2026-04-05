@@ -6,26 +6,49 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Runs
 
-### v47 — Tencent + ATB recipe: CFG 0.25 + n_critic=2 + NO GMM
+### v48 — Tencent + v28 pretrain + ATB recipe (CFG 0.25, n_critic=2)
 
-**Status**: RUNNING — 2026-04-05. PID 752231 on vinge. At ep24.
+**Status**: RUNNING — 2026-04-05. PID 767172 on vinge.
 **Recipe**: WGAN-SN + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO GMM.
-**Pretrain**: v43/pretrain_complete.pt.
-**Goal**: Reproduce ATB (0.089). ATB peaked ~ep65-70.
+**Pretrain**: v28/pretrain_complete.pt (same pretrain as ATB runs v31/v34).
+**Goal**: Test if v28 pretrain is what made v31/v34 hit ATB=0.089 (v47 used v43 pretrain, best=0.149).
+**Hypothesis**: v47 (v43 pretrain, same recipe) couldn't beat 0.149 vs v43's 0.117 ceiling — v28 pretrain quality may be the missing variable.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
-| 5     | 0.233  | 0.195 ★  |
-| 10    | 0.287  | 0.192 ★  |
-| 20    | 0.318  | 0.179 ★  |
 
-### alibaba_v8 — Alibaba + v5 recipe + CFG 0.25 (hot-start from v5/ep50)
+### alibaba_v9 — Alibaba + v1 pretrain + lower lr_d (2.5e-5) + GMM+var_cond+CFG
 
-**Status**: RUNNING — 2026-04-05. PID 758919 on vinge. Just launched.
-**Recipe**: GMM K=8 + var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=5e-5.
-**Pretrain**: alibaba_v5/epoch_0050.pt used as pretrain_complete.pt (best Alibaba weights).
-**Key**: Fresh critic (pretrain loader skips C/opt_C). CFG is new on top of v5's recipe.
-**Goal**: Push recall from 0.560 toward 0.65+ to beat ATB (0.089).
+**Status**: RUNNING — 2026-04-05. PID 767572 on vinge.
+**Recipe**: GMM K=8 + var_cond + CFG cond_drop=0.25 + cond_dim=10 + n_critic=1 + lr_d=2.5e-5. Clean start.
+**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only; same starting point as v5).
+**Key**: lr_d halved from v5 (5e-5→2.5e-5) to prevent post-ep50 critic dominance that degraded v5.
+**Goal**: Match/exceed alibaba_v5 ep50 (0.108★, recall=0.560) without post-peak decay.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+
+---
+
+## Post-Mortem: alibaba_v8 — Alibaba hot-start from Phase 3 checkpoint (KILLED ep5, 2026-04-05)
+
+**Best**: ep5 recall≈0, MMD²=0.19–0.27, combined≈0.23+. Complete mode collapse.
+**Root cause**: pretrain_complete.pt was set to alibaba_v5/epoch_0050.pt (Phase 3 checkpoint). The
+pretrain loader restores G but NOT C/opt_C, so critic starts fresh. G (trained against strong ep50 critic)
+immediately fools a weak new critic → G_loss = −3 to −5, recall≈0.
+**Lesson**: NEVER use Phase 3 checkpoints as pretrain_complete.pt. Only Phase 1-2.5 pretrain checkpoints
+(where C hasn't been trained adversarially) are safe as hot-start pretrains.
+
+---
+
+## Post-Mortem: v47 — Tencent, v43 pretrain, n_critic=2 (KILLED ep65, 2026-04-05)
+
+**Best**: ep65 combined=0.149★, recall=0.429.
+**Finding**: Consistently WORSE than v43 (same epoch v43=0.122). n_critic=2 alone cannot reproduce ATB.
+- v47 ep65: combined=0.149, recall=0.429
+- v43 ep75: combined=0.117, recall=0.476 (v43's best)
+**Remaining hypothesis**: v31/v34 used v28 pretrain; v47 used v43 pretrain. v48 tests this directly.
+**Lesson**: n_critic=2 is not the key ATB ingredient — or v28 pretrain quality compounds with it.
 
 ---
 
