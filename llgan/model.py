@@ -244,8 +244,11 @@ class GMMPrior(nn.Module):
         self.noise_dim = noise_dim
         self.K = K
 
-        # Learnable mixture component parameters
-        self.means    = nn.Parameter(torch.randn(K, noise_dim) * 0.5)
+        # Learnable mixture component parameters.
+        # Zero-init means: initial behavior is identical to N(0,I), so the
+        # pretrained G sees familiar noise in early Phase 3.  Gradient updates
+        # push components apart as training progresses.
+        self.means    = nn.Parameter(torch.zeros(K, noise_dim))
         self.log_stds = nn.Parameter(torch.zeros(K, noise_dim))
 
         # Small MLP: cond → K logits (component selector)
