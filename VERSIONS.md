@@ -6,22 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Runs
 
-### v49 — Tencent + BayesGAN M=5 + v28 pretrain + ATB recipe
+### v49 — Tencent + BayesGAN M=5 + v28 pretrain (KILLED ep35)
 
-**Status**: MONITORING ep35 — 2026-04-05. PID 780011 on vinge.
-**Recipe**: BayesGAN M=5 particles + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
+**Best**: ep10 recall=0.370, combined=0.152★. ep35: recall=0.179 — killed.
+See post-mortem below.
+
+### v51 — Tencent + BayesGAN M=2 + v28 pretrain + ATB recipe
+
+**Status**: RUNNING — 2026-04-05. PID 796458 on vinge.
+**Recipe**: BayesGAN M=2 + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
 **Pretrain**: v28/pretrain_complete.pt.
+**Key**: M=5 (v49) had 10 critic updates/G step → over-regularized. M=2 = 4 total updates.
+Epoch timing: ~110s (vs 250s for M=5).
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
-| 5     | 0.320  | 0.173 ★  |
-| 10    | 0.370  | 0.152 ★  |
-| 15    | 0.305  | 0.163    |
-| 20    | 0.336  | 0.160    |
-| 25    | 0.322  | 0.174    |
-| 30    | 0.234  | 0.179    |
-
-ep30 recall=0.234 declining. Best still ep10 (0.152★). Kill if ep35 recall < 0.30.
 
 ### v50 — Tencent + exact v34 recipe + seed=42
 
@@ -44,6 +43,16 @@ is closer to single-critic dynamics while still providing some diversity to prev
 
 | Epoch | Recall | Combined |
 |-------|--------|----------| 
+
+---
+
+## Post-Mortem: v49 — Tencent + BayesGAN M=5 (KILLED ep35, 2026-04-05)
+
+**Best**: ep10 recall=0.370, combined=0.152★. ep35: recall=0.179, combined=0.201 — continuously declining.
+**Root cause**: n_critic=2 × M=5 = 10 total critic weight updates per G step. Too aggressive — G falls
+behind the critic collective, gradients degrade, recall collapses after ep10.
+**Lesson**: BayesGAN M scales the effective critic strength. At M=5+n_critic=2 the critics dominate.
+Try M=2 (v51) or reduce n_critic to 1.
 
 ---
 
