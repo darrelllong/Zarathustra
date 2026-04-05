@@ -6,35 +6,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Runs
 
-### v52 — Tencent + pure ATB recipe (no char-file, fresh seed, lr_d=5e-5)
+### v54 — Tencent + char-file + regime sampler (RUNNING)
 
-**Status**: RUNNING — 2026-04-05. PID 828094 on vinge.
-**Recipe**: cond_dim=10 + cond_drop_prob=0.25 + NO char-file (window z_global) + n_critic=2 + lr_d=5e-5
-+ supervisor_loss_weight=1.0 + full losses + diversity=1.0.
-**Pretrain**: v28/pretrain_complete.pt.
-**Rationale**: Every run since v40 used char-file, which collapsed the accidental mixture structure
-that gave v31/v34 their ATB recall. This is a direct reproduction attempt with a fresh random seed.
-ATB seed success rate: 2/4 runs (v31, v34). Bad seeds: v33 (0.107), v36 (0.116).
-
-| Epoch | Recall | Combined |
-|-------|--------|----------|
-| 5     | 0.285  | 0.198 ★  |
-| 10    | 0.317  | 0.176 ★  |
-| 15    | 0.238  | 0.191    |
-| 20    | 0.383  | 0.144 ★  |
-| 25    | 0.305  | 0.172    |
-
-ep20 combined=0.144★ with MMD²=0.020 — strong early signal, W-distance healthy (0.79).
-
-### v53 — Tencent + mixed-type Recovery heads (RUNNING)
-
-**Status**: RUNNING — 2026-04-05. PID 853089 on vinge.
-**Recipe**: Same ATB recipe as v52 + `--mixed-type-recovery` (IDEAS.md idea #7).
-Binary columns (opcode col 2, obj_id_reuse col 4) use sigmoid→[-1,1] Recovery head + BCE
-Phase 1 reconstruction loss. Continuous cols keep Tanh + MSE.
-**Goal**: Produce sharper ±1 values for binary fields → lower MMD² during evaluation.
-**Pretrain**: tencent_v53/pretrain_complete.pt (fresh pretrain, AE recon=0.00001).
-Log: ~/train_v53.log.
+**Status**: RUNNING — 2026-04-05. PID 879269 on vinge.
+**Recipe**: ATB recipe + char-file + `--n-regimes 8` + `--w-stop-threshold 3.0` + CFG 0.25 +
+n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
+**Pretrain**: v28/pretrain_complete.pt (regime_sampler params initialized fresh, optimizer rebuilt).
+**Hypothesis**: Gumbel-Softmax regime sampler replaces raw cond passthrough with hard one-hot
+selection over K=8 workload prototypes. Deliberately recreates the mixture structure that gave
+v31/v34 their ATB recall — now with char-file precision instead of noisy z_global randomness.
+Temperature annealed τ: 1.0 → 0.1.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
@@ -44,30 +25,55 @@ Log: ~/train_v53.log.
 **Status**: RUNNING — 2026-04-05. PID 846562 on vinge.
 **Recipe**: GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5 + supervisor_loss_weight=1.0 + char-file.
 **Pretrain**: alibaba_v1/pretrain_complete.pt.
-**Rationale**: alibaba_v5 achieved ATB=0.108 with this exact recipe. All subsequent Alibaba runs
-added complexity (BayesGAN, etc.) and got worse. Fresh seed to retry the proven recipe.
+**Rationale**: alibaba_v5 achieved ATB=0.108 with this exact recipe. Fresh seed retry.
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
 | 5     | 0.110  | 0.241 ★  |
 | 10    | 0.184  | 0.209 ★  |
 | 15    | 0.184  | 0.220    |
+| 20    | 0.228  | 0.208 ★  |
+| 25    | 0.287  | 0.178 ★  |
+| 30    | 0.207  | 0.208    |
+
+ep25 combined=0.178★ beats alibaba_v5 at ep25 (0.197). Tracking ahead of v5's trajectory. Key milestone: ep40-50 where v5 had its recall surge (0.24→0.56).
 
 ### alibaba_v14 — Alibaba + mixed-type Recovery (PRETRAIN RUNNING)
 
 **Status**: PRETRAIN — 2026-04-05. On vinge.
 **Recipe**: Same as alibaba_v13 + `--mixed-type-recovery` (idea #7 for Alibaba).
-**Goal**: Mixed-type heads for Alibaba's binary cols → sharper ±1 values → lower MMD².
 Log: ~/train_alibaba_v14_pretrain.log.
 
-### v54 — Tencent + char-file + regime sampler (QUEUED)
+---
 
-**Recipe**: ATB recipe + char-file + `--n-regimes 8` + `--w-stop-threshold 3.0` (ideas #5 + #8).
-**Rationale**: Regime sampler converts clean char-file stats into discrete workload-type
-codes (Gumbel-Softmax, K=8). Hypothesis: this recreates the accidental mixture behavior of
-v31/v34's noisy z_global as a deliberate, learnable mechanism — combined metric of 0.089 without
-seed lottery. Uses v28 pretrain (critic not pretrained, only G cond path changed).
-**Status**: QUEUED — will launch when v52/v53 produce ep50 data.
+## Post-Mortem: v52 — Tencent + pure ATB recipe, bad seed (KILLED ep46, 2026-04-05)
+
+**Best**: ep20 recall=0.383, combined=0.144★ (MMD²=0.020).
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 20    | 0.383  | 0.144 ★  |
+| 25    | 0.305  | 0.172    |
+| 30    | 0.327  | 0.162    |
+| 35    | 0.296  | 0.161    |
+| 40    | 0.329  | 0.161    |
+| 45    | 0.331  | 0.154    |
+
+**Root cause**: Bad seed. Recall plateaued at 0.29–0.38 with no upward trend from ep20 to ep46. At recall=0.33, combined floor = 0.134 even with perfect MMD²=0 — no path to ATB (0.089). v31/v34's good seeds had steadily climbing recall through ep70.
+**Key lesson**: The recall plateau at 0.30–0.38 is NOT a char-file problem (v52 used window z_global). It's a seed problem — bad seeds plateau regardless of conditioning method.
+**Implication**: Need a mechanism (regime sampler, BayesGAN) to make the model LESS seed-dependent rather than hoping for lucky seeds.
+
+---
+
+## Post-Mortem: v53 — Tencent + mixed-type Recovery (KILLED ep19, 2026-04-05)
+
+**Best**: ep5 combined=0.178★, recall=0.278.
+**Finding**: Combined flat at 0.178–0.180 from ep5 to ep15. No improvement in 14 epochs.
+MMD²=0.034–0.037 — actually WORSE than v52's 0.020. Binary columns were not the MMD² bottleneck.
+**Root cause**: The mixed-type Recovery hypothesis was wrong. Sigmoid heads for opcode/reuse
+didn't lower MMD² — the evaluation metric was already handling binary fields adequately with Tanh.
+The new pretrain may also have been weaker than v28's.
+**Lesson**: Mixed-type heads are not a path to lower MMD². Drop this approach.
 
 ---
 
