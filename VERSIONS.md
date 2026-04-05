@@ -6,11 +6,24 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Run: v46 — Tencent + GMM K=8 + CFG 0.20 + cond_dim=10 + n_critic=1
 
-**Status**: RUNNING — 2026-04-05. PID 732258 on vinge.
-**Hypothesis**: GMM + CFG combo — ATB runs (v31/v34) used CFG with cond_dim=10; v45 showed GMM helps recall.
-**Recipe**: WGAN-SN + GMM K=8 + cond_dim=10 + char-file + cond_drop_prob=0.20 + n_critic=1 + lr_d=5e-5.
+**Status**: RUNNING — 2026-04-05. PID 732258 on vinge. At ep42.
+**Recipe**: WGAN-SN + GMM K=8 + CFG cond_drop=0.20 + cond_dim=10 + char-file + n_critic=1 + lr_d=5e-5.
 **Pretrain**: v45/pretrain_complete.pt (GMM K=8 architecture, cond_dim=10).
-**Goal**: Beat ATB (0.089) by combining GMM (recall lift) with CFG (coverage regularizer).
+**Goal**: Beat ATB (0.089).
+
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 5     | 0.382  | 0.157 ★  |
+| 10    | 0.257  | 0.197    |
+| 15    | 0.272  | 0.178    |
+| 20    | 0.331  | 0.176    |
+| 25    | 0.349  | 0.160    |
+| **30** | **0.392** | **0.157** ★ |
+| 35    | 0.425  | 0.149 ★  |
+| 40    | 0.388  | 0.164    |
+
+**Notable**: Ascending trend; ep35=0.425 best so far. ep5 recall (0.382) was 2.6× v43 and 30% above v45 — GMM+CFG synergy confirmed. Currently behind v43's ep35 pace (v43 had 0.463 at ep35).
 
 ---
 
@@ -34,11 +47,28 @@ Recall stuck at ~0.48; ATB needs ~0.60+. Adding CFG is the next logical step (v4
 
 ## Current Run: alibaba_v5 — Alibaba + GMM K=8 + var-cond + FULL explosion guard + n_critic=1
 
-**Status**: RUNNING — 2026-04-05. PID 726415 on vinge.
-**What's new vs alibaba_v4**: Fixed explosion guard — also skip when `g_loss.abs() > 1e6`
-(torch.isfinite() only catches NaN/inf; alibaba explosions are ~1.8T which is large but finite).
+**Status**: RUNNING — 2026-04-05. PID 726415 on vinge. At ep60.
+**What's new vs alibaba_v4**: Fixed explosion guard — also skip when `g_loss.abs() > 1e6`.
 **Pretrain**: reusing alibaba_v1/pretrain_complete.pt.
-**Goal**: reach alibaba_v1's ep25 best (0.122★/0.509) and continue improving stably.
+**Goal**: beat ATB (0.089).
+
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 5     | 0.123  | 0.251 ★  |
+| 10    | 0.262  | 0.205 ★  |
+| 15    | 0.318  | 0.175 ★  |
+| 20    | 0.251  | 0.191    |
+| 25    | 0.241  | 0.197    |
+| 30    | 0.256  | 0.191    |
+| 35    | 0.339  | 0.171 ★  |
+| 40    | 0.423  | 0.151 ★  |
+| 45    | 0.508  | 0.127 ★  |
+| **50** | **0.560** | **0.108** ★ |
+| 55    | 0.442  | 0.137    |
+| 60    | 0.520  | 0.112    |
+
+**Notable**: ep50 combined=0.108 is the best Alibaba result ever. Recall=0.560 surpasses all previous Alibaba runs. G_loss is large (5-7) but stable — no explosions (guard working). Best Alibaba ever, approaching ATB.
 
 ---
 
