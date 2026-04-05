@@ -4,13 +4,27 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: v47 — Tencent + ATB recipe: CFG 0.25 + n_critic=2 + NO GMM
+## Current Runs
 
-**Status**: RUNNING — 2026-04-05. PID 752231 on vinge.
-**Hypothesis**: GMM hurts when combined with CFG. Restore exact ATB recipe (v31/v34).
+### v47 — Tencent + ATB recipe: CFG 0.25 + n_critic=2 + NO GMM
+
+**Status**: RUNNING — 2026-04-05. PID 752231 on vinge. At ep24.
 **Recipe**: WGAN-SN + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO GMM.
 **Pretrain**: v43/pretrain_complete.pt.
-**Goal**: Reproduce or beat ATB (0.089). n_critic=2 was key difference from post-v40 runs.
+**Goal**: Reproduce ATB (0.089). ATB peaked ~ep65-70.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 5     | 0.233  | 0.195 ★  |
+| 10    | 0.287  | 0.192 ★  |
+| 20    | 0.318  | 0.179 ★  |
+
+### alibaba_v7 — Alibaba + n_critic=2 + CFG 0.25 + var_cond
+
+**Status**: RUNNING — 2026-04-05. PID 755136 on vinge. Just launched.
+**Recipe**: WGAN-SN + n_critic=2 + CFG cond_drop=0.25 + var_cond + cond_dim=10 + lr_d=2.5e-5. NO GMM.
+**Pretrain**: alibaba_v1/pretrain_complete.pt.
+**Goal**: Beat alibaba_v5 best (0.108★/0.560). Apply n_critic=2 insight from v47 to Alibaba.
 
 ---
 
