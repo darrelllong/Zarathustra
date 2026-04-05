@@ -721,6 +721,7 @@ class TracePreprocessor:
         self._obj_locality_cols: List[str] = []    # obj_id cols → reuse + stride split
         self._obj_locality_first: Dict[str, float] = {}  # first abs value for cumsum
         self._obj_size_granularity: int = obj_size_granularity
+        self._dropped_cols: List[str] = []         # zero-variance cols auto-dropped
 
     # ------------------------------------------------------------------
     def fit(self, df: pd.DataFrame) -> "TracePreprocessor":
@@ -741,12 +742,28 @@ class TracePreprocessor:
             if c.lower() in _LOG_COLS and c not in self._cat_maps
         ]
         df = self._apply_log(df)
-        self.col_names = list(df.columns)
-        self.num_cols = len(self.col_names)
-        for col in self.col_names:
+        # Auto-drop zero-variance columns: columns where min == max carry no
+        # information and waste model capacity.  Common cases: opcode in
+        # pure-read corpora (alibaba, tencent_block), obj_id_reuse when reuse
+        # ratio ≈ 0.  The dropped columns are recorded so inverse_transform
+        # can re-insert them with their constant value.
+        self._dropped_cols = []
+        self._dropped_const: Dict[str, float] = {}  # col → constant value
+        all_cols = list(df.columns)
+        keep_cols = []
+        for col in all_cols:
             lo = float(df[col].min())
             hi = float(df[col].max())
             self._stats[col] = {"lo": lo, "hi": hi}
+            if hi == lo:
+                self._dropped_cols.append(col)
+                self._dropped_const[col] = lo
+            else:
+                keep_cols.append(col)
+        if self._dropped_cols:
+            df = df[keep_cols]
+        self.col_names = list(df.columns)
+        self.num_cols = len(self.col_names)
         return self
 
     def transform(self, df: pd.DataFrame) -> np.ndarray:
@@ -760,7 +777,7 @@ class TracePreprocessor:
         for i, col in enumerate(self.col_names):
             lo = self._stats[col]["lo"]
             hi = self._stats[col]["hi"]
-            span = hi - lo if hi != lo else 1.0
+            span = hi - lo  # guaranteed > 0 for kept columns
             out[:, i] = (df[col].values.astype(np.float32) - lo) / span * 2 - 1
         return out
 
@@ -769,7 +786,7 @@ class TracePreprocessor:
         for i, col in enumerate(self.col_names):
             lo = self._stats[col]["lo"]
             hi = self._stats[col]["hi"]
-            span = hi - lo if hi != lo else 1.0
+            span = hi - lo  # > 0 for kept columns
             vals = (arr[:, i].astype(np.float64) + 1) / 2 * span + lo
             # Undo log1p transform before any other post-processing
             if col in self._log_cols:
@@ -780,6 +797,18 @@ class TracePreprocessor:
             data[col] = vals
 
         df = pd.DataFrame(data)
+
+        # Re-insert dropped zero-variance columns with their constant values.
+        # This ensures generated output has the same schema as the original data.
+        for col, const in getattr(self, "_dropped_const", {}).items():
+            # Undo log1p if this was a log-transformed column
+            val = const
+            if col in self._log_cols:
+                val = np.expm1(max(val, 0.0))
+            if col in self._cat_maps:
+                inv_map = {v: k for k, v in self._cat_maps[col].items()}
+                val = inv_map.get(int(round(val)), val)
+            df[col] = val
 
         # Undo timestamp delta encoding: cumsum of IATs + start restores absolute times.
         # The first delta is 0 by construction (_apply_deltas uses prepend=vals[0]),
@@ -885,6 +914,15 @@ class TracePreprocessor:
 
     @staticmethod
     def _encode_opcode(series: pd.Series) -> pd.Series:
+        """Encode opcode to +1.0 (read) / -1.0 (write).
+
+        Handles format conventions:
+          0 / "r" / "read"  → +1.0 (read)
+          1 / "w" / "write" → -1.0 (write)
+          -1 / negative     → +1.0 (read/unknown sentinel; common in
+                              libCacheSim oracleGeneral & LCS when opcode
+                              is not recorded — NOT a write indicator)
+        """
         s = series.astype(str).str.lower().str.strip()
         def _map(x):
             if x in {"r", "read", "0"}:
@@ -893,7 +931,10 @@ class TracePreprocessor:
                 return -1.0
             else:
                 try:
-                    return 1.0 if int(float(x)) == 0 else -1.0
+                    v = int(float(x))
+                    # Negative values (e.g. -1) are missing/sentinel, not writes.
+                    # Only positive 1 means write; 0 and negatives → read.
+                    return -1.0 if v == 1 else 1.0
                 except ValueError:
                     return 0.0
         return s.map(_map)

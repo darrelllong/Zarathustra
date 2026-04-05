@@ -4,6 +4,38 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Design Decisions
+
+### Auto-drop zero-variance columns (2026-04-05)
+
+**Problem:** R-based family characterization of 30,628 trace files revealed that both
+alibaba and tencent_block have `write_ratio=0.0` and `opcode_switch_ratio=0.0` across
+ALL files — opcode is always "read". The model was wasting capacity generating variation
+in a constant column. Additionally, `obj_id_reuse` is near-degenerate in alibaba (0.4%).
+
+**Root cause:** The oracle_general binary format uses `op=-1` as a sentinel for
+"opcode not recorded". Our `_encode_opcode()` was treating -1 as "write" because
+`int(-1) != 0`. The R characterization correctly identified write_ratio=0 because
+its profiler knows -1 means unknown. So the GAN was learning FAKE read/write variation
+from misinterpreted sentinel values.
+
+**Fix (two parts):**
+1. Fixed `_encode_opcode()`: negative sentinel values now map to +1.0 (read/unknown)
+   instead of -1.0 (write). Only `op=1` is write.
+2. Added auto-drop of zero-variance columns in `TracePreprocessor.fit()`: after all
+   encoding, columns where `min == max` are removed from `col_names` and not modeled.
+   `inverse_transform()` re-inserts dropped columns with their constant values so
+   generated output retains the original schema.
+
+**Effect:** alibaba and tencent_block go from 6 columns to 5 (opcode dropped).
+Corpora with actual writes (Baleen24, MSR exchange, LCS traces) are unaffected —
+auto-drop only fires when a column is truly constant in the training seed data.
+
+**Impact on active runs:** v54 and alibaba_v15 use old preprocessors (serialized in
+checkpoint). This fix takes effect on the NEXT run launched with fresh preprocessing.
+
+---
+
 ## Current Runs
 
 ### v54 — Tencent + char-file + regime sampler (RUNNING)

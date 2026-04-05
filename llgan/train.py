@@ -371,6 +371,8 @@ def train(cfg: Config) -> None:
         print(f"  delta-encoded: {prep._delta_cols}")
         print(f"  locality-split: {prep._obj_locality_cols}")
         print(f"  log-transformed: {prep._log_cols}")
+        if getattr(prep, "_dropped_cols", []):
+            print(f"  auto-dropped (zero variance): {prep._dropped_cols}")
 
         # Load precharacterized per-file conditioning vectors if provided.
         # Keys are filenames (basename); values are (cond_dim,) float32 tensors.
@@ -421,6 +423,8 @@ def train(cfg: Config) -> None:
         print(f"  delta-encoded: {prep._delta_cols}")
         print(f"  locality-split: {prep._obj_locality_cols}")
         print(f"  log-transformed: {prep._log_cols}")
+        if getattr(prep, "_dropped_cols", []):
+            print(f"  auto-dropped (zero variance): {prep._dropped_cols}")
         print(f"  train windows: {len(train_ds):,}  val: {len(val_ds):,}")
         val_tensor = torch.stack([val_ds[i] for i in range(len(val_ds))])
 
