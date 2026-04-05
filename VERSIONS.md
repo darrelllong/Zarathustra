@@ -45,6 +45,36 @@ Recall stuck at ~0.48; ATB needs ~0.60+. Adding CFG is the next logical step (v4
 
 ---
 
+## Current Run: alibaba_v6 — Alibaba hot-start from v5/ep50, lower lr_d=3e-5
+
+**Status**: RUNNING — 2026-04-05. PID 747517 on vinge.
+**What's new**: Hot-start from alibaba_v5/epoch_0050.pt (best-ever Alibaba checkpoint, combined=0.108★).
+Reset optimizer with lr_d=3e-5 (vs 5e-5) to prevent critic from dominating again.
+**Goal**: Push recall from 0.560 toward 0.65+, beat ATB (0.089). 100 epochs from ep51.
+
+---
+
+## Post-Mortem: alibaba_v5 — Alibaba + GMM K=8 + var-cond + explosion guard (KILLED ep85, 2026-04-05)
+
+**Best**: ep50 EMA combined=0.108★, recall=0.560 — best Alibaba result ever.
+
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 50    | 0.560  | 0.108 ★  |
+| 55    | 0.442  | 0.137    |
+| 60    | 0.520  | 0.112    |
+| 65    | 0.540  | 0.121    |
+| 70    | 0.470  | 0.125    |
+| 75    | 0.443  | 0.141    |
+| 80    | 0.371  | 0.155    |
+| 85    | 0.431  | 0.143    |
+
+**Root cause of decline**: G_loss grew to 9.3 at ep80 — critic dominated G as lr_d=5e-5 accumulated.
+**Lesson**: Lower lr_d for Alibaba with var_cond. Hot-restart from ep50 with lr_d=3e-5 (→ alibaba_v6).
+
+---
+
 ## Current Run: alibaba_v5 — Alibaba + GMM K=8 + var-cond + FULL explosion guard + n_critic=1
 
 **Status**: RUNNING — 2026-04-05. PID 726415 on vinge. At ep60.
