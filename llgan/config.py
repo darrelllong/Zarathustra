@@ -100,6 +100,16 @@ class Config:
                                       # (0 = off; 4096 = page-aligned; matches real block traces
                                       # where sizes are multiples of 4KB)
 
+    # Variational conditioning (IDEAS.md idea #3)
+    var_cond: bool = False               # Enable variational encoder on char-file conditioning.
+                                         # Replaces fixed cond vector with N(μ(cond), σ(cond)):
+                                         # samples at train time, uses μ at eval.  Makes G robust
+                                         # to conditioning noise; closes EMA→full-eval gap.
+                                         # Requires cond_dim > 0 and char_file.
+    var_cond_kl_weight: float = 0.001    # Weight for KL(q(cond|stats) || N(0,I)) in G loss.
+                                         # Small (0.001) lets σ grow slowly; try 0.01 for
+                                         # stronger regularization toward unit Gaussian.
+
     # GMM prior on generator noise
     gmm_components: int = 0              # K mixture components in noise prior (0 = flat N(0,I)).
                                          # When > 0 and cond_dim > 0, replaces N(0,I) with a

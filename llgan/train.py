@@ -84,54 +84,56 @@ def _make_z_global(
     file_cond: Optional[torch.Tensor] = None,
     training: bool = True,
     G=None,
-) -> torch.Tensor:
+):
     """Build z_global, optionally prepending workload descriptors.
+
+    Returns (z_global, kl_loss) where kl_loss is zero unless variational
+    conditioning is active.
 
     Classifier-free guidance (CFG): when cfg.cond_drop_prob > 0 and training,
     randomly replace descriptor vectors with zeros with the given probability.
-    This forces the generator to learn both conditional and unconditional
-    generation, preventing overfitting to specific descriptor values and
-    improving generalization at eval time.
+
+    Variational conditioning (IDEAS.md #3): when G.cond_encoder is set, the
+    char-file vector is passed through a learned N(μ,σ²) encoder at training
+    time.  At eval (training=False), the deterministic mean μ is used.  The
+    returned kl_loss should be added to the generator's loss (scaled by
+    cfg.var_cond_kl_weight).
 
     Args:
         B: batch size
-        cfg: Config with noise_dim, cond_dim, and cond_drop_prob
+        cfg: Config with noise_dim, cond_dim, cond_drop_prob, etc.
         device: target device
-        real_features: (B, T, num_cols) real feature-space windows.
-            Used as fallback when file_cond is None and cfg.cond_dim > 0.
+        real_features: (B, T, num_cols) fallback when file_cond is None.
         file_cond: (B, cond_dim) precharacterized per-file conditioning vectors.
-            When provided, used instead of computing from real_features windows.
-            More stable than window-level descriptors; enables multi-corpus
-            conditioning keyed on full-file statistics.
-        training: if True, apply CFG dropout; if False (eval), always condition.
-        G: Generator instance; when provided and G.gmm_prior is not None, noise
-            is sampled from the GMM prior conditioned on the workload descriptor
-            rather than from flat N(0,I).
+        training: if True, apply CFG dropout and variational sampling.
+        G: Generator instance; used for GMM prior and cond_encoder.
 
     Returns:
-        (B, noise_dim) when cond_dim == 0,
-        (B, cond_dim + noise_dim) when cond_dim > 0.
+        z_global:  (B, noise_dim) or (B, cond_dim + noise_dim)
+        kl_loss:   scalar tensor; 0 when var_cond is off
     """
+    kl_loss = torch.zeros((), device=device)
     if cfg.cond_dim > 0:
         if file_cond is not None:
             cond = file_cond.to(device)
         else:
             cond = compute_window_descriptors(real_features)
+        # Variational conditioning: perturb cond at training time, use μ at eval
+        if G is not None and getattr(G, "cond_encoder", None) is not None:
+            cond, kl_loss = G.cond_encoder(cond, training=training)
+        # GMM prior: sample noise from conditioning-aware mixture.  Uses cond
+        # before CFG dropout so workload→noise mapping is stable.
+        if G is not None and getattr(G, "gmm_prior", None) is not None:
+            noise = G.sample_noise(B, device, cond=cond)
+        else:
+            noise = torch.randn(B, cfg.noise_dim, device=device)
         # Classifier-free guidance: randomly drop conditioning during training
         drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
         if training and drop_prob > 0:
             mask = (torch.rand(B, 1, device=device) > drop_prob).float()
             cond = cond * mask
-        # GMM prior: sample noise from conditioning-aware mixture.  Uses the
-        # raw (pre-CFG-dropout) conditioning so each workload type always maps
-        # to its own noise region, even when CFG zeros the conditioning for G.
-        if G is not None and getattr(G, "gmm_prior", None) is not None:
-            raw_cond = file_cond.to(device) if file_cond is not None else                        compute_window_descriptors(real_features)
-            noise = G.sample_noise(B, device, cond=raw_cond)
-        else:
-            noise = torch.randn(B, cfg.noise_dim, device=device)
-        return torch.cat([cond, noise], dim=1)
-    return torch.randn(B, cfg.noise_dim, device=device)
+        return torch.cat([cond, noise], dim=1), kl_loss
+    return torch.randn(B, cfg.noise_dim, device=device), kl_loss
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +441,8 @@ def train(cfg: Config) -> None:
                   avatar=_avatar,
                   cond_dim=cfg.cond_dim,
                   film_cond=getattr(cfg, "film_cond", False),
-                  gmm_components=getattr(cfg, "gmm_components", 0)).to(device)
+                  gmm_components=getattr(cfg, "gmm_components", 0),
+                  var_cond=getattr(cfg, "var_cond", False)).to(device)
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
@@ -826,8 +829,8 @@ def train(cfg: Config) -> None:
                     xb, fc_pre = batch_pre.to(device), None
                 B_pre = xb.size(0)
                 xb_dev = xb
-                z_g = _make_z_global(B_pre, cfg, device, real_features=xb_dev,
-                                     file_cond=fc_pre, G=G)
+                z_g, _ = _make_z_global(B_pre, cfg, device, real_features=xb_dev,
+                                        file_cond=fc_pre, G=G)
                 z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
                 opt_G.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
@@ -952,8 +955,8 @@ def train(cfg: Config) -> None:
 
             # --- Critic steps (n_critic per generator step) ---
             for _ in range(cfg.n_critic):
-                z_g = _make_z_global(B, cfg, device, real_features=real_batch,
-                                     file_cond=file_cond_batch, G=G)
+                z_g, _ = _make_z_global(B, cfg, device, real_features=real_batch,
+                                        file_cond=file_cond_batch, G=G)
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
                 H_fake = G(z_g, z_l).detach()
 
@@ -1065,8 +1068,8 @@ def train(cfg: Config) -> None:
                     scaler_C.update()
 
             # --- Generator step ---
-            z_g = _make_z_global(B, cfg, device, real_features=real_batch,
-                                 file_cond=file_cond_batch, G=G)
+            z_g, kl_loss = _make_z_global(B, cfg, device, real_features=real_batch,
+                                          file_cond=file_cond_batch, G=G)
             z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
 
             opt_G.zero_grad()
@@ -1285,11 +1288,11 @@ def train(cfg: Config) -> None:
                     # targeting the mode coverage gaps in recall.
                     _fc1 = file_cond_batch[:B2] if file_cond_batch is not None else None
                     _fc2 = file_cond_batch[B2:B2*2] if file_cond_batch is not None else None
-                    z_g1 = _make_z_global(B2, cfg, device, real_features=real_batch[:B2],
-                                          file_cond=_fc1, G=G)
+                    z_g1, _ = _make_z_global(B2, cfg, device, real_features=real_batch[:B2],
+                                             file_cond=_fc1, G=G)
                     z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
-                    z_g2 = _make_z_global(B2, cfg, device, real_features=real_batch[B2:B2*2],
-                                          file_cond=_fc2, G=G)
+                    z_g2, _ = _make_z_global(B2, cfg, device, real_features=real_batch[B2:B2*2],
+                                             file_cond=_fc2, G=G)
                     z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
                     f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
                     f2 = G(z_g2, z_l2)
@@ -1312,6 +1315,12 @@ def train(cfg: Config) -> None:
                     feat_fake_gc, _cf_cond = _pack_windows(feat_fake_g, _pack_sz, file_cond_batch)
                     cf_g_score = C_feat(feat_fake_gc, cond=_cf_cond)
                     g_loss = g_loss + _feat_cw * (-cf_g_score.mean())
+
+                # Variational conditioning KL loss (IDEAS.md #3): regularise the
+                # cond encoder toward N(0,I).  kl_loss=0 when var_cond is off.
+                _kl_w = getattr(cfg, "var_cond_kl_weight", 0.0)
+                if _kl_w > 0:
+                    g_loss = g_loss + _kl_w * kl_loss
 
             scaler.scale(g_loss).backward()
             if cfg.grad_clip > 0:
@@ -1536,6 +1545,15 @@ def parse_args() -> Config:
                    help="GMM prior: K mixture components in noise space (0=flat N(0,I)). "
                         "When >0 and --cond-dim>0, replaces N(0,I) with a conditioning-aware "
                         "mixture so each workload type gets its own noise region. Try 8.")
+    p.add_argument("--var-cond",         action="store_true", default=False,
+                   help="Variational conditioning (IDEAS.md #3): replaces fixed char-file "
+                        "vector with a learned N(μ,σ²) distribution. Samples cond at train "
+                        "time; uses μ at eval. Adds KL(q||N(0,I)) to G loss. "
+                        "Requires --cond-dim>0 and --char-file.")
+    p.add_argument("--var-cond-kl-weight", type=float, default=0.001,
+                   help="Weight for KL divergence term in G loss when --var-cond is set. "
+                        "Small values (0.001) let σ grow slowly; larger values (0.01) "
+                        "push μ toward 0 and σ toward 1 more aggressively.")
     p.add_argument("--cond-drop-prob",   type=float, default=0.0,
                    help="Classifier-free guidance: drop conditioning with this probability (0=always condition)")
     p.add_argument("--hidden-size",      type=int,   default=256)
@@ -1738,6 +1756,9 @@ def parse_args() -> Config:
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.dmd_ckpt_weight             = args.dmd_ckpt_weight
+    cfg.gmm_components              = args.gmm_components
+    cfg.var_cond                    = args.var_cond
+    cfg.var_cond_kl_weight          = args.var_cond_kl_weight
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs

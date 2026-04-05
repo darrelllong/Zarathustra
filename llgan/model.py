@@ -215,6 +215,57 @@ class LatentDiscriminator(nn.Module):
 # Generator and Critic
 # ---------------------------------------------------------------------------
 
+class CondEncoder(nn.Module):
+    """Variational encoder for char-file conditioning vectors (IDEAS.md idea #3).
+
+    Replaces the fixed char-file conditioning vector with a learned distribution:
+        μ, log_σ² = Linear(char_stats)
+        cond ~ N(μ, exp(log_σ²/2))   at training time  [reparameterized]
+        cond = μ                      at eval time
+
+    Benefits:
+    - Generator becomes robust to conditioning noise → closes EMA→eval gap
+    - Principled uncertainty over workload type; two traces with same write_ratio
+      but different temporal dynamics get different noise realizations
+    - KL divergence KL(q(cond|stats) || N(0,I)) regularises the encoder
+
+    Init: mu_net ≈ identity (passes char_stats through unchanged), logvar bias=-6
+    (σ≈0.05, near-deterministic) → backward compatible with existing pretrained
+    checkpoints. σ grows as training finds it can exploit conditioning uncertainty.
+    """
+
+    def __init__(self, cond_dim: int):
+        super().__init__()
+        self.mu_net     = nn.Linear(cond_dim, cond_dim)
+        self.logvar_net = nn.Linear(cond_dim, cond_dim)
+        # Identity init for mu (passes input through unchanged at start)
+        nn.init.eye_(self.mu_net.weight)
+        nn.init.zeros_(self.mu_net.bias)
+        # Near-zero logvar: σ=exp(-3)≈0.05 — tiny perturbation initially
+        nn.init.zeros_(self.logvar_net.weight)
+        nn.init.constant_(self.logvar_net.bias, -6.0)
+
+    def forward(self, cond: torch.Tensor, training: bool = True):
+        """
+        Args:
+            cond:     (B, cond_dim) raw char-file conditioning vector
+            training: sample if True; use μ deterministically if False
+        Returns:
+            encoded:  (B, cond_dim) — perturbed at train time, deterministic at eval
+            kl:       scalar KL(N(μ,σ²) || N(0,I)) = 0.5*(σ²+μ²-1-log σ²).mean()
+        """
+        mu     = self.mu_net(cond)
+        logvar = self.logvar_net(cond).clamp(-10, 2)   # σ in [e^-5, e^1]
+        if training:
+            std     = (0.5 * logvar).exp()
+            encoded = mu + std * torch.randn_like(mu)
+            kl      = 0.5 * (logvar.exp() + mu.pow(2) - 1.0 - logvar).mean()
+        else:
+            encoded = mu
+            kl      = cond.new_zeros(())
+        return encoded, kl
+
+
 class GMMPrior(nn.Module):
     """
     Gaussian Mixture Model prior for the generator's noise vector.
@@ -320,6 +371,7 @@ class Generator(nn.Module):
         cond_dim: int = 0,
         film_cond: bool = False,
         gmm_components: int = 0,
+        var_cond: bool = False,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -329,6 +381,13 @@ class Generator(nn.Module):
         self.avatar      = avatar
         self.cond_dim    = cond_dim
         self.film_cond   = film_cond and (cond_dim > 0)
+
+        # Variational conditioning encoder (IDEAS.md idea #3): replaces fixed
+        # char-file vector with a sampled distribution at training time.
+        if var_cond and cond_dim > 0:
+            self.cond_encoder = CondEncoder(cond_dim)
+        else:
+            self.cond_encoder = None
 
         # GMM prior: replaces flat N(0,I) noise with a conditioning-aware
         # mixture.  Only active when gmm_components > 0 and cond_dim > 0.
@@ -400,10 +459,13 @@ class Generator(nn.Module):
         return torch.randn(B, self.noise_dim, device=device)
 
     def _init_weights(self):
+        _skip = {"gmm_prior", "cond_encoder"}   # these have their own init
         for name, p in self.named_parameters():
-            if "weight" in name and "gmm_prior" not in name:
+            if any(s in name for s in _skip):
+                continue
+            if "weight" in name:
                 nn.init.normal_(p, 0.0, 0.02)
-            elif "bias" in name and "gmm_prior" not in name:
+            elif "bias" in name:
                 nn.init.zeros_(p)
 
     def forward(
@@ -452,6 +514,9 @@ class Generator(nn.Module):
         if self.cond_dim > 0:
             if cond is None:
                 cond = torch.randn(n_windows, self.cond_dim, device=device) * 0.5
+            # Variational encoder: use μ (deterministic) at inference
+            if self.cond_encoder is not None:
+                cond, _ = self.cond_encoder(cond, training=False)
             noise = self.sample_noise(n_windows, device, cond=cond)
             z_global = torch.cat([cond, noise], dim=1)
         else:
