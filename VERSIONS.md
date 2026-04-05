@@ -4,6 +4,41 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Current Run: alibaba_v3 — Alibaba + GMM K=8 + var-cond (clamped) + n_critic=1
+
+**Status**: RUNNING — 2026-04-05. PID 704715 on vinge.
+**What's new vs alibaba_v1**: CondEncoder output clamped — mu.clamp(-20,20), encoded.clamp(-10,10).
+Prevents the ~1.8T G_loss explosions that crashed alibaba_v1 at ep6/24/28/34.
+**Pretrain**: reusing alibaba_v1/pretrain_complete.pt (identical architecture: GMM+var_cond).
+**Goal**: reach alibaba_v1's ep25 performance (0.122★/0.509) stably and continue improving.
+
+---
+
+## Post-Mortem: alibaba_v2 — Alibaba + GMM K=8 (no var-cond) (KILLED ep31, 2026-04-05)
+
+**Status**: KILLED ep31.
+**Best**: ep10 EMA combined=0.166, recall=0.354. Did NOT improve beyond ep10.
+
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 5     | 0.116  | 0.259 ★  |
+| 10    | 0.354  | 0.166 ★  |
+| 20    | 0.259  | 0.178    |
+| 30    | 0.247  | 0.188    |
+
+**Root cause**: Without var_cond, Alibaba recall DECLINES after ep10. The CondEncoder provided
+useful exploration/diversity that drove alibaba_v1's rapid recall improvement (0.354→0.509 in 15 epochs).
+Removing it stalls the model. Tencent doesn't need var_cond, but Alibaba does — the data has
+more diverse conditioning vectors and var_cond's noise helps G cover the space.
+
+**EMA crash (fixed)**: alibaba_v2 also exposed an EMA key-mismatch bug when loading a pretrain
+from a different architecture (cond_encoder keys in ema_G_state not filtered). Fixed in train.py.
+
+→ alibaba_v3: restore var_cond + fix CondEncoder with output clamping to prevent explosions.
+
+---
+
 ## Post-Mortem: alibaba_v1 — Alibaba traces + v44 recipe (GMM K=8 + var-cond + n_critic=1) (KILLED ep40, 2026-04-04)
 
 **Status**: KILLED ep40.
