@@ -60,6 +60,15 @@ added complexity (BayesGAN, etc.) and got worse. Fresh seed to retry the proven 
 **Goal**: Mixed-type heads for Alibaba's binary cols → sharper ±1 values → lower MMD².
 Log: ~/train_alibaba_v14_pretrain.log.
 
+### v54 — Tencent + char-file + regime sampler (QUEUED)
+
+**Recipe**: ATB recipe + char-file + `--n-regimes 8` + `--w-stop-threshold 3.0` (ideas #5 + #8).
+**Rationale**: Regime sampler converts clean char-file stats into discrete workload-type
+codes (Gumbel-Softmax, K=8). Hypothesis: this recreates the accidental mixture behavior of
+v31/v34's noisy z_global as a deliberate, learnable mechanism — combined metric of 0.089 without
+seed lottery. Uses v28 pretrain (critic not pretrained, only G cond path changed).
+**Status**: QUEUED — will launch when v52/v53 produce ep50 data.
+
 ---
 
 ## Post-Mortem: v51 — Tencent + BayesGAN M=2 (KILLED ep25, 2026-04-05)

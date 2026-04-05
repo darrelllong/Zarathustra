@@ -292,6 +292,82 @@ class CondEncoder(nn.Module):
         return encoded, kl
 
 
+class RegimeSampler(nn.Module):
+    """
+    Regime-first stage-1 sampler (IDEAS.md idea #5).
+
+    Maps per-file conditioning vectors to discrete regime codes using
+    Gumbel-Softmax (Jang et al., ICLR 2017).  K learnable regime prototypes
+    partition workload space (burst, sequential, write-heavy, random-read,
+    …).  During training a hard one-hot selection is made via straight-
+    through Gumbel-Softmax, committing to exactly one regime before G
+    generates a window.  At inference, argmax selects the most likely regime.
+
+    Why this helps over raw conditioning passthrough:
+    - Current architecture blends all K regime signals continuously; G must
+      simultaneously generate every workload type, which dilutes gradients.
+    - Regime sampler commits to one prototype per window; G specialises each
+      LSTM trajectory for a single workload type.  Recall improves because
+      under-represented modes get dedicated generation paths.
+    - With char-file conditioning, this deliberately recreates the accidental
+      mixture structure that gave v31/v34 their ATB recall when using noisy
+      window z_global — now as a learnable, controlled mechanism.
+
+    Compatible with v28 pretrain: only G's conditioning path is affected;
+    E/R/S are unchanged so no new pretrain is needed.
+
+    Temperature annealing: start τ=tau_start, anneal to τ=tau_end over
+    training.  Call .anneal(frac) with frac ∈ [0,1] from the training loop.
+    """
+
+    def __init__(
+        self,
+        cond_dim: int,
+        n_regimes: int = 8,
+        tau_start: float = 1.0,
+        tau_end: float = 0.1,
+    ):
+        super().__init__()
+        self.cond_dim   = cond_dim
+        self.n_regimes  = n_regimes
+        self.tau_start  = tau_start
+        self.tau_end    = tau_end
+        self.tau        = tau_start
+
+        # Regime prototypes: K learnable vectors in cond_dim space.
+        # Zero-init → initially all prototypes are identical (neutral start).
+        self.prototypes = nn.Embedding(n_regimes, cond_dim)
+        nn.init.normal_(self.prototypes.weight, 0.0, 0.1)
+
+        # Assignment network: maps cond → logits over K regimes.
+        self.assign_net = nn.Sequential(
+            nn.Linear(cond_dim, cond_dim * 2),
+            nn.LeakyReLU(0.2),
+            nn.Linear(cond_dim * 2, n_regimes),
+        )
+
+    def anneal(self, frac: float) -> None:
+        """Update Gumbel temperature. frac = current_epoch / total_epochs."""
+        self.tau = self.tau_start + (self.tau_end - self.tau_start) * min(frac, 1.0)
+
+    def forward(self, cond: torch.Tensor) -> torch.Tensor:
+        """
+        cond : (B, cond_dim) per-window/file conditioning vector.
+        Returns regime_code : (B, cond_dim) — the selected prototype
+        (or a weighted blend during evaluation).
+        """
+        logits = self.assign_net(cond)           # (B, K)
+        if self.training:
+            # Hard Gumbel-Softmax: one-hot selection with straight-through grads.
+            one_hot = torch.nn.functional.gumbel_softmax(
+                logits, tau=self.tau, hard=True)  # (B, K)
+        else:
+            # Argmax at inference — commit to the single most likely regime.
+            idx = logits.argmax(dim=1)            # (B,)
+            one_hot = torch.zeros_like(logits).scatter_(1, idx.unsqueeze(1), 1.0)
+        return one_hot @ self.prototypes.weight   # (B, cond_dim)
+
+
 class GMMPrior(nn.Module):
     """
     Gaussian Mixture Model prior for the generator's noise vector.
@@ -398,6 +474,7 @@ class Generator(nn.Module):
         film_cond: bool = False,
         gmm_components: int = 0,
         var_cond: bool = False,
+        n_regimes: int = 0,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -414,6 +491,15 @@ class Generator(nn.Module):
             self.cond_encoder = CondEncoder(cond_dim)
         else:
             self.cond_encoder = None
+
+        # Regime sampler (IDEAS.md idea #5): Gumbel-Softmax over K workload
+        # regime prototypes.  Replaces raw cond passthrough with a hard
+        # discrete regime assignment — G commits to one workload type per
+        # window before generating.  Compatible with v28 pretrain.
+        if n_regimes > 0 and cond_dim > 0:
+            self.regime_sampler = RegimeSampler(cond_dim, n_regimes=n_regimes)
+        else:
+            self.regime_sampler = None
 
         # GMM prior: replaces flat N(0,I) noise with a conditioning-aware
         # mixture.  Only active when gmm_components > 0 and cond_dim > 0.

@@ -123,6 +123,12 @@ def _make_z_global(
         # Variational conditioning: perturb cond at training time, use μ at eval
         if G is not None and getattr(G, "cond_encoder", None) is not None:
             cond, kl_loss = G.cond_encoder(cond, training=training)
+        # Regime sampler (IDEAS.md #5): map cond → discrete regime code via
+        # Gumbel-Softmax.  Replaces raw cond with a regime prototype vector,
+        # committing G to one workload type before generation.  Applied BEFORE
+        # CFG dropout so the regime selection is stable.
+        if G is not None and getattr(G, "regime_sampler", None) is not None:
+            cond = G.regime_sampler(cond)
         # GMM prior: sample noise from conditioning-aware mixture.  Uses cond
         # before CFG dropout so workload→noise mapping is stable.
         if G is not None and getattr(G, "gmm_prior", None) is not None:
@@ -444,7 +450,11 @@ def train(cfg: Config) -> None:
                   cond_dim=cfg.cond_dim,
                   film_cond=getattr(cfg, "film_cond", False),
                   gmm_components=getattr(cfg, "gmm_components", 0),
-                  var_cond=getattr(cfg, "var_cond", False)).to(device)
+                  var_cond=getattr(cfg, "var_cond", False),
+                  n_regimes=getattr(cfg, "n_regimes", 0)).to(device)
+    if getattr(cfg, "n_regimes", 0) > 0 and cfg.cond_dim > 0:
+        print(f"[regime-sampler] K={cfg.n_regimes} workload regimes, "
+              f"τ: {G.regime_sampler.tau_start}→{G.regime_sampler.tau_end}")
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
@@ -1002,6 +1012,9 @@ def train(cfg: Config) -> None:
             E.train(); R.train(); S.train()
         if LD is not None:
             LD.train()
+        # Anneal Gumbel temperature for regime sampler (idea #5).
+        if getattr(G, "regime_sampler", None) is not None:
+            G.regime_sampler.anneal(epoch / max(cfg.epochs - 1, 1))
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
 
@@ -1833,6 +1846,12 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--n-regimes",             type=int,   default=0,
+                   help="Regime-first two-stage generation (IDEAS.md idea #5): K workload "
+                        "regime prototypes; Gumbel-Softmax selects one per window before G "
+                        "generates. Temperature annealed τ: 1.0→0.1 over training. "
+                        "Compatible with v28 pretrain. Requires cond_dim > 0. "
+                        "Recommended: 8. (0 = off)")
     p.add_argument("--w-stop-threshold",     type=float, default=0.0,
                    help="W-distance spike guard: stop training if W-dist exceeds this value "
                         "for 3 consecutive epochs (0=off). Prevents the conditioning collapse "
@@ -1922,6 +1941,7 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.n_regimes               = args.n_regimes
     cfg.w_stop_threshold        = args.w_stop_threshold
     cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery

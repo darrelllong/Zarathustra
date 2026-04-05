@@ -110,6 +110,16 @@ class Config:
                                          # Small (0.001) lets σ grow slowly; try 0.01 for
                                          # stronger regularization toward unit Gaussian.
 
+    # Regime-first two-stage generation (IDEAS.md idea #5)
+    n_regimes: int = 0               # Number of workload regime prototypes (0 = off).
+                                      # When > 0 and cond_dim > 0, replaces raw cond passthrough
+                                      # with a Gumbel-Softmax regime sampler: K learnable regime
+                                      # prototypes in cond space, hard one-hot selection per window.
+                                      # G commits to one workload type before generating each window.
+                                      # Compatible with v28 pretrain (only G's cond path changes).
+                                      # Temperature annealed τ: 1.0 → 0.1 over training.
+                                      # Recommended: 8 (same as GMM K for consistency).
+
     # Multi-resolution critic (IDEAS.md idea #8, HiFi-GAN style)
     multi_scale_critic: bool = False     # Replace single Critic with 3-scale MultiScaleCritic.
                                           # Each scale sees T, T//2, T//4 timesteps respectively.
