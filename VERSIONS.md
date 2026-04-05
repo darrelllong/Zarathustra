@@ -4,7 +4,35 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Current Run: alibaba_v1 — Alibaba traces + v44 recipe (GMM K=8 + var-cond + n_critic=1)
+## Post-Mortem: alibaba_v1 — Alibaba traces + v44 recipe (GMM K=8 + var-cond + n_critic=1) (KILLED ep40, 2026-04-04)
+
+**Status**: KILLED ep40.
+**Best**: ep25 EMA combined=0.122, recall=0.509 ← promising but crashed.
+
+**Eval progression**:
+| Epoch | MMD²    | Recall | Combined |
+|-------|---------|--------|----------|
+| 5     | 0.05534 | 0.206  | 0.214 ★  |
+| 10    | 0.03629 | 0.350  | 0.166 ★  |
+| 15    | 0.04074 | 0.354  | 0.170    |
+| 20    | 0.02392 | 0.441  | 0.136 ★  |
+| 25    | 0.02397 | 0.509  | 0.122 ★  |
+| 35    | 0.07509 | 0.234  | 0.228    |
+| 40    | 0.03177 | 0.415  | 0.149    |
+
+**Root cause**: var_cond G_loss explosions (ep6, ep24, ep28, ep34 — ~1.8 trillion each, every 6-8 epochs).
+The Alibaba conditioning vectors have more extreme distributions than Tencent, hitting CondEncoder edge cases.
+Crash at ep35 (recall 0.509 → 0.234) after ep34 explosion. Partial recovery at ep40 but not trustworthy.
+
+**Lesson**: var_cond is even more dangerous on Alibaba than Tencent. Remove it. The pretrain (phases 1-2.5)
+is good — reuse for alibaba_v2 without var_cond.
+**Key positive finding**: Alibaba IS more amenable than Tencent. ep25 recall=0.509 > v43 Tencent recall=0.476 at ep75.
+
+→ alibaba_v2: same recipe as v45 (GMM K=8, no var_cond), reusing alibaba_v1 pretrain_complete.pt.
+
+---
+
+## Current Run: alibaba_v2 — Alibaba traces + v45 recipe (GMM K=8, no var-cond, n_critic=1)
 
 **Status**: RUNNING — 2026-04-04. PID 664211 on vinge.
 **Data**: /tiamat/zarathustra/traces/alibaba (237/239 files matched), oracle_general .zst.
@@ -27,6 +55,8 @@ Recall=0.509 is near v34 ATB territory (0.608). Strong upward trajectory.
 **Warning**: Recurring G_loss explosions (ep6, ep24, ep28: ~1.8 trillion each).
 Self-recovering via EMA/grad_clip. Root cause: var_cond CondEncoder + extreme Alibaba conditioning
 vectors. Frequency increasing (ep24 and ep28 are 4 epochs apart). Monitor closely.
+
+(See Post-Mortem above for full eval table through ep40)
 
 ---
 
