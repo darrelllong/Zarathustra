@@ -68,20 +68,32 @@ Temperature annealed τ: 1.0 → 0.1.
 | 65    | 0.517  | 0.118 ★  |
 | 70    | 0.442  | 0.133    |
 | 75    | 0.550  | 0.108 ★  |
+| 80    | 0.495  | 0.122    |
+| 85    | 0.507  | 0.123    |
+| 90    | 0.530  | 0.114    |
 
 **RECALL SURGE AT ep65-75!** 0.488→0.517→0.550. Combined=0.108★ — only 0.019 from ATB (0.089)!
-MMD²=0.018 is lowest ever. If recall continues to 0.59+ by ep90, this BEATS ATB.
+MMD²=0.018 is lowest ever. Recall regressed ep80-85 (0.495-0.507) but recovering at ep90 (0.530).
+G_loss spiked at ep89 (-0.46) then recovered (-3.11 at ep90). Still alive, 110 epochs remaining.
 
-### alibaba_v15 — Alibaba + regime sampler (RUNNING)
+### alibaba_v16 — Alibaba + regime sampler + auto-drop fix (RUNNING)
 
-**Status**: RUNNING — 2026-04-05. PID 891332 on vinge.
+**Status**: RUNNING pretrain — 2026-04-05. PID 924358 on vinge.
 **Recipe**: var_cond + GMM K=8 + `--n-regimes 8` + `--cond-drop-prob 0.25` + `--w-stop-threshold 3.0` +
-n_critic=1 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
-**Pretrain**: alibaba_v13/pretrain_complete.pt (regime_sampler params initialized fresh, optimizer rebuilt).
-**Hypothesis**: If regime sampler works spectacularly on Tencent (v54 ep10: combined=0.121★), it
-should work on Alibaba too. Same Gumbel-Softmax K=8 approach + var_cond/GMM from Alibaba ATB recipe.
-Log: ~/train_alibaba_v15.log.
+n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
+**Pretrain**: FRESH (required — architecture changed from 6→5 columns with auto-drop fix).
+**Changes from v15**: (1) auto-drop fix removes constant opcode column (5 cols instead of 6),
+(2) n_critic=2 (was 1 in v15 — matching v54's successful config).
+**Hypothesis**: Same regime sampler as v15 but with clean 5-col architecture. The model no longer
+wastes capacity on a degenerate opcode column filled with misinterpreted sentinel values.
+Log: ~/train_alibaba_v16.log.
 
+---
+
+## Post-Mortem: alibaba_v15 — Alibaba + regime sampler (KILLED ep85, 2026-04-05)
+
+**Best**: ep60 recall=0.368, combined=0.168★.
+**Eval progression**:
 | Epoch | Recall | Combined |
 |-------|--------|----------|
 | 5     | 0.119  | 0.412 ★  |
@@ -95,13 +107,15 @@ Log: ~/train_alibaba_v15.log.
 | 45    | 0.302  | 0.204    |
 | 50    | 0.306  | 0.184 ★  |
 | 55    | 0.331  | 0.169 ★  |
-
 | 60    | 0.368  | 0.168 ★  |
 | 65    | 0.369  | 0.176    |
 | 70    | 0.283  | 0.194    |
 
-Surged to ep60 (combined=0.168★, recall=0.368) — best alibaba result since v5. But ep70
-recall regressed to 0.283. Stalled? Watching until ep85 for possible second surge.
+**Why killed**: Peaked at ep60. Recall declined from 0.368→0.283 over 10 epochs with no recovery.
+Combined stalled at 0.168 — still far from alibaba ATB (0.108). Also: running old 6-column
+architecture with broken opcode encoding. Replaced by alibaba_v16 with auto-drop fix (5 columns).
+**Key lesson**: n_critic=1 may have been too weak — v54 uses n_critic=2 and has better stability.
+v16 uses n_critic=2.
 
 ---
 
