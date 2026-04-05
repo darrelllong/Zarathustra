@@ -4,6 +4,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Current Run: v47 — Tencent + ATB recipe: CFG 0.25 + n_critic=2 + NO GMM
+
+**Status**: RUNNING — 2026-04-05. PID 752231 on vinge.
+**Hypothesis**: GMM hurts when combined with CFG. Restore exact ATB recipe (v31/v34).
+**Recipe**: WGAN-SN + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5. NO GMM.
+**Pretrain**: v43/pretrain_complete.pt.
+**Goal**: Reproduce or beat ATB (0.089). n_critic=2 was key difference from post-v40 runs.
+
+---
+
+## Post-Mortem: v46 — Tencent + GMM K=8 + CFG 0.20 (KILLED ep95, 2026-04-05)
+
+**Best**: ep90 combined=0.125★, recall=0.463.
+**Finding**: GMM+CFG performed WORSE than pure CFG (v43):
+- v43 ep75: combined=0.117★, recall=0.476 (v43's final best)
+- v46 ep90: combined=0.125★, recall=0.463 (v46's best at comparable epoch)
+GMM prior raises MMD² (more spread out latent space) without improving recall enough to compensate.
+**Lesson**: GMM + CFG interfere. GMM alone only marginally helps (v45: 0.117→0.119). The real ATB
+ingredient was n_critic=2, not GMM. Restoring n_critic=2 without GMM is v47.
+
+---
+
 ## Current Run: v46 — Tencent + GMM K=8 + CFG 0.20 + cond_dim=10 + n_critic=1
 
 **Status**: RUNNING — 2026-04-05. PID 732258 on vinge. At ep42.
