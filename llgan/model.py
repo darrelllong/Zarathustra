@@ -712,3 +712,79 @@ class Critic(nn.Module):
 
 # Keep old name as alias so existing code that imports Discriminator still works
 Discriminator = Critic
+
+
+class MultiScaleCritic(nn.Module):
+    """Multi-resolution critic (HiFi-GAN style, IDEAS.md idea #8).
+
+    Three independent LSTM critics, each seeing a different temporal
+    resolution of the input sequence:
+      - Scale 0: full T steps (fine structure — burst events, IAT spikes)
+      - Scale 1: T//2 steps via stride-2 downsampling (medium — burst envelopes)
+      - Scale 2: T//4 steps via stride-4 downsampling (coarse — workload regime)
+
+    G loss = mean over all scales (same averaging as BayesGAN, but orthogonal
+    diversity — different views of the data rather than different posterior
+    samples of the same discriminator).
+
+    Drop-in replacement for Critic: same forward() signature, same optimiser
+    interface.  Critic is NOT part of pretrain_complete.pt so this can be
+    combined with v28 pretrain without a new pretrain phase.
+
+    Reference: Jungil Kong et al., "HiFi-GAN", NeurIPS 2020.
+    """
+
+    def __init__(
+        self,
+        num_cols: int,
+        hidden_size: int,
+        use_spectral_norm: bool = True,
+        sn_lstm: bool = True,
+        minibatch_std: bool = True,
+        patch_embed: bool = False,
+        cond_dim: int = 0,
+        n_scales: int = 3,
+    ):
+        super().__init__()
+        self.n_scales = n_scales
+        self.critics = nn.ModuleList([
+            Critic(
+                num_cols, hidden_size,
+                use_spectral_norm=use_spectral_norm,
+                sn_lstm=sn_lstm,
+                minibatch_std=minibatch_std,
+                patch_embed=patch_embed,
+                cond_dim=cond_dim,
+            )
+            for _ in range(n_scales)
+        ])
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        return_features: bool = False,
+        cond: Optional[torch.Tensor] = None,
+    ):
+        """x: (batch, T, num_cols).  Returns mean score over all scales.
+
+        Features returned are those of the full-resolution (scale-0) critic,
+        used for feature matching loss — same as single-critic baseline.
+        """
+        scores: List[torch.Tensor] = []
+        feat0: Optional[torch.Tensor] = None
+        seq = x
+        for i, critic in enumerate(self.critics):
+            s, f = critic(seq, return_features=True, cond=cond)
+            scores.append(s)
+            if i == 0:
+                feat0 = f
+            # Stride-2 downsampling for next scale (average adjacent pairs)
+            if seq.size(1) >= 2:
+                # (B, T, D) → average over pairs → (B, T//2, D)
+                T = seq.size(1) // 2 * 2  # ensure even
+                seq = seq[:, :T, :].reshape(seq.size(0), T // 2, 2, seq.size(2)).mean(dim=2)
+
+        score = torch.stack(scores).mean(0)
+        if return_features:
+            return score, feat0
+        return score

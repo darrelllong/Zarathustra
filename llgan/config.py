@@ -110,6 +110,15 @@ class Config:
                                          # Small (0.001) lets σ grow slowly; try 0.01 for
                                          # stronger regularization toward unit Gaussian.
 
+    # Multi-resolution critic (IDEAS.md idea #8, HiFi-GAN style)
+    multi_scale_critic: bool = False     # Replace single Critic with 3-scale MultiScaleCritic.
+                                          # Each scale sees T, T//2, T//4 timesteps respectively.
+                                          # G loss = mean over scales. Critic is NOT pretrained so
+                                          # this is compatible with v28 pretrain (no new pretrain).
+                                          # Targets DMD-GEN and AutoCorr by forcing critic to
+                                          # discriminate at burst (fine), envelope (medium), and
+                                          # regime (coarse) temporal scales simultaneously.
+
     # Mixed-type output heads in Recovery (IDEAS.md idea #7, CTGAN-style)
     mixed_type_recovery: bool = False    # Enable type-aware Recovery output heads: binary columns
                                          # (opcode, obj_id_reuse) use sigmoid→scaled-to-[-1,1] instead

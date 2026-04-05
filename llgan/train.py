@@ -43,7 +43,7 @@ from config import Config
 from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
                      compute_window_descriptors, load_file_characterizations,
                      _OPCODE_COLS)
-from model import Generator, Critic, Encoder, Recovery, Supervisor, LatentDiscriminator
+from model import Generator, Critic, MultiScaleCritic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
 
 
@@ -447,12 +447,15 @@ def train(cfg: Config) -> None:
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
-    C = Critic(critic_input_dim, cfg.hidden_size,
-               use_spectral_norm=use_sn,
-               sn_lstm=cfg.sn_lstm,
-               minibatch_std=cfg.minibatch_std,
-               patch_embed=cfg.patch_embed,
-               cond_dim=_proj_critic_dim).to(device)
+    _critic_cls = MultiScaleCritic if getattr(cfg, "multi_scale_critic", False) else Critic
+    C = _critic_cls(critic_input_dim, cfg.hidden_size,
+                    use_spectral_norm=use_sn,
+                    sn_lstm=cfg.sn_lstm,
+                    minibatch_std=cfg.minibatch_std,
+                    patch_embed=cfg.patch_embed,
+                    cond_dim=_proj_critic_dim).to(device)
+    if getattr(cfg, "multi_scale_critic", False):
+        print(f"[multi-scale critic] 3-scale critic active (T, T//2, T//4)")
 
     # Identify binary column indices for mixed-type Recovery heads (idea #7).
     # Opcode columns (±1 read/write) and obj_id_reuse (±1 same-obj indicator)
@@ -1811,6 +1814,11 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--multi-scale-critic",   action="store_true", default=False,
+                   help="Multi-resolution critic (IDEAS.md idea #8, HiFi-GAN style): "
+                        "3 independent LSTM critics at T, T//2, T//4 temporal scales. "
+                        "G loss = mean over scales. Compatible with v28 pretrain (critic "
+                        "is not pretrained). Targets burst/envelope/regime discrimination.")
     p.add_argument("--mixed-type-recovery",  action="store_true", default=False,
                    help="Mixed-type output heads in Recovery (IDEAS.md idea #7): "
                         "binary columns (opcode, obj_id_reuse) use sigmoid→[-1,1] heads "
@@ -1890,6 +1898,7 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery
     cfg.bayes_critics           = args.bayes_critics
     cfg.avatar                  = args.avatar

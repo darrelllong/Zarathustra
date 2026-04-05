@@ -29,6 +29,17 @@ Phase 1 reconstruction loss. Continuous cols keep Tanh + MSE.
 **New pretrain required**: mixed-type head architecture incompatible with v28 pretrain.
 Log: ~/train_v53_pretrain.log.
 
+### alibaba_v13 — Alibaba + pure v5 recipe, fresh seed
+
+**Status**: RUNNING — 2026-04-05. PID 846562 on vinge.
+**Recipe**: GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5 + supervisor_loss_weight=1.0 + char-file.
+**Pretrain**: alibaba_v1/pretrain_complete.pt.
+**Rationale**: alibaba_v5 achieved ATB=0.108 with this exact recipe. All subsequent Alibaba runs
+added complexity (BayesGAN, etc.) and got worse. Fresh seed to retry the proven recipe.
+
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+
 ---
 
 ## Post-Mortem: v51 — Tencent + BayesGAN M=2 (KILLED ep25, 2026-04-05)
