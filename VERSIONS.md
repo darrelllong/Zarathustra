@@ -33,8 +33,12 @@ Temperature annealed τ: 1.0 → 0.1.
 | 55    | 0.486  | 0.123    |
 | 60    | 0.488  | 0.121    |
 
-Recall flat at 0.40-0.51 for 45 epochs. MMD²=0.019 (lowest ever) but recall won't break 0.51.
-2nd best combined scores ever (only ATB 0.089 is better) but no recall surge occurring.
+| 65    | 0.517  | 0.118 ★  |
+| 70    | 0.442  | 0.133    |
+| 75    | 0.550  | 0.108 ★  |
+
+**RECALL SURGE AT ep65-75!** 0.488→0.517→0.550. Combined=0.108★ — only 0.019 from ATB (0.089)!
+MMD²=0.018 is lowest ever. If recall continues to 0.59+ by ep90, this BEATS ATB.
 
 ### alibaba_v15 — Alibaba + regime sampler (RUNNING)
 
@@ -60,9 +64,12 @@ Log: ~/train_alibaba_v15.log.
 | 50    | 0.306  | 0.184 ★  |
 | 55    | 0.331  | 0.169 ★  |
 
-**SURGING.** Recall dipped at ep35 (0.193) then exploded: 0.284→0.306→0.331. Combined
-hitting new ★ every eval since ep40. G_loss dropped to -3.6 (ep48-52), W-distance jumped
-0.17→0.98. Pace: +0.07 recall/5ep. If sustained, recall~0.50 by ep70, combined near ATB.
+| 60    | 0.368  | 0.168 ★  |
+| 65    | 0.369  | 0.176    |
+| 70    | 0.283  | 0.194    |
+
+Surged to ep60 (combined=0.168★, recall=0.368) — best alibaba result since v5. But ep70
+recall regressed to 0.283. Stalled? Watching until ep85 for possible second surge.
 
 ---
 
