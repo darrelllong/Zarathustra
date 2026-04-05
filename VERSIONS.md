@@ -6,46 +6,44 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Current Runs
 
-### v49 — Tencent + BayesGAN M=5 + v28 pretrain (KILLED ep35)
+### v52 — Tencent + pure ATB recipe (no char-file, fresh seed, lr_d=5e-5)
 
-**Best**: ep10 recall=0.370, combined=0.152★. ep35: recall=0.179 — killed.
-See post-mortem below.
-
-### v51 — Tencent + BayesGAN M=2 + v28 pretrain + ATB recipe
-
-**Status**: RUNNING — 2026-04-05. PID 796458 on vinge.
-**Recipe**: BayesGAN M=2 + CFG cond_drop=0.25 + cond_dim=10 + char-file + n_critic=2 + lr_d=2.5e-5.
+**Status**: RUNNING — 2026-04-05. PID 826973 on vinge.
+**Recipe**: cond_dim=10 + cond_drop_prob=0.25 + NO char-file (window z_global) + n_critic=2 + lr_d=5e-5.
 **Pretrain**: v28/pretrain_complete.pt.
+**Rationale**: Every run since v40 used char-file, which collapsed the accidental mixture structure
+that gave v31/v34 their ATB recall. This is a direct reproduction attempt with a fresh random seed.
+ATB seed success rate: 2/4 runs (v31, v34). Bad seeds: v33 (0.107), v36 (0.116).
 
 | Epoch | Recall | Combined |
 |-------|--------|----------|
-| 5     | 0.426  | 0.144 ★  |
-| 10    | 0.315  | 0.172    |
 
-ep5 recall=0.426 — highest ever at ep5. ep10 dip; watching ep15 for recovery.
+---
 
-### v50 — Tencent + seed=42 (KILLED ep30)
+## Post-Mortem: v51 — Tencent + BayesGAN M=2 (KILLED ep25, 2026-04-05)
 
-**Best**: ep15 recall=0.310, combined=0.185★. Oscillating through ep30, seed=42 not lucky. Killed.
+**Best**: ep5 recall=0.426, combined=0.144★. ep25: combined=0.155, recall=0.367 — oscillating, no recovery.
+**Finding**: BayesGAN M=2 gives spectacular early recall (0.426 — highest ever at ep5) but MMD² too high
+(0.029–0.035 vs ATB's 0.007–0.011). Combined ceiling: 0.144. Far from ATB=0.089.
+**Root cause**: M=2 critics improve recall via posterior averaging but can't simultaneously achieve ATB's
+low MMD². The two objectives are in tension with BayesGAN regularization.
+**Lesson**: BayesGAN improves recall ceiling but not combined score. The combined metric requires both
+low MMD² AND high recall — BayesGAN achieves one at the cost of the other.
 
-### alibaba_v12 — Alibaba + BayesGAN M=2 + v5 recipe
+---
 
-**Status**: RUNNING — 2026-04-05. PID 793128 on vinge.
-**Recipe**: BayesGAN M=2 + GMM K=8 + var_cond + n_critic=1 + lr_d=5e-5. NO CFG.
-**Pretrain**: alibaba_v1/pretrain_complete.pt (Phase 1-2.5 only).
-**Key**: M=5 (v11) capped recall at 0.340 — too many critics averaging G signal. M=2 (1 extra particle)
-is closer to single-critic dynamics while still providing some diversity to prevent post-ep50 collapse.
+## Post-Mortem: alibaba_v12 — Alibaba + BayesGAN M=2 (KILLED ep58, 2026-04-05)
 
-| Epoch | Recall | Combined |
-|-------|--------|----------|
-| 5     | 0.136  | 0.262 ★  |
-| 10    | 0.205  | 0.250 ★  |
-| 15    | 0.210  | 0.231 ★  |
-| 20    | 0.187  | 0.211 ★  |
-| 25    | 0.288  | 0.182 ★  |
-| 30    | 0.358  | 0.156 ★  |
+**Best**: ep40 recall=0.395, combined=0.146★. ep55+: plateaued at 0.146–0.152.
+**Finding**: BayesGAN M=2 helped Alibaba more than Tencent (0.146 vs v11's 0.168), but still far
+from alibaba ATB (0.108). Peaked ep40, flat thereafter. G_loss trending negative (−1.0 to −2.0)
+indicating incipient critic dominance.
+**Lesson**: Neither BayesGAN M=2 nor M=5 can break the Alibaba recall ceiling toward v5's 0.560.
+Need architectural change.
 
-Steadily climbing recall. Best Alibaba since v5. G_loss healthy. No explosions through ep30.
+---
+
+## Post-Mortem: v50 — Tencent + seed=42 (KILLED ep30)
 
 ---
 
