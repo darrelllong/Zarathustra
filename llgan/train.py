@@ -620,9 +620,12 @@ def train(cfg: Config) -> None:
 
         if cfg.reset_optimizer:
             # Fresh optimizers at new LR — do NOT restore optimizer state, scheduler,
-            # mmd_history, best_combined, or start_epoch.  Training restarts from
-            # epoch 0 with the loaded model weights and the new hyperparameters.
-            print(f"Hot-start from {resume_path} with reset optimizer "
+            # mmd_history, or best_combined.  Advance start_epoch from the checkpoint
+            # so Phase 1–2.5 pretrain gates (which check start_epoch == 0) are skipped
+            # when hot-starting from a Phase 3 checkpoint.
+            if "epoch" in ckpt:
+                start_epoch = ckpt["epoch"] + 1
+            print(f"Hot-start from {resume_path} (epoch {start_epoch}) with reset optimizer "
                   f"(lr_g={cfg.lr_g:.2e}, lr_d={cfg.lr_d:.2e}, n_critic={cfg.n_critic})")
         else:
             # pretrain_complete.pt only has opt_G (critic not trained yet).
