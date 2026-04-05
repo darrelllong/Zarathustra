@@ -38,43 +38,20 @@ checkpoint). This fix takes effect on the NEXT run launched with fresh preproces
 
 ## Current Runs
 
-### v54 — Tencent + char-file + regime sampler (RUNNING)
+### v55 — Tencent + regime sampler + projection discriminator + auto-drop (RUNNING)
 
-**Status**: RUNNING — 2026-04-05. PID 879269 on vinge.
-**Recipe**: ATB recipe + char-file + `--n-regimes 8` + `--w-stop-threshold 3.0` + CFG 0.25 +
-n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
-**Pretrain**: v28/pretrain_complete.pt (regime_sampler params initialized fresh, optimizer rebuilt).
-**Hypothesis**: Gumbel-Softmax regime sampler replaces raw cond passthrough with hard one-hot
-selection over K=8 workload prototypes. Deliberately recreates the mixture structure that gave
-v31/v34 their ATB recall — now with char-file precision instead of noisy z_global randomness.
-Temperature annealed τ: 1.0 → 0.1.
+**Status**: RUNNING pretrain — 2026-04-05. PID 938038 on vinge.
+**Recipe**: v54 recipe + `--proj-critic` + auto-drop fix (5 cols). Fresh pretrain (architecture changed).
+**Changes from v54**: (1) `--proj-critic` — critic now conditions on char-file workload descriptors
+via projection discriminator (Miyato & Koyama, ICLR 2018). Scores "realistic for THIS workload type?"
+instead of "realistic in general?". (2) Auto-drop fix: 5 columns (opcode dropped). (3) Fresh pretrain.
+**Hypothesis**: v54 reached combined=0.108★ (0.019 from ATB) but collapsed at ep100 with G_loss going
+positive. The projection discriminator gives the critic workload-type awareness, providing sharper
+gradients that should stabilize training and push recall higher. This was Idea #10 from IDEAS.md,
+previously blocked until char-file training reached 100+ epochs — now unblocked by v54's 112 epochs.
+Log: ~/train_tencent_v55.log.
 
-| Epoch | Recall | Combined |
-|-------|--------|----------|
-| 5     | 0.200  | 0.203 ★  |
-| 10    | 0.487  | 0.121 ★  |
-| 15    | 0.458  | 0.132    |
-| 20    | 0.509  | 0.119 ★  |
-| 25    | 0.448  | 0.134    |
-| 30    | 0.421  | 0.136    |
-| 35    | 0.484  | 0.124    |
-
-| 40    | 0.401  | 0.147    |
-| 45    | 0.456  | 0.132    |
-| 50    | 0.457  | 0.135    |
-| 55    | 0.486  | 0.123    |
-| 60    | 0.488  | 0.121    |
-
-| 65    | 0.517  | 0.118 ★  |
-| 70    | 0.442  | 0.133    |
-| 75    | 0.550  | 0.108 ★  |
-| 80    | 0.495  | 0.122    |
-| 85    | 0.507  | 0.123    |
-| 90    | 0.530  | 0.114    |
-
-**RECALL SURGE AT ep65-75!** 0.488→0.517→0.550. Combined=0.108★ — only 0.019 from ATB (0.089)!
-MMD²=0.018 is lowest ever. Recall regressed ep80-85 (0.495-0.507) but recovering at ep90 (0.530).
-G_loss spiked at ep89 (-0.46) then recovered (-3.11 at ep90). Still alive, 110 epochs remaining.
+### alibaba_v16 — Alibaba + regime sampler + auto-drop fix (RUNNING)
 
 ### alibaba_v16 — Alibaba + regime sampler + auto-drop fix (RUNNING)
 
@@ -87,6 +64,31 @@ n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
 **Hypothesis**: Same regime sampler as v15 but with clean 5-col architecture. The model no longer
 wastes capacity on a degenerate opcode column filled with misinterpreted sentinel values.
 Log: ~/train_alibaba_v16.log.
+
+---
+
+## Post-Mortem: v54 — Tencent + regime sampler (KILLED ep112, 2026-04-05)
+
+**Best**: ep75 recall=0.550, combined=0.108★ (MMD²=0.018).
+**Eval progression**:
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 10    | 0.487  | 0.121 ★  |
+| 20    | 0.509  | 0.119 ★  |
+| 65    | 0.517  | 0.118 ★  |
+| 75    | 0.550  | 0.108 ★  |
+| 90    | 0.530  | 0.114    |
+| 100   | 0.364  | 0.151    |
+| 105   | 0.368  | 0.153    |
+| 110   | 0.416  | 0.138    |
+
+**Why killed**: Mode collapse at ep100 — G_loss went positive (+4.27). Recall crashed from
+0.550→0.364. Partial recovery at ep110 (0.416) but 28% worse than peak. Second G_loss spike
+at ep112 (+1.33). No realistic path back to 0.108★.
+**Key achievement**: Combined=0.108 is only 0.019 from ATB (0.089). Regime sampler validated.
+**Key lesson**: The collapse pattern (G_loss spikes at ep89, ep100, ep112) suggests the critic
+loses its gradient signal in late training. Projection discriminator (#10) should help by giving
+the critic workload-type conditioning — sharper, more targeted gradients.
 
 ---
 
