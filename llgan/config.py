@@ -110,6 +110,15 @@ class Config:
                                          # Small (0.001) lets σ grow slowly; try 0.01 for
                                          # stronger regularization toward unit Gaussian.
 
+    # BayesGAN: posterior over discriminators (Saatci & Wilson, NeurIPS 2017)
+    bayes_critics: int = 0               # Number of critic particles (0 = standard single critic).
+                                         # Each particle is updated with SGLD (Adam + Gaussian noise
+                                         # injection), approximating a posterior over discriminators.
+                                         # G loss is averaged across all particles, preventing any
+                                         # single boundary from forcing mode collapse.
+                                         # Recommended: 5 (memory: M × ~1MB; GB10 has 124GB).
+                                         # Requires wgan-sn. Incompatible with wgan-gp/r1/r2.
+
     # GMM prior on generator noise
     gmm_components: int = 0              # K mixture components in noise prior (0 = flat N(0,I)).
                                          # When > 0 and cond_dim > 0, replaces N(0,I) with a

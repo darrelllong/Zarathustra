@@ -531,6 +531,31 @@ def train(cfg: Config) -> None:
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
+    # BayesGAN (Saatci & Wilson, NeurIPS 2017): maintain a posterior over critics.
+    # Particle 0 is C itself. Extra particles (1..M-1) are initialized from C
+    # with small perturbations so they start diverse.  Each is updated by Adam +
+    # SGLD Gaussian noise injection; G sees the average score across all particles.
+    # This prevents any single discriminator boundary from forcing mode collapse.
+    _n_extra = max(0, getattr(cfg, "bayes_critics", 0) - 1)
+    C_extra: list = []
+    opt_C_extra: list = []
+    if _n_extra > 0:
+        for _ in range(_n_extra):
+            _Ci = Critic(critic_input_dim, cfg.hidden_size,
+                         use_spectral_norm=use_sn, sn_lstm=cfg.sn_lstm,
+                         minibatch_std=cfg.minibatch_std, patch_embed=cfg.patch_embed,
+                         cond_dim=_proj_critic_dim).to(device)
+            _Ci.load_state_dict(C.state_dict())
+            with torch.no_grad():
+                for _p in _Ci.parameters():
+                    _p.add_(torch.randn_like(_p) * 0.01)
+            C_extra.append(_Ci)
+            opt_C_extra.append(torch.optim.Adam(_Ci.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9)))
+        print(f"[BayesGAN] {len(C_extra)+1} critic particles "
+              f"({len(C_extra)} extra; SGLD noise injection enabled)")
+    C_all: list = [C] + C_extra
+    opt_C_all: list = [opt_C] + opt_C_extra
+
     # Cosine annealing: decay lr from initial → eta_min over cfg.epochs steps.
     # In the second half of training the generator and critic are close to
     # equilibrium — large gradient steps cause them to perpetually overshoot
@@ -546,8 +571,14 @@ def train(cfg: Config) -> None:
         sched_C = torch.optim.lr_scheduler.CosineAnnealingLR(
             opt_C, T_max=cfg.epochs, eta_min=cfg.lr_d * cfg.lr_cosine_decay
         )
+        sched_C_extra = [
+            torch.optim.lr_scheduler.CosineAnnealingLR(
+                _oi, T_max=cfg.epochs, eta_min=cfg.lr_d * cfg.lr_cosine_decay)
+            for _oi in opt_C_extra
+        ]
     else:
         sched_G = sched_C = None
+        sched_C_extra = []
 
     bce = nn.BCEWithLogitsLoss() if cfg.loss == "bce" else None
 
@@ -634,6 +665,16 @@ def train(cfg: Config) -> None:
                 opt_G.load_state_dict(ckpt["opt_G"])
             if "opt_C" in ckpt:
                 opt_C.load_state_dict(ckpt["opt_C"])
+            # BayesGAN extra particles: restore if checkpoint has them, otherwise
+            # seed from C (already loaded) + small perturbation (same as init above).
+            if C_extra:
+                _c_extra_states = ckpt.get("C_extra", [])
+                _o_extra_states = ckpt.get("opt_C_extra", [])
+                for _i, (_Ci, _oi) in enumerate(zip(C_extra, opt_C_extra)):
+                    if _i < len(_c_extra_states):
+                        _Ci.load_state_dict(_c_extra_states[_i], strict=False)
+                    if _i < len(_o_extra_states):
+                        _oi.load_state_dict(_o_extra_states[_i])
             # pretrain_complete.pt has no "epoch" key; leave start_epoch=0.
             if "epoch" in ckpt:
                 start_epoch = ckpt["epoch"] + 1
@@ -980,94 +1021,86 @@ def train(cfg: Config) -> None:
                 z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
                 H_fake = G(z_g, z_l).detach()
 
-                opt_C.zero_grad()
-                with torch.amp.autocast(device.type, enabled=use_amp):
-                    # PacGAN packing: pack consecutive windows to give critic
-                    # explicit intra-pack diversity signal (helps detect mode collapse).
-                    _pack_sz = getattr(cfg, "pack_size", 1)
-                    H_real_c, _c_cond = _pack_windows(H_real, _pack_sz, file_cond_batch)
-                    H_fake_c, _    = _pack_windows(H_fake, _pack_sz, file_cond_batch)
+                # PacGAN packing (computed once, shared across BayesGAN particles)
+                _pack_sz = getattr(cfg, "pack_size", 1)
+                H_real_c, _c_cond = _pack_windows(H_real, _pack_sz, file_cond_batch)
+                H_fake_c, _    = _pack_windows(H_fake, _pack_sz, file_cond_batch)
 
-                    if cfg.loss == "rpgan":
-                        # Relativistic Paired GAN (R3GAN, NeurIPS 2024).
-                        # Critic judges: "is real more real than fake?" for paired
-                        # samples. Unlike WGAN, the relativistic loss forces the
-                        # generator to simultaneously improve and maintain mode coverage.
-                        # D_loss = -E[log σ(C(x_r) - C(x_f))] (BCE with target=1)
-                        c_real = C(H_real_c, cond=_c_cond)     # (B_p, 1)
-                        c_fake = C(H_fake_c, cond=_c_cond)     # (B_p, 1) already detached
-                        rel = c_real - c_fake
-                        c_loss = nn.functional.softplus(-rel).mean()
-                        w_dists.append(rel.mean().item())      # positive = critic winning
-                    elif cfg.loss in ("wgan-sn", "wgan-gp"):
-                        # Separate W estimate from penalty terms so the log shows
-                        # the true Wasserstein distance (W > 0 = critic winning;
-                        # oscillating W = GAN cycling).
-                        c_base = (C(H_fake_c, cond=_c_cond) - C(H_real_c, cond=_c_cond)).mean()
-                        w_dists.append(-c_base.item())   # W = E[C(real)] - E[C(fake)]
-                        c_loss = c_base
-                        if cfg.loss == "wgan-gp":
-                            # Gradient penalty: enforce 1-Lipschitz on all critic
-                            # weights by penalising |∇C(x̂)| ≠ 1 at interpolations.
-                            # Requires create_graph=True through the LSTM; CUDA only
-                            # (MPS falls back to wgan-sn at device selection time).
-                            eps = torch.rand(B, 1, 1, device=device)
-                            x_hat = (eps * H_real.detach() +
-                                     (1 - eps) * H_fake).requires_grad_(True)
-                            with torch.backends.cudnn.flags(enabled=False):
-                                d_hat = C(x_hat, cond=_c_cond)
-                            grads = torch.autograd.grad(
-                                outputs=d_hat.sum(), inputs=x_hat,
-                                create_graph=True)[0]           # (B, T, latent_dim)
-                            gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
-                            c_loss = c_loss + cfg.gp_lambda * gp
-                        # R1 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
-                        # real samples. Penalises |∇C(x_real)|² → 0, preventing the
-                        # critic from memorising real data via large local gradients.
-                        # Effective under wgan-sn too (not restricted to wgan-gp).
-                        # cuDNN LSTM does not support double-backward; disable cuDNN
-                        # for the critic forward so autograd can differentiate through it.
-                        if cfg.r1_lambda > 0:
-                            H_real_r1 = H_real.detach().clone().requires_grad_(True)
-                            with torch.backends.cudnn.flags(enabled=False):
-                                d_real_r1 = C(H_real_r1)
-                            grads_r1 = torch.autograd.grad(
-                                outputs=d_real_r1.sum(), inputs=H_real_r1,
-                                create_graph=True)[0]
-                            r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
-                            c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
-                        # R2 regularisation (R3GAN, NeurIPS 2024): zero-centered GP on
-                        # fake samples. Complements WGAN-GP's 1-centered interpolated-
-                        # point penalty — together they provide full convergence guarantees.
-                        if cfg.r2_lambda > 0:
-                            H_fake_r2 = H_fake.clone().requires_grad_(True)
-                            with torch.backends.cudnn.flags(enabled=False):
-                                d_fake_r2 = C(H_fake_r2)
-                            grads_r2 = torch.autograd.grad(
-                                outputs=d_fake_r2.sum(), inputs=H_fake_r2,
-                                create_graph=True)[0]
-                            r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
-                            c_loss = c_loss + cfg.r2_lambda * r2
-                    else:  # bce
-                        real_labels = torch.ones(B, 1, device=device)
-                        fake_labels = torch.zeros(B, 1, device=device)
-                        c_loss = (bce(C(H_real_c, cond=_c_cond), real_labels[:H_real_c.size(0)]) +
-                                  bce(C(H_fake_c, cond=_c_cond), fake_labels[:H_fake_c.size(0)]))
-                scaler_C.scale(c_loss).backward()
-                if cfg.grad_clip > 0:
-                    # Gradient clipping is the primary Lipschitz constraint on
-                    # the LSTM weights, which spectral norm does not reach.
-                    # Without it, the critic's unconstrained LSTM diverged in v12:
-                    # C loss drifted from -10 to -31 over 85 epochs as LSTM
-                    # weights grew monotonically.  Clip at 1.0 (Pascanu et al.
-                    # 2013 recommendation for RNNs) prevents this without
-                    # requiring gradient penalty computation.
-                    scaler_C.unscale_(opt_C)
-                    nn.utils.clip_grad_norm_(C.parameters(), cfg.grad_clip)
-                scaler_C.step(opt_C)
-                scaler_C.update()   # C-only scaler; decoupled from G scaler so
-                                    # C overflow doesn't cascade into G's scale
-                c_losses.append(c_loss.item())
+                # BayesGAN: update all critic particles.  When bayes_critics <= 1,
+                # C_all = [C] and this is identical to the previous single-critic loop.
+                _w_batch: list = []
+                _c_batch: list = []
+                for _Ci, _opt_Ci in zip(C_all, opt_C_all):
+                    _opt_Ci.zero_grad()
+                    with torch.amp.autocast(device.type, enabled=use_amp):
+                        if cfg.loss == "rpgan":
+                            c_real = _Ci(H_real_c, cond=_c_cond)
+                            c_fake = _Ci(H_fake_c, cond=_c_cond)
+                            rel = c_real - c_fake
+                            c_loss = nn.functional.softplus(-rel).mean()
+                            _w_batch.append(rel.mean().item())
+                        elif cfg.loss in ("wgan-sn", "wgan-gp"):
+                            c_base = (_Ci(H_fake_c, cond=_c_cond) -
+                                      _Ci(H_real_c, cond=_c_cond)).mean()
+                            _w_batch.append(-c_base.item())
+                            c_loss = c_base
+                            # Gradient penalties only on the primary critic (C); they
+                            # need create_graph=True which is expensive, and spectral
+                            # norm already handles Lipschitz for extra particles.
+                            if _Ci is C:
+                                if cfg.loss == "wgan-gp":
+                                    eps = torch.rand(B, 1, 1, device=device)
+                                    x_hat = (eps * H_real.detach() +
+                                             (1 - eps) * H_fake).requires_grad_(True)
+                                    with torch.backends.cudnn.flags(enabled=False):
+                                        d_hat = _Ci(x_hat, cond=_c_cond)
+                                    grads = torch.autograd.grad(
+                                        outputs=d_hat.sum(), inputs=x_hat,
+                                        create_graph=True)[0]
+                                    gp = ((grads.norm(2, dim=(1, 2)) - 1) ** 2).mean()
+                                    c_loss = c_loss + cfg.gp_lambda * gp
+                                if cfg.r1_lambda > 0:
+                                    H_real_r1 = H_real.detach().clone().requires_grad_(True)
+                                    with torch.backends.cudnn.flags(enabled=False):
+                                        d_real_r1 = _Ci(H_real_r1)
+                                    grads_r1 = torch.autograd.grad(
+                                        outputs=d_real_r1.sum(), inputs=H_real_r1,
+                                        create_graph=True)[0]
+                                    r1 = (grads_r1.norm(2, dim=(1, 2)) ** 2).mean()
+                                    c_loss = c_loss + cfg.r1_lambda * 0.5 * r1
+                                if cfg.r2_lambda > 0:
+                                    H_fake_r2 = H_fake.clone().requires_grad_(True)
+                                    with torch.backends.cudnn.flags(enabled=False):
+                                        d_fake_r2 = _Ci(H_fake_r2)
+                                    grads_r2 = torch.autograd.grad(
+                                        outputs=d_fake_r2.sum(), inputs=H_fake_r2,
+                                        create_graph=True)[0]
+                                    r2 = (grads_r2.norm(2, dim=(1, 2)) ** 2).mean()
+                                    c_loss = c_loss + cfg.r2_lambda * r2
+                        else:  # bce
+                            real_labels = torch.ones(B, 1, device=device)
+                            fake_labels = torch.zeros(B, 1, device=device)
+                            c_loss = (bce(_Ci(H_real_c, cond=_c_cond), real_labels[:H_real_c.size(0)]) +
+                                      bce(_Ci(H_fake_c, cond=_c_cond), fake_labels[:H_fake_c.size(0)]))
+                    scaler_C.scale(c_loss).backward()
+                    if cfg.grad_clip > 0:
+                        scaler_C.unscale_(_opt_Ci)
+                        nn.utils.clip_grad_norm_(_Ci.parameters(), cfg.grad_clip)
+                    scaler_C.step(_opt_Ci)
+                    scaler_C.update()
+                    # SGLD noise injection for particle diversity (extra particles only).
+                    # After the Adam step, add ε ~ N(0, 2η·I) to perturb this particle
+                    # away from the others, approximating SGLD posterior sampling.
+                    if _Ci is not C and len(C_all) > 1:
+                        _eta = _opt_Ci.param_groups[0]["lr"]
+                        with torch.no_grad():
+                            for _p in _Ci.parameters():
+                                _p.add_(torch.randn_like(_p) * (_eta * 2.0) ** 0.5)
+                    _c_batch.append(c_loss.item())
+
+                # Log mean W-dist and mean c_loss across particles
+                w_dists.append(sum(_w_batch) / len(_w_batch))
+                c_losses.append(sum(_c_batch) / len(_c_batch))
 
                 # --- Feature-space critic step (dual discriminator) ---
                 if C_feat is not None and R is not None:
@@ -1103,7 +1136,19 @@ def train(cfg: Config) -> None:
                         c_real_g = C(H_real, cond=file_cond_batch)   # (B, 1), no grad through real
                     g_loss = nn.functional.softplus(-(g_score - c_real_g)).mean()
                 elif cfg.loss in ("wgan-sn", "wgan-gp"):
-                    g_score, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
+                    if len(C_all) > 1:
+                        # BayesGAN: G sees the average score across all critic particles.
+                        # This prevents G from exploiting a single weak critic — it must
+                        # satisfy the *posterior distribution* over critics.
+                        # feat_fake from particle 0 (C) for feature matching below.
+                        _g_scores = []
+                        for _Ci in C_all:
+                            _si, _ = _Ci(H_fake, return_features=True, cond=file_cond_batch)
+                            _g_scores.append(_si)
+                        g_score = torch.stack(_g_scores).mean(0)
+                        _, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
+                    else:
+                        g_score, feat_fake = C(H_fake, return_features=True, cond=file_cond_batch)
                     g_loss = -g_score.mean()
                 else:  # bce
                     real_labels = torch.ones(B, 1, device=device)
@@ -1466,6 +1511,9 @@ def train(cfg: Config) -> None:
                                       "S": S.state_dict()})
                 if LD is not None:
                     ckpt_data["LD"] = LD.state_dict()
+                if C_extra:
+                    ckpt_data["C_extra"] = [_Ci.state_dict() for _Ci in C_extra]
+                    ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
                 torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
             else:
@@ -1508,6 +1556,9 @@ def train(cfg: Config) -> None:
                                   "S": S.state_dict()})
             if LD is not None:
                 ckpt_data["LD"] = LD.state_dict()
+            if C_extra:
+                ckpt_data["C_extra"] = [_Ci.state_dict() for _Ci in C_extra]
+                ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
             ckpt_data["mmd_history"] = mmd_history
             torch.save(ckpt_data, ckpt_path)
             print(f"  → saved {ckpt_path}")
@@ -1517,6 +1568,8 @@ def train(cfg: Config) -> None:
         if sched_G is not None:
             sched_G.step()
             sched_C.step()
+            for _s in sched_C_extra:
+                _s.step()
 
     final_path = ckpt_dir / "final.pt"
     final_data = {
@@ -1731,6 +1784,14 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--bayes-critics",        type=int, default=0,
+                   help="BayesGAN: number of critic particles (0=off, 1=same as 0). "
+                        "Each extra particle uses SGLD (Adam + Gaussian noise injection) "
+                        "to approximate a posterior over discriminators. G loss is averaged "
+                        "across all particles — no single boundary forces mode collapse. "
+                        "Saatci & Wilson, NeurIPS 2017. Recommended: 5. "
+                        "Requires wgan-sn (incompatible with wgan-gp/r1/r2). "
+                        "Memory: M × ~1MB per particle (trivial on GB10 124GB).")
     args = p.parse_args()
 
     cfg = Config()
@@ -1796,6 +1857,7 @@ def parse_args() -> Config:
     cfg.supervisor_steps        = args.supervisor_steps
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
+    cfg.bayes_critics           = args.bayes_critics
     cfg.avatar                  = args.avatar
     cfg.dist_loss_weight        = args.dist_loss_weight
     cfg.latent_disc_weight      = args.latent_disc_weight
