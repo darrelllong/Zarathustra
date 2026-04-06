@@ -383,8 +383,19 @@ def _sample_fake(ckpt, n_samples: int, device,
         R.load_state_dict(ckpt["R"])
         R.eval()
 
-    if cond_dim > 0 and real_windows is None:
-        raise ValueError("real_windows required when cond_dim > 0")
+    # Build conditioning pool: prefer char-file (stable per-file stats) over
+    # noisy window-level descriptors (which may fail on auto-dropped columns).
+    cond_pool = None
+    if cond_dim > 0:
+        char_file = getattr(cfg, "char_file", "")
+        if char_file:
+            from dataset import load_file_characterizations
+            char_lookup = load_file_characterizations(char_file, cond_dim)
+            if char_lookup:
+                cond_pool = torch.stack(list(char_lookup.values())).to(device)
+
+        if cond_pool is None and real_windows is None:
+            raise ValueError("real_windows required when cond_dim > 0 and no char_file")
 
     chunks = []
     with torch.no_grad():
@@ -392,11 +403,16 @@ def _sample_fake(ckpt, n_samples: int, device,
             n = min(batch_size, n_samples - start)
             noise = torch.randn(n, cfg.noise_dim, device=device)
             if cond_dim > 0:
-                # Sample real windows and compute their descriptors
-                idx = np.random.choice(len(real_windows), n, replace=True)
-                rw = torch.tensor(real_windows[idx], dtype=torch.float32,
-                                  device=device)
-                cond = compute_window_descriptors(rw)  # (n, cond_dim)
+                if cond_pool is not None:
+                    # Sample from char-file conditioning pool
+                    idx = torch.randint(0, len(cond_pool), (n,))
+                    cond = cond_pool[idx]
+                else:
+                    # Fallback: compute from real windows
+                    idx = np.random.choice(len(real_windows), n, replace=True)
+                    rw = torch.tensor(real_windows[idx], dtype=torch.float32,
+                                      device=device)
+                    cond = compute_window_descriptors(rw)
                 z_g = torch.cat([cond, noise], dim=1)
             else:
                 z_g = noise
