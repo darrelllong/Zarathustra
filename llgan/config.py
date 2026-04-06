@@ -41,6 +41,10 @@ class Config:
     trace_dir: str = ""          # directory of trace files (mutually exclusive with trace_path)
     files_per_epoch: int = 8     # files sampled per epoch
     records_per_file: int = 15_000  # records loaded from each file per epoch
+    block_sample: bool = False   # sample contiguous file blocks instead of random files per epoch;
+                                 # preserves temporal coherence for corpora with high Hurst exponent
+                                 # (alibaba H=0.98, block/random ratio=0.503). Requires sorted file
+                                 # names that reflect temporal order. (IDEAS.md idea #13)
     char_file: str = ""          # path to trace_characterizations.jsonl for precharacterized
                                  # per-file conditioning vectors; when set, replaces noisy
                                  # window-level z_global descriptors with stable full-trace stats

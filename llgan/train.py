@@ -359,7 +359,11 @@ def train(cfg: Config) -> None:
         all_files = _collect_files(cfg.trace_dir, cfg.trace_format)
         if not all_files:
             raise RuntimeError(f"No files found in {cfg.trace_dir}")
-        print(f"Trace dir: {cfg.trace_dir}  ({len(all_files)} files found)")
+        if getattr(cfg, "block_sample", False):
+            all_files.sort()  # temporal order by filename
+            print(f"Trace dir: {cfg.trace_dir}  ({len(all_files)} files found, block sampling)")
+        else:
+            print(f"Trace dir: {cfg.trace_dir}  ({len(all_files)} files found)")
 
         # Fit preprocessor on a seed set of files (held constant across training)
         n_seed = min(max(cfg.files_per_epoch, 4), len(all_files))
@@ -1033,7 +1037,12 @@ def train(cfg: Config) -> None:
         # for the model to encounter the diversity of tenant behaviours, burst regimes,
         # and access patterns without overfitting to any single file's particularities.
         if multifile:
-            epoch_files = random.sample(all_files, min(cfg.files_per_epoch, len(all_files)))
+            k = min(cfg.files_per_epoch, len(all_files))
+            if getattr(cfg, "block_sample", False):
+                start = random.randint(0, len(all_files) - k)
+                epoch_files = all_files[start:start + k]
+            else:
+                epoch_files = random.sample(all_files, k)
             train_ds, _ = _load_epoch_dataset(
                 epoch_files, cfg.trace_format, cfg.records_per_file, prep, cfg.timestep,
                 char_lookup=char_lookup,
@@ -1748,6 +1757,10 @@ def parse_args() -> Config:
                    help="Files sampled per epoch in --trace-dir mode")
     p.add_argument("--records-per-file", type=int,   default=15_000,
                    help="Records loaded from each file per epoch")
+    p.add_argument("--block-sample",     action="store_true",
+                   help="Sample contiguous file blocks instead of random files per epoch. "
+                        "Preserves temporal coherence for corpora with high Hurst exponent "
+                        "(alibaba H=0.98). Requires filenames that sort into temporal order.")
     p.add_argument("--char-file",        default="",
                    metavar="JSONL",
                    help="Path to trace_characterizations.jsonl. When set, each "
@@ -1913,6 +1926,7 @@ def parse_args() -> Config:
     cfg.n_critic         = args.n_critic
     cfg.max_records      = args.max_records
     cfg.files_per_epoch  = args.files_per_epoch
+    cfg.block_sample     = args.block_sample
     cfg.records_per_file = args.records_per_file
     cfg.char_file        = args.char_file or ""
     cfg.checkpoint_dir   = args.checkpoint_dir
