@@ -201,58 +201,92 @@ def _compute_hrc(obj_ids: np.ndarray, footprint: int,
     return hrc[:n_points]
 
 
-def _seqs_to_obj_ids(seqs: np.ndarray) -> np.ndarray:
-    """Reconstruct integer object IDs from normalised (N, T, d) windows.
+def _seqs_to_obj_ids(seqs: np.ndarray, prep=None) -> np.ndarray:
+    """Reconstruct integer object IDs from (N, T, d) windows.
 
-    The generator outputs normalised features in [-1, 1].  For HRC evaluation
-    we only need *relative* object identity (which positions revisit the same
-    object).  We reconstruct from the locality split:
-      - Column index for obj_id_reuse: 3 (after ts, obj_size, tenant)
-      - Column index for obj_id_stride: 4
-    Reuse > 0 → same object (delta=0); otherwise delta = sign(stride)*expm1(|stride|).
+    Uses the preprocessor's inverse transform to get real-scale object IDs.
+    Each window is inverse-transformed independently (obj_id base offset doesn't
+    matter for within-window LRU simulation; across windows we add large offsets
+    to prevent cross-window collisions).
 
-    The resulting cumulative IDs are quantised to integers.
+    Args:
+        seqs: (N, T, d) numpy array of windows.
+        prep: TracePreprocessor instance with scaler params (from checkpoint).
     """
-    # seqs: (N, T, d) normalised
     N, T, d = seqs.shape
-    # Flatten windows into one long stream per reconstruction
-    flat = seqs.reshape(N * T, d)
-    # Use obj_id_reuse (col 3) and obj_id_stride (col 4) if available
-    if d >= 5:
-        reuse = flat[:, 3]    # >0 means reuse
-        stride = flat[:, 4]   # signed-log delta
-        delta = np.where(reuse > 0, 0.0, np.sign(stride) * np.expm1(np.abs(stride)))
-    elif d >= 2:
-        # Fallback: use column 1 as raw obj_id delta
-        delta = flat[:, 1]
-    else:
-        return np.arange(N * T)  # degenerate: every access is unique
 
-    obj_ids = np.cumsum(delta).astype(np.int64)
-    return obj_ids
+    if prep is not None and hasattr(prep, 'inverse_transform'):
+        all_ids = []
+        for i in range(N):
+            window = seqs[i]  # (T, d)
+            try:
+                df_inv = prep.inverse_transform(window)
+                if 'obj_id' in df_inv.columns:
+                    ids = df_inv['obj_id'].values.astype(np.int64)
+                    # Offset each window by a large amount to prevent cross-window
+                    # ID collisions (simulating separate streams)
+                    all_ids.append(ids + i * 10_000_000)
+                    continue
+            except Exception:
+                pass
+            all_ids.append(np.arange(T, dtype=np.int64) + i * 10_000_000)
+        return np.concatenate(all_ids)
+
+    # Fallback without prep: each access is unique (worst case)
+    return np.arange(N * T, dtype=np.int64)
 
 
 def hrc_mae(real_seqs: np.ndarray, fake_seqs: np.ndarray,
-            n_points: int = 20) -> tuple:
+            prep=None, n_points: int = 20) -> tuple:
     """Compute HRC MAE between real and generated traces.
 
+    Simulates LRU caches per-window (T=12 timesteps per window) and averages
+    hit ratios across all windows at each cache size.  This avoids the need to
+    stitch windows into long streams while still measuring cache locality.
+
     Args:
-        real_seqs, fake_seqs: (N, T, d) normalised windows.
+        real_seqs, fake_seqs: (N, T, d) windows (normalised).
+        prep: TracePreprocessor for inverse transform (from checkpoint).
         n_points: number of cache-size sample points on the HRC.
 
     Returns:
         (mae, real_hrc, fake_hrc): scalar MAE and the two HRC arrays.
     """
-    real_ids = _seqs_to_obj_ids(real_seqs)
-    fake_ids = _seqs_to_obj_ids(fake_seqs)
+    def _per_window_hrc(seqs, prep, n_pts):
+        """Compute average LRU hit ratio curve across windows."""
+        N, T, d = seqs.shape
+        # Determine cache sizes from 1 to T (window length)
+        sizes = np.unique(np.linspace(1, T, n_pts).astype(int))
+        n_pts_actual = len(sizes)
 
-    # Use real footprint as reference for both curves
-    footprint = len(np.unique(real_ids))
-    if footprint == 0:
-        return 0.0, np.zeros(n_points), np.zeros(n_points)
+        hit_ratios = np.zeros(n_pts_actual)
+        for i in range(N):
+            window = seqs[i]  # (T, d)
+            # Get real-scale obj_ids for this window
+            if prep is not None and hasattr(prep, 'inverse_transform'):
+                try:
+                    df_inv = prep.inverse_transform(window)
+                    if 'obj_id' in df_inv.columns:
+                        ids = df_inv['obj_id'].values.astype(np.int64)
+                    else:
+                        ids = np.arange(T)
+                except Exception:
+                    ids = np.arange(T)
+            else:
+                ids = np.arange(T)
 
-    real_hrc = _compute_hrc(real_ids, footprint, n_points)
-    fake_hrc = _compute_hrc(fake_ids, footprint, n_points)
+            for j, cs in enumerate(sizes):
+                hit_ratios[j] += _lru_hit_ratio(ids, int(cs))
+        hit_ratios /= N
+
+        # Pad/truncate to n_points
+        if len(hit_ratios) < n_points:
+            hit_ratios = np.pad(hit_ratios, (0, n_points - len(hit_ratios)),
+                                constant_values=hit_ratios[-1] if len(hit_ratios) > 0 else 0)
+        return hit_ratios[:n_points]
+
+    real_hrc = _per_window_hrc(real_seqs, prep, n_points)
+    fake_hrc = _per_window_hrc(fake_seqs, prep, n_points)
 
     mae = float(np.abs(real_hrc - fake_hrc).mean())
     return mae, real_hrc, fake_hrc
@@ -516,7 +550,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     fake_reuse = _reuse_rate(fake_seqs)
 
     # HRC: cache fidelity via LRU hit ratio curve comparison
-    hrc_score, real_hrc, fake_hrc = hrc_mae(real_seqs, fake_seqs, n_points=20)
+    hrc_score, real_hrc, fake_hrc = hrc_mae(real_seqs, fake_seqs,
+                                             prep=ckpt.get("prep"),
+                                             n_points=20)
 
     print(f"\n{'─'*40}")
     print(f"  MMD²         : {mmd:.5f}")
