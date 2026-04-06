@@ -211,6 +211,8 @@ random files per epoch. Easy change in the dataloader.
 - **Structured generator factorization** — valid but overlaps with regime-first (#5); do that first
 - **BayesGAN M=2 + regime sampler** — tried in v56, G_loss stayed positive, recall stuck 0.27-0.33. BayesGAN redundant when regime sampler already provides mode coverage.
 - **Projection discriminator** — tried in v55, W-distance exploded to 38.6 in 5 epochs. Critic too powerful with workload conditioning.
+- **Deeper LSTM 2-layer (#11)** — tried in v59 (tencent) and v19 (alibaba). Both mode-collapsed: W→0, recall stuck. Deeper network finds degenerate equilibria. Needs different training strategy.
+- **Expanded conditioning cond_dim=13 (#12)** — tried in v20 (alibaba). Made things worse: recall 0.085 vs v18's 0.386 at same epoch. Extra dims add noise.
 
 ---
 
@@ -219,15 +221,17 @@ random files per epoch. Easy change in the dataloader.
 - **#1 GMM prior (--gmm-components)** — implemented, part of ATB recipe
 - **#3 Variational conditioning (--var-cond)** — implemented, part of alibaba recipe
 - **#5 Regime sampler (--n-regimes 8)** — validated: v54 reached combined=0.108★ (0.019 from ATB)
+- **#5 Regime sampler K=2 (alibaba only)** — validated: v18 reached combined=0.110★ NEW ALIBABA ATB. K=2 fails on tencent (v58).
 - **#8 Multi-scale critic (--multi-scale-critic)** — implemented
+- **#13 Block sampling (--block-sample)** — implemented, testing in v21 (alibaba) and v60 (tencent)
 
-## Execution order (updated 2026-04-05)
+## Execution order (updated 2026-04-06)
 
 1. ~~v40–v54: char-file, GMM, var_cond, regime sampler~~ (DONE)
-2. **v57 (running):** v54 remastered with clip fix — test if surviving past ep100 beats ATB
-3. **Next:** K=2 regime sampler — silhouette analysis shows K=2 is optimal (0.94 vs 0.50 at K=4+). Our K=8 may be over-partitioning. Test K=2 and K=3.
-4. **Then:** Deeper LSTM (#11) — 2-layer generator+critic, new pretrain required
-5. **Then:** Expanded conditioning (#12) — add object_unique, stride_autocorr, obj_size_std; drop 5 near-constant dims
-6. **Then:** Block sampling for alibaba (#13)
-7. **Then:** Self-diagnosing upweighting (#9)
+2. ~~v57: clip fix~~ (DONE — combined=0.108★, best single tencent run)
+3. ~~K=2 regime sampler~~ (DONE — alibaba ATB 0.110★; tencent failed)
+4. ~~Deeper LSTM (#11)~~ (FAILED — both corpora mode-collapsed)
+5. ~~Expanded conditioning (#12)~~ (FAILED — hurt recall)
+6. **v60/v21 (running):** Block sampling (#13) — testing on both corpora
+7. **Next:** Self-diagnosing upweighting (#9)
 8. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses

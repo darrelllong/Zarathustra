@@ -94,14 +94,25 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v59 — Tencent + 2-layer LSTM + K=8 regime sampler (RUNNING)
+### tencent_v60 — Tencent + block sampling + K=8 (RUNNING)
 
-**Status**: RUNNING pretrain — 2026-04-06 on vinge.
+**Status**: RUNNING adversarial — 2026-04-06. PID 1117859 on vinge.
+**Recipe**: `--block-sample` + `--n-regimes 8` + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from v57 (same architecture, block sampling is dataloader-only).
+**Hypothesis**: Tencent Hurst=0.79, block/random ratio=0.694. Less extreme than alibaba
+but still persistent. Block sampling may help by preserving temporal coherence.
+Log: ~/train_tencent_v60.log.
+
+## Post-Mortem: tencent_v59 — 2-layer LSTM + K=8 (W-COLLAPSE — KILLED ep74)
+
+**Status**: KILLED at ep74/200 — 2026-04-06.
 **Recipe**: `--num-lstm-layers 2` + `--n-regimes 8` + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: FRESH (2-layer LSTM architecture change).
-**Hypothesis**: K=2 failed on tencent (v58: recall stuck 0.20-0.25 through ep70 vs v57's 0.47 at ep60).
-Tencent's higher heterogeneity (2.006) and 23 changepoints need more regime coverage than alibaba.
-Keep K=8 (proven), add 2-layer LSTM for hierarchical temporal capacity.
+**Result**: Best combined=0.163★ at ep25 (recall=0.307). W-distance repeatedly collapsed to
+near-zero (ep28-31, ep53-56, ep66-74). Recall oscillated 0.14-0.31, never stable.
+At ep60, v57 (1-layer) had combined=0.123 — v59 was at 0.176.
+**Key insight**: 2-layer LSTM fails on BOTH corpora (alibaba_v19 also mode-collapsed). The
+deeper network finds degenerate equilibria where W→0 and generator produces low-diversity
+output. Needs different training strategy (lower lr, warmup, dropout between layers).
 Log: ~/train_tencent_v59.log.
 
 ## Post-Mortem: tencent_v58 — Tencent + K=2 regime sampler (KILLED ep70, recall stuck)
