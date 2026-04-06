@@ -115,13 +115,28 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v60 — Tencent + block sampling + K=8 (RUNNING)
+### tencent_v61 — Tencent + lower lr + block sampling + K=8 (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-06. PID 1117859 on vinge.
+**Status**: RUNNING pretrain → adversarial — 2026-04-06. PID 1139314 on vinge.
+**Recipe**: `--block-sample` + `--n-regimes 8` + lr_g=8e-5 (was 1e-4) + lr_d=4e-5 (was 5e-5)
++ w_stop=4.0 (was 3.0) + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from v57 (same architecture, reset optimizer for new lr).
+**Hypothesis**: Lower lr produced the smoothest alibaba run ever (v22). v60 had wild W oscillations
+(0.1→3.4) with standard lr. Lower lr should stabilise tencent training same as alibaba.
+Log: ~/train_tencent_v61.log.
+
+## Post-Mortem: tencent_v60 — block sampling + K=8 (KILLED ep130, combined=0.119★)
+
+**Status**: KILLED at ep130/200 — 2026-04-06.
 **Recipe**: `--block-sample` + `--n-regimes 8` + clip + auto-drop (5 cols) + n_critic=2.
 **Pretrain**: REUSED from v57 (same architecture, block sampling is dataloader-only).
-**Hypothesis**: Tencent Hurst=0.79, block/random ratio=0.694. Less extreme than alibaba
-but still persistent. Block sampling may help by preserving temporal coherence.
+**Result**: Best combined=0.119★ at ep115 (recall=0.472, MMD²=0.013). Block sampling helped
+early (beat v57's 0.108 trajectory at same epoch), but W-distance oscillated wildly (0.1→3.4).
+W near-collapsed at ep112 (W=0.099), recovered briefly for best at ep115, then degraded.
+15 epochs without improvement after ep115, recall slipping from 0.472 to 0.397.
+**Key insight**: Block sampling helps tencent (v60 best > v57 at same epoch count), but
+standard lr produces too-unstable training. The W oscillation pattern (0.1→3.4) suggests
+critic and generator are over-responsive. Lower lr (v61) should stabilize.
 Log: ~/train_tencent_v60.log.
 
 ## Post-Mortem: tencent_v59 — 2-layer LSTM + K=8 (W-COLLAPSE — KILLED ep74)
