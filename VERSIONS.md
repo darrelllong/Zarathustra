@@ -62,15 +62,24 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### alibaba_v23 — Alibaba + multi-scale critic + lower lr (RUNNING)
+### alibaba_v24 — Alibaba + self-diagnosing upweighting (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-06. PID 1168064 on vinge.
-**Recipe**: `--multi-scale-critic` + var_cond + GMM K=8 + lr_g=8e-5, lr_d=4e-5 +
-w_stop=4.0 + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: REUSED from alibaba_v22 (same architecture, multi-scale only changes C).
-**Hypothesis**: Multi-scale critic (HiFi-GAN style, 3-scale T/T÷2/T÷4) forces critic to
-discriminate at burst, envelope, and regime temporal scales simultaneously. Should improve
-DMD-GEN and AutoCorr. Combined with lower lr recipe from v22.
+**Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
+**Recipe**: v22 recipe (K=2 implicit, var_cond, GMM K=8, lower lr) + `--self-diag-temp 10.0`.
+Should be safer on alibaba than tencent since alibaba W stays naturally low.
+**Pretrain**: REUSED from alibaba_v22.
+Log: ~/train_alibaba_v24.log.
+
+## Post-Mortem: alibaba_v23 — multi-scale critic (KILLED ep60, 0.199★)
+
+**Status**: KILLED at ep60/200 — 2026-04-06.
+**Recipe**: `--multi-scale-critic` + var_cond + GMM K=8 + lr_g=8e-5, lr_d=4e-5.
+**Result**: Best combined=0.199★ at ep50 (recall=0.287, MMD²=0.056). Recall stuck 0.27–0.30
+for 30 epochs. W flat at 0.28–0.48 — multi-scale critic couldn't discriminate effectively.
+Worse than v22 (0.111) at same epoch count.
+**Key insight**: Multi-scale critic hurts alibaba. With T=12 and low reuse, the downsampled
+scales (T//2=6, T//4=3) have too few timesteps for meaningful discrimination. The critic's
+discriminative power was diluted across scales rather than concentrated.
 Log: ~/train_alibaba_v23.log.
 
 ## Post-Mortem: alibaba_v22 — lower lr + extended training (completed 200ep, 0.111★)
