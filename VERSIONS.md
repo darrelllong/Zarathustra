@@ -129,14 +129,26 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v61 — Tencent + lower lr + block sampling + K=8 (RUNNING)
+### tencent_v62 — Tencent + self-diagnosing upweighting (RUNNING)
 
-**Status**: RUNNING adversarial ep64/200 — 2026-04-06. PID 1164876 on vinge (restarted from ep60).
-**Recipe**: `--block-sample` + `--n-regimes 8` + lr_g=8e-5 (was 1e-4) + lr_d=4e-5 (was 5e-5)
-+ w_stop=4.0 (was 3.0) + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: REUSED from v57 (same architecture, reset optimizer for new lr).
-**Progress**: Best combined=0.124★ at ep60 (recall=0.465, MMD²=0.017). Smooth W (0.6–1.1),
-steadily improving. Trajectory looks promising — on track to beat ATB 0.089 if trend continues.
+**Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
+**Recipe**: v61 recipe + `--self-diag-temp 2.0` (self-diagnosing upweighting, NeurIPS 2021).
+Real samples with high critic scores (underrepresented modes) get upweighted in critic
+training and feature matching via softmax(score/temp). Should improve recall by focusing
+on modes G currently under-covers.
+**Pretrain**: REUSED from v57 (no architecture change — pure training signal change).
+Log: ~/train_tencent_v62.log.
+
+## Post-Mortem: tencent_v61 — lower lr + block sampling (KILLED ep75, 0.124★)
+
+**Status**: KILLED at ep75/200 — 2026-04-06.
+**Recipe**: `--block-sample` + `--n-regimes 8` + lr_g=8e-5 + lr_d=4e-5 + w_stop=4.0.
+**Pretrain**: REUSED from v57.
+**Result**: Best combined=0.124★ at ep60 (recall=0.465, MMD²=0.017). Training disrupted by
+accidental DataLoader worker kill at ep65. Post-restart: recall degraded from 0.465→0.314,
+combined worsened to 0.161. W-spike to 2.06 at ep71.
+**Key insight**: Lower lr produces smooth W growth (0.6–1.1 pre-crash). The 0.124★ trajectory
+was on track, but the restart disruption was unrecoverable.
 Log: ~/train_tencent_v61.log.
 
 ## Post-Mortem: tencent_v60 — block sampling + K=8 (KILLED ep130, combined=0.119★)

@@ -769,12 +769,15 @@ def train(cfg: Config) -> None:
         for k, v in G.state_dict().items():
             if k not in ema_G_state:
                 ema_G_state[k] = v.clone().to(device)
-        try:
-            opt_G.load_state_dict(pc["opt_G"])
-        except (ValueError, KeyError):
-            # G architecture changed since pretrain (e.g. cond_encoder / gmm_prior added);
-            # optimizer param groups no longer match — start fresh (harmless for Phase 3).
-            print("  opt_G state incompatible with new G architecture; using fresh optimizer.")
+        if cfg.reset_optimizer:
+            print(f"  Fresh optimizer (lr_g={cfg.lr_g:.2e}, lr_d={cfg.lr_d:.2e})")
+        else:
+            try:
+                opt_G.load_state_dict(pc["opt_G"])
+            except (ValueError, KeyError):
+                # G architecture changed since pretrain (e.g. cond_encoder / gmm_prior added);
+                # optimizer param groups no longer match — start fresh (harmless for Phase 3).
+                print("  opt_G state incompatible with new G architecture; using fresh optimizer.")
         prep = pc["prep"]
         if pc.get("val_tensor") is not None:
             val_tensor = pc["val_tensor"].to(device)
@@ -1105,8 +1108,16 @@ def train(cfg: Config) -> None:
                             c_loss = nn.functional.softplus(-rel).mean()
                             _w_batch.append(rel.mean().item())
                         elif cfg.loss in ("wgan-sn", "wgan-gp"):
-                            c_base = (_Ci(H_fake_c, cond=_c_cond) -
-                                      _Ci(H_real_c, cond=_c_cond)).mean()
+                            _c_fake_scores = _Ci(H_fake_c, cond=_c_cond)
+                            _c_real_scores = _Ci(H_real_c, cond=_c_cond)
+                            if cfg.self_diag_temp > 0:
+                                # Self-diagnosing upweighting: real samples with high
+                                # critic scores (= modes G under-covers) get more weight.
+                                _sd_w = torch.softmax(
+                                    _c_real_scores.detach() / cfg.self_diag_temp, dim=0)
+                                c_base = _c_fake_scores.mean() - (_sd_w * _c_real_scores).sum()
+                            else:
+                                c_base = (_c_fake_scores - _c_real_scores).mean()
                             _w_batch.append(-c_base.item())
                             c_loss = c_base
                             # Gradient penalties only on the primary critic (C); they
@@ -1226,9 +1237,16 @@ def train(cfg: Config) -> None:
                 # to cover all modes the critic can "see", fixing mode collapse.
                 if cfg.feature_matching_weight > 0:
                     with torch.no_grad():
-                        _, feat_real = C(H_real, return_features=True, cond=file_cond_batch)
+                        _fm_scores, feat_real = C(H_real, return_features=True, cond=file_cond_batch)
+                    if cfg.self_diag_temp > 0:
+                        # Upweight features of under-covered real samples
+                        _fm_w = torch.softmax(
+                            _fm_scores.detach() / cfg.self_diag_temp, dim=0)  # (B, 1)
+                        feat_real_avg = (_fm_w * feat_real).sum(0)
+                    else:
+                        feat_real_avg = feat_real.mean(0)
                     loss_fm = nn.functional.mse_loss(
-                        feat_fake.mean(0), feat_real.mean(0))
+                        feat_fake.mean(0), feat_real_avg)
                     g_loss = g_loss + cfg.feature_matching_weight * loss_fm
 
                 if latent_ae:
@@ -1855,6 +1873,11 @@ def parse_args() -> Config:
                    help="Dual discriminator: weight of feature-space critic C_feat in G loss "
                         "(0=off). Requires latent_dim > 0. C_feat operates on decoded features "
                         "so it penalises quality problems invisible in latent space. Try 0.5–1.0.")
+    p.add_argument("--self-diag-temp",     type=float, default=0.0,
+                   help="Self-diagnosing upweighting temperature (0=off). When > 0, real "
+                        "samples with high critic scores (underrepresented modes) are "
+                        "upweighted in critic training and feature matching via softmax. "
+                        "Try 1.0–5.0. Compatible with existing pretrain. (NeurIPS 2021)")
     p.add_argument("--r1-lambda",          type=float, default=0.0,
                    help="R1 zero-centered GP on real samples (R3GAN NeurIPS 2024; 0=off)")
     p.add_argument("--r2-lambda",          type=float, default=0.0,
@@ -1956,6 +1979,7 @@ def parse_args() -> Config:
     cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.feat_critic_weight          = args.feat_critic_weight
+    cfg.self_diag_temp              = args.self_diag_temp
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda
     cfg.dmd_ckpt_weight             = args.dmd_ckpt_weight

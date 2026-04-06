@@ -99,6 +99,13 @@ class Config:
     r1_lambda: float = 0.0            # R1: zero-centered GP on real samples (R3GAN)
     r2_lambda: float = 0.0            # R2: zero-centered GP on fake samples (R3GAN)
 
+    # Self-diagnosing upweighting (Self-Diagnosing GAN, NeurIPS 2021)
+    self_diag_temp: float = 0.0       # Temperature for critic-score softmax weighting (0 = off).
+                                      # When > 0, real samples with high critic scores (= modes G
+                                      # under-covers) get upweighted in critic training and feature
+                                      # matching. Lower temp = sharper focus on hard samples.
+                                      # Try 1.0–5.0. Compatible with existing pretrain checkpoints.
+
     # v15 data representation
     obj_size_granularity: int = 4096  # snap obj_size to this byte multiple before encoding
                                       # (0 = off; 4096 = page-aligned; matches real block traces

@@ -313,8 +313,8 @@ prove it via cache evaluation (#14).
 4. ~~Deeper LSTM (#11)~~ (FAILED — both corpora mode-collapsed)
 5. ~~Expanded conditioning (#12)~~ (FAILED — hurt recall)
 6. ~~Block sampling (#13)~~ (DONE — helps tencent, hurts alibaba)
-7. **v61/v22 (running):** Lower lr (8e-5/4e-5) — testing on both corpora
-8. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
-9. **Next:** Self-diagnosing upweighting (#9) — especially upweight high-reuse windows
+7. ~~v61/v22: Lower lr (8e-5/4e-5)~~ (DONE — v22 completed 0.111★, v61 killed at 0.124★)
+8. **v62/v23 (running):** Self-diagnosing upweighting (#9, temp=2.0) on tencent; multi-scale critic on alibaba
+9. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
 10. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
 11. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
