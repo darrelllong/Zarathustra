@@ -62,14 +62,25 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### alibaba_v19 — Alibaba + 2-layer LSTM + K=2 regime sampler (RUNNING)
+### alibaba_v20 — Alibaba + expanded conditioning (cond_dim=13) + K=2 (RUNNING)
 
 **Status**: RUNNING pretrain — 2026-04-06 on vinge.
-**Recipe**: `--num-lstm-layers 2` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: FRESH (architecture change — 2-layer LSTM incompatible with 1-layer checkpoints).
-**Hypothesis**: R analysis found 21-23 temporal changepoints and Hurst 0.79-0.98 in the training
-corpora, suggesting the single LSTM layer lacks capacity for hierarchical temporal structure.
-2-layer LSTM + K=2 (already validated) may push past alibaba_v18's 0.110★.
+**Recipe**: `--cond-dim 13` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: FRESH (cond_dim change from 10→13 incompatible with existing checkpoints).
+**Hypothesis**: R conditioning audit found 5/10 current dims near-constant for tencent, and
+3 high-signal features missing: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+Adding these to K=2 (validated) should improve recall by giving G better workload conditioning.
+Log: ~/train_alibaba_v20.log.
+
+## Post-Mortem: alibaba_v19 — 2-layer LSTM + K=2 (MODE COLLAPSE — KILLED ep39)
+
+**Status**: KILLED at ep39/150 — 2026-04-06.
+**Recipe**: `--num-lstm-layers 2` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop.
+**Result**: Best combined=0.220★ at ep10 (recall=0.180). Recall collapsed to 0.115-0.154 from
+ep15-39. G_loss persistently negative (-3.4 to -5.4) = generator overshooting without diverse
+output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
+**Key insight**: 2-layer LSTM mode-collapses on alibaba. Deeper network finds degenerate
+equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
 ### tencent_v59 — Tencent + 2-layer LSTM + K=8 regime sampler (RUNNING)
