@@ -536,11 +536,17 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     E = _load_encoder(ckpt, device)
     cfid = context_fid(real_seqs, fake_seqs, E, device) if E is not None else None
 
-    # Reuse rate: fraction of positions (t>0) whose obj_id exactly matches
-    # a prior position within the same window.  Real block I/O: ~40-50%.
+    # Reuse rate: fraction of accesses where obj_id_reuse > 0 (same object as prior).
+    # Uses the locality-split reuse column directly (col 3 for standard 5-col layout).
     def _reuse_rate(seqs: np.ndarray) -> float:
-        # seqs: (N, T, d); obj_id is column 1
-        obj = seqs[:, :, 1]          # (N, T)
+        # seqs: (N, T, d); obj_id_reuse is column 3 (after ts, obj_size, tenant)
+        d = seqs.shape[2]
+        if d >= 4:
+            # Use the explicit reuse flag (locality split)
+            reuse = seqs[:, 1:, 3]   # skip first timestep (always miss)
+            return float((reuse > 0).mean())
+        # Fallback for legacy layout: check exact column-1 matches
+        obj = seqs[:, :, 1]
         hits = 0
         for t in range(1, obj.shape[1]):
             hits += (np.abs(obj[:, :t] - obj[:, t:t+1]) < 1e-6).any(axis=1).sum()
@@ -549,7 +555,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     real_reuse = _reuse_rate(real_seqs)
     fake_reuse = _reuse_rate(fake_seqs)
 
-    # HRC: cache fidelity via LRU hit ratio curve comparison
+    # HRC: cache fidelity via LRU hit ratio curve comparison.
+    # NOTE: With T=12 windows, per-window HRC is limited.  For full cache
+    # fidelity evaluation, use generate.py → compare.py on long traces.
     hrc_score, real_hrc, fake_hrc = hrc_mae(real_seqs, fake_seqs,
                                              prep=ckpt.get("prep"),
                                              n_points=20)
