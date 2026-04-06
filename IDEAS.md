@@ -225,6 +225,86 @@ random files per epoch. Easy change in the dataloader.
 - **#8 Multi-scale critic (--multi-scale-critic)** — implemented
 - **#13 Block sampling (--block-sample)** — implemented, testing in v21 (alibaba) and v60 (tencent)
 
+### 14. HRC (Hit Ratio Curve) evaluation — cache fidelity metric
+
+**Why this is urgent:** Both 2DIO (EUROSYS '26) and DiffGen (ICA3PP '25) evaluate trace
+generators on cache behavior, not just distributional metrics. 2DIO directly benchmarks
+LLGAN and shows that low MMD² does NOT imply good HRC fidelity — their w11 trace has
+the lowest MMD² but the worst HRC match. DiffGen shows LSTM/Transformer traces match
+distributions but fail cache replay (62-66% hit ratio deviation). Reviewers will ask for this.
+
+**Implementation:**
+- Build a simple LRU/FIFO/LFU cache simulator (or use CacheSim)
+- For each generated trace, compute HRC: hit ratio vs cache size (normalized to footprint M)
+- Compare against real trace HRCs using MAE (mean absolute error)
+- Add as a post-hoc eval metric alongside MMD²/recall/DMD-GEN
+- Does NOT change training — pure evaluation addition
+
+**Expected impact:** Validates (or reveals gaps in) our model's practical utility for storage
+benchmarking. If our joint temporal modeling produces better HRCs than DiffGen's independent
+field generation, that's a strong paper argument.
+
+---
+
+### 15. Reuse rate amplification — targeted obj_id_reuse improvement
+
+**Why this matters:** Our best models produce ~0.5% reuse rate vs real traces at ~10%+.
+Both 2DIO and DiffGen identify locality-of-reference as the critical property for cache
+fidelity. Without sufficient object re-access, generated traces produce ~0% hit ratio at
+any cache size — making cache evaluation meaningless.
+
+**Possible approaches:**
+- **Loss reweighting**: Upweight the obj_id_reuse column in reconstruction loss (currently
+  treated equally with other columns). Binary cross-entropy on reuse column specifically.
+- **Conditional generation**: Condition on target reuse rate from char-file (we already have
+  reuse_ratio in cond vector). Ensure G actually responds to it.
+- **Self-diagnosing upweighting (#9)**: Identify real windows with high reuse and upweight
+  them in critic training — directly addresses the mode collapse on reuse events.
+- **Post-hoc reuse injection**: At generation time, apply a learned reuse policy on top of
+  the raw stride output — threshold small strides to force exact object revisits.
+
+**Expected impact:** Directly targets the cache fidelity gap identified by both competitor papers.
+Even small improvements (0.5% → 5%) would dramatically improve HRC fidelity.
+
+---
+
+### 16. Mixed-type output heads (validated by DiffGen)
+
+DiffGen (ICA3PP '25) validates the core insight of IDEAS.md #7: different field types need
+different generation strategies. DiffGen goes further — completely separate models per field
+type (parametric for statistical fields, Transformer for continuous, histogram+Markov for
+categorical). Their per-field specialization beats unified LSTM/Transformer/RNN on all
+three datasets.
+
+Our existing `mixed_type_recovery` flag (config.py) already implements sigmoid heads for
+binary columns. DiffGen's results suggest we should:
+- Ensure binary columns (opcode, obj_id_reuse) use sigmoid → BCE loss, not tanh → MSE
+- Consider Markov transition modeling for opcode sequences (not relevant for tencent/alibaba
+  where opcode is always write, but matters for multi-opcode traces like RocksDB/Systor)
+- The key advantage we have over DiffGen: our LSTM generates all fields jointly, preserving
+  cross-field temporal correlations that DiffGen completely ignores
+
+---
+
+## Competitive landscape (updated 2026-04-06)
+
+**2DIO** (Wang, Khor, Desnoyers — EUROSYS '26): Parametric (non-ML) cache-accurate trace
+generator. Strength: perfect HRC reproduction via IRD modeling. Weakness: no learning,
+requires manual parameter fitting per trace, can't capture complex multi-field correlations.
+Directly benchmarks LLGAN and finds it lacking on HRC fidelity (but uses weak reimplementation:
+BCE loss, hidden=100-126, 30 epochs, [LBA, Length] only).
+
+**DiffGen** (Liu et al. — ICA3PP '25): Classify-then-generate framework. Strength: per-field
+specialization beats one-model-fits-all. Weakness: generates fields independently — no
+cross-field temporal correlations. Uses Baleen/RocksDB/Systor (not tencent/alibaba).
+Cites LLGAN [Zhang et al. NAS 2024] as related work.
+
+**Our advantage:** Joint temporal modeling of all fields simultaneously via LSTM with
+workload conditioning. Neither competitor captures cross-field dynamics. But we must
+prove it via cache evaluation (#14).
+
+---
+
 ## Execution order (updated 2026-04-06)
 
 1. ~~v40–v54: char-file, GMM, var_cond, regime sampler~~ (DONE)
@@ -232,6 +312,9 @@ random files per epoch. Easy change in the dataloader.
 3. ~~K=2 regime sampler~~ (DONE — alibaba ATB 0.110★; tencent failed)
 4. ~~Deeper LSTM (#11)~~ (FAILED — both corpora mode-collapsed)
 5. ~~Expanded conditioning (#12)~~ (FAILED — hurt recall)
-6. **v60/v21 (running):** Block sampling (#13) — testing on both corpora
-7. **Next:** Self-diagnosing upweighting (#9)
-8. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
+6. ~~Block sampling (#13)~~ (DONE — helps tencent, hurts alibaba)
+7. **v61/v22 (running):** Lower lr (8e-5/4e-5) — testing on both corpora
+8. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
+9. **Next:** Self-diagnosing upweighting (#9) — especially upweight high-reuse windows
+10. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
+11. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
