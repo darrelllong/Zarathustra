@@ -62,14 +62,25 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### alibaba_v20 — Alibaba + expanded conditioning (cond_dim=13) + K=2 (RUNNING)
+### alibaba_v21 — Alibaba + block sampling + K=2 (RUNNING)
 
-**Status**: RUNNING pretrain — 2026-04-06 on vinge.
-**Recipe**: `--cond-dim 13` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: FRESH (cond_dim change from 10→13 incompatible with existing checkpoints).
-**Hypothesis**: R conditioning audit found 5/10 current dims near-constant for tencent, and
-3 high-signal features missing: object_unique, signed_stride_lag1_autocorr, obj_size_std.
-Adding these to K=2 (validated) should improve recall by giving G better workload conditioning.
+**Status**: RUNNING adversarial — 2026-04-06. PID 1114371 on vinge.
+**Recipe**: `--block-sample` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from alibaba_v18 (same architecture, block sampling is dataloader-only change).
+**Hypothesis**: alibaba Hurst=0.98 — consecutive files are near-perfectly correlated. Random
+sampling destroys temporal structure (block/random ratio=0.503). Block sampling gives the
+generator batches with realistic within-batch diversity.
+Log: ~/train_alibaba_v21.log.
+
+## Post-Mortem: alibaba_v20 — expanded conditioning cond_dim=13 (FAILING — KILLED ep15)
+
+**Status**: KILLED at ep15/150 — 2026-04-06.
+**Recipe**: `--cond-dim 13` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop.
+**Result**: Best combined=0.276★ at ep5 (recall=0.151). Recall dropped to 0.085 at ep15 and
+still falling. MMD² extremely high (0.12). v18 (cond_dim=10) had recall=0.386 at ep5.
+**Key insight**: Expanded conditioning hurts. The 3 extra dims add noise that overwhelms the
+model early. May need progressive feature introduction or pre-normalization. Not worth
+pursuing before other ideas.
 Log: ~/train_alibaba_v20.log.
 
 ## Post-Mortem: alibaba_v19 — 2-layer LSTM + K=2 (MODE COLLAPSE — KILLED ep39)
