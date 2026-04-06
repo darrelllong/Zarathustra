@@ -62,32 +62,46 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### v55 — Tencent + regime sampler + projection discriminator + auto-drop (RUNNING)
+### v56 — Tencent + BayesGAN M=2 + regime sampler + clip fix (RUNNING)
 
-**Status**: RUNNING pretrain — 2026-04-05. PID 938038 on vinge.
-**Recipe**: v54 recipe + `--proj-critic` + auto-drop fix (5 cols). Fresh pretrain (architecture changed).
-**Changes from v54**: (1) `--proj-critic` — critic now conditions on char-file workload descriptors
-via projection discriminator (Miyato & Koyama, ICLR 2018). Scores "realistic for THIS workload type?"
-instead of "realistic in general?". (2) Auto-drop fix: 5 columns (opcode dropped). (3) Fresh pretrain.
-**Hypothesis**: v54 reached combined=0.108★ (0.019 from ATB) but collapsed at ep100 with G_loss going
-positive. The projection discriminator gives the critic workload-type awareness, providing sharper
-gradients that should stabilize training and push recall higher. This was Idea #10 from IDEAS.md,
-previously blocked until char-file training reached 100+ epochs — now unblocked by v54's 112 epochs.
-Log: ~/train_tencent_v55.log.
+**Status**: RUNNING pretrain — 2026-04-05. PID 982942 on vinge.
+**Recipe**: v54 recipe + `--bayes-critics 2` + clip fix + auto-drop (5 cols). NO proj_critic.
+**Changes from v54**: (1) BayesGAN M=2: posterior over 2 critic particles with SGLD noise injection.
+Generator sees average gradient across particles — no single critic boundary can force mode collapse.
+(2) Clip fix: normalized values clamped to [-1, 1] to prevent poison-point destabilization.
+(3) Auto-drop: 5 columns (opcode dropped).
+**Hypothesis**: v54 reached 0.108★ but collapsed at ep100 from poison points (now fixed by clip).
+BayesGAN M=2 gave the highest early recall ever (0.426 at ep5 in v51) but MMD² was too high.
+That was before the regime sampler. Combining BayesGAN's anti-collapse properties with the
+regime sampler's structural mode coverage + clip fix could push past ATB.
+Log: ~/train_tencent_v56.log.
 
-### alibaba_v16 — Alibaba + regime sampler + auto-drop fix (RUNNING)
+### alibaba_v16 — Alibaba + regime sampler + auto-drop + clip fix (RUNNING)
 
-### alibaba_v16 — Alibaba + regime sampler + auto-drop fix (RUNNING)
-
-**Status**: RUNNING pretrain — 2026-04-05. PID 924358 on vinge.
+**Status**: RUNNING adversarial ep6 — 2026-04-05. PID 948197 on vinge.
 **Recipe**: var_cond + GMM K=8 + `--n-regimes 8` + `--cond-drop-prob 0.25` + `--w-stop-threshold 3.0` +
-n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses.
+n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses + clip fix.
 **Pretrain**: FRESH (required — architecture changed from 6→5 columns with auto-drop fix).
 **Changes from v15**: (1) auto-drop fix removes constant opcode column (5 cols instead of 6),
-(2) n_critic=2 (was 1 in v15 — matching v54's successful config).
+(2) n_critic=2 (was 1 in v15 — matching v54's successful config), (3) clip fix.
+ep5: recall=0.288, combined=0.203★. W≈0.2, G_loss positive but decreasing — healthy early trajectory.
 **Hypothesis**: Same regime sampler as v15 but with clean 5-col architecture. The model no longer
 wastes capacity on a degenerate opcode column filled with misinterpreted sentinel values.
 Log: ~/train_alibaba_v16.log.
+
+---
+
+## Post-Mortem: v55 — Tencent + proj_critic (W-SPIKE KILLED ep5, 2026-04-05)
+
+**Best**: ep5 recall=0.386, combined=0.166★.
+**Why killed**: W-distance exploded: 1.26→2.45→11.55→18.32→**38.62** in 5 epochs (normal: 0.5–2.0).
+W-spike guard auto-stopped. The projection discriminator made the critic too powerful — conditioning
+on workload type gave it a trivial discriminator signal. G_loss reached -227.
+**Key lesson**: `--proj-critic` cannot be used with the current architecture. The critic gets
+workload-type information via projection while the generator uses regime sampling — the asymmetry
+makes discrimination trivially easy. Would need generator-side parity (e.g. the generator also
+receiving the projected conditioning) or a much weaker critic (lower lr_d, fewer n_critic steps).
+**Disposition**: Idea #10 shelved. Moving to BayesGAN (v56).
 
 ---
 
