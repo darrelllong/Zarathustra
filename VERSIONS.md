@@ -157,6 +157,17 @@ combats mode collapse on reuse events.
 **Pretrain**: REUSED from alibaba_v22.
 Log: ~/train_alibaba_v27.log.
 
+## Post-Mortem: alibaba_v25 — higher var_cond_kl 0.01 (W-STOP ep151, 0.120★)
+
+**Status**: STOPPED by W-spike guard at ep151/200 — 2026-04-06.
+**Recipe**: v22 ATB recipe + `--var-cond-kl-weight 0.01` (10× default) + GMM 8 (no regime).
+**Result**: Best combined=**0.120★** at ep45 (recall=**0.513** — highest ever on alibaba,
+MMD²=0.023). Sustained at 0.13–0.15 for ~80 epochs, then W climbed to 4.02 triggering guard.
+**Key insight**: Higher KL gives huge early recall (0.513 unprecedented) but cannot stabilize.
+Did not beat ATB 0.110. The recall ceiling is reachable but conditioning noise makes
+end-state convergence impossible. Future: try with lower var_cond_kl + recall annealing.
+Log: ~/train_alibaba_v25.log.
+
 ## Post-Mortem: alibaba_v26 — continuity loss (KILLED ep34, 0.198★)
 
 **Status**: KILLED at ep34/200 — 2026-04-06.
