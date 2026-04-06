@@ -62,6 +62,16 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
+### alibaba_v19 — Alibaba + 2-layer LSTM + K=2 regime sampler (RUNNING)
+
+**Status**: RUNNING pretrain — 2026-04-06 on vinge.
+**Recipe**: `--num-lstm-layers 2` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: FRESH (architecture change — 2-layer LSTM incompatible with 1-layer checkpoints).
+**Hypothesis**: R analysis found 21-23 temporal changepoints and Hurst 0.79-0.98 in the training
+corpora, suggesting the single LSTM layer lacks capacity for hierarchical temporal structure.
+2-layer LSTM + K=2 (already validated) may push past alibaba_v18's 0.110★.
+Log: ~/train_alibaba_v19.log.
+
 ### tencent_v58 — Tencent + K=2 regime sampler (RUNNING)
 
 **Status**: RUNNING adversarial — 2026-04-05. PID 1063095 on vinge.
