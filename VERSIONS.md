@@ -73,13 +73,23 @@ The clip fix prevents that collapse. If the regime sampler can reproduce v54's t
 survive past ep100, this beats ATB.
 Log: ~/train_tencent_v57.log.
 
-### alibaba_v17 — Alibaba + regime sampler + clip fix, new seed (RUNNING)
+### alibaba_v18 — Alibaba + K=2 regime sampler (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-05. PID 1031186 on vinge.
+**Status**: RUNNING adversarial — 2026-04-05. PID 1050979 on vinge.
+**Recipe**: var_cond + GMM K=8 + `--n-regimes 2` + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from alibaba_v16 (compatible architecture, K doesn't affect pretrain).
+**Hypothesis**: Silhouette analysis shows K=2 is optimal (0.94 vs 0.50 at K=8). K=8 may be
+over-partitioning the data. K=2 should give cleaner regime separation.
+Log: ~/train_alibaba_v18.log.
+
+### alibaba_v17 — Alibaba + regime sampler + clip fix, new seed (BAD SEED — KILLED ep37)
+
+**Status**: BAD SEED — killed at ep37 — 2026-04-05.
 **Recipe**: Same as v16. Regime sampler K=8 + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: REUSED from alibaba_v16 (saved 1.5 hours).
-**Hypothesis**: v16 reached 0.157★ (best alibaba since v5) then W-spike killed it at ep112.
-Different random seed may avoid the W-spike trajectory. Clip fix is in place.
+**Pretrain**: REUSED from alibaba_v16.
+**Result**: Recall stuck 0.115–0.130 from ep15–ep37 (v16 had recall=0.312 at same epoch). Best
+combined=0.233 at ep15. G_loss went negative (-3.27) at ep36 without recall improvement — classic
+bad seed. Generator found an adversarial equilibrium that satisfies the critic without diverse output.
 Log: ~/train_alibaba_v17.log.
 
 ### alibaba_v16 — Alibaba + regime sampler + auto-drop + clip fix (W-SPIKE KILLED ep112)

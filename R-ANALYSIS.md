@@ -2,432 +2,757 @@
 
 ## Scope
 
-This document describes exactly what the R-based characterization pipeline did.
+This document describes the math used by the R characterization pipeline.
 
 Important boundary:
 
-- Raw trace decoding was not done in R.
-- Raw trace decoding and first-pass per-file profiling were done in Python in [parsers/core.py](/Users/darrell/Zarathustra/parsers/core.py).
-- R consumed the normalized per-file characterization JSONL produced from that parser layer and then performed family-level statistical analysis, clustering, regime detection, outlier scoring, and report generation.
+- R did not decode raw traces.
+- Python decoded raw traces, computed per-file profiles, and wrote normalized JSONL.
+- R consumed those normalized per-file profiles and did family-level statistics, multivariate analysis, regime analysis, outlier analysis, and report generation.
 
-The main R entrypoints are:
+Main entrypoints:
 
-- [R-scripts/extract_family_features.R](/Users/darrell/Zarathustra/R-scripts/extract_family_features.R)
-- [R-scripts/analyze_family.R](/Users/darrell/Zarathustra/R-scripts/analyze_family.R)
-- [R-scripts/render_family_report.R](/Users/darrell/Zarathustra/R-scripts/render_family_report.R)
-- [R-scripts/run_corpus_analysis.R](/Users/darrell/Zarathustra/R-scripts/run_corpus_analysis.R)
+- [extract_family_features.R](/Users/darrell/Zarathustra/R-scripts/extract_family_features.R)
+- [analyze_family.R](/Users/darrell/Zarathustra/R-scripts/analyze_family.R)
+- [render_family_report.R](/Users/darrell/Zarathustra/R-scripts/render_family_report.R)
+- [run_corpus_analysis.R](/Users/darrell/Zarathustra/R-scripts/run_corpus_analysis.R)
 
 ## Data Flow
 
-1. Python produced normalized per-file rows in:
-   `trace_characterizations.normalized.jsonl`
-2. R flattened each per-file JSON profile into a rectangular feature table.
-3. R grouped rows by `logical_family_id = paste(dataset, family, sep = "__")`.
-4. R ran family-level analysis on each group's `features.csv`.
-5. R wrote:
-   - `analysis.json`
-   - `metric_summary.csv`
-   - optional `cluster_assignments.csv`
-   - optional `kmeans_diagnostics.csv`
-   - optional `top_correlations.csv`
-   - optional `outliers.csv`
-   - optional `outlier_decomposition.csv`
-   - optional `outlier_sensitivity.csv`
-   - optional `regime_segments.csv`
-   - optional `regime_transitions.csv`
-   - optional `conditioning_redundancy.csv`
-   - optional `conditioning_candidates.csv`
-   - family Markdown report
+1. Python wrote normalized per-file rows into `trace_characterizations.normalized.jsonl`.
+2. R flattened each JSON row into one tabular row of scalar features.
+3. R grouped rows by
+   \( \text{logical\_family\_id} = \text{"dataset\_\_family"} \),
+   where the string is formed by concatenating `dataset`, `"__"`, and `family`.
+4. R ran one family-level analysis per group.
+5. R wrote `analysis.json`, `metric_summary.csv`, optional diagnostics CSVs, and one Markdown report per family.
 
-## What R Read From Python
+## Notation
 
-R did not re-open trace binaries. It used parser-derived scalar summaries such as:
+For a family with \( n \) files and \( p \) numeric features:
 
-- request-sequence fields:
-  `ts_duration`, `sample_record_rate`, `iat_zero_ratio`, `iat_lag1_autocorr`, `burstiness_cv`, `iat_*`, `obj_size_*`, `write_ratio`, `opcode_switch_ratio`, `reuse_ratio`, `forward_seek_ratio`, `backward_seek_ratio`, `signed_stride_lag1_autocorr`, `abs_stride_*`, `tenant_*`, `object_*`, `response_time_*`, `lcs_version`, `ttl_present`
-- aggregate time-series fields:
-  `sampling_interval_*`, `read_iops_*`, `write_iops_*`, `total_iops_*`, `read_bw_*`, `write_bw_*`, `total_bw_*`, `disk_usage_*`, `idle_ratio`, `write_share_iops_mean`, `total_iops_lag1_autocorr`, `disk_usage_lag1_autocorr`
-- structured-table fields:
-  `schema_column_count`, `schema_numeric_cols`, `schema_mixed_cols`, `schema_high_cardinality_cols`, `first_numeric_monotone_ratio`, `first_numeric_diff_*`
+- \( x_{ij} \) is feature \( j \) for file \( i \)
+- \( x_{\cdot j} \) is the vector of all finite values for feature \( j \)
+- \( m_j \) is the number of finite observations for feature \( j \)
+- \( \widetilde{x}_j \) is the sample median of feature \( j \)
+- \( s_j \) is the sample standard deviation of feature \( j \)
 
-Those values were flattened in [R-scripts/extract_family_features.R](/Users/darrell/Zarathustra/R-scripts/extract_family_features.R).
+When a feature is only partially present, R computes the statistic on the finite subset.
 
-## Parser-Side Math Feeding R
+## Parser-Side Math Passed Into R
 
-These formulas were computed in Python and then passed into R.
+These formulas were computed in Python before R ever saw the data.
 
-For request-sequence traces:
+### Request-Sequence Profiles
 
-- inter-arrival times:
-  `iat_i = max(0, ts_i - ts_{i-1})`
-- duration:
-  `ts_duration = ts_last - ts_first`
-- sample record rate:
-  `sample_record_rate = n / ts_duration` if `ts_duration > 0`
-- zero inter-arrival ratio:
-  `iat_zero_ratio = count(iat_i = 0) / len(iat)`
-- burstiness coefficient of variation:
-  `burstiness_cv = sd(iat) / mean(iat)` when `mean(iat) != 0`
-- write ratio:
-  `write_ratio = count(op < 0) / len(op)`
-- opcode switch ratio:
-  `opcode_switch_ratio = count(op_i != op_{i-1}) / (n - 1)`
-- object-id deltas:
-  `delta_i = obj_id_i - obj_id_{i-1}`
-- reuse ratio:
-  `reuse_ratio = count(delta_i = 0) / len(delta)`
-- forward seek ratio:
-  `forward_seek_ratio = count(delta_i > 0) / len(delta)`
-- backward seek ratio:
-  `backward_seek_ratio = count(delta_i < 0) / len(delta)`
-- lag-1 autocorrelation:
-  `corr(x_t, x_{t-1})` using the usual Pearson numerator and denominator
+Given timestamps \( t_1, \dots, t_n \), opcodes \( o_1, \dots, o_n \), object ids \( u_1, \dots, u_n \), and object sizes \( b_1, \dots, b_n \):
 
-For aggregate time-series traces:
+Inter-arrival times:
 
-- sampling intervals:
-  `dt_i = max(0, ts_i - ts_{i-1})`
-- total IOPS:
-  `total_iops_i = read_iops_i + write_iops_i`
-- idle ratio:
-  `idle_ratio = count(total_iops_i = 0) / n`
-- write IOPS share:
-  `write_share_iops_mean = sum(write_iops) / sum(total_iops)` when total is nonzero
+$$
+\mathrm{iat}_i = \max(0, t_i - t_{i-1}), \quad i = 2, \dots, n
+$$
 
-For all numeric summary blocks:
+Duration:
 
-- quantiles were linear-interpolated empirical quantiles at `q50`, `q90`, `q99`
-- standard deviation was population-style:
-  `sqrt(sum((x_i - mean(x))^2) / n)`
+$$
+\mathrm{ts\_duration} = t_n - t_1
+$$
 
-## R Feature Extraction
+Sample record rate:
 
-R's flattening step was deterministic field extraction. No estimation happened here beyond:
+$$
+\mathrm{sample\_record\_rate} =
+\begin{cases}
+\dfrac{n}{\mathrm{ts\_duration}}, & \mathrm{ts\_duration} > 0 \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
 
-- converting missing JSON paths to `NA`
-- turning booleans like `ttl_present` into `0/1`
-- counting structured-schema properties:
-  - `schema_column_count = length(columns)`
-  - `schema_numeric_cols = count(numeric_ratio >= 0.8)`
-  - `schema_mixed_cols = count(0.2 < numeric_ratio < 0.8)`
-  - `schema_high_cardinality_cols = count(token_summary.unique >= 100)`
+Zero-IAT ratio:
 
-## R Summary Statistics
+$$
+\mathrm{iat\_zero\_ratio} =
+\dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \mathrm{iat}_i = 0 \}
+$$
 
-For each family and each numeric feature, R computed the following in [R-scripts/analyze_family.R](/Users/darrell/Zarathustra/R-scripts/analyze_family.R):
+Burstiness coefficient of variation:
 
-- finite sample count:
-  `n = count(is.finite(x))`
-- missing fraction:
-  `missing_frac = mean(!is.finite(x_raw))`
-- mean:
-  `mean(x)`
-- median:
-  `median(x)`
-- MAD:
-  `mad(x, center = median(x), constant = 1)`
-- standard deviation:
-  `sd(x)` from R's sample standard deviation
-- coefficient of variation:
-  `cv = sd(x) / abs(mean(x))` when `abs(mean(x)) > 1e-12`
-- skewness:
-  `e1071::skewness(x, type = 2)` when available, else `moments::skewness(x)`
-- kurtosis:
-  `e1071::kurtosis(x, type = 2)` when available, else `moments::kurtosis(x)`
-- quantiles:
-  `q10`, `q25`, `q75`, `q90` using `stats::quantile(..., type = 7)`
-- min and max
+$$
+\mathrm{burstiness\_cv} =
+\begin{cases}
+\dfrac{\mathrm{sd}(\mathrm{iat})}{\mathrm{mean}(\mathrm{iat})}, & \mathrm{mean}(\mathrm{iat}) \neq 0 \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
 
-These were written to `metric_summary.csv`.
+Write ratio:
+
+$$
+\mathrm{write\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ o_i < 0 \}
+$$
+
+Opcode switch ratio:
+
+$$
+\mathrm{opcode\_switch\_ratio} =
+\begin{cases}
+\dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ o_i \neq o_{i-1} \}, & n \geq 2 \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
+
+Signed object-id stride:
+
+$$
+\Delta_i = u_i - u_{i-1}, \quad i = 2, \dots, n
+$$
+
+Reuse, forward-seek, and backward-seek ratios:
+
+$$
+\mathrm{reuse\_ratio} =
+\dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i = 0 \}
+$$
+
+$$
+\mathrm{forward\_seek\_ratio} =
+\dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i > 0 \}
+$$
+
+$$
+\mathrm{backward\_seek\_ratio} =
+\dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i < 0 \}
+$$
+
+Lag-1 autocorrelation for a sequence \( y_1, \dots, y_m \):
+
+$$
+\rho_1(y) =
+\dfrac{\sum_{k=2}^{m} (y_k - \overline{y})(y_{k-1} - \overline{y})}
+{\sum_{k=1}^{m} (y_k - \overline{y})^2}
+$$
+
+This was used for `iat_lag1_autocorr` and `signed_stride_lag1_autocorr` when the denominator was nonzero.
+
+Summary fields like `iat_q50`, `iat_q90`, `iat_q99`, `obj_size_q50`, and `abs_stride_q90` were empirical quantiles of those derived vectors.
+
+### Aggregate Time-Series Profiles
+
+Given timestamped samples with read IOPS \( r_i \), write IOPS \( w_i \), read bandwidth \( R_i \), write bandwidth \( W_i \), and disk usage \( d_i \):
+
+Sampling interval:
+
+$$
+\delta_i = \max(0, t_i - t_{i-1}), \quad i = 2, \dots, n
+$$
+
+Total IOPS:
+
+$$
+\mathrm{total\_iops}_i = r_i + w_i
+$$
+
+Total bandwidth:
+
+$$
+\mathrm{total\_bw}_i = R_i + W_i
+$$
+
+Idle ratio:
+
+$$
+\mathrm{idle\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ \mathrm{total\_iops}_i = 0 \}
+$$
+
+Write-share IOPS mean:
+
+$$
+\mathrm{write\_share\_iops\_mean} =
+\begin{cases}
+\dfrac{\sum_{i=1}^{n} w_i}{\sum_{i=1}^{n} (r_i + w_i)}, & \sum_{i=1}^{n} (r_i + w_i) > 0 \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
+
+### Structured-Table Profiles
+
+Given schema column summaries \( c_1, \dots, c_q \):
+
+Column count:
+
+$$
+\mathrm{schema\_column\_count} = q
+$$
+
+Numeric-column count:
+
+$$
+\mathrm{schema\_numeric\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{numeric\_ratio}(c_\ell) \geq 0.8 \}
+$$
+
+Mixed-column count:
+
+$$
+\mathrm{schema\_mixed\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ 0.2 < \mathrm{numeric\_ratio}(c_\ell) < 0.8 \}
+$$
+
+High-cardinality-column count:
+
+$$
+\mathrm{schema\_high\_cardinality\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{unique\_tokens}(c_\ell) \geq 100 \}
+$$
+
+## R Flattening
+
+`extract_family_features.R` performs deterministic field extraction only:
+
+- missing paths become `NA`
+- boolean flags become \( 0 \) or \( 1 \)
+- counts and summaries are copied into one wide row per file
+
+No estimation or learned model enters here.
+
+## Univariate Statistics Per Feature
+
+For each feature \( j \), R takes the finite subset
+
+$$
+x_{\cdot j}^{\ast} = \{ x_{ij} : x_{ij} \text{ is finite} \}
+$$
+
+and computes:
+
+Finite count:
+
+$$
+m_j = \left| x_{\cdot j}^{\ast} \right|
+$$
+
+Missing fraction:
+
+$$
+\mathrm{missing\_frac}_j =
+1 - \dfrac{m_j}{n}
+$$
+
+Mean:
+
+$$
+\overline{x}_j = \dfrac{1}{m_j} \sum_{x \in x_{\cdot j}^{\ast}} x
+$$
+
+Median:
+
+$$
+\widetilde{x}_j = \mathrm{median}(x_{\cdot j}^{\ast})
+$$
+
+Sample standard deviation:
+
+$$
+s_j =
+\sqrt{
+\dfrac{1}{m_j - 1}
+\sum_{x \in x_{\cdot j}^{\ast}} (x - \overline{x}_j)^2
+}
+$$
+
+Median absolute deviation with R's `constant = 1`:
+
+$$
+\mathrm{MAD}_j = \mathrm{median}\left( \left| x - \widetilde{x}_j \right| : x \in x_{\cdot j}^{\ast} \right)
+$$
+
+Coefficient of variation:
+
+$$
+\mathrm{CV}_j =
+\begin{cases}
+\dfrac{s_j}{\left| \overline{x}_j \right|}, & \left| \overline{x}_j \right| > 10^{-12} \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
+
+Sample skewness and kurtosis came from package implementations:
+
+- `e1071::skewness(, type = 2)` when available, else `moments::skewness`
+- `e1071::kurtosis(, type = 2)` when available, else `moments::kurtosis`
+
+### Quantiles
+
+R used `stats::quantile(, type = 7)`. For probability \( p \in (0,1) \), let the sorted sample be
+\( x_{(1)} \leq \dots \leq x_{(m)} \), and define
+
+$$
+h = (m - 1)p + 1
+$$
+
+$$
+k = \lfloor h \rfloor, \quad \gamma = h - k
+$$
+
+Then the type-7 quantile is
+
+$$
+Q(p) = (1 - \gamma) x_{(k)} + \gamma x_{(k+1)}
+$$
+
+with the obvious endpoint handling when \( h \) lands on the boundary.
+
+R computed \( Q(0.10) \), \( Q(0.25) \), \( Q(0.75) \), and \( Q(0.90) \) for the family reports, and the parser-side Python code had already supplied many \( Q(0.50) \), \( Q(0.90) \), and \( Q(0.99) \) summaries per file.
 
 ## Heterogeneity Score
 
-R defined a family-level `heterogeneity_score` as:
+For a family with valid per-feature CVs \( \mathrm{CV}_1, \dots, \mathrm{CV}_r \), R defines
 
-- compute `cv` for every numeric metric with valid data
-- clip each `cv` at `25`
-- take the median of the clipped values
+$$
+\mathrm{heterogeneity\_score} =
+\mathrm{median}\left(
+\min(\mathrm{CV}_1, 25),
+\dots,
+\min(\mathrm{CV}_r, 25)
+\right)
+$$
 
-So:
+This is a robust cross-feature dispersion summary:
 
-`heterogeneity_score = median(min(cv_j, 25))` over all finite metric CVs
+- large when many features vary strongly across files
+- small when files are similar across the available feature surface
 
-Interpretation:
+## Feature Matrix For Multivariate Analysis
 
-- higher means larger cross-file dispersion across many features
-- near zero means files within the family look very similar in the available feature space
+Starting from the wide feature table, R builds the multivariate matrix in five steps:
 
-## Feature Matrix Used For Multivariate Analysis
-
-R built a numeric feature matrix as follows:
-
-1. keep only columns listed in `numeric_columns`
-2. coerce all to numeric
-3. keep columns with at least `max(4, floor(0.5 * n_rows))` finite entries
-4. keep only complete-case rows for PCA and clustering
+1. keep only `numeric_columns`
+2. coerce every retained column to numeric
+3. keep column \( j \) only if it has at least
+   $$
+   \max(4, \lfloor 0.5 n \rfloor)
+   $$
+   finite values
+4. keep only rows that are complete across the retained columns
 5. drop zero-variance columns
 
-This means PCA and clustering ran on a stricter subset than the univariate summaries.
+So PCA and clustering operate on a stricter complete-case matrix than the univariate summaries.
 
 ## Correlation Analysis
 
-R computed:
+R computes the pairwise-complete Pearson correlation matrix
 
-`cor_mat = cor(feature_matrix, use = "pairwise.complete.obs")`
+$$
+C = \mathrm{cor}(X, \text{use} = \text{"pairwise.complete.obs"})
+$$
 
-Then it enumerated all off-diagonal pairs `(i, j)` and ranked them by:
+For each feature pair \( (a,b) \), it records
 
-`abs_correlation = abs(cor_mat[i, j])`
+$$
+\left| C_{ab} \right|
+$$
 
-The top 8 pairs were written into the report.
+and ranks pairs by that absolute correlation.
 
 ## PCA
 
-R ran:
+Let the complete-case matrix be \( X \in \mathbb{R}^{n_c \times p_c} \).
 
-`prcomp(numeric_matrix, center = TRUE, scale. = TRUE)`
+R centers and scales each column:
 
-So the PCA math was on z-scored columns:
+$$
+z_{ij} = \dfrac{x_{ij} - \mu_j}{\sigma_j}
+$$
 
-`z_ij = (x_ij - mean_j) / sd_j`
+where \( \mu_j \) and \( \sigma_j \) are the column mean and sample standard deviation on the complete-case matrix.
 
-Outputs used:
+Then `prcomp(..., center = TRUE, scale. = TRUE)` computes the singular value decomposition of the standardized matrix. Equivalently, PCA diagonalizes the sample covariance of \( Z \):
 
-- PC scores
-- rotation/loadings
-- variance explained from `summary(pca)$importance`
-- `pc1_variance = importance[2, 1]`
+$$
+\dfrac{1}{n_c - 1} Z^\top Z = V \Lambda V^\top
+$$
 
-Plots written:
+Outputs used by the reports:
 
-- `pca_scree.png`
-- `pca_scatter.png`
-- `pc_order.png`
+- principal-component scores
+  $$
+  S = ZV
+  $$
+- loadings \( V \)
+- variance explained by each component
+- `pc1_variance`, the proportion explained by PC1
 
-## Clustering
+## K-Means Diagnostics And Final Fit
 
-R ran three clustering styles where data size permitted.
+R evaluates
 
-### K-means
+$$
+k \in \{ 2, 3, \dots, \min(12, n_c - 1) \}
+$$
 
-R first ran a K sweep:
+For each \( k \), it fits k-means with `nstart = 10` and records total within-cluster sum of squares:
 
-`k in {2, ..., min(12, n_rows - 1)}`
+$$
+\mathrm{WSS}(k) =
+\sum_{g=1}^{k} \sum_{i \in C_g}
+\left\| s_i - \mu_g \right\|_2^2
+$$
 
-For each `k`, it fit:
+where \( s_i \) is the feature vector or PCA-space vector being clustered and \( \mu_g \) is cluster centroid \( g \).
 
-`kmeans(numeric_matrix, centers = k, nstart = 10)`
+If the `cluster` package is available, R also computes the average silhouette width. For file \( i \):
 
-and retained:
+$$
+a(i) = \text{mean dissimilarity from } i \text{ to its own cluster}
+$$
 
-- total within-cluster sum of squares:
-  `tot_withinss`
-- average silhouette width, when the `cluster` package was available
+$$
+b(i) = \min_{g \neq c(i)} \text{mean dissimilarity from } i \text{ to cluster } g
+$$
 
-If `n_rows > 1200`, silhouette scoring was done on a random 1200-row subset to keep the cost bounded.
+$$
+\mathrm{sil}(i) =
+\dfrac{b(i) - a(i)}{\max(a(i), b(i))}
+$$
 
-Selected `k`:
+and the reported silhouette score is
 
-- if at least one finite silhouette was available:
-  `best_k = argmax_k silhouette(k)`
-- else:
-  `best_k = 2`
+$$
+\overline{\mathrm{sil}}(k) =
+\dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathrm{sil}(i)
+$$
+
+If \( n_c > 1200 \), silhouette scoring is evaluated on a random 1200-row subset for cost control.
+
+Selected \( k \):
+
+$$
+k^\ast =
+\begin{cases}
+\arg\max_k \overline{\mathrm{sil}}(k), & \text{if any finite silhouette exists} \\
+2, & \text{otherwise}
+\end{cases}
+$$
 
 Final k-means fit:
 
-`kmeans(numeric_matrix, centers = best_k, nstart = 20)`
+$$
+\text{kmeans}(X, \text{centers} = k^\ast, \text{nstart} = 20)
+$$
 
-### Gaussian Mixture Model
+## Gaussian Mixture Model
 
-R used `mclust::Mclust` with:
+R runs `mclust::Mclust` over
 
-`G = 1:min(6, n_rows - 1)`
+$$
+G \in \{ 1, 2, \dots, \min(6, n_c - 1) \}
+$$
 
-Outputs retained:
+and keeps the model with maximum BIC.
 
-- selected component count
+For a candidate model with log-likelihood \( \ell \), \( d \) free parameters, and \( n_c \) observations, the BIC score used by `mclust` is of the form
+
+$$
+\mathrm{BIC} = 2 \ell - d \log n_c
+$$
+
+The pipeline retains:
+
+- selected component count \( G^\ast \)
 - model name
-- best BIC
-- mean uncertainty
+- maximum BIC
+- mean classification uncertainty
 
-### DBSCAN
+If posterior responsibilities are \( \tau_{ig} \), then per-file uncertainty is
 
-R set:
+$$
+u_i = 1 - \max_g \tau_{ig}
+$$
 
-- `minPts = max(4, min(20, floor(log(n_rows) * 3)))`
-- `eps = quantile(kNNdist(numeric_matrix, k = minPts), 0.90)`
+and the report stores
 
-then ran:
+$$
+\overline{u} = \dfrac{1}{n_c} \sum_{i=1}^{n_c} u_i
+$$
 
-`dbscan(numeric_matrix, eps = eps, minPts = minPts)`
+## DBSCAN
 
-Outputs retained:
+R sets
 
-- number of nonzero clusters
-- noise fraction:
-  `mean(cluster == 0)`
+$$
+\mathrm{minPts} = \max\left(4, \min\left(20, \left\lfloor 3 \log n_c \right\rfloor \right)\right)
+$$
+
+It then computes the `kNNdist` vector using \( \mathrm{minPts} \) neighbors and sets
+
+$$
+\varepsilon = Q_{0.90}(\mathrm{kNNdist})
+$$
+
+Then it runs DBSCAN with that \( \varepsilon \) and `minPts`.
+
+Reported outputs:
+
+- number of non-noise clusters
+- noise fraction
+  $$
+  \mathrm{noise\_fraction} =
+  \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathbf{1}\{ \mathrm{cluster}_i = 0 \}
+  $$
 
 ## Outlier Scoring
 
-Outliers were computed from PCA scores.
+Let \( S \) be the retained PCA-score matrix after dropping zero-variance PCs.
 
-Let `S` be the retained PCA score matrix after dropping zero-variance PCs.
+Primary outlier score:
 
-Primary score:
+$$
+d_i^2 = (s_i - \mu)^\top \Sigma^{-1} (s_i - \mu)
+$$
 
-`d_i^2 = (s_i - mu)^T Sigma^{-1} (s_i - mu)`
+where \( \mu \) is the mean PCA-score vector and \( \Sigma \) is the sample covariance of the PCA scores.
 
-using `stats::mahalanobis`.
+This is Mahalanobis distance squared.
 
-Fallback if covariance inversion failed:
+Fallback if covariance inversion fails:
 
-`outlier_score_i = sum(scale(S)_i^2)`
+$$
+\mathrm{outlier\_score}_i =
+\sum_{j=1}^{q}
+\left(
+\dfrac{s_{ij} - \overline{s}_{\cdot j}}
+\mathrm{sd}(s_{\cdot j})}
+\right)^2
+$$
 
-The top 8 files by outlier score were written to the report.
+R ranks files by descending outlier score and keeps the top 8 in the report.
 
 ## Outlier Decomposition
 
-For each numeric feature `x_j`, R computed a robust center and scale:
+For each numeric feature \( j \), R computes a robust center and scale:
 
-- `center_j = median(x_j)`
-- `scale_j = mad(x_j, center = center_j, constant = 1)`
+$$
+c_j = \mathrm{median}(x_{\cdot j})
+$$
+
+$$
+r_j = \mathrm{MAD}(x_{\cdot j})
+$$
 
 Fallbacks:
 
-- if `mad = 0` or non-finite, use `sd(x_j)`
-- if that also failed, use `1`
+$$
+r_j =
+\begin{cases}
+\mathrm{MAD}(x_{\cdot j}), & \mathrm{MAD}(x_{\cdot j}) > 10^{-9} \\
+\mathrm{sd}(x_{\cdot j}), & \mathrm{sd}(x_{\cdot j}) > 10^{-9} \\
+1, & \text{otherwise}
+\end{cases}
+$$
 
-For each reported outlier file `i`, R then computed per-feature robust z-scores:
+Then for each reported outlier file \( i \), R computes robust per-feature z-scores:
 
-`z_ij = (x_ij - center_j) / scale_j`
+$$
+z_{ij} = \dfrac{x_{ij} - c_j}{r_j}
+$$
 
-The report keeps the top contributing features ranked by:
-
-`abs(z_ij)`
-
-So the outlier explanation is no longer just "this file is far away"; it also shows which features made it extreme.
+It ranks features by \( |z_{ij}| \) and reports the top contributors.
 
 ## Outlier Sensitivity
 
-R also ran a leave-top-N-out sensitivity check using the ranked outlier list.
+For the metric set
 
-For:
+- `burstiness_cv`
+- `abs_stride_mean`
+- `obj_size_std`
+- `reuse_ratio`
+- `iat_q50`
+- `object_unique`
 
-- `N in {1, 3, 5, 10}`, when valid for the family
-- metrics in:
-  `burstiness_cv`, `abs_stride_mean`, `obj_size_std`, `reuse_ratio`, `iat_q50`, `object_unique`
+and for
 
-it computed:
+$$
+N \in \{ 1, 3, 5, 10 \}
+$$
 
-- baseline median:
-  `m_base = median(x)`
-- trimmed median after removing the top `N` outliers:
-  `m_trim = median(x without top-N outliers)`
-- relative shift:
-  `relative_shift = (m_trim - m_base) / max(abs(m_base), 1e-9)`
+when valid for the family, R removes the top \( N \) outliers and compares medians.
 
-These rows were ranked by `abs(relative_shift)` and surfaced in the report.
+Baseline median:
+
+$$
+m_j^{\mathrm{base}} = \mathrm{median}(x_{\cdot j})
+$$
+
+Trimmed median:
+
+$$
+m_{j,N}^{\mathrm{trim}} =
+\mathrm{median}(x_{\cdot j} \setminus \text{top-}N\text{ outliers})
+$$
+
+Relative shift:
+
+$$
+\mathrm{relative\_shift}_{j,N} =
+\dfrac{m_{j,N}^{\mathrm{trim}} - m_j^{\mathrm{base}}}
+\max\left( \left| m_j^{\mathrm{base}} \right|, 10^{-9} \right)}
+$$
+
+Rows are ranked by \( |\mathrm{relative\_shift}_{j,N}| \).
 
 ## Regime Detection
 
-R attempted regime detection only when:
+R attempts regime detection only when:
 
-- `ts_start` existed
-- PCA existed
-- at least 8 ordered files were available
+- `ts_start` exists
+- PCA exists
+- at least 8 ordered files exist
 
-Procedure:
+Files are ordered by
 
-1. order files by `(ts_start, rel_path)`
-2. merge ordered files with PCA scores
-3. take the ordered `PC1` series
-4. run changepoint detection:
+$$
+( \mathrm{ts\_start}, \mathrm{rel\_path} )
+$$
 
-`changepoint::cpt.meanvar(series, method = "PELT", penalty = "SIC")`
+and R takes the ordered PC1 sequence
 
-Outputs:
+$$
+y_1, y_2, \dots, y_m
+$$
 
-- `changepoint_count`
+It then runs
+
+$$
+\texttt{changepoint::cpt.meanvar}(y, \texttt{method = "PELT"}, \texttt{penalty = "SIC"})
+$$
+
+Conceptually, this chooses changepoints that minimize penalized segment cost:
+
+$$
+\sum_{r=1}^{R} \mathrm{cost}(y_{\tau_{r-1}+1:\tau_r}) + \beta R
+$$
+
+with PELT search and SIC-style penalty.
+
+R records:
+
+- changepoint count
 - changepoint indices
 
-R also computed optional `tsfeatures` on the ordered `PC1` series:
-
-- entropy
-- lumpiness
-- stability
-- hurst
-- flat_spots
+R also calls `tsfeatures::tsfeatures` on the ordered PC1 series and stores package-defined scalar summaries such as entropy, lumpiness, stability, Hurst, and flat-spots. Those are library outputs, not formulas reimplemented in this repo.
 
 ## Regime Attribution
 
-If changepoints existed, R converted them into explicit segments.
+If changepoints are
 
-Let changepoints be:
+$$
+1 \leq c_1 < c_2 < \dots < c_m < n
+$$
 
-`c_1 < c_2 < ... < c_m`
+then segments are
 
-Then the ordered files were split into segments:
-
-- segment 1: `1 .. c_1`
-- segment 2: `c_1 + 1 .. c_2`
+- segment 1: \( 1, \dots, c_1 \)
+- segment 2: \( c_1 + 1, \dots, c_2 \)
 - ...
-- segment `m + 1`: `c_m + 1 .. n`
+- segment \( m+1 \): \( c_m + 1, \dots, n \)
 
-For each segment, R stored:
+For each segment \( r \), R stores:
 
 - file count
-- min/max `ts_start`
-- `median(PC1)`
-- `sd(PC1)`
+- minimum and maximum `ts_start`
+- \( \mathrm{median}(\mathrm{PC1}) \)
+- \( \mathrm{sd}(\mathrm{PC1}) \)
 
-For each adjacent segment pair and each numeric feature `x_j`, R computed a robust effect size:
+For each adjacent segment pair \( A \) and \( B \), and each feature \( j \):
 
-- `a_j = median(x_j in left segment)`
-- `b_j = median(x_j in right segment)`
-- `s_a = mad(left_j, constant = 1)`
-- `s_b = mad(right_j, constant = 1)`
-- pooled robust scale:
-  `s_p = sqrt(mean(c(s_a^2, s_b^2)))`
+Left and right medians:
 
-Fallback:
+$$
+a_j = \mathrm{median}(x_{A,j}), \quad b_j = \mathrm{median}(x_{B,j})
+$$
 
-- if `s_p` was zero or non-finite, use the pooled variance analogue:
-  `sqrt(mean(c(var(left_j), var(right_j))))`
+Robust scales:
 
-Effect size:
+$$
+s_{A,j} = \mathrm{MAD}(x_{A,j}), \quad s_{B,j} = \mathrm{MAD}(x_{B,j})
+$$
 
-`effect_j = abs(a_j - b_j) / s_p`
+Pooled robust scale:
 
-For each transition, the top-ranked drivers by `effect_j` were written to `regime_transitions.csv` and rendered into the family report.
+$$
+s_{p,j} = \sqrt{\dfrac{s_{A,j}^2 + s_{B,j}^2}{2}}
+$$
+
+Fallback if \( s_{p,j} \) is zero or non-finite:
+
+$$
+s_{p,j} =
+\sqrt{
+\dfrac{\mathrm{var}(x_{A,j}) + \mathrm{var}(x_{B,j})}{2}
+}
+$$
+
+Transition effect size:
+
+$$
+e_j = \dfrac{|a_j - b_j|}{s_{p,j}}
+$$
+
+For each transition, features are ranked by \( e_j \), and the top drivers are written into `regime_transitions.csv` and into the family report.
 
 ## Temporal Sampling Diagnostic
 
-To test whether file order likely matters, R compared local sequential coherence against random coherence in PCA space.
+To test whether sequential blocks are more coherent than random batches, R:
 
-Procedure:
+1. orders files by `ts_start`
+2. keeps available PC coordinates among PC1, PC2, and PC3
+3. chooses
+   $$
+   \mathrm{block\_size} =
+   \max\left(4, \min\left(16, \left\lfloor \sqrt{n} \right\rfloor \right)\right)
+   $$
+4. splits the ordered series into contiguous non-overlapping blocks
+5. computes the mean pairwise Euclidean distance inside each block
+6. draws 64 random batches of the same size and computes the same statistic
 
-1. order files by `(ts_start, rel_path)`
-2. retain `PC1`, `PC2`, `PC3` where available
-3. choose:
-   `block_size = max(4, min(16, floor(sqrt(n_rows))))`
-4. split the ordered series into contiguous non-overlapping blocks
-5. for each block, compute mean within-block pairwise Euclidean distance in PCA space
-6. draw 64 random batches of the same size and compute the same mean pairwise distance
+For a block \( B \), the within-block distance summary is
 
-Summary statistics:
+$$
+D(B) =
+\dfrac{1}{|P(B)|}
+\sum_{(u,v) \in P(B)}
+\left\| s_u - s_v \right\|_2
+$$
 
-- `median_block_distance`
-- `median_random_distance`
-- `block_random_distance_ratio = median_block_distance / median_random_distance`
+where \( P(B) \) is the set of unordered pairs inside the block.
+
+R then computes
+
+$$
+\mathrm{median\_block\_distance} = \mathrm{median}(D(B_1), \dots, D(B_q))
+$$
+
+$$
+\mathrm{median\_random\_distance} = \mathrm{median}(D(R_1), \dots, D(R_{64}))
+$$
+
+$$
+\mathrm{block\_random\_distance\_ratio} =
+\dfrac{\mathrm{median\_block\_distance}}
+{\mathrm{median\_random\_distance}}
+$$
 
 Interpretation:
 
-- values well below `1` mean sequential blocks are much more internally coherent than random batches
-- those families get a block-sampling warning in the report
+- values near \( 1 \) mean ordered blocks are not much more coherent than random batches
+- values well below \( 1 \) mean temporal adjacency matters
+
+The current report emits a block-sampling warning when the ratio is below \( 0.85 \).
 
 ## Conditioning Audit
 
-R ran a conditioning-space audit against the current GAN-facing conditioning set:
+R audits the current GAN-facing conditioning set:
 
 - `write_ratio`
 - `reuse_ratio`
@@ -440,97 +765,150 @@ R ran a conditioning-space audit against the current GAN-facing conditioning set
 - `forward_seek_ratio`
 - `backward_seek_ratio`
 
-For current conditioning features, R flagged near-constant dimensions using:
+### Near-Constant Detection
 
-- `sd(x_j) <= 1e-9` or
-- `IQR(x_j) <= 1e-9`
+A current conditioning feature \( j \) is flagged as near-constant when either
 
-For redundancy, it reused the family correlation matrix and flagged pairs with:
+$$
+\mathrm{sd}(x_{\cdot j}) \leq 10^{-9}
+$$
 
-`abs(corr(x_i, x_j)) >= 0.95`
+or
 
-For candidate additions:
+$$
+\mathrm{IQR}(x_{\cdot j}) \leq 10^{-9}
+$$
+
+### Redundancy Detection
+
+Using the family correlation matrix \( C \), a pair \( (i,j) \) is flagged as highly redundant when
+
+$$
+|C_{ij}| \geq 0.95
+$$
+
+### Candidate Additions
+
+R separately evaluates:
 
 - `object_unique`
 - `signed_stride_lag1_autocorr`
 - `obj_size_std`
 
-R stored:
+For each candidate \( z \), it stores:
 
-- `sd`
-- `IQR`
-- `max_abs_corr_with_cond`
+- \( \mathrm{sd}(z) \)
+- \( \mathrm{IQR}(z) \)
+- maximum absolute correlation with the current conditioning set
+  $$
+  \max_j | \mathrm{corr}(z, x_j) |
+  $$
 
-and marked a candidate as recommended when:
+A candidate is marked recommended when
 
-- `IQR > 0`
-- and `max_abs_corr_with_cond < 0.95` or unavailable
+$$
+\mathrm{IQR}(z) > 0
+$$
+
+and
+
+$$
+\max_j | \mathrm{corr}(z, x_j) | < 0.95
+$$
+
+or when that maximum correlation is unavailable.
 
 ## Suggested GAN Modes
 
-R defined:
+R defines
 
-- `mclust_modes = components from Mclust`, if available
-- `regime_modes = changepoint_count + 1`, if available
+$$
+\mathrm{mclust\_modes} =
+\begin{cases}
+G^\ast, & \text{if Mclust succeeded} \\
+1, & \text{otherwise}
+\end{cases}
+$$
 
-Then:
+$$
+\mathrm{regime\_modes} =
+\begin{cases}
+\mathrm{changepoint\_count} + 1, & \text{if changepoints exist} \\
+1, & \text{otherwise}
+\end{cases}
+$$
 
-`suggested_modes = max(1, min(8, mclust_modes), min(8, regime_modes))`
+Then
 
-So the recommendation is intentionally capped at 8 for practicality even if changepoint counts are much larger.
+$$
+\mathrm{suggested\_modes} =
+\max\left(
+1,
+\min(8, \mathrm{mclust\_modes}),
+\min(8, \mathrm{regime\_modes})
+\right)
+$$
+
+So the recommendation is explicitly capped at \( 8 \).
 
 ## Split-By-Format Flag
 
-R set:
+R sets
 
-`split_by_format = (number of unique formats > 1) OR (number of unique parsers > 1)`
+$$
+\mathrm{split\_by\_format} =
+\mathbf{1}\{
+\# \mathrm{formats} > 1
+\text{ or }
+\# \mathrm{parsers} > 1
+\}
+$$
 
-This is a hard warning that a family likely should not be pooled naively in GAN training.
+This is a hard warning that the family should not be pooled naively.
 
-## Textual GAN Guidance
+## Rule-Based GAN Guidance
 
-The Markdown guidance bullets were rule-based, not learned.
-
-Examples:
+The report guidance bullets are deterministic rules on top of the computed statistics. Examples:
 
 - if `split_by_format = TRUE`, warn to split by encoding
-- if `heterogeneity_score > 2.5`, warn against single unconditional training
-- if mixture components >= 3, note multiple modes
+- if `heterogeneity_score > 2.5`, warn against one unconditional model
+- if Mclust finds at least 3 components, note multi-mode structure
 - if changepoints exist, note regime structure
-- if read share > 0.9, warn that opcode priors are strongly read-skewed
-- if write ratio > 0.6, emphasize write-burst preservation
-- if `reuse_ratio` is high, emphasize locality-aware losses and conditioning
-- if `burstiness_cv > 10`, emphasize inter-arrival, FFT, and ACF losses
-- if tenant diversity is high, emphasize tenant/context conditioning
-- if `block_random_distance_ratio < 0.85`, recommend block or curriculum sampling
+- if mean read share exceeds \( 0.9 \), warn that the family is strongly read-skewed
+- if mean write ratio exceeds \( 0.6 \), emphasize write-pressure preservation
+- if median `reuse_ratio` exceeds \( 0.5 \), emphasize locality-aware conditioning
+- if median `burstiness_cv` exceeds \( 10 \), emphasize burst-sensitive losses
+- if median `tenant_unique` exceeds \( 8 \), suggest tenant-aware conditioning
+- if `block_random_distance_ratio < 0.85`, suggest block or curriculum sampling
 - if the conditioning audit recommends additions, mention those candidate features
 
-## Resource Policy
+No learned classifier or optimizer chooses these text bullets.
 
-During remote execution on `vinge.local`:
+## Resource Policy On `vinge.local`
+
+During remote execution:
 
 - jobs ran under `nice -n 10`
 - jobs ran under `ionice -c3`
 - BLAS/OpenMP thread env vars were pinned to 1
-- the R orchestration script detected active `train.py` jobs and reported `worker_cap=6`
-- the heavy parser normalization was not rerun for the deep R pass; R reused the existing normalized corpus
+- if `train.py` was active, the R orchestration script set `worker_cap = 6`
+- otherwise it would have allowed `worker_cap = 12`
 
-## Outputs Produced
+The rebuttal follow-through rerun used the already-normalized corpus and wrote remote heavy output to:
 
-Repo outputs:
+- `/tiamat/zarathustra/r-output/rebuttal_pass_20260405_2033/`
+
+Repo summaries were synced back into:
 
 - [characterizations/README.md](/Users/darrell/Zarathustra/characterizations/README.md)
 - [characterizations/families.csv](/Users/darrell/Zarathustra/characterizations/families.csv)
 - [characterizations/rollup.json](/Users/darrell/Zarathustra/characterizations/rollup.json)
 - [characterizations/families](/Users/darrell/Zarathustra/characterizations/families)
 
-Remote heavy outputs:
-
-- `/tiamat/zarathustra/r-output/rebuttal_pass_20260405_2033/`
-
 ## Limitations
 
-- R did not estimate raw sequence distributions from trace binaries directly.
-- The family analysis is only as rich as the parser-derived per-file profile surface.
-- Structured-table families like parquet and text schemas currently get more schema and column-shape analysis than true request-dynamics analysis.
-- `suggested_modes` is a practical heuristic, not a proven optimal number of latent regimes.
+- R never re-opened raw binaries, so all math is downstream of the parser-derived profile surface.
+- Structured-table families still get more schema math than request-dynamics math.
+- `suggested_modes` is a heuristic, not an ablation-validated optimum.
+- `tsfeatures` metrics are package outputs; they were not reimplemented symbolically in this repo.
+- The analysis is still file-level. It informs GAN work, but it is not yet a window-level characterization of the actual training sequences.
