@@ -138,15 +138,45 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v62 — Tencent + self-diagnosing upweighting temp=10 (RUNNING)
+### tencent_v63 — Tencent + lower lr, NO block-sample (RUNNING)
 
 **Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
-**Recipe**: v61 recipe + `--self-diag-temp 10.0` (self-diagnosing upweighting, NeurIPS 2021).
-First attempt with temp=2.0 caused W-explosion (0.15→6.22 in 9 epochs, killed by w-spike
-guard). temp=10.0 produces near-uniform weights until critic scores diverge significantly,
-avoiding the positive feedback loop.
-**Pretrain**: REUSED from v57 (no architecture change — pure training signal change).
+**Recipe**: `--n-regimes 8` + lr_g=8e-5, lr_d=4e-5 + w_stop=4.0 + n_critic=2. No block-sample,
+no self-diag. Clean baseline to isolate effect of lower lr on tencent without confounders.
+**Pretrain**: REUSED from v57.
+Log: ~/train_tencent_v63.log.
+
+### alibaba_v25 — Alibaba + higher var_cond KL (0.01) (RUNNING)
+
+**Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
+**Recipe**: v22 recipe + `--var-cond-kl-weight 0.01` (10× default). Hypothesis: v31 ATB used
+noisy window-level conditioning; char-file is too clean. Higher KL weight → wider σ →
+more conditioning noise → restores the accidental soft mixture effect.
+**Pretrain**: REUSED from alibaba_v22.
+Log: ~/train_alibaba_v25.log.
+
+## Post-Mortem: tencent_v62 — self-diagnosing temp=10 (W-SPIKE GUARD ep60, 0.121★)
+
+**Status**: KILLED by w-spike guard at ep60/200 — 2026-04-06.
+**Recipe**: v61 recipe + `--self-diag-temp 10.0`. First attempt with temp=2.0 exploded in
+9 epochs. temp=10.0 lasted 60 epochs.
+**Result**: Best combined=0.121★ at ep60 (recall=0.505, MMD²=0.022). Self-diag improved recall
+(0.505 vs v61's 0.465) and beat v57 (0.108). But W grew steadily from 0.15→4.5, eventually
+triggering the 3-consecutive W>4.0 guard.
+**Key insight**: Self-diagnosing upweighting has a fundamental positive feedback loop: high
+critic scores → more weight → critic pushes scores higher → repeat. temp=10 delays but
+doesn't prevent the explosion. Deprioritized.
 Log: ~/train_tencent_v62.log.
+
+## Post-Mortem: alibaba_v24 — self-diagnosing temp=10 (W-COLLAPSE — KILLED ep37)
+
+**Status**: KILLED at ep37/200 — 2026-04-06.
+**Recipe**: v22 recipe + `--self-diag-temp 10.0`.
+**Result**: Best combined=0.171★ at ep20 (recall=0.368). W collapsed to near-zero at ep29-34
+(W=0.002–0.05), then spiked to W=3.52 at ep36. Recall dropped to 0.139. G_loss hit 9.9.
+**Key insight**: Self-diagnosing is even worse on alibaba — the low natural W means the
+softmax weights become degenerate (all weight on ~1 sample) even at temp=10. Deprioritized.
+Log: ~/train_alibaba_v24.log.
 
 ## Post-Mortem: tencent_v61 — lower lr + block sampling (KILLED ep75, 0.124★)
 

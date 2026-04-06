@@ -213,6 +213,8 @@ random files per epoch. Easy change in the dataloader.
 - **Projection discriminator** — tried in v55, W-distance exploded to 38.6 in 5 epochs. Critic too powerful with workload conditioning.
 - **Deeper LSTM 2-layer (#11)** — tried in v59 (tencent) and v19 (alibaba). Both mode-collapsed: W→0, recall stuck. Deeper network finds degenerate equilibria. Needs different training strategy.
 - **Expanded conditioning cond_dim=13 (#12)** — tried in v20 (alibaba). Made things worse: recall 0.085 vs v18's 0.386 at same epoch. Extra dims add noise.
+- **Self-diagnosing upweighting (#9)** — tried in v62 (tencent, temp=2→10) and v24 (alibaba, temp=10). Fundamental positive feedback loop: high critic scores → more weight → higher scores → W-explosion. temp=2 explodes in 9ep, temp=10 in ~60ep. Alibaba worse (W-collapses). Not worth pursuing without architectural changes to break the feedback loop.
+- **Multi-scale critic (#8) on alibaba** — tried in v23. W stuck at 0.3, recall stagnated 0.27-0.30. With T=12, downsampled scales (T//2=6, T//4=3) too short for meaningful discrimination. May work better with longer windows.
 
 ---
 
@@ -222,7 +224,7 @@ random files per epoch. Easy change in the dataloader.
 - **#3 Variational conditioning (--var-cond)** — implemented, part of alibaba recipe
 - **#5 Regime sampler (--n-regimes 8)** — validated: v54 reached combined=0.108★ (0.019 from ATB)
 - **#5 Regime sampler K=2 (alibaba only)** — validated: v18 reached combined=0.110★ NEW ALIBABA ATB. K=2 fails on tencent (v58).
-- **#8 Multi-scale critic (--multi-scale-critic)** — implemented
+- **#8 Multi-scale critic (--multi-scale-critic)** — implemented (works on tencent, hurts alibaba)
 - **#13 Block sampling (--block-sample)** — implemented, testing in v21 (alibaba) and v60 (tencent)
 
 ### 14. HRC (Hit Ratio Curve) evaluation — cache fidelity metric
@@ -314,7 +316,9 @@ prove it via cache evaluation (#14).
 5. ~~Expanded conditioning (#12)~~ (FAILED — hurt recall)
 6. ~~Block sampling (#13)~~ (DONE — helps tencent, hurts alibaba)
 7. ~~v61/v22: Lower lr (8e-5/4e-5)~~ (DONE — v22 completed 0.111★, v61 killed at 0.124★)
-8. **v62/v23 (running):** Self-diagnosing upweighting (#9, temp=2.0) on tencent; multi-scale critic on alibaba
-9. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
-10. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
-11. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
+8. ~~Self-diagnosing (#9)~~ (FAILED — positive feedback loop destabilizes both corpora)
+9. ~~Multi-scale critic (#8) on alibaba~~ (FAILED — T=12 too short for multi-scale)
+10. **v63/v25 (running):** Clean lower-lr tencent (no block-sample); alibaba with higher KL (0.01)
+11. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
+12. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
+13. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
