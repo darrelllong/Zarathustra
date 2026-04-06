@@ -62,15 +62,27 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### v57 — Tencent + regime sampler + clip fix — "v54 remastered" (RUNNING)
+### tencent_v58 — Tencent + K=2 regime sampler (RUNNING)
 
-**Status**: RUNNING pretrain — 2026-04-05. PID 1012660 on vinge.
-**Recipe**: IDENTICAL to v54 + clip fix + auto-drop (5 cols). No proj_critic, no BayesGAN.
-The cleanest test: the regime sampler recipe that reached 0.108★, with only the poison-point
-fix that should have prevented v54's ep100 collapse. Fresh pretrain (5 cols).
-**Hypothesis**: v54 reached combined=0.108★ at ep75 then collapsed from poison points at ep100.
-The clip fix prevents that collapse. If the regime sampler can reproduce v54's trajectory and
-survive past ep100, this beats ATB.
+**Status**: RUNNING adversarial — 2026-04-05. PID 1063095 on vinge.
+**Recipe**: `--n-regimes 2` + clip + auto-drop (5 cols) + n_critic=2. No var_cond/GMM (Tencent recipe).
+**Pretrain**: REUSED from v57 (stripped regime_sampler K=8→K=2 keys + cleared optimizer state).
+**Hypothesis**: R silhouette analysis shows K=2 optimal (0.94 vs 0.50 at K=8). alibaba_v18 (K=2)
+already beat alibaba ATB. If K=2 works for Tencent too, it confirms over-partitioning was a
+systemic problem.
+Log: ~/train_tencent_v58.log.
+
+## Post-Mortem: v57 — Tencent + regime sampler + clip fix (W-SPIKE ep110, combined=0.108★)
+
+**Status**: W-SPIKE GUARD killed at ep110/200 — 2026-04-05.
+**Recipe**: IDENTICAL to v54 + clip fix + auto-drop (5 cols). K=8 regime sampler, n_critic=2.
+**Result**: Best combined=0.10808★ at ep110 (recall=0.558, MMD²=0.0197). Clip fix kept it alive
+through ep110 where v54 collapsed terminally at ep100. Recall climbed steadily: 0.389→0.471→0.526→0.558.
+W-distance escalated from ep85 onward (2.8→3.5), eventually triggering the 3.0 guard for 3
+consecutive epochs. Second-best Tencent result ever (ATB co-ATB v31/v34 = 0.089).
+**Key insight**: Clip fix works — prevented terminal collapse. But W-distance still rises with
+epoch count, suggesting the critic eventually dominates. K=2 (v58) may help by reducing
+regime fragmentation pressure on the generator.
 Log: ~/train_tencent_v57.log.
 
 ### alibaba_v18 — Alibaba + K=2 regime sampler (RUNNING)
