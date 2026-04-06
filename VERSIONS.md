@@ -62,14 +62,28 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### alibaba_v22 — Alibaba + v18 recipe + lower lr + extended training (RUNNING)
+### alibaba_v23 — Alibaba + multi-scale critic + lower lr (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-06. PID 1124932 on vinge.
+**Status**: RUNNING adversarial — 2026-04-06. PID 1168064 on vinge.
+**Recipe**: `--multi-scale-critic` + var_cond + GMM K=8 + lr_g=8e-5, lr_d=4e-5 +
+w_stop=4.0 + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from alibaba_v22 (same architecture, multi-scale only changes C).
+**Hypothesis**: Multi-scale critic (HiFi-GAN style, 3-scale T/T÷2/T÷4) forces critic to
+discriminate at burst, envelope, and regime temporal scales simultaneously. Should improve
+DMD-GEN and AutoCorr. Combined with lower lr recipe from v22.
+Log: ~/train_alibaba_v23.log.
+
+## Post-Mortem: alibaba_v22 — lower lr + extended training (completed 200ep, 0.111★)
+
+**Status**: COMPLETED 200 epochs — 2026-04-06.
 **Recipe**: v18 winning recipe (K=2 + var_cond + GMM K=8) with: lr_g=8e-5 (was 1e-4),
 lr_d=4e-5 (was 5e-5), w_stop_threshold=4.0 (was 3.0), epochs=200 (was 150).
 **Pretrain**: REUSED from v18 (identical architecture).
-**Hypothesis**: v18 was killed by W-spike at ep103. Lower lr should slow W-distance growth.
-Higher threshold + more epochs give it room to keep training past ep100.
+**Result**: Best combined=0.111★ at ep195 (did NOT beat ATB 0.110). Smooth training
+throughout — no W-spikes. Lower lr eliminated the collapse seen in v18.
+**Key insight**: Lower lr prevents collapse and enables full 200-epoch training, but the
+recipe plateaus at ~0.111. Need architectural changes (multi-scale critic, etc.) to push
+further.
 Log: ~/train_alibaba_v22.log.
 
 ## Post-Mortem: alibaba_v21 — block sampling + K=2 (W-COLLAPSES — KILLED ep71)
@@ -117,12 +131,12 @@ Log: ~/train_alibaba_v19.log.
 
 ### tencent_v61 — Tencent + lower lr + block sampling + K=8 (RUNNING)
 
-**Status**: RUNNING pretrain → adversarial — 2026-04-06. PID 1139314 on vinge.
+**Status**: RUNNING adversarial ep64/200 — 2026-04-06. PID 1164876 on vinge (restarted from ep60).
 **Recipe**: `--block-sample` + `--n-regimes 8` + lr_g=8e-5 (was 1e-4) + lr_d=4e-5 (was 5e-5)
 + w_stop=4.0 (was 3.0) + clip + auto-drop (5 cols) + n_critic=2.
 **Pretrain**: REUSED from v57 (same architecture, reset optimizer for new lr).
-**Hypothesis**: Lower lr produced the smoothest alibaba run ever (v22). v60 had wild W oscillations
-(0.1→3.4) with standard lr. Lower lr should stabilise tencent training same as alibaba.
+**Progress**: Best combined=0.124★ at ep60 (recall=0.465, MMD²=0.017). Smooth W (0.6–1.1),
+steadily improving. Trajectory looks promising — on track to beat ATB 0.089 if trend continues.
 Log: ~/train_tencent_v61.log.
 
 ## Post-Mortem: tencent_v60 — block sampling + K=8 (KILLED ep130, combined=0.119★)

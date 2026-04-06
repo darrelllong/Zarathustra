@@ -659,7 +659,12 @@ def train(cfg: Config) -> None:
 
     if resume_path is not None:
         ckpt = torch.load(resume_path, map_location=device, weights_only=False)
-        G.load_state_dict(ckpt.get("G_live", ckpt["G"]))  # prefer live weights for training
+        _g_missing, _g_unexpected = G.load_state_dict(
+            ckpt.get("G_live", ckpt["G"]), strict=False)
+        if _g_missing:
+            print(f"  New G params (freshly initialised): {_g_missing}")
+        if _g_unexpected:
+            print(f"  Dropped stale G params: {_g_unexpected}")
         # Migrate critic state dict: old checkpoints store plain LSTM weight
         # keys (e.g. "lstm.weight_ih_l0"); new SN-LSTM models expect "_orig"
         # suffixed keys ("lstm.weight_ih_l0_orig").  Rename on load so old
