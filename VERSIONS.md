@@ -73,9 +73,18 @@ The clip fix prevents that collapse. If the regime sampler can reproduce v54's t
 survive past ep100, this beats ATB.
 Log: ~/train_tencent_v57.log.
 
-### alibaba_v16 — Alibaba + regime sampler + auto-drop + clip fix (RUNNING)
+### alibaba_v17 — Alibaba + regime sampler + clip fix, new seed (RUNNING)
 
-**Status**: RUNNING adversarial ep6 — 2026-04-05. PID 948197 on vinge.
+**Status**: RUNNING adversarial — 2026-04-05. PID 1031186 on vinge.
+**Recipe**: Same as v16. Regime sampler K=8 + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: REUSED from alibaba_v16 (saved 1.5 hours).
+**Hypothesis**: v16 reached 0.157★ (best alibaba since v5) then W-spike killed it at ep112.
+Different random seed may avoid the W-spike trajectory. Clip fix is in place.
+Log: ~/train_alibaba_v17.log.
+
+### alibaba_v16 — Alibaba + regime sampler + auto-drop + clip fix (W-SPIKE KILLED ep112)
+
+**Status**: W-SPIKE KILLED ep112 — 2026-04-05.
 **Recipe**: var_cond + GMM K=8 + `--n-regimes 8` + `--cond-drop-prob 0.25` + `--w-stop-threshold 3.0` +
 n_critic=2 + lr_d=5e-5 + supervisor_loss_weight=1.0 + full losses + clip fix.
 **Pretrain**: FRESH (required — architecture changed from 6→5 columns with auto-drop fix).
