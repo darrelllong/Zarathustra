@@ -225,8 +225,9 @@ random files per epoch. Easy change in the dataloader.
 
 1. ~~v40–v54: char-file, GMM, var_cond, regime sampler~~ (DONE)
 2. **v57 (running):** v54 remastered with clip fix — test if surviving past ep100 beats ATB
-3. **Next:** Deeper LSTM (#11) — 2-layer generator+critic, new pretrain required
-4. **Then:** Expanded conditioning (#12) — add object_unique, stride_autocorr, obj_size_std
-5. **Then:** Block sampling for alibaba (#13)
-6. **Then:** Self-diagnosing upweighting (#9)
-7. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
+3. **Next:** K=2 regime sampler — silhouette analysis shows K=2 is optimal (0.94 vs 0.50 at K=4+). Our K=8 may be over-partitioning. Test K=2 and K=3.
+4. **Then:** Deeper LSTM (#11) — 2-layer generator+critic, new pretrain required
+5. **Then:** Expanded conditioning (#12) — add object_unique, stride_autocorr, obj_size_std; drop 5 near-constant dims
+6. **Then:** Block sampling for alibaba (#13)
+7. **Then:** Self-diagnosing upweighting (#9)
+8. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
