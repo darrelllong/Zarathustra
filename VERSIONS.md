@@ -129,13 +129,13 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v62 — Tencent + self-diagnosing upweighting (RUNNING)
+### tencent_v62 — Tencent + self-diagnosing upweighting temp=10 (RUNNING)
 
 **Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
-**Recipe**: v61 recipe + `--self-diag-temp 2.0` (self-diagnosing upweighting, NeurIPS 2021).
-Real samples with high critic scores (underrepresented modes) get upweighted in critic
-training and feature matching via softmax(score/temp). Should improve recall by focusing
-on modes G currently under-covers.
+**Recipe**: v61 recipe + `--self-diag-temp 10.0` (self-diagnosing upweighting, NeurIPS 2021).
+First attempt with temp=2.0 caused W-explosion (0.15→6.22 in 9 epochs, killed by w-spike
+guard). temp=10.0 produces near-uniform weights until critic scores diverge significantly,
+avoiding the positive feedback loop.
 **Pretrain**: REUSED from v57 (no architecture change — pure training signal change).
 Log: ~/train_tencent_v62.log.
 
