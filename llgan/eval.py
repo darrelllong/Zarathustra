@@ -1,5 +1,5 @@
 """
-Evaluation metrics for LLGAN: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr.
+Evaluation metrics for LLGAN: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr, HRC.
 
 DMD-GEN (Abba Haddou et al., NeurIPS 2025, arXiv 2412.11292) is the first
 principled metric for temporal mode collapse in time series generative models.
@@ -146,6 +146,116 @@ def autocorr_score(
     for lag in range(1, max_lag + 1):
         total += np.abs(_acf(real_seqs, lag) - _acf(fake_seqs, lag)).mean()
     return float(total / max_lag)
+
+
+# ---------------------------------------------------------------------------
+# HRC (Hit Ratio Curve) — cache fidelity metric
+# ---------------------------------------------------------------------------
+# 2DIO (Wang et al., EUROSYS '26) and DiffGen (Liu et al., ICA3PP '25) both
+# show that distributional metrics (MMD², recall) do NOT imply cache fidelity.
+# A trace with perfect marginal distributions can produce completely wrong
+# cache behaviour if the inter-reference distance (IRD) structure is wrong.
+#
+# We simulate LRU caches at multiple sizes and compare the hit ratio curves
+# between real and generated traces.  The metric is MAE across cache sizes.
+
+from collections import OrderedDict
+
+
+def _lru_hit_ratio(obj_ids: np.ndarray, cache_size: int) -> float:
+    """Simulate an LRU cache and return the hit ratio.
+
+    obj_ids: 1-D array of integer object identifiers (quantised).
+    cache_size: number of distinct objects the cache can hold.
+    """
+    if cache_size <= 0 or len(obj_ids) == 0:
+        return 0.0
+    cache = OrderedDict()
+    hits = 0
+    for oid in obj_ids:
+        if oid in cache:
+            hits += 1
+            cache.move_to_end(oid)
+        else:
+            cache[oid] = True
+            if len(cache) > cache_size:
+                cache.popitem(last=False)
+    return hits / len(obj_ids)
+
+
+def _compute_hrc(obj_ids: np.ndarray, footprint: int,
+                 n_points: int = 20) -> np.ndarray:
+    """Compute LRU hit ratio curve at n_points cache sizes from 1% to 100% of footprint.
+
+    Returns: (n_points,) array of hit ratios.
+    """
+    if footprint <= 0:
+        return np.zeros(n_points)
+    sizes = np.unique(np.linspace(
+        max(1, footprint // 100), footprint, n_points
+    ).astype(int))
+    hrc = np.array([_lru_hit_ratio(obj_ids, int(s)) for s in sizes])
+    # Pad to n_points if fewer unique sizes
+    if len(hrc) < n_points:
+        hrc = np.pad(hrc, (0, n_points - len(hrc)), constant_values=hrc[-1])
+    return hrc[:n_points]
+
+
+def _seqs_to_obj_ids(seqs: np.ndarray) -> np.ndarray:
+    """Reconstruct integer object IDs from normalised (N, T, d) windows.
+
+    The generator outputs normalised features in [-1, 1].  For HRC evaluation
+    we only need *relative* object identity (which positions revisit the same
+    object).  We reconstruct from the locality split:
+      - Column index for obj_id_reuse: 3 (after ts, obj_size, tenant)
+      - Column index for obj_id_stride: 4
+    Reuse > 0 → same object (delta=0); otherwise delta = sign(stride)*expm1(|stride|).
+
+    The resulting cumulative IDs are quantised to integers.
+    """
+    # seqs: (N, T, d) normalised
+    N, T, d = seqs.shape
+    # Flatten windows into one long stream per reconstruction
+    flat = seqs.reshape(N * T, d)
+    # Use obj_id_reuse (col 3) and obj_id_stride (col 4) if available
+    if d >= 5:
+        reuse = flat[:, 3]    # >0 means reuse
+        stride = flat[:, 4]   # signed-log delta
+        delta = np.where(reuse > 0, 0.0, np.sign(stride) * np.expm1(np.abs(stride)))
+    elif d >= 2:
+        # Fallback: use column 1 as raw obj_id delta
+        delta = flat[:, 1]
+    else:
+        return np.arange(N * T)  # degenerate: every access is unique
+
+    obj_ids = np.cumsum(delta).astype(np.int64)
+    return obj_ids
+
+
+def hrc_mae(real_seqs: np.ndarray, fake_seqs: np.ndarray,
+            n_points: int = 20) -> tuple:
+    """Compute HRC MAE between real and generated traces.
+
+    Args:
+        real_seqs, fake_seqs: (N, T, d) normalised windows.
+        n_points: number of cache-size sample points on the HRC.
+
+    Returns:
+        (mae, real_hrc, fake_hrc): scalar MAE and the two HRC arrays.
+    """
+    real_ids = _seqs_to_obj_ids(real_seqs)
+    fake_ids = _seqs_to_obj_ids(fake_seqs)
+
+    # Use real footprint as reference for both curves
+    footprint = len(np.unique(real_ids))
+    if footprint == 0:
+        return 0.0, np.zeros(n_points), np.zeros(n_points)
+
+    real_hrc = _compute_hrc(real_ids, footprint, n_points)
+    fake_hrc = _compute_hrc(fake_ids, footprint, n_points)
+
+    mae = float(np.abs(real_hrc - fake_hrc).mean())
+    return mae, real_hrc, fake_hrc
 
 
 # prdc ships compute_prdc; fall back to a manual nearest-neighbour impl if absent
@@ -383,6 +493,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     real_reuse = _reuse_rate(real_seqs)
     fake_reuse = _reuse_rate(fake_seqs)
 
+    # HRC: cache fidelity via LRU hit ratio curve comparison
+    hrc_score, real_hrc, fake_hrc = hrc_mae(real_seqs, fake_seqs, n_points=20)
+
     print(f"\n{'─'*40}")
     print(f"  MMD²         : {mmd:.5f}")
     print(f"  α-precision  : {prdc['precision']:.4f}  (fake plausibility)")
@@ -395,6 +508,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
         print(f"  Context-FID  : {cfid:.2f}  (Fréchet in encoder latent space; <10 good)")
     print(f"  reuse rate   : real={real_reuse:.3f}  fake={fake_reuse:.3f}"
           f"  {'⚠ locality gap' if abs(real_reuse - fake_reuse) > 0.1 else ''}")
+    print(f"  HRC-MAE      : {hrc_score:.4f}  (LRU hit ratio curve MAE; 0=perfect)")
+    print(f"    real HRC   : [{', '.join(f'{v:.2f}' for v in real_hrc[::5])}]  (1%..100% footprint)")
+    print(f"    fake HRC   : [{', '.join(f'{v:.2f}' for v in fake_hrc[::5])}]")
     print(f"{'─'*40}")
 
     if baseline_path:
