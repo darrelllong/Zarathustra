@@ -17,6 +17,15 @@
 
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | forward_seek_ratio vs backward_seek_ratio (-0.999) |
 
 ## Format Breakdown
 
@@ -68,14 +77,29 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN3.csv.sort.zst | 3.999 |
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN4.csv.sort.zst | 3.698 |
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN6.csv.sort.zst | 2.256 |
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN0.csv.sort.zst | 2.067 |
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN1.csv.sort.zst | 1.557 |
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN2.csv.sort.zst | 1.423 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN3.csv.sort.zst | 3.999 | iat_std (z=497.523); burstiness_cv (z=49.26) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN4.csv.sort.zst | 3.698 | reuse_ratio (z=3.727); iat_q50 (z=2.67) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN6.csv.sort.zst | 2.256 | iat_q50 (z=-4.239); object_top10_share (z=2.803) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN0.csv.sort.zst | 2.067 | abs_stride_q50 (z=46.51); obj_size_mean (z=9.822) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN1.csv.sort.zst | 1.557 | obj_size_q99 (z=9.521); size_bytes (z=-1.309) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN2.csv.sort.zst | 1.423 | obj_size_mean (z=11.031); obj_size_q90 (z=6) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 3 | reuse_ratio | 0.001 | 0 | -1 |
+| 5 | reuse_ratio | 0.001 | 0 | -1 |
+| 5 | obj_size_std | 30237.28 | 53698.07 | 0.776 |
+| 3 | obj_size_std | 30237.28 | 50732.61 | 0.678 |
+| 5 | burstiness_cv | 2.943 | 1.307 | -0.556 |
+| 3 | burstiness_cv | 2.943 | 1.361 | -0.538 |
+| 3 | abs_stride_mean | 480827761082 | 729780372283 | 0.518 |
+| 5 | abs_stride_mean | 480827761082 | 729780372283 | 0.518 |
+| 3 | object_unique | 3371.5 | 3892 | 0.154 |
+| 5 | object_unique | 3371.5 | 3892 | 0.154 |
 
 ## Notable Files
 

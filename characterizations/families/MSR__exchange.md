@@ -18,10 +18,20 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 8 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Tenant diversity is high; tenant/context conditioning is likely useful.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | forward_seek_ratio vs backward_seek_ratio (-0.997) |
 
 ## Format Breakdown
 
@@ -33,10 +43,43 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.042 |
 | Ordered PC1 changepoints | 7 |
 | PCA variance explained by PC1 | 0.346 |
+| Hurst exponent on ordered PC1 | 0.786 |
+| Block/random distance ratio | 0.842 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 340593544697580116508672 | 0.497 |
+| 3 | 203394640854876816408576 | 0.476 |
+| 4 | 150101986367924351270912 | 0.481 |
+| 5 | 109318100474162311069696 | 0.469 |
+| 6 | 78884462175117018923008 | 0.49 |
+| 7 | 63061686007813810159616 | 0.495 |
+| 8 | 54982145782752600915968 | 0.458 |
+| 9 | 49693255828232416002048 | 0.396 |
+| 10 | 43096805986950675693568 | 0.402 |
+| 11 | 37507104160922218790912 | 0.427 |
+| 12 | 33436859146828469239808 | 0.42 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | obj_size_q90 | 11.314 | iat_q90 | 3.525 | response_time_q90 | 2.983 |
+| 2 -> 3 | response_time_q90 | 7.336 | obj_size_q90 | 5.485 | iat_q90 | 3.578 |
+| 3 -> 4 | signed_stride_lag1_autocorr | 2.822 | abs_stride_std | 1.834 | object_top1_share | 1.613 |
+| 4 -> 5 | abs_stride_q99 | 8.118 | response_time_mean | 4.686 | signed_stride_lag1_autocorr | 4.106 |
+| 5 -> 6 | obj_size_q90 | 2.145 | obj_size_std | 1.633 | abs_stride_q99 | 1.599 |
+| 6 -> 7 | iat_zero_ratio | 1.414 | iat_min | 1.414 | forward_seek_ratio | 0.857 |
+| 7 -> 8 | iat_q90 | 1.777 | tenant_top1_share | 1.597 | iat_min | 1.414 |
 
 ## Strongest Correlations
 
@@ -76,16 +119,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-46-AM.trace.csv.gz | 68.049 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-31-AM.trace.csv.gz | 28.044 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.02-37-PM.trace.csv.gz | 9.58 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.06-17-AM.trace.csv.gz | 9.481 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.08-49-AM.trace.csv.gz | 8.615 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.04-01-AM.trace.csv.gz | 6.671 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.05-02-AM.trace.csv.gz | 6.505 |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.04-47-AM.trace.csv.gz | 5.9 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-46-AM.trace.csv.gz | 68.049 | response_time_q50 (z=109.039); abs_stride_q50 (z=91.264) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-31-AM.trace.csv.gz | 28.044 | response_time_q50 (z=117.657); abs_stride_q50 (z=77.024) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.02-37-PM.trace.csv.gz | 9.58 | response_time_q99 (z=137.213); response_time_std (z=27.946) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.06-17-AM.trace.csv.gz | 9.481 | obj_size_mean (z=5.53); response_time_q90 (z=-5.419) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.08-49-AM.trace.csv.gz | 8.615 | response_time_q99 (z=19.479); response_time_q50 (z=14.549) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.04-01-AM.trace.csv.gz | 6.671 | response_time_q50 (z=81.5); abs_stride_q50 (z=27.209) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.05-02-AM.trace.csv.gz | 6.505 | response_time_q50 (z=15.902); iat_lag1_autocorr (z=11.116) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.04-47-AM.trace.csv.gz | 5.9 | response_time_q50 (z=60.569); iat_lag1_autocorr (z=12.422) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 1 | reuse_ratio | 0.003 | 0.003 | 0.048 |
+| 3 | reuse_ratio | 0.003 | 0.003 | 0.048 |
+| 5 | reuse_ratio | 0.003 | 0.003 | 0.048 |
+| 10 | reuse_ratio | 0.003 | 0.003 | 0.048 |
+| 10 | burstiness_cv | 4.495 | 4.648 | 0.034 |
+| 5 | iat_q50 | 115.5 | 117 | 0.013 |
+| 10 | iat_q50 | 115.5 | 116.5 | 0.009 |
+| 1 | burstiness_cv | 4.495 | 4.532 | 0.008 |
+| 3 | burstiness_cv | 4.495 | 4.532 | 0.008 |
+| 5 | burstiness_cv | 4.495 | 4.532 | 0.008 |
 
 ## Notable Files
 

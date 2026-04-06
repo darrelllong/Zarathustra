@@ -21,6 +21,15 @@
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, obj_size_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -32,10 +41,36 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0 |
 | Ordered PC1 changepoints | 2 |
 | PCA variance explained by PC1 | 0.222 |
+| Hurst exponent on ordered PC1 | 0.5 |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 231644117329442167062528 | 0.693 |
+| 3 | 56263123749828374298624 | 0.647 |
+| 4 | 37631854305759727714304 | 0.55 |
+| 5 | 21165546246712854577152 | 0.467 |
+| 6 | 14337987981660395667456 | 0.392 |
+| 7 | 17112371933416326692864 | 0.352 |
+| 8 | 5544227565860910268416 | 0.341 |
+| 9 | 3443022721465262800896 | 0.295 |
+| 10 | 2376255311507161612288 | 0.244 |
+| 11 | 275050467111513915392 | 0.211 |
+| 12 | 91237103860140441600 | 0.138 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | burstiness_cv | 3.503 | tenant_top1_share | 2.68 | size_bytes | 2.041 |
+| 2 -> 3 | burstiness_cv | 4.265 | iat_zero_ratio | 3.223 | object_top10_share | 2.645 |
 
 ## Strongest Correlations
 
@@ -75,16 +110,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_0.oracleGeneral.zst | 8.585 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prxy_1.oracleGeneral.zst | 6.021 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_4.oracleGeneral.zst | 3.263 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_usr_1.oracleGeneral.zst | 3.129 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_1.oracleGeneral.zst | 3.091 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_web_2.oracleGeneral.zst | 2.873 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_src1_0.oracleGeneral.zst | 2.632 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prn_0.oracleGeneral.zst | 2.299 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_0.oracleGeneral.zst | 8.585 | abs_stride_q50 (z=31.878); iat_lag1_autocorr (z=17.217) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prxy_1.oracleGeneral.zst | 6.021 | sample_record_rate (z=74.136); size_bytes (z=20.089) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_4.oracleGeneral.zst | 3.263 | iat_std (z=238.856); iat_mean (z=12.74) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_usr_1.oracleGeneral.zst | 3.129 | abs_stride_q50 (z=49.43); iat_lag1_autocorr (z=17.257) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_1.oracleGeneral.zst | 3.091 | abs_stride_q50 (z=7306.769); abs_stride_mean (z=7.669) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_web_2.oracleGeneral.zst | 2.873 | iat_std (z=88.266); iat_mean (z=12.571) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_src1_0.oracleGeneral.zst | 2.632 | iat_std (z=197.55); ts_duration (z=12.916) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prn_0.oracleGeneral.zst | 2.299 | reuse_ratio (z=26.571); iat_lag1_autocorr (z=11.693) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | abs_stride_mean | 10734964167 | 32671762307 | 2.043 |
+| 3 | abs_stride_mean | 10734964167 | 32203910067 | 2 |
+| 10 | reuse_ratio | 0.004 | 0.006 | 0.389 |
+| 10 | obj_size_std | 17324.47 | 21393.08 | 0.235 |
+| 5 | reuse_ratio | 0.004 | 0.005 | 0.222 |
+| 1 | reuse_ratio | 0.004 | 0.003 | -0.222 |
+| 3 | reuse_ratio | 0.004 | 0.003 | -0.222 |
+| 10 | burstiness_cv | 6.699 | 5.877 | -0.123 |
+| 1 | burstiness_cv | 6.699 | 7.338 | 0.095 |
+| 3 | burstiness_cv | 6.699 | 6.06 | -0.095 |
 
 ## Notable Files
 

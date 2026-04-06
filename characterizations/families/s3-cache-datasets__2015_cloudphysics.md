@@ -21,6 +21,15 @@
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | forward_seek_ratio vs backward_seek_ratio (-0.992) |
 
 ## Format Breakdown
 
@@ -32,10 +41,44 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.066 |
 | Ordered PC1 changepoints | 8 |
 | PCA variance explained by PC1 | 0.199 |
+| Hurst exponent on ordered PC1 | 0.701 |
+| Block/random distance ratio | 1.092 |
+| Sampling recommendation | random_sampling_is_less_problematic |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 49052887092172562432 | 0.984 |
+| 3 | 15368729563236937728 | 0.797 |
+| 4 | 12912626014622765056 | 0.58 |
+| 5 | 8826949501259444224 | 0.584 |
+| 6 | 8379242046393213952 | 0.584 |
+| 7 | 7274001190067757056 | 0.569 |
+| 8 | 3906510552262976000 | 0.606 |
+| 9 | 5354161389259911168 | 0.328 |
+| 10 | 5248206810790833152 | 0.337 |
+| 11 | 5008914523528914944 | 0.292 |
+| 12 | 4844564904266328064 | 0.295 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | iat_std | 2.371 | iat_lag1_autocorr | 2.029 | forward_seek_ratio | 1.76 |
+| 2 -> 3 | iat_lag1_autocorr | 5.206 | iat_std | 3.414 | tenant_top1_share | 2.892 |
+| 3 -> 4 | tenant_top1_share | 2.439 | obj_size_q50 | 1.414 | iat_q90 | 1.414 |
+| 4 -> 5 | tenant_top1_share | 2.534 | abs_stride_q90 | 2.336 | signed_stride_lag1_autocorr | 1.427 |
+| 5 -> 6 | obj_size_mean | 2.417 | object_unique | 1.996 | signed_stride_lag1_autocorr | 1.552 |
+| 6 -> 7 | backward_seek_ratio | 2.06 | forward_seek_ratio | 2.032 | ts_duration | 1.787 |
+| 7 -> 8 | abs_stride_q99 | 2.097 | abs_stride_std | 1.87 | abs_stride_mean | 1.736 |
+| 8 -> 9 | obj_size_q90 | 3.773 | abs_stride_q50 | 3.299 | obj_size_mean | 2.31 |
 
 ## Strongest Correlations
 
@@ -75,16 +118,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w54.oracleGeneral.bin.zst | 100.513 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w11.oracleGeneral.bin.zst | 56.144 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w86.oracleGeneral.bin.zst | 42.207 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w08.oracleGeneral.bin.zst | 14.829 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w46.oracleGeneral.bin.zst | 6.352 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w92.oracleGeneral.bin.zst | 6.035 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w28.oracleGeneral.bin.zst | 5.685 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w21.oracleGeneral.bin.zst | 4.973 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w54.oracleGeneral.bin.zst | 100.513 | abs_stride_q50 (z=36043.11); abs_stride_mean (z=1501.477) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w11.oracleGeneral.bin.zst | 56.144 | obj_size_mean (z=102.776); obj_size_q90 (z=84) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w86.oracleGeneral.bin.zst | 42.207 | iat_std (z=173.5); iat_q99 (z=68.18) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w08.oracleGeneral.bin.zst | 14.829 | obj_size_mean (z=92.757); obj_size_q90 (z=41.333) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w46.oracleGeneral.bin.zst | 6.352 | iat_std (z=84.724); reuse_ratio (z=80.667) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w92.oracleGeneral.bin.zst | 6.035 | ts_duration (z=7.928); iat_mean (z=7.928) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w28.oracleGeneral.bin.zst | 5.685 | iat_q99 (z=24); iat_mean (z=13.826) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w21.oracleGeneral.bin.zst | 4.973 | sample_record_rate (z=128.791); burstiness_cv (z=12.306) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | abs_stride_mean | 12295186 | 12901058 | 0.049 |
+| 1 | abs_stride_mean | 12295186 | 11990499 | -0.025 |
+| 3 | abs_stride_mean | 12295186 | 11990499 | -0.025 |
+| 5 | abs_stride_mean | 12295186 | 11990499 | -0.025 |
+| 5 | obj_size_std | 19497.34 | 19047.68 | -0.023 |
+| 1 | burstiness_cv | 5.393 | 5.416 | 0.004 |
+| 3 | burstiness_cv | 5.393 | 5.416 | 0.004 |
+| 5 | burstiness_cv | 5.393 | 5.369 | -0.004 |
+| 1 | object_unique | 2784.5 | 2774 | -0.004 |
+| 3 | object_unique | 2784.5 | 2795 | 0.004 |
 
 ## Notable Files
 

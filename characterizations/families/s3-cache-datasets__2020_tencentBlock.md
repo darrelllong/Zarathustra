@@ -19,9 +19,19 @@
 
 - Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants.
 - Ordered PC1 changepoints suggest 24 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Strongest feature coupling in this pass: iat_mean vs iat_q50 (corr=0.96).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, obj_size_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -34,10 +44,59 @@
 
 | Item | Value |
 |---|---|
-| DBSCAN clusters | 2 |
-| DBSCAN noise fraction | 0.082 |
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
+| DBSCAN clusters | 5 |
+| DBSCAN noise fraction | 0.078 |
 | Ordered PC1 changepoints | 23 |
 | PCA variance explained by PC1 | 0.213 |
+| Hurst exponent on ordered PC1 | 0.792 |
+| Block/random distance ratio | 0.694 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 29411196477719631060008960 | 0.94 |
+| 3 | 18186204651239461695258624 | 0.846 |
+| 4 | 13732868104073988358012928 | 0.499 |
+| 5 | 12108415229834564890263552 | 0.504 |
+| 6 | 8862879306843843559686144 | 0.479 |
+| 7 | 7595940575834472116649984 | 0.483 |
+| 8 | 7390846807947293004660736 | 0.496 |
+| 9 | 5661895870982251884838912 | 0.499 |
+| 10 | 5337891443868216059756544 | 0.464 |
+| 11 | 5254519393605403151433728 | 0.4 |
+| 12 | 5155126932747642308919296 | 0.435 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | abs_stride_q50 | 1.221 | backward_seek_ratio | 1.055 | iat_q90 | 1 |
+| 2 -> 3 | abs_stride_q99 | 1.357 | abs_stride_std | 1.192 | abs_stride_mean | 0.619 |
+| 3 -> 4 | reuse_ratio | 2.334 | iat_q90 | 1.414 | obj_size_min | 1.414 |
+| 4 -> 5 | object_unique | 1.229 | size_bytes | 1.16 | object_top1_share | 1.069 |
+| 5 -> 6 | iat_q99 | 0.392 | object_top1_share | 0.388 | reuse_ratio | 0.363 |
+| 6 -> 7 | obj_size_min | 8.485 | abs_stride_q99 | 2.482 | abs_stride_std | 2.074 |
+| 7 -> 8 | abs_stride_q50 | 2.05 | abs_stride_q99 | 1.833 | abs_stride_q90 | 1.476 |
+| 8 -> 9 | iat_q90 | 1.414 | iat_lag1_autocorr | 1.071 | signed_stride_lag1_autocorr | 0.875 |
+| 9 -> 10 | iat_mean | 2.483 | ts_duration | 2.483 | size_bytes | 2.15 |
+| 10 -> 11 | tenant_top1_share | 1.837 | signed_stride_lag1_autocorr | 1.619 | size_bytes | 1.563 |
+| 11 -> 12 | obj_size_min | 1.414 | iat_q90 | 1.414 | reuse_ratio | 1.248 |
+| 12 -> 13 | obj_size_min | 2.124 | iat_q90 | 1.414 | iat_q99 | 1.265 |
+| 13 -> 14 | reuse_ratio | 0.652 | abs_stride_q50 | 0.407 | forward_seek_ratio | 0.387 |
+| 14 -> 15 | backward_seek_ratio | 0.371 | object_top1_share | 0.35 | signed_stride_lag1_autocorr | 0.315 |
+| 15 -> 16 | iat_q90 | 1.414 | iat_zero_ratio | 1.296 | backward_seek_ratio | 1.277 |
+| 16 -> 17 | iat_q99 | 4.427 | ts_duration | 4.184 | iat_mean | 4.184 |
+| 17 -> 18 | obj_size_min | 1.414 | abs_stride_q50 | 1.398 | obj_size_q99 | 1.181 |
+| 18 -> 19 | sample_record_rate | 2.872 | iat_q90 | 2.828 | burstiness_cv | 2.528 |
+| 19 -> 20 | abs_stride_q90 | 2.609 | sample_record_rate | 2.388 | tenant_top1_share | 1.932 |
+| 20 -> 21 | iat_q99 | 0.969 | reuse_ratio | 0.466 | object_unique | 0.42 |
+| 21 -> 22 | iat_q99 | 1 | obj_size_q99 | 0.636 | abs_stride_std | 0.545 |
+| 22 -> 23 | iat_q99 | 1 | abs_stride_q50 | 0.757 | iat_q90 | 0.632 |
+| 23 -> 24 | sample_record_rate | 2.465 | abs_stride_q90 | 2.267 | size_bytes | 2.117 |
 
 ## Strongest Correlations
 
@@ -77,16 +136,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/10K/tencentBlock_3330.oracleGeneral.zst | 1356.781 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25497.oracleGeneral.zst | 609.951 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_11839.oracleGeneral.zst | 529.65 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/100K/tencentBlock_12500.oracleGeneral.zst | 251.79 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_26060.oracleGeneral.zst | 232.744 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25489.oracleGeneral.zst | 228.65 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25302.oracleGeneral.zst | 167.319 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25518.oracleGeneral.zst | 166.842 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/10K/tencentBlock_3330.oracleGeneral.zst | 1356.781 | ts_duration (z=272.178); iat_mean (z=271.493) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25497.oracleGeneral.zst | 609.951 | iat_mean (z=314756.6); iat_std (z=142360) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_11839.oracleGeneral.zst | 529.65 | abs_stride_q90 (z=176.496); abs_stride_std (z=166.49) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/100K/tencentBlock_12500.oracleGeneral.zst | 251.79 | abs_stride_mean (z=132.253); abs_stride_std (z=106.139) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_26060.oracleGeneral.zst | 232.744 | iat_mean (z=207343); iat_std (z=101576) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25489.oracleGeneral.zst | 228.65 | iat_mean (z=195782.8); iat_std (z=101101) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25302.oracleGeneral.zst | 167.319 | iat_mean (z=110150); iat_std (z=86988.93) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25518.oracleGeneral.zst | 166.842 | iat_mean (z=95092.79); iat_std (z=82067.38) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | burstiness_cv | 2.958 | 2.961 | 0.001 |
+| 5 | burstiness_cv | 2.958 | 2.961 | 0.001 |
+| 10 | abs_stride_mean | 4166683813 | 4164124069 | -0.001 |
+| 5 | object_unique | 1788 | 1789 | 0.001 |
+| 10 | object_unique | 1788 | 1789 | 0.001 |
+| 3 | abs_stride_mean | 4166683813 | 4165146346 | 0 |
+| 5 | abs_stride_mean | 4166683813 | 4165146346 | 0 |
+| 3 | burstiness_cv | 2.958 | 2.958 | 0 |
+| 1 | object_unique | 1788 | 1788.5 | 0 |
+| 3 | object_unique | 1788 | 1788.5 | 0 |
 
 ## Notable Files
 

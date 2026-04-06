@@ -19,6 +19,15 @@
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_zero_ratio (corr=-1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | iat_q50 |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -70,12 +79,27 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample100.csv.zst | 2.25 |
-| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample10.csv.zst | 2.25 |
-| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.raw.csv.zst | 2.25 |
-| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.csv.zst | 2.25 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample100.csv.zst | 2.25 | iat_lag1_autocorr (z=-24.369); iat_zero_ratio (z=-23.462) |
+| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample10.csv.zst | 2.25 | sample_record_rate (z=-1); ts_duration (z=1) |
+| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.raw.csv.zst | 2.25 | schema_numeric_cols (z=-2); size_bytes (z=-1.08) |
+| s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.csv.zst | 2.25 | size_bytes (z=30.432); ts_duration (z=-1) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 3 | reuse_ratio | 0.027 | 0.002 | -0.908 |
+| 1 | burstiness_cv | 40.529 | 63.984 | 0.579 |
+| 3 | burstiness_cv | 40.529 | 63.984 | 0.579 |
+| 1 | reuse_ratio | 0.027 | 0.015 | -0.454 |
+| 3 | object_unique | 1738 | 2397 | 0.379 |
+| 1 | object_unique | 1738 | 2067.5 | 0.19 |
+| 3 | abs_stride_mean | 5772565070961766400 | 6344717976505384960 | 0.099 |
+| 1 | abs_stride_mean | 5772565070961766400 | 6058641523733575680 | 0.05 |
+| 1 | iat_q50 | 0 | 0 | 0 |
+| 3 | iat_q50 | 0 | 0 | 0 |
 
 ## Notable Files
 

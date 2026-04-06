@@ -18,6 +18,15 @@
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | reuse_ratio vs backward_seek_ratio (-0.975) |
 
 ## Format Breakdown
 
@@ -69,13 +78,28 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_1.oracleGeneral.bin.zst | 3.198 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_3.oracleGeneral.bin.zst | 3.192 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_2.oracleGeneral.bin.zst | 3.19 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_4.oracleGeneral.bin.zst | 1.284 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_5.oracleGeneral.bin.zst | 1.137 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_1.oracleGeneral.bin.zst | 3.198 | abs_stride_q99 (z=-3.648); obj_size_std (z=-3.595) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_3.oracleGeneral.bin.zst | 3.192 | reuse_ratio (z=7.333); abs_stride_std (z=3.953) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_2.oracleGeneral.bin.zst | 3.19 | object_top1_share (z=51); object_top10_share (z=8.286) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_4.oracleGeneral.bin.zst | 1.284 | object_unique (z=15.333); reuse_ratio (z=-5.75) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_5.oracleGeneral.bin.zst | 1.137 | object_unique (z=7.778); iat_std (z=-1.649) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 3 | object_unique | 2377 | 2481 | 0.044 |
+| 3 | reuse_ratio | 0.242 | 0.233 | -0.035 |
+| 1 | object_unique | 2377 | 2412 | 0.015 |
+| 1 | abs_stride_mean | 4670174504930991104 | 4700168190619619328 | 0.006 |
+| 3 | abs_stride_mean | 4670174504930991104 | 4700168190619619328 | 0.006 |
+| 1 | burstiness_cv | 7.272 | 7.248 | -0.003 |
+| 3 | burstiness_cv | 7.272 | 7.248 | -0.003 |
+| 1 | obj_size_std | 3234544 | 3243046 | 0.003 |
+| 3 | obj_size_std | 3234544 | 3229564 | -0.002 |
+| 1 | reuse_ratio | 0.242 | 0.242 | 0 |
 
 ## Notable Files
 

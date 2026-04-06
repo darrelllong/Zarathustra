@@ -21,6 +21,15 @@
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: sample_records vs iat_q99 (corr=-1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | iat_q50, obj_size_q50, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -32,10 +41,41 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.028 |
 | Ordered PC1 changepoints | 5 |
 | PCA variance explained by PC1 | 0.369 |
+| Hurst exponent on ordered PC1 | 0.543 |
+| Block/random distance ratio | 1.134 |
+| Sampling recommendation | random_sampling_is_less_problematic |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 735142116474531584 | 0.892 |
+| 3 | 385853306064195904 | 0.823 |
+| 4 | 263979881798210144 | 0.687 |
+| 5 | 254384194195490912 | 0.454 |
+| 6 | 67692631425003728 | 0.466 |
+| 7 | 63923950052348432 | 0.391 |
+| 8 | 45875923665502288 | 0.492 |
+| 9 | 44496907444467160 | 0.451 |
+| 10 | 43318594600786912 | 0.448 |
+| 11 | 40462105047630216 | 0.433 |
+| 12 | 6916243222411154 | 0.462 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | signed_stride_lag1_autocorr | 3.734 | write_ratio | 2.151 | iat_zero_ratio | 2.126 |
+| 2 -> 3 | opcode_switch_ratio | 3.512 | write_ratio | 3.416 | burstiness_cv | 2.856 |
+| 3 -> 4 | iat_q99 | 1382.74 | ts_duration | 403.295 | object_top10_share | 15.123 |
+| 4 -> 5 | iat_q99 | 1385.918 | ts_duration | 129.602 | iat_zero_ratio | 23.45 |
+| 5 -> 6 | forward_seek_ratio | 13.57 | iat_zero_ratio | 9.261 | backward_seek_ratio | 8.143 |
 
 ## Strongest Correlations
 
@@ -75,16 +115,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_lcs/msr/rsrch_2.csv.lcs.zst | 18.771 |
-| s3-cache-datasets/cache_dataset_lcs/msr/wdev_3.csv.lcs.zst | 18.228 |
-| s3-cache-datasets/cache_dataset_lcs/msr/wdev_1.csv.lcs.zst | 13.692 |
-| s3-cache-datasets/cache_dataset_lcs/msr/mds_1.csv.lcs.zst | 12.148 |
-| s3-cache-datasets/cache_dataset_lcs/msr/usr_1.csv.lcs.zst | 11.355 |
-| s3-cache-datasets/cache_dataset_lcs/msr/prxy_1.csv.lcs.zst | 4.654 |
-| s3-cache-datasets/cache_dataset_lcs/msr/prn_1.csv.lcs.zst | 1.861 |
-| s3-cache-datasets/cache_dataset_lcs/msr/web_3.csv.lcs.zst | 1.837 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_lcs/msr/rsrch_2.csv.lcs.zst | 18.771 | iat_std (z=317.09); abs_stride_q90 (z=48.684) |
+| s3-cache-datasets/cache_dataset_lcs/msr/wdev_3.csv.lcs.zst | 18.228 | iat_q99 (z=7122); iat_std (z=2316.747) |
+| s3-cache-datasets/cache_dataset_lcs/msr/wdev_1.csv.lcs.zst | 13.692 | iat_q99 (z=7114.74); iat_std (z=1831.977) |
+| s3-cache-datasets/cache_dataset_lcs/msr/mds_1.csv.lcs.zst | 12.148 | abs_stride_q90 (z=174.789); abs_stride_mean (z=37.202) |
+| s3-cache-datasets/cache_dataset_lcs/msr/usr_1.csv.lcs.zst | 11.355 | abs_stride_q90 (z=152.157); size_bytes (z=49.825) |
+| s3-cache-datasets/cache_dataset_lcs/msr/prxy_1.csv.lcs.zst | 4.654 | sample_record_rate (z=440.297); size_bytes (z=62.331) |
+| s3-cache-datasets/cache_dataset_lcs/msr/prn_1.csv.lcs.zst | 1.861 | sample_record_rate (z=188.108); abs_stride_q90 (z=37.48) |
+| s3-cache-datasets/cache_dataset_lcs/msr/web_3.csv.lcs.zst | 1.837 | signed_stride_lag1_autocorr (z=4.569); iat_q99 (z=4.53) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | reuse_ratio | 0 | 0.002 | 3.75 |
+| 10 | abs_stride_mean | 505020.5 | 302091.3 | -0.402 |
+| 5 | abs_stride_mean | 505020.5 | 311927.8 | -0.382 |
+| 3 | abs_stride_mean | 505020.5 | 331482.1 | -0.344 |
+| 1 | abs_stride_mean | 505020.5 | 447300.5 | -0.114 |
+| 3 | object_unique | 2868 | 2977 | 0.038 |
+| 1 | object_unique | 2868 | 2928 | 0.021 |
+| 5 | object_unique | 2868 | 2928 | 0.021 |
+| 1 | burstiness_cv | 8.634 | 8.571 | -0.007 |
+| 3 | burstiness_cv | 8.634 | 8.696 | 0.007 |
 
 ## Notable Files
 

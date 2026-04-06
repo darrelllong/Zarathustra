@@ -20,6 +20,15 @@
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_zero_ratio (corr=-1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | reuse_ratio vs forward_seek_ratio (-0.998); reuse_ratio vs backward_seek_ratio (-0.998); forward_seek_ratio vs backward_seek_ratio (0.993) |
 
 ## Format Breakdown
 
@@ -31,10 +40,31 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.074 |
 | Ordered PC1 changepoints | 0 |
 | PCA variance explained by PC1 | 0.292 |
+| Hurst exponent on ordered PC1 | 0.5 |
+| Block/random distance ratio | 1.056 |
+| Sampling recommendation | random_sampling_is_less_problematic |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 61693954746090695324043153175339859968 | 0.803 |
+| 3 | 44962931981881171325324723553359101952 | 0.504 |
+| 4 | 40173071196567184267151186411237933056 | 0.505 |
+| 5 | 36978764325263951856358887451520925696 | 0.447 |
+| 6 | 34853343132528287620119535883005198336 | 0.328 |
+| 7 | 33478874848687229133665450532628594688 | 0.297 |
+| 8 | 12217395539109555052375819068366651392 | 0.287 |
+| 9 | 10977538722140370510078947468494503936 | 0.317 |
+| 10 | 9978775318906152363534399165773643776 | 0.357 |
+| 11 | 9496494337145339247475028496492789760 | 0.358 |
+| 12 | 4738810408117532063879937679664611328 | 0.34 |
 
 ## Strongest Correlations
 
@@ -74,16 +104,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.948 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster10.oracleGeneral.sample10.zst | 16.601 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster35.oracleGeneral.sample10.zst | 16.008 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster2.oracleGeneral.sample10.zst | 11.133 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster25.oracleGeneral.sample10.zst | 10.257 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 9.791 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 9.633 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster26.oracleGeneral.sample10.zst | 7.649 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.948 | obj_size_q50 (z=328.116); obj_size_q90 (z=262.205) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster10.oracleGeneral.sample10.zst | 16.601 | tenant_top1_share (z=-30.5); iat_lag1_autocorr (z=-21.666) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster35.oracleGeneral.sample10.zst | 16.008 | abs_stride_q90 (z=-30.349); forward_seek_ratio (z=-23) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster2.oracleGeneral.sample10.zst | 11.133 | forward_seek_ratio (z=-17.518); abs_stride_q50 (z=-16.921) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster25.oracleGeneral.sample10.zst | 10.257 | object_top1_share (z=41.299); object_top10_share (z=14.74) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 9.791 | obj_size_q50 (z=216.916); obj_size_q90 (z=130.476) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 9.633 | obj_size_q99 (z=127.238); obj_size_std (z=124.266) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster26.oracleGeneral.sample10.zst | 7.649 | iat_lag1_autocorr (z=-21.089); iat_mean (z=20.267) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | obj_size_std | 204.103 | 186.615 | -0.086 |
+| 5 | reuse_ratio | 0.038 | 0.035 | -0.075 |
+| 10 | burstiness_cv | 18.446 | 19.74 | 0.07 |
+| 10 | reuse_ratio | 0.038 | 0.036 | -0.046 |
+| 1 | obj_size_std | 204.103 | 194.906 | -0.045 |
+| 3 | obj_size_std | 204.103 | 194.906 | -0.045 |
+| 5 | obj_size_std | 204.103 | 194.906 | -0.045 |
+| 3 | burstiness_cv | 18.446 | 19.268 | 0.045 |
+| 10 | object_unique | 1859 | 1933 | 0.04 |
+| 3 | reuse_ratio | 0.038 | 0.037 | -0.016 |
 
 ## Notable Files
 

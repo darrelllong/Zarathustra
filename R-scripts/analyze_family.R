@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 required_packages <- c("jsonlite")
-optional_packages <- c("changepoint", "dbscan", "e1071", "mclust", "moments", "forecast", "tsfeatures", "corrplot")
+optional_packages <- c("changepoint", "cluster", "dbscan", "e1071", "mclust", "moments", "forecast", "tsfeatures", "corrplot")
 
 package_available <- function(pkg) {
   requireNamespace(pkg, quietly = TRUE)
@@ -108,6 +108,13 @@ format_number <- function(x, digits = 3) {
   format(round(x[[1]], digits), trim = TRUE, scientific = FALSE)
 }
 
+safe_nth <- function(x, n, default = NA) {
+  if (length(x) < n) {
+    return(default)
+  }
+  x[[n]]
+}
+
 safe_stat <- function(x, fn, default = NA_real_) {
   vals <- suppressWarnings(as.numeric(x))
   vals <- vals[is.finite(vals)]
@@ -190,6 +197,41 @@ top_correlation_pairs <- function(cor_mat, limit = 8) {
   head(pair_df, limit)
 }
 
+robust_scale_vector <- function(x) {
+  vals <- suppressWarnings(as.numeric(x))
+  center <- stats::median(vals, na.rm = TRUE)
+  scale <- stats::mad(vals, center = center, constant = 1, na.rm = TRUE)
+  if (!is.finite(scale) || scale <= 1e-9) {
+    scale <- stats::sd(vals, na.rm = TRUE)
+  }
+  if (!is.finite(scale) || scale <= 1e-9) {
+    scale <- 1
+  }
+  list(center = center, scale = scale)
+}
+
+effect_size_between <- function(x, y) {
+  x <- suppressWarnings(as.numeric(x))
+  y <- suppressWarnings(as.numeric(y))
+  x <- x[is.finite(x)]
+  y <- y[is.finite(y)]
+  if (length(x) < 2 || length(y) < 2) {
+    return(NA_real_)
+  }
+  x_center <- stats::median(x)
+  y_center <- stats::median(y)
+  x_scale <- stats::mad(x, center = x_center, constant = 1)
+  y_scale <- stats::mad(y, center = y_center, constant = 1)
+  pooled <- sqrt(mean(c(x_scale ^ 2, y_scale ^ 2), na.rm = TRUE))
+  if (!is.finite(pooled) || pooled <= 1e-9) {
+    pooled <- sqrt(mean(c(stats::var(x), stats::var(y)), na.rm = TRUE))
+  }
+  if (!is.finite(pooled) || pooled <= 1e-9) {
+    return(NA_real_)
+  }
+  abs(x_center - y_center) / pooled
+}
+
 compute_heterogeneity <- function(metric_summary_df) {
   if (nrow(metric_summary_df) == 0) {
     return(NA_real_)
@@ -200,6 +242,54 @@ compute_heterogeneity <- function(metric_summary_df) {
     return(NA_real_)
   }
   stats::median(pmin(vals, 25))
+}
+
+compute_kmeans_diagnostics <- function(cluster_matrix) {
+  if (nrow(cluster_matrix) < 8 || ncol(cluster_matrix) < 2) {
+    return(list(best_k = NA_integer_, table = data.frame()))
+  }
+  max_k <- min(12L, nrow(cluster_matrix) - 1L)
+  ks <- seq.int(2L, max_k)
+  if (length(ks) == 0) {
+    return(list(best_k = NA_integer_, table = data.frame()))
+  }
+
+  diag_matrix <- cluster_matrix
+  if (nrow(diag_matrix) > 1200) {
+    idx <- sort(sample(seq_len(nrow(diag_matrix)), 1200L))
+    diag_matrix <- diag_matrix[idx, , drop = FALSE]
+  }
+  dist_mat <- if (package_available("cluster") && nrow(diag_matrix) >= 4) stats::dist(diag_matrix) else NULL
+
+  rows <- lapply(ks, function(k) {
+    km <- tryCatch(stats::kmeans(cluster_matrix, centers = k, nstart = 10), error = function(e) NULL)
+    if (is.null(km)) {
+      return(NULL)
+    }
+    sil <- NA_real_
+    if (!is.null(dist_mat) && length(km$cluster) == nrow(cluster_matrix)) {
+      if (nrow(cluster_matrix) == nrow(diag_matrix)) {
+        sil <- tryCatch(mean(cluster::silhouette(km$cluster, dist_mat)[, "sil_width"], na.rm = TRUE), error = function(e) NA_real_)
+      } else {
+        km_diag <- tryCatch(stats::kmeans(diag_matrix, centers = k, nstart = 5), error = function(e) NULL)
+        if (!is.null(km_diag)) {
+          sil <- tryCatch(mean(cluster::silhouette(km_diag$cluster, dist_mat)[, "sil_width"], na.rm = TRUE), error = function(e) NA_real_)
+        }
+      }
+    }
+    data.frame(k = k, tot_withinss = km$tot.withinss, silhouette = sil, stringsAsFactors = FALSE)
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (length(rows) == 0) {
+    return(list(best_k = NA_integer_, table = data.frame()))
+  }
+  table <- do.call(rbind, rows)
+  if (any(is.finite(table$silhouette))) {
+    best_k <- table$k[[which.max(replace(table$silhouette, !is.finite(table$silhouette), -Inf))]]
+  } else {
+    best_k <- table$k[[1]]
+  }
+  list(best_k = as.integer(best_k), table = table)
 }
 
 make_pca_bundle <- function(numeric_matrix, sample_ids, out_dir) {
@@ -246,10 +336,18 @@ compute_clusters <- function(numeric_matrix, sample_ids) {
 
   out <- list(summary = list(), assignments = data.frame(rel_path = cluster_ids, stringsAsFactors = FALSE))
 
-  k <- min(6L, nrow(cluster_matrix) - 1L)
+  k_diag <- compute_kmeans_diagnostics(cluster_matrix)
+  if (nrow(k_diag$table) > 0) {
+    out$summary$kmeans_diagnostics <- list(
+      best_k = k_diag$best_k,
+      table = k_diag$table
+    )
+  }
+
+  k <- if (is.finite(k_diag$best_k)) k_diag$best_k else min(6L, nrow(cluster_matrix) - 1L)
   if (k >= 2L) {
     km <- stats::kmeans(cluster_matrix, centers = k, nstart = 20)
-    out$summary$kmeans <- list(centers = km$centers, sizes = km$size, tot_withinss = km$tot.withinss)
+    out$summary$kmeans <- list(centers = km$centers, sizes = km$size, tot_withinss = km$tot.withinss, selected_k = k)
     out$assignments$kmeans_cluster <- km$cluster
   }
 
@@ -312,6 +410,97 @@ compute_outliers <- function(pca_bundle, limit = 8) {
   head(out, limit)
 }
 
+compute_outlier_decomposition <- function(df, usable_numeric, outliers, limit = 8, top_features = 4) {
+  if (nrow(outliers) == 0 || nrow(usable_numeric) == 0) {
+    return(data.frame())
+  }
+  mat <- as.data.frame(usable_numeric, stringsAsFactors = FALSE)
+  mat$rel_path <- df$rel_path
+  centers <- vapply(usable_numeric, function(col) robust_scale_vector(col)$center, numeric(1))
+  scales <- vapply(usable_numeric, function(col) robust_scale_vector(col)$scale, numeric(1))
+
+  rows <- lapply(seq_len(min(limit, nrow(outliers))), function(i) {
+    row <- mat[match(outliers$rel_path[[i]], mat$rel_path), , drop = FALSE]
+    if (nrow(row) == 0) {
+      return(NULL)
+    }
+    feature_cols <- setdiff(names(row), "rel_path")
+    vals <- suppressWarnings(as.numeric(row[1, feature_cols, drop = TRUE]))
+    names(vals) <- feature_cols
+    z <- (vals - centers) / scales
+    finite <- is.finite(z)
+    if (!any(finite)) {
+      return(NULL)
+    }
+    ord <- order(abs(z), decreasing = TRUE, na.last = TRUE)
+    ord <- ord[seq_len(min(top_features, length(ord)))]
+    feature_names <- names(vals)[ord]
+    feature_z <- z[ord]
+    data.frame(
+      rel_path = outliers$rel_path[[i]],
+      outlier_score = outliers$outlier_score[[i]],
+      top_feature_1 = safe_nth(feature_names, 1, NA_character_),
+      top_feature_1_z = safe_nth(feature_z, 1, NA_real_),
+      top_feature_2 = safe_nth(feature_names, 2, NA_character_),
+      top_feature_2_z = safe_nth(feature_z, 2, NA_real_),
+      top_feature_3 = safe_nth(feature_names, 3, NA_character_),
+      top_feature_3_z = safe_nth(feature_z, 3, NA_real_),
+      top_feature_4 = safe_nth(feature_names, 4, NA_character_),
+      top_feature_4_z = safe_nth(feature_z, 4, NA_real_),
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (length(rows) == 0) {
+    return(data.frame())
+  }
+  do.call(rbind, rows)
+}
+
+compute_outlier_sensitivity <- function(df, outliers) {
+  metrics <- intersect(c("burstiness_cv", "abs_stride_mean", "obj_size_std", "reuse_ratio", "iat_q50", "object_unique"), names(df))
+  if (nrow(outliers) == 0 || length(metrics) == 0) {
+    return(data.frame())
+  }
+  steps <- c(1L, 3L, 5L, 10L)
+  steps <- steps[steps < nrow(df)]
+  if (length(steps) == 0) {
+    return(data.frame())
+  }
+
+  rows <- list()
+  idx <- 1L
+  for (n_remove in steps) {
+    trimmed <- df[!(df$rel_path %in% outliers$rel_path[seq_len(min(n_remove, nrow(outliers)))]), , drop = FALSE]
+    for (metric in metrics) {
+      base <- suppressWarnings(as.numeric(df[[metric]]))
+      comp <- suppressWarnings(as.numeric(trimmed[[metric]]))
+      base <- base[is.finite(base)]
+      comp <- comp[is.finite(comp)]
+      if (length(base) == 0 || length(comp) == 0) {
+        next
+      }
+      baseline <- stats::median(base)
+      trimmed_val <- stats::median(comp)
+      denom <- max(abs(baseline), 1e-9)
+      rows[[idx]] <- data.frame(
+        n_removed = n_remove,
+        metric = metric,
+        baseline_median = baseline,
+        trimmed_median = trimmed_val,
+        relative_shift = (trimmed_val - baseline) / denom,
+        stringsAsFactors = FALSE
+      )
+      idx <- idx + 1L
+    }
+  }
+  if (length(rows) == 0) {
+    return(data.frame())
+  }
+  out <- do.call(rbind, rows)
+  out[order(abs(out$relative_shift), decreasing = TRUE), , drop = FALSE]
+}
+
 compute_regimes <- function(df, pca_bundle) {
   if (is.null(pca_bundle)) {
     return(NULL)
@@ -358,7 +547,211 @@ compute_regimes <- function(df, pca_bundle) {
   regime
 }
 
-build_gan_guidance <- function(df, heterogeneity_score, cluster_summary, regime_summary, top_corr, outliers) {
+compute_regime_attribution <- function(df, usable_numeric, pca_bundle, regime_summary) {
+  if (is.null(pca_bundle) || is.null(regime_summary$changepoints) || !("ts_start" %in% names(df))) {
+    return(NULL)
+  }
+  ordered <- df[is.finite(df$ts_start), c("rel_path", "ts_start"), drop = FALSE]
+  ordered <- ordered[order(ordered$ts_start, ordered$rel_path), , drop = FALSE]
+  if (nrow(ordered) < 8) {
+    return(NULL)
+  }
+
+  numeric_df <- as.data.frame(usable_numeric, stringsAsFactors = FALSE)
+  numeric_df$rel_path <- df$rel_path
+  merged <- merge(ordered, numeric_df, by = "rel_path", all.x = FALSE, all.y = FALSE)
+  merged <- merge(merged, pca_bundle$scores[, c("rel_path", intersect(c("PC1", "PC2"), names(pca_bundle$scores))), drop = FALSE], by = "rel_path", all.x = FALSE, all.y = FALSE)
+  merged <- merged[order(merged$ts_start, merged$rel_path), , drop = FALSE]
+  if (nrow(merged) < 8) {
+    return(NULL)
+  }
+
+  cps <- unique(as.integer(regime_summary$changepoints))
+  cps <- cps[is.finite(cps) & cps >= 1 & cps < nrow(merged)]
+  bounds <- c(0L, cps, nrow(merged))
+  if (length(bounds) < 2) {
+    return(NULL)
+  }
+
+  segments <- vector("list", length(bounds) - 1L)
+  for (i in seq_len(length(bounds) - 1L)) {
+    start_idx <- bounds[[i]] + 1L
+    end_idx <- bounds[[i + 1L]]
+    seg <- merged[start_idx:end_idx, , drop = FALSE]
+    segments[[i]] <- data.frame(
+      segment = i,
+      start_index = start_idx,
+      end_index = end_idx,
+      files = nrow(seg),
+      ts_start_min = min(seg$ts_start, na.rm = TRUE),
+      ts_start_max = max(seg$ts_start, na.rm = TRUE),
+      pc1_median = if ("PC1" %in% names(seg)) stats::median(seg$PC1, na.rm = TRUE) else NA_real_,
+      pc1_sd = if ("PC1" %in% names(seg)) stats::sd(seg$PC1, na.rm = TRUE) else NA_real_,
+      stringsAsFactors = FALSE
+    )
+  }
+  segment_df <- do.call(rbind, segments)
+
+  numeric_cols <- intersect(names(usable_numeric), names(merged))
+  transition_rows <- list()
+  idx <- 1L
+  for (i in seq_len(nrow(segment_df) - 1L)) {
+    left <- merged[segment_df$start_index[[i]]:segment_df$end_index[[i]], numeric_cols, drop = FALSE]
+    right <- merged[segment_df$start_index[[i + 1L]]:segment_df$end_index[[i + 1L]], numeric_cols, drop = FALSE]
+    feature_scores <- lapply(numeric_cols, function(metric) {
+      eff <- effect_size_between(left[[metric]], right[[metric]])
+      if (!is.finite(eff)) {
+        return(NULL)
+      }
+      data.frame(
+        metric = metric,
+        effect_size = eff,
+        from_median = stats::median(suppressWarnings(as.numeric(left[[metric]])), na.rm = TRUE),
+        to_median = stats::median(suppressWarnings(as.numeric(right[[metric]])), na.rm = TRUE),
+        stringsAsFactors = FALSE
+      )
+    })
+    feature_scores <- Filter(Negate(is.null), feature_scores)
+    if (length(feature_scores) == 0) {
+      next
+    }
+    feature_df <- do.call(rbind, feature_scores)
+    feature_df <- feature_df[order(feature_df$effect_size, decreasing = TRUE), , drop = FALSE]
+    top <- head(feature_df, 4)
+    transition_rows[[idx]] <- data.frame(
+      from_segment = i,
+      to_segment = i + 1L,
+      top_driver_1 = safe_nth(top$metric, 1, NA_character_),
+      top_driver_1_effect = safe_nth(top$effect_size, 1, NA_real_),
+      top_driver_2 = safe_nth(top$metric, 2, NA_character_),
+      top_driver_2_effect = safe_nth(top$effect_size, 2, NA_real_),
+      top_driver_3 = safe_nth(top$metric, 3, NA_character_),
+      top_driver_3_effect = safe_nth(top$effect_size, 3, NA_real_),
+      top_driver_4 = safe_nth(top$metric, 4, NA_character_),
+      top_driver_4_effect = safe_nth(top$effect_size, 4, NA_real_),
+      stringsAsFactors = FALSE
+    )
+    idx <- idx + 1L
+  }
+  transition_df <- if (length(transition_rows) > 0) do.call(rbind, transition_rows) else data.frame()
+
+  list(
+    segments = segment_df,
+    transitions = transition_df
+  )
+}
+
+compute_temporal_sampling_diagnostic <- function(df, pca_bundle) {
+  if (is.null(pca_bundle) || !("ts_start" %in% names(df))) {
+    return(NULL)
+  }
+  ordered <- df[is.finite(df$ts_start), c("rel_path", "ts_start"), drop = FALSE]
+  ordered <- ordered[order(ordered$ts_start, ordered$rel_path), , drop = FALSE]
+  merged <- merge(ordered, pca_bundle$scores, by = "rel_path", all.x = FALSE, all.y = FALSE)
+  merged <- merged[order(merged$ts_start, merged$rel_path), , drop = FALSE]
+  pc_cols <- intersect(c("PC1", "PC2", "PC3"), names(merged))
+  if (nrow(merged) < 16 || length(pc_cols) == 0) {
+    return(NULL)
+  }
+
+  block_size <- max(4L, min(16L, floor(sqrt(nrow(merged)))))
+  n_blocks <- floor(nrow(merged) / block_size)
+  if (n_blocks < 2) {
+    return(NULL)
+  }
+  mat <- as.matrix(merged[, pc_cols, drop = FALSE])
+  block_distances <- vapply(seq_len(n_blocks), function(i) {
+    idx <- ((i - 1L) * block_size + 1L):(i * block_size)
+    sub <- mat[idx, , drop = FALSE]
+    if (nrow(sub) < 2) {
+      return(NA_real_)
+    }
+    mean(stats::dist(sub))
+  }, numeric(1))
+  random_trials <- 64L
+  random_distances <- vapply(seq_len(random_trials), function(i) {
+    idx <- sort(sample(seq_len(nrow(mat)), block_size))
+    sub <- mat[idx, , drop = FALSE]
+    mean(stats::dist(sub))
+  }, numeric(1))
+
+  ratio <- stats::median(block_distances, na.rm = TRUE) / stats::median(random_distances, na.rm = TRUE)
+  list(
+    block_size = block_size,
+    n_blocks = n_blocks,
+    median_block_distance = stats::median(block_distances, na.rm = TRUE),
+    median_random_distance = stats::median(random_distances, na.rm = TRUE),
+    block_random_distance_ratio = ratio,
+    recommendation = if (is.finite(ratio) && ratio < 0.85) "block_sampling_preserves_temporal_coherence" else "random_sampling_is_less_problematic"
+  )
+}
+
+compute_conditioning_audit <- function(df, cor_mat) {
+  cond_features <- intersect(
+    c("write_ratio", "reuse_ratio", "burstiness_cv", "iat_q50", "obj_size_q50", "opcode_switch_ratio", "iat_lag1_autocorr", "tenant_unique", "forward_seek_ratio", "backward_seek_ratio"),
+    names(df)
+  )
+  candidate_features <- intersect(c("object_unique", "signed_stride_lag1_autocorr", "obj_size_std"), names(df))
+
+  feature_stats <- lapply(cond_features, function(metric) {
+    vals <- suppressWarnings(as.numeric(df[[metric]]))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) {
+      return(NULL)
+    }
+    spread <- stats::IQR(vals, na.rm = TRUE)
+    data.frame(
+      metric = metric,
+      sd = stats::sd(vals),
+      iqr = spread,
+      near_constant = isTRUE((is.finite(spread) && spread <= 1e-9) || (is.finite(stats::sd(vals)) && stats::sd(vals) <= 1e-9)),
+      stringsAsFactors = FALSE
+    )
+  })
+  feature_stats <- Filter(Negate(is.null), feature_stats)
+  feature_stats <- if (length(feature_stats) > 0) do.call(rbind, feature_stats) else data.frame()
+
+  redundant_pairs <- data.frame()
+  if (!is.null(cor_mat) && all(cond_features %in% rownames(cor_mat))) {
+    sub <- cor_mat[cond_features, cond_features, drop = FALSE]
+    redundant_pairs <- top_correlation_pairs(sub, limit = 20)
+    redundant_pairs <- redundant_pairs[redundant_pairs$abs_correlation >= 0.95, , drop = FALSE]
+  }
+
+  add_rows <- lapply(candidate_features, function(metric) {
+    vals <- suppressWarnings(as.numeric(df[[metric]]))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) {
+      return(NULL)
+    }
+    max_corr <- NA_real_
+    if (!is.null(cor_mat) && metric %in% rownames(cor_mat) && length(cond_features) > 0) {
+      corr_vals <- abs(cor_mat[metric, cond_features, drop = TRUE])
+      corr_vals <- corr_vals[is.finite(corr_vals)]
+      if (length(corr_vals) > 0) {
+        max_corr <- max(corr_vals)
+      }
+    }
+    data.frame(
+      metric = metric,
+      sd = stats::sd(vals),
+      iqr = stats::IQR(vals, na.rm = TRUE),
+      max_abs_corr_with_cond = max_corr,
+      recommended = isTRUE(stats::IQR(vals, na.rm = TRUE) > 0) && (!is.finite(max_corr) || max_corr < 0.95),
+      stringsAsFactors = FALSE
+    )
+  })
+  add_rows <- Filter(Negate(is.null), add_rows)
+  add_rows <- if (length(add_rows) > 0) do.call(rbind, add_rows) else data.frame()
+
+  list(
+    near_constant = feature_stats[feature_stats$near_constant, , drop = FALSE],
+    redundant_pairs = redundant_pairs,
+    candidate_additions = add_rows
+  )
+}
+
+build_gan_guidance <- function(df, heterogeneity_score, cluster_summary, regime_summary, top_corr, outliers, temporal_sampling = NULL, conditioning_audit = NULL) {
   notes <- character()
   read_heavy <- safe_stat(1 - df$write_ratio, mean)
   write_heavy <- safe_stat(df$write_ratio, mean)
@@ -379,6 +772,9 @@ build_gan_guidance <- function(df, heterogeneity_score, cluster_summary, regime_
   }
   if (!is.null(regime_summary$changepoint_count) && regime_summary$changepoint_count >= 1) {
     notes <- c(notes, paste0("Ordered PC1 changepoints suggest ", regime_summary$changepoint_count + 1, " regimes when files are ordered by trace start time."))
+  }
+  if (!is.null(temporal_sampling$block_random_distance_ratio) && is.finite(temporal_sampling$block_random_distance_ratio) && temporal_sampling$block_random_distance_ratio < 0.85) {
+    notes <- c(notes, "Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.")
   }
   if (is.finite(read_heavy) && read_heavy > 0.9) {
     notes <- c(notes, "Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.")
@@ -401,6 +797,12 @@ build_gan_guidance <- function(df, heterogeneity_score, cluster_summary, regime_
   }
   if (nrow(outliers) > 0) {
     notes <- c(notes, "A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.")
+  }
+  if (!is.null(conditioning_audit$candidate_additions) && nrow(conditioning_audit$candidate_additions) > 0) {
+    recommended <- conditioning_audit$candidate_additions$metric[conditioning_audit$candidate_additions$recommended]
+    if (length(recommended) > 0) {
+      notes <- c(notes, paste0("Current characterization suggests extra conditioning value from: ", paste(recommended, collapse = ", "), "."))
+    }
   }
   if (length(notes) == 0) {
     notes <- "Family looks comparatively homogeneous in the extracted feature space."
@@ -540,6 +942,11 @@ analyze_family <- function(features_path, out_dir) {
   cluster_results <- if (nrow(numeric_matrix) >= 8 && ncol(numeric_matrix) >= 2) compute_clusters(numeric_matrix, numeric_ids) else list(summary = NULL, assignments = data.frame())
   regime_summary <- compute_regimes(df, pca_bundle)
   outliers <- compute_outliers(pca_bundle)
+  outlier_decomposition <- compute_outlier_decomposition(df, usable_numeric, outliers)
+  outlier_sensitivity <- compute_outlier_sensitivity(df, outliers)
+  regime_attribution <- compute_regime_attribution(df, usable_numeric, pca_bundle, regime_summary)
+  temporal_sampling <- compute_temporal_sampling_diagnostic(df, pca_bundle)
+  conditioning_audit <- compute_conditioning_audit(df, cor_mat)
   heterogeneity_score <- compute_heterogeneity(summary_df)
 
   plot_family_metrics(df, out_dir, cor_mat = cor_mat, pca_bundle = pca_bundle)
@@ -553,6 +960,27 @@ analyze_family <- function(features_path, out_dir) {
   if (nrow(outliers) > 0) {
     write.csv(outliers, file.path(out_dir, "outliers.csv"), row.names = FALSE)
   }
+  if (nrow(outlier_decomposition) > 0) {
+    write.csv(outlier_decomposition, file.path(out_dir, "outlier_decomposition.csv"), row.names = FALSE)
+  }
+  if (nrow(outlier_sensitivity) > 0) {
+    write.csv(outlier_sensitivity, file.path(out_dir, "outlier_sensitivity.csv"), row.names = FALSE)
+  }
+  if (!is.null(regime_attribution$segments) && nrow(regime_attribution$segments) > 0) {
+    write.csv(regime_attribution$segments, file.path(out_dir, "regime_segments.csv"), row.names = FALSE)
+  }
+  if (!is.null(regime_attribution$transitions) && nrow(regime_attribution$transitions) > 0) {
+    write.csv(regime_attribution$transitions, file.path(out_dir, "regime_transitions.csv"), row.names = FALSE)
+  }
+  if (!is.null(cluster_results$summary$kmeans_diagnostics$table) && nrow(cluster_results$summary$kmeans_diagnostics$table) > 0) {
+    write.csv(cluster_results$summary$kmeans_diagnostics$table, file.path(out_dir, "kmeans_diagnostics.csv"), row.names = FALSE)
+  }
+  if (!is.null(conditioning_audit$redundant_pairs) && nrow(conditioning_audit$redundant_pairs) > 0) {
+    write.csv(conditioning_audit$redundant_pairs, file.path(out_dir, "conditioning_redundancy.csv"), row.names = FALSE)
+  }
+  if (!is.null(conditioning_audit$candidate_additions) && nrow(conditioning_audit$candidate_additions) > 0) {
+    write.csv(conditioning_audit$candidate_additions, file.path(out_dir, "conditioning_candidates.csv"), row.names = FALSE)
+  }
 
   observations <- family_observations(df, summary_df, cluster_results$summary %||% list(), regime_summary %||% list())
   gan_guidance <- build_gan_guidance(
@@ -561,7 +989,9 @@ analyze_family <- function(features_path, out_dir) {
     cluster_summary = cluster_results$summary %||% list(),
     regime_summary = regime_summary %||% list(),
     top_corr = top_corr,
-    outliers = outliers
+    outliers = outliers,
+    temporal_sampling = temporal_sampling,
+    conditioning_audit = conditioning_audit
   )
 
   split_by_format <- length(unique(df$format)) > 1 || length(unique(df$parser)) > 1
@@ -588,13 +1018,18 @@ analyze_family <- function(features_path, out_dir) {
     metrics = summaries,
     top_correlations = top_corr,
     outliers = outliers,
+    outlier_decomposition = outlier_decomposition,
+    outlier_sensitivity = head(outlier_sensitivity, 12),
     pca = if (!is.null(pca_bundle)) list(
       pc1_variance = pca_bundle$importance[2, 1],
       importance = pca_bundle$importance[, seq_len(min(4, ncol(pca_bundle$importance))), drop = FALSE],
       rotation = pca_bundle$model$rotation[, seq_len(min(4, ncol(pca_bundle$model$rotation))), drop = FALSE]
     ) else NULL,
     clusters = cluster_results$summary,
-    regimes = regime_summary
+    regimes = regime_summary,
+    regime_attribution = regime_attribution,
+    temporal_sampling = temporal_sampling,
+    conditioning_audit = conditioning_audit
   )
 
   analysis <- sanitize_json(analysis)

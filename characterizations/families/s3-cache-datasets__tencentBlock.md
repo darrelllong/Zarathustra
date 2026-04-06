@@ -21,6 +21,15 @@
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: iat_std vs iat_q99 (corr=0.98).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | iat_q50, obj_size_q50, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -32,10 +41,52 @@
 
 | Item | Value |
 |---|---|
-| DBSCAN clusters | 4 |
-| DBSCAN noise fraction | 0.072 |
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
+| DBSCAN clusters | 3 |
+| DBSCAN noise fraction | 0.077 |
 | Ordered PC1 changepoints | 16 |
 | PCA variance explained by PC1 | 0.287 |
+| Hurst exponent on ordered PC1 | 0.711 |
+| Block/random distance ratio | 0.897 |
+| Sampling recommendation | random_sampling_is_less_problematic |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 912711130451567050752 | 0.957 |
+| 3 | 694830797802674061312 | 0.907 |
+| 4 | 176559793923085598720 | 0.904 |
+| 5 | 149732600456342765568 | 0.825 |
+| 6 | 99847691812393762816 | 0.624 |
+| 7 | 99196610065203183616 | 0.65 |
+| 8 | 84912207065050087424 | 0.673 |
+| 9 | 84317788072516255744 | 0.657 |
+| 10 | 76539145940746010624 | 0.667 |
+| 11 | 76322041021864099840 | 0.558 |
+| 12 | 74715715982277722112 | 0.542 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | iat_q99 | 0.5 | write_ratio | 0.328 | reuse_ratio | 0.306 |
+| 2 -> 3 | reuse_ratio | 4.759 | abs_stride_q90 | 2.689 | iat_std | 2.588 |
+| 3 -> 4 | iat_q99 | 4.427 | reuse_ratio | 3.598 | iat_std | 3.404 |
+| 4 -> 5 | write_ratio | 0.844 | opcode_switch_ratio | 0.525 | sample_record_rate | 0.474 |
+| 5 -> 6 | write_ratio | 5.875 | opcode_switch_ratio | 2.692 | abs_stride_q99 | 2.364 |
+| 6 -> 7 | write_ratio | 7.891 | opcode_switch_ratio | 3.12 | iat_std | 2.471 |
+| 7 -> 8 | iat_q99 | 0.632 | opcode_switch_ratio | 0.392 | reuse_ratio | 0.329 |
+| 8 -> 9 | opcode_switch_ratio | 0.632 | sample_record_rate | 0.32 | iat_mean | 0.279 |
+| 9 -> 10 | opcode_switch_ratio | 0.283 | sample_record_rate | 0.279 | ts_duration | 0.248 |
+| 10 -> 11 | object_top10_share | 2.628 | backward_seek_ratio | 2.317 | object_top1_share | 1.834 |
+| 11 -> 12 | object_top10_share | 2.309 | backward_seek_ratio | 2.17 | object_top1_share | 1.701 |
+| 12 -> 13 | abs_stride_q90 | 1.081 | reuse_ratio | 0.949 | signed_stride_lag1_autocorr | 0.807 |
+| 13 -> 14 | signed_stride_lag1_autocorr | 0.912 | abs_stride_q90 | 0.778 | object_unique | 0.6 |
+| 14 -> 15 | object_top10_share | 1.621 | iat_std | 1.58 | ts_duration | 1.486 |
+| 15 -> 16 | reuse_ratio | 6.004 | abs_stride_q90 | 5.898 | backward_seek_ratio | 5.627 |
+| 16 -> 17 | reuse_ratio | 5.906 | iat_q90 | 4.243 | abs_stride_q90 | 2.871 |
 
 ## Strongest Correlations
 
@@ -75,16 +126,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25829.lcs.zst | 555.808 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25497.lcs.zst | 513.913 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/11839.lcs.zst | 465.648 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/12500.lcs.zst | 461.611 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/21369.lcs.zst | 404.428 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25489.lcs.zst | 278.678 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/3330.lcs.zst | 273.502 |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25800.lcs.zst | 226.331 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25829.lcs.zst | 555.808 | iat_mean (z=396982.6); iat_std (z=303290) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25497.lcs.zst | 513.913 | iat_mean (z=521134.7); iat_std (z=169408.8) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/11839.lcs.zst | 465.648 | abs_stride_std (z=146.902); abs_stride_q99 (z=127.571) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/12500.lcs.zst | 461.611 | abs_stride_q90 (z=193.877); abs_stride_mean (z=140.028) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/21369.lcs.zst | 404.428 | abs_stride_mean (z=137.012); abs_stride_std (z=126.829) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25489.lcs.zst | 278.678 | iat_mean (z=324153.3); iat_std (z=120310.8) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/3330.lcs.zst | 273.502 | abs_stride_q99 (z=127.557); abs_stride_std (z=125.115) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25800.lcs.zst | 226.331 | iat_mean (z=188225.4); iat_std (z=171633.8) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | abs_stride_mean | 393588.3 | 392556.7 | -0.003 |
+| 5 | abs_stride_mean | 393588.3 | 392657.1 | -0.002 |
+| 10 | burstiness_cv | 4.514 | 4.52 | 0.001 |
+| 1 | abs_stride_mean | 393588.3 | 394090.4 | 0.001 |
+| 5 | burstiness_cv | 4.514 | 4.519 | 0.001 |
+| 3 | abs_stride_mean | 393588.3 | 393173 | -0.001 |
+| 3 | burstiness_cv | 4.514 | 4.517 | 0.001 |
+| 1 | burstiness_cv | 4.514 | 4.514 | 0 |
+| 1 | obj_size_std | 0 | 0 | 0 |
+| 1 | reuse_ratio | 0.004 | 0.004 | 0 |
 
 ## Notable Files
 

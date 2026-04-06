@@ -22,6 +22,15 @@
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | iat_q50 |
+| Recommended candidate additions | signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -73,14 +82,29 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.sample0.01.zst | 3.062 |
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.sample0.1.zst | 2.885 |
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.sample0.01.zst | 2.87 |
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.zst | 2.805 |
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.sample0.1.zst | 1.897 |
-| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.zst | 1.482 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.sample0.01.zst | 3.062 | abs_stride_q99 (z=4428534107059); abs_stride_std (z=3695598190076) |
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.sample0.1.zst | 2.885 | abs_stride_q99 (z=2083555974300); abs_stride_std (z=1932715782822) |
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.sample0.01.zst | 2.87 | ts_duration (z=21.667); iat_mean (z=21.667) |
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202401_kv_traces_all_sort.csv.lcs.zst | 2.805 | abs_stride_std (z=1012689711731); abs_stride_q99 (z=332060558595) |
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.sample0.1.zst | 1.897 | iat_zero_ratio (z=-3.222); ts_duration (z=3.222) |
+| s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.zst | 1.482 | size_bytes (z=9.969); sample_record_rate (z=4.468) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 5 | burstiness_cv | 10.118 | 21.307 | 1.106 |
+| 3 | burstiness_cv | 10.118 | 20.211 | 0.998 |
+| 3 | object_unique | 680 | 468 | -0.312 |
+| 5 | object_unique | 680 | 528 | -0.224 |
+| 5 | obj_size_std | 3118.714 | 2640.796 | -0.153 |
+| 3 | obj_size_std | 3118.714 | 2730.606 | -0.124 |
+| 1 | obj_size_std | 3118.714 | 2732.239 | -0.124 |
+| 3 | reuse_ratio | 0.755 | 0.838 | 0.111 |
+| 1 | object_unique | 680 | 620 | -0.088 |
+| 5 | reuse_ratio | 0.755 | 0.801 | 0.061 |
 
 ## Notable Files
 

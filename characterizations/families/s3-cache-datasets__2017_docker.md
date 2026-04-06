@@ -18,6 +18,14 @@
 - Strongest feature coupling in this pass: size_bytes vs schema_high_cardinality_cols (corr=0.93).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
 
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | none flagged |
+| Recommended candidate additions | none flagged |
+| Highly redundant current pairs | none flagged |
+
 ## Format Breakdown
 
 | Format | Files | Parsers |
@@ -57,15 +65,15 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/dal09.parquet | 5.143 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/syd01.parquet | 3.705 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/lon02.parquet | 2.318 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/dev-mon01.parquet | 2.15 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/prestage-mon01.parquet | 2.15 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/stage-dal09.parquet | 1.611 |
-| s3-cache-datasets/cache_dataset_parquet/2017_docker/fra02.parquet | 0.922 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/dal09.parquet | 5.143 | size_bytes (z=5.972); schema_high_cardinality_cols (z=2.646) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/syd01.parquet | 3.705 | size_bytes (z=-0.832); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/lon02.parquet | 2.318 | size_bytes (z=1.242); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/dev-mon01.parquet | 2.15 | schema_mixed_cols (z=2.049); size_bytes (z=-1) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/prestage-mon01.parquet | 2.15 | schema_mixed_cols (z=2.049); size_bytes (z=-0.884) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/stage-dal09.parquet | 1.611 | size_bytes (z=1.03); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2017_docker/fra02.parquet | 0.922 | sample_records (z=0); size_bytes (z=0) |
 
 ## Notable Files
 

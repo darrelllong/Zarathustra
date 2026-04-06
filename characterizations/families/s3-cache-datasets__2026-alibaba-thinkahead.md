@@ -19,10 +19,20 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 8 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, obj_size_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr |
+| Highly redundant current pairs | forward_seek_ratio vs backward_seek_ratio (-0.955) |
 
 ## Format Breakdown
 
@@ -34,10 +44,43 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.089 |
 | Ordered PC1 changepoints | 7 |
 | PCA variance explained by PC1 | 0.238 |
+| Hurst exponent on ordered PC1 | 0.5 |
+| Block/random distance ratio | 0.717 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 106776690978223506325504 | 0.938 |
+| 3 | 35431607872077827145728 | 0.87 |
+| 4 | 19829828452379996979200 | 0.882 |
+| 5 | 5302177802903527358464 | 0.907 |
+| 6 | 5254002674706204852224 | 0.822 |
+| 7 | 5203954043661199605760 | 0.848 |
+| 8 | 5202476924867592585216 | 0.81 |
+| 9 | 5202446310692827955200 | 0.557 |
+| 10 | 5202420337260752797696 | 0.628 |
+| 11 | 5202402168337430740992 | 0.638 |
+| 12 | 5199452190222011334656 | 0.616 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | abs_stride_std | 1.414 | abs_stride_q99 | 1.414 | abs_stride_mean | 1.414 |
+| 2 -> 3 | abs_stride_q99 | 6.153 | signed_stride_lag1_autocorr | 4.508 | abs_stride_q90 | 4.296 |
+| 3 -> 4 | reuse_ratio | 7.06 | object_unique | 5.4 | abs_stride_q99 | 3.592 |
+| 4 -> 5 | reuse_ratio | 2.852 | object_unique | 2.124 | abs_stride_q90 | 1.966 |
+| 5 -> 6 | backward_seek_ratio | 14.842 | size_bytes | 4.113 | forward_seek_ratio | 3.71 |
+| 6 -> 7 | forward_seek_ratio | 5.427 | backward_seek_ratio | 4.262 | reuse_ratio | 3.275 |
+| 7 -> 8 | reuse_ratio | 5.413 | iat_std | 1.905 | sample_record_rate | 1.732 |
 
 ## Strongest Correlations
 
@@ -77,16 +120,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c17.oracleGeneral.zst | 36.679 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c4.oracleGeneral.zst | 35.349 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c25.oracleGeneral.zst | 15.343 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c15.oracleGeneral.zst | 12.976 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c14.oracleGeneral.zst | 10.336 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c3.oracleGeneral.zst | 2.192 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c26.oracleGeneral.zst | 1.982 |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c21.oracleGeneral.zst | 1.958 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c17.oracleGeneral.zst | 36.679 | abs_stride_q50 (z=1249998189); abs_stride_mean (z=631226.5) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c4.oracleGeneral.zst | 35.349 | abs_stride_std (z=109335.4); iat_std (z=29316.91) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c25.oracleGeneral.zst | 15.343 | iat_lag1_autocorr (z=420.801); object_top10_share (z=17.238) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c15.oracleGeneral.zst | 12.976 | iat_std (z=5715.798); abs_stride_std (z=5389.91) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c14.oracleGeneral.zst | 10.336 | object_top10_share (z=16.857); object_unique (z=-12.05) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c3.oracleGeneral.zst | 2.192 | iat_mean (z=5.667); ts_duration (z=5.667) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c26.oracleGeneral.zst | 1.982 | abs_stride_q99 (z=55.42); abs_stride_std (z=38.067) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c21.oracleGeneral.zst | 1.958 | abs_stride_q90 (z=114583.3); abs_stride_mean (z=89459.59) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 3 | burstiness_cv | 26.106 | 25.446 | -0.025 |
+| 5 | burstiness_cv | 26.106 | 25.446 | -0.025 |
+| 10 | burstiness_cv | 26.106 | 25.617 | -0.019 |
+| 10 | reuse_ratio | 0.027 | 0.027 | 0.018 |
+| 10 | abs_stride_mean | 674742.4 | 663604.4 | -0.016 |
+| 1 | burstiness_cv | 26.106 | 25.861 | -0.009 |
+| 1 | reuse_ratio | 0.027 | 0.027 | 0.009 |
+| 3 | reuse_ratio | 0.027 | 0.027 | 0.009 |
+| 5 | reuse_ratio | 0.027 | 0.027 | 0.009 |
+| 1 | abs_stride_mean | 674742.4 | 669173.4 | -0.008 |
 
 ## Notable Files
 

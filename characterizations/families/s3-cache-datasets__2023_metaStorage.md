@@ -19,6 +19,14 @@
 - Strongest feature coupling in this pass: first_numeric_diff_mean vs first_numeric_diff_std (corr=0.73).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
 
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | none flagged |
+| Recommended candidate additions | none flagged |
+| Highly redundant current pairs | none flagged |
+
 ## Format Breakdown
 
 | Format | Files | Parsers |
@@ -59,14 +67,14 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_1.csv | 4.166 |
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_3.csv.zst | 3.796 |
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_2.csv.zst | 2.202 |
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_5.csv.zst | 1.63 |
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_4.csv.zst | 1.625 |
-| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_1.csv.zst | 1.58 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_1.csv | 4.166 | size_bytes (z=95.996); first_numeric_diff_std (z=1) |
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_3.csv.zst | 3.796 | first_numeric_diff_mean (z=1.5); first_numeric_diff_std (z=-0.521) |
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_2.csv.zst | 2.202 | size_bytes (z=-1.113); first_numeric_diff_std (z=0.521) |
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_5.csv.zst | 1.63 | first_numeric_diff_std (z=-3.029); first_numeric_diff_mean (z=-1.5) |
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_4.csv.zst | 1.625 | first_numeric_diff_std (z=-3.029); first_numeric_diff_mean (z=-1.5) |
+| s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_1.csv.zst | 1.58 | size_bytes (z=-1.499); first_numeric_diff_std (z=1) |
 
 ## Notable Files
 

@@ -30,19 +30,44 @@ analysis_table_to_df <- function(x) {
     return(x)
   }
   if (is.list(x) && !is.null(names(x))) {
-    lengths <- vapply(x, length, integer(1))
-    if (length(unique(lengths)) == 1 && unique(lengths) >= 1) {
-      return(data.frame(lapply(x, function(v) unlist(v, use.names = FALSE)), stringsAsFactors = FALSE))
+    atomicish <- vapply(x, function(v) is.atomic(v) || is.null(v), logical(1))
+    if (all(atomicish)) {
+      return(data.frame(lapply(x, function(v) {
+        lengths <- vapply(x, length, integer(1))
+        max_len <- max(lengths, 1L)
+        if (length(v) == 0) {
+          return(rep(NA, max_len))
+        }
+        vals <- unlist(v, use.names = FALSE)
+        if (length(vals) < max_len) {
+          length(vals) <- max_len
+        }
+        vals
+      }), stringsAsFactors = FALSE))
     }
   }
   if (is.list(x)) {
     rows <- lapply(x, function(item) {
+      if (is.null(item) || length(item) == 0) {
+        return(NULL)
+      }
       if (is.data.frame(item)) {
         item
+      } else if (is.list(item) && !is.null(names(item))) {
+        as.data.frame(lapply(item, function(v) {
+          if (length(v) == 0) {
+            return(NA)
+          }
+          unlist(v, use.names = FALSE)[[1]]
+        }), stringsAsFactors = FALSE)
       } else {
-        as.data.frame(item, stringsAsFactors = FALSE)
+        tryCatch(as.data.frame(item, stringsAsFactors = FALSE), error = function(e) NULL)
       }
     })
+    rows <- Filter(Negate(is.null), rows)
+    if (length(rows) == 0) {
+      return(data.frame())
+    }
     return(do.call(rbind, rows))
   }
   data.frame()
@@ -50,7 +75,7 @@ analysis_table_to_df <- function(x) {
 
 render_family_report <- function(features_path, analysis_path, out_path) {
   df <- safe_read_csv(features_path)
-  analysis <- jsonlite::fromJSON(analysis_path, simplifyVector = FALSE)
+  analysis <- jsonlite::fromJSON(analysis_path, simplifyVector = TRUE)
   metric_summary_path <- file.path(dirname(analysis_path), "metric_summary.csv")
   metric_summary <- if (file.exists(metric_summary_path) && file.info(metric_summary_path)$size > 0) safe_read_csv(metric_summary_path) else data.frame()
 
@@ -78,6 +103,23 @@ render_family_report <- function(features_path, analysis_path, out_path) {
     lines <- c(lines, paste0("- ", note))
   }
 
+  lines <- c(lines, "", "## Conditioning Audit", "", "| Item | Value |", "|---|---|")
+  cond_drop <- analysis_table_to_df(analysis$conditioning_audit$near_constant)
+  cond_add <- analysis_table_to_df(analysis$conditioning_audit$candidate_additions)
+  cond_redundant <- analysis_table_to_df(analysis$conditioning_audit$redundant_pairs)
+  recommended_additions <- character()
+  if (nrow(cond_add) > 0 && "recommended" %in% names(cond_add)) {
+    recommended_additions <- cond_add$metric[cond_add$recommended %in% TRUE]
+  }
+  lines <- c(lines, paste0("| Near-constant current conditioning features | ", if (nrow(cond_drop) > 0) paste(cond_drop$metric, collapse = ", ") else "none flagged", " |"))
+  lines <- c(lines, paste0("| Recommended candidate additions | ", if (length(recommended_additions) > 0) paste(recommended_additions, collapse = ", ") else "none flagged", " |"))
+  if (nrow(cond_redundant) > 0) {
+    pair_text <- apply(head(cond_redundant, 4), 1, function(row) paste0(row[["metric_a"]], " vs ", row[["metric_b"]], " (", format_number(row[["correlation"]]), ")"))
+    lines <- c(lines, paste0("| Highly redundant current pairs | ", paste(pair_text, collapse = "; "), " |"))
+  } else {
+    lines <- c(lines, "| Highly redundant current pairs | none flagged |")
+  }
+
   lines <- c(lines, "", "## Format Breakdown", "", "| Format | Files | Parsers |", "|---|---:|---|")
   if (nrow(df) > 0 && "format" %in% names(df)) {
     for (fmt in sort(unique(df$format))) {
@@ -88,6 +130,12 @@ render_family_report <- function(features_path, analysis_path, out_path) {
   }
 
   lines <- c(lines, "", "## Clustering And Regimes", "", "| Item | Value |", "|---|---|")
+  if (!is.null(analysis$clusters$kmeans$selected_k)) {
+    lines <- c(lines, paste0("| K-means selected K | ", analysis$clusters$kmeans$selected_k, " |"))
+  }
+  if (!is.null(analysis$clusters$kmeans_diagnostics$best_k)) {
+    lines <- c(lines, paste0("| Best silhouette K | ", analysis$clusters$kmeans_diagnostics$best_k, " |"))
+  }
   if (!is.null(analysis$clusters$mclust$components)) {
     lines <- c(lines, paste0("| Mclust components | ", analysis$clusters$mclust$components, " |"))
   }
@@ -100,6 +148,43 @@ render_family_report <- function(features_path, analysis_path, out_path) {
   }
   if (!is.null(analysis$pca$pc1_variance)) {
     lines <- c(lines, paste0("| PCA variance explained by PC1 | ", format_number(analysis$pca$pc1_variance), " |"))
+  }
+  if (!is.null(analysis$regimes$tsfeatures$hurst)) {
+    lines <- c(lines, paste0("| Hurst exponent on ordered PC1 | ", format_number(analysis$regimes$tsfeatures$hurst), " |"))
+  }
+  if (!is.null(analysis$temporal_sampling$block_random_distance_ratio)) {
+    lines <- c(lines, paste0("| Block/random distance ratio | ", format_number(analysis$temporal_sampling$block_random_distance_ratio), " |"))
+    lines <- c(lines, paste0("| Sampling recommendation | ", analysis$temporal_sampling$recommendation %||% "N/A", " |"))
+  }
+
+  kdiag <- analysis_table_to_df(analysis$clusters$kmeans_diagnostics$table)
+  if (nrow(kdiag) > 0) {
+    lines <- c(lines, "", "### K Selection", "", "| K | Within-SS | Silhouette |", "|---:|---:|---:|")
+    for (i in seq_len(nrow(kdiag))) {
+      row <- kdiag[i, , drop = FALSE]
+      lines <- c(lines, paste0("| ", row$k, " | ", format_number(row$tot_withinss), " | ", format_number(row$silhouette), " |"))
+    }
+  }
+
+  regime_df <- analysis_table_to_df(analysis$regime_attribution$transitions)
+  if (nrow(regime_df) > 0) {
+    lines <- c(lines, "", "## Regime Transition Drivers", "", "| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |", "|---|---|---:|---|---:|---|---:|")
+    for (i in seq_len(nrow(regime_df))) {
+      row <- regime_df[i, , drop = FALSE]
+      lines <- c(
+        lines,
+        paste0(
+          "| ", row$from_segment, " -> ", row$to_segment,
+          " | ", row$top_driver_1 %||% "N/A",
+          " | ", format_number(row$top_driver_1_effect),
+          " | ", row$top_driver_2 %||% "N/A",
+          " | ", format_number(row$top_driver_2_effect),
+          " | ", row$top_driver_3 %||% "N/A",
+          " | ", format_number(row$top_driver_3_effect),
+          " |"
+        )
+      )
+    }
   }
 
   lines <- c(lines, "", "## Strongest Correlations", "", "| Metric A | Metric B | Correlation |", "|---|---|---:|")
@@ -137,15 +222,34 @@ render_family_report <- function(features_path, analysis_path, out_path) {
     }
   }
 
-  lines <- c(lines, "", "## Outlier Files", "", "| rel_path | outlier_score |", "|---|---:|")
+  lines <- c(lines, "", "## Outlier Files", "", "| rel_path | outlier_score | top drivers |", "|---|---:|---|")
   outlier_df <- analysis_table_to_df(analysis$outliers)
+  outlier_decomp_df <- analysis_table_to_df(analysis$outlier_decomposition)
   if (nrow(outlier_df) > 0) {
     for (i in seq_len(min(8, nrow(outlier_df)))) {
       row <- outlier_df[i, , drop = FALSE]
-      lines <- c(lines, paste0("| ", row$rel_path, " | ", format_number(row$outlier_score), " |"))
+      decomp <- outlier_decomp_df[outlier_decomp_df$rel_path == row$rel_path, , drop = FALSE]
+      driver_text <- "N/A"
+      if (nrow(decomp) > 0) {
+        driver_text <- paste(
+          paste0(decomp$top_feature_1[[1]] %||% "N/A", " (z=", format_number(decomp$top_feature_1_z[[1]]), ")"),
+          paste0(decomp$top_feature_2[[1]] %||% "N/A", " (z=", format_number(decomp$top_feature_2_z[[1]]), ")"),
+          sep = "; "
+        )
+      }
+      lines <- c(lines, paste0("| ", row$rel_path, " | ", format_number(row$outlier_score), " | ", driver_text, " |"))
     }
   } else {
-    lines <- c(lines, "| N/A | N/A |")
+    lines <- c(lines, "| N/A | N/A | N/A |")
+  }
+
+  outlier_sensitivity_df <- analysis_table_to_df(analysis$outlier_sensitivity)
+  if (nrow(outlier_sensitivity_df) > 0) {
+    lines <- c(lines, "", "## Outlier Sensitivity", "", "| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |", "|---:|---|---:|---:|---:|")
+    for (i in seq_len(min(10, nrow(outlier_sensitivity_df)))) {
+      row <- outlier_sensitivity_df[i, , drop = FALSE]
+      lines <- c(lines, paste0("| ", row$n_removed, " | ", row$metric, " | ", format_number(row$baseline_median), " | ", format_number(row$trimmed_median), " | ", format_number(row$relative_shift), " |"))
+    }
   }
 
   lines <- c(lines, "", "## Notable Files", "", "| rel_path | format | write_ratio | reuse_ratio | burstiness_cv | ts_duration |", "|---|---|---:|---:|---:|---:|")

@@ -23,6 +23,15 @@
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: schema_column_count vs schema_numeric_cols (corr=0.99).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, iat_q50, opcode_switch_ratio, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -35,9 +44,27 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 3 |
+| Best silhouette K | 3 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.044 |
 | PCA variance explained by PC1 | 0.518 |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 306432730406275055616 | 0.662 |
+| 3 | 9855405250063163392 | 0.813 |
+| 4 | 2404647468314093568 | 0.807 |
+| 5 | 1523060352168586752 | 0.806 |
+| 6 | 1509158103059552256 | 0.716 |
+| 7 | 613253242332020480 | 0.678 |
+| 8 | 269895456856252288 | 0.64 |
+| 9 | 255491885062816896 | 0.595 |
+| 10 | 254846892040225408 | 0.495 |
+| 11 | 253955027678082080 | 0.538 |
+| 12 | 253776988310089120 | 0.562 |
 
 ## Strongest Correlations
 
@@ -77,16 +104,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_04.csv.zst | 18.717 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | 12.2 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202206/kvcache_traces_4.csv.zst | 9.01 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_02.csv.zst | 2.588 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202401_kv_traces_all_sort.csv.zst | 2.345 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_1.csv.zst | 1.95 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_2.csv.zst | 1.95 |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_3.csv.zst | 1.95 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_04.csv.zst | 18.717 | first_numeric_diff_std (z=974671070); first_numeric_diff_mean (z=-6423502) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | 12.2 | first_numeric_diff_std (z=628590028); first_numeric_diff_mean (z=461513) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202206/kvcache_traces_4.csv.zst | 9.01 | first_numeric_diff_std (z=199118.3); first_numeric_diff_mean (z=10553.33) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_02.csv.zst | 2.588 | first_numeric_diff_std (z=567731696); first_numeric_diff_mean (z=1509536) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202401_kv_traces_all_sort.csv.zst | 2.345 | size_bytes (z=10.247); schema_high_cardinality_cols (z=2.222) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_1.csv.zst | 1.95 | schema_high_cardinality_cols (z=2.222); schema_column_count (z=1) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_2.csv.zst | 1.95 | schema_high_cardinality_cols (z=2.222); schema_column_count (z=1) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_3.csv.zst | 1.95 | schema_high_cardinality_cols (z=2.222); schema_column_count (z=1) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 1 | burstiness_cv | 21.307 | 21.307 | 0 |
+| 1 | abs_stride_mean | 160497.9 | 160497.9 | 0 |
+| 1 | obj_size_std | 1731.789 | 1731.789 | 0 |
+| 1 | reuse_ratio | 0.894 | 0.894 | 0 |
+| 1 | iat_q50 | 0 | 0 | 0 |
+| 1 | object_unique | 325 | 325 | 0 |
+| 3 | burstiness_cv | 21.307 | 21.307 | 0 |
+| 3 | abs_stride_mean | 160497.9 | 160497.9 | 0 |
+| 3 | obj_size_std | 1731.789 | 1731.789 | 0 |
+| 3 | reuse_ratio | 0.894 | 0.894 | 0 |
 
 ## Notable Files
 

@@ -17,10 +17,20 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 36 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Tenant diversity is high; tenant/context conditioning is likely useful.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | none flagged |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | reuse_ratio vs backward_seek_ratio (-0.985); reuse_ratio vs forward_seek_ratio (-0.984) |
 
 ## Format Breakdown
 
@@ -32,10 +42,71 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 3 |
 | DBSCAN noise fraction | 0.045 |
 | Ordered PC1 changepoints | 35 |
 | PCA variance explained by PC1 | 0.337 |
+| Hurst exponent on ordered PC1 | 0.961 |
+| Block/random distance ratio | 0.353 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 14921684591957014528 | 0.976 |
+| 3 | 13569605214776494080 | 0.843 |
+| 4 | 223420333441869952 | 0.847 |
+| 5 | 13489379162946998272 | 0.693 |
+| 6 | 149997725930480672 | 0.588 |
+| 7 | 145749703886544832 | 0.545 |
+| 8 | 121658415783095664 | 0.536 |
+| 9 | 115367004443761296 | 0.558 |
+| 10 | 114707330129062448 | 0.492 |
+| 11 | 111745680703889296 | 0.527 |
+| 12 | 111083569153877920 | 0.526 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | sample_record_rate | 4.622 | tenant_unique | 3.637 | iat_min | 2.602 |
+| 2 -> 3 | sample_record_rate | 4.697 | obj_size_mean | 4.334 | tenant_unique | 4.178 |
+| 3 -> 4 | signed_stride_lag1_autocorr | 18.967 | iat_lag1_autocorr | 3.121 | size_bytes | 2.264 |
+| 4 -> 5 | iat_std | 1961.59 | ts_duration | 1514.891 | iat_mean | 1514.891 |
+| 5 -> 6 | obj_size_mean | 80.05 | forward_seek_ratio | 66.939 | abs_stride_mean | 49.886 |
+| 6 -> 7 | obj_size_std | 17.785 | object_top1_share | 4.193 | obj_size_mean | 2.898 |
+| 7 -> 8 | size_bytes | 339.913 | sample_record_rate | 54.458 | write_ratio | 21.871 |
+| 8 -> 9 | forward_seek_ratio | 2.193 | write_ratio | 2.071 | burstiness_cv | 1.802 |
+| 9 -> 10 | size_bytes | 524.776 | sample_record_rate | 28.41 | iat_mean | 6.149 |
+| 10 -> 11 | abs_stride_q50 | 9.9 | tenant_unique | 6 | write_ratio | 5.365 |
+| 11 -> 12 | signed_stride_lag1_autocorr | 5.964 | iat_min | 5.833 | object_unique | 5.657 |
+| 12 -> 13 | tenant_top10_share | 24.042 | iat_min | 21.431 | object_unique | 11.314 |
+| 13 -> 14 | object_top10_share | 7.155 | backward_seek_ratio | 5.856 | reuse_ratio | 4.49 |
+| 14 -> 15 | size_bytes | 39.227 | tenant_unique | 13.4 | sample_record_rate | 10.538 |
+| 15 -> 16 | write_ratio | 4.933 | abs_stride_std | 1.994 | tenant_top1_share | 1.636 |
+| 16 -> 17 | iat_std | 276.49 | iat_q99 | 249.81 | tenant_unique | 169.548 |
+| 17 -> 18 | obj_size_min | 61776.62 | tenant_unique | 260.215 | iat_std | 198.109 |
+| 18 -> 19 | iat_std | 70.54 | iat_mean | 61.426 | ts_duration | 61.426 |
+| 19 -> 20 | write_ratio | 57.091 | obj_size_mean | 13.301 | obj_size_q99 | 10.107 |
+| 20 -> 21 | backward_seek_ratio | 30.507 | object_top1_share | 6.487 | abs_stride_std | 5.653 |
+| 21 -> 22 | iat_zero_ratio | 7.793 | obj_size_min | 7.425 | object_unique | 6.506 |
+| 22 -> 23 | obj_size_q99 | 4.817 | signed_stride_lag1_autocorr | 2.184 | backward_seek_ratio | 2.059 |
+| 23 -> 24 | obj_size_q99 | 6.372 | tenant_unique | 4.802 | tenant_top10_share | 4.339 |
+| 24 -> 25 | tenant_unique | 15 | object_top10_share | 4.991 | tenant_top10_share | 4.42 |
+| 25 -> 26 | obj_size_mean | 3.576 | size_bytes | 1.828 | iat_zero_ratio | 1.533 |
+| 26 -> 27 | obj_size_mean | 3.576 | size_bytes | 2.511 | obj_size_q90 | 2.216 |
+| 27 -> 28 | sample_record_rate | 18.352 | size_bytes | 18.131 | iat_q90 | 17.678 |
+| 28 -> 29 | object_top1_share | 4.487 | signed_stride_lag1_autocorr | 4.049 | reuse_ratio | 4.038 |
+| 29 -> 30 | backward_seek_ratio | 3.379 | object_unique | 3.202 | burstiness_cv | 1.719 |
+| 30 -> 31 | abs_stride_q90 | 4.745 | abs_stride_std | 4.67 | tenant_unique | 4.243 |
+| 31 -> 32 | obj_size_min | 5.091 | abs_stride_std | 4.845 | abs_stride_q90 | 2.86 |
+| 32 -> 33 | tenant_top10_share | 17.515 | obj_size_min | 5.091 | signed_stride_lag1_autocorr | 4.803 |
+| 33 -> 34 | tenant_top10_share | 912.168 | signed_stride_lag1_autocorr | 143.819 | iat_lag1_autocorr | 41.879 |
+| 34 -> 35 | abs_stride_std | 11.89 | iat_q99 | 10.069 | tenant_top10_share | 8.264 |
+| 35 -> 36 | abs_stride_q50 | 67.144 | tenant_top10_share | 8.632 | object_top1_share | 8.468 |
 
 ## Strongest Correlations
 
@@ -75,16 +146,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| Baleen24/extracted/storage_0.1_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 |
-| Baleen24/extracted/storage_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 |
-| Baleen24/extracted/storage/storage/201910/Region2/full_0.2_0.1.trace | 47.488 |
-| Baleen24/extracted/storage_0.1_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 |
-| Baleen24/extracted/storage_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 |
-| Baleen24/extracted/storage/storage/202110/Region4/full_0.1_0.1.trace | 45.75 |
-| Baleen24/extracted/storage_all_Region3/201910/Region3/full.trace | 27.506 |
-| Baleen24/extracted/storage_0.1_10/storage/201910/Region3/full_0.3_0.1.trace | 15.964 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| Baleen24/extracted/storage_0.1_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage_0.1_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
+| Baleen24/extracted/storage_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
+| Baleen24/extracted/storage/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
+| Baleen24/extracted/storage_all_Region3/201910/Region3/full.trace | 27.506 | obj_size_min (z=5241.8); sample_record_rate (z=2302.995) |
+| Baleen24/extracted/storage_0.1_10/storage/201910/Region3/full_0.3_0.1.trace | 15.964 | obj_size_min (z=5241.8); obj_size_std (z=-14.395) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | object_unique | 722 | 766 | 0.061 |
+| 3 | object_unique | 722 | 760 | 0.053 |
+| 5 | object_unique | 722 | 760 | 0.053 |
+| 3 | reuse_ratio | 0.311 | 0.309 | -0.005 |
+| 10 | reuse_ratio | 0.311 | 0.31 | -0.002 |
+| 5 | burstiness_cv | 1.415 | 1.413 | -0.002 |
+| 10 | burstiness_cv | 1.415 | 1.414 | -0.001 |
+| 1 | abs_stride_mean | 2351121 | 2352739 | 0.001 |
+| 3 | abs_stride_mean | 2351121 | 2352739 | 0.001 |
+| 5 | abs_stride_mean | 2351121 | 2352739 | 0.001 |
 
 ## Notable Files
 

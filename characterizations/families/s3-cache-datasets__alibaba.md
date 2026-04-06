@@ -18,9 +18,19 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 23 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: iat_mean vs iat_q90 (corr=0.99).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | iat_q50, obj_size_q50, tenant_unique |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr |
+| Highly redundant current pairs | forward_seek_ratio vs backward_seek_ratio (-0.961) |
 
 ## Format Breakdown
 
@@ -32,10 +42,58 @@
 
 | Item | Value |
 |---|---|
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.08 |
 | Ordered PC1 changepoints | 22 |
 | PCA variance explained by PC1 | 0.274 |
+| Hurst exponent on ordered PC1 | 0.695 |
+| Block/random distance ratio | 0.688 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+
+### K Selection
+
+| K | Within-SS | Silhouette |
+|---:|---:|---:|
+| 2 | 1115731198562949660672 | 0.977 |
+| 3 | 648575049005363888128 | 0.941 |
+| 4 | 622952439118409891840 | 0.779 |
+| 5 | 504104469511542931456 | 0.791 |
+| 6 | 496918499784578826240 | 0.79 |
+| 7 | 495712727490412281856 | 0.718 |
+| 8 | 495283243302627704832 | 0.667 |
+| 9 | 199528512111614427136 | 0.724 |
+| 10 | 494794491241867837440 | 0.648 |
+| 11 | 198939014722948497408 | 0.612 |
+| 12 | 198812720734478630912 | 0.617 |
+
+## Regime Transition Drivers
+
+| Transition | Driver 1 | Effect | Driver 2 | Effect | Driver 3 | Effect |
+|---|---|---:|---|---:|---|---:|
+| 1 -> 2 | sample_record_rate | 17.794 | burstiness_cv | 16.573 | iat_zero_ratio | 3.589 |
+| 2 -> 3 | sample_record_rate | 18.025 | burstiness_cv | 15.382 | object_unique | 3.618 |
+| 3 -> 4 | write_ratio | 1.414 | opcode_switch_ratio | 1.414 | reuse_ratio | 1.414 |
+| 4 -> 5 | abs_stride_q90 | 1.758 | reuse_ratio | 1.414 | abs_stride_q50 | 1.414 |
+| 5 -> 6 | abs_stride_std | 0.837 | forward_seek_ratio | 0.713 | backward_seek_ratio | 0.709 |
+| 6 -> 7 | iat_q90 | 2.357 | ts_duration | 2.03 | iat_mean | 1.98 |
+| 7 -> 8 | reuse_ratio | 1.414 | write_ratio | 1.414 | opcode_switch_ratio | 1.414 |
+| 8 -> 9 | burstiness_cv | 3.055 | write_ratio | 2.493 | iat_zero_ratio | 2.181 |
+| 9 -> 10 | sample_record_rate | 28.241 | iat_lag1_autocorr | 7.355 | reuse_ratio | 1.961 |
+| 10 -> 11 | size_bytes | 3.884 | signed_stride_lag1_autocorr | 2.661 | write_ratio | 2.002 |
+| 11 -> 12 | size_bytes | 2.21 | write_ratio | 1.414 | opcode_switch_ratio | 1.414 |
+| 12 -> 13 | burstiness_cv | 6.679 | sample_record_rate | 3.143 | iat_zero_ratio | 2.828 |
+| 13 -> 14 | ts_duration | 1.414 | iat_mean | 1.414 | write_ratio | 1.414 |
+| 14 -> 15 | abs_stride_q99 | 0.644 | iat_lag1_autocorr | 0.54 | size_bytes | 0.489 |
+| 15 -> 16 | backward_seek_ratio | 1.462 | forward_seek_ratio | 1.458 | size_bytes | 1.447 |
+| 16 -> 17 | burstiness_cv | 3.115 | abs_stride_std | 1.598 | sample_record_rate | 1.581 |
+| 17 -> 18 | sample_record_rate | 4.263 | burstiness_cv | 3.953 | size_bytes | 2.984 |
+| 18 -> 19 | sample_record_rate | 2.005 | burstiness_cv | 1.997 | iat_zero_ratio | 1.715 |
+| 19 -> 20 | size_bytes | 1.878 | backward_seek_ratio | 1.508 | forward_seek_ratio | 1.507 |
+| 20 -> 21 | size_bytes | 3.686 | abs_stride_mean | 2.111 | forward_seek_ratio | 0.971 |
+| 21 -> 22 | sample_record_rate | 1245.922 | abs_stride_std | 162.244 | iat_std | 114.903 |
+| 22 -> 23 | abs_stride_std | 142.888 | abs_stride_mean | 49.808 | iat_std | 30.177 |
 
 ## Strongest Correlations
 
@@ -75,16 +133,31 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| s3-cache-datasets/cache_dataset_lcs/alibaba/809.lcs.zst | 760.456 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/791.lcs.zst | 322.295 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/811.lcs.zst | 114.764 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/893.lcs.zst | 73.588 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/816.lcs.zst | 67.762 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/796.lcs.zst | 45.401 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/4.lcs.zst | 42.333 |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/805.lcs.zst | 39.705 |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| s3-cache-datasets/cache_dataset_lcs/alibaba/809.lcs.zst | 760.456 | iat_mean (z=267650.8); iat_std (z=100006.2) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/791.lcs.zst | 322.295 | abs_stride_q90 (z=292.244); abs_stride_mean (z=177.298) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/811.lcs.zst | 114.764 | iat_mean (z=44878.13); iat_std (z=22241.43) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/893.lcs.zst | 73.588 | opcode_switch_ratio (z=408.5); abs_stride_mean (z=95.709) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/816.lcs.zst | 67.762 | iat_mean (z=27235.56); iat_std (z=22950.63) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/796.lcs.zst | 45.401 | reuse_ratio (z=832); abs_stride_q90 (z=69.654) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/4.lcs.zst | 42.333 | sample_record_rate (z=615.205); opcode_switch_ratio (z=479.5) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/805.lcs.zst | 39.705 | iat_std (z=4755.967); ts_duration (z=4089.091) |
+
+## Outlier Sensitivity
+
+| N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
+|---:|---|---:|---:|---:|
+| 10 | abs_stride_mean | 392307 | 387023.2 | -0.014 |
+| 5 | abs_stride_mean | 392307 | 388179 | -0.011 |
+| 10 | burstiness_cv | 6.399 | 6.44 | 0.006 |
+| 1 | abs_stride_mean | 392307 | 390090.4 | -0.006 |
+| 3 | abs_stride_mean | 392307 | 390090.4 | -0.006 |
+| 5 | burstiness_cv | 6.399 | 6.429 | 0.005 |
+| 10 | object_unique | 2960 | 2971.5 | 0.004 |
+| 5 | object_unique | 2960 | 2970 | 0.003 |
+| 3 | burstiness_cv | 6.399 | 6.418 | 0.003 |
+| 1 | burstiness_cv | 6.399 | 6.408 | 0.001 |
 
 ## Notable Files
 

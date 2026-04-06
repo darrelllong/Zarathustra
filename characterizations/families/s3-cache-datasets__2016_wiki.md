@@ -17,6 +17,14 @@
 
 - Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants.
 
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | none flagged |
+| Recommended candidate additions | none flagged |
+| Highly redundant current pairs | none flagged |
+
 ## Format Breakdown
 
 | Format | Files | Parsers |
@@ -54,9 +62,9 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| N/A | N/A |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| N/A | N/A | N/A |
 
 ## Notable Files
 

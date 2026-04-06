@@ -36,6 +36,28 @@ read_analysis_json <- function(path) {
   jsonlite::fromJSON(path, simplifyVector = TRUE)
 }
 
+first_field <- function(x, field) {
+  if (is.null(x) || is.null(x[[field]]) || length(x[[field]]) == 0) {
+    return(NA)
+  }
+  x[[field]][[1]]
+}
+
+collapse_field <- function(x, field, predicate = NULL) {
+  if (is.null(x) || is.null(x[[field]]) || length(x[[field]]) == 0) {
+    return("")
+  }
+  vals <- x[[field]]
+  if (!is.null(predicate)) {
+    keep <- predicate(x)
+    if (length(keep) == length(vals)) {
+      vals <- vals[keep]
+    }
+  }
+  vals <- vals[!is.na(vals) & nzchar(as.character(vals))]
+  paste(vals, collapse = ",")
+}
+
 flatten_analysis_summary <- function(analysis) {
   data.frame(
     logical_family_id = analysis$logical_family_id,
@@ -49,9 +71,17 @@ flatten_analysis_summary <- function(analysis) {
     heterogeneity_score = analysis$heterogeneity_score %||% NA_real_,
     suggested_modes = analysis$suggested_modes %||% 1L,
     split_by_format = isTRUE(analysis$split_by_format),
+    kmeans_selected_k = analysis$clusters$kmeans$selected_k %||% NA_real_,
+    kmeans_best_k = analysis$clusters$kmeans_diagnostics$best_k %||% NA_real_,
     mclust_components = analysis$clusters$mclust$components %||% NA_real_,
     dbscan_clusters = analysis$clusters$dbscan$clusters %||% NA_real_,
     changepoint_count = analysis$regimes$changepoint_count %||% NA_real_,
+    hurst = analysis$regimes$tsfeatures$hurst %||% NA_real_,
+    block_random_distance_ratio = analysis$temporal_sampling$block_random_distance_ratio %||% NA_real_,
+    temporal_sampling_recommendation = analysis$temporal_sampling$recommendation %||% "",
+    top_regime_driver = first_field(analysis$regime_attribution$transitions, "top_driver_1"),
+    conditioning_drop_candidates = collapse_field(analysis$conditioning_audit$near_constant, "metric"),
+    conditioning_add_candidates = collapse_field(analysis$conditioning_audit$candidate_additions, "metric", function(tbl) tbl$recommended %in% TRUE),
     top_gan_guidance = paste(head(analysis$gan_guidance %||% character(), 3), collapse = " "),
     stringsAsFactors = FALSE
   )
@@ -74,9 +104,17 @@ build_rollup <- function(features, family_summary) {
       heterogeneity_score = row$heterogeneity_score[[1]],
       suggested_modes = row$suggested_modes[[1]],
       split_by_format = isTRUE(row$split_by_format[[1]]),
+      kmeans_selected_k = row$kmeans_selected_k[[1]],
+      kmeans_best_k = row$kmeans_best_k[[1]],
       mclust_components = row$mclust_components[[1]],
       dbscan_clusters = row$dbscan_clusters[[1]],
       changepoint_count = row$changepoint_count[[1]],
+      hurst = row$hurst[[1]],
+      block_random_distance_ratio = row$block_random_distance_ratio[[1]],
+      temporal_sampling_recommendation = row$temporal_sampling_recommendation[[1]],
+      top_regime_driver = row$top_regime_driver[[1]],
+      conditioning_drop_candidates = row$conditioning_drop_candidates[[1]],
+      conditioning_add_candidates = row$conditioning_add_candidates[[1]],
       gan_guidance = row$top_gan_guidance[[1]],
       write_ratio = stats::median(subset$write_ratio, na.rm = TRUE),
       reuse_ratio = stats::median(subset$reuse_ratio, na.rm = TRUE),
@@ -96,8 +134,8 @@ render_readme <- function(family_summary, out_path) {
     paste0("**Total logical families:** ", nrow(family_summary), "  "),
     paste0("**Families suggesting multiple GAN modes:** ", sum(family_summary$suggested_modes > 1, na.rm = TRUE), "  "),
     "",
-    "| Family | Dataset | Files | Size | Heterogeneity | Modes | Split Format | Guidance |",
-    "|---|---|---:|---:|---:|---:|---|---|"
+    "| Family | Dataset | Files | Size | Heterogeneity | Modes | Split Format | Hurst | Block/Random | Guidance |",
+    "|---|---|---:|---:|---:|---:|---|---:|---:|---|"
   )
   ordered <- family_summary[order(family_summary$heterogeneity_score, decreasing = TRUE, na.last = TRUE), , drop = FALSE]
   for (i in seq_len(nrow(ordered))) {
@@ -113,6 +151,8 @@ render_readme <- function(family_summary, out_path) {
         " | ", format_number(row$heterogeneity_score[[1]]),
         " | ", row$suggested_modes[[1]],
         " | ", if (isTRUE(row$split_by_format[[1]])) "yes" else "no",
+        " | ", format_number(row$hurst[[1]]),
+        " | ", format_number(row$block_random_distance_ratio[[1]]),
         " | ", row$top_gan_guidance[[1]],
         " |"
       )

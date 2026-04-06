@@ -21,6 +21,15 @@
 - Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants.
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
+- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+
+## Conditioning Audit
+
+| Item | Value |
+|---|---|
+| Near-constant current conditioning features | write_ratio, burstiness_cv, iat_q50, opcode_switch_ratio, iat_lag1_autocorr, tenant_unique, backward_seek_ratio |
+| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Highly redundant current pairs | none flagged |
 
 ## Format Breakdown
 
@@ -65,9 +74,9 @@
 
 ## Outlier Files
 
-| rel_path | outlier_score |
-|---|---:|
-| N/A | N/A |
+| rel_path | outlier_score | top drivers |
+|---|---:|---|
+| N/A | N/A | N/A |
 
 ## Notable Files
 

@@ -34,6 +34,29 @@
 5. For write-heavy families like `Baleen24`, `MSR__exchange`, `s3-cache-datasets__alibaba`, and `s3-cache-datasets__tencentBlock`, keep opcode-transition fidelity as a first-class metric.
 6. Inspect outlier traces called out in the family reports before folding them into benchmark sets.
 
+## Rebuttal-Driven Follow-Ups
+
+Completed in the current R pass:
+
+- silhouette-based K diagnostics
+- per-regime feature attribution tables
+- feature-level outlier decomposition
+- top-N outlier removal sensitivity summaries
+- block-vs-random temporal sampling diagnostics
+- conditioning audits for redundancy, near-constant dimensions, and the 3 candidate additions
+
+Still pending:
+
+1. Expand the candidate conditioning set for the GAN analysis notebook or next training plan to include:
+   `object_unique`, `signed_stride_lag1_autocorr`, and `obj_size_std`.
+2. Audit conditioning redundancy specifically for `tencentBlock` and `alibaba`:
+   `backward_seek_ratio` is largely determined by `1 - forward_seek_ratio - reuse_ratio`, and `opcode_switch_ratio` appears low-signal in the main corpora.
+3. Add per-regime feature attribution on top of changepoints so we can say what shifts at each regime boundary instead of only counting boundaries.
+4. Add outlier decomposition so every flagged outlier is explained by feature contribution, not only by a Mahalanobis score.
+5. Test block or sequential file sampling for `alibaba`-like high-persistence families instead of assuming file-level i.i.d. sampling is harmless.
+6. Add K-ablation experiments around the suggested mode count instead of treating the current `suggested_modes` heuristic as final truth.
+7. Add within-file window analysis for the top GAN corpora, because file-level summaries do not fully describe window-level generation difficulty.
+
 ## Files To Use
 
 - Rollup: [characterizations/README.md](/Users/darrell/Zarathustra/characterizations/README.md)

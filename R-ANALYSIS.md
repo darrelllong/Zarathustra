@@ -28,8 +28,15 @@ The main R entrypoints are:
    - `analysis.json`
    - `metric_summary.csv`
    - optional `cluster_assignments.csv`
+   - optional `kmeans_diagnostics.csv`
    - optional `top_correlations.csv`
    - optional `outliers.csv`
+   - optional `outlier_decomposition.csv`
+   - optional `outlier_sensitivity.csv`
+   - optional `regime_segments.csv`
+   - optional `regime_transitions.csv`
+   - optional `conditioning_redundancy.csv`
+   - optional `conditioning_candidates.csv`
    - family Markdown report
 
 ## What R Read From Python
@@ -203,13 +210,32 @@ R ran three clustering styles where data size permitted.
 
 ### K-means
 
-R used:
+R first ran a K sweep:
 
-`k = min(6, n_rows - 1)`
+`k in {2, ..., min(12, n_rows - 1)}`
 
-then:
+For each `k`, it fit:
 
-`kmeans(numeric_matrix, centers = k, nstart = 20)`
+`kmeans(numeric_matrix, centers = k, nstart = 10)`
+
+and retained:
+
+- total within-cluster sum of squares:
+  `tot_withinss`
+- average silhouette width, when the `cluster` package was available
+
+If `n_rows > 1200`, silhouette scoring was done on a random 1200-row subset to keep the cost bounded.
+
+Selected `k`:
+
+- if at least one finite silhouette was available:
+  `best_k = argmax_k silhouette(k)`
+- else:
+  `best_k = 2`
+
+Final k-means fit:
+
+`kmeans(numeric_matrix, centers = best_k, nstart = 20)`
 
 ### Gaussian Mixture Model
 
@@ -259,6 +285,49 @@ Fallback if covariance inversion failed:
 
 The top 8 files by outlier score were written to the report.
 
+## Outlier Decomposition
+
+For each numeric feature `x_j`, R computed a robust center and scale:
+
+- `center_j = median(x_j)`
+- `scale_j = mad(x_j, center = center_j, constant = 1)`
+
+Fallbacks:
+
+- if `mad = 0` or non-finite, use `sd(x_j)`
+- if that also failed, use `1`
+
+For each reported outlier file `i`, R then computed per-feature robust z-scores:
+
+`z_ij = (x_ij - center_j) / scale_j`
+
+The report keeps the top contributing features ranked by:
+
+`abs(z_ij)`
+
+So the outlier explanation is no longer just "this file is far away"; it also shows which features made it extreme.
+
+## Outlier Sensitivity
+
+R also ran a leave-top-N-out sensitivity check using the ranked outlier list.
+
+For:
+
+- `N in {1, 3, 5, 10}`, when valid for the family
+- metrics in:
+  `burstiness_cv`, `abs_stride_mean`, `obj_size_std`, `reuse_ratio`, `iat_q50`, `object_unique`
+
+it computed:
+
+- baseline median:
+  `m_base = median(x)`
+- trimmed median after removing the top `N` outliers:
+  `m_trim = median(x without top-N outliers)`
+- relative shift:
+  `relative_shift = (m_trim - m_base) / max(abs(m_base), 1e-9)`
+
+These rows were ranked by `abs(relative_shift)` and surfaced in the report.
+
 ## Regime Detection
 
 R attempted regime detection only when:
@@ -288,6 +357,114 @@ R also computed optional `tsfeatures` on the ordered `PC1` series:
 - stability
 - hurst
 - flat_spots
+
+## Regime Attribution
+
+If changepoints existed, R converted them into explicit segments.
+
+Let changepoints be:
+
+`c_1 < c_2 < ... < c_m`
+
+Then the ordered files were split into segments:
+
+- segment 1: `1 .. c_1`
+- segment 2: `c_1 + 1 .. c_2`
+- ...
+- segment `m + 1`: `c_m + 1 .. n`
+
+For each segment, R stored:
+
+- file count
+- min/max `ts_start`
+- `median(PC1)`
+- `sd(PC1)`
+
+For each adjacent segment pair and each numeric feature `x_j`, R computed a robust effect size:
+
+- `a_j = median(x_j in left segment)`
+- `b_j = median(x_j in right segment)`
+- `s_a = mad(left_j, constant = 1)`
+- `s_b = mad(right_j, constant = 1)`
+- pooled robust scale:
+  `s_p = sqrt(mean(c(s_a^2, s_b^2)))`
+
+Fallback:
+
+- if `s_p` was zero or non-finite, use the pooled variance analogue:
+  `sqrt(mean(c(var(left_j), var(right_j))))`
+
+Effect size:
+
+`effect_j = abs(a_j - b_j) / s_p`
+
+For each transition, the top-ranked drivers by `effect_j` were written to `regime_transitions.csv` and rendered into the family report.
+
+## Temporal Sampling Diagnostic
+
+To test whether file order likely matters, R compared local sequential coherence against random coherence in PCA space.
+
+Procedure:
+
+1. order files by `(ts_start, rel_path)`
+2. retain `PC1`, `PC2`, `PC3` where available
+3. choose:
+   `block_size = max(4, min(16, floor(sqrt(n_rows))))`
+4. split the ordered series into contiguous non-overlapping blocks
+5. for each block, compute mean within-block pairwise Euclidean distance in PCA space
+6. draw 64 random batches of the same size and compute the same mean pairwise distance
+
+Summary statistics:
+
+- `median_block_distance`
+- `median_random_distance`
+- `block_random_distance_ratio = median_block_distance / median_random_distance`
+
+Interpretation:
+
+- values well below `1` mean sequential blocks are much more internally coherent than random batches
+- those families get a block-sampling warning in the report
+
+## Conditioning Audit
+
+R ran a conditioning-space audit against the current GAN-facing conditioning set:
+
+- `write_ratio`
+- `reuse_ratio`
+- `burstiness_cv`
+- `iat_q50`
+- `obj_size_q50`
+- `opcode_switch_ratio`
+- `iat_lag1_autocorr`
+- `tenant_unique`
+- `forward_seek_ratio`
+- `backward_seek_ratio`
+
+For current conditioning features, R flagged near-constant dimensions using:
+
+- `sd(x_j) <= 1e-9` or
+- `IQR(x_j) <= 1e-9`
+
+For redundancy, it reused the family correlation matrix and flagged pairs with:
+
+`abs(corr(x_i, x_j)) >= 0.95`
+
+For candidate additions:
+
+- `object_unique`
+- `signed_stride_lag1_autocorr`
+- `obj_size_std`
+
+R stored:
+
+- `sd`
+- `IQR`
+- `max_abs_corr_with_cond`
+
+and marked a candidate as recommended when:
+
+- `IQR > 0`
+- and `max_abs_corr_with_cond < 0.95` or unavailable
 
 ## Suggested GAN Modes
 
@@ -325,6 +502,8 @@ Examples:
 - if `reuse_ratio` is high, emphasize locality-aware losses and conditioning
 - if `burstiness_cv > 10`, emphasize inter-arrival, FFT, and ACF losses
 - if tenant diversity is high, emphasize tenant/context conditioning
+- if `block_random_distance_ratio < 0.85`, recommend block or curriculum sampling
+- if the conditioning audit recommends additions, mention those candidate features
 
 ## Resource Policy
 
@@ -347,7 +526,7 @@ Repo outputs:
 
 Remote heavy outputs:
 
-- `/tiamat/zarathustra/r-output/deep_results_20260405_1/`
+- `/tiamat/zarathustra/r-output/rebuttal_pass_20260405_2033/`
 
 ## Limitations
 
