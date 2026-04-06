@@ -151,19 +151,82 @@ References:
 
 ---
 
+### 11. Deeper LSTM (2–3 layers)
+
+**Why this matters now:** R characterization found 23 temporal changepoints for tencent and
+21 for alibaba. The Hurst exponent is 0.79 (tencent) and 0.98 (alibaba), indicating strong
+long-range temporal dependence. A single LSTM layer has limited capacity for hierarchical
+temporal representations — the first layer must simultaneously track per-step dynamics AND
+multi-scale regime structure.
+
+**Implementation:**
+- Change LSTM in both Generator and Critic from `num_layers=1` to `num_layers=2` (or 3)
+- Add residual connections between layers to prevent gradient degradation
+- Optionally: different hidden sizes per layer (e.g., 256→128 pyramid)
+- Minimal code change — PyTorch LSTM supports `num_layers` natively
+
+**Expected impact:** Better capture of multi-scale temporal structure (burst envelopes,
+regime transitions, long-range stride autocorrelation). R found that the data has structure
+at 96-file, 127-file, and 164-file scales (Tencent changepoint spacing) — a single LSTM
+layer may lack the representational depth to model these overlapping timescales simultaneously.
+
+**Risk:** Deeper models are harder to train and more prone to gradient issues. May need
+lower learning rate or gradient clipping adjustments. Pretrain checkpoints are incompatible
+(architecture change).
+
+---
+
+### 12. Expanded conditioning (cond_dim 10 → 13)
+
+**Why:** R analysis identified three features with significant signal that we don't use:
+- `object_unique` (Tencent median=1788, Alibaba=2182) — object diversity directly controls
+  reuse/seek balance
+- `signed_stride_lag1_autocorr` (Tencent=-0.17, Alibaba=-0.41) — stride memory is a
+  different signal from IAT autocorr
+- `obj_size_std` — distribution spread, not just center (q50)
+
+Also: `backward_seek_ratio` is redundant (= 1 - forward - reuse) and `opcode_switch_ratio`
+is always 0 after auto-drop. Net: drop 2, add 3 → cond_dim 11 (or 13 if keeping both).
+
+See R-REBUTTAL.md for details.
+
+---
+
+### 13. Block sampling for alibaba (Hurst=0.98)
+
+**Why:** Alibaba's Hurst exponent is 0.98 (near-persistent). Consecutive files' PC1 scores
+are almost perfectly correlated — files are NOT exchangeable. Our random `files-per-epoch=12`
+sampling destroys this temporal structure. Block sampling (contiguous file windows) would
+give the generator batches with realistic within-batch diversity.
+
+**Implementation:** Add `--block-sample` flag to sample contiguous file ranges instead of
+random files per epoch. Easy change in the dataloader.
+
+---
+
 ## Deprioritized (incremental, not bold)
 
 - **PacGAN packed critic** — tried in v39, didn't break recall ceiling
 - **Full relativistic GAN objective** — tried in v39 (RpGAN), caused C_loss→0 immediately, worse than WGAN-SN
 - **Structured generator factorization** — valid but overlaps with regime-first (#5); do that first
+- **BayesGAN M=2 + regime sampler** — tried in v56, G_loss stayed positive, recall stuck 0.27-0.33. BayesGAN redundant when regime sampler already provides mode coverage.
+- **Projection discriminator** — tried in v55, W-distance exploded to 38.6 in 5 epochs. Critic too powerful with workload conditioning.
 
 ---
 
-## Execution order
+## Tried and validated
 
-1. **v40 (running):** v34 WGAN-SN + char-file. Establishes char-file baseline.
-2. **v41:** GMM prior on z (idea #1) — implement and stack on v40 recipe.
-3. **v42:** Variational conditioning (idea #3) — cheap, stack on v41 if v41 works.
-4. **v43:** BayesGAN discriminator (idea #2) — if recall still below 0.65 after v41/v42.
-5. **v44:** Regime-first / two-stage generation (idea #5) — bold architectural rewrite if needed.
-6. **v45:** Path-space critic (idea #6) — replaces all auxiliary losses, clean slate.
+- **#1 GMM prior (--gmm-components)** — implemented, part of ATB recipe
+- **#3 Variational conditioning (--var-cond)** — implemented, part of alibaba recipe
+- **#5 Regime sampler (--n-regimes 8)** — validated: v54 reached combined=0.108★ (0.019 from ATB)
+- **#8 Multi-scale critic (--multi-scale-critic)** — implemented
+
+## Execution order (updated 2026-04-05)
+
+1. ~~v40–v54: char-file, GMM, var_cond, regime sampler~~ (DONE)
+2. **v57 (running):** v54 remastered with clip fix — test if surviving past ep100 beats ATB
+3. **Next:** Deeper LSTM (#11) — 2-layer generator+critic, new pretrain required
+4. **Then:** Expanded conditioning (#12) — add object_unique, stride_autocorr, obj_size_std
+5. **Then:** Block sampling for alibaba (#13)
+6. **Then:** Self-diagnosing upweighting (#9)
+7. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
