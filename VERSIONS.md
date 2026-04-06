@@ -138,12 +138,27 @@ output. alibaba_v18 (1-layer) had recall=0.460 at ep25.
 equilibrium. May need lower lr_g, warmup schedule, or gradient clipping adjustments.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v63 — Tencent + lower lr, NO block-sample (RUNNING)
+### tencent_v64 — Tencent + reuse rate amplification (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
-**Recipe**: `--n-regimes 8` + lr_g=8e-5, lr_d=4e-5 + w_stop=4.0 + n_critic=2. No block-sample,
-no self-diag. Clean baseline to isolate effect of lower lr on tencent without confounders.
+**Status**: RUNNING adversarial — 2026-04-06.
+**Recipe**: v63 base (K=8 regime + lower lr + clean) + `--locality-loss-weight 3.0` (was 1.0)
++ `--diversity-loss-weight 2.0` (was 1.0). Same intervention as alibaba_v27. Targets IDEAS
+#15 reuse rate amplification on tencent.
 **Pretrain**: REUSED from v57.
+Log: ~/train_tencent_v64.log.
+
+## Post-Mortem: tencent_v63 — lower lr, no block-sample (COMPLETED 200ep, full=0.120)
+
+**Status**: COMPLETED 200 epochs — 2026-04-06.
+**Recipe**: K=8 regime + lr_g=8e-5, lr_d=4e-5 + w_stop=4.0 + n_critic=2. Clean baseline.
+**Result**: Training-log best=0.10301★ at ep175 (recall=0.518, MMD²=0.00671). **Full eval
+(2000 samples) on best.pt: combined=0.120** (MMD²=0.0134, recall=0.4665, DMD-GEN=0.692,
+HRC-MAE=0.0214, reuse fake=0.018 vs real=0.048).
+**Key insight**: TRAINING-LOG estimates are ~14% optimistic vs full eval (0.103 → 0.120).
+Always run full eval before celebrating. v63 final 0.120 is WORSE than v22 (0.111) and
+v57 (0.108). The lower-lr clean recipe converged smoothly but plateaued. Reuse rate (0.018)
+still 2.7× below real (0.048) — motivates v64 reuse amplification.
+**Note**: HRC-MAE metric is now in eval.py (LRU cache fidelity, IDEAS #14 partially done).
 Log: ~/train_tencent_v63.log.
 
 ### alibaba_v27 — Alibaba + reuse rate amplification (RUNNING)
