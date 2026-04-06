@@ -75,7 +75,7 @@ from typing import Dict, List, Optional, Tuple
 # Normalization clip ranges derived empirically from 13,732 request_sequence
 # traces across all characterized families (see traces/analysis/trace_rollup.py).
 #
-# 10-dim vector layout (matches current cond_dim=10 default):
+# 13-dim vector layout (cond_dim=10 uses [0:10], cond_dim=13 uses all):
 #   0: write_ratio             linear [0, 1]
 #   1: log(reuse_ratio+0.001)  log-offset, clipped [-7, 0]
 #   2: log(burstiness_cv)      log, clipped [0, 4.5]
@@ -86,6 +86,10 @@ from typing import Dict, List, Optional, Tuple
 #   7: log(tenant_unique)      log, clipped [0, 6.5]
 #   8: forward_seek_ratio      linear [0, 1]
 #   9: backward_seek_ratio     linear [0, 1]
+# --- R-analysis additions (IDEAS.md idea #12) ---
+#  10: log(object_unique)      log, clipped [0, 10]
+#  11: signed_stride_lag1_autocorr  identity [-1, 1]
+#  12: log(obj_size_std+1)     log, clipped [0, 14]
 # All output values are in [-1, 1].
 
 
@@ -121,6 +125,11 @@ def profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> List[float]:
     tenant_unique       = float(ten.get("unique") or 1.0)
     forward_seek_ratio  = float(profile.get("forward_seek_ratio") or 0.5)
     backward_seek_ratio = float(profile.get("backward_seek_ratio") or 0.0)
+    # R-analysis additions (IDEAS.md idea #12)
+    obj_summary         = profile.get("obj_id_summary") or {}
+    object_unique       = float(obj_summary.get("unique") or 1.0)
+    stride_autocorr     = float(profile.get("signed_stride_lag1_autocorr") or 0.0)
+    obj_size_std        = float(obj.get("std") or 0.0)
 
     vec = [
         _cn(write_ratio,                                    0.0,   1.0),   # 0
@@ -133,6 +142,10 @@ def profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> List[float]:
         _cn(math.log(max(tenant_unique, 1.0)),              0.0,  6.5),   # 7
         _cn(forward_seek_ratio,                             0.0,  1.0),   # 8
         _cn(backward_seek_ratio,                            0.0,  1.0),   # 9
+        # R-analysis additions (IDEAS.md idea #12)
+        _cn(math.log(max(object_unique, 1.0)),              0.0, 10.0),   # 10
+        _cn(max(-1.0, min(1.0, stride_autocorr)),          -1.0,  1.0),   # 11
+        _cn(math.log(max(obj_size_std, 0.0) + 1.0),        0.0, 14.0),   # 12
     ]
 
     if len(vec) < cond_dim:
