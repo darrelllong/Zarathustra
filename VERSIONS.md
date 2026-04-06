@@ -146,14 +146,26 @@ no self-diag. Clean baseline to isolate effect of lower lr on tencent without co
 **Pretrain**: REUSED from v57.
 Log: ~/train_tencent_v63.log.
 
-### alibaba_v26 — Alibaba + continuity loss (RUNNING)
+### alibaba_v27 — Alibaba + reuse rate amplification (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
-**Recipe**: v22 recipe + `--continuity-loss-weight 0.5` (re-added to train.py; was removed
-at some point after v33). Generates two adjacent windows with carried LSTM hidden state
-and penalises boundary mean/std mismatch. Targets the train/inference gap (model only
-trained on single windows but eval uses multi-window traces).
+**Status**: RUNNING adversarial — 2026-04-06.
+**Recipe**: v22 ATB base (K=2 + var_cond + GMM 8 + lower lr) + `--locality-loss-weight 3.0`
+(was 1.0) + `--diversity-loss-weight 2.0` (was 1.0). Pure hyperparameter push targeting
+IDEAS #15 (reuse rate amplification) via existing knobs — no code changes. Locality loss
+weight 3× should push the model harder on stride-repetition, while higher diversity loss
+combats mode collapse on reuse events.
 **Pretrain**: REUSED from alibaba_v22.
+Log: ~/train_alibaba_v27.log.
+
+## Post-Mortem: alibaba_v26 — continuity loss (KILLED ep34, 0.198★)
+
+**Status**: KILLED at ep34/200 — 2026-04-06.
+**Recipe**: v22 ATB recipe + `--continuity-loss-weight 0.5` (re-added to train.py).
+**Result**: Best combined=**0.198★** at ep25 (recall=0.305, MMD²=0.059). Almost 2× ATB
+(0.110). Recall stuck at 0.27–0.34, no improvement trajectory. Hopeless.
+**Key insight**: Continuity loss does not help alibaba — adding the boundary-coherence
+penalty either over-constrains the generator or interferes with the GMM/var_cond stack.
+Worth retrying on tencent where DMD-GEN gap is more critical.
 Log: ~/train_alibaba_v26.log.
 
 ## Post-Mortem: alibaba_v25 — higher var_cond KL 0.01 (KILLED ep100, 0.120★)
