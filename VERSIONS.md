@@ -62,19 +62,16 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### v56 — Tencent + BayesGAN M=2 + regime sampler + clip fix (RUNNING)
+### v57 — Tencent + regime sampler + clip fix — "v54 remastered" (RUNNING)
 
-**Status**: RUNNING pretrain — 2026-04-05. PID 982942 on vinge.
-**Recipe**: v54 recipe + `--bayes-critics 2` + clip fix + auto-drop (5 cols). NO proj_critic.
-**Changes from v54**: (1) BayesGAN M=2: posterior over 2 critic particles with SGLD noise injection.
-Generator sees average gradient across particles — no single critic boundary can force mode collapse.
-(2) Clip fix: normalized values clamped to [-1, 1] to prevent poison-point destabilization.
-(3) Auto-drop: 5 columns (opcode dropped).
-**Hypothesis**: v54 reached 0.108★ but collapsed at ep100 from poison points (now fixed by clip).
-BayesGAN M=2 gave the highest early recall ever (0.426 at ep5 in v51) but MMD² was too high.
-That was before the regime sampler. Combining BayesGAN's anti-collapse properties with the
-regime sampler's structural mode coverage + clip fix could push past ATB.
-Log: ~/train_tencent_v56.log.
+**Status**: RUNNING pretrain — 2026-04-05. PID 1012660 on vinge.
+**Recipe**: IDENTICAL to v54 + clip fix + auto-drop (5 cols). No proj_critic, no BayesGAN.
+The cleanest test: the regime sampler recipe that reached 0.108★, with only the poison-point
+fix that should have prevented v54's ep100 collapse. Fresh pretrain (5 cols).
+**Hypothesis**: v54 reached combined=0.108★ at ep75 then collapsed from poison points at ep100.
+The clip fix prevents that collapse. If the regime sampler can reproduce v54's trajectory and
+survive past ep100, this beats ATB.
+Log: ~/train_tencent_v57.log.
 
 ### alibaba_v16 — Alibaba + regime sampler + auto-drop + clip fix (RUNNING)
 
@@ -88,6 +85,28 @@ ep5: recall=0.288, combined=0.203★. W≈0.2, G_loss positive but decreasing �
 **Hypothesis**: Same regime sampler as v15 but with clean 5-col architecture. The model no longer
 wastes capacity on a degenerate opcode column filled with misinterpreted sentinel values.
 Log: ~/train_alibaba_v16.log.
+
+---
+
+## Post-Mortem: v56 — Tencent + BayesGAN M=2 + regime sampler (KILLED ep35, 2026-04-05)
+
+**Best**: ep20 recall=0.329, combined=0.159★.
+| Epoch | Recall | Combined |
+|-------|--------|----------|
+| 5     | 0.239  | 0.182 ★  |
+| 10    | 0.289  | 0.182 ★  |
+| 20    | 0.329  | 0.159 ★  |
+| 25    | 0.275  | 0.171    |
+| 30    | 0.299  | 0.167    |
+| 35    | 0.320  | 0.168    |
+
+**Why killed**: Recall stuck at 0.27-0.33, G_loss persistently positive (0.08–1.44). At ep35,
+combined=0.168 vs v54's 0.124 at the same epoch — 0.044 behind with no sign of closing.
+BayesGAN M=2 dual critics suppressed the generator. The posterior averaging makes the critic
+ensemble too robust for the generator to fool.
+**Key lesson**: BayesGAN M=2 + regime sampler don't synergize. BayesGAN's anti-collapse is
+redundant when the regime sampler already provides structural mode coverage. And the extra
+critic strength slows learning without benefit. Rev. Bayes deprioritized for now.
 
 ---
 
