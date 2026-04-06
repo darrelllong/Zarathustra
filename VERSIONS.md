@@ -72,14 +72,26 @@ corpora, suggesting the single LSTM layer lacks capacity for hierarchical tempor
 2-layer LSTM + K=2 (already validated) may push past alibaba_v18's 0.110★.
 Log: ~/train_alibaba_v19.log.
 
-### tencent_v58 — Tencent + K=2 regime sampler (RUNNING)
+### tencent_v59 — Tencent + 2-layer LSTM + K=8 regime sampler (RUNNING)
 
-**Status**: RUNNING adversarial — 2026-04-05. PID 1063095 on vinge.
-**Recipe**: `--n-regimes 2` + clip + auto-drop (5 cols) + n_critic=2. No var_cond/GMM (Tencent recipe).
-**Pretrain**: REUSED from v57 (stripped regime_sampler K=8→K=2 keys + cleared optimizer state).
-**Hypothesis**: R silhouette analysis shows K=2 optimal (0.94 vs 0.50 at K=8). alibaba_v18 (K=2)
-already beat alibaba ATB. If K=2 works for Tencent too, it confirms over-partitioning was a
-systemic problem.
+**Status**: RUNNING pretrain — 2026-04-06 on vinge.
+**Recipe**: `--num-lstm-layers 2` + `--n-regimes 8` + clip + auto-drop (5 cols) + n_critic=2.
+**Pretrain**: FRESH (2-layer LSTM architecture change).
+**Hypothesis**: K=2 failed on tencent (v58: recall stuck 0.20-0.25 through ep70 vs v57's 0.47 at ep60).
+Tencent's higher heterogeneity (2.006) and 23 changepoints need more regime coverage than alibaba.
+Keep K=8 (proven), add 2-layer LSTM for hierarchical temporal capacity.
+Log: ~/train_tencent_v59.log.
+
+## Post-Mortem: tencent_v58 — Tencent + K=2 regime sampler (KILLED ep70, recall stuck)
+
+**Status**: KILLED at ep70/200 — 2026-04-06.
+**Recipe**: `--n-regimes 2` + clip + auto-drop (5 cols) + n_critic=2. No var_cond/GMM.
+**Result**: Best combined=0.201★ at ep35 (recall=0.260). Recall never broke 0.30 through 70 epochs.
+v57 (K=8) had recall=0.471 at ep60. G_loss deeply negative (-3.6 to -4.9) with low recall =
+classic mode collapse: G found a few modes that fool the critic but doesn't cover the distribution.
+**Key insight**: K=2 works for alibaba (0.110★) but NOT for tencent. The silhouette K=2 optimum
+was measured on 2020_tencentBlock features — but tencent_block_1M has higher heterogeneity (2.006)
+and 23 changepoints. The two corpora may need different K. Tencent needs K≥8.
 Log: ~/train_tencent_v58.log.
 
 ## Post-Mortem: v57 — Tencent + regime sampler + clip fix (W-SPIKE ep110, combined=0.108★)
