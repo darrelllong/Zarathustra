@@ -475,6 +475,7 @@ class Generator(nn.Module):
         gmm_components: int = 0,
         var_cond: bool = False,
         n_regimes: int = 0,
+        num_lstm_layers: int = 1,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -484,6 +485,7 @@ class Generator(nn.Module):
         self.avatar      = avatar
         self.cond_dim    = cond_dim
         self.film_cond   = film_cond and (cond_dim > 0)
+        self.num_lstm_layers = num_lstm_layers
 
         # Variational conditioning encoder (IDEAS.md idea #3): replaces fixed
         # char-file vector with a sampled distribution at training time.
@@ -516,13 +518,13 @@ class Generator(nn.Module):
         # z_global influence both "what the generator is doing now" (h) and
         # "what it will tend to do over the window" (c).
         z_input_dim = noise_dim + cond_dim
-        self.z_to_h0 = nn.Linear(z_input_dim, hidden_size)
-        self.z_to_c0 = nn.Linear(z_input_dim, hidden_size)
+        self.z_to_h0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
+        self.z_to_c0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
 
         self.lstm = nn.LSTM(
             input_size=noise_dim,
             hidden_size=hidden_size,
-            num_layers=1,
+            num_layers=num_lstm_layers,
             batch_first=True,
         )
         self.fc      = nn.Linear(hidden_size, out_dim)
@@ -597,8 +599,11 @@ class Generator(nn.Module):
         return_hidden : pass True when generating multi-window traces.
         """
         if hidden is None:
-            h0 = self.z_to_h0(z_global).unsqueeze(0)   # (1, batch, hidden)
-            c0 = self.z_to_c0(z_global).unsqueeze(0)
+            B = z_global.size(0)
+            L = self.num_lstm_layers
+            H = self.hidden_size
+            h0 = self.z_to_h0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
+            c0 = self.z_to_c0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
             hidden = (h0, c0)
         h, hidden_out = self.lstm(z_local, hidden)
         # FiLM: reinject workload conditioning at every timestep so it cannot
@@ -684,11 +689,13 @@ class Critic(nn.Module):
                  sn_lstm: bool = True,
                  minibatch_std: bool = True,
                  patch_embed: bool = False,
-                 cond_dim: int = 0):
+                 cond_dim: int = 0,
+                 num_lstm_layers: int = 1):
         super().__init__()
         self.minibatch_std = minibatch_std
         self.patch_embed   = patch_embed
         self.cond_dim      = cond_dim
+        self.num_lstm_layers = num_lstm_layers
         # One extra input feature when minibatch_std is on: the mean per-step
         # standard deviation across the batch, appended as a scalar channel.
         lstm_input = num_cols + (1 if minibatch_std else 0)
@@ -714,7 +721,7 @@ class Critic(nn.Module):
         self.lstm = nn.LSTM(
             input_size=lstm_in,
             hidden_size=hidden_size,
-            num_layers=1,
+            num_layers=num_lstm_layers,
             batch_first=True,
         )
 
@@ -724,11 +731,10 @@ class Critic(nn.Module):
             # causing W→31 and mode collapse at epoch 100.
             # SN power iteration runs under torch.no_grad() so it is
             # device-agnostic (MPS, CUDA, CPU all work).
-            # weight_ih_l0: (4H, input_size) — input gate weights
-            # weight_hh_l0: (4H, H)          — recurrent gate weights
             from torch.nn.utils import spectral_norm
-            spectral_norm(self.lstm, name='weight_ih_l0')
-            spectral_norm(self.lstm, name='weight_hh_l0')
+            for layer_idx in range(num_lstm_layers):
+                spectral_norm(self.lstm, name=f'weight_ih_l{layer_idx}')
+                spectral_norm(self.lstm, name=f'weight_hh_l{layer_idx}')
 
         # A single linear layer maps each LSTM hidden state to a scalar
         # attention weight. Softmax across the time dimension gives a
@@ -830,6 +836,7 @@ class MultiScaleCritic(nn.Module):
         patch_embed: bool = False,
         cond_dim: int = 0,
         n_scales: int = 3,
+        num_lstm_layers: int = 1,
     ):
         super().__init__()
         self.n_scales = n_scales
@@ -841,6 +848,7 @@ class MultiScaleCritic(nn.Module):
                 minibatch_std=minibatch_std,
                 patch_embed=patch_embed,
                 cond_dim=cond_dim,
+                num_lstm_layers=num_lstm_layers,
             )
             for _ in range(n_scales)
         ])

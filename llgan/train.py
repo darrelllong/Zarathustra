@@ -455,7 +455,8 @@ def train(cfg: Config) -> None:
                   film_cond=getattr(cfg, "film_cond", False),
                   gmm_components=getattr(cfg, "gmm_components", 0),
                   var_cond=getattr(cfg, "var_cond", False),
-                  n_regimes=getattr(cfg, "n_regimes", 0)).to(device)
+                  n_regimes=getattr(cfg, "n_regimes", 0),
+                  num_lstm_layers=getattr(cfg, "num_lstm_layers", 1)).to(device)
     if getattr(cfg, "n_regimes", 0) > 0 and cfg.cond_dim > 0:
         print(f"[regime-sampler] K={cfg.n_regimes} workload regimes, "
               f"τ: {G.regime_sampler.tau_start}→{G.regime_sampler.tau_end}")
@@ -468,7 +469,8 @@ def train(cfg: Config) -> None:
                     sn_lstm=cfg.sn_lstm,
                     minibatch_std=cfg.minibatch_std,
                     patch_embed=cfg.patch_embed,
-                    cond_dim=_proj_critic_dim).to(device)
+                    cond_dim=_proj_critic_dim,
+                    num_lstm_layers=getattr(cfg, "num_lstm_layers", 1)).to(device)
     if getattr(cfg, "multi_scale_critic", False):
         print(f"[multi-scale critic] 3-scale critic active (T, T//2, T//4)")
 
@@ -1850,6 +1852,10 @@ def parse_args() -> Config:
                         "auto-disabled with wgan-gp/r1/r2 due to create_graph incompatibility)")
     p.add_argument("--no-amp",               dest="amp", action="store_false",
                    help="Disable AMP (useful for debugging)")
+    p.add_argument("--num-lstm-layers",        type=int,   default=1,
+                   help="Number of LSTM layers in Generator and Critic (IDEAS.md idea #11). "
+                        "2-3 layers enable hierarchical temporal representations. "
+                        "Requires fresh pretrain (architecture change). (default: 1)")
     p.add_argument("--n-regimes",             type=int,   default=0,
                    help="Regime-first two-stage generation (IDEAS.md idea #5): K workload "
                         "regime prototypes; Gumbel-Softmax selects one per window before G "
@@ -1946,6 +1952,7 @@ def parse_args() -> Config:
     cfg.lr_er                   = args.lr_er
     cfg.amp                     = args.amp
     cfg.n_regimes               = args.n_regimes
+    cfg.num_lstm_layers         = args.num_lstm_layers
     cfg.w_stop_threshold        = args.w_stop_threshold
     cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery

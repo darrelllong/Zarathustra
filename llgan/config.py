@@ -147,6 +147,13 @@ class Config:
                                          # Recommended: 5 (memory: M × ~1MB; GB10 has 124GB).
                                          # Requires wgan-sn. Incompatible with wgan-gp/r1/r2.
 
+    # Deeper LSTM (IDEAS.md idea #11)
+    num_lstm_layers: int = 1             # Number of LSTM layers in Generator and Critic (default 1).
+                                         # 2–3 layers enable hierarchical temporal representations:
+                                         # layer 1 tracks per-step dynamics, layer 2+ captures
+                                         # multi-scale regime structure (burst envelopes, changepoints).
+                                         # Requires fresh pretrain (architecture change).
+
     # GMM prior on generator noise
     gmm_components: int = 0              # K mixture components in noise prior (0 = flat N(0,I)).
                                          # When > 0 and cond_dim > 0, replaces N(0,I) with a

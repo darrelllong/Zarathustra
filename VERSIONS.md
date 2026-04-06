@@ -85,13 +85,16 @@ epoch count, suggesting the critic eventually dominates. K=2 (v58) may help by r
 regime fragmentation pressure on the generator.
 Log: ~/train_tencent_v57.log.
 
-### alibaba_v18 — Alibaba + K=2 regime sampler (RUNNING)
+## Post-Mortem: alibaba_v18 — Alibaba + K=2 regime sampler (W-SPIKE ep103, combined=0.110★ NEW ATB)
 
-**Status**: RUNNING adversarial — 2026-04-05. PID 1050979 on vinge.
+**Status**: W-SPIKE GUARD killed at ep103/150 — 2026-04-06.
 **Recipe**: var_cond + GMM K=8 + `--n-regimes 2` + clip + auto-drop (5 cols) + n_critic=2.
-**Pretrain**: REUSED from alibaba_v16 (compatible architecture, K doesn't affect pretrain).
-**Hypothesis**: Silhouette analysis shows K=2 is optimal (0.94 vs 0.50 at K=8). K=8 may be
-over-partitioning the data. K=2 should give cleaner regime separation.
+**Pretrain**: REUSED from alibaba_v16 (stripped regime_sampler K=8→K=2 keys).
+**Result**: Best combined=0.11026★ at ep100 (recall=0.527, MMD²=0.0158). **NEW ALIBABA ATB** —
+30% better than previous ATB (0.157 from v16). Recall climbed steadily: 0.386→0.460→0.511→0.527.
+W-distance escalated ep101-103 (3.85→4.53→3.74), triggering guard.
+**Key insight**: K=2 regime sampler validated by R silhouette analysis. K=8 was over-partitioning.
+K=2 gave cleaner regime separation → better recall AND better MMD².
 Log: ~/train_alibaba_v18.log.
 
 ### alibaba_v17 — Alibaba + regime sampler + clip fix, new seed (BAD SEED — KILLED ep37)
