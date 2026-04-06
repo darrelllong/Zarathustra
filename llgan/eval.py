@@ -364,7 +364,13 @@ def _sample_fake(ckpt, n_samples: int, device,
 
     cond_dim = getattr(cfg, "cond_dim", 0)
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
-                  latent_dim=latent_dim, cond_dim=cond_dim).to(device)
+                  latent_dim=latent_dim, cond_dim=cond_dim,
+                  film_cond=getattr(cfg, "film_cond", False),
+                  gmm_components=getattr(cfg, "gmm_components", 0),
+                  var_cond=getattr(cfg, "var_cond", False),
+                  n_regimes=getattr(cfg, "n_regimes", 0),
+                  num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
+                  ).to(device)
     # Prefer EMA weights: smoother, less oscillated, consistently produces
     # better samples than the instantaneous live weights at any given epoch.
     g_weights = ckpt.get("G_ema", ckpt["G"])
