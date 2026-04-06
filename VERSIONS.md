@@ -62,7 +62,28 @@ timing (ep100) is consistent with cumulative destabilization from outlier encoun
 
 ## Current Runs
 
-### alibaba_v21 — Alibaba + block sampling + K=2 (RUNNING)
+### alibaba_v22 — Alibaba + v18 recipe + lower lr + extended training (RUNNING)
+
+**Status**: RUNNING adversarial — 2026-04-06. PID 1124932 on vinge.
+**Recipe**: v18 winning recipe (K=2 + var_cond + GMM K=8) with: lr_g=8e-5 (was 1e-4),
+lr_d=4e-5 (was 5e-5), w_stop_threshold=4.0 (was 3.0), epochs=200 (was 150).
+**Pretrain**: REUSED from v18 (identical architecture).
+**Hypothesis**: v18 was killed by W-spike at ep103. Lower lr should slow W-distance growth.
+Higher threshold + more epochs give it room to keep training past ep100.
+Log: ~/train_alibaba_v22.log.
+
+## Post-Mortem: alibaba_v21 — block sampling + K=2 (W-COLLAPSES — KILLED ep71)
+
+**Status**: KILLED at ep71/150 — 2026-04-06.
+**Recipe**: `--block-sample` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop.
+**Result**: Best combined=0.150 at ep70 (recall=0.386). Repeated W-collapses (W→0.004 at
+ep32-37, ep56, ep61). v18 (random) was at 0.117 at ep65. Block sampling hurts alibaba —
+too-coherent batches make critic's job trivially easy within a single regime.
+**Key insight**: Block sampling helps tencent (v60 ahead of v57 at same epoch) but hurts
+alibaba. The corpora respond differently despite both having high Hurst exponents.
+Log: ~/train_alibaba_v21.log.
+
+### alibaba_v21 — Alibaba + block sampling + K=2 (KILLED)
 
 **Status**: RUNNING adversarial — 2026-04-06. PID 1114371 on vinge.
 **Recipe**: `--block-sample` + `--n-regimes 2` + var_cond + GMM K=8 + clip + auto-drop (5 cols) + n_critic=2.
