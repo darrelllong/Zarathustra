@@ -1454,6 +1454,31 @@ def train(cfg: Config) -> None:
                     loss_div = -(x_dist / z_dist).mean()
                     g_loss = g_loss + cfg.diversity_loss_weight * loss_div
 
+                # L_cont: chunk-continuity loss (v33).  Generate two adjacent
+                # windows carrying LSTM hidden state (as generate.py does at
+                # inference) and penalise distributional mismatch at the
+                # boundary.  Closes train/inference gap targeting DMD-GEN.
+                if cfg.continuity_loss_weight > 0:
+                    z_gc, _ = _make_z_global(B, cfg, device, real_features=real_batch,
+                                             file_cond=file_cond_batch, G=G)
+                    z_lc1 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                    z_lc2 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                    H_cont_1, h_carry = G(z_gc, z_lc1, return_hidden=True)
+                    H_cont_2 = G(z_gc, z_lc2, hidden=h_carry)
+                    if latent_ae:
+                        feat_cont_1 = R(H_cont_1)
+                        feat_cont_2 = R(H_cont_2)
+                    else:
+                        feat_cont_1 = H_cont_1
+                        feat_cont_2 = H_cont_2
+                    k_cont = max(1, min(3, cfg.timestep // 4))
+                    tail = feat_cont_1[:, -k_cont:, :]
+                    head = feat_cont_2[:, :k_cont, :]
+                    loss_cont_mean = (tail.mean(dim=1) - head.mean(dim=1)).pow(2).mean()
+                    loss_cont_std  = (tail.std(dim=1)  - head.std(dim=1)).pow(2).mean()
+                    loss_cont = loss_cont_mean + loss_cont_std
+                    g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
+
                 # Feature-space critic in generator loss (dual discriminator).
                 # C_feat operates in decoded feature space — it sees what the
                 # downstream evaluator sees, preventing the generator from hiding
@@ -1873,6 +1898,11 @@ def parse_args() -> Config:
                    help="Dual discriminator: weight of feature-space critic C_feat in G loss "
                         "(0=off). Requires latent_dim > 0. C_feat operates on decoded features "
                         "so it penalises quality problems invisible in latent space. Try 0.5–1.0.")
+    p.add_argument("--continuity-loss-weight", type=float, default=0.0,
+                   help="L_cont: boundary-continuity loss for multi-window coherence. "
+                        "Generates two adjacent windows with carried LSTM hidden state "
+                        "and penalises boundary mean/std mismatch. Targets DMD-GEN. "
+                        "Try 0.5–1.0.")
     p.add_argument("--self-diag-temp",     type=float, default=0.0,
                    help="Self-diagnosing upweighting temperature (0=off). When > 0, real "
                         "samples with high critic scores (underrepresented modes) are "
@@ -1979,6 +2009,7 @@ def parse_args() -> Config:
     cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.feat_critic_weight          = args.feat_critic_weight
+    cfg.continuity_loss_weight      = args.continuity_loss_weight
     cfg.self_diag_temp              = args.self_diag_temp
     cfg.r1_lambda                   = args.r1_lambda
     cfg.r2_lambda                   = args.r2_lambda

@@ -146,13 +146,25 @@ no self-diag. Clean baseline to isolate effect of lower lr on tencent without co
 **Pretrain**: REUSED from v57.
 Log: ~/train_tencent_v63.log.
 
-### alibaba_v25 — Alibaba + higher var_cond KL (0.01) (RUNNING)
+### alibaba_v26 — Alibaba + continuity loss (RUNNING)
 
 **Status**: RUNNING adversarial — 2026-04-06. PID on vinge.
-**Recipe**: v22 recipe + `--var-cond-kl-weight 0.01` (10× default). Hypothesis: v31 ATB used
-noisy window-level conditioning; char-file is too clean. Higher KL weight → wider σ →
-more conditioning noise → restores the accidental soft mixture effect.
+**Recipe**: v22 recipe + `--continuity-loss-weight 0.5` (re-added to train.py; was removed
+at some point after v33). Generates two adjacent windows with carried LSTM hidden state
+and penalises boundary mean/std mismatch. Targets the train/inference gap (model only
+trained on single windows but eval uses multi-window traces).
 **Pretrain**: REUSED from alibaba_v22.
+Log: ~/train_alibaba_v26.log.
+
+## Post-Mortem: alibaba_v25 — higher var_cond KL 0.01 (KILLED ep100, 0.120★)
+
+**Status**: KILLED at ep100/200 — 2026-04-06.
+**Recipe**: v22 recipe + `--var-cond-kl-weight 0.01` (10× default).
+**Result**: Best combined=0.120★ at ep45 (recall=0.513 — highest ever on alibaba, MMD²=0.023).
+After ep45: degraded to 0.13–0.15, recall dropped to 0.41–0.48, W climbed to 2.5–3.2.
+**Key insight**: Higher KL weight gave a huge early recall boost (0.513 is unprecedented on
+alibaba) but the model couldn't stabilize. The increased conditioning noise creates diversity
+but also instability. Close to ATB (0.110) but didn't beat it.
 Log: ~/train_alibaba_v25.log.
 
 ## Post-Mortem: tencent_v62 — self-diagnosing temp=10 (W-SPIKE GUARD ep60, 0.121★)
