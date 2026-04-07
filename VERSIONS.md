@@ -54,9 +54,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Running: tencent_v67 — supervisor-loss-weight=5 on tencent (mirroring alibaba_v34 success)
+## Post-Mortem: tencent_v67 — supervisor-loss-weight=5 on tencent (training-log 0.10567★ → full eval 0.12323, worse than ATB by 38%)
 
-**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0`. Same scalar tweak that just produced the new alibaba record. Currently ep87/200, best 0.10567★ ep65 (recall 0.518). Trajectory looks faster than v66 — promising.
+**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0`. Same scalar tweak that produced the new alibaba record in v34.
+
+**Result**: Ran all 200 epochs. Training-log best comb=0.10567 (ep65). **Full eval best.pt (ep65)**: MMD²=0.01453, recall=0.4565, **comb=0.12323**, α-prec=0.833, density=0.924, DMD-GEN=0.7184, AutoCorr=0.0582, Context-FID=0.28, HRC-MAE=0.0372, reuse=0.005 vs real 0.012. vs tencent ATB 0.089 → **38% worse**. Train/eval gap 17% (much smaller than v66's 47% but still loses). Recall 0.456 is the weak spot.
+
+**Lesson**: The supervisor-weight boost that made alibaba explode does not cleanly transfer to tencent — precision is strong (α=0.833) but recall undershoots. Tencent's weakness is coverage, not plausibility, so the next tencent knob should attack mode collapse directly rather than reinforcement of the generator's inner dynamics.
+
+---
+
+## Launched: tencent_v68 — supervisor=5 + diversity-loss-weight=2.0 (up from 1.0)
+
+**Recipe**: v67 recipe + `--diversity-loss-weight 2.0`. MSGAN mode-seeking loss maximises |G(z1)-G(z2)|/|z1-z2| across noise pairs — directly combats β-recall mode collapse, which v67 showed is the tencent bottleneck (recall=0.4565 vs alibaba_v34 recall=0.6420).
 
 ---
 
