@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v68 — diversity=2.0 + supervisor=5 on tencent (training-log 0.10215★ → full eval 0.1554, FAILED, W-spike killed ep148)
+
+**Recipe**: v57 ATB + `--diversity-loss-weight 2.0 --supervisor-loss-weight 5.0` (combine v34 alibaba winner with mode-coverage attack).
+
+**Result**: Best training-log comb=0.10215 ep70 (recall=0.592 — historic high for tencent). W-spike guard killed at ep148 (W=4.42 × 3). **Full eval best.pt (ep70)**: MMD²=0.04856, **recall=0.466** (vs train-log 0.592), α-precision=0.9350, DMD-GEN=0.6351, **HRC-MAE=0.0666** (poor cache fidelity), Context-FID=1.04. **Combined = 0.1554**, vs ATB 0.089 → **75% worse**. Train/eval gap **52%** — worst yet.
+
+**Lesson**: Diversity loss inflates training-log recall but doesn't transfer to full eval on tencent. tencent's train/eval gap is the dominant problem; G-side knobs that worked on alibaba don't generalize. Need to attack train/eval gap directly, not just push training-log scores.
+
+**v31 co-ATB combined=0.089 remains the tencent record.**
+
+---
+
 ## Post-Mortem: alibaba_v36 — supervisor-weight=10 on alibaba (best 0.10373★ ep130 → full eval 0.1441, FAILED)
 
 **Recipe**: v34 ATB recipe with `--supervisor-loss-weight 10.0` (vs v34's 5.0). Otherwise identical: cond-dim 10, n-regimes 2, var-cond, gmm-components 8, cross-cov 2.0, locality 1.0, diversity 1.0, ACF 0.2.
