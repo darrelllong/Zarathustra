@@ -60,9 +60,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: alibaba_v31 — Self-Diagnosing GAN (NEVER TRIED)
+## Post-Mortem: alibaba_v31 — Self-Diagnosing GAN temp=2.0 (AUTO-KILLED ep7 W-spike)
 
-**Recipe**: v22 ATB recipe + `--self-diag-temp 2.0` (Self-Diagnosing GAN, NeurIPS 2021). Upweights real samples with high critic scores (= modes G under-covers) in critic training and feature matching. Directly targets β-recall, which is our alibaba bottleneck (v29 full eval recall=0.41).
+**Recipe**: v22 ATB recipe + `--self-diag-temp 2.0`.
+
+**Result**: W exploded 6.2→6.5→7.0 in ep5-7; W-spike guard stopped training. Self-diag upweighting of high-critic-score reals amplified the critic too fast and broke the Lipschitz balance. Only 1 eval (ep5 comb=0.215).
+
+**Lesson**: Self-diag temp=2.0 is too sharp for this corpus. Could retry at temp=5.0 (gentler) but shelving for now — orthogonal idea (PacGAN) is more promising.
+
+---
+
+## Launched: alibaba_v32 — PacGAN pack-size=2 (NEVER TRIED)
+
+**Recipe**: v22 ATB recipe + `--pack-size 2` (PacGAN, Lin et al. NeurIPS 2018). Critic scores packs of 2 windows jointly; detects low-diversity packs as mode-collapse signature. Clean, principled attack on mode collapse that's orthogonal to regularization.
 
 ---
 
