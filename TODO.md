@@ -345,3 +345,36 @@ Items marked ✓ are done and in the repo.
 | FreqMoE, arXiv 2501.15125 | Frequency-decomposition MoE for time series; supports regime-switching generator design |
 | PatchFormer, arXiv 2601.20845 | Hierarchical masked reconstruction + cross-domain transfer; supports masked pretraining curriculum |
 | Flow-Based TS Gen, arXiv 2601.22848 | Equivariance-regularised latent flow; reinforces latent-space generation without image tricks |
+
+---
+
+## Reviewer Action Items (Round 1 — Evaluation/Correctness Bugs)
+
+- [ ] `[P1]` Fix PRDC fallback in `llgan/eval.py:297,321,330,337` — `r_fake` unused; "recall" and "coverage" both derived from the same `in_real_ball.any(axis=1).mean()`. Either install `prdc` as a hard dep or implement the correct fallback (recall uses real-in-fake-balls, coverage uses unique-real-in-fake-balls).
+- [ ] `[P1]` Fix `eval.py --baseline` path at `llgan/eval.py:586` — passes no real windows to `_sample_fake()` for conditional checkpoints; will raise at `llgan/eval.py:432`. Thread real windows through the baseline branch.
+- [ ] `[P1]` Fix reuse-rate hard-coded column index at `llgan/eval.py:539,542,546` — use `prep.col_names.index("obj_id_reuse")` the way `llgan/train.py:446` already does. Reverify recent VERSIONS.md reuse numbers after fix.
+- [ ] `[P2]` Fix `TraceDataset` off-by-one at `llgan/dataset.py:988` — `len = max(0, len(data) - timestep + 1)`. Files with exactly `timestep` records currently contribute zero windows.
+- [ ] `[P2]` Fix small-val-set crash in `llgan/mmd.py:113,115,250,252` — reshape using the actual returned count, not the requested `n_samples`.
+- [ ] `[P2]` Decouple parser from hard-coded `/tiamat/zarathustra/traces` root in `parsers/core.py:19` and `traces/analysis/*.py:25,97`. Accept via env var or CLI.
+- [ ] `[P2]` Soften "statistically indistinguishable" claims in `README.md:11,13` and `paper/main.tex:65,214` until DMD-GEN < 0.3 is actually achieved.
+- [ ] `[P3]` Resolve paper placeholders (authors, hidden size, ablations, baselines, figures, final results) at `paper/main.tex:41,467,491,560`; fix `d=5` vs `d∈{5,6}` at `paper/main.tex:211`; reconcile Tencent dataset count at `paper/main.tex:451` with README counts.
+
+## Reviewer Action Items (Round 2 — Strategic Race Focus)
+
+- [ ] `[P1]` Build a pretrain bank: train 5–10 fresh pretrains under varied seeds/settings, rank by downstream joint-phase outcomes, then launch Phase 3 runs from the top few. Operationalize "pretrain quality is dominant variable" (VERSIONS.md:1902).
+- [ ] `[P1]` Fork corpus playbooks in CLAUDE.md / README: Tencent = high-K regime (K=8) + multimodal prior; Alibaba = low-K regime (K=2) + more exploration noise. Do not unify recipes.
+- [ ] `[P1]` Locality engine (explicit copy path): two-head generator that first decides reuse vs new seek, then either copies from recent-object memory or regresses a stride. Currently only supervising with L_loc scalar — reviewer is right that this is a regression, not a mechanism.
+- [ ] `[P2]` Add HRC + reuse-rate to the combined checkpoint score (currently just MMD² + 0.2·(1−recall) + optional DMD-GEN weight). Use HRC-MAE as a third tiebreaker.
+
+## Reviewer Action Items (Round 3 — Big Bets)
+
+- [ ] `[P1]` R-informed conditioning redesign: drop `backward_seek_ratio` + `opcode_switch_ratio`; add `object_unique`, `signed_stride_lag1_autocorr`, `obj_size_std`; compress to orthogonal factor space (PCA or learned) before the generator. Do not conflate with a raw `cond_dim` bump.
+- [ ] `[P1]` Window-level characterization bridge: derive per-window pseudo-labels (burst regime, locality class, object-diversity band, stride-memory pattern) from a windowed R pass, then train the regime selector supervised against those labels.
+- [ ] `[P1]` Poison-point two-population training: quarantine stride-outlier files, train main G on the core distribution, then either fine-tune a tail expert or add an outlier regime to the mixture.
+- [ ] `[P1]` Routed mixture-of-experts generator: small router (driven by cleaned conditioning or window pseudo-labels) picks among experts (high-reuse, burst-random, low-diversity-read; optionally corpus-specific). Stronger version of the regime sampler.
+- [ ] `[P2]` Limited reopen of GMM prior under clean conditions (no `var_cond` confound). Small experiment only.
+- [ ] `[P2]` Limited reopen of `cond_dim=13` *after* the conditioning redesign above — it was previously tested with the dirty feature set.
+
+## Reviewer Action Items (Round 4 — Open From Round 1)
+
+- See Round 1 items (PRDC, baseline, reuse-rate). Round 4 re-confirmed these are still open at eval.py L314, L539, L582.
