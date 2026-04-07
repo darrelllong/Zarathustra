@@ -56,7 +56,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Running: tencent_v67 — supervisor-loss-weight=5 on tencent (mirroring alibaba_v34 success)
 
-**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0`. Same scalar tweak that just produced the new alibaba record. Currently ep74/200, best 0.10567★ ep65 (recall 0.518). Trajectory looks faster than v66 — promising.
+**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0`. Same scalar tweak that just produced the new alibaba record. Currently ep87/200, best 0.10567★ ep65 (recall 0.518). Trajectory looks faster than v66 — promising.
+
+---
+
+## Post-Mortem: alibaba_v35 — v34 + proj_critic (W-spike killed at ep6)
+
+**Recipe**: v34 winning recipe + `--proj-critic`. Hypothesis: projection discriminator (Miyato & Koyama) adds inner-product cond term to critic, expected to boost mode coverage when char-file present.
+
+**Result**: G loss exploded immediately (ep2 G=21, ep3 G=47, ep4 G=63). W jumped to 9.7 by ep4. W-spike guard auto-killed at ep6. Best.pt training-log 0.12796 (worse than v34's ep5 0.144 baseline anyway). Total runtime <10 min.
+
+**Lesson**: Adding the projection-critic head on top of an already-tuned wgan-sn critic doubles the adversarial signal without retuning the lr_d / n_critic ratio. The two critic heads (latent space + cond-projection) interfere. proj_critic needs its own balance — likely lower lr_d and/or fresh pretrain. Shelved as plug-in for v34 recipe.
+
+---
+
+## Launched: alibaba_v36 — supervisor-loss-weight=10 (push the winning knob harder)
+
+**Recipe**: v34 winning recipe but `--supervisor-loss-weight 10.0` (was 5.0). Doubles the supervisor's relative weight against the adversarial loss. Hypothesis: if 5× already produced 25% improvement over ATB, 10× may push further — though too high risks underweighting the GAN signal entirely.
 
 ---
 
