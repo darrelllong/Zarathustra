@@ -34,9 +34,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: tencent_v66 — dual feature-space critic (first feat-critic on tencent)
+## Post-Mortem: tencent_v66 — feat-critic=0.5 on tencent (training-log 0.07658★ → full eval 0.11282, WORSE than ATB by 27%)
 
-**Recipe**: v57 ATB recipe + `--feat-critic-weight 0.5`. `feat_critic` is showing early promise on alibaba_v29 (training-log 0.10004★ at ep115, still running at ep169). Never tried on tencent. Analogous to v29 but with tencent regime count (K=8) and tencent ATB recipe.
+**Recipe**: v57 ATB recipe + `--feat-critic-weight 0.5`.
+
+**Result**: Ran all 200 epochs. Training-log best comb=0.07658 (ep185, recall=0.651) — first time any tencent training-log broke ATB 0.089 (by 14%). **Full eval best.pt (ep185)**: MMD²=0.01292, recall=0.5005, **comb=0.11282**, DMD-GEN=0.7148, AutoCorr=0.0358, α-prec=0.6225, HRC-MAE=0.0552. vs tencent ATB 0.089 → **27% worse**. Training-log was 47% optimistic — the worst train/eval gap yet seen.
+
+**Lesson**: Feat-critic on tencent inflates training-log MMD² metric (uses different evaluator state from full eval) more than it improves real generation. Recall did jump (0.583→0.651 training-log, 0.5005 full-eval) but not enough. Same conclusion as alibaba_v29: feat-critic helps training-log but the train/eval gap nullifies the apparent gain. Drop feat-critic as ATB candidate on both corpora.
+
+---
+
+## Launched: tencent_v67 — supervisor-loss-weight=5 on tencent (mirroring alibaba_v34's working recipe)
+
+**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0` (default is 1.0). Supervisor weight boost is the only G-side knob that has produced training-log gains on alibaba (v34 reached 0.10917★ ep70, first sub-ATB on alibaba). Testing whether the same simple scalar tweak transfers to tencent.
 
 ---
 
