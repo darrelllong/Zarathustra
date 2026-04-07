@@ -143,3 +143,39 @@ Reading the experiment history end to end, the repo has already done the hard pa
 ### Short Take
 
 The newer R work changes the interpretation of a few old experiments. Some things really were bad ideas, but some "failures" were actually tests run with redundant columns, poisoned tails, or the wrong abstraction level. The biggest opportunity now is to use the new analysis not just to tune the existing model, but to redesign what the model is allowed to condition on, what it is asked to copy, and which parts of the distribution it should learn jointly versus separately.
+
+---
+
+## Round 4
+
+### Since-Review Check
+
+1. `[P1]` No new commits have landed after this peer review. `HEAD` and `origin/main` are both still at the peer-review commit, so there is no later code change to assess yet. That matters because the strategic conclusions in Rounds 2 and 3 have not been superseded by a new model result.
+
+2. `[P2]` There was, however, a meaningful evaluation-fix wave immediately before this review, and it partially addressed earlier concerns:
+   HRC cache-fidelity was added in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py).
+   eval-time generator construction now threads through `gmm_components`, `var_cond`, `n_regimes`, and `num_lstm_layers` in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L399).
+   conditional eval now prefers char-file conditioning pools over noisy window descriptors in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L420).
+   reuse-rate evaluation was partially fixed in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L539), in the sense that it no longer reads the obviously wrong feature.
+
+3. `[P2]` Some earlier evaluation findings remain open even after that cleanup:
+   the PRDC fallback is still wrong in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L314), and this still matters locally because `prdc` is not installed;
+   the reuse-rate path still hardcodes column 3 rather than using `prep.col_names` in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L539);
+   the baseline path still calls `_sample_fake()` without passing real windows in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L582), so conditional baseline comparisons are still fragile.
+
+4. `[P2]` The actual project rebuttal is still unwritten. [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L1) remains a blank placeholder. That is separate from the R-side critique/response pair and should not be confused with it.
+
+5. `[P2]` The R rebuttal response is real and useful, but it is analysis-side follow-through, not the main rebuttal for the project. [R-REBUTTAL-RESPONSE.md](/Users/darrell/Zarathustra/R-REBUTTAL-RESPONSE.md#L12) documents substantial progress:
+   silhouette-based K diagnostics,
+   per-regime feature attribution,
+   outlier decomposition,
+   top-N sensitivity summaries,
+   block-vs-random diagnostics,
+   and conditioning audits.
+   That strengthens the evidence base behind the strategic recommendations in Rounds 2 and 3, but it does not change model behavior by itself.
+
+6. `[P2]` The most important unchanged conclusion from the rebuttal side is still the file-level versus window-level mismatch. [R-REBUTTAL-RESPONSE.md](/Users/darrell/Zarathustra/R-REBUTTAL-RESPONSE.md#L9) says the biggest remaining gap is that the current R pass is family-level and file-level, while the GAN ultimately lives at the window level. That reinforces, rather than weakens, the recommendation to build a window-level characterization bridge and use it to supervise regime structure.
+
+### Updated Read
+
+The current state is not "the review is stale." It is closer to "the repo has improved its measurement surface, but has not yet changed the underlying strategic picture." The rebuttal-side analysis has become stronger, the evaluation harness is better than it was, and the main race question is still the same one: how to turn those newer insights into a model that handles long-horizon dynamics and locality, not just aggregate fidelity.
