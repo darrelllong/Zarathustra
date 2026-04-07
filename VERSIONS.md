@@ -50,9 +50,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: alibaba_v30 — BayesGAN posterior over critics (NEVER TRIED)
+## Post-Mortem: alibaba_v30 — BayesGAN 5 critics (KILLED ep14, hopeless)
 
-**Recipe**: v22 ATB recipe + `--bayes-critics 5`. M=5 critic particles updated via SGLD (Adam + Gaussian noise), G loss averaged across particles. Config rationale: prevents any single decision boundary from forcing mode collapse → targets β-recall directly. Never tried in any version.
+**Recipe**: v22 ATB recipe + `--bayes-critics 5`. M=5 critic particles with SGLD noise injection.
+
+**Result**: W stuck at 0.15-0.20 for 14 epochs (vs normal 2-4). ep5 comb=0.232, ep10 comb=0.237 (worse). SGLD Gaussian noise drowns out the critic gradient signal; Lipschitz penalty not enforced per-particle so the ensemble effectively collapses to weak critics. Killed ep14.
+
+**Lesson**: BayesGAN doesn't compose with our wgan-sn/feature-matching stack as-is — the SGLD noise needs to be proportional to the existing critic gradient scale, not a fixed value. Shelved.
+
+---
+
+## Launched: alibaba_v31 — Self-Diagnosing GAN (NEVER TRIED)
+
+**Recipe**: v22 ATB recipe + `--self-diag-temp 2.0` (Self-Diagnosing GAN, NeurIPS 2021). Upweights real samples with high critic scores (= modes G under-covers) in critic training and feature matching. Directly targets β-recall, which is our alibaba bottleneck (v29 full eval recall=0.41).
 
 ---
 
