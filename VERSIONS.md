@@ -80,9 +80,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: alibaba_v33 — FiLM conditioning in G (NEVER TRIED)
+## Post-Mortem: alibaba_v33 — FiLM conditioning (KILLED ep27, deteriorating)
 
-**Recipe**: v22 ATB recipe + `--film-cond`. FiLM conditioning (Perez et al. NeurIPS 2018) applies (1+γ(z_global))·h + β(z_global) to LSTM hidden states, re-injecting workload conditioning at every timestep. Zero-init so backward-compatible with v22 pretrain (film_gamma/beta freshly initialised on load). Generator-side only — does not touch critic.
+**Recipe**: v22 ATB recipe + `--film-cond`.
+
+**Result**: Best ep10 comb=0.156★, then deterioration: ep15=0.160, ep20=0.166, ep25=0.186 (recall 0.407→0.262). W stuck at 0.2-0.4 indicating critic can't keep up with G changes from FiLM injection. Killed ep27 — training-log 0.156 already worse than ATB 0.110 and trending the wrong way.
+
+**Lesson**: FiLM adds cond re-injection at every timestep, but starting from a pretrain that saw no FiLM, γ/β drift and damage the learned latent dynamics. Might need fresh pretrain with film_cond from the start — too expensive to try now.
+
+---
+
+## Launched: alibaba_v34 — supervisor_loss_weight=5 (UNTRIED VALUE)
+
+**Recipe**: v22 ATB recipe + `--supervisor-loss-weight 5.0` (default 1.0). TimeGAN paper uses η=10. Higher supervisor weight strengthens temporal next-step prediction signal, targeting mode coherence. Generator-side only, no architecture change.
 
 ---
 
