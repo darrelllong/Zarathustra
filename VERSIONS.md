@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v36 — supervisor-weight=10 on alibaba (best 0.10373★ ep130 → full eval 0.1441, FAILED)
+
+**Recipe**: v34 ATB recipe with `--supervisor-loss-weight 10.0` (vs v34's 5.0). Otherwise identical: cond-dim 10, n-regimes 2, var-cond, gmm-components 8, cross-cov 2.0, locality 1.0, diversity 1.0, ACF 0.2.
+
+**Result**: Ran all 200 epochs cleanly (no W-spike kill, brief W=5 spike at ep178/199 but not 3-consecutive). Training-log best comb=0.10373 ep130 (recall=0.576). **Full eval best.pt**: MMD²=0.01729, **recall=0.366** (vs v34's 0.642 — collapsed), α-precision=0.802 (vs v34's 0.708, only metric better), DMD-GEN=0.7419 (vs v34 0.7002), HRC-MAE=0.0070, Context-FID=0.13. **Combined = 0.1441**, vs v34's 0.0823 = **75% worse**.
+
+**Lesson**: Supervisor-weight=10 collapses recall on alibaba. v34's weight=5 is the sweet spot; doubling it pushes G to over-commit to supervisor's mean trajectory and lose mode coverage. Training-log was again ~28% optimistic on the failed direction.
+
+**v34 (supervisor=5) remains the alibaba record at combined=0.0823.**
+
+---
+
 ## Post-Mortem: tencent_v64 — reuse-rate amplification (KILLED ep183, 0.099★ training-log → 0.128 full eval)
 
 **Recipe**: v57 ATB recipe + `--locality-loss-weight 3.0 --diversity-loss-weight 2.0` (idea #15).
