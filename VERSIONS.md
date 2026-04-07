@@ -44,9 +44,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: tencent_v67 — supervisor-loss-weight=5 on tencent (mirroring alibaba_v34's working recipe)
+## 🏆 NEW ALIBABA RECORD: alibaba_v34 — supervisor-loss-weight=5.0 (full eval 0.0823, BEATS ATB by 25%)
 
-**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0` (default is 1.0). Supervisor weight boost is the only G-side knob that has produced training-log gains on alibaba (v34 reached 0.10917★ ep70, first sub-ATB on alibaba). Testing whether the same simple scalar tweak transfers to tencent.
+**Recipe**: v22 ATB recipe + `--supervisor-loss-weight 5.0` (default is 1.0).
+
+**Result**: Ran all 200 epochs. Two best peaks: ep70 0.10917★ then late-stage cosine LR pickup → ep195 0.10100★ (recall 0.568). **Full eval best.pt (ep195)**: MMD²=0.01070, recall=0.6420, **comb=0.0823**, α-prec=0.7075, density=1.1002, DMD-GEN=0.7002, AutoCorr=0.0635, Context-FID=0.21, HRC-MAE=0.0063, reuse=0.003 vs real 0.005. vs alibaba ATB 0.110 → **25% BETTER**. Train/eval gap inverted: full eval BETTER than training-log (0.0823 < 0.10100) — first time ever.
+
+**Lesson**: Supervisor-weight boost (5×) is the working G-side knob on alibaba. Pairs the supervisor's stepwise reconstruction signal with the standard adversarial loss at higher relative weight, producing both faster convergence (ep70 first sub-ATB) AND late-stage cosine pickup (ep195 final best). Recall climbed from 0.547 → 0.642, the highest alibaba recall ever measured. New ATB. Expect this to be the new alibaba baseline; future alibaba runs should layer on top of this recipe.
+
+---
+
+## Running: tencent_v67 — supervisor-loss-weight=5 on tencent (mirroring alibaba_v34 success)
+
+**Recipe**: v57 ATB recipe + `--supervisor-loss-weight 5.0`. Same scalar tweak that just produced the new alibaba record. Currently ep74/200, best 0.10567★ ep65 (recall 0.518). Trajectory looks faster than v66 — promising.
 
 ---
 
