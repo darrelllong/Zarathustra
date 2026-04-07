@@ -24,9 +24,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: tencent_v65 — continuity loss on tencent (UNTRIED COMBO)
+## Post-Mortem: tencent_v65 — continuity loss on tencent (training-log 0.09741★ → full eval 0.12869, WORSE than ATB by 45%)
 
-**Recipe**: v57 ATB recipe + `--continuity-loss-weight 0.5`. Continuity loss had only been tested on alibaba (v26 KILLED ep34 0.198) — never on tencent. Targets DMD-GEN by training G with carry-state generation.
+**Recipe**: v57 ATB recipe + `--continuity-loss-weight 0.5`.
+
+**Result**: Ran all 200 epochs. Best training-log comb=0.09741 (ep195). **Full eval best.pt (ep195)**: MMD²=0.01789, recall=0.4460, **comb=0.12869**, DMD-GEN=0.7026, AutoCorr=0.0459, α-prec=0.6625, coverage=0.4460. vs ATB tencent 0.089 → **45% worse**. Training-log was 32% optimistic.
+
+**Lesson**: Continuity loss targets DMD-GEN at train time but does NOT translate to full-eval improvement — DMD-GEN 0.7026 is no better than other recent runs. Late-stage cosine LR pickup confirmed again (best at ep195), but the training-log / full-eval gap persists. Drop continuity loss as ATB candidate on tencent.
+
+---
+
+## Launched: tencent_v66 — dual feature-space critic (first feat-critic on tencent)
+
+**Recipe**: v57 ATB recipe + `--feat-critic-weight 0.5`. `feat_critic` is showing early promise on alibaba_v29 (training-log 0.10004★ at ep115, still running at ep169). Never tried on tencent. Analogous to v29 but with tencent regime count (K=8) and tencent ATB recipe.
+
+---
 
 ## Launched: alibaba_v29 — dual feature-space critic (NEVER TRIED)
 
