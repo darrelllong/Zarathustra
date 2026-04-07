@@ -40,6 +40,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v29 — feat-critic=0.5 (training-log 0.10004★ → full eval 0.12964, 18% worse than ATB)
+
+**Recipe**: v22 ATB recipe + `--feat-critic-weight 0.5`. First feat-critic experiment ever.
+
+**Result**: W-spike guard stopped at ep176. Best ep115 training-log 0.10004★ (first sub-0.11 training-log on alibaba, briefly beating ATB). **Full eval ep115**: MMD²=0.01154, recall=0.4095, **comb=0.12964**, DMD-GEN=0.7471, α-prec=0.755, HRC-MAE=0.0102. vs alibaba ATB 0.110 → 18% worse. Train/eval gap 30% — same pattern as v65.
+
+**Lesson**: Feat-critic helps training-log but the persistent ~30% train/eval gap nullifies the apparent gain. The gap, not the recipe, is now the bottleneck. Consider direct attacks on the gap: stronger regularization, larger val set, or eval-time EMA consistency.
+
+---
+
+## Launched: alibaba_v30 — BayesGAN posterior over critics (NEVER TRIED)
+
+**Recipe**: v22 ATB recipe + `--bayes-critics 5`. M=5 critic particles updated via SGLD (Adam + Gaussian noise), G loss averaged across particles. Config rationale: prevents any single decision boundary from forcing mode collapse → targets β-recall directly. Never tried in any version.
+
+---
+
 ## Launched: alibaba_v29 — dual feature-space critic (NEVER TRIED)
 
 **Recipe**: v22 ATB recipe + `--feat-critic-weight 0.5`. The `feat_critic` config option (added but never exercised in any prior version) enables a second critic operating on decoded features rather than latent space. Should catch quality problems invisible to the latent critic. Config recommends 0.5–1.0.
