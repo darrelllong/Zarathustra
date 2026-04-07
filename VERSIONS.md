@@ -161,12 +161,36 @@ still 2.7× below real (0.048) — motivates v64 reuse amplification.
 **Note**: HRC-MAE metric is now in eval.py (LRU cache fidelity, IDEAS #14 partially done).
 Log: ~/train_tencent_v63.log.
 
-### alibaba_v27 — Alibaba + reuse rate amplification (RUNNING)
+### alibaba_v28 — Alibaba + intermediate var_cond_kl 0.005 (RUNNING)
 
 **Status**: RUNNING adversarial — 2026-04-06.
-**Recipe**: v22 ATB base (K=2 + var_cond + GMM 8 + lower lr) + `--locality-loss-weight 3.0`
-(was 1.0) + `--diversity-loss-weight 2.0` (was 1.0). Pure hyperparameter push targeting
-IDEAS #15 (reuse rate amplification) via existing knobs — no code changes. Locality loss
+**Recipe**: v22 ATB recipe (K=2 + var_cond + GMM 8 + lower lr) + `--var-cond-kl-weight 0.005`
+(midpoint between v22's default 0.001 and v25's 0.01). v22 had stability, v25 had recall=0.513
+peak — try to capture both. Standard locality/diversity weights.
+**Pretrain**: REUSED from alibaba_v22.
+Log: ~/train_alibaba_v28.log.
+
+## Post-Mortem: alibaba_v27 — reuse rate amplification (W-STOP ep161, full=0.117)
+
+**Status**: STOPPED by W-spike guard at ep161/200 — 2026-04-06.
+**Recipe**: v22 ATB base + `--locality-loss-weight 3.0` + `--diversity-loss-weight 2.0`
+(IDEAS #15 reuse rate amplification via existing knobs).
+**Result**: Training-log best **0.09728★** at ep155 — but full eval reveals MASSIVE training-log
+mismatch.
+- ep85 best.pt: full eval **0.117** (MMD²=0.0189, recall=0.5085, HRC-MAE=0.0088, α-prec=0.945)
+- ep140 best.pt: full eval **0.121** (MMD²=0.0274, recall=0.534)
+- ep155 best.pt: full eval **0.156** (MMD²=0.0274, recall=**0.357 collapsed**)
+**Key insight**: Training-log "improvements" past ep85 were ARTIFACTS of EMA/1000-sample noise.
+Full eval at ep155 shows recall actually COLLAPSED. Genuine best is ep85 at 0.117 — still WORSE
+than ATB 0.110. Reuse amplification via existing knobs did not break ATB.
+**Lesson learned**: best.pt selection must use full eval not training-log; training-log can flip
+ordering by 30%+. Need to gate best.pt updates on full eval, not optimistic EMA.
+Log: ~/train_alibaba_v27.log.
+
+### alibaba_v27 — Alibaba + reuse rate amplification (COMPLETED)
+
+**Status**: STOPPED — see post-mortem above.
+**Recipe**: v22 ATB base + `--locality-loss-weight 3.0` + `--diversity-loss-weight 2.0`. Locality loss
 weight 3× should push the model harder on stride-repetition, while higher diversity loss
 combats mode collapse on reuse events.
 **Pretrain**: REUSED from alibaba_v22.
