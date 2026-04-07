@@ -4,6 +4,36 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v64 — reuse-rate amplification (KILLED ep183, 0.099★ training-log → 0.128 full eval)
+
+**Recipe**: v57 ATB recipe + `--locality-loss-weight 3.0 --diversity-loss-weight 2.0` (idea #15).
+
+**Result**: Best training-log 0.0986 (ep150). Full eval **0.128** (vs ATB tencent 0.089) — 30% optimistic gap. Reuse rate barely moved (0.018→0.024 vs real 0.183). Late-stage epochs 165–180 all worse than ep150 (0.099–0.130). Killed at ep183/200.
+
+**Lesson**: Hyperparameter pushing of locality/diversity weights does not amplify reuse rate enough to matter; idea #15 needs structural change (sigmoid+BCE on reuse column or post-hoc reuse injection).
+
+---
+
+## Post-Mortem: alibaba_v28 — reuse-rate amplification (KILLED ep125, full eval 0.137)
+
+**Recipe**: v22 ATB recipe + `--locality-loss-weight 1.0 --diversity-loss-weight 1.0` (already at base; mild idea #15).
+
+**Result**: Best training-log 0.106 (ep75). Full eval ep75 **0.137** (MMD²=0.018, recall=0.41) — 29% optimistic gap. ep80–125 all drifted upward (0.124–0.128 training-log). Killed at ep125.
+
+**Lesson**: Same as tencent_v64 — training-log selection misleads by ~30% on alibaba too.
+
+---
+
+## Launched: tencent_v65 — continuity loss on tencent (UNTRIED COMBO)
+
+**Recipe**: v57 ATB recipe + `--continuity-loss-weight 0.5`. Continuity loss had only been tested on alibaba (v26 KILLED ep34 0.198) — never on tencent. Targets DMD-GEN by training G with carry-state generation.
+
+## Launched: alibaba_v29 — dual feature-space critic (NEVER TRIED)
+
+**Recipe**: v22 ATB recipe + `--feat-critic-weight 0.5`. The `feat_critic` config option (added but never exercised in any prior version) enables a second critic operating on decoded features rather than latent space. Should catch quality problems invisible to the latent critic. Config recommends 0.5–1.0.
+
+---
+
 ## Design Decisions
 
 ### Auto-drop zero-variance columns (2026-04-05)
