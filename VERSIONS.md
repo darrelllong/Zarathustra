@@ -70,9 +70,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Launched: alibaba_v32 — PacGAN pack-size=2 (NEVER TRIED)
+## Post-Mortem: alibaba_v32 — PacGAN pack-size=2 (AUTO-KILLED ep7, W=11.18)
 
-**Recipe**: v22 ATB recipe + `--pack-size 2` (PacGAN, Lin et al. NeurIPS 2018). Critic scores packs of 2 windows jointly; detects low-diversity packs as mode-collapse signature. Clean, principled attack on mode collapse that's orthogonal to regularization.
+**Recipe**: v22 ATB recipe + `--pack-size 2`.
+
+**Result**: W-spike guard stopped at ep7. W=4.7→?→11.18 in three epochs. Critic got too strong too fast when packed into pairs (effectively 2× sample density per forward). Only ep5 eval (comb=0.230).
+
+**Lesson**: Third critic-side knob to blow up in a row (after bayes v30 and self-diag v31). wgan-sn at lr_d=4e-5 is tightly tuned; any extra critic capacity breaks the Lipschitz balance. Shifting to generator-side knobs.
+
+---
+
+## Launched: alibaba_v33 — FiLM conditioning in G (NEVER TRIED)
+
+**Recipe**: v22 ATB recipe + `--film-cond`. FiLM conditioning (Perez et al. NeurIPS 2018) applies (1+γ(z_global))·h + β(z_global) to LSTM hidden states, re-injecting workload conditioning at every timestep. Zero-init so backward-compatible with v22 pretrain (film_gamma/beta freshly initialised on load). Generator-side only — does not touch critic.
 
 ---
 
