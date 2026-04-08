@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v40 — feat-critic-weight=0.5 (dual discriminator) on v37 recipe (FAILED, full eval 0.158, β-recall collapsed 0.564→0.333)
+
+**Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8) + `--feat-critic-weight 0.5` (dual discriminator: latent-space C + feature-space C_feat).
+
+**Result**: Trained 200/200 epochs. Training-log best comb=**0.10347** ep115 (recall=0.564, MMD²=0.01627). **Full eval: combined=0.158** (MMD²=0.02459, **β-recall=0.3325** — collapsed from training-log 0.564), α-precision=0.6410, density=0.5782, DMD-GEN=0.7476, HRC-MAE=0.0144. **100% worse than v37 ATB 0.0786.**
+
+**Lesson**: The dual discriminator gave the largest *training-log* improvement of any alibaba run this session (best 0.10347, recall 0.564) but produced the worst *full-eval* recall collapse — train/eval gap of nearly 50% on β-recall alone. The feature-space critic appears to teach G to game the critic-feature distribution at training time but produces samples that collapse on the eval-time TimeGAN-style PRDC measurement. This is the same train/eval inversion that killed v36 (supervisor=10) and v38 (block_sample). Closing feat-critic on alibaba.
+
+**Pattern across the alibaba sweep**: every recipe layered on top of v37 (block_sample, multi-scale critic, feat-critic) has produced equal-or-better training-log combined but failed at full eval due to recall collapse. **v37 (supervisor=5 + diversity=2.0) combined=0.0786 remains the alibaba record** and looks increasingly like a hard local optimum reachable only by that specific G-side recipe.
+
+---
+
 ## Post-Mortem: tencent_v73 — supervisor-steps=2 (SeriesGAN 2-step) (KILLED ep133, best 0.12419 ep90, plateau then degradation)
 
 **Recipe**: v68 base (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, **no diversity-loss**) + `--supervisor-steps 2` (SeriesGAN 2-step latent supervisor).
