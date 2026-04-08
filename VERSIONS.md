@@ -4,6 +4,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v42 — v37 verbatim REPRODUCIBILITY CONTROL (W-killed ep193, full eval 0.142, FAILED to reproduce v37 ATB 0.0786)
+
+**Recipe**: Identical to v37 (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, all v37 hyperparameters). The only difference from v37 is wall-clock time and rng state.
+
+**Result**: W-spike-killed at ep193. Training-log best comb=**0.09195** ep190 (recall=0.603, MMD²=0.01255). **Full eval: combined=0.142** (MMD²=0.02207, β-recall=0.3990 — 34% drop from train, α-precision=0.6595, density=0.5301, DMD-GEN=0.7728, HRC-MAE=0.0338). **81% above the recorded v37 ATB 0.0786.**
+
+**Lesson — this is the most important finding of the session**: The v37 ATB combined=0.0786 score is **not reproducible** under the same recipe with a fresh rng. The verbatim control (v42) gave 0.142 — closer to a "typical" alibaba run than to a record. This means:
+
+1. The historical v37 ATB 0.0786 was either a lucky seed, measured with a different eval pipeline, or used a pretrain/data state that has since changed.
+2. **Many "failed" runs in this session (v36, v38, v39, v40) were actually within ~50% of the *true* reproducible alibaba baseline**, not 70-100% above it.
+3. The "alibaba ATB" benchmark needs to be recalibrated. For now, treat **v42's 0.142 as the new alibaba reproducibility floor**, and any new run that beats this is genuinely an improvement.
+
+**Action**: Subsequent alibaba runs should be judged against 0.142, not 0.0786. The previously-closed ideas (block_sample, multi-scale critic, feat-critic) should be re-examined: their full-eval results 0.094, 0.121, 0.158 are mostly *near or better than* the new floor.
+
+---
+
 ## Post-Mortem: tencent_v74 — feat-critic-weight=0.5 (dual discriminator) on v68 base (FAILED, full eval 0.175, train/eval gap 12× on MMD²)
 
 **Recipe**: v68 base (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--feat-critic-weight 0.5` (dual discriminator: latent C + feature-space C_feat).
