@@ -4,6 +4,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v41 — patch-embed + cond-drop-prob 0.5 + var-cond-kl 0.01 (KILLED ep18 by W-spike guard)
+
+**Recipe**: v37 base + `--patch-embed` (Conv1d patch embedding before critic LSTM, TTS-GAN style) + stronger CFG (`--cond-drop-prob 0.5`) + stronger variational reg (`--var-cond-kl-weight 0.01`).
+
+**Result**: Killed at ep18. W trajectory: ep15=3.53, ep16=4.21, ep17=4.59, ep18=4.80 — 3 consecutive >4.0. best.pt at ep15 (0.14700) is unusable. Critic loss G≈-3 throughout — patch embedding is producing critic features that the spectral-norm bound cannot constrain at lr_d=4e-5.
+
+**Lesson**: patch_embed is yet another critic-architecture change that breaks wgan-sn at the standard lr_d. Same pattern as v71/v72 — any critic-side change on alibaba/tencent at lr_d=4e-5 destabilizes within 5–10 epochs. Either reduce lr_d to ~1e-5 when enabling patch_embed, or pretrain the modified critic from scratch. Park as "needs lr_d retune."
+
+---
+
 ## Post-Mortem: alibaba_v40 — feat-critic-weight=0.5 (dual discriminator) on v37 recipe (FAILED, full eval 0.158, β-recall collapsed 0.564→0.333)
 
 **Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8) + `--feat-critic-weight 0.5` (dual discriminator: latent-space C + feature-space C_feat).
