@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v72 — PacGAN pack-size=2 (KILLED ep9 by W-spike guard, identical failure to v71)
+
+**Recipe**: v68 base + `--pack-size 2` (Lin et al. NeurIPS 2018, paired-window critic for mode-collapse detection).
+
+**Result**: Killed at ep9. W trajectory: ep5=1.70, ep6=2.73, ep7=8.08, ep8=14.71, ep9=18.65 — explosive divergence from ep6 onward. best.pt saved at ep5 (0.19309, recall=0.354) is well below ATB 0.089.
+
+**Lesson**: PacGAN's paired-window concatenation effectively doubles the critic input dimensionality at each step, and the wgan-sn spectral-norm bound on the critic LSTM is tuned for the singleton input. The W-distance blew through the Lipschitz bound within 4 epochs. Like v71, this is a critic-architecture change that needs lr_d reduction (try `--lr-d 2e-5`) or stronger SN to remain stable. Park as "needs lr re-tune"; not a tencent ATB tool in current form.
+
+**Pattern emerging**: every critic-side change tried on tencent in this sweep (v71 self-diag, v72 PacGAN) destabilizes wgan-sn within ~5–9 epochs at the standard lr_d=4e-5. Multi-scale critic (v70) is the lone exception and was the most promising. Pivoting to G-side ideas while alibaba_v39 finishes.
+
+---
+
 ## Post-Mortem: tencent_v71 — self-diag-temp 2.0 (KILLED ep9 by W-spike guard, critic destabilization)
 
 **Recipe**: v68 base (n-regimes=8, supervisor=5, no diversity-loss) + `--self-diag-temp 2.0` (idea #9, upweights real samples with high critic score).
