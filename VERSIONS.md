@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v39 — multi-scale critic on v37 recipe (KILLED ep139, best 0.12129 ep95, FAILED 54% above ATB)
+
+**Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8) + `--multi-scale-critic` (idea #8, 3-scale T/T/2/T/4).
+
+**Result**: Killed at ep139/200. Training-log best comb=**0.12129** ep95 (recall=0.507, MMD²=0.02269). Bounced 0.121–0.131 for ~40 epochs after ep95 with cosine LR already past 60% decay. Would need 35% drop in 60 remaining epochs to catch v37 ATB 0.0786 — judged hopeless. No full eval.
+
+**Lesson**: Multi-scale critic on alibaba sees the same plateau pattern as on tencent (v70): training-log best is decent but the curve flattens early and never recovers via cosine pickup. The 3-scale critic appears to *bound* what the generator can match (since coarser scales are easier to satisfy) rather than push it. Combined with v70 evidence, multi-scale critic is now closed as a primary lever — only viable as a fine-tune from a strong single-scale baseline, not a from-scratch joint phase.
+
+**v37 (supervisor=5 + diversity=2.0) combined=0.0786 remains the alibaba record.**
+
+---
+
 ## Post-Mortem: tencent_v72 — PacGAN pack-size=2 (KILLED ep9 by W-spike guard, identical failure to v71)
 
 **Recipe**: v68 base + `--pack-size 2` (Lin et al. NeurIPS 2018, paired-window critic for mode-collapse detection).
