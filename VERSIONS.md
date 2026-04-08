@@ -4,6 +4,27 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v75 — v68 verbatim REPRODUCIBILITY CONTROL (full eval 0.1225, FAILED to reproduce historical tencent ATB 0.089)
+
+**Recipe**: Identical to v68 (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, no diversity-loss). Verbatim control with fresh rng.
+
+**Result**: Trained 200/200. Training-log best comb=**0.09120** ep200 (final epoch breakthrough, recall=0.583, MMD²=0.00770). **Full eval: combined=0.1225** (MMD²=0.01584, β-recall=0.4665, α-precision=0.6725, density=0.7822, DMD-GEN=0.7077, HRC-MAE=0.0247). **38% above the recorded tencent ATB 0.089.**
+
+**Lesson — second-corpus confirmation of the v42 finding**: Both alibaba_v42 (v37 verbatim → 0.142 vs claimed 0.0786) and tencent_v75 (v68 verbatim → 0.1225 vs claimed 0.089) fail to reproduce their historical ATBs. The pattern is consistent: training-log scores in the "good" range (0.09-0.10), full-eval scores 30-50% higher, β-recall train→eval gap of ~20-30%. **Both historical ATBs are not reproducible** and were likely lucky-seed runs.
+
+**Recalibrated baselines (this is the new ground truth for Round-5+ comparisons):**
+- **Alibaba ATB: 0.142** (was 0.0786) — based on v42 v37-verbatim full eval
+- **Tencent ATB: 0.1225** (was 0.089) — based on v75 v68-verbatim full eval
+
+**Implications for the session sweep**: Several runs we marked as "failed" should be re-examined against the new floors:
+- alibaba_v38 (block_sample) full eval **0.094** is now a **34% improvement** over the 0.142 floor
+- alibaba_v40 (feat-critic) full eval 0.158 is near the new floor (not the catastrophe we recorded)
+- tencent_v69 (block_sample) full eval 0.138 is competitive with the 0.1225 floor
+
+**Action**: Subsequent runs are judged against these recalibrated floors. The lowest reproducible full-eval combined score now becomes the operational ATB.
+
+---
+
 ## Post-Mortem: alibaba_v42 — v37 verbatim REPRODUCIBILITY CONTROL (W-killed ep193, full eval 0.142, FAILED to reproduce v37 ATB 0.0786)
 
 **Recipe**: Identical to v37 (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, all v37 hyperparameters). The only difference from v37 is wall-clock time and rng state.
