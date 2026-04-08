@@ -4,6 +4,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v43 — v37 + diversity-loss-weight 4.0 (full eval 0.149, marginal vs new 0.142 floor)
+
+**Recipe**: v37 base + `--diversity-loss-weight 4.0` (2× v37's 2.0). MSGAN mode-seeking pushed harder to combat recall mode collapse.
+
+**Result**: Trained 200/200. Training-log best comb=**0.11629** ep50 (recall=0.519, MMD²=0.02009). **Full eval: combined=0.149** (MMD²=0.01921, β-recall=0.3515, **α-precision=0.7745** — highest of session, density=0.5887, DMD-GEN=0.7273, HRC-MAE=0.0121). Marginally **5% above the recalibrated 0.142 floor**, basically a tie with v42.
+
+**Lesson**: Doubling diversity-loss-weight does not improve recall at full eval. The α-precision spike to 0.7745 (vs v42 0.6595) suggests stronger mode-seeking does shift the precision/recall tradeoff toward precision — useful if precision were the bottleneck, but it isn't. Diversity above 2.0 is closed for alibaba.
+
+---
+
 ## Post-Mortem: tencent_v75 — v68 verbatim REPRODUCIBILITY CONTROL (full eval 0.1225, FAILED to reproduce historical tencent ATB 0.089)
 
 **Recipe**: Identical to v68 (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, no diversity-loss). Verbatim control with fresh rng.
