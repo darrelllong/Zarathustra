@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v38 — block_sample + v37 recipe (training-log 0.09355★ → full eval 0.09439, FAILED, 20% worse than v37)
+
+**Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, cond-dim 10, n-regimes 2, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--block-sample` (idea #13).
+
+**Result**: Ran all 200 epochs cleanly. Training-log best comb=**0.09355** ep180 (recall=0.592). Late-epoch W spikes to 5.7/5.5 ep172/173 but never 3-consec. **Full eval best.pt (ep180)**: MMD²=0.01719 (vs v37 0.01149 — regress), **β-recall=0.6140** (vs v37 0.6645 — slight regress), α-prec=0.8370 (vs v37 0.9050 — regress), DMD-GEN=0.7446, **HRC-MAE=0.0022** (vs v37 0.0227 — **10× improvement**, near perfect cache fidelity), Context-FID=0.15. **Combined = 0.09439**, vs v37's **0.0786 → 20% worse**.
+
+**Lesson**: block_sample on alibaba dramatically improves HRC-MAE (10× better cache fidelity) but at a net cost to MMD² and α-precision. The temporal coherence gained from contiguous-block batching helps cache footprint reproduction (the cache only sees order, not content quality) but seems to slightly degrade per-window content quality. block_sample is therefore a *cache-fidelity tool*, not an ATB tool. If cache fidelity becomes the primary metric, revisit. For combined metric, v37's random sampling wins.
+
+**v37 (combined=0.0786) remains the alibaba record.**
+
+---
+
 ## Post-Mortem: tencent_v69 — block_sample on tencent (training-log 0.10629★ → full eval 0.1378, FAILED, 30% gap)
 
 **Recipe**: v68 recipe (n-regimes=8, supervisor=5, diversity=2.0, cond-dim 10, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--block-sample` (idea #13 — preserves temporal coherence by streaming contiguous file blocks rather than random files per epoch).
