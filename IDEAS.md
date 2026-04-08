@@ -6,6 +6,10 @@ Parameter tuning is unlikely to produce the breakthrough needed. The ideas below
 
 ---
 
+### 0. Fourier analysis
+
+Have we done a Fourier transform on the time series in the trace to look for dominant frequencies? Should R do that, or some other tool?
+
 ### 1. Gaussian Mixture Prior on latent z (GMM-GAN)
 
 **Why this is the breakthrough candidate:** The generator currently samples `z ~ N(0, I)` — a single unimodal prior. But workloads come from clearly distinct regimes (burst, sequential, random-read, write-heavy). The diversity loss tries to fight this after the fact. A GMM prior makes multi-modal coverage *structural*.
