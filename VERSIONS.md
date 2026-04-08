@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v73 — supervisor-steps=2 (SeriesGAN 2-step) (KILLED ep133, best 0.12419 ep90, plateau then degradation)
+
+**Recipe**: v68 base (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2, **no diversity-loss**) + `--supervisor-steps 2` (SeriesGAN 2-step latent supervisor).
+
+**Result**: Killed at ep133/200. Training-log best comb=**0.12419** ep90 (recall=0.444, MMD²=**0.01289**). Three consecutive worse evals after ep90: 0.12419 → 0.13549 (ep110) → 0.16611 (ep130). Cosine LR already 70% decayed (3.6e-5 → 2.5e-5) by the time degradation set in, so no recovery runway.
+
+**Lesson**: 2-step supervisor improved MMD² noticeably (down to 0.01289 — ATB-level) but the 2-step latent unrolling introduces a coupling between supervisor accuracy and generator drift: as G shifts, the 2-step supervisor target itself shifts, and the loss surface becomes harder to follow under cosine LR decay. The result is a sharp peak followed by post-peak degradation. **Best non-killed tencent training-log of the session** but never reached ATB. Could potentially work with a *much* slower cosine decay (decay=0.2 instead of 0.05) so LR stays high enough to track the moving target. Park as "needs slower LR decay."
+
+**v31 co-ATB combined=0.089 remains the tencent record.**
+
+---
+
 ## Post-Mortem: alibaba_v39 — multi-scale critic on v37 recipe (KILLED ep139, best 0.12129 ep95, FAILED 54% above ATB)
 
 **Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, n-regimes=2, var-cond, gmm 8) + `--multi-scale-critic` (idea #8, 3-scale T/T/2/T/4).
