@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v70 — multi-scale critic on tencent (KILLED ep73, training-log 0.10224★, glacial throughput due to GPU contention with alibaba_v39)
+
+**Recipe**: v68 recipe (n-regimes=8, supervisor=5, cond-dim 10, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2; **no diversity-loss this time**) + `--multi-scale-critic` (idea #8, 3-scale T/T/2/T/4).
+
+**Result**: Killed at ep73/200. Training-log best comb=**0.10224** ep70 (recall=0.537, MMD²=0.00974). This is the best non-spike-killed tencent training-log we've seen on a clean run. **No full eval run** — at projected 30% train/eval gap that gives ~0.133 vs ATB 0.089 (49% worse), and the GPU-contention crawl was preventing alibaba_v39 (newer multi-scale critic test on alibaba) from making progress. Decision: kill the lower-yield run, free GPU.
+
+**Lesson**: Multi-scale critic does shape signal on tencent (best clean training-log seen so far), but at training cost (3× critic forward passes) that doubles when paired with another multi-scale run. Not killable yet as an idea on tencent — should retry as the *only* run on the GPU after alibaba_v39 finishes. For now: park the v70 result and try a critic-side idea that doesn't multiply forward passes.
+
+**v31 co-ATB combined=0.089 remains the tencent record.**
+
+---
+
 ## Post-Mortem: alibaba_v38 — block_sample + v37 recipe (training-log 0.09355★ → full eval 0.09439, FAILED, 20% worse than v37)
 
 **Recipe**: v37 winning recipe (supervisor=5, diversity=2.0, cond-dim 10, n-regimes 2, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--block-sample` (idea #13).
