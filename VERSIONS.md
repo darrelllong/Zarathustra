@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## 🏆 alibaba_v37 — NEW ALIBABA RECORD (combined=0.0786, supervisor=5 + diversity=2.0)
+
+**Recipe**: v34 ATB recipe (supervisor=5) + `--diversity-loss-weight 2.0` (carried over from tencent_v68 hypothesis). Otherwise identical: cond-dim 10, n-regimes 2, var-cond, gmm-components 8, cross-cov 2.0, locality 1.0, ACF 0.2.
+
+**Result**: Best training-log comb=**0.09318** ep110 (recall=0.616 — historic high). W-spike killed at ep181 (cosine LR pickup pushed critic too hard, brief stress in late epochs). **Full eval best.pt (ep110)**: MMD²=**0.01149**, **β-recall=0.6645** (new alibaba record), **α-precision=0.9050** (vs v34's 0.708 — big jump), DMD-GEN=0.7593 (slight regression), Context-FID=**0.05** (vs v34's 0.21), HRC-MAE=0.0227 (regression from v34's 0.0063). **Combined = 0.0786**, vs v34's 0.0823 → **4.5% improvement, new alibaba record**.
+
+**Lesson**: Diversity loss (MSGAN mode-seeking) DOES help on alibaba even though it failed on tencent — the recall jump from 0.642 → 0.6645 plus α-precision jump from 0.708 → 0.905 is the cleanest dual improvement we've seen. The recipe is now: supervisor=5 (anchors mean trajectory) + diversity=2.0 (forces mode coverage). Train/eval gap actually inverted (training-log 0.093 → full-eval 0.079 — better in eval).
+
+**alibaba_v37 combined=0.0786 is the new alibaba record. v34 (0.0823) demoted.**
+
+---
+
 ## Post-Mortem: tencent_v68 — diversity=2.0 + supervisor=5 on tencent (training-log 0.10215★ → full eval 0.1554, FAILED, W-spike killed ep148)
 
 **Recipe**: v57 ATB + `--diversity-loss-weight 2.0 --supervisor-loss-weight 5.0` (combine v34 alibaba winner with mode-coverage attack).
