@@ -4,6 +4,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v71 — self-diag-temp 2.0 (KILLED ep9 by W-spike guard, critic destabilization)
+
+**Recipe**: v68 base (n-regimes=8, supervisor=5, no diversity-loss) + `--self-diag-temp 2.0` (idea #9, upweights real samples with high critic score).
+
+**Result**: Killed at ep9. W trajectory: ep5=1.94, ep6=3.94, ep7=5.65, ep8=6.24, ep9=6.86 — 3 consecutive >4.0 triggered W-stop guard. best.pt saved at ep5 (0.16478) is unusable.
+
+**Lesson**: Self-diagnosing upweighting at temp=2.0 destabilizes wgan-sn critic immediately — the per-sample weighting amplifies the loss on hard samples too aggressively, breaking the critic Lipschitz bound. Either temp must be much higher (softer weighting, e.g. 5.0+) or self-diag must be paired with reduced lr_d or stronger spectral norm. Skip on tencent for now.
+
+---
+
 ## Post-Mortem: tencent_v70 — multi-scale critic on tencent (KILLED ep73, training-log 0.10224★, glacial throughput due to GPU contention with alibaba_v39)
 
 **Recipe**: v68 recipe (n-regimes=8, supervisor=5, cond-dim 10, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2; **no diversity-loss this time**) + `--multi-scale-critic` (idea #8, 3-scale T/T/2/T/4).
