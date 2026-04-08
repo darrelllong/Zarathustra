@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v69 — block_sample on tencent (training-log 0.10629★ → full eval 0.1378, FAILED, 30% gap)
+
+**Recipe**: v68 recipe (n-regimes=8, supervisor=5, diversity=2.0, cond-dim 10, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--block-sample` (idea #13 — preserves temporal coherence by streaming contiguous file blocks rather than random files per epoch).
+
+**Result**: Ran all 200 epochs. Training-log best comb=**0.10629** ep60 (recall=0.531). One brief W=4.04 spike at ep174 (no kill, recovered). **Full eval best.pt (ep60)**: MMD²=0.02427, **recall=0.4325**, α-prec=0.811, DMD-GEN=0.7319, AutoCorr=0.0397, Context-FID=0.51, HRC-MAE=0.0404. **Combined = 0.1378**, vs tencent ATB 0.089 → **54% worse**. Train/eval gap = 30%.
+
+**Lesson**: block_sample (which is ATB-validated for alibaba where Hurst=0.98) does NOT help tencent (Hurst=0.79). Tencent's train/eval gap is structural — every G-side knob (continuity, feat-critic, diversity, supervisor, block-sample) hits the same ~30% wall. The remaining levers are critic-side architectural changes (multi-scale critic, projection critic with proper lr_d) and pretrain-side (deeper LSTM, mixed-type heads — both require fresh pretrain).
+
+**v31 co-ATB combined=0.089 remains the tencent record.**
+
+---
+
 ## 🏆 alibaba_v37 — NEW ALIBABA RECORD (combined=0.0786, supervisor=5 + diversity=2.0)
 
 **Recipe**: v34 ATB recipe (supervisor=5) + `--diversity-loss-weight 2.0` (carried over from tencent_v68 hypothesis). Otherwise identical: cond-dim 10, n-regimes 2, var-cond, gmm-components 8, cross-cov 2.0, locality 1.0, ACF 0.2.
