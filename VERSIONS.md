@@ -4,6 +4,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v74 — feat-critic-weight=0.5 (dual discriminator) on v68 base (FAILED, full eval 0.175, train/eval gap 12× on MMD²)
+
+**Recipe**: v68 base (n-regimes=8, supervisor=5, var-cond, gmm 8, cross-cov 2.0, locality 1.0, ACF 0.2) + `--feat-critic-weight 0.5` (dual discriminator: latent C + feature-space C_feat).
+
+**Result**: Trained 200/200. Training-log best comb=**0.06476** ep195 (recall=0.700, MMD²=**0.00466**) — *the highest tencent training-log of the session, "27% below ATB"*. **Full eval: combined=0.175** (MMD²=**0.05617** — 12× the train value, β-recall=0.4065 — 42% drop from train 0.700, α-precision=0.6160, density=0.4723, DMD-GEN=0.6765, HRC-MAE=0.0629). **97% worse than ATB 0.089.**
+
+**Lesson**: Definitive confirmation across **both** corpora (alibaba_v40, tencent_v74) that feat-critic produces the most extreme train/eval gap of any technique in the project. The feature-space critic teaches G to fit the C_feat-induced feature manifold, which is then off-distribution for the eval-time TimeGAN encoder. The bigger the train improvement, the worse the eval. **Feat-critic is closed for both corpora.**
+
+**Pattern**: The session has now found that on tencent the train/eval gap can swing from ~30% (clean recipes) to ~70% (feat-critic) to 12× (when the C_feat manifold is exotic enough). Future ideas must be filtered by *eval-set behavior*, not training-log combined alone. Need a mid-training cheap eval signal to detect runaway train/eval divergence early.
+
+**v31 co-ATB combined=0.089 remains the tencent record.**
+
+---
+
 ## Post-Mortem: alibaba_v41 — patch-embed + cond-drop-prob 0.5 + var-cond-kl 0.01 (KILLED ep18 by W-spike guard)
 
 **Recipe**: v37 base + `--patch-embed` (Conv1d patch embedding before critic LSTM, TTS-GAN style) + stronger CFG (`--cond-drop-prob 0.5`) + stronger variational reg (`--var-cond-kl-weight 0.01`).
