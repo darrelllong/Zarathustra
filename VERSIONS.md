@@ -6,8 +6,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v51** — v48 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). Just launched, ep2/200.
-- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). ep21/200, best 0.14967★ ep15.
+- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5. ep179/200, best 0.08366★ ep150. Winding down.
+
+---
+
+## Post-Mortem: alibaba_v51 — v48 + cond-drop-prob 0.5 (W-spike kill ep162, full eval 0.1064 — does NOT beat ATB 0.0767)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--cond-drop-prob 0.5` (2× standard 0.25). Testing whether more aggressive CFG dropout improves eval generalization.
+
+**Result**: W-spike killed at ep162. Training-log best comb=**0.07124★** ep155 (recall=0.679, MMD²=0.00704 — **best alibaba training-log ever**). But **full eval: combined=0.1064** (MMD²=0.01900, β-recall=0.5630, α-precision=0.7300, DMD-GEN=**0.6825** — best alibaba dynamics ever, HRC-MAE=0.0037, Context-FID=0.14).
+
+**Lesson**: cond-drop-prob 0.5 produces spectacular training-log numbers but does NOT generalize on alibaba. The 49% train→eval gap (0.07124→0.1064) is dramatically worse than v48's negative gap (0.10347→0.0767). Hypothesis: on alibaba's small corpus (239 files), dropping conditioning 50% of the time during training makes G overfit to the unconditional distribution, which doesn't match the full-eval conditioning. **cond-drop-prob 0.25 remains the alibaba sweet spot.**
+
+Positive: DMD-GEN 0.6825 is the best alibaba dynamics score ever (v48 was 0.7367, improvement of 7.4%). This suggests cond-drop 0.5 helps temporal dynamics even if it hurts distributional metrics. Future work: could cond-drop 0.5 be used for a late-stage fine-tune targeting DMD-GEN specifically?
 
 ---
 
