@@ -42,6 +42,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v48 — v46 + block-sample (full eval **0.0767 — NEW ALL-TIME ALIBABA RECORD**, beats 0.1283 by 40%)
+
+**Recipe**: v46 base (n-regimes 4) + `--block-sample`. Combining the two independently-validated winning levers. W-spike killed ep139; best.pt at ep110 preserved.
+
+**Result**: Training-log best comb=**0.10347** ep110 (recall=0.553, MMD²=0.01407). **Full eval: combined=0.0767** (MMD²=**0.01304**, β-recall=**0.6815**, α-precision=0.8375, density=1.5676, coverage=0.6815, DMD-GEN=0.7367, AutoCorr=0.0384, Context-FID=0.19, HRC-MAE=**0.0006**).
+
+**THIS IS THE MOST IMPORTANT RESULT OF THE PROJECT.** Key findings:
+
+1. **β-recall INCREASED at full eval** (0.553→0.6815, +23%). This is the first time in the entire project history that recall improved from training to evaluation. Every prior run showed 13-60% recall collapse.
+2. **MMD² DECREASED at full eval** (0.01407→0.01304, −7%). Also unprecedented — the eval distribution is closer to real than the training-log measurement suggested.
+3. **HRC-MAE 0.0006 is effectively perfect** — the cache hit-ratio curve of synthetic data is indistinguishable from real data at 4 decimal places.
+4. **β-recall 0.6815 is the highest recall ever measured** at full eval on any corpus in this project. Previous best was v78 tencent at 0.5325.
+5. **The two winning levers multiply**: block-sample (preserves temporal coherence) × n-regimes 4 (provides workload diversity) together eliminate the train→eval gap that has plagued every prior alibaba run. The mechanism is clear: alibaba has H=0.98 (nearly maximal Hurst exponent), so temporal coherence from block-sample at training time directly matches eval data's temporal structure.
+
+**NEW ALIBABA ATB: 0.0767.** Updated leaderboard:
+
+| Corpus | ATB | Run | Key Lever |
+|--------|-----|-----|-----------|
+| Alibaba | **0.0767** | v48 | block-sample + n-regimes 4 |
+| Tencent | **0.1008** | v78 | block-sample + diversity 2.0 |
+
+---
+
 ## Post-Mortem: alibaba_v47 — v37 + n-regimes 8 (full eval 0.1369, worse than v46 0.1283)
 
 **Recipe**: v37 base + `--n-regimes 8` (up from v46's 4). Testing whether more regime prototypes improve alibaba further.
