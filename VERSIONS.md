@@ -4,6 +4,33 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v46 — v37 + n-regimes 4 (full eval **0.1283 — NEW ALIBABA RECORD**, beats 0.142 floor by 9.6%)
+
+**Recipe**: v37 base + `--n-regimes 4` (up from v37's 2). Hypothesis: alibaba's diverse workloads benefit from more regime prototypes.
+
+**Result**: Trained 200/200. Training-log best comb=**0.09513** ep75 (recall=0.600, MMD²=0.01503 — highest alibaba recall ever at training-log). **Full eval: combined=0.1283** (MMD²=0.02585, β-recall=**0.4880**, α-precision=**0.8835**, density=0.7976, coverage=0.488, DMD-GEN=0.7122, AutoCorr=0.0379, HRC-MAE=**0.0067**, Context-FID=0.30).
+
+**Lesson — n-regimes 4 is the first technique to genuinely beat the recalibrated alibaba floor.** Key observations:
+1. β-recall train→eval drop was only **19%** (0.600→0.488) — the smallest holdout gap this session. Compare v44 (60% drop), v42 (34% drop).
+2. α-precision 0.8835 is highest alibaba ever (vs v42 0.6595, v43 0.7745).
+3. HRC-MAE 0.0067 is near-perfect cache fidelity.
+4. DMD-GEN 0.7122 still the open dynamics gap.
+5. The regime count was the bottleneck: 2 regimes (v37/v42) couldn't express enough workload diversity. 4 regimes gave recall breathing room.
+
+**NEW ALIBABA ATB: 0.1283.** Next: test n-regimes 8 (v47).
+
+---
+
+## Post-Mortem: tencent_v77 — v76 + supervisor-steps 2 (full eval 0.1756, worse than v76 0.1122 record)
+
+**Recipe**: v76 base (diversity 2.0) + `--supervisor-steps 2`. Hypothesis: 2-step supervisor adds temporal coherence.
+
+**Result**: Trained 200/200. Training-log best comb=**0.09956** ep125 (recall=0.544, MMD²=0.00846). **Full eval: combined=0.1756** (MMD²=0.04621, β-recall=0.3530, α-precision=0.7505, density=0.6564, DMD-GEN=0.7134, HRC-MAE=0.0298). **57% above the tencent 0.1122 record.**
+
+**Lesson**: sup-steps=2 produces the familiar train→eval collapse: MMD² 0.00846→0.04621 (5.5×), recall 0.544→0.353 (35% drop). Combined with alibaba_v45 failure, **supervisor-steps=2 is now closed on both corpora**. The 2-step supervisor teaches G to overfit to the supervisor's latent manifold, which doesn't generalize at eval.
+
+---
+
 ## Post-Mortem: alibaba_v45 — v37 + supervisor-steps 2 (killed ep43, no improvement)
 
 **Recipe**: v37 base + `--supervisor-steps 2`. Untried lever for alibaba.
