@@ -4,6 +4,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v45 — v37 + supervisor-steps 2 (killed ep43, no improvement)
+
+**Recipe**: v37 base + `--supervisor-steps 2`. Untried lever for alibaba.
+
+**Result**: Killed at ep43. Best comb=**0.15516** at ep15, then 28 epochs with no further improvement. Recall stuck at 0.34-0.38. Lagging v44's pace at the same epoch (v44 ep45 was 0.14489).
+
+**Lesson**: 2-step supervisor does not help alibaba. The supervisor signal at 1-step is already sufficient (or saturating); doubling it adds friction without gain. Closed for alibaba. Combined with v45 killing supervisor-steps=2 on tencent (currently being tested in v77, watch result), this lever may be globally unhelpful.
+
+**Note on v76 final.pt**: full eval of final.pt (ep200) gave combined=0.1331 (recall collapsed 0.571→0.425), worse than the ep70 best.pt record of 0.1122. **Tencent ATB remains 0.1122 (v76 best.pt @ ep70).** The final.pt overtrained on dynamics at the expense of recall coverage.
+
+---
+
 ## Post-Mortem: tencent_v76 — v68 + diversity-loss-weight 2.0 (full eval **0.1122 — NEW TENCENT RECORD**, beats 0.1225 floor by 8.4%)
 
 **Recipe**: v68 base + `--diversity-loss-weight 2.0`. First time MSGAN diversity loss applied to tencent. Killed mid-run by SSH disconnect at ep148; best.pt saved at ep70.
