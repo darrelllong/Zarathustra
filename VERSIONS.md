@@ -4,6 +4,27 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v78 — v76 + block-sample (full eval **0.1008 — NEW TENCENT RECORD**, beats 0.1122 by 10.2%)
+
+**Recipe**: v76 base (diversity 2.0) + `--block-sample`. First use of contiguous temporal block sampling with the v76 winning recipe. W-spike killed at ep199 (W>4.0 for 3 consecutive epochs); best.pt at ep110 preserved.
+
+**Result**: Training-log best comb=**0.08355** ep110 (recall=0.615, MMD²=0.00645 — both all-time tencent records). **Full eval: combined=0.1008** (MMD²=**0.00734**, β-recall=**0.5325**, α-precision=0.8410, density=1.0650, coverage=0.5325, DMD-GEN=0.7416, AutoCorr=0.0598, Context-FID=0.14, HRC-MAE=0.0795).
+
+**Lesson — block-sample is the tencent breakthrough lever.** Key observations:
+1. Train→eval MMD² gap was only **14%** (0.00645→0.00734) — by far the smallest gap this session. Compare v77 (5.5× gap), v76 (1.86× gap).
+2. Train→eval recall gap only **13%** (0.615→0.5325) — also smallest this session.
+3. Block-sample preserves temporal coherence during training, so the model doesn't have to learn cross-file transitions that don't exist in eval. This is why the train→eval gap shrinks dramatically.
+4. Context-FID 0.14 is the lowest tencent ever — the latent space distribution is nearly matching real data.
+
+**NEW TENCENT ATB: 0.1008.** Recalibrated leaderboard:
+
+| Corpus | ATB | Run | Key Lever |
+|--------|-----|-----|-----------|
+| Tencent | **0.1008** | v78 | block-sample + diversity 2.0 |
+| Alibaba | **0.1283** | v46 | n-regimes 4 |
+
+---
+
 ## Post-Mortem: alibaba_v46 — v37 + n-regimes 4 (full eval **0.1283 — NEW ALIBABA RECORD**, beats 0.142 floor by 9.6%)
 
 **Recipe**: v37 base + `--n-regimes 4` (up from v37's 2). Hypothesis: alibaba's diverse workloads benefit from more regime prototypes.
