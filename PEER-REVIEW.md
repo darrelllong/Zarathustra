@@ -217,3 +217,38 @@ Since Round 4, the new commits have mostly updated [VERSIONS.md](/Users/darrell/
 ### Short Take
 
 The last few days did change my view. The biggest story is no longer just "find a better model." It is that the repo is still partly training one conditional system, evaluating another, and benchmarking both on a moving preprocessing target. Fix that contract first, and several supposedly failed ideas become worth another shot. Ignore it, and the team risks winning training logs while losing the actual race.
+
+---
+
+## Round 6
+
+### What I Think Of The New Numbers
+
+1. `[P1]` The new records are real progress, and they validate the Round 5 warning that some ideas had been closed too aggressively after a benchmark mistake. [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L7) Tencent `v78` at `0.1008` and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L28) Alibaba `v46` at `0.1283` are the strongest evidence yet that revisiting old ideas under the recalibrated floor was the right call. This is not just noise. It is the first concrete payoff from that reopening logic.
+
+2. `[P1]` The new numbers strongly reinforce the corpus-specific playbook. Tencent’s breakthrough came from `block_sample` layered onto the new `v76` base in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L13). Alibaba’s breakthrough came from raising regime capacity from 2 to 4 in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L34). Then [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L45) shows that 8 regimes is already too many for Alibaba. That is exactly the kind of asymmetric answer a race team wants early: stop looking for one universal recipe.
+
+3. `[P1]` The new numbers also give a cleaner answer on one reopened idea: `supervisor-steps=2` now looks closed on both corpora. [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L55) Tencent `v77` fails badly at full eval, and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L64) Alibaba `v45` never becomes competitive. I would now take this out of the active search space unless it is embedded inside a very different architecture.
+
+4. `[P2]` Tencent `v78` is a major distributional win, but not yet a true dynamics/locality win. The record is driven by MMD² and recall holding up at eval in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L7), and that is important. But DMD-GEN is still `0.7416`, AutoCorr is still elevated, and HRC-MAE is `0.0795`, which is not a cache-fidelity breakthrough. My read is that `block_sample` fixed a training/eval mismatch and improved support coverage, but it did not solve the long-horizon law of the process. That makes the Fourier-analysis recommendation more valuable, not less, because the model may now be getting the right sample cloud while still missing the right rhythms.
+
+5. `[P2]` Alibaba `v46` is the strongest evidence yet that regime count is a structural bottleneck rather than a cosmetic hyperparameter. Four regimes beat the reproducibility floor; eight regimes over-partitioned the corpus and hurt recall in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L45). That is a meaningful architectural clue. It suggests the next Alibaba-side gains are more likely to come from a smarter regime or routing design than from another generic loss change. At the same time, `v46` still leaves DMD-GEN around `0.71` and Context-FID at `0.30`, so it should be read as a better workload-family fit, not as a full dynamics solution.
+
+6. `[P2]` The new records do not rebut the main technical caveat from Round 5, because there were still no core code changes in the commits that produced this update. The repo got better numbers through better experiment selection, not through a resolved train/eval/generate contract. That means the wins are strategically meaningful, but the conditioning-path mismatch and benchmarking concerns still stand. In other words: the search has improved faster than the infrastructure.
+
+### Updated Race Plan
+
+1. Tencent should now have a clear primary branch: keep `block_sample` on, keep the `v76/v78` family as the base, and search on top of that.
+
+2. Alibaba should now have a different primary branch: keep `n-regimes=4` as the working baseline and stop treating 2 and 8 as equally plausible defaults.
+
+3. `supervisor-steps=2` should leave the active queue.
+
+4. The sidecar metrics need to stay visible even when combined score improves:
+   Tencent just showed that you can set a record while DMD-GEN and HRC remain unresolved.
+
+5. A short Fourier-analysis pass is even more justified now, because the new best Tencent model improved distributional holdout behavior without improving the temporal story.
+
+### Short Take
+
+The new numbers are good news, and they are genuinely informative. They say the reopening was worth doing, `block_sample` is the current Tencent lever, and `n-regimes=4` is the current Alibaba lever. They also say the race is not over: the repo is getting better at matching distributions than at matching dynamics, and the infrastructure caveats from Round 5 still apply.
