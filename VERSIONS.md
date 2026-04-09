@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v52** — v48 (ATB) + locality-loss-weight 2.0. ep21/200, best 0.16880★ ep15.
-- **tencent_v83** — v78 (ATB) + locality-loss-weight 2.0. Just launched.
+- **alibaba_v53** — v48 verbatim (reproducibility control). Just launched.
+- **tencent_v83** — v78 (ATB) + locality-loss-weight 2.0. ep71/200, best 0.11971★ ep70. Three consecutive ★s.
+
+---
+
+## Post-Mortem: alibaba_v52 — v48 + locality-loss-weight 2.0 (killed ep87, lagging 27%)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--locality-loss-weight 2.0` (2× standard 1.0). Testing stronger locality emphasis per reviewer recommendation.
+
+**Result**: Killed at ep87. Best comb=**0.13188★** at ep80 (recall=0.491, MMD²=0.03008). 27% behind v48's pace at the same epoch. Recall oscillating 0.41-0.49, never breaking 0.50 sustainably.
+
+**Lesson**: locality-loss-weight 2.0 adds too much friction on alibaba — the model spends capacity satisfying the locality constraint at the expense of distributional fidelity. The reviewer is right that locality needs an architectural solution (copy path), not a loss weight increase. **Close: locality-loss-weight 2.0 is dead on alibaba.** The standard 1.0 remains in the base recipe.
 
 ---
 
