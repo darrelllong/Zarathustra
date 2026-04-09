@@ -4,6 +4,30 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: tencent_v76 — v68 + diversity-loss-weight 2.0 (full eval **0.1122 — NEW TENCENT RECORD**, beats 0.1225 floor by 8.4%)
+
+**Recipe**: v68 base + `--diversity-loss-weight 2.0`. First time MSGAN diversity loss applied to tencent. Killed mid-run by SSH disconnect at ep148; best.pt saved at ep70.
+
+**Result**: Training-log best comb=**0.10049** ep70 (recall=0.578, MMD²=0.01599). **Full eval: combined=0.1122** (MMD²=0.01959, β-recall=**0.5370** held up at full eval, α-precision=0.9015, density=2.1714, DMD-GEN=0.7012, AutoCorr=0.0676, HRC-MAE=0.0762).
+
+**Lesson — diversity-loss-weight 2.0 is the first technique to genuinely beat the recalibrated tencent floor.** Critically, β-recall did **not** collapse from train→eval (0.578→0.537, only 7% drop, vs the 30%+ collapse seen in feat-critic and other failed techniques). α-precision 0.9015 is the highest tencent precision we've measured. DMD-GEN 0.70 still the open gap. **NEW TENCENT ATB: 0.1122.** Diversity 2.0 transferred cleanly from alibaba to tencent — a rare case of cross-corpus generalization.
+
+**Action**: Promote diversity 2.0 to the tencent base recipe. Next try: v68 + diversity 2.0 + supervisor-steps=2 OR + cross-cov 4.0.
+
+---
+
+## Post-Mortem: alibaba_v44 — v37 + cross-cov-loss-weight 4.0 (full eval 0.187, **WORSE** than 0.142 floor by 32%)
+
+**Recipe**: v37 base + `--cross-cov-loss-weight 4.0` (2× v37's 2.0). Targeting DMD-GEN temporal dynamics gap by doubling the cross-feature lag-1 covariance penalty. Killed mid-run by SSH disconnect at ep81; best.pt saved at ep80.
+
+**Result**: Training-log best comb=**0.12400** ep80 (recall=0.484, MMD²=0.02090). **Full eval: combined=0.187** (MMD²=0.02642, β-recall=**0.1960** — collapsed from 0.484, α-precision=0.5965, density=0.4372, coverage=0.1960, DMD-GEN=0.7573, HRC-MAE=0.0295).
+
+**Lesson**: Doubling cross-cov to 4.0 induces severe recall collapse at full eval (0.484→0.196, 60% drop). The training-log score is misleading because the cross-cov penalty drives G to satisfy the lag-1 covariance constraint by collapsing onto a lower-dimensional manifold. v37's 2.0 weight is the upper bound; cross-cov 4.0 is closed for alibaba. **DMD-GEN also did not improve** (0.7573 vs ~0.73 baseline) — the cross-cov regulariser does not actually move temporal dynamics at the eval level.
+
+**Action**: Cross-cov tuning closed as a primary lever for alibaba. Next try: route through R-informed conditioning instead.
+
+---
+
 ## Post-Mortem: alibaba_v43 — v37 + diversity-loss-weight 4.0 (full eval 0.149, marginal vs new 0.142 floor)
 
 **Recipe**: v37 base + `--diversity-loss-weight 4.0` (2× v37's 2.0). MSGAN mode-seeking pushed harder to combat recall mode collapse.
