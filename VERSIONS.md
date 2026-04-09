@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v50** — v48 (ATB) + acf-loss-weight 0.5. Testing whether acf-loss helps on top of block-sample recipe. ep4/200.
-- **tencent_v81** — v78 (ATB) + acf-loss-weight 0.5. Same idea for tencent. ep1/200.
+- **alibaba_v50** — v48 (ATB) + acf-loss-weight 0.5 + block-sample. ep88/200, best 0.12367★ ep85. Still improving but W climbing (3.0-3.5).
+- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). Just launched, ep2/200.
+
+---
+
+## Post-Mortem: tencent_v81 — v78 + acf-loss-weight 0.5 (killed ep89, critic collapse)
+
+**Recipe**: v78 base (block-sample, diversity 2.0, n-regimes 8) + `--acf-loss-weight 0.5` (2.5× standard 0.2). Testing stronger autocorrelation penalty on tencent with block-sample.
+
+**Result**: Killed at ep89. Best comb=**0.10332★** at ep60 (recall=0.524, MMD²=0.00812 — excellent). But critic collapsed after ep60: W dropped from 1.1 to 0.005 by ep89, MMD² spiked to 0.06061, recall crashed to 0.347. No recovery possible.
+
+**Lesson**: acf-loss 0.5 destabilizes the critic-generator balance on tencent. The early trajectory was promising (ep60 ★ nearly matched v78 ATB pace) but the stronger ACF penalty creates conflicting gradients that eventually overwhelm the critic. Combined with alibaba_v49 failure (acf 0.5 without block-sample), **acf-loss-weight 0.5 is now closed on both corpora**. The standard 0.2 weight remains part of the base recipe.
 
 ---
 
