@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v50** — v48 (ATB) + acf-loss-weight 0.5 + block-sample. ep88/200, best 0.12367★ ep85. Still improving but W climbing (3.0-3.5).
-- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). Just launched, ep2/200.
+- **alibaba_v51** — v48 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). Just launched, ep2/200.
+- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5 (more aggressive CFG dropout). ep21/200, best 0.14967★ ep15.
+
+---
+
+## Post-Mortem: alibaba_v50 — v48 + acf-loss-weight 0.5 + block-sample (killed ep111, stagnant)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--acf-loss-weight 0.5` (2.5× standard 0.2). Testing whether stronger ACF penalty helps on top of block-sample.
+
+**Result**: Killed at ep111. Best comb=**0.12367★** at ep85 (recall=0.505, MMD²=0.02477). 26 epochs stagnant. At ep110, score was 0.12869 — 24% behind v48's training-log peak of 0.10347 at the same epoch.
+
+**Lesson**: acf-loss 0.5 hurts even with block-sample. The stronger ACF penalty adds friction without improving temporal dynamics — block-sample already provides temporal coherence via the sampling strategy. Combined with v49 (acf 0.5 without block-sample) and v81 (acf 0.5 tencent, critic collapse), **acf-loss-weight 0.5 is definitively closed on both corpora with and without block-sample**.
 
 ---
 
