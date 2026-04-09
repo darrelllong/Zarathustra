@@ -42,6 +42,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Post-Mortem: alibaba_v47 — v37 + n-regimes 8 (full eval 0.1369, worse than v46 0.1283)
+
+**Recipe**: v37 base + `--n-regimes 8` (up from v46's 4). Testing whether more regime prototypes improve alibaba further.
+
+**Result**: W-spike killed ep180. Training-log best comb=**0.09756** ep160 (recall=0.560, MMD²=0.00966). **Full eval: combined=0.1369** (MMD²=0.01772, β-recall=0.4040, α-precision=0.5990, Context-FID=**0.08** — best ever). **6.7% above v46's 0.1283.**
+
+**Lesson**: n-regimes 8 is too many for alibaba's 239 files. Recall drops from v46's 0.488 to 0.404 at eval — more regimes spread training data too thin per regime. **n-regimes 4 remains the alibaba sweet spot.** However, Context-FID 0.08 (best ever) suggests the latent representation is improving even as coverage suffers.
+
+---
+
 ## Post-Mortem: tencent_v77 — v76 + supervisor-steps 2 (full eval 0.1756, worse than v76 0.1122 record)
 
 **Recipe**: v76 base (diversity 2.0) + `--supervisor-steps 2`. Hypothesis: 2-step supervisor adds temporal coherence.
