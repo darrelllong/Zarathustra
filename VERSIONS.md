@@ -4,6 +4,43 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Currently Running
+
+- **alibaba_v50** — v48 (ATB) + acf-loss-weight 0.5. Testing whether acf-loss helps on top of block-sample recipe. ep4/200.
+- **tencent_v81** — v78 (ATB) + acf-loss-weight 0.5. Same idea for tencent. ep1/200.
+
+---
+
+## Post-Mortem: tencent_v80 — v78 verbatim + w-stop 5.0 (killed ep94, **WORSE** than v78 ATB 0.1008)
+
+**Recipe**: v78 verbatim (block-sample, diversity 2.0, n-regimes 8) + `--w-stop-threshold 5.0` (relaxed from 4.0). Testing reproducibility of block-sample recipe with looser W guard.
+
+**Result**: Killed at ep94. Best comb=**0.12385★** at ep50 (recall=0.445, MMD²=0.01285). 44 epochs without improvement. Recall oscillating 0.37–0.45. v78 at ep80 was already 0.09222 — v80 lagged by 34%.
+
+**Lesson**: Relaxing w-stop to 5.0 does not help — the model doesn't exploit the extra headroom productively. The W values in v80 stayed moderate (0.2–2.6), so the relaxation was irrelevant. v80's underperformance vs v78 is likely just seed variance, confirming that block-sample results have ~23% seed-dependent spread. **Close: w-stop 5.0 doesn't add value.**
+
+---
+
+## Post-Mortem: alibaba_v49 — v46 + acf-loss-weight 0.5 (killed ep49, **WORSE** than v46 0.1283)
+
+**Recipe**: v46 base (n-regimes 4) + `--acf-loss-weight 0.5` (2.5× v46's 0.2). Testing whether stronger autocorrelation penalty improves temporal dynamics. **NOTE: did NOT have --block-sample** — omitted by mistake.
+
+**Result**: Killed at ep49. Best comb=**0.15709★** at ep10 (recall=0.415, MMD²=0.04019). 39 epochs without improvement. Recall stuck 0.30–0.36. Far behind v46's pace (v46 ep20 was 0.13259).
+
+**Lesson**: acf-loss 0.5 without block-sample hurts convergence badly. The stronger ACF penalty fights the random file ordering, creating contradictory gradients. v50 will test acf-loss 0.5 WITH block-sample, where temporal coherence is already provided by the sampling strategy. **Close: acf-loss 0.5 without block-sample dead on alibaba.**
+
+---
+
+## Post-Mortem: tencent_v79 — v78 + gmm-components 16 (killed ep110, stagnant)
+
+**Recipe**: v78 base (block-sample, diversity 2.0, n-regimes 8) + `--gmm-components 16` (2× standard 8). Required fresh pretrain due to n-regimes mismatch (initially tried n-regimes 12 but pretrain had K=8).
+
+**Result**: Killed at ep110. Best consistently 0.02+ behind v78 with gmm-8. No improvement trajectory.
+
+**Lesson**: gmm-components 16 fragments the latent space without adding useful structure. 8 components already match the regime count. **Close: gmm-16 doesn't help.**
+
+---
+
 ## Post-Mortem: tencent_v78 — v76 + block-sample (full eval **0.1008 — NEW TENCENT RECORD**, beats 0.1122 by 10.2%)
 
 **Recipe**: v76 base (diversity 2.0) + `--block-sample`. First use of contiguous temporal block sampling with the v76 winning recipe. W-spike killed at ep199 (W>4.0 for 3 consecutive epochs); best.pt at ep110 preserved.
