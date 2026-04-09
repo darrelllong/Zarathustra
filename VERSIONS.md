@@ -6,7 +6,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v82** — v78 (ATB) + cond-drop-prob 0.5. ep179/200, best 0.08366★ ep150. Winding down.
+- **alibaba_v52** — v48 (ATB) + locality-loss-weight 2.0. ep21/200, best 0.16880★ ep15.
+- **tencent_v83** — v78 (ATB) + locality-loss-weight 2.0. Just launched.
+
+---
+
+## Post-Mortem: tencent_v82 — v78 + cond-drop-prob 0.5 (full eval 0.1204 — does NOT beat ATB 0.1008)
+
+**Recipe**: v78 base (block-sample, diversity 2.0, n-regimes 8) + `--cond-drop-prob 0.5` (2× standard 0.25). Testing more aggressive CFG dropout for eval generalization.
+
+**Result**: Trained 200/200. Training-log best comb=**0.08200★** ep200 (recall=0.621, MMD²=0.00610 — excellent). **Full eval: combined=0.1204** (MMD²=0.01327, β-recall=0.4645, α-precision=0.8445, DMD-GEN=0.7410, AutoCorr=0.0434, Context-FID=**0.10** — best tencent ever, HRC-MAE=0.0136).
+
+**Lesson**: cond-drop-prob 0.5 fails on tencent for the same reason as alibaba v51: spectacular training-log (nearly matching v78's peak) but 47% train→eval gap kills it (v78 had only 20% gap). Dropping conditioning 50% of the time makes G learn a blended conditional/unconditional model that looks great at training-time EMA metrics but doesn't specialize correctly at eval. **cond-drop-prob 0.5 is now closed on BOTH corpora.** 0.25 remains the sweet spot.
+
+Context-FID 0.10 (best tencent ever) and AutoCorr 0.0434 (better than v78's 0.0598) suggest the latent representation is improving even as recall coverage suffers. Same DMD-GEN pattern as v51.
 
 ---
 
