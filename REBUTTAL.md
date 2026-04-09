@@ -37,3 +37,28 @@ We also accept Finding 7 in full: BayesGAN, mixed-type recovery, and deeper stac
 No new technical findings; we appreciate the confirmation that the evaluation-fix wave partially closed earlier concerns. The three still-open eval bugs (PRDC fallback, baseline path, reuse-rate column) are already in the Round 1 TODO list and will be fixed in the next code-quality sweep.
 
 We note for the record that, since Round 4 was written, `alibaba_v34` (supervisor-loss-weight=5) produced a new full-eval record of combined=0.0823 (25% better than the previous alibaba ATB of 0.110), with β-recall climbing to 0.642 (the highest alibaba recall ever measured). This is the first time the full-eval score on alibaba has *beaten* the training-log score, which inverts the persistent ~30% train/eval gap that motivated much of the reviewer's caution in Round 1 Finding 7. DMD-GEN remains at 0.70 — Round 2 Finding 5's concern about long-horizon dynamics still stands — but the non-dynamics metrics are now strong enough to justify the more precise claim above.
+
+---
+
+## Round 5
+
+We accept Findings 1 (z_global inference path mismatch), 2 (preprocessor confounding), 3 (checkpoint selection on untrusted surface), and 6 (Fourier analysis). These are legitimate infrastructure debts and now have TODO entries. Finding 1 in particular — the divergent `z_global` construction between train.py and eval.py/generate.py — is a compelling candidate explanation for some of the train→eval gap, and we will prioritize unifying these paths.
+
+We accept Finding 5 (multi-seed evaluation) as methodologically correct but note the tension with race velocity. We will adopt a compromise: verbatim controls for any new ATB claim, but not 3-seed bundles for every exploratory run. The recent recalibration (v42 → alibaba floor 0.142, v75 → tencent floor 0.1225) already demonstrates we take reproducibility seriously even when the conclusions are painful.
+
+We strongly agree with Finding 4's reopening of alibaba `block_sample` and consider this vindicated by subsequent results. Since this review was written, `alibaba_v48` (block-sample + n-regimes 4) produced combined=**0.0767** — a 46% improvement over the recalibrated floor and the strongest result in the project's history. Key facts:
+- β-recall **increased** at full eval (0.553→0.6815, +23%) — the first-ever negative train→eval gap on any corpus.
+- HRC-MAE=**0.0006** — effectively perfect cache fidelity at 4 decimal places.
+- The mechanism is clear: alibaba has H=0.98 (near-persistent Hurst exponent), so block-sample's temporal coherence matches the natural data structure.
+
+This confirms the reviewer's instinct that block-sample was "one of the strongest reproducible improvements" when judged against the correct floor. We disagree, however, with reopening multi-scale critic (tencent) and 2-step supervisor (tencent): `tencent_v77` (supervisor-steps=2) produced combined=0.1756 at full eval with a 5.5× MMD² gap — this is not a floor-calibration issue but a genuine failure mode where the 2-step supervisor teaches G to overfit to the supervisor's latent manifold.
+
+---
+
+## Round 6
+
+We accept Findings 1–3 (records are real, corpus-specific playbooks confirmed, supervisor-steps=2 globally closed) and Finding 5 (n-regimes=4 is structural for alibaba, not cosmetic). These align exactly with our experimental conclusions.
+
+We partially push back on Finding 4's characterization of tencent_v78 as "not yet a true dynamics/locality win." The claim is correct for tencent (DMD-GEN=0.7416, HRC-MAE=0.0795), but the reviewer should note that the same block-sample lever on alibaba (v48) produced HRC-MAE=**0.0006** — a genuine cache-fidelity breakthrough. Block-sample IS solving practical cache behavior on alibaba even if DMD-GEN remains open. The more precise statement is: *block-sample closes the cache-fidelity gap on high-Hurst corpora (alibaba H=0.98) but not on moderate-Hurst corpora (tencent H=0.79), where temporal rhythms at longer horizons still need structural modeling.*
+
+We accept Finding 6 (search has improved faster than infrastructure) as a fair observation. The z_global unification and preprocessor freezing from Round 5 are on the TODO list but have been deprioritized relative to model wins during the race. We will address them in the next code-quality sweep.

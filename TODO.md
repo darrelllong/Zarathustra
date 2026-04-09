@@ -378,3 +378,16 @@ Items marked ✓ are done and in the repo.
 ## Reviewer Action Items (Round 4 — Open From Round 1)
 
 - See Round 1 items (PRDC, baseline, reuse-rate). Round 4 re-confirmed these are still open at eval.py L314, L539, L582.
+
+## Reviewer Action Items (Round 5 — Reproducibility Infrastructure)
+
+- [ ] `[P1]` Unify `z_global` inference path: build one canonical `_make_z_global()` helper and route `train.py`, `mmd.py`, `eval.py`, `model.py`, and `generate.py` through it. Currently train uses full conditioning stack (cond_encoder + regime_sampler + GMM noise) while eval/generate do raw `torch.cat([cond, noise])`. This is a plausible contributor to train/eval gaps and failed verbatim controls.
+- [ ] `[P1]` Freeze per-corpus preprocessor manifest: fix the preprocessor seed and fit it on a deterministic subset, separated from the validation split. Currently preprocessor is fit on a random seed subset before val carve-out (`train.py:368,395`), which changes min/max ranges, clipping boundaries, and even which columns survive auto-drop. This confounds reproducibility controls.
+- [ ] `[P1]` Improve checkpoint selection: either periodic shadow full-eval on a larger fixed file bundle, or validate that EMA-based selection on 10 held-out files rank-preserves to full eval. Current small-val selection promotes false winners (30-50% train→eval gaps documented).
+- [ ] `[P2]` Fourier spectral analysis pass: run FFT on `ts_delta`, `obj_id_stride`, `obj_size`, and binary reuse on both real traces and synthetic long-rollouts. Diagnostic for burst periodicities and narrowband artifacts that MMD/PRDC/ACF/DMD-GEN may miss.
+- [ ] `[P2]` Multi-seed evaluation protocol: run 3 seeds per candidate family with fixed preprocessor and held-out eval bundle, rather than single-seed runs. Prevents optimizing toward unreproducible ATBs.
+
+## Reviewer Action Items (Round 6 — Post-Record Assessment)
+
+- [ ] `[P2]` Keep DMD-GEN and HRC-MAE visible in triage even when combined score improves. v78 tencent set a combined record while DMD-GEN (0.7416) and HRC-MAE (0.0795) remain unresolved.
+- [ ] `[P2]` Fourier analysis now even more justified: v78 may be getting the right sample cloud while missing the right temporal rhythms. Prioritize before next architectural push.
