@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v88** — v86 verbatim (2nd attempt). v87 had critic collapse; testing seed-dependence.
-- **alibaba_v58** — v48 base + n-regimes 6 + KL 0.01. Fresh pretrain. Testing regime count between sweet-spot 4 and failed 8.
+- **tencent_v88** — v86 verbatim (2nd attempt). v87 had critic collapse; testing seed-dependence. ep93/200, best 0.11756★ ep90.
+- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain.
+
+## Post-Mortem: alibaba_v58 — n-regimes 6 + KL 0.01 (early-stopped ~ep88, best 0.12961★ ep20)
+
+**Recipe**: n-regimes 6, var-cond-kl-weight 0.01, fresh pretrain. Testing regime count between alibaba sweet-spot 4 and closed 8.
+
+**Result**: Early-stopped around ep88. Best comb=**0.12961★** at ep20 — never improved again in 68 epochs. Scores regressed to 0.14-0.155 range. W low (0.25-0.87).
+
+**Lesson**: n-regimes 6 is worse than n-regimes 4 for alibaba. The n-regimes 4 floor with KL 0.01 is ~0.119 (avg v55/v57 evals). 6 regimes over-segments alibaba's Hurst=0.98 data — fewer, broader regimes work better for near-persistent traces. **n-regimes 6 CLOSED for alibaba.** Confirmed: alibaba=4, tencent=8.
+
+---
 
 ## Post-Mortem: tencent_v87 — v86 verbatim (killed ep76, critic collapse at ep60)
 
