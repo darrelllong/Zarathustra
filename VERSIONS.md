@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain. ep117/200, best 0.09793★ ep105.
-- **tencent_v89** — v86 base (KL 0.01, n-regimes 8) + moment-loss-weight 0.2 (2× default). Using v86 pretrain. Just launched.
+- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain. ep190/200, best 0.09793★ ep105. Finishing.
+- **tencent_v90** — v86 base (KL 0.01, n-regimes 8) + quantile-loss-weight 0.4 (2× default). Using v86 pretrain. Just launched.
+
+## Post-Mortem: tencent_v89 — moment-loss-weight 0.2 (killed ep64, critic collapse at ep52)
+
+**Recipe**: v86 base (KL 0.01, n-regimes 8) + moment-loss-weight 0.2 (2× default). Using v86 pretrain.
+
+**Result**: Killed at ep64. Best comb=**0.13522★** ep25. W crashed from 0.75 (ep47) to **0.05** (ep52) — critic died. Same pattern as v87 (collapsed ep60).
+
+**Lesson**: Tencent v86 pretrain has ~50% collapse rate around ep50-60. v86 and v88 survived; v87 and v89 collapsed. Cannot determine if moment-loss 0.2 contributed or if this is purely seed-dependent. Switching to quantile-loss-weight 0.4 for v90 to test a different lever. **moment-loss-weight 0.2 INCONCLUSIVE for tencent** (works on alibaba v59).
+
+---
 
 ## Post-Mortem: tencent_v88 — v86 verbatim, 2nd attempt (W-guard ep184, full eval **0.1099 — CONFIRMS v86**)
 
