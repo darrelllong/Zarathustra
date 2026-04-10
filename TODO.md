@@ -391,3 +391,23 @@ Items marked ✓ are done and in the repo.
 
 - [ ] `[P2]` Keep DMD-GEN and HRC-MAE visible in triage even when combined score improves. v78 tencent set a combined record while DMD-GEN (0.7416) and HRC-MAE (0.0795) remain unresolved.
 - [ ] `[P2]` Fourier analysis now even more justified: v78 may be getting the right sample cloud while missing the right temporal rhythms. Prioritize before next architectural push.
+
+## Reviewer Action Items (Round 7 — Rebuttal Critique)
+
+- [ ] `[P1]` Complete verbatim controls before making mechanism-level claims in the rebuttal. Do not declare "mechanism is clear" until reproducibility runs confirm the result. Frame as "leading hypothesis" until then.
+- [ ] `[P1]` Run Fourier spectral analysis — this is now the third round requesting it. The latest results (v78 tencent record with poor DMD-GEN; v51 alibaba best DMD-GEN but poor combined; v82 tencent best Context-FID) create exactly the tradeoff profile where spectral diagnostics are essential.
+- [ ] `[P1]` Do not close Tencent multi-scale critic without a full eval. Old v70 result had no full eval, and VERSIONS.md says it was "not killable yet." Inconsistent to close it after recalibrating other closures as too aggressive.
+- [ ] `[P2]` Reframe rebuttal claims: replace "mechanism is clear" with "leading hypothesis" where z_global unification and preprocessor freezing are still undone. Accepted measurement caveats and mechanism certainty are contradictory.
+- [ ] `[P2]` Stop treating combined score as the sole lens — v51 (best DMD-GEN), v82 (best Context-FID + AutoCorr) contain useful signal even though they "lost" on combined.
+- [ ] `[P2]` Resume structural bets: explicit locality/copy path, window-level characterization bridge, path-space critic, MoE generator. The post-record exploitation sweep does not mean the structural design space is exhausted.
+
+## Reviewer Action Items (Round 8 — NSF Proposal Recovery)
+
+- [ ] `[P1]` Re-elevate validation to first-class research track: add density-sensitive metrics, clustering-style similarity, long-rollout diagnostics, Fourier/spectral checks, and external-system replay behavior to the winner-selection loop. Not paper cleanup — part of the main invention.
+- [ ] `[P1]` Recover anomaly/outlier modeling as structured problem: tail expert, anomaly class, regulator, or random-timestep insertion mechanism. The NSF proposal treated outliers as necessary for realistic traces, not as cleanup noise. Stronger than just clipping.
+- [ ] `[P1]` Build correlation-aware conditioning: factorized descriptors (PCA or learned factor space), remove unlearnable columns, separate file-level vs window-level signals. Old RBM work already showed reconstruction improves when correlated features are grouped.
+- [ ] `[P1]` Push whole-trace generation: chunk-continuity training, long-rollout supervision, or regime-first hierarchical generator. The 12-step window is narrower than the original problem statement.
+- [ ] `[P2]` Semi-supervised / structured latent modeling: disentangled factors, regime-first generation, pseudo-labeled window classes. InfoGAN-style structured latents were in the original proposal.
+- [ ] `[P2]` External-system replay testing for finalists: compare generated vs real traces on actual system metrics (hit ratio, response time, CPU). "Behavioral equivalence under replay" not just "holdout similarity in embedding space."
+- [ ] `[P2]` Compositional/hybrid workload generation: normal-plus-anomalous synthesis, workload-family experts, corpus-bridging. Original proposal envisioned one generator family serving multiple workload types.
+- [ ] `[P3]` Benchmark against existing generators (Filebench, Impressions, VdBench) on both statistical and replay-system metrics for competitive positioning.
