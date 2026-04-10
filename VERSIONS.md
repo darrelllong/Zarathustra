@@ -6,8 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v88** — v86 verbatim (2nd attempt). v87 had critic collapse; testing seed-dependence. ep93/200, best 0.11756★ ep90.
-- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain.
+- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain. ep117/200, best 0.09793★ ep105.
+- **tencent_v89** — v86 base (KL 0.01, n-regimes 8) + moment-loss-weight 0.2 (2× default). Using v86 pretrain. Just launched.
+
+## Post-Mortem: tencent_v88 — v86 verbatim, 2nd attempt (W-guard ep184, full eval **0.1099 — CONFIRMS v86**)
+
+**Recipe**: v86 verbatim (block-sample, n-regimes 8, KL 0.01). Using v86's pretrain. 2nd attempt after v87 collapsed.
+
+**Training-log**: Best **0.10737★** ep125 (MMD²=0.01387, recall=0.532). W-spike guard triggered at ep184 (W=4.65, 5.51, 4.23 — 3 consecutive >4.0).
+
+**Full eval: combined=0.1099** (MMD²=0.01312, β-recall=0.5160, α-precision=0.7805, DMD-GEN=0.7357, Context-FID=0.08, HRC-MAE=0.0078). Train→eval gap: 2.4% (smallest tencent gap ever).
+
+**KL 0.01 REPRODUCIBLE ON TENCENT — second independent confirmation:**
+
+| Run | Training-log | Full eval | Train→eval gap |
+|-----|-------------|-----------|----------------|
+| v86 | 0.1028★ | **0.1130** | 9.7% |
+| v87 | 0.1346★ | COLLAPSED | — |
+| v88 | 0.1074★ | **0.1099** | 2.4% |
+
+v86 and v88 agree to within 3% at eval. v87's collapse was seed-specific. **New tencent reproducible floor: ~0.110** (avg v86/v88).
+
+---
 
 ## Post-Mortem: alibaba_v58 — n-regimes 6 + KL 0.01 (early-stopped ~ep88, best 0.12961★ ep20)
 
