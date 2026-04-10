@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v53** — v48 verbatim (reproducibility control). ep45/200, best 0.10666★ ep40. Tracking near v48's peak already.
-- **tencent_v84** — v78 verbatim (reproducibility control). Just launched.
+- **alibaba_v53** — v48 verbatim (reproducibility control). ep164/200, best ~0.09480 ep160. W flirting with guard.
+- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). Just launched.
+
+---
+
+## Post-Mortem: tencent_v84 — v78 verbatim (killed ep112, full eval 0.1464 — **v78 was a lucky seed**)
+
+**Recipe**: v78 verbatim (block-sample, diversity 2.0, n-regimes 8). Clean reproducibility control.
+
+**Result**: Killed at ep112. Best comb=**0.10548★** at ep80 (recall=0.524, MMD²=0.01038). 32 epochs stagnant. **Full eval: combined=0.1464** (MMD²=0.03076, β-recall=0.4220, α-precision=0.8650, DMD-GEN=0.7129, Context-FID=0.13, HRC-MAE=0.0622). **45% worse than v78's ATB of 0.1008.**
+
+**Lesson — v78 was a lucky seed.** The verbatim control cannot reproduce v78's training-log trajectory (0.10548 vs 0.08355, 26% gap) or full-eval result (0.1464 vs 0.1008, 45% gap). Combined with v80 (w-stop 5.0, eval ~0.124★ training-log), this establishes that tencent block-sample results have **~40-45% seed-dependent spread at full eval**. The v78 recipe is sound but the specific ATB number includes significant seed luck. Future tencent improvements should be evaluated against the reproducible floor (~0.14), not the lucky v78 ATB.
 
 ---
 
