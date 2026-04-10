@@ -6,8 +6,30 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v53** — v48 verbatim (reproducibility control). ep164/200, best ~0.09480 ep160. W flirting with guard.
-- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). Just launched.
+- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep22/200, best 0.13200★ ep20.
+
+## Recalibrated Reproducible Floors (2026-04-09)
+
+Both ATBs confirmed as lucky seeds via verbatim controls:
+
+| Corpus | Lucky ATB | Verbatim Control | Reproducible Floor |
+|--------|-----------|------------------|-------------------|
+| Alibaba | 0.0767 (v48) | 0.1325 (v53) | **~0.13** |
+| Tencent | 0.1008 (v78) | 0.1464 (v84) | **~0.14** |
+
+Future improvements should be evaluated against reproducible floors, not lucky ATBs.
+
+---
+
+## Post-Mortem: alibaba_v53 — v48 verbatim (W-spike kill ep179, full eval 0.1325 — **v48 was also a lucky seed**)
+
+**Recipe**: v48 verbatim (block-sample, n-regimes 4). Clean reproducibility control.
+
+**Result**: W-spike killed at ep179. Best.pt at ep140 (saved MMD²=0.01474). Training-log showed improvement through ep175 (0.09380). **Full eval: combined=0.1325** (MMD²=0.01505, β-recall=0.4130, α-precision=0.6475, DMD-GEN=0.7242, Context-FID=0.10, HRC-MAE=0.0150). **73% worse than v48's ATB of 0.0767.**
+
+**Lesson — v48 was a lucky seed, just like v78 and the historical v37/v68.** The gap is almost entirely in recall: v48 eval'd at 0.6815 recall (negative train→eval gap), v53 eval'd at 0.4130 (29% recall drop from training-log). The MMD² values are comparable (0.01304 vs 0.01505). This means v48's unprecedented negative train→eval gap was seed luck, not a property of the block-sample recipe.
+
+**Both ATBs are now confirmed as non-reproducible lucky seeds.** The reproducible floor for the block-sample recipes is ~0.13 (alibaba) and ~0.14 (tencent). The Round 5 reviewer was right: "the session should stop treating one lucky single-seed run as enough evidence." Future claims should benchmark against these floors.
 
 ---
 
