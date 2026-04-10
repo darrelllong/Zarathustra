@@ -6,8 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain (correct path: tencent_block_1M, 5 columns). Pretraining phase 2.5.
-- **alibaba_v56** — v48 + var-cond-kl-weight 0.02 (4× standard 0.005). Pushing KL regularization harder after v55's success.
+- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain. ep42/200, best 0.15499★ ep15.
+- **alibaba_v57** — v55 verbatim (v48 + var-cond-kl-weight 0.01). Reproducibility control for v55's 0.1251 eval.
+
+## Post-Mortem: alibaba_v56 — v48 + var-cond-kl-weight 0.02 (killed ep34, critic collapse)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--var-cond-kl-weight 0.02` (4× standard 0.005).
+
+**Result**: Killed at ep34. Best comb=0.15582★ ep30 (recall=0.382, MMD²=0.03222). W values crashed from 0.52 (ep25) to **0.03-0.04** (ep28-34) — critic effectively dead.
+
+**KL weight sweep now complete:**
+- 0.005 (default): floor ~0.13 (v53)
+- **0.01 (2×): eval 0.1251 (v55) — sweet spot**
+- 0.02 (4×): critic collapse (v56) — too aggressive
+
+**Lesson**: var-cond-kl-weight 0.02 over-regularizes the conditioning, washing out the discriminative signal the critic needs. **var-cond-kl-weight 0.02 closed on alibaba.** The sweet spot is 0.01.
 
 ## Post-Mortem: alibaba_v55 — v48 + var-cond-kl-weight 0.01 (completed ep200, full eval **0.1251 — BEATS FLOOR**)
 
