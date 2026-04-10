@@ -363,3 +363,66 @@ The old proposal in [Zoroaster_Final_NSFProposal2019_Final.pdf](/Users/darrell/Z
 ### Short Take
 
 The old NSF proposal does not say the team is out of big ideas. It says the opposite. The original plan was broader, more structural, and more ambitious than the current scalar-tuning loop. If the team wants to push over the top, one of the best places to look is not outside the project. It is back at the ideas the project started with and has only partially implemented.
+
+---
+
+## Round 9
+
+### OK, So Do It
+
+The new rebuttal is materially better. It picks up the later criticism, accepts that the structural design space is still open, and even says outright that the path forward is through better modeling of what the generator conditions on and how, not through more auxiliary output losses in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L74) and [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L94). That is the right conclusion. The problem now is execution. The repo has crossed from "not seeing the issue" into "seeing it and still not doing it."
+
+1. `[P1]` The active search still contradicts the rebuttal’s own conclusion. The project now says the recent sweep was too scalar-heavy and that copy-path locality, a window-level bridge, path-space critics, and MoE structure remain high-priority in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L74). It also says the KL result matters because it changes how conditioning is modeled, not because it is just one more loss in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L94). But the current active Alibaba run is still `moment-loss-weight 0.2` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L10). That is exactly the old behavior. If the rebuttal really believes its own Round 8 conclusion, then `v59` should not be the lead move. Freeze the KL win as a base and quit messing around with scalar tweaking.
+
+2. `[P1]` The project already knows the highest-leverage next actions, and they are still sitting in TODO form rather than code or experiments. The open reviewer items already name the right work:
+   Fourier diagnostics in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L398),
+   structural bets like copy path, window-level bridge, path-space critic, and MoE in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L402),
+   validation as a first-class track in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L406),
+   anomaly modeling in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L407),
+   correlation-aware conditioning in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L408),
+   whole-trace generation in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L409),
+   and replay-system testing in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L411).
+   At this point the bottleneck is not idea discovery. It is choosing one or two of these and actually building them.
+
+3. `[P1]` The KL 0.01 result should be treated as base camp, not destination. It is a real and important finding: it improves Alibaba reproducible performance in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L32), materially improves Tencent in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L53), and sharply reduces the train→eval gap on Tencent in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L61). But the main thing it proves is the review’s broader point: the remaining leverage is in conditioning semantics and conditional robustness, not in piling on more generic loss terms. The right reaction is to branch structural experiments from `v57` and `v86`, not to keep spending prime cycles on `0.005 vs 0.01 vs 0.02` and then `moment-loss-weight 0.2`.
+
+4. `[P1]` Fourier is now the clearest unforced error in the repo. The rebuttal explicitly concedes that Fourier was deferred rather than answered in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L70), and the corresponding item is still open in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L398). That was already true before the new KL runs. It is even more true now. The project now has exactly the kind of profile where spectral evidence matters:
+   `v86` is the strongest Tencent reproducible result but still has DMD-GEN `0.7139` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L59),
+   `v51` remains the best Alibaba DMD-GEN result despite losing on combined in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L193),
+   and `v82` remained useful on Context-FID and AutoCorr despite losing overall in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L181).
+   Stop agreeing that spectral analysis is important and then not running it. Just do it.
+
+5. `[P1]` Locality still lacks a mechanism, and the repo has already shown that more locality weight is not the answer. Both corpora closed `locality-loss-weight 2.0` as the wrong move in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L163) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L171). The TODO already says the reviewer is right that the model needs an explicit copy path in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L366). So the next locality work should not be `locality-loss-weight 3.0`, `moment-loss`, or another penalty term. It should be the copy-path or recent-object-memory mechanism the repo has now accepted multiple times.
+
+6. `[P1]` The infrastructure debts still matter because they control whether the new conditioning story is even being measured cleanly. The rebuttal correctly softens mechanism claims while `z_global` unification and preprocessor freezing remain open in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L76). Those debts are still sitting in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L384) and [TODO.md](/Users/darrell/Zarathustra/TODO.md#L385). If the team wants to make the KL story the new baseline truth, it should stop leaving the condition-path contract partly divergent between training and eval. Otherwise it will keep mixing real algorithmic progress with measurement noise.
+
+7. `[P2]` The newer results are also a warning against being seduced by pretty training curves from scalar moves. `supervisor-loss-weight 10.0` looked excellent in training and collapsed catastrophically at eval on Tencent in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L104). `cond-drop-prob 0.5` looked spectacular in training and still failed at eval on both corpora in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L181) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L193). The project now has enough evidence that scalar sweeps are unusually good at generating false hope. That is exactly why the remaining compute budget should go into mechanism changes that test different hypotheses, not finer coefficient walks around the current objective.
+
+8. `[P2]` “Actively pursuing” is no longer enough as a phrase. The rebuttal says chunk continuity, hierarchical generation, replay evaluation, compositional generation, and structured conditioning are the right future path in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L88), [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L90), and [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L92). Good. Now pick an actual build order. My recommendation is:
+   one conditioning-structure experiment,
+   one locality-structure experiment,
+   one diagnostics package,
+   and only then any further scalar sidecars.
+   Until that happens, the project is still spending too much energy proving it understands the criticism instead of cashing that understanding into model changes.
+
+### What I Would Do Right Now
+
+1. Freeze `alibaba_v57` and `tencent_v86` as the new reproducible baselines and stop spending mainline effort on fresh scalar-only variants.
+
+2. Run the Fourier or spectrum pass immediately on real traces plus long synthetic rollouts for `v57`, `v86`, `v51`, and `v82`.
+
+3. Implement one conditioning-structure change next:
+   correlation-aware factorized conditioning plus file-level versus window-level separation,
+   or the window-level pseudo-label bridge.
+
+4. Implement one locality-structure change next:
+   explicit reuse-vs-new decision with copy path or recent-object memory.
+
+5. On Tencent, reopen one critic-side structural test only after that:
+   either full-eval multi-scale critic or a path-space critic.
+
+6. Treat any additional scalar sweep as a sidecar, not the main event.
+
+### Short Take
+
+The new rebuttal is finally saying many of the right things. That is good. But now the standard is higher: the team does not need more agreement with the review. It needs follow-through. The repo already knows what the next serious bets are. So do them.
