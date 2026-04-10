@@ -6,8 +6,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep74/200, best 0.11246★ ep55. Plateaued ~0.112 for 20ep. W healthy (1.0-1.6).
-- **alibaba_v55** — v48 + var-cond-kl-weight 0.01 (2× standard 0.005). Testing stronger variational regularization.
+- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain (6-column data after obj_id_reuse fix). Pretraining.
+- **alibaba_v55** — v48 + var-cond-kl-weight 0.01 (2× standard 0.005). ep140/200, best 0.09162★ ep135 (recall 0.600). Strong run.
+
+## Post-Mortem: tencent_v85 — v78 + supervisor-loss-weight 10.0 (completed ep200, full eval **MODE COLLAPSE**)
+
+**Recipe**: v78 base (block-sample, n-regimes 8) + `--supervisor-loss-weight 10.0` (2× standard 5.0).
+
+**Training-log**: Best **0.09569★** ep155 (MMD²=0.00919, recall=0.568). ★ at ep25→30→35→40→50→55→90→110→125→155. Strongest sustained convergence this session. W values healthy (1.0-2.9), one late spike at 5.3 (ep176).
+
+**Full eval: CATASTROPHIC MODE COLLAPSE.** Combined=**0.365** (MMD²=0.16575, β-recall=**0.0045**, α-precision=0.005, DMD-GEN=0.7984, Context-FID=3.53, HRC-MAE=0.0200). The model produces near-zero diversity at eval despite spectacular training-log numbers.
+
+**Lesson**: supervisor-loss-weight 10.0 causes the same failure mode as cond-drop-prob 0.5 — G overfits to the supervisor's latent manifold during training, producing numbers that look excellent in-distribution but collapse completely out-of-distribution at eval. The training-log ★ trajectory was entirely illusory. **supervisor-loss-weight 10.0 CLOSED on both corpora** (alibaba v54: W stuck 0.2-0.3; tencent v85: mode collapse at eval).
+
+---
 
 ## Post-Mortem: alibaba_v54 — v48 + supervisor-loss-weight 10.0 (killed ep25, hopeless)
 
