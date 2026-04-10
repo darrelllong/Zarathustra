@@ -6,7 +6,8 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep22/200, best 0.13200★ ep20.
+- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep50/200, best 0.11798★ ep50. ★ every checkpoint.
+- **alibaba_v54** — v48 + supervisor-loss-weight 10.0 (2× standard). Just launched.
 
 ## Recalibrated Reproducible Floors (2026-04-09)
 
