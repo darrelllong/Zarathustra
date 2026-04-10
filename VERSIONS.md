@@ -6,8 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v59** — v55/v57 base (KL 0.01, n-regimes 4) + moment-loss-weight 0.2 (2× default). Using v48 pretrain. ep190/200, best 0.09793★ ep105. Finishing.
-- **tencent_v90** — v86 base (KL 0.01, n-regimes 8) + quantile-loss-weight 0.4 (2× default). Using v86 pretrain. Just launched.
+- **alibaba_v60** — v59 base (KL 0.01, moment-loss 0.2) + quantile-loss-weight 0.3 (1.5× default). Using v48 pretrain. Just launched.
+- **tencent_v90** — v86 base (KL 0.01, n-regimes 8) + quantile-loss-weight 0.4 (2× default). Using v86 pretrain. ep28/200, best 0.14828★ ep20.
+
+## Post-Mortem: alibaba_v59 — moment-loss-weight 0.2 (completed ep200, full eval **0.1113 — NEW ALIBABA RECORD**)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + KL 0.01 + moment-loss-weight 0.2 (2× default).
+
+**Training-log**: Best **0.09793★** ep105 (MMD²=0.01353, recall=0.578). Plateaued after ep105.
+
+**Full eval: combined=0.1113** (MMD²=0.01649, β-recall=0.5260, α-precision=**0.9070**, density=1.40, coverage=0.526, DMD-GEN=0.7688, Context-FID=0.15, HRC-MAE=0.0101). Train→eval gap: **13.6%** (best alibaba gap ever).
+
+**moment-loss-weight 0.2 VALIDATED on alibaba — new record and tighter gap:**
+
+| Run | Recipe | Full eval | Train→eval gap |
+|-----|--------|-----------|----------------|
+| v55 | KL 0.01 | 0.1251 | 28% |
+| v57 | KL 0.01 (verbatim) | 0.1134 | 28% |
+| **v59** | **KL 0.01 + moment 0.2** | **0.1113** | **13.6%** |
+
+α-precision 0.907 is highest alibaba ever. The doubled moment loss helps both distribution matching (MMD²) and conditioning robustness (smaller gap). **New alibaba floor: ~0.111.**
+
+---
 
 ## Post-Mortem: tencent_v89 — moment-loss-weight 0.2 (killed ep64, critic collapse at ep52)
 
