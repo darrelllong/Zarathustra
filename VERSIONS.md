@@ -6,8 +6,25 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain (6-column data after obj_id_reuse fix). Pretraining.
-- **alibaba_v55** — v48 + var-cond-kl-weight 0.01 (2× standard 0.005). ep140/200, best 0.09162★ ep135 (recall 0.600). Strong run.
+- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain (correct path: tencent_block_1M, 5 columns). Pretraining phase 2.5.
+- **alibaba_v56** — v48 + var-cond-kl-weight 0.02 (4× standard 0.005). Pushing KL regularization harder after v55's success.
+
+## Post-Mortem: alibaba_v55 — v48 + var-cond-kl-weight 0.01 (completed ep200, full eval **0.1251 — BEATS FLOOR**)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--var-cond-kl-weight 0.01` (2× standard 0.005). Testing stronger variational regularization.
+
+**Training-log**: Best **0.08894★** ep165 (MMD²=0.01124, recall=0.612). ★ at ep5→10→15→20→40→50→80→125→135→155→165. W values spiked late (ep186=5.3, ep192=6.2, ep198=6.6) but never 3 consecutive above guard. best.pt saved at ep145.
+
+**Full eval: combined=0.1251** (MMD²=0.01647, β-recall=0.4570, α-precision=0.7085, DMD-GEN=0.7508, Context-FID=0.10, HRC-MAE=0.0112). Train→eval gap: 41% (typical).
+
+**This is the first genuine improvement over the reproducible alibaba floor:**
+- v55 eval: **0.1251** vs v53 verbatim floor: **0.1325** → **5.6% improvement**
+- Recall improved: 0.457 vs v53's 0.413
+- MMD² slightly worse: 0.01647 vs v53's 0.01505
+
+**Lesson**: var-cond-kl-weight 0.01 (2×) is a validated improvement for alibaba. The stronger KL regularization makes the conditioning distribution more robust at eval time, reducing the train→eval gap on recall. Unlike supervisor-loss 10 and cond-drop 0.5 (which produced spectacular training-logs but collapsed at eval), the KL weight change produces modest training-log numbers that hold up at eval. **New alibaba reproducible floor: ~0.125.**
+
+---
 
 ## Post-Mortem: tencent_v85 — v78 + supervisor-loss-weight 10.0 (completed ep200, full eval **MODE COLLAPSE**)
 
