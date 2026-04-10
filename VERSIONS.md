@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep50/200, best 0.11798★ ep50. ★ every checkpoint.
-- **alibaba_v54** — v48 + supervisor-loss-weight 10.0 (2× standard). Just launched.
+- **tencent_v85** — v78 + supervisor-loss-weight 10.0 (2× standard). ep74/200, best 0.11246★ ep55. Plateaued ~0.112 for 20ep. W healthy (1.0-1.6).
+- **alibaba_v55** — v48 + var-cond-kl-weight 0.01 (2× standard 0.005). Testing stronger variational regularization.
+
+## Post-Mortem: alibaba_v54 — v48 + supervisor-loss-weight 10.0 (killed ep25, hopeless)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--supervisor-loss-weight 10.0` (2× standard 5.0). Testing whether stronger supervisor signal helps alibaba.
+
+**Result**: Killed at ep25. Best comb=**0.18611★** at ep20 (recall=0.341, MMD²=0.05421). Regressing at ep25 (comb=0.21668). W values stuck at 0.2-0.3 — far too low, indicating critic can't separate real/fake. Compare: v53 verbatim was at 0.10877 by ep15.
+
+**Lesson**: supervisor-loss-weight 10.0 overwhelms the adversarial signal on alibaba. The supervisor's latent manifold dominates, preventing the critic from developing separation. This contrasts with tencent where v85 (same change) shows strong sustained convergence — likely because tencent's 8-regime structure gives the critic more to work with vs alibaba's 4 regimes. **supervisor-loss-weight 10.0 closed on alibaba** (but still testing on tencent v85).
+
+---
 
 ## Recalibrated Reproducible Floors (2026-04-09)
 
