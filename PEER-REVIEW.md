@@ -289,3 +289,77 @@ The new numbers are good news, and they are genuinely informative. They say the 
 ### Updated Read
 
 The rebuttal is much better than having no rebuttal at all. It accepts several important criticisms, and the new results are genuinely strong. But the authors are still doing too much causal storytelling on top of unresolved infrastructure and unfinished controls. The hard version of the feedback is: do not repeat the old benchmark mistake with prettier numbers. Finish the controls, unify the conditional inference path, and run the spectral analysis before declaring that the mechanism is understood.
+
+---
+
+## Round 8
+
+### Ideas Recovered From The Old NSF Proposal
+
+The old proposal in [Zoroaster_Final_NSFProposal2019_Final.pdf](/Users/darrell/Downloads/Zoroaster_Final_NSFProposal2019_Final.pdf) is worth taking seriously as a strategy document, not just as history. In several ways it is more ambitious than the current post-record tuning loop. Its center of gravity is not "find one more better scalar." It is: generate globally representative traces, validate them rigorously, and deliberately model the weird parts of real workloads instead of sanding them off.
+
+1. `[P1]` Re-elevate validation and representativity to a first-class research track. One of the three core objectives in the proposal was building a quantitative framework for judging whether synthetic traces are actually representative, because existing metrics were not enough. That maps directly onto the current race problem. The team is still selecting winners on a checkpoint surface that it does not fully trust, and the rebuttal is still leaning too hard on a combined score that clearly misses some temporal structure. The old proposal was right: the validation stack is not support work. It is part of the main invention. Concretely, that means density-sensitive metrics, clustering-style similarity, long-rollout diagnostics, Fourier or spectral checks, and external-system behavior all belong in the winner-selection loop, not just in paper cleanup.
+
+2. `[P1]` The proposal’s real target was whole-trace representativity, not local plausibility. It explicitly aimed to generate globally representative traces and to model an entire trace rather than a facet. That is a strong reminder that the current 12-step-window worldview is still narrower than the original problem statement. The present repo can win distributional holdout metrics while still failing on long-horizon cadence, locality, or burst timing. The old proposal argues for staying aggressive here: chunk-continuity training, hierarchical generation, regime-to-event models, and long synthetic rollouts are not optional embellishments. They are the actual task.
+
+3. `[P1]` Explicit anomaly and outlier modeling was a founding goal, and the repo should recover that ambition. The proposal did not treat anomalies as cleanup noise. It treated them as necessary to realistic trace synthesis, especially for burstiness and higher-order effects. More importantly, it listed multiple concrete ways to do this:
+   transformative metrics that learn how normal segments turn into outliers,
+   anomaly-trained generators that explicitly model the outlier distribution,
+   regulators plus a random timestep generator to place rare events into otherwise normal sequences,
+   and hybrid workloads with a separate anomalous class.
+   That is a much richer playbook than clipping poison points or hoping the main GAN learns the tails implicitly. The current review already pushed toward two-population modeling and tail experts; the NSF proposal says that instinct is not a detour. It is part of the original blueprint.
+
+4. `[P1]` The proposal already identified feature covariance as a structural issue, not a preprocessing nuisance. The RBM section reports that reconstruction quality improved sharply when the feature set was reduced, especially for correlated seek-related subsets, and it explicitly proposed studying feature correlations to understand which groups belong together. That is highly relevant now that the R analysis has shown some columns are redundant, weak, or effectively unlearnable. The modern version of this old idea is: stop feeding the model a flat bag of partly redundant descriptors, and instead build correlation-aware or factorized conditioning spaces. In other words, the current R-guided conditioning redesign is not a new side quest. It is a recovery of something the project should have been doing from the start.
+
+5. `[P1]` The proposal already warned that the wrong architecture class will fake progress and then stall. Its GAN preliminary results argued that plain dense networks were a poor fit for time-series structure because they do not capture correlation across past, present, and future events. The proposed response was not "tune harder." It was to evaluate time-series-suited architectures: conditional RBMs, stacked temporal RBMs, recurrent models, LSTMs, CNNs for wider feature spaces, and semi-supervised InfoGAN variants. Not every one of those choices will be good in 2026, and some have already had weak results in this repo. But the deeper point still stands: architecture has to respect temporal structure. The current local exploitation phase should not be misread as proof that the structural design space is empty.
+
+6. `[P2]` Semi-supervised or structured latent modeling belongs back in the active idea set. The proposal’s early InfoGAN work was aimed at surfacing meaningful latent factors rather than letting the generator stay completely implicit. That is very close in spirit to the current regime-sampler, router, and mixture ideas. The right modern interpretation is not necessarily "go back to old InfoGAN code." It is to keep pushing on disentangled or supervised latent structure:
+   regime-first generation,
+   mixture-of-experts routing,
+   factorized condition spaces,
+   or pseudo-labeled window classes from the newer analysis stack.
+   The old proposal was already leaning in that direction.
+
+7. `[P2]` External-system testing should be treated as a race advantage, not just as a paper-validation extra. The proposal wanted generated traces to be compared against real traces on actual systems using metrics like arrival rate, response time, CPU usage, reliability, and overall performance impact. The current repo has moved in this direction with HRC and cache-fidelity checks, but the proposal’s point is broader: a trace can be statistically close yet still behave wrongly when replayed. For finalist models, the team should think in terms of "behavioral equivalence under replay" rather than just "holdout similarity in embedding space."
+
+8. `[P2]` Benchmarking against existing generators is still a useful missing lens. The proposal explicitly wanted comparisons against tools like Filebench, Impressions, and VdBench, both statistically and on replayed system behavior. That may not be the main race bottleneck today, but it is still strategically valuable. If the repo can show not only that a candidate beats prior internal checkpoints, but also that it captures dependencies or locality patterns that legacy generators miss, that sharpens both scientific confidence and competitive positioning.
+
+9. `[P2]` Hybrid or compositional workload generation was part of the original vision and still has upside. The proposal repeatedly talks about mixed or hybrid workloads, where one synthetic trace should be able to exercise multiple characteristics or subsystems without needing separate benchmark traces for each facet. In current terms, that suggests more than a single monolithic generator trying to average everything together. It points toward compositional generation:
+   hybrid regime sequences,
+   mixture-of-experts by workload family,
+   or explicit synthesis of normal-plus-anomalous components.
+   This is especially relevant if the team wants one generator family that can serve both Alibaba and Tencent without pretending the corpora are identical.
+
+10. `[P2]` Conditional generation should remain a product goal, but with cleaner semantics. The proposal’s long-term promise was effectively "given system characteristics, generate realistic workloads with minimal human effort." That is the mature version of what the current char-file or conditioning path is trying to do. The answer is not to abandon conditioning because one large `cond_dim` test failed. The answer is to make conditioning scientifically sound:
+    use only signal-bearing descriptors,
+    separate file-level from window-level factors,
+    route them through a consistent train/eval/generate path,
+    and let them control structured generation rather than just get concatenated onto noise.
+
+11. `[P2]` The proposal’s anomaly section is a quiet argument for spectrum-aware analysis, not against it. It frames long-term variability as something that can look like an outlier over short windows and explicitly talks about variation over different periods. That strengthens the current Fourier point. A frequency-domain pass is not some decorative side analysis; it is one of the most direct ways to test whether the model is capturing the multi-period temporal structure that the original proposal said matters.
+
+12. `[P3]` The old proposal also reinforces a more general strategic lesson: this project is not supposed to win by being a prettier Filebench. Its original ambition was a self-improving suite of generators plus a validation framework plus anomaly modeling plus hybrid-workload synthesis. The recent tuning loop around `v48` and `v78` may be a smart short-term exploitation phase, but it is still narrower than the original agenda. If the team starts talking as if only scalar tuning remains, it is not honoring the strongest ideas in its own founding document.
+
+### What I Would Recover Now
+
+1. Move validation back to equal footing with model design:
+   checkpoint selection should combine full-eval distributional metrics, locality metrics, spectral diagnostics, and at least one replay-style systems check for finalists.
+
+2. Reopen anomaly generation as a structured modeling problem:
+   tail expert, anomaly class, regulator, or random-timestep insertion mechanism, rather than only clipping and retraining.
+
+3. Use the R results to build correlation-aware conditioning:
+   factorized descriptors, removal of unlearnable columns, and separate file-level versus window-level signals.
+
+4. Keep pushing on whole-trace generation:
+   chunk continuity, long-rollout supervision, or a regime-first hierarchical generator.
+
+5. Treat compositional generation as live:
+   normal-plus-anomalous synthesis, workload-family experts, and hybrid traces rather than one undifferentiated generator.
+
+6. Continue the Fourier or spectrum work:
+   the proposal’s own anomaly framing makes that one of the most on-mission diagnostics available.
+
+### Short Take
+
+The old NSF proposal does not say the team is out of big ideas. It says the opposite. The original plan was broader, more structural, and more ambitious than the current scalar-tuning loop. If the team wants to push over the top, one of the best places to look is not outside the project. It is back at the ideas the project started with and has only partially implemented.
