@@ -6,8 +6,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v86** — v78 base + var-cond-kl-weight 0.01 (2× standard 0.005). Fresh pretrain. ep42/200, best 0.15499★ ep15.
-- **alibaba_v57** — v55 verbatim (v48 + var-cond-kl-weight 0.01). Reproducibility control for v55's 0.1251 eval.
+- **tencent_v87** — v86 verbatim (v78 base + var-cond-kl-weight 0.01). Reproducibility control for v86's 0.1130 eval. Using v86's pretrain.
+- **alibaba_v57** — v55 verbatim (v48 + var-cond-kl-weight 0.01). ep163/200, best **0.08890★** ep160 (matches v55's 0.08894★ to within 0.004%).
+
+## Post-Mortem: tencent_v86 — v78 base + var-cond-kl-weight 0.01 (completed ep200, full eval **0.1130 — BEATS FLOOR BY 23%**)
+
+**Recipe**: v78 base (block-sample, n-regimes 8) + `--var-cond-kl-weight 0.01` (2× standard 0.005). Fresh pretrain with correct trace path (tencent_block_1M, 5 columns).
+
+**Training-log**: Best **0.10302★** ep170 (MMD²=0.01262, recall=0.548). Steady convergence: ep15→0.155, ep50→0.144, ep75→0.134, ep100→0.130, ep110→0.126, ep125→0.119, ep170→0.103. W values spiked late (ep172=4.09, ep174=4.63) but never triggered 3-consecutive guard.
+
+**Full eval: combined=0.1130** (MMD²=0.01717, β-recall=0.5210, α-precision=0.9225, DMD-GEN=0.7139, AutoCorr=0.0346, Context-FID=0.07, HRC-MAE=0.0494).
+
+**MAJOR RESULT — 22.8% improvement over tencent reproducible floor:**
+- v86 eval: **0.1130** vs v84 verbatim floor: **0.1464** → **-22.8%**
+- α-precision: 0.9225 (best ever tencent — 92% of fakes plausible)
+- Context-FID: 0.07 (best ever)
+- Train→eval gap: **9.7%** — smallest gap ever observed (vs typical 30-45%)
+
+**var-cond-kl-weight 0.01 now validated on BOTH corpora:**
+- Alibaba: v55 eval 0.1251 (vs floor 0.1325, -5.6%)
+- Tencent: v86 eval **0.1130** (vs floor 0.1464, **-22.8%**)
+- The improvement is NOT from training-log score (which plateaus similarly) but from dramatically reduced train→eval gap
+
+---
 
 ## Post-Mortem: alibaba_v56 — v48 + var-cond-kl-weight 0.02 (killed ep34, critic collapse)
 
