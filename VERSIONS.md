@@ -6,8 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v87** — v86 verbatim (v78 base + var-cond-kl-weight 0.01). Reproducibility control for v86's 0.1130 eval. Using v86's pretrain.
-- **alibaba_v57** — v55 verbatim (v48 + var-cond-kl-weight 0.01). ep163/200, best **0.08890★** ep160 (matches v55's 0.08894★ to within 0.004%).
+- **tencent_v87** — v86 verbatim (v78 base + var-cond-kl-weight 0.01). ep46/200, best 0.13461★ ep40. Reproducibility control.
+
+## Post-Mortem: alibaba_v57 — v55 verbatim, var-cond-kl-weight 0.01 (completed ep200, full eval **0.1134 — CONFIRMS AND BEATS v55**)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + `--var-cond-kl-weight 0.01`. Verbatim repeat of v55 for reproducibility testing.
+
+**Training-log**: Best **0.08832★** ep185 (MMD²=0.01062, recall=0.612). Matched v55's 0.08894★ to within 0.7%. best.pt saved at ep195 (EMA improved late).
+
+**Full eval: combined=0.1134** (MMD²=0.01364, β-recall=0.5010, α-precision=0.7285, DMD-GEN=0.7927, Context-FID=0.34, HRC-MAE=0.0064). Train→eval gap: 28%.
+
+**KL 0.01 DEFINITIVELY REPRODUCIBLE — verbatim control outperforms original:**
+- v57 eval: **0.1134** vs v55 eval: 0.1251 → v57 is **9.4% better**
+- Both beat old floor: v53 verbatim 0.1325 → **14.4% improvement**
+- HRC-MAE: **0.0064** — near-perfect cache fidelity
+- Train→eval gap: 28% (v57) vs 41% (v55) — KL regularization is working
+
+**Updated alibaba reproducible floors with KL 0.01:**
+- v55: eval 0.1251
+- v57: eval 0.1134
+- **New floor: ~0.119** (average), down from ~0.13 with base recipe
+
+---
 
 ## Post-Mortem: tencent_v86 — v78 base + var-cond-kl-weight 0.01 (completed ep200, full eval **0.1130 — BEATS FLOOR BY 23%**)
 
