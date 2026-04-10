@@ -6,7 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **tencent_v87** — v86 verbatim (v78 base + var-cond-kl-weight 0.01). ep46/200, best 0.13461★ ep40. Reproducibility control.
+- **tencent_v88** — v86 verbatim (2nd attempt). v87 had critic collapse; testing seed-dependence.
+- **alibaba_v58** — v48 base + n-regimes 6 + KL 0.01. Fresh pretrain. Testing regime count between sweet-spot 4 and failed 8.
+
+## Post-Mortem: tencent_v87 — v86 verbatim (killed ep76, critic collapse at ep60)
+
+**Recipe**: v86 verbatim (block-sample, n-regimes 8, KL 0.01). Using v86's pretrain.
+
+**Result**: Killed at ep76. Best comb=**0.13461★** ep40. W crashed from 0.59 (ep59) to **0.02** (ep60) — critic died instantly. Recall dropped to 0.255. Unrecoverable.
+
+**Lesson**: Fresh tencent pretrain has seed-dependent instability. v86 succeeded (eval 0.1130) but v87 collapsed with identical recipe. v86's result may include a seed luck component. Need v88 to disambiguate.
+
+---
 
 ## Post-Mortem: alibaba_v57 — v55 verbatim, var-cond-kl-weight 0.01 (completed ep200, full eval **0.1134 — CONFIRMS AND BEATS v55**)
 
