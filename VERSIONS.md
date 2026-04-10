@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v53** — v48 verbatim (reproducibility control). Just launched.
-- **tencent_v83** — v78 (ATB) + locality-loss-weight 2.0. ep71/200, best 0.11971★ ep70. Three consecutive ★s.
+- **alibaba_v53** — v48 verbatim (reproducibility control). ep45/200, best 0.10666★ ep40. Tracking near v48's peak already.
+- **tencent_v84** — v78 verbatim (reproducibility control). Just launched.
+
+---
+
+## Post-Mortem: tencent_v83 — v78 + locality-loss-weight 2.0 (killed ep117, 39% behind ATB pace)
+
+**Recipe**: v78 base (block-sample, diversity 2.0, n-regimes 8) + `--locality-loss-weight 2.0` (2× standard 1.0).
+
+**Result**: Killed at ep117. Best comb=**0.11628★** at ep115 (recall=0.480, MMD²=0.01238). 39% behind v78's training-log at ep110 (0.08355). Cannot reach ATB even with zero eval gap.
+
+**Lesson**: locality-loss-weight 2.0 is too slow on tencent, same as alibaba (v52). **locality-loss-weight 2.0 closed on both corpora.** The reviewer is right: locality needs a structural copy path, not a loss weight increase.
 
 ---
 
