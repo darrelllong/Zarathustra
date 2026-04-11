@@ -6,8 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v66** — v59 recipe + lower lr (6e-5/3e-5, 75% of standard) + w-stop 3.0. Using v48 pretrain. Just launched. Hypothesis: training stability determines eval quality.
-- **tencent_v96** — v93 verbatim control (KL 0.01, acf-loss 0.3). Using v86 pretrain. ep185/200, best **0.11876★** ep115. Stalled 70 epochs.
+- **alibaba_v66** — v59 recipe + lower lr (6e-5/3e-5, 75% of standard) + w-stop 3.0. Using v48 pretrain. ep59/200, best **0.18605★** ep45. Stable (W 0.78-0.98). Slow convergence but calm training.
+
+## Post-Mortem: tencent_v96 — v93 verbatim control (completed ep200, eval **0.1749 — did NOT reproduce v93**)
+
+**Recipe**: v93 verbatim (KL 0.01, acf-loss 0.3). Using v86 pretrain.
+
+**Training-log**: Best **0.11876★** ep115 (MMD²=0.01826, recall=0.497). Peaked early vs v93 (which peaked ep185). Stalled 85 epochs after ep115.
+
+**Full eval: combined=0.1749** (MMD²=0.03493, β-recall=0.3000, α-precision=0.7395, density=0.7050, DMD-GEN=0.7213, HRC-MAE=0.0514). Train→eval gap: **47%** — recall collapsed from 0.497→0.300.
+
+**CRITICAL FINDING: NEITHER corpus record is reproducible with verbatim controls.**
+
+| Corpus | Original | Control | Reproduced? |
+|--------|----------|---------|-------------|
+| Alibaba | v59 eval 0.1113 | v65 eval 0.1351 | ✗ (23% worse) |
+| Tencent | v93 eval 0.0995 | v96 eval 0.1749 | ✗ (76% worse) |
+
+**The reviewer (Round 9) was exactly right:** scalar results are seed-dependent and generate false hope. Both "records" appear to be lucky seeds. The true reproducible baselines are uncertain — possibly alibaba ~0.12, tencent ~0.11-0.13 range.
+
+**CONCLUSION: The scalar tuning era is definitively over.** Not because we've exhausted the search space (though we have), but because the results are not reproducible. Further improvement requires structural changes that produce robust, seed-independent gains.
+
+---
 
 ## Post-Mortem: alibaba_v65 — v59 verbatim control (W-guard ep183, eval **0.1351 — did NOT reproduce v59**)
 
