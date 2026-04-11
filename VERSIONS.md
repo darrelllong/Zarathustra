@@ -6,8 +6,39 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v60** — v59 base (KL 0.01, moment-loss 0.2) + quantile-loss-weight 0.3 (1.5× default). Using v48 pretrain. ep186/200, best 0.09551★ ep115. Finishing.
-- **tencent_v91** — stacked recipe (KL 0.01, moment-loss 0.2, quantile-loss 0.3). Using v86 pretrain. Just launched.
+- **alibaba_v62** — v59 base (KL 0.01, moment-loss 0.2) + acf-loss-weight 0.3 (1.5× default). Using v48 pretrain. Just launched.
+- **tencent_v92** — v86 base (KL 0.01) + moment-loss-weight 0.2. Using v86 pretrain. 2nd attempt (v89 collapsed at ep52, seed-specific). Just launched.
+
+## Post-Mortem: alibaba_v60 — moment 0.2 + quantile 0.3 (completed ep200, full eval **0.1697 — EVAL COLLAPSE**)
+
+**Recipe**: v48 base (block-sample, n-regimes 4) + KL 0.01 + moment-loss 0.2 + quantile-loss 0.3.
+
+**Training-log**: Best **0.09551★** ep115 (MMD²=0.01361, recall=0.591). Strong training scores.
+
+**Full eval: combined=0.1697** (MMD²=0.03140, β-recall=0.3085, α-precision=**0.4320**, density=0.2885). Train→eval gap: **78%** — catastrophic mode collapse at eval.
+
+**CRITICAL FINDING: quantile-loss-weight increase causes eval collapse on BOTH corpora.** Same pattern as supervisor-loss-weight 10 and cond-drop 0.5 — training-log looks great but eval reveals the generator overfit to the training manifold.
+
+| Corpus | quantile-loss | Training-log | Full eval | Verdict |
+|--------|--------------|-------------|-----------|---------|
+| Alibaba | 0.3 (v60) | 0.0955★ | **0.1697** | COLLAPSE |
+| Tencent | 0.4 (v90) | 0.1100★ | 0.1235 | Worse |
+
+**quantile-loss-weight increase CLOSED on BOTH corpora.** v61 (alibaba, +fft) and v91 (tencent, stacked) killed preemptively — same failing base recipe.
+
+---
+
+## Post-Mortem: tencent_v91 — moment 0.2 + quantile 0.3 (killed early — base recipe proven to collapse at eval)
+
+**Recipe**: v86 base (KL 0.01) + moment-loss 0.2 + quantile-loss 0.3. Killed preemptively after v60 eval showed quantile-loss increase causes eval collapse.
+
+---
+
+## Post-Mortem: alibaba_v61 — moment 0.2 + quantile 0.3 + fft 0.1 (killed — base recipe proven to collapse)
+
+**Recipe**: v60 base + fft-loss 0.1. Killed preemptively — v60's eval collapse proved the base recipe is broken.
+
+---
 
 ## Post-Mortem: tencent_v90 — quantile-loss-weight 0.4 (completed ep200, full eval **0.1235 — WORSE THAN FLOOR**)
 
