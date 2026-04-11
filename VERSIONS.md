@@ -6,8 +6,30 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v64** — v59 base (KL 0.01, moment-loss 0.2) + fft-loss-weight 0.1 (2× default). Using v48 pretrain. ep67/200, best **0.13366★** ep60. W elevated (3-4), G_loss very high (7-8). Unstable but improving.
-- **tencent_v95** — v93 base (KL 0.01, acf-loss 0.3) + diversity-loss 3.0. Using v86 pretrain. Just launched.
+- **alibaba_v65** — v59 verbatim control (KL 0.01, moment-loss 0.2). Using v48 pretrain. Confirming v59 record is reproducible.
+- **tencent_v95** — v93 base (KL 0.01, acf-loss 0.3) + diversity-loss 3.0. Using v86 pretrain. ep48/200, best **0.13300★** ep20. Scores worsening — concerning.
+
+## Post-Mortem: alibaba_v64 — fft-loss 0.1 (W-guard ep104, eval **0.1319 — WORSE than v59**)
+
+**Recipe**: v59 base (KL 0.01, moment-loss 0.2) + fft-loss-weight 0.1. Using v48 pretrain.
+
+**Training-log**: Best **0.10734★** ep90 (MMD²=0.02104, recall=0.569). Best-ever alibaba training-log score. W-spike guard killed at ep104 (W=4.03, 4.22, 5.33). G_loss extremely high (7-8 throughout).
+
+**Full eval: combined=0.1319** (MMD²=0.03216, β-recall=0.5015, α-precision=**0.4840**, density=0.6718, DMD-GEN=0.7232). Train→eval gap: 23%. α-precision 0.484 — generator producing implausible samples.
+
+**fft-loss-weight 0.1 on alibaba: CLOSED.** Fifth consecutive alibaba scalar tweak to fail:
+
+| Run | Tweak | Train★ | Eval | Verdict |
+|-----|-------|--------|------|---------|
+| v58 | n-regimes 6 | 0.130 | — | Stalled |
+| v60 | quantile 0.3 | 0.096 | **0.170** | Collapse |
+| v62 | acf 0.3 | 0.102 | **0.138** | Worse |
+| v63 | diversity 3.0 | 0.120 | — | Stalled |
+| v64 | fft 0.1 | 0.107 | **0.132** | Worse |
+
+**CONCLUSION: Scalar tuning on alibaba is exhausted.** v59 (KL 0.01 + moment-loss 0.2) IS the alibaba ceiling for loss-weight tuning. Further improvement requires structural/architectural changes.
+
+---
 
 ## Post-Mortem: tencent_v94 — acf 0.3 + moment-loss 0.2 (killed ep112 — stalled)
 
