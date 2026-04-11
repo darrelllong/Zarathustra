@@ -212,6 +212,54 @@ def dmdgen(
     return float(np.mean(angle_distances)) if angle_distances else float("nan")
 
 
+def spectral_divergence(
+    real_seqs: np.ndarray,
+    fake_seqs: np.ndarray,
+    n_pad: int = 32,
+) -> tuple[float, np.ndarray, np.ndarray]:
+    """
+    Fourier spectral divergence between real and generated sequences.
+
+    Computes the per-feature power spectral density (PSD) via zero-padded FFT,
+    then measures the mean L1 distance between the averaged real and fake PSDs.
+
+    real_seqs / fake_seqs: (N, T, d) arrays, normalized to [-1, 1].
+    n_pad: FFT length (zero-pad T to this for better frequency resolution).
+
+    Returns:
+      - score: mean absolute PSD difference across features (0 = perfect)
+      - real_psd: (n_freq, d) mean PSD per feature for real data
+      - fake_psd: (n_freq, d) mean PSD per feature for fake data
+    """
+    T, d = real_seqs.shape[1], real_seqs.shape[2]
+    n_fft = max(n_pad, T)
+    n_freq = n_fft // 2 + 1
+
+    # Hann window to reduce spectral leakage on short (T=12) windows
+    window = np.hanning(T).astype(np.float32)
+
+    def _psd(seqs):
+        # seqs: (N, T, d) → apply window, FFT, power spectrum
+        windowed = seqs * window[np.newaxis, :, np.newaxis]
+        # rfft along time axis with zero-padding
+        F = np.fft.rfft(windowed, n=n_fft, axis=1)  # (N, n_freq, d)
+        power = np.abs(F) ** 2  # (N, n_freq, d)
+        # Average across windows, normalize by max to get relative PSD
+        mean_psd = power.mean(axis=0)  # (n_freq, d)
+        # Normalize each feature's PSD to sum to 1 (distribution comparison)
+        totals = mean_psd.sum(axis=0, keepdims=True)
+        totals = np.where(totals > 0, totals, 1.0)
+        return mean_psd / totals
+
+    real_psd = _psd(real_seqs)
+    fake_psd = _psd(fake_seqs)
+
+    # Mean absolute difference across frequency bins and features
+    score = float(np.abs(real_psd - fake_psd).mean())
+
+    return score, real_psd, fake_psd
+
+
 @torch.no_grad()
 def evaluate_metrics(
     generator,

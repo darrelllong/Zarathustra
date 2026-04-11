@@ -60,7 +60,7 @@ import torch
 from scipy.stats import wasserstein_distance
 from scipy.linalg import sqrtm
 
-from mmd import dmdgen, _dmd_subspace  # DMD-GEN lives in mmd.py; imported here to avoid duplication
+from mmd import dmdgen, _dmd_subspace, spectral_divergence  # DMD-GEN + Fourier live in mmd.py
 
 # ---------------------------------------------------------------------------
 # Context-FID  (TSGBench, VLDB 2024, arXiv 2309.03755)
@@ -532,6 +532,9 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
                        batch_size=min(64, len(real_seqs) // 2))
     ac_score = autocorr_score(real_seqs, fake_seqs, max_lag=5)
 
+    # Fourier spectral divergence: per-feature PSD comparison
+    spectral_score, real_psd, fake_psd = spectral_divergence(real_seqs, fake_seqs)
+
     # Context-FID: Fréchet distance in the Encoder's latent space
     E = _load_encoder(ckpt, device)
     cfid = context_fid(real_seqs, fake_seqs, E, device) if E is not None else None
@@ -570,6 +573,7 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     print(f"  coverage     : {prdc['coverage']:.4f}")
     print(f"  DMD-GEN      : {dmd_score:.4f}  (temporal dynamics; 0=perfect, >0.3=poor)")
     print(f"  AutoCorr     : {ac_score:.4f}  (lag-1..5 ACF diff; 0=perfect)")
+    print(f"  Spectral     : {spectral_score:.4f}  (Fourier PSD divergence; 0=perfect)")
     if cfid is not None:
         print(f"  Context-FID  : {cfid:.2f}  (Fréchet in encoder latent space; <10 good)")
     print(f"  reuse rate   : real={real_reuse:.3f}  fake={fake_reuse:.3f}"

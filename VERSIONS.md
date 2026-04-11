@@ -6,7 +6,17 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v66** — v59 recipe + lower lr (6e-5/3e-5, 75% of standard) + w-stop 3.0. Using v48 pretrain. ep59/200, best **0.18605★** ep45. Stable (W 0.78-0.98). Slow convergence but calm training.
+*No training runs active. Transitioning to structural changes per reviewer Round 9 build order.*
+
+## Post-Mortem: alibaba_v66 — lower lr stability test (killed ep88 — too slow)
+
+**Recipe**: v59 base (KL 0.01, moment-loss 0.2) + lr-g 6e-5, lr-d 3e-5 (75% of standard) + w-stop 3.0. Using v48 pretrain.
+
+**Training-log**: Best **0.18605★** ep45 (recall=0.329). Training was stable (W 0.78-0.98, never spiked) but convergence far too slow — v65 was at 0.117★ by ep60 with the same recipe at standard lr. Killed at ep88. Lower lr stabilizes training but doesn't converge fast enough to produce competitive scores.
+
+**Stability hypothesis partially confirmed, partially falsified:** Calmer training is achievable with lower lr, but the model needs sufficient lr to learn the data distribution within 200 epochs. The solution to the train→eval gap is not simply "train more gently" — it requires structural changes that are inherently more robust.
+
+---
 
 ## Post-Mortem: tencent_v96 — v93 verbatim control (completed ep200, eval **0.1749 — did NOT reproduce v93**)
 
