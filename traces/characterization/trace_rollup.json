@@ -1,0 +1,1780 @@
+{
+  "characterized_files": 30628,
+  "groups": {
+    "Baleen24/Baleen24/baleen24": {
+      "burstiness_cv": {
+        "count": 374,
+        "max": 4.278264430078513,
+        "mean": 1.5203319056032245,
+        "median": 1.4151548238544374,
+        "min": 1.0114124416865504
+      },
+      "bytes": 31376065904,
+      "dataset": "Baleen24",
+      "family": "Baleen24",
+      "files": 374,
+      "format": "baleen24",
+      "iat_q50": {
+        "count": 374,
+        "max": 3.8996849060058594,
+        "mean": 1.0250407081236814,
+        "median": 1.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "baleen24": 374
+      },
+      "reuse_ratio": {
+        "count": 374,
+        "max": 1.0,
+        "mean": 0.3683747624924095,
+        "median": 0.3108669108669109,
+        "min": 0.07692307692307693
+      },
+      "sample_records": {
+        "count": 374,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 374,
+        "max": 3191316.0,
+        "mean": 1124316.4532085562,
+        "median": 1048576.0,
+        "min": 262144.0
+      },
+      "tenant_unique": {
+        "count": 374,
+        "max": 587,
+        "mean": 120.97058823529412,
+        "median": 28,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 374,
+        "max": 1.0,
+        "mean": 0.6408391126336899,
+        "median": 0.6455078125,
+        "min": 0.17529296875
+      }
+    },
+    "MSR/exchange/exchange_etw": {
+      "burstiness_cv": {
+        "count": 96,
+        "max": 7.507586334978879,
+        "mean": 4.414903173802073,
+        "median": 4.532285443249396,
+        "min": 1.1229431586636278
+      },
+      "bytes": 1479416826,
+      "dataset": "MSR",
+      "family": "exchange",
+      "files": 96,
+      "format": "exchange_etw",
+      "iat_q50": {
+        "count": 96,
+        "max": 307.0,
+        "mean": 130.57291666666666,
+        "median": 116.0,
+        "min": 47.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "exchange_etw": 96
+      },
+      "reuse_ratio": {
+        "count": 96,
+        "max": 0.017582417582417582,
+        "mean": 0.0033323158323158328,
+        "median": 0.002686202686202686,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 96,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 96,
+        "max": 8192.0,
+        "mean": 7021.333333333333,
+        "median": 8192.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 96,
+        "max": 10,
+        "mean": 8.989583333333334,
+        "median": 9,
+        "min": 7
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 96,
+        "max": 0.930419921875,
+        "mean": 0.7471669514973959,
+        "median": 0.7861328125,
+        "min": 0.001220703125
+      }
+    },
+    "alibaba/alibaba/oracle_general": {
+      "burstiness_cv": {
+        "count": 999,
+        "max": 63.984373092185564,
+        "mean": 8.115959782798003,
+        "median": 3.8326010867456564,
+        "min": 0.8217577633758666
+      },
+      "bytes": 100765044913,
+      "dataset": "alibaba",
+      "family": "alibaba",
+      "files": 1000,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 999,
+        "max": 30.0,
+        "mean": 0.0985985985985986,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 1000
+      },
+      "reuse_ratio": {
+        "count": 999,
+        "max": 0.683028083028083,
+        "mean": 0.004416327203805472,
+        "median": 0.0002442002442002442,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 1000,
+        "max": 4096,
+        "mean": 4047.027,
+        "median": 4096,
+        "min": 0
+      },
+      "size_q50": {
+        "count": 999,
+        "max": 524288.0,
+        "mean": 41164.23623623623,
+        "median": 4096.0,
+        "min": 1024.0
+      },
+      "tenant_unique": {
+        "count": 999,
+        "max": 2,
+        "mean": 1.996996996996997,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 999,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2007_msr/oracle_general": {
+      "burstiness_cv": {
+        "count": 14,
+        "max": 47.24493252058424,
+        "mean": 13.604631096972794,
+        "median": 7.337830060719586,
+        "min": 2.312810294058253
+      },
+      "bytes": 1637389703,
+      "dataset": "s3-cache-datasets",
+      "family": "2007_msr",
+      "files": 14,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 14,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 14
+      },
+      "reuse_ratio": {
+        "count": 14,
+        "max": 0.11794871794871795,
+        "mean": 0.024228152799581373,
+        "median": 0.005372405372405372,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 14,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 14,
+        "max": 65536.0,
+        "mean": 8704.0,
+        "median": 4096.0,
+        "min": 512.0
+      },
+      "tenant_unique": {
+        "count": 14,
+        "max": 2,
+        "mean": 1.9285714285714286,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 14,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2007_wiki/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 39128779019,
+      "dataset": "s3-cache-datasets",
+      "family": "2007_wiki",
+      "files": 4,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 4
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 4,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2015_cloudphysics/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 9026863149,
+      "dataset": "s3-cache-datasets",
+      "family": "2015_cloudphysics",
+      "files": 106,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 106
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 106,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2016_wiki/text": {
+      "burstiness_cv": null,
+      "bytes": 95213049,
+      "dataset": "s3-cache-datasets",
+      "family": "2016_wiki",
+      "files": 1,
+      "format": "text",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2016_wiki/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 26491912192,
+      "dataset": "s3-cache-datasets",
+      "family": "2016_wiki",
+      "files": 1,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2017_docker/parquet": {
+      "burstiness_cv": null,
+      "bytes": 600585203,
+      "dataset": "s3-cache-datasets",
+      "family": "2017_docker",
+      "files": 7,
+      "format": "parquet",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "parquet_stub": 7
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 7,
+        "max": 0,
+        "mean": 0.0,
+        "median": 0,
+        "min": 0
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2017_systor/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 34993572898,
+      "dataset": "s3-cache-datasets",
+      "family": "2017_systor",
+      "files": 6,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 6
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 6,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2018_tencentPhoto/oracle_general": {
+      "burstiness_cv": {
+        "count": 2,
+        "max": 28.600699292150185,
+        "mean": 28.600699292150185,
+        "median": 28.600699292150185,
+        "min": 28.600699292150185
+      },
+      "bytes": 72132172910,
+      "dataset": "s3-cache-datasets",
+      "family": "2018_tencentPhoto",
+      "files": 2,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 2,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 2
+      },
+      "reuse_ratio": {
+        "count": 2,
+        "max": 0.009035409035409036,
+        "mean": 0.00866910866910867,
+        "median": 0.009035409035409036,
+        "min": 0.008302808302808303
+      },
+      "sample_records": {
+        "count": 2,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 2,
+        "max": 14680.5,
+        "mean": 14442.5,
+        "median": 14680.5,
+        "min": 14204.5
+      },
+      "tenant_unique": {
+        "count": 2,
+        "max": 2,
+        "mean": 2.0,
+        "median": 2,
+        "min": 2
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 2,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2018_tencentPhoto/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 90918912199,
+      "dataset": "s3-cache-datasets",
+      "family": "2018_tencentPhoto",
+      "files": 2,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 2
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 2,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2019_wiki/oracle_general": {
+      "burstiness_cv": {
+        "count": 2,
+        "max": 45.23825814507009,
+        "mean": 28.439352435946454,
+        "median": 45.23825814507009,
+        "min": 11.640446726822816
+      },
+      "bytes": 53649628938,
+      "dataset": "s3-cache-datasets",
+      "family": "2019_wiki",
+      "files": 3,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 3,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 3
+      },
+      "reuse_ratio": {
+        "count": 3,
+        "max": 0.002686202686202686,
+        "mean": 0.0013838013838013837,
+        "median": 0.0014652014652014652,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 3,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 3,
+        "max": 22741.5,
+        "mean": 12503.333333333334,
+        "median": 10272.5,
+        "min": 4496.0
+      },
+      "tenant_unique": {
+        "count": 3,
+        "max": 2,
+        "mean": 2.0,
+        "median": 2,
+        "min": 2
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 3,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2019_wiki/text": {
+      "burstiness_cv": null,
+      "bytes": 65605391,
+      "dataset": "s3-cache-datasets",
+      "family": "2019_wiki",
+      "files": 1,
+      "format": "text",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2019_wiki/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 25760060833,
+      "dataset": "s3-cache-datasets",
+      "family": "2019_wiki",
+      "files": 2,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 2
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 2,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2020_alibabaBlock/oracle_general": {
+      "burstiness_cv": {
+        "count": 1000,
+        "max": 63.984373092185564,
+        "mean": 8.109861150973499,
+        "median": 3.8326010867456564,
+        "min": 0.8217577633758666
+      },
+      "bytes": 100786283892,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_alibabaBlock",
+      "files": 1000,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 1000,
+        "max": 30.0,
+        "mean": 0.0985,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 1000
+      },
+      "reuse_ratio": {
+        "count": 1000,
+        "max": 0.683028083028083,
+        "mean": 0.004418748483439273,
+        "median": 0.0002442002442002442,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 1000,
+        "max": 4096,
+        "mean": 4051.123,
+        "median": 4096,
+        "min": 5
+      },
+      "size_q50": {
+        "count": 1000,
+        "max": 524288.0,
+        "mean": 41127.168,
+        "median": 4096.0,
+        "min": 1024.0
+      },
+      "tenant_unique": {
+        "count": 1000,
+        "max": 2,
+        "mean": 1.997,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 1000,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2020_alibabaBlock/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 150421221737,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_alibabaBlock",
+      "files": 1,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2020_tencentBlock/oracle_general": {
+      "burstiness_cv": {
+        "count": 4992,
+        "max": 63.96334638014516,
+        "mean": 4.143660504215925,
+        "median": 2.9582028184317846,
+        "min": 0.0
+      },
+      "bytes": 163244704467,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_tencentBlock",
+      "files": 4995,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 4993,
+        "max": 258597.0,
+        "mean": 181.18676146605247,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 4995
+      },
+      "reuse_ratio": {
+        "count": 4993,
+        "max": 1.0,
+        "mean": 0.03888991659767779,
+        "median": 0.010256410256410256,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 4995,
+        "max": 4096,
+        "mean": 4032.364964964965,
+        "median": 4096,
+        "min": 1
+      },
+      "size_q50": {
+        "count": 4995,
+        "max": 524288.0,
+        "mean": 13172.494094094094,
+        "median": 4096.0,
+        "min": 512.0
+      },
+      "tenant_unique": {
+        "count": 4995,
+        "max": 2,
+        "mean": 1.9843843843843845,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 4995,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2020_tencentBlock/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 137224724902,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_tencentBlock",
+      "files": 1,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2020_twitter/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 152248401229,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_twitter",
+      "files": 54,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 54
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 54,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2020_twr_cdn.zst/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 231608521285,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_twr_cdn.zst",
+      "files": 1,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2020_twr_cdn/parquet": {
+      "burstiness_cv": null,
+      "bytes": 293223291415,
+      "dataset": "s3-cache-datasets",
+      "family": "2020_twr_cdn",
+      "files": 2,
+      "format": "parquet",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "parquet_stub": 2
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 2,
+        "max": 0,
+        "mean": 0.0,
+        "median": 0,
+        "min": 0
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2022_metaCDN/oracle_general": {
+      "burstiness_cv": {
+        "count": 3,
+        "max": 28.338432528299172,
+        "mean": 21.102340856274537,
+        "median": 26.06386558397561,
+        "min": 8.904724456548827
+      },
+      "bytes": 2234960001,
+      "dataset": "s3-cache-datasets",
+      "family": "2022_metaCDN",
+      "files": 3,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 3,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 3
+      },
+      "reuse_ratio": {
+        "count": 3,
+        "max": 0.16874236874236875,
+        "mean": 0.10630850630850631,
+        "median": 0.0844932844932845,
+        "min": 0.06568986568986569
+      },
+      "sample_records": {
+        "count": 3,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 3,
+        "max": 70887.0,
+        "mean": 54198.5,
+        "median": 56574.5,
+        "min": 35134.0
+      },
+      "tenant_unique": {
+        "count": 3,
+        "max": 2,
+        "mean": 2.0,
+        "median": 2,
+        "min": 2
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 3,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2022_metaKV/oracle_general": {
+      "burstiness_cv": {
+        "count": 2,
+        "max": 21.307275752662516,
+        "mean": 20.759329342035127,
+        "median": 21.307275752662516,
+        "min": 20.211382931407737
+      },
+      "bytes": 65307778508,
+      "dataset": "s3-cache-datasets",
+      "family": "2022_metaKV",
+      "files": 4,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 4,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 4
+      },
+      "reuse_ratio": {
+        "count": 4,
+        "max": 0.9308913308913309,
+        "mean": 0.8956043956043956,
+        "median": 0.914041514041514,
+        "min": 0.8437118437118437
+      },
+      "sample_records": {
+        "count": 4,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 4,
+        "max": 226.0,
+        "mean": 124.5,
+        "median": 196.0,
+        "min": 17.0
+      },
+      "tenant_unique": {
+        "count": 4,
+        "max": 2,
+        "mean": 2.0,
+        "median": 2,
+        "min": 2
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 4,
+        "max": 0.000732421875,
+        "mean": 0.00018310546875,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/2022_metaKV/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 85515981910,
+      "dataset": "s3-cache-datasets",
+      "family": "2022_metaKV",
+      "files": 24,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 24
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 24,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2022_metaStorage/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 616636804,
+      "dataset": "s3-cache-datasets",
+      "family": "2022_metaStorage",
+      "files": 5,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 5
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 5,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2023_metaCDN/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 3731742149,
+      "dataset": "s3-cache-datasets",
+      "family": "2023_metaCDN",
+      "files": 3,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 3
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 3,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2023_metaStorage/text": {
+      "burstiness_cv": null,
+      "bytes": 1554951754,
+      "dataset": "s3-cache-datasets",
+      "family": "2023_metaStorage",
+      "files": 1,
+      "format": "text",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2023_metaStorage/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 1329098047,
+      "dataset": "s3-cache-datasets",
+      "family": "2023_metaStorage",
+      "files": 5,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 5
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 5,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2024_google/parquet": {
+      "burstiness_cv": null,
+      "bytes": 66153501928,
+      "dataset": "s3-cache-datasets",
+      "family": "2024_google",
+      "files": 6,
+      "format": "parquet",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "parquet_stub": 6
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 6,
+        "max": 0,
+        "mean": 0.0,
+        "median": 0,
+        "min": 0
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2024_google/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 118301931428,
+      "dataset": "s3-cache-datasets",
+      "family": "2024_google",
+      "files": 186,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 186
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 186,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/2026-alibaba-thinkahead/oracle_general": {
+      "burstiness_cv": {
+        "count": 45,
+        "max": 63.95192465233366,
+        "mean": 29.03120544068348,
+        "median": 26.105554964413226,
+        "min": 12.068674018382609
+      },
+      "bytes": 15366738380,
+      "dataset": "s3-cache-datasets",
+      "family": "2026-alibaba-thinkahead",
+      "files": 45,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 45,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 45
+      },
+      "reuse_ratio": {
+        "count": 45,
+        "max": 0.13943833943833944,
+        "mean": 0.027030253696920362,
+        "median": 0.026617826617826617,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 45,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 45,
+        "max": 1.0,
+        "mean": 1.0,
+        "median": 1.0,
+        "min": 1.0
+      },
+      "tenant_unique": {
+        "count": 45,
+        "max": 2,
+        "mean": 1.9777777777777779,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 45,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/alibaba/lcs": {
+      "burstiness_cv": {
+        "count": 993,
+        "max": 63.984373092185564,
+        "mean": 14.920568377032927,
+        "median": 6.3993878267121955,
+        "min": 1.0721462934383763
+      },
+      "bytes": 477220451258,
+      "dataset": "s3-cache-datasets",
+      "family": "alibaba",
+      "files": 1000,
+      "format": "lcs",
+      "iat_q50": {
+        "count": 1000,
+        "max": 6.0,
+        "mean": 0.012,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "lcs": 1000
+      },
+      "reuse_ratio": {
+        "count": 1000,
+        "max": 0.6102564102564103,
+        "mean": 0.004152981592827422,
+        "median": 0.0007326007326007326,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 1000,
+        "max": 4096,
+        "mean": 4068.895,
+        "median": 4096,
+        "min": 6
+      },
+      "size_q50": {
+        "count": 1000,
+        "max": 4096.0,
+        "mean": 4096.0,
+        "median": 4096.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 1000,
+        "max": 1,
+        "mean": 1.0,
+        "median": 1,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 1000,
+        "max": 1.0,
+        "mean": 0.76241026756896,
+        "median": 0.975830078125,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/cache_trace_twitter_memcache/oracle_general": {
+      "burstiness_cv": {
+        "count": 43,
+        "max": 63.984373092185564,
+        "mean": 48.05315567845457,
+        "median": 45.23825814507009,
+        "min": 15.488135876895466
+      },
+      "bytes": 1735611432504,
+      "dataset": "s3-cache-datasets",
+      "family": "cache_trace_twitter_memcache",
+      "files": 54,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 54,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 54
+      },
+      "reuse_ratio": {
+        "count": 54,
+        "max": 0.3575091575091575,
+        "mean": 0.03287658843214399,
+        "median": 0.006837606837606838,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 54,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 54,
+        "max": 28009.5,
+        "mean": 1261.0277777777778,
+        "median": 125.0,
+        "min": 19.0
+      },
+      "tenant_unique": {
+        "count": 54,
+        "max": 2,
+        "mean": 1.9259259259259258,
+        "median": 2,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 54,
+        "max": 0.021728515625,
+        "mean": 0.0008951822916666666,
+        "median": 0.0,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/cache_trace_twitter_memcache/parquet": {
+      "burstiness_cv": null,
+      "bytes": 179182912738,
+      "dataset": "s3-cache-datasets",
+      "family": "cache_trace_twitter_memcache",
+      "files": 10,
+      "format": "parquet",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "parquet_stub": 10
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 10,
+        "max": 0,
+        "mean": 0.0,
+        "median": 0,
+        "min": 0
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/cache_trace_twitter_memcache/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 2264718133466,
+      "dataset": "s3-cache-datasets",
+      "family": "cache_trace_twitter_memcache",
+      "files": 162,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 162
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 162,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/cloudphysics/lcs": {
+      "burstiness_cv": {
+        "count": 103,
+        "max": 63.984373092185564,
+        "mean": 16.426105025398606,
+        "median": 8.924473218191773,
+        "min": 2.4210005539292094
+      },
+      "bytes": 64319531250,
+      "dataset": "s3-cache-datasets",
+      "family": "cloudphysics",
+      "files": 106,
+      "format": "lcs",
+      "iat_q50": {
+        "count": 106,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "lcs": 106
+      },
+      "reuse_ratio": {
+        "count": 106,
+        "max": 0.32625152625152626,
+        "mean": 0.028562213467873843,
+        "median": 0.003418803418803419,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 106,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 106,
+        "max": 4096.0,
+        "mean": 4096.0,
+        "median": 4096.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 106,
+        "max": 1,
+        "mean": 1.0,
+        "median": 1,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 106,
+        "max": 1.0,
+        "mean": 0.6785082547169812,
+        "median": 0.86279296875,
+        "min": 0.0
+      }
+    },
+    "s3-cache-datasets/cloudphysics/text": {
+      "burstiness_cv": null,
+      "bytes": 986,
+      "dataset": "s3-cache-datasets",
+      "family": "cloudphysics",
+      "files": 1,
+      "format": "text",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 1
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 1,
+        "max": 1,
+        "mean": 1.0,
+        "median": 1,
+        "min": 1
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/metaKV/lcs": {
+      "burstiness_cv": null,
+      "bytes": 26152938221,
+      "dataset": "s3-cache-datasets",
+      "family": "metaKV",
+      "files": 3,
+      "format": "lcs",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "lcs_stub": 3
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 3,
+        "max": 0,
+        "mean": 0.0,
+        "median": 0,
+        "min": 0
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/metaKV/text_zst": {
+      "burstiness_cv": null,
+      "bytes": 7126300497,
+      "dataset": "s3-cache-datasets",
+      "family": "metaKV",
+      "files": 8,
+      "format": "text_zst",
+      "iat_q50": null,
+      "idle_ratio": null,
+      "parser_counts": {
+        "generic_text": 8
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 8,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": null,
+      "write_ratio": null
+    },
+    "s3-cache-datasets/msr/lcs": {
+      "burstiness_cv": {
+        "count": 36,
+        "max": 63.97783291871062,
+        "mean": 17.840065668892553,
+        "median": 8.696346043443816,
+        "min": 3.22705269401075
+      },
+      "bytes": 8130400717,
+      "dataset": "s3-cache-datasets",
+      "family": "msr",
+      "files": 36,
+      "format": "lcs",
+      "iat_q50": {
+        "count": 36,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "lcs": 36
+      },
+      "reuse_ratio": {
+        "count": 36,
+        "max": 0.5052503052503052,
+        "mean": 0.0272013743558459,
+        "median": 0.0004884004884004884,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 36,
+        "max": 4096,
+        "mean": 3931.1666666666665,
+        "median": 4096,
+        "min": 904
+      },
+      "size_q50": {
+        "count": 36,
+        "max": 4096.0,
+        "mean": 4096.0,
+        "median": 4096.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 36,
+        "max": 1,
+        "mean": 1.0,
+        "median": 1,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 36,
+        "max": 1.0,
+        "mean": 0.7712715021394112,
+        "median": 0.919921875,
+        "min": 0.009521484375
+      }
+    },
+    "s3-cache-datasets/other/oracle_general": {
+      "burstiness_cv": {
+        "count": 1,
+        "max": 63.984373092185564,
+        "mean": 63.984373092185564,
+        "median": 63.984373092185564,
+        "min": 63.984373092185564
+      },
+      "bytes": 386344048303,
+      "dataset": "s3-cache-datasets",
+      "family": "other",
+      "files": 2,
+      "format": "oracle_general",
+      "iat_q50": {
+        "count": 2,
+        "max": 0.0,
+        "mean": 0.0,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "oracle_general": 2
+      },
+      "reuse_ratio": {
+        "count": 2,
+        "max": 0.050793650793650794,
+        "mean": 0.025396825396825397,
+        "median": 0.050793650793650794,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 2,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": {
+        "count": 2,
+        "max": 8192.0,
+        "mean": 6144.0,
+        "median": 8192.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 2,
+        "max": 2,
+        "mean": 2.0,
+        "median": 2,
+        "min": 2
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 2,
+        "max": 0.017333984375,
+        "mean": 0.016357421875,
+        "median": 0.017333984375,
+        "min": 0.015380859375
+      }
+    },
+    "s3-cache-datasets/tencentBlock/lcs": {
+      "burstiness_cv": {
+        "count": 4967,
+        "max": 63.984373092185564,
+        "mean": 8.305071999577144,
+        "median": 4.51412153008547,
+        "min": 0.731451420816903
+      },
+      "bytes": 817117209599,
+      "dataset": "s3-cache-datasets",
+      "family": "tencentBlock",
+      "files": 4995,
+      "format": "lcs",
+      "iat_q50": {
+        "count": 4991,
+        "max": 86410.0,
+        "mean": 30.38970146263274,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "idle_ratio": null,
+      "parser_counts": {
+        "lcs": 4995
+      },
+      "reuse_ratio": {
+        "count": 4991,
+        "max": 0.7655677655677655,
+        "mean": 0.020108137251270003,
+        "median": 0.004395604395604396,
+        "min": 0.0
+      },
+      "sample_records": {
+        "count": 4991,
+        "max": 4096,
+        "mean": 4044.106992586656,
+        "median": 4096,
+        "min": 3
+      },
+      "size_q50": {
+        "count": 4991,
+        "max": 4096.0,
+        "mean": 4096.0,
+        "median": 4096.0,
+        "min": 4096.0
+      },
+      "tenant_unique": {
+        "count": 4991,
+        "max": 1,
+        "mean": 1.0,
+        "median": 1,
+        "min": 1
+      },
+      "total_iops_q50": null,
+      "write_ratio": {
+        "count": 4991,
+        "max": 1.0,
+        "mean": 0.8198152322379268,
+        "median": 0.98046875,
+        "min": 0.0
+      }
+    },
+    "tencent/cloud_disk/tencent_cloud_disk": {
+      "burstiness_cv": null,
+      "bytes": 7270989623,
+      "dataset": "tencent",
+      "family": "cloud_disk",
+      "files": 16296,
+      "format": "tencent_cloud_disk",
+      "iat_q50": null,
+      "idle_ratio": {
+        "count": 16296,
+        "max": 1.0,
+        "mean": 0.7457352246381397,
+        "median": 0.90673828125,
+        "min": 0.0
+      },
+      "parser_counts": {
+        "tencent_cloud_disk": 16296
+      },
+      "reuse_ratio": null,
+      "sample_records": {
+        "count": 16296,
+        "max": 4096,
+        "mean": 4096.0,
+        "median": 4096,
+        "min": 4096
+      },
+      "size_q50": null,
+      "tenant_unique": null,
+      "total_iops_q50": {
+        "count": 16296,
+        "max": 121804.5,
+        "mean": 126.76322410407462,
+        "median": 0.0,
+        "min": 0.0
+      },
+      "write_ratio": null
+    }
+  },
+  "inventory_files": 31701,
+  "parser_counts": {
+    "baleen24": 374,
+    "exchange_etw": 96,
+    "generic_text": 575,
+    "lcs": 6137,
+    "lcs_stub": 3,
+    "oracle_general": 7122,
+    "parquet_stub": 25,
+    "tencent_cloud_disk": 16296
+  },
+  "recommended_conditioning_features": {
+    "aggregate_time_series": [
+      "sampling_interval_q50",
+      "read_iops_q50",
+      "read_iops_q90",
+      "write_iops_q50",
+      "write_iops_q90",
+      "total_bw_q50",
+      "disk_usage_q50",
+      "idle_ratio",
+      "lag1_autocorr"
+    ],
+    "generic_sequence_or_log": [
+      "column_count",
+      "numeric_column_ratio",
+      "time_like_first_column",
+      "schema_tokens"
+    ],
+    "request_sequence": [
+      "iat_q50",
+      "iat_q90",
+      "burstiness_cv",
+      "obj_size_q50",
+      "obj_size_q90",
+      "write_ratio",
+      "opcode_switch_ratio",
+      "reuse_ratio",
+      "top1_object_share",
+      "tenant_count",
+      "forward_seek_ratio",
+      "backward_seek_ratio"
+    ]
+  },
+  "trace_files": 30628,
+  "use_case_counts": {
+    "aggregate_time_series": 16296,
+    "generic_sequence_or_log": 575,
+    "inventory_only": 25,
+    "request_sequence": 13732
+  }
+}

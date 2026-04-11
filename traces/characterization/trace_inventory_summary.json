@@ -1,0 +1,61 @@
+{
+  "by_dataset": {
+    "Baleen24": {
+      "bytes": 215830658676,
+      "files": 589,
+      "trace_files": 374
+    },
+    "MSR": {
+      "bytes": 1479445833,
+      "files": 98,
+      "trace_files": 96
+    },
+    "alibaba": {
+      "bytes": 100765769280,
+      "files": 1367,
+      "trace_files": 1000
+    },
+    "checkpoints": {
+      "bytes": 1415593265,
+      "files": 143,
+      "trace_files": 0
+    },
+    "s3-cache-datasets": {
+      "bytes": 7963222835675,
+      "files": 13204,
+      "trace_files": 12862
+    },
+    "tencent": {
+      "bytes": 7573729242,
+      "files": 16300,
+      "trace_files": 16296
+    }
+  },
+  "by_format": {
+    "baleen24": 374,
+    "exchange_etw": 96,
+    "lcs": 6140,
+    "metadata": 52,
+    "oracle_general": 7122,
+    "other": 960,
+    "parquet": 25,
+    "tar": 47,
+    "tar_gz": 11,
+    "temp": 1,
+    "tencent_cloud_disk": 16296,
+    "text": 4,
+    "text_zst": 571,
+    "zip": 2
+  },
+  "by_role": {
+    "archive": 60,
+    "hidden": 2,
+    "metadata": 670,
+    "other": 340,
+    "temporary": 1,
+    "trace": 30628
+  },
+  "root": "/tiamat/zarathustra/traces",
+  "total_bytes": 8290288031971,
+  "total_files": 31701
+}
