@@ -22,7 +22,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Best **0.11270★** ep65 (MMD²=0.0179, recall=0.526). Stalled 52 epochs after ep65 — recall declined to 0.388, W rising to 2.5–3.5. Killed ep117.
 
-**Notable**: 0.113★ is within 3% of v59's training-log record (0.110★). W was much healthier than v67 (bce=2.0). The question is whether copy-path contributed or this was seed luck. v69 (no copy-path control) will answer this. **Eval running on best.pt.**
+**Full eval: combined≈0.198** (MMD²=0.054, β-recall=0.280, α-precision=0.326, DMD-GEN=0.699, HRC-MAE=0.083). Train→eval gap: **75%** — worse than v59 eval (0.111) and v65 control (0.135).
+
+**CRITICAL: Copy-path actively harmful for alibaba.** real reuse=0.001, fake reuse=0.084 — model generated 84× more reuse than real data. Alibaba reuse is essentially zero; the class-weighted BCE amplified a near-zero rate into phantom reuse events. Copy-path should NOT be used on low-reuse corpora.
 
 ---
 
