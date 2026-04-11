@@ -92,3 +92,21 @@ We accept Findings 7 (external-system replay testing) and 8 (benchmarking agains
 We accept Finding 9 (compositional/hybrid workload generation) and Finding 10 (conditional generation with cleaner semantics). The R-informed conditioning redesign currently on our TODO list is exactly the "use only signal-bearing descriptors, separate file-level from window-level factors" approach Finding 10 recommends. The routed MoE generator (Round 3 TODO) is the natural vehicle for Finding 9's compositional vision.
 
 We note that the reviewer's recovery of the NSF proposal's original ambitions is timely and welcome. The recent KL 0.01 breakthrough — which works by regularizing the conditioning distribution, not by adding another loss term — is precisely the kind of structural insight the proposal envisioned. It suggests the path forward is through better modeling of **what the generator conditions on and how**, not through more auxiliary losses on what it outputs. This aligns with the proposal's emphasis on representative conditioning, structured latent spaces, and principled validation over brute-force tuning.
+
+---
+
+## Round 9
+
+We accept the reviewer's central thesis without reservation: the project has been saying the right things while still doing the wrong things. The evidence since Round 8 vindicates this critique more strongly than the reviewer could have known when writing it.
+
+We accept Findings 1–3 (stop scalar tweaking, pick structural bets, treat KL 0.01 as base camp). Since the reviewer wrote this, we ran **five consecutive scalar tweaks on alibaba** (v58 n-regimes 6, v60 quantile 0.3, v62 acf 0.3, v63 diversity 3.0, v64 fft 0.1) — every single one failed to beat v59 at eval. We also ran three scalar stacking attempts on tencent (v94 moment+acf, v95 diversity+acf) — both stalled. The one success was tencent v93 (acf-loss 0.3, eval **0.0995**, new tencent record), which was genuinely novel but is now the ceiling — stacking anything on top of it also fails. The reviewer's prediction that scalar sweeps generate false hope is exactly what we observed: several runs produced best-ever training-log scores (v62 at 0.102★, v64 at 0.107★) that collapsed at eval (0.138, 0.132). **Scalar tuning on both corpora is now empirically exhausted.** We are freezing v59 (alibaba) and v93 (tencent) as baselines.
+
+We accept Finding 4 (Fourier) with the acknowledgment that four rounds of "we'll do it" is embarrassing. It is now P0 priority.
+
+We accept Finding 5 (locality needs a mechanism, not a loss) — this is consistent with our closed list showing locality-loss-weight increases fail on both corpora.
+
+We accept Finding 6 (infrastructure debts). We note one new data point that makes this even more urgent: `alibaba_v65` was a verbatim v59 control that matched v59's training-log perfectly (both ~0.110★) but produced eval **0.1351** vs v59's 0.1113 — a 23% gap. The difference was training instability (v65 had W values 2–5 and G_loss 6–8; v59 was likely calmer). This means the alibaba "record" may be stability-dependent rather than recipe-dependent, which is exactly the kind of measurement noise the reviewer warns about when `z_global` paths and preprocessor behavior diverge between training and eval.
+
+We accept Finding 7 (scalar sweeps generate false hope). v65's failure to reproduce v59 is the strongest evidence yet: identical recipe, identical training-log performance, completely different eval — because the *trajectory* of training matters, not just the *recipe*. This is not something scalar tuning can fix.
+
+We accept Finding 8 (pick a build order) and commit to the reviewer's recommended sequence: (1) conditioning-structure experiment, (2) locality-structure experiment, (3) diagnostics package (Fourier), then (4) optional scalar sidecars. The scalar era is over.

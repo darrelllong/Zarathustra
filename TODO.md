@@ -411,3 +411,14 @@ Items marked ✓ are done and in the repo.
 - [ ] `[P2]` External-system replay testing for finalists: compare generated vs real traces on actual system metrics (hit ratio, response time, CPU). "Behavioral equivalence under replay" not just "holdout similarity in embedding space."
 - [ ] `[P2]` Compositional/hybrid workload generation: normal-plus-anomalous synthesis, workload-family experts, corpus-bridging. Original proposal envisioned one generator family serving multiple workload types.
 - [ ] `[P3]` Benchmark against existing generators (Filebench, Impressions, VdBench) on both statistical and replay-system metrics for competitive positioning.
+
+## Reviewer Action Items (Round 9 — "So Do It")
+
+- [ ] `[P0]` **STOP SCALAR TUNING.** Freeze v59 (alibaba) and v93 (tencent) as reproducible baselines. No more scalar-only variants on mainline compute. All scalar sweeps are sidecars only.
+- [ ] `[P0]` **RUN FOURIER NOW.** Fourth round requesting spectral analysis. Run on real traces + synthetic rollouts from v59, v93, v51 (best DMD-GEN), v82 (best Context-FID). No more deferring.
+- [ ] `[P0]` **PICK A BUILD ORDER AND EXECUTE.** Recommended: (1) one conditioning-structure experiment, (2) one locality-structure experiment, (3) one diagnostics package, (4) then optional scalar sidecars.
+- [ ] `[P1]` Implement conditioning-structure change: correlation-aware factorized conditioning with file-level vs window-level separation, OR window-level pseudo-label bridge. This is the highest-leverage structural bet.
+- [ ] `[P1]` Implement locality-structure change: explicit reuse-vs-new decision with copy path or recent-object memory. Not another locality-loss weight — an actual mechanism.
+- [ ] `[P1]` Fix infrastructure debts BEFORE making mechanism claims: z_global unification (train vs eval path divergence) and preprocessor freezing. These control whether the conditioning story is even being measured cleanly.
+- [ ] `[P2]` On tencent only, reopen one critic-side structural test AFTER conditioning/locality work: full-eval multi-scale critic or path-space critic.
+- [ ] `[P2]` Treat v65's failure to reproduce v59 (training-log matched but eval diverged 23%) as evidence that scalar results are stability-dependent and unreliable without verbatim controls.
