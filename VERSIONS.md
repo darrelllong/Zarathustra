@@ -9,10 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v68 — copy-path at lower weight (bce=0.5)
 **Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v48 pretrain. Lower weight after v67 stalled at bce=2.0.
 
-### tencent_v97 — copy-path structural reuse mechanism (ep25/200)
-**Recipe**: v93 base (KL 0.01, acf 0.3) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v86 pretrain.
+### tencent_v98 — v93 recipe 3rd seed attempt (no copy-path)
+**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. Third attempt to reproduce v93 record (v96 failed at 0.175). No copy-path — pure base recipe with fresh seed. Tests reproducibility.
 
-**Training-log** (ep25): Best **0.17779★** ep25 (MMD²=0.0296, recall=0.259). W very stable (0.7–1.4). reuse_bce still high (9.1–9.9) — model hasn't cracked reuse yet but distributional metrics improving. Still improving.
+---
+
+## Post-Mortem: tencent_v97 — copy-path bce=0.5 (killed ep101 — stalled, reuse_bce diverging)
+
+**Recipe**: v93 base (KL 0.01, acf 0.3) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v86 pretrain. (First launch at bce=2.0 collapsed W→11.8 by ep3.)
+
+**Training-log**: Best **0.14346★** ep60 (MMD²=0.0256, recall=0.410). Stalled 40 epochs after ep60 — ep100 combined=0.150. recall peaked 0.41 then flat.
+
+**CRITICAL FINDING: Copy-path reuse_bce NEVER declined.** Started at 9.3 (ep5), rose to 12.5 (ep101). The Generator/Recovery architecture cannot respond to per-timestep BCE on a column treated as just another regression target through a shared GRU. The distributional improvement (0.220→0.143) came entirely from the base recipe, not the copy-path mechanism. The reuse mechanism needs to be **architectural** (separate reuse decision head), not a loss added to the existing architecture.
 
 ---
 
