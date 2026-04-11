@@ -6,8 +6,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v65** — v59 verbatim control (KL 0.01, moment-loss 0.2). Using v48 pretrain. ep22/200. Confirming v59 record is reproducible.
-- **tencent_v96** — v93 verbatim control (KL 0.01, acf-loss 0.3). Using v86 pretrain. Just launched. Confirming v93 record is reproducible.
+- **alibaba_v66** — v59 recipe + lower lr (6e-5/3e-5, 75% of standard) + w-stop 3.0. Using v48 pretrain. Just launched. Hypothesis: training stability determines eval quality.
+- **tencent_v96** — v93 verbatim control (KL 0.01, acf-loss 0.3). Using v86 pretrain. ep185/200, best **0.11876★** ep115. Stalled 70 epochs.
+
+## Post-Mortem: alibaba_v65 — v59 verbatim control (W-guard ep183, eval **0.1351 — did NOT reproduce v59**)
+
+**Recipe**: v59 verbatim (KL 0.01, moment-loss 0.2). Using v48 pretrain.
+
+**Training-log**: Best **0.11000★** ep180 (MMD²=0.01760, recall=0.538). W-spike guard killed at ep183 (W=4.34, 5.16, 4.93). Training was **unstable throughout** — W values 2-5, G_loss 6-8 from ep60 onward.
+
+**Full eval: combined=0.1351** (MMD²=0.03918, β-recall=0.5205, α-precision=**0.5435**, density=0.5047, DMD-GEN=0.7537). Train→eval gap: 23%.
+
+**KEY INSIGHT: Training-log matched v59 perfectly (both ~0.110★), but eval diverged massively (0.135 vs 0.111).** The difference: v65 was unstable (high W/G_loss) while v59 was likely calmer. **Training stability determines eval quality** — the EMA model absorbs noisy parameter states during high-W epochs, degrading eval. v59's eval of 0.1113 may be stability-dependent rather than recipe-dependent.
+
+**Implication**: Lower learning rates and/or tighter W-stop thresholds may improve eval by keeping training stable.
+
+---
 
 ## Post-Mortem: tencent_v95 — acf 0.3 + diversity-loss 3.0 (killed ep70 — stalled)
 
