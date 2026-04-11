@@ -6,8 +6,22 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v62** — v59 base (KL 0.01, moment-loss 0.2) + acf-loss-weight 0.3 (1.5× default). Using v48 pretrain. ep102/200, best **0.11167★** ep75 (recall=0.507). W ~1.3–2.1, slightly elevated. Very promising — training-log already matches v59 eval record.
-- **tencent_v93** — v86 base (KL 0.01) + acf-loss-weight 0.3. Using v86 pretrain. Just launched. Testing acf-loss 0.3 on tencent (parallel with alibaba v62).
+- **alibaba_v63** — v59 base (KL 0.01, moment-loss 0.2) + diversity-loss-weight 3.0 (1.5× default). Using v48 pretrain. Just launched.
+- **tencent_v93** — v86 base (KL 0.01) + acf-loss-weight 0.3. Using v86 pretrain. ep123/200, best **0.12105★** ep120. Improving steadily.
+
+## Post-Mortem: alibaba_v62 — moment 0.2 + acf-loss 0.3 (W-guard ep186, eval **0.1375 — WORSE than v59**)
+
+**Recipe**: v59 base (KL 0.01, moment-loss 0.2) + acf-loss-weight 0.3. Using v48 pretrain.
+
+**Training-log**: Best **0.10207★** ep155 (MMD²=0.01127, recall=0.546). Best-ever alibaba training-log score. W-spike guard killed at ep186 (W=5.78, 4.55, 5.38 — 3 consecutive >4.0).
+
+**Full eval: combined=0.1375** (MMD²=0.02144, β-recall=0.4195, α-precision=0.7850, density=0.5890, DMD-GEN=0.7870, HRC-MAE=0.0124). Train→eval gap: **35%** — recall collapsed from 0.546→0.420.
+
+**PATTERN CONFIRMED: auxiliary loss increases beyond v59 recipe consistently degrade eval.** acf-loss 0.3, quantile increase — all produce better training but worse eval. The v59 recipe (KL 0.01 + moment 0.2, default everything else) remains the optimal alibaba configuration for scalar tuning.
+
+**acf-loss-weight 0.3 on alibaba: CLOSED.**
+
+---
 
 ## Post-Mortem: tencent_v92 — moment-loss 0.2, 2nd attempt (killed ep123 — stalled)
 
