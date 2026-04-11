@@ -6,17 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v67 — copy-path structural reuse mechanism (ep34/200)
-**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 2.0 --stride-consistency-weight 1.0`. Using v48 pretrain. First structural change per Reviewer Round 9 build order item #2.
+### alibaba_v68 — copy-path at lower weight (bce=0.5)
+**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v48 pretrain. Lower weight after v67 stalled at bce=2.0.
 
-**Copy-path mechanism**: Per-timestep BCE on reuse column (class-weighted for seek/reuse imbalance) + stride-reuse consistency loss + Recovery stride gating. Replaces scalar locality_loss with per-timestep supervision.
-
-**Training-log** (ep34): Best **0.16722★** ep20 (MMD²=0.0376, recall=0.352). W oscillating 0.5–3.8 with one spike to 5.08 at ep30. reuse_bce declining (7.8→3.5), stride_con tiny (0.001–0.004).
-
-### tencent_v97 — copy-path structural reuse mechanism (Phase 2.5 warm-up)
+### tencent_v97 — copy-path structural reuse mechanism (ep25/200)
 **Recipe**: v93 base (KL 0.01, acf 0.3) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v86 pretrain.
 
-**Note**: First launch with bce_weight=2.0 collapsed immediately (W→11.8 by ep3, W-spike guard killed ep4). Relaunched with 0.5. In Phase 2.5 warm-up.
+**Training-log** (ep25): Best **0.17779★** ep25 (MMD²=0.0296, recall=0.259). W very stable (0.7–1.4). reuse_bce still high (9.1–9.9) — model hasn't cracked reuse yet but distributional metrics improving. Still improving.
+
+---
+
+## Post-Mortem: alibaba_v67 — copy-path bce=2.0 (killed ep63 — stalled, W trending up)
+
+**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 2.0 --stride-consistency-weight 1.0`. Using v48 pretrain. First structural copy-path experiment.
+
+**Training-log**: Best **0.16446★** ep35 (MMD²=0.0345, recall=0.350). No improvement for 28 epochs after ep35. W trending up to 3.2–4.3 range. reuse_bce stabilized at 2.8–4.2 (stopped declining). At ep60, v59 baseline was ~0.110★ — v67 was 63% behind at 0.179. Killed ep63.
+
+**Lesson**: bce_weight=2.0 too aggressive for alibaba. The class-weighted BCE adds ~8–16 to G_loss early on (weight × bce ≈ 2.0 × 4–8), destabilizing the GAN equilibrium. Tencent v97 survived with bce_weight=0.5 and is still improving. Try 0.5 for alibaba (v68).
 
 ---
 
