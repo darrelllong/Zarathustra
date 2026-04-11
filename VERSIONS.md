@@ -6,8 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v60** — v59 base (KL 0.01, moment-loss 0.2) + quantile-loss-weight 0.3 (1.5× default). Using v48 pretrain. Just launched.
-- **tencent_v90** — v86 base (KL 0.01, n-regimes 8) + quantile-loss-weight 0.4 (2× default). Using v86 pretrain. ep28/200, best 0.14828★ ep20.
+- **alibaba_v60** — v59 base (KL 0.01, moment-loss 0.2) + quantile-loss-weight 0.3 (1.5× default). Using v48 pretrain. ep186/200, best 0.09551★ ep115. Finishing.
+- **tencent_v91** — stacked recipe (KL 0.01, moment-loss 0.2, quantile-loss 0.3). Using v86 pretrain. Just launched.
+
+## Post-Mortem: tencent_v90 — quantile-loss-weight 0.4 (completed ep200, full eval **0.1235 — WORSE THAN FLOOR**)
+
+**Recipe**: v86 base (KL 0.01, n-regimes 8) + quantile-loss-weight 0.4 (2× default). Using v86 pretrain.
+
+**Training-log**: Best **0.10998★** ep95 (MMD²=0.01598, recall=0.530). W-elevated late phase.
+
+**Full eval: combined=0.1235** (MMD²=0.01626, β-recall=0.4640, α-precision=0.8875, DMD-GEN=0.7712, Context-FID=0.17, HRC-MAE=0.0745). Train→eval gap: 12.3%.
+
+**quantile-loss-weight 0.4 DOES NOT HELP tencent.** Recall dropped (0.464 vs v88's 0.516), HRC-MAE much worse (0.075 vs v88's 0.008). Interestingly, fake reuse rate is 0.098 vs real 0.056 — model OVER-generates reuse. The doubled quantile loss may be pushing tails too aggressively, causing distribution mismatch.
+
+| Run | Recipe | Training-log | Full eval |
+|-----|--------|-------------|-----------|
+| v86 | KL 0.01 (base) | 0.1028★ | **0.1130** |
+| v88 | KL 0.01 (verbatim) | 0.1074★ | **0.1099** |
+| v90 | KL 0.01 + quantile 0.4 | 0.1100★ | 0.1235 |
+
+**quantile-loss-weight 0.4 CLOSED for tencent.**
+
+---
 
 ## Post-Mortem: alibaba_v59 — moment-loss-weight 0.2 (completed ep200, full eval **0.1113 — NEW ALIBABA RECORD**)
 
