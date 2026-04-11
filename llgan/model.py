@@ -116,12 +116,19 @@ class Recovery(nn.Module):
 
     def __init__(self, latent_dim: int, hidden_size: int, num_cols: int,
                  avatar: bool = False,
-                 binary_cols: Optional[List[int]] = None):
+                 binary_cols: Optional[List[int]] = None,
+                 copy_path: bool = False,
+                 reuse_col: int = -1,
+                 stride_col: int = -1):
         super().__init__()
         self.avatar      = avatar
         self.num_cols    = num_cols
         self.binary_cols = sorted(binary_cols) if binary_cols else []
         self.cont_cols   = [i for i in range(num_cols) if i not in set(self.binary_cols)]
+        # Copy-path: gate stride by (1 - reuse_prob) so stride→0 when reuse
+        self.copy_path = copy_path and reuse_col >= 0 and stride_col >= 0
+        self.reuse_col = reuse_col
+        self.stride_col = stride_col
 
         self.gru = nn.GRU(latent_dim, hidden_size, num_layers=1, batch_first=True)
         if avatar:
@@ -158,6 +165,16 @@ class Recovery(nn.Module):
         result[..., self.cont_cols]   = torch.tanh(self.fc_cont(out))
         # Sigmoid → [0,1] → scale to [-1,1] for consistency with real data range
         result[..., self.binary_cols] = torch.sigmoid(self.fc_binary(out)) * 2.0 - 1.0
+
+        # Copy-path: gate stride by (1 - reuse_prob).
+        # When reuse is predicted (+1 → prob≈1), stride is zeroed out.
+        # When seek is predicted (-1 → prob≈0), stride passes through.
+        # No new parameters — just a structural constraint in the forward pass.
+        if self.copy_path:
+            reuse_val = result[..., self.reuse_col]      # [-1, 1]
+            reuse_prob = (reuse_val + 1.0) / 2.0         # [0, 1]
+            result[..., self.stride_col] = result[..., self.stride_col] * (1.0 - reuse_prob)
+
         return result
 
 

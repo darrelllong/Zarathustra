@@ -447,6 +447,14 @@ def train(cfg: Config) -> None:
                   if hasattr(prep, "col_names") and "obj_id_reuse" in prep.col_names
                   else prep.col_names.index("obj_id") if "obj_id" in prep.col_names
                   else 1)
+    # Column index of obj_id_stride (used by copy-path stride-reuse consistency).
+    stride_col = (prep.col_names.index("obj_id_stride")
+                  if hasattr(prep, "col_names") and "obj_id_stride" in prep.col_names
+                  else -1)
+
+    if cfg.copy_path:
+        print(f"[copy-path] reuse_col={obj_id_col} stride_col={stride_col} "
+              f"bce_w={cfg.reuse_bce_weight} stride_w={cfg.stride_consistency_weight}")
 
     # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
     # redundant and can interfere with the penalty gradient computation.
@@ -495,7 +503,10 @@ def train(cfg: Config) -> None:
                     avatar=_avatar).to(device)
         R = Recovery(cfg.latent_dim, cfg.hidden_size, prep.num_cols,
                      avatar=_avatar,
-                     binary_cols=_binary_cols if _binary_cols else None).to(device)
+                     binary_cols=_binary_cols if _binary_cols else None,
+                     copy_path=cfg.copy_path,
+                     reuse_col=obj_id_col,
+                     stride_col=stride_col).to(device)
         S = Supervisor(cfg.latent_dim, cfg.hidden_size,
                        avatar=_avatar).to(device)
         opt_AE  = torch.optim.Adam(list(E.parameters()) + list(R.parameters()),
@@ -1035,6 +1046,7 @@ def train(cfg: Config) -> None:
             G.regime_sampler.anneal(epoch / max(cfg.epochs - 1, 1))
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
+        cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1421,6 +1433,36 @@ def train(cfg: Config) -> None:
                     loss_loc = (fake_reuse - real_reuse).pow(2)
                     g_loss = g_loss + cfg.locality_loss_weight * loss_loc
 
+                # Copy-path: per-timestep reuse BCE + stride-reuse consistency.
+                # Structural replacement for scalar locality_loss: gives per-timestep
+                # gradient for reuse decisions + enforces stride=0 when reuse=+1.
+                if cfg.copy_path and stride_col >= 0:
+                    obj_fake_reuse_cp = fake_decoded[:, :, obj_id_col]   # (B, T) in [-1, 1]
+                    obj_real_reuse_cp = real_batch[:, :, obj_id_col]
+                    # Map to [0,1] for BCE
+                    fake_p = (obj_fake_reuse_cp + 1.0) / 2.0
+                    real_p = (obj_real_reuse_cp + 1.0) / 2.0
+                    # Class-weighted BCE: upweight reuse events (minority class).
+                    # pos_weight = (1 - mean_reuse_rate) / mean_reuse_rate
+                    with torch.no_grad():
+                        mean_reuse = real_p.mean().clamp(min=0.01)
+                        pos_w = (1.0 - mean_reuse) / mean_reuse  # e.g. 0.9/0.1 = 9.0
+                    weight = real_p * pos_w + (1.0 - real_p)      # per-element weight
+                    loss_reuse_bce = nn.functional.binary_cross_entropy(
+                        fake_p.clamp(1e-6, 1.0 - 1e-6), real_p,
+                        weight=weight,
+                        reduction='mean',
+                    )
+                    g_loss = g_loss + cfg.reuse_bce_weight * loss_reuse_bce
+                    cp_bce_losses.append(loss_reuse_bce.item())
+
+                    # Stride-reuse consistency: penalise |stride| where real says reuse.
+                    stride_fake = fake_decoded[:, :, stride_col]
+                    reuse_mask = (obj_real_reuse_cp > 0).float()  # 1 where reuse
+                    loss_stride_cons = (stride_fake.abs() * reuse_mask).mean()
+                    g_loss = g_loss + cfg.stride_consistency_weight * loss_stride_cons
+                    cp_stride_losses.append(loss_stride_cons.item())
+
                 # L_div: MSGAN mode-seeking diversity loss.
                 # For two independently sampled noise pairs, maximise the ratio of
                 # output distance to input distance — directly combats mode collapse
@@ -1579,6 +1621,10 @@ def train(cfg: Config) -> None:
                f"W={w_mean:+.4f}  C={c_mean:.4f}  G={g_mean:.4f}  "
                f"lr={lr_now:.2e}  t={elapsed:.1f}s"
                f"{n_files_str}")
+        if cp_bce_losses:
+            cp_bce_m = sum(cp_bce_losses) / len(cp_bce_losses)
+            cp_str_m = sum(cp_stride_losses) / len(cp_stride_losses) if cp_stride_losses else 0.0
+            log += f"  reuse_bce={cp_bce_m:.4f}  stride_con={cp_str_m:.4f}"
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             # Evaluate using the EMA model, not the live G.
@@ -1890,6 +1936,15 @@ def parse_args() -> Config:
                    help="L_loc: stride-repetition rate matching within windows (0=off; try 1.0). "
                         "Matches the fraction of obj_id deltas that repeat within a window — "
                         "a proxy for sequential-access consistency.")
+    p.add_argument("--copy-path", action="store_true", default=False,
+                   help="Copy-path mechanism: per-timestep reuse BCE + stride-reuse "
+                        "consistency loss + Recovery stride gating. Structural replacement "
+                        "for scalar locality_loss. Pretrain-compatible.")
+    p.add_argument("--reuse-bce-weight", type=float, default=2.0,
+                   help="Copy-path: per-timestep BCE weight on reuse column (default 2.0). "
+                        "Class-weighted to handle seek/reuse imbalance.")
+    p.add_argument("--stride-consistency-weight", type=float, default=1.0,
+                   help="Copy-path: penalise |stride| when real reuse=+1 (default 1.0).")
     p.add_argument("--diversity-loss-weight", type=float, default=0.0,
                    help="L_div: MSGAN mode-seeking loss — maximises output/noise distance ratio "
                         "across random pairs; combats mode collapse (low β-recall). "
@@ -2007,6 +2062,9 @@ def parse_args() -> Config:
     cfg.lr_cosine_decay             = args.lr_cosine_decay
     cfg.gp_lambda                   = args.gp_lambda
     cfg.locality_loss_weight        = args.locality_loss_weight
+    cfg.copy_path                   = args.copy_path
+    cfg.reuse_bce_weight            = args.reuse_bce_weight
+    cfg.stride_consistency_weight   = args.stride_consistency_weight
     cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.feat_critic_weight          = args.feat_critic_weight
     cfg.continuity_loss_weight      = args.continuity_loss_weight

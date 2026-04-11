@@ -88,6 +88,22 @@ class Config:
                                        # Measures fraction of positions whose obj_id DELTA matches a prior
                                        # delta in the window — captures sequential-access strides, not raw
                                        # object identity (delta encoding precludes direct ID comparison).
+
+    # Copy-path mechanism (Reviewer Round 9, build order item #2):
+    # Structural reuse-vs-seek decision with per-timestep supervision.
+    # Replaces scalar locality_loss with:
+    #   (a) per-timestep BCE on reuse column (class-weighted for imbalance)
+    #   (b) stride-reuse consistency loss (stride→0 when reuse=+1)
+    #   (c) Recovery-level stride gating (stride * (1-reuse_prob))
+    # Pretrain-compatible: no new parameters, just forward-pass gating + losses.
+    copy_path: bool = False              # Enable copy-path mechanism (0 = off).
+    reuse_bce_weight: float = 2.0        # Per-timestep BCE weight on reuse column.
+                                         # Higher than locality_loss because this gives
+                                         # per-timestep gradients, not just mean matching.
+    stride_consistency_weight: float = 1.0  # Penalise |stride| when reuse=+1.
+                                             # Enforces the structural constraint that
+                                             # object reuse implies zero stride.
+
     diversity_loss_weight: float = 0.0  # L_div: MSGAN mode-seeking loss — maximises |G(z1)-G(z2)|/|z1-z2|
                                         # across random noise pairs; directly combats β-recall mode collapse.
                                         # Requires a second G forward pass per step. Try 0.5–2.0.
