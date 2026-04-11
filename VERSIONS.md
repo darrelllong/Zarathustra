@@ -6,8 +6,26 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v63** — v59 base (KL 0.01, moment-loss 0.2) + diversity-loss-weight 3.0 (1.5× default). Using v48 pretrain. Just launched.
-- **tencent_v93** — v86 base (KL 0.01) + acf-loss-weight 0.3. Using v86 pretrain. ep123/200, best **0.12105★** ep120. Improving steadily.
+- **alibaba_v63** — v59 base (KL 0.01, moment-loss 0.2) + diversity-loss-weight 3.0 (1.5× default). Using v48 pretrain. ep69/200, best **0.13456★** ep65.
+
+## Post-Mortem: tencent_v93 — acf-loss 0.3 (completed ep200, eval **0.0995 — NEW TENCENT RECORD**)
+
+**Recipe**: v86 base (KL 0.01) + acf-loss-weight 0.3. Using v86 pretrain.
+
+**Training-log**: Best **0.10854★** ep185 (MMD²=0.01194, recall=0.517).
+
+**Full eval: combined=0.0995** (MMD²=0.01019, β-recall=**0.5535**, α-precision=0.8305, density=1.1347, coverage=0.5535, DMD-GEN=**0.6846**, AutoCorr=0.0330, Context-FID=0.11, HRC-MAE=0.0251).
+
+**NEW TENCENT RECORD.** 9.5% improvement over previous best (v88 eval 0.1099). Train→eval gap: **-8.3%** (eval BETTER than training-log). β-recall 0.5535 and DMD-GEN 0.6846 are both best-ever for tencent.
+
+**acf-loss-weight 0.3 on tencent: VALIDATED.** Interestingly, acf-loss 0.3 failed on alibaba (v62 eval 0.1375) but works on tencent — corpus-specific effect.
+
+| Corpus | Previous Best | New Best | Recipe | Improvement |
+|--------|--------------|----------|--------|-------------|
+| Tencent | 0.1099 (v88) | **0.0995 (v93)** | KL 0.01 + acf-loss 0.3 | 9.5% |
+| Alibaba | **0.1113 (v59)** | — | KL 0.01 + moment-loss 0.2 | — |
+
+---
 
 ## Post-Mortem: alibaba_v62 — moment 0.2 + acf-loss 0.3 (W-guard ep186, eval **0.1375 — WORSE than v59**)
 
