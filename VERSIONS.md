@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v62** — v59 base (KL 0.01, moment-loss 0.2) + acf-loss-weight 0.3 (1.5× default). Using v48 pretrain. Just launched.
-- **tencent_v92** — v86 base (KL 0.01) + moment-loss-weight 0.2. Using v86 pretrain. 2nd attempt (v89 collapsed at ep52, seed-specific). Just launched.
+- **alibaba_v62** — v59 base (KL 0.01, moment-loss 0.2) + acf-loss-weight 0.3 (1.5× default). Using v48 pretrain. ep102/200, best **0.11167★** ep75 (recall=0.507). W ~1.3–2.1, slightly elevated. Very promising — training-log already matches v59 eval record.
+- **tencent_v93** — v86 base (KL 0.01) + acf-loss-weight 0.3. Using v86 pretrain. Just launched. Testing acf-loss 0.3 on tencent (parallel with alibaba v62).
+
+## Post-Mortem: tencent_v92 — moment-loss 0.2, 2nd attempt (killed ep123 — stalled)
+
+**Recipe**: v86 base (KL 0.01) + moment-loss-weight 0.2. Using v86 pretrain.
+
+**Training-log**: Best **0.13726★** ep70 (MMD²=0.01936, recall=0.410). Stalled for 53 epochs — no improvement after ep70. Latest ep120 comb=0.147, recall dropped to 0.353.
+
+**Survived ep50-60 danger zone** (unlike v89), but never approached tencent floor of 0.110. Killed at ep123.
+
+**moment-loss-weight 0.2 on tencent: CLOSED.** Two attempts (v89 collapsed ep52, v92 stalled at 0.137). Works on alibaba (v59 record 0.1113) but not on tencent.
 
 ## Post-Mortem: alibaba_v60 — moment 0.2 + quantile 0.3 (completed ep200, full eval **0.1697 — EVAL COLLAPSE**)
 
