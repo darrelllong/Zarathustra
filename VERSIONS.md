@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v68 — copy-path at lower weight (bce=0.5)
-**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v48 pretrain. Lower weight after v67 stalled at bce=2.0.
+### alibaba_v69 — v59 recipe control (no copy-path, fresh seed)
+**Recipe**: v59 verbatim (KL 0.01). Using v48 pretrain. Control for v68 — tests whether v68's 0.113★ came from copy-path or seed luck. (v65 control got 0.135 eval.)
 
-### tencent_v98 — v93 recipe 3rd seed attempt (no copy-path)
-**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. Third attempt to reproduce v93 record (v96 failed at 0.175). No copy-path — pure base recipe with fresh seed. Tests reproducibility.
+### tencent_v98 — v93 recipe 3rd seed attempt (ep39/200)
+**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. Third attempt to reproduce v93 record (v96 failed at 0.175).
+
+**Training-log** (ep39): Best **0.14549★** ep35 (MMD²=0.0135, recall=0.340). W incredibly stable (0.39–0.64). Still improving.
+
+---
+
+## Post-Mortem: alibaba_v68 — copy-path bce=0.5 (killed ep117 — stalled ep65, eval pending)
+
+**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v48 pretrain.
+
+**Training-log**: Best **0.11270★** ep65 (MMD²=0.0179, recall=0.526). Stalled 52 epochs after ep65 — recall declined to 0.388, W rising to 2.5–3.5. Killed ep117.
+
+**Notable**: 0.113★ is within 3% of v59's training-log record (0.110★). W was much healthier than v67 (bce=2.0). The question is whether copy-path contributed or this was seed luck. v69 (no copy-path control) will answer this. **Eval running on best.pt.**
 
 ---
 
