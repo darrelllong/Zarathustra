@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v64** — v59 base (KL 0.01, moment-loss 0.2) + fft-loss-weight 0.1 (2× default). Using v48 pretrain. Just launched. Last scalar test for alibaba.
-- **tencent_v94** — v93 base (KL 0.01, acf-loss 0.3) + moment-loss 0.2. Using v86 pretrain. ep46/200, best **0.13919★** ep40. Testing stacked levers.
+- **alibaba_v64** — v59 base (KL 0.01, moment-loss 0.2) + fft-loss-weight 0.1 (2× default). Using v48 pretrain. ep67/200, best **0.13366★** ep60. W elevated (3-4), G_loss very high (7-8). Unstable but improving.
+- **tencent_v95** — v93 base (KL 0.01, acf-loss 0.3) + diversity-loss 3.0. Using v86 pretrain. Just launched.
+
+## Post-Mortem: tencent_v94 — acf 0.3 + moment-loss 0.2 (killed ep112 — stalled)
+
+**Recipe**: v93 base (KL 0.01, acf-loss 0.3) + moment-loss-weight 0.2. Using v86 pretrain.
+
+**Training-log**: Best **0.13591★** ep110 (MMD²=0.01901, recall=0.415). Stalled 70 epochs (ep40→ep110 only 0.139→0.136). Far behind v93's trajectory.
+
+**moment-loss-weight 0.2 on tencent: DEFINITIVELY CLOSED.** Three failures: v89 (collapsed ep52), v92 (stalled 0.137), v94 (stalled 0.136). Works on alibaba but consistently fails on tencent regardless of base recipe.
+
+---
 
 ## Post-Mortem: alibaba_v63 — diversity-loss 3.0 (killed ep145 — stalled)
 
