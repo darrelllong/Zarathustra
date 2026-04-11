@@ -426,3 +426,77 @@ The new rebuttal is materially better. It picks up the later criticism, accepts 
 ### Short Take
 
 The new rebuttal is finally saying many of the right things. That is good. But now the standard is higher: the team does not need more agreement with the review. It needs follow-through. The repo already knows what the next serious bets are. So do them.
+
+---
+
+## Round 10
+
+### Good, Now Stay On The Structural Path
+
+The last 24 hours finally contain real movement. The repo did not merely acknowledge the critique again. It actually acted on two of the biggest points:
+the Fourier-spectrum concern is now a live metric in [mmd.py](/Users/darrell/Zarathustra/llgan/mmd.py#L215) and [eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L535),
+and the first true locality mechanism is now running as `alibaba_v67` and `tencent_v97` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L9).
+That is the best kind of response. The review should say that plainly. It should also say the equally important second half just as plainly: do not backslide now.
+
+1. `[P1]` The Fourier point appears to have landed in exactly the right way. The repo now has a real spectral-divergence metric in [mmd.py](/Users/darrell/Zarathustra/llgan/mmd.py#L215), live reporting in [eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L576), and an April 11 commit (`0985c20`) whose conclusion is the one this review was trying to force into the open: PSD match is already pretty good, so the remaining gap is not simple marginal frequency content. That is a meaningful result. It sharpens the agenda. It says the project should stop treating "temporal structure" as one fuzzy thing and instead focus on the harder local and cross-step structure that Fourier does **not** solve:
+   reuse decisions,
+   stride consistency,
+   inter-reference dynamics,
+   and path-level state transitions.
+
+2. `[P1]` The copy-path launch is the right next move, and it should stay the main event. `alibaba_v67` and `tencent_v97` are now active in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L9). The mechanism itself is exactly the kind of thing this review has been asking for: timestep-level reuse supervision, stride-reuse consistency, and recovery-time stride gating rather than one scalar locality penalty in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L12). That is real progress. Do more of this. Do not let the repo respond to the first unstable copy-path run by retreating into another round of `moment`, `fft`, `acf`, `quantile`, or loss-weight stacking. The whole point of this week’s learning is that locality is a mechanism problem.
+
+3. `[P1]` The strongest new evidence against scalar fiddling is now internal and overwhelming. The repo itself says both corpus records failed verbatim controls in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L41), and explicitly concludes that scalar tuning is over in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L50). The rebuttal now says the same thing even more bluntly in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L102): five consecutive Alibaba scalar tweaks failed, the Tencent stacks failed, and the remaining path is structural. Good. Hold the line. The worst possible mistake now would be to absorb that lesson in prose and then sneak back into coefficient exploration because the first copy-path warm-up is noisy.
+
+4. `[P1]` The local-structure agenda is now much clearer than it was a day ago. Fourier trimmed away one source of ambiguity. If PSD is already close, then the next locality work should target what is still obviously broken:
+   explicit reuse-vs-new classification,
+   recent-object memory or pointer retrieval,
+   stride gating and stride realism on non-reuse steps,
+   and locality-aware sequence diagnostics such as reuse precision/recall, reuse-run lengths, and stack-distance or inter-reference-distance summaries.
+   In other words: stop asking "what scalar weight improves locality?" and ask "what state does the model need in order to decide whether this access is a reuse, and of what?"
+
+5. `[P1]` GEMINI’s code review makes this even more urgent because several eval-path bugs still appear to be live. The new review in [PEER-REVIEW-GEMINI.md](/Users/darrell/Zarathustra/PEER-REVIEW-GEMINI.md#L9) is not nitpicking; it points at exactly the kind of problems that can corrupt conclusions about the new structural work:
+   conditional eval still does raw `torch.cat([cond, noise])` in [eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L450) instead of the encoded conditioning path used in training,
+   HRC sampling still uses the padded cache-size pattern in [eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L259),
+   the reuse metric is still hardcoded to column 3 in [eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L545),
+   and the fallback descriptor path is still fixed at 10 dims while GEMINI points out the `cond_dim=13` mismatch in [PEER-REVIEW-GEMINI.md](/Users/darrell/Zarathustra/PEER-REVIEW-GEMINI.md#L11) and [dataset.py](/Users/darrell/Zarathustra/llgan/dataset.py#L203).
+   My recommendation is hard-edged here: do not declare the copy path a win or a failure until the eval path for conditional models is trustworthy enough to read it.
+
+6. `[P1]` The non-reproducibility of both scalar-era "records" should change how local-structure experiments are judged. `v65` failed to reproduce `v59` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L54), and `v96` failed to reproduce `v93` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L33). That means the main question for the new locality work is not "does it beat the luckiest number?" It is:
+   does it produce a more robust train→eval contract,
+   does it materially improve locality-facing metrics,
+   and does it reduce seed sensitivity?
+   Structural bets should be held to a higher standard than scalars, but also a more appropriate one.
+
+7. `[P2]` The best next local-structure ideas are no longer mysterious:
+   keep the new copy-path branch running and tune it as a mechanism, not as another generic loss stack;
+   add one locality-native diagnostic family, preferably reuse precision/recall plus stack-distance or IRD comparisons;
+   reopen the path-space critic idea specifically for Tencent after the copy path has a stable baseline;
+   and connect the new trace-characterization drop to locality supervision, especially if the characterization data can be used to derive pseudo-labels for bursty versus reuse-heavy windows.
+   This is now a coherent program, not just a bag of ideas.
+
+8. `[P2]` One repo-quality note is worth saying out loud because it reflects execution discipline: the new trace-analysis drop also introduced an accidental absolute-path mirror under [Users/darrell/Zarathustra/TODO.md](/Users/darrell/Zarathustra/Users/darrell/Zarathustra/TODO.md) and [Users/darrell/Zarathustra/llgan/train.py](/Users/darrell/Zarathustra/Users/darrell/Zarathustra/llgan/train.py). That is not the main race issue, but it is the sort of artifact that makes fast-moving repos harder to trust. Clean it up before it multiplies.
+
+### What I Would Do Right Now
+
+1. Keep `alibaba_v67` and `tencent_v97` as the mainline effort until there is a real read on copy-path locality behavior.
+
+2. Fix the GEMINI eval blockers before drawing strong conclusions from those runs:
+   conditional eval path, HRC weighting, reuse-column resolution, and descriptor-dimension fallback.
+
+3. Add locality-native diagnostics next:
+   reuse precision/recall,
+   reuse streak distribution,
+   stride-on-reuse violation rate,
+   and stack-distance or IRD comparisons.
+
+4. Use the Fourier result as a pruning decision:
+   stop spending prime effort on generic frequency penalties unless they support a specific structural hypothesis.
+
+5. After copy-path stabilizes, spend the next structural budget on either:
+   path-space critic for Tencent,
+   or conditioning redesign with file-level versus window-level separation.
+
+### Short Take
+
+This is the first update where the repo has genuinely moved in the direction the review has been pushing: Fourier is real, copy-path is real, and the rebuttal now admits the scalar era is over. Good. The next review should not have to say this again. Stay on the local-structure problem until it yields.
