@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-- **alibaba_v65** — v59 verbatim control (KL 0.01, moment-loss 0.2). Using v48 pretrain. Confirming v59 record is reproducible.
-- **tencent_v95** — v93 base (KL 0.01, acf-loss 0.3) + diversity-loss 3.0. Using v86 pretrain. ep48/200, best **0.13300★** ep20. Scores worsening — concerning.
+- **alibaba_v65** — v59 verbatim control (KL 0.01, moment-loss 0.2). Using v48 pretrain. ep22/200. Confirming v59 record is reproducible.
+- **tencent_v96** — v93 verbatim control (KL 0.01, acf-loss 0.3). Using v86 pretrain. Just launched. Confirming v93 record is reproducible.
+
+## Post-Mortem: tencent_v95 — acf 0.3 + diversity-loss 3.0 (killed ep70 — stalled)
+
+**Recipe**: v93 base (KL 0.01, acf-loss 0.3) + diversity-loss-weight 3.0. Using v86 pretrain.
+
+**Training-log**: Best **0.13300★** ep20. Stalled 50 epochs, scores worsening (0.133→0.139→0.151). G_loss climbing. Killed at ep70.
+
+**CONCLUSION: Scalar tuning on BOTH corpora is exhausted.** Stacking any additional loss weight on validated recipes (v59 alibaba, v93 tencent) consistently fails. Now running verbatim controls on both records before moving to structural changes.
+
+---
 
 ## Post-Mortem: alibaba_v64 — fft-loss 0.1 (W-guard ep104, eval **0.1319 — WORSE than v59**)
 
