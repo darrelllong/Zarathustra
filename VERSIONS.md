@@ -6,7 +6,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-*No training runs active. Transitioning to structural changes per reviewer Round 9 build order.*
+### alibaba_v67 — copy-path structural reuse mechanism (ep34/200)
+**Recipe**: v59 base (KL 0.01) + `--copy-path --reuse-bce-weight 2.0 --stride-consistency-weight 1.0`. Using v48 pretrain. First structural change per Reviewer Round 9 build order item #2.
+
+**Copy-path mechanism**: Per-timestep BCE on reuse column (class-weighted for seek/reuse imbalance) + stride-reuse consistency loss + Recovery stride gating. Replaces scalar locality_loss with per-timestep supervision.
+
+**Training-log** (ep34): Best **0.16722★** ep20 (MMD²=0.0376, recall=0.352). W oscillating 0.5–3.8 with one spike to 5.08 at ep30. reuse_bce declining (7.8→3.5), stride_con tiny (0.001–0.004).
+
+### tencent_v97 — copy-path structural reuse mechanism (Phase 2.5 warm-up)
+**Recipe**: v93 base (KL 0.01, acf 0.3) + `--copy-path --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Using v86 pretrain.
+
+**Note**: First launch with bce_weight=2.0 collapsed immediately (W→11.8 by ep3, W-spike guard killed ep4). Relaunched with 0.5. In Phase 2.5 warm-up.
+
+---
 
 ## Post-Mortem: alibaba_v66 — lower lr stability test (killed ep88 — too slow)
 
