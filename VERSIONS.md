@@ -9,8 +9,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v76 — PCF loss (v71 VERBATIM #2, seed bundle point 3)
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for alibaba reproducibility cluster. v71 eval=0.067 (ATB), v74 eval=0.093. Using v48 pretrain.
 
-### tencent_v104 — PCF loss (v99 VERBATIM #2, seed bundle point 3)
-**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for reproducibility cluster. v99 eval=0.112, v103 eval=0.098 (new ATB). Using v86 pretrain.
+---
+
+## Post-Mortem: tencent_v104 — PCF loss (W-stopped ep57, eval 0.134 — seed bundle point 3)
+
+**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.091★** ep45. Stars at ep5→10→20→30→35→45. W-stopped at ep57 (W=4.15 for 3 consecutive).
+
+**Full eval: combined≈0.134** (MMD²=0.015, β-recall=0.404, α-precision=0.837, DMD-GEN=0.738, HRC-MAE=0.057, reuse=0.014/0.014). Train→eval gap: **+47%**.
+
+**Tencent seed bundle complete.** Three points with the same recipe: {v99=0.112, v103=0.098, v104=0.134}. Mean ≈ 0.115, std ≈ 0.018. More variance than alibaba bundle. PCF recipe is validated but tencent shows higher seed sensitivity.
+
+| Tencent PCF verbatim | Combined | Recall | Precision | HRC-MAE | Gap |
+|---------------------|----------|--------|-----------|---------|-----|
+| **v103 (ATB)** | **0.098** | 0.499 | 0.841 | 0.058 | +1% |
+| v99 | 0.112 | 0.470 | 0.846 | 0.050 | -5% |
+| v104 | 0.134 | 0.404 | 0.837 | 0.057 | +47% |
 
 ---
 
