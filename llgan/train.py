@@ -577,7 +577,25 @@ def train(cfg: Config) -> None:
     # update ratio without letting the unconstrained LSTM explode (v12 failure).
     # Beta1=0.5 (vs the usual 0.9) reduces gradient momentum, which helps with
     # GAN oscillations by making each update less "sticky".
-    opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
+    # PCF loss (path characteristic function, IDEAS.md #6):
+    # Learnable frequency vectors that replace handcrafted auxiliary losses.
+    pcf_loss_fn = None
+    if getattr(cfg, 'pcf_loss_weight', 0) > 0:
+        from pcf_loss import PCFLoss
+        pcf_loss_fn = PCFLoss(
+            num_cols=prep.num_cols,
+            timestep=cfg.timestep,
+            n_freqs=getattr(cfg, 'pcf_n_freqs', 32),
+            freq_scale=getattr(cfg, 'pcf_freq_scale', 0.1),
+        ).to(device)
+        print(f"[PCF] Path characteristic function loss enabled: "
+              f"n_freqs={cfg.pcf_n_freqs}, scale={cfg.pcf_freq_scale}")
+
+    # G optimizer includes PCF learnable frequencies when PCF is active.
+    g_params = list(G.parameters())
+    if pcf_loss_fn is not None:
+        g_params += list(pcf_loss_fn.parameters())
+    opt_G = torch.optim.Adam(g_params, lr=cfg.lr_g, betas=(0.5, 0.9))
     opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
 
     # BayesGAN (Saatci & Wilson, NeurIPS 2017): maintain a posterior over critics.
@@ -1047,6 +1065,7 @@ def train(cfg: Config) -> None:
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
+        pcf_losses = []   # PCF loss tracking
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1531,6 +1550,15 @@ def train(cfg: Config) -> None:
                     cf_g_score = C_feat(feat_fake_gc, cond=_cf_cond)
                     g_loss = g_loss + _feat_cw * (-cf_g_score.mean())
 
+                # L_PCF: Path Characteristic Function loss (IDEAS.md #6, PCF-GAN).
+                # Single learned functional replacing handcrafted auxiliary losses.
+                # Compares empirical characteristic functions of real vs fake path
+                # increments at learnable frequency vectors.
+                if pcf_loss_fn is not None and getattr(cfg, 'pcf_loss_weight', 0) > 0:
+                    loss_pcf = pcf_loss_fn(real_batch.detach(), fake_decoded)
+                    g_loss = g_loss + cfg.pcf_loss_weight * loss_pcf
+                    pcf_losses.append(loss_pcf.item())
+
                 # Variational conditioning KL loss (IDEAS.md #3): regularise the
                 # cond encoder toward N(0,I).  kl_loss=0 when var_cond is off.
                 _kl_w = getattr(cfg, "var_cond_kl_weight", 0.0)
@@ -1625,6 +1653,9 @@ def train(cfg: Config) -> None:
             cp_bce_m = sum(cp_bce_losses) / len(cp_bce_losses)
             cp_str_m = sum(cp_stride_losses) / len(cp_stride_losses) if cp_stride_losses else 0.0
             log += f"  reuse_bce={cp_bce_m:.4f}  stride_con={cp_str_m:.4f}"
+        if pcf_losses:
+            pcf_m = sum(pcf_losses) / len(pcf_losses)
+            log += f"  pcf={pcf_m:.4f}"
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             # Evaluate using the EMA model, not the live G.
@@ -1945,6 +1976,14 @@ def parse_args() -> Config:
                         "Class-weighted to handle seek/reuse imbalance.")
     p.add_argument("--stride-consistency-weight", type=float, default=1.0,
                    help="Copy-path: penalise |stride| when real reuse=+1 (default 1.0).")
+    p.add_argument("--pcf-loss-weight",      type=float, default=0.0,
+                   help="L_PCF: path characteristic function loss (PCF-GAN, NeurIPS 2023). "
+                        "Single learned functional replacing ACF/FFT/moment/quantile/cross-cov/"
+                        "locality losses. When > 0, set those to 0. Try 1.0–5.0.")
+    p.add_argument("--pcf-n-freqs",         type=int,   default=32,
+                   help="Number of learnable frequency vectors for PCF loss (default 32)")
+    p.add_argument("--pcf-freq-scale",      type=float, default=0.1,
+                   help="Initial scale of PCF frequency vectors (default 0.1)")
     p.add_argument("--diversity-loss-weight", type=float, default=0.0,
                    help="L_div: MSGAN mode-seeking loss — maximises output/noise distance ratio "
                         "across random pairs; combats mode collapse (low β-recall). "
@@ -2065,6 +2104,9 @@ def parse_args() -> Config:
     cfg.copy_path                   = args.copy_path
     cfg.reuse_bce_weight            = args.reuse_bce_weight
     cfg.stride_consistency_weight   = args.stride_consistency_weight
+    cfg.pcf_loss_weight             = args.pcf_loss_weight
+    cfg.pcf_n_freqs                 = args.pcf_n_freqs
+    cfg.pcf_freq_scale              = args.pcf_freq_scale
     cfg.diversity_loss_weight       = args.diversity_loss_weight
     cfg.feat_critic_weight          = args.feat_critic_weight
     cfg.continuity_loss_weight      = args.continuity_loss_weight

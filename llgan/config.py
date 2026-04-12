@@ -104,6 +104,14 @@ class Config:
                                              # Enforces the structural constraint that
                                              # object reuse implies zero stride.
 
+    # Path Characteristic Function loss (PCF-GAN, NeurIPS 2023, IDEAS.md #6)
+    # Replaces handcrafted auxiliary losses (ACF, FFT, moment, quantile, cross-cov,
+    # locality) with a single learned functional on path increments.
+    # When > 0, set ACF/FFT/moment/quantile/cross-cov/locality weights to 0.
+    pcf_loss_weight: float = 0.0     # L_PCF weight (0 = off; try 1.0–5.0)
+    pcf_n_freqs: int = 32            # number of learnable frequency vectors
+    pcf_freq_scale: float = 0.1      # initial frequency vector scale
+
     diversity_loss_weight: float = 0.0  # L_div: MSGAN mode-seeking loss — maximises |G(z1)-G(z2)|/|z1-z2|
                                         # across random noise pairs; directly combats β-recall mode collapse.
                                         # Requires a second G forward pass per step. Try 0.5–2.0.
