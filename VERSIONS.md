@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v72 — PCF loss (lower weight, higher w-stop)
 **Recipe**: v71 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 — lower PCF weight should reduce W pressure while maintaining distributional guidance. Using v48 pretrain.
 
-### tencent_v100 — PCF loss (lower weight, higher w-stop)
-**Recipe**: v99 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0** (was 3.0). v99 had W spikes to 3.6 with weight 2.0 — lower weight should improve stability. Matches alibaba_v72's recipe. Using v86 pretrain.
+### tencent_v101 — PCF loss (v99 recipe + higher w-stop)
+**Recipe**: v99 verbatim (PCF 2.0) + **w-stop 4.0** (was 3.0). v99 was the tencent ATB; higher w-stop gives it more runway. v100 proved PCF 1.0 too weak for tencent. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v100 — PCF loss (killed ep75, eval 0.120 — worse than v99)
+
+**Recipe**: v99 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0**. Using v86 pretrain.
+
+**Training-log**: Best **0.105★** ep25. G_loss spiked to 5-8 after ep50, 50 epochs without improvement. Killed at ep75.
+
+**Full eval: combined≈0.120** (MMD²=0.017, β-recall=0.486, α-precision=0.738, DMD-GEN=0.705, HRC-MAE=0.049). Train→eval gap: 14%.
+
+**Finding: PCF weight 1.0 too weak for tencent.** Precision dropped to 0.738 (was 0.904 in v99). G_loss instability suggests insufficient distributional guidance. PCF weight 2.0 is the right setting for tencent.
 
 ---
 
