@@ -6,11 +6,28 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v72 — PCF loss (lower weight, higher w-stop)
-**Recipe**: v71 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 — lower PCF weight should reduce W pressure while maintaining distributional guidance. Using v48 pretrain.
+### alibaba_v73 — PCF loss (v71 recipe + higher w-stop)
+**Recipe**: v71 verbatim (PCF 2.0, grad-clip 0.5) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 but eval'd at 0.067 (ATB). v72 showed PCF 1.0 is too weak (eval 0.111). Giving the winning PCF 2.0 recipe more runway. Using v48 pretrain.
 
 ### tencent_v101 — PCF loss (v99 recipe + higher w-stop)
 **Recipe**: v99 verbatim (PCF 2.0) + **w-stop 4.0** (was 3.0). v99 was the tencent ATB; higher w-stop gives it more runway. v100 proved PCF 1.0 too weak for tencent. Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v72 — PCF loss (killed ep123, eval 0.111 — PCF 1.0 too weak)
+
+**Recipe**: v71 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0**. Using v48 pretrain.
+
+**Training-log**: Best **0.100★** ep90 (MMD²=0.017, recall=0.584). Stars at ep5→10→20→45→50→60→65→90. W exceeded 4.0 at ep121. Killed at ep123.
+
+**Full eval: combined≈0.111** (MMD²=0.018, β-recall=0.536, α-precision=0.855, DMD-GEN=0.705, HRC-MAE=0.009). Train→eval gap: 11%.
+
+**KEY FINDING: PCF weight 2.0 > 1.0 for alibaba.** v71 (PCF 2.0) eval'd at 0.067 with a NEGATIVE 32% gap. v72 (PCF 1.0) eval'd at 0.111 with a normal 11% gap. Higher adversarial frequency pressure creates models that generalize BETTER — the learned frequency vectors find discriminative features that also improve out-of-sample quality.
+
+| Alibaba eval | Combined | MMD² | Recall | Precision | PCF wt | Gap |
+|-------------|----------|------|--------|-----------|--------|-----|
+| **v71 (ATB)** | **0.067** | **0.007** | **0.701** | **0.926** | 2.0 | -32% |
+| v72 | 0.111 | 0.018 | 0.536 | 0.855 | 1.0 | +11% |
 
 ---
 
