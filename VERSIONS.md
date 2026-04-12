@@ -9,8 +9,8 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v74 — PCF loss (v71 VERBATIM reproducibility check)
 **Recipe**: v71 verbatim (PCF 2.0, grad-clip 0.5, w-stop 3.0). Reproducibility check — if v71's 0.067 eval reproduces, it's paper-grade evidence that PCF is the breakthrough. Using v48 pretrain.
 
-### tencent_v102 — PCF loss (n_freqs 64, double frequency resolution)
-**Recipe**: v99 base (PCF 2.0) + **n_freqs 64** (was 32) + w-stop 4.0. Tencent has 13x more files than alibaba — may need finer-grained frequency discrimination. v101 proved w-stop alone doesn't help. Using v86 pretrain.
+### tencent_v103 — PCF loss (v99 VERBATIM reproducibility check)
+**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, grad-clip 0.5). Reproducibility check — v100/v101/v102 all failed to beat v99. If v99 reproduces, it's paper-grade evidence. Using v86 pretrain.
 
 ---
 
@@ -46,6 +46,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 |-------------|----------|------|--------|-----------|--------|-----|
 | **v71 (ATB)** | **0.067** | **0.007** | **0.701** | **0.926** | 2.0 | -32% |
 | v72 | 0.111 | 0.018 | 0.536 | 0.855 | 1.0 | +11% |
+
+---
+
+## Post-Mortem: tencent_v102 — PCF loss (killed ep57, eval 0.146 — n_freqs 64 not helpful)
+
+**Recipe**: v99 base (PCF 2.0) + **n_freqs 64** (was 32) + w-stop 4.0. Using v86 pretrain.
+
+**Training-log**: Best **0.099★** ep30. 5 stars ep5→30. G_loss elevated (4-6). W spiked to 4.93 at ep56. Killed at ep57.
+
+**Full eval: combined≈0.146** (MMD²=0.019, β-recall=0.365, α-precision=0.718, DMD-GEN=0.787, HRC-MAE=0.067). Train→eval gap: 47%.
+
+**Finding: n_freqs=64 trains faster but evaluates worse.** Reached 0.099 at ep30 (v99 needed ep60 for 0.095) but the early checkpoint wasn't robust. More frequencies = faster discrimination learning = more instability. Tencent PCF recipe is: n_freqs=32, w-stop 3.0, PCF 2.0 (v99 original).
 
 ---
 
