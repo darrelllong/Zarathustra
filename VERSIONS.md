@@ -9,9 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v71 — PCF loss experiment (IDEAS.md #6, PCF-GAN)
 **Recipe**: v70 base (grad-clip 0.5, w-stop 3.0) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32**. ALL handcrafted auxiliary losses ZEROED (ACF, FFT, moment, quantile, cross-cov, locality = 0). Keeps feature-matching 1.0, supervisor 5.0, diversity 2.0. Using v48 pretrain. FIRST PCF experiment — single learned path characteristic function replaces 6 handcrafted losses.
 
-### tencent_v98 — v93 recipe + UNIFIED z_global (finishing)
-**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. UNIFIED z_global.
-**Status ep165**: Best **0.132★** ep165 (MMD²=0.013, recall=0.407). ~12 epochs to completion.
+### tencent_v99 — PCF loss experiment (IDEAS.md #6, PCF-GAN)
+**Recipe**: v98 base (n-regimes 8) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32 --grad-clip 0.5**. ALL handcrafted auxiliary losses ZEROED. Keeps feature-matching 1.0, supervisor 5.0, diversity 2.0. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v98 — v93 recipe + UNIFIED z_global (completed ep200, eval **0.146 — best tencent unified**)
+
+**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. UNIFIED z_global. Resumed from ep60 (DataLoader crash).
+
+**Training-log**: Best **0.132★** ep165 (MMD²=0.013, recall=0.407). Stars at ep65→95→105→120→165. Late surge after 45-epoch plateau.
+
+**Full eval: combined≈0.146** (MMD²=0.028, β-recall=0.409, α-precision=0.771, DMD-GEN=**0.661**, HRC-MAE=0.043). Train→eval gap: **11%** — BEST gap ever across both corpora. DMD-GEN 0.661 is also best ever (vs typical ~0.72).
+
+**KEY FINDING: z_global unification works for tencent.** 11% gap vs v96 control's 47%. The unified eval path produces reliable checkpoint selection for tencent. The DMD-GEN improvement (0.721→0.661) is a bonus — the correct conditioning stack at eval time produces more temporally coherent generated sequences.
 
 ---
 
