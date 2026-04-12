@@ -500,3 +500,70 @@ That is the best kind of response. The review should say that plainly. It should
 ### Short Take
 
 This is the first update where the repo has genuinely moved in the direction the review has been pushing: Fourier is real, copy-path is real, and the rebuttal now admits the scalar era is over. Good. The next review should not have to say this again. Stay on the local-structure problem until it yields.
+
+---
+
+## Round 11
+
+### PCF Is A Door, Not A Destination
+
+The new state of the repo is better than it was a day ago. That should be said clearly. PCF is not another fake dawn. `alibaba_v71` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md) is a real breakthrough, `alibaba_v74` directionally reproduces it in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md), `tencent_v99` moved the corrected-contract baseline materially in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md), and `tencent_v103` improved it again in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md). The rebuttal is also right to treat PCF as a genuine structural win in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L118). Good. Keep that. But the next mistake is already visible: turning one good abstraction into a new sandbox for scalar fiddling around that abstraction.
+
+1. `[P1]` The latest PCF follow-up table is already flashing the warning light. `alibaba_v72` weakened PCF to `1.0` and got worse in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md). `alibaba_v73` moved `w-stop` to `4.0` and got much worse in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md). `alibaba_v75` added `moment-loss-weight 0.1` on top of PCF and failed badly in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md). Tencent shows the same pattern: `v100`, `v101`, and `v102` all underperform the cleaner PCF line in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md). That is exactly how projects fall back into the old trap. PCF is a structural idea. `pcf-loss-weight`, `w-stop`, `n_freqs`, and hybrid-loss garnish are scalar exploitation around that idea. Do not let the mainline drift there again.
+
+2. `[P1]` The right reaction is to freeze the current clean PCF recipe as base camp, not to keep orbiting it. Finish the active reproducibility bundle `alibaba_v76` and `tencent_v104` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md), then lock the default recipe at the current winner shape:
+   PCF `2.0`,
+   `n_freqs=32`,
+   `w-stop=3.0`,
+   no moment/ACF/FFT hybrid piling.
+   If there is a future reason to revisit those knobs, do it as a sidecar after the next mechanism lands. The mainline should move forward from the PCF result, not sideways around it.
+
+3. `[P1]` The core architectural gap is now clearer than ever: the critic got smarter, but the generator still does not have the right local-state abstraction. PCF can tell the model that a path law is wrong. It cannot by itself give the generator an object-memory, a reuse decision, or a pointer back into recent history. That is why the rebuttal’s phrasing in [REBUTTAL.md](/Users/darrell/Zarathustra/REBUTTAL.md#L132) needs one more push. Yes, PCF captures more local and inter-step structure than the old hand-built losses. No, that does not mean the locality problem is solved at the generator level. The next serious move should therefore be generator-side structure, not more critic-side coefficient polishing.
+
+4. `[P1]` My strongest recommendation is a mixed-type, two-route generator for locality:
+   one head decides `reuse vs new`,
+   one recent-object memory or pointer module resolves the reused object when reuse fires,
+   and a separate continuous branch predicts stride or fresh object motion only on non-reuse steps.
+   This is already foreshadowed in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L111) and [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L256). It is the kind of layer change that matches the problem. `obj_id_reuse` is not the same target as `ts_delta`, `obj_size`, or `obj_id_stride`. Treating them through one shared regression-style path is exactly the kind of abstraction error that keeps locality soft and blurry. Do not just add depth. Add the right branch.
+
+5. `[P1]` The second-best next abstraction is a file-level plus window-level split in the latent contract. The repo keeps discovering that file descriptors matter, window regimes matter, and long-rollout dynamics matter, but the generator still compresses too much of that into one flat local interface. The next conditioning-side build should separate:
+   slow file-level context,
+   medium-timescale window regime or pseudo-label,
+   and fast per-step stochastic evolution.
+   That can be done via the window-level characterization bridge already parked in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L372) or a factorized conditioning redesign in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L359). Either would be a bigger step forward than another march through `1.0 vs 2.0 vs 3.0`.
+
+6. `[P1]` Locality evaluation now needs to become architecture guidance, not post-hoc complaint. The current TODO is right to ask for reuse precision/recall, streak distributions, and stack-distance or IRD summaries in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L436). I would go one step harder: make at least one locality-native diagnostic part of the accept-or-reject gate for the next generator-side experiment. If a candidate improves combined score but does not improve reuse realism, reuse-run statistics, or IRD shape, it should not be treated as the next foundation model for this race. The project is trying to generate synthetic I/O traces, not just nice low-dimensional sample clouds.
+
+7. `[P2]` Corpus-specificity matters here. Alibaba and Tencent should not be forced through the exact same locality mechanism expectations. The current evidence says Alibaba can win big on PCF with very strong distributional and cache behavior in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md), while Tencent is the harder proving ground for local structure and sequence realism. That suggests a sane split:
+   use Alibaba to validate that the cleaner PCF backbone is stable and reproducible,
+   and use Tencent as the primary battleground for the next explicit reuse-memory or locality-native architecture.
+   A single “one locality mechanism to rule them all” play may be the wrong optimization target.
+
+8. `[P2]` The repo should resist the temptation to interpret “not more depth” as “do nothing architectural.” There are still concrete, nontrivial abstractions on the table:
+   mixed-type output heads,
+   explicit reuse-memory or pointer retrieval,
+   locality-only or multi-branch critics,
+   file-level plus window-level latent split,
+   and window-pseudo-label routing.
+   Those are the right kinds of layer changes. A deeper vanilla LSTM is the least convincing version of “architecture work” here unless it comes after the target-type split and locality mechanism work, not before.
+
+### What I Would Do Right Now
+
+1. Finish `alibaba_v76` and `tencent_v104`, then freeze the clean PCF recipe as the default mainline baseline.
+
+2. Stop spending mainline cycles on `pcf-loss-weight`, `w-stop`, `n_freqs`, or hybrid auxiliary stacks unless there is a new mechanism attached.
+
+3. Build one generator-side locality abstraction next:
+   mixed-type heads plus explicit reuse-vs-new routing,
+   recent-object memory or pointer retrieval on reuse steps,
+   stride prediction only on non-reuse steps.
+
+4. Build one conditioning-side abstraction next:
+   file-level versus window-level split,
+   or the window-level characterization bridge.
+
+5. Promote at least one locality-native metric to a checkpoint or promotion gate, not just a notes section in `VERSIONS.md`.
+
+### Short Take
+
+PCF is the best progress the repo has made in a while, and it deserves to be treated as a real breakthrough. But it is a breakthrough in critic design, not proof that generator-side locality is solved. So the right next step is not to spend a week fiddling with `pcf-loss-weight`, `w-stop`, and `n_freqs`. It is to add the right generator abstractions for reuse, memory, and split target types, then judge them with locality-native diagnostics.
