@@ -6,14 +6,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v69 — v59 recipe + UNIFIED z_global (fresh)
-**Recipe**: v59 verbatim (KL 0.01). Using v48 pretrain. **FIRST RUN WITH UNIFIED z_global** — mmd.py checkpoint selection now uses cond_encoder + regime_sampler + gmm_prior, matching training. Previous runs selected checkpoints that performed well under the divergent (no regime/GMM) eval path.
-
 ### tencent_v98 — v93 recipe + UNIFIED z_global (fresh)
 **Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. **FIRST RUN WITH UNIFIED z_global.**
+**Status ep69**: Best **0.152★** ep60 (MMD²=0.018, recall=0.327). W stable (0.5-1.2). Still improving.
+
+### alibaba_v70 — v59 recipe + UNIFIED z_global + tighter stability
+**Recipe**: v59 base (KL 0.01) + **grad-clip 0.5** (was 1.0) + **w-stop 3.0** (was 4.0). Using v48 pretrain. Stability-focused: v69 destabilized at ep56-69 (W collapsed to 0.01, then spiked to 2.4). Tighter grad-clip should prevent the oscillation.
 
 **z_global unification (critical infrastructure fix):**
-Re-evaled v59 and v93 with unified eval path → both WORSE (v59: 0.111→0.145, v93: 0.100→0.164). Expected: these checkpoints were optimized for the divergent path. New runs (v69, v98) will select checkpoints optimized for the correct unified path. This is the single highest-leverage fix in the project — every previous train→eval gap was partly caused by this divergence.
+Re-evaled v59 and v93 with unified eval path → both WORSE (v59: 0.111→0.145, v93: 0.100→0.164). Expected: these checkpoints were optimized for the divergent path. New runs (v69, v98, v70) select checkpoints optimized for the correct unified path.
+
+---
+
+## Post-Mortem: alibaba_v69 — v59 recipe + UNIFIED z_global (killed ep69 — destabilized)
+
+**Recipe**: v59 verbatim (KL 0.01). Using v48 pretrain. FIRST RUN WITH UNIFIED z_global.
+
+**Training-log**: Best **0.134★** ep40 (MMD²=0.020, recall=0.432). Stalled 29 epochs. W collapsed to 0.01-0.05 at ep56-65, then spiked to 2.4 at ep67-69. G_loss exploded to 7.8. Classic GAN oscillation — killed ep69.
+
+**Full eval: combined≈0.163** (MMD²=0.019, β-recall=0.280, α-precision=0.770, DMD-GEN=0.744, HRC-MAE=0.012). Train→eval gap: **22%** — best gap we've seen (vs historical 30-75%), confirming z_global unification helps. But still worse than v59 unified re-eval (0.145). The mid-training instability degraded the EMA.
+
+**Reuse**: real=0.006, fake=0.011 — no phantom reuse (unlike v68's copy-path).
+
+**Key takeaway**: Unified z_global reduces train→eval gap (22% vs 30-75%), but training stability still matters. v70 launched with grad-clip 0.5 + w-stop 3.0 to prevent oscillation.
 
 ---
 
