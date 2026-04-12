@@ -9,8 +9,8 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v75 — PCF loss + moment matching (hybrid)
 **Recipe**: v71 base (PCF 2.0, w-stop 3.0) + **moment-loss-weight 0.1**. Tests whether adding marginal moment matching on top of PCF's temporal dynamics improves MMD²/recall. All other aux losses still zeroed. Using v48 pretrain.
 
-### tencent_v103 — PCF loss (v99 VERBATIM reproducibility check)
-**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, grad-clip 0.5). Reproducibility check — v100/v101/v102 all failed to beat v99. If v99 reproduces, it's paper-grade evidence. Using v86 pretrain.
+### tencent_v104 — PCF loss (v99 VERBATIM #2, seed bundle point 3)
+**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for reproducibility cluster. v99 eval=0.112, v103 eval=0.098 (new ATB). Using v86 pretrain.
 
 ---
 
@@ -63,6 +63,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 |-------------|----------|------|--------|-----------|--------|-----|
 | **v71 (ATB)** | **0.067** | **0.007** | **0.701** | **0.926** | 2.0 | -32% |
 | v72 | 0.111 | 0.018 | 0.536 | 0.855 | 1.0 | +11% |
+
+---
+
+## Post-Mortem: tencent_v103 — PCF loss (W-stopped ep58, eval **0.098 — NEW TENCENT ATB**)
+
+**Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.092★** ep30. Stars at ep5→10→25→30. W-stopped at ep58 (W=3.87 for 3 consecutive).
+
+**Full eval: combined≈0.098** (MMD²=**0.008**, β-recall=**0.547**, α-precision=0.828, DMD-GEN=0.737, HRC-MAE=0.060, Context-FID=0.06). Train→eval gap: 7%.
+
+**v99 VERBATIM BEAT v99 BY 13%.** New tencent ATB. MMD² nearly halved (0.008 vs v99's 0.014). PCF recipe validated on tencent with two data points. Seed variance favorable this time.
+
+| Tencent PCF verbatim | Combined | MMD² | Recall | Precision | Gap |
+|---------------------|----------|------|--------|-----------|-----|
+| v99 | 0.112 | 0.014 | 0.508 | 0.904 | 18% |
+| **v103 (new ATB)** | **0.098** | **0.008** | **0.547** | 0.828 | 7% |
 
 ---
 
