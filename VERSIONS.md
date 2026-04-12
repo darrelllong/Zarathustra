@@ -6,13 +6,14 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v69 — v59 recipe control (no copy-path, fresh seed)
-**Recipe**: v59 verbatim (KL 0.01). Using v48 pretrain. Control for v68 — tests whether v68's 0.113★ came from copy-path or seed luck. (v65 control got 0.135 eval.)
+### alibaba_v69 — v59 recipe + UNIFIED z_global (fresh)
+**Recipe**: v59 verbatim (KL 0.01). Using v48 pretrain. **FIRST RUN WITH UNIFIED z_global** — mmd.py checkpoint selection now uses cond_encoder + regime_sampler + gmm_prior, matching training. Previous runs selected checkpoints that performed well under the divergent (no regime/GMM) eval path.
 
-### tencent_v98 — v93 recipe 3rd seed attempt (ep39/200)
-**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. Third attempt to reproduce v93 record (v96 failed at 0.175).
+### tencent_v98 — v93 recipe + UNIFIED z_global (fresh)
+**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. **FIRST RUN WITH UNIFIED z_global.**
 
-**Training-log** (ep39): Best **0.14549★** ep35 (MMD²=0.0135, recall=0.340). W incredibly stable (0.39–0.64). Still improving.
+**z_global unification (critical infrastructure fix):**
+Re-evaled v59 and v93 with unified eval path → both WORSE (v59: 0.111→0.145, v93: 0.100→0.164). Expected: these checkpoints were optimized for the divergent path. New runs (v69, v98) will select checkpoints optimized for the correct unified path. This is the single highest-leverage fix in the project — every previous train→eval gap was partly caused by this divergence.
 
 ---
 
