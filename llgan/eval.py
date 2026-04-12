@@ -435,21 +435,26 @@ def _sample_fake(ckpt, n_samples: int, device,
     with torch.no_grad():
         for start in range(0, n_samples, batch_size):
             n = min(batch_size, n_samples - start)
-            noise = torch.randn(n, cfg.noise_dim, device=device)
             if cond_dim > 0:
                 if cond_pool is not None:
-                    # Sample from char-file conditioning pool
                     idx = torch.randint(0, len(cond_pool), (n,))
                     cond = cond_pool[idx]
                 else:
-                    # Fallback: compute from real windows
                     idx = np.random.choice(len(real_windows), n, replace=True)
                     rw = torch.tensor(real_windows[idx], dtype=torch.float32,
                                       device=device)
                     cond = compute_window_descriptors(rw)
+                # Unify z_global path with training (Round 5 TODO):
+                # Apply cond_encoder, regime_sampler, gmm_prior — same as
+                # _make_z_global(training=False) in train.py.
+                if getattr(G, 'cond_encoder', None) is not None:
+                    cond, _ = G.cond_encoder(cond, training=False)
+                if getattr(G, 'regime_sampler', None) is not None:
+                    cond = G.regime_sampler(cond)
+                noise = G.sample_noise(n, device, cond=cond)
                 z_g = torch.cat([cond, noise], dim=1)
             else:
-                z_g = noise
+                z_g = torch.randn(n, cfg.noise_dim, device=device)
             z_l = torch.randn(n, cfg.timestep, cfg.noise_dim, device=device)
             out = G(z_g, z_l)
             if R is not None:

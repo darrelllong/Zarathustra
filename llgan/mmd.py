@@ -299,19 +299,26 @@ def evaluate_metrics(
         real = val_data[idx].to(device)
         real_flat = real.view(n_samples, -1).cpu().numpy().astype(np.float32)
 
-        noise = torch.randn(n_samples, generator.noise_dim, device=device)
         if getattr(generator, 'cond_dim', 0) > 0:
             if cond_pool is not None:
-                # Char-file conditioning: sample from the pool of file-level
-                # stats so EMA eval uses the same distribution as training.
                 cidx = torch.randint(len(cond_pool), (n_samples,))
                 cond = cond_pool[cidx].to(device)
             else:
                 from dataset import compute_window_descriptors
                 cond = compute_window_descriptors(real)
+            # Unify z_global path with training (Round 5 TODO):
+            # Apply cond_encoder (deterministic μ), regime_sampler, and
+            # gmm_prior — the same stack _make_z_global uses at train time.
+            # Previously this was raw torch.cat([cond, noise]), skipping all
+            # three transformations and causing 30-75% train→eval gaps.
+            if getattr(generator, 'cond_encoder', None) is not None:
+                cond, _ = generator.cond_encoder(cond, training=False)
+            if getattr(generator, 'regime_sampler', None) is not None:
+                cond = generator.regime_sampler(cond)
+            noise = generator.sample_noise(n_samples, device, cond=cond)
             z_global = torch.cat([cond, noise], dim=1)
         else:
-            z_global = noise
+            z_global = torch.randn(n_samples, generator.noise_dim, device=device)
         z_local  = torch.randn(n_samples, timestep, generator.noise_dim, device=device)
         fake = generator(z_global, z_local)
         if recovery is not None:

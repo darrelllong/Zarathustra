@@ -648,9 +648,12 @@ class Generator(nn.Module):
         if self.cond_dim > 0:
             if cond is None:
                 cond = torch.randn(n_windows, self.cond_dim, device=device) * 0.5
-            # Variational encoder: use μ (deterministic) at inference
+            # Unify z_global path with training: cond_encoder → regime_sampler
+            # → gmm_prior, same as _make_z_global(training=False).
             if self.cond_encoder is not None:
                 cond, _ = self.cond_encoder(cond, training=False)
+            if getattr(self, 'regime_sampler', None) is not None:
+                cond = self.regime_sampler(cond)
             noise = self.sample_noise(n_windows, device, cond=cond)
             z_global = torch.cat([cond, noise], dim=1)
         else:

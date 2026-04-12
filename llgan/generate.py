@@ -107,16 +107,22 @@ def generate(
         # Each stream is an independent long trace.
         # z_global is fixed per stream (workload identity); LSTM hidden state
         # is carried across windows so long-range burst structure is coherent.
-        noise = torch.randn(n_streams, cfg.noise_dim, device=device)
         if cond_dim > 0:
             if cond_vec is not None:
                 cond = cond_vec
             else:
-                # Default: generic conditioning from N(0, 0.5)
                 cond = torch.randn(n_streams, cond_dim, device=device) * 0.5
+            # Unify z_global path with training (Round 5 TODO):
+            # Apply cond_encoder, regime_sampler, gmm_prior — same as
+            # _make_z_global(training=False) in train.py.
+            if getattr(G, 'cond_encoder', None) is not None:
+                cond, _ = G.cond_encoder(cond, training=False)
+            if getattr(G, 'regime_sampler', None) is not None:
+                cond = G.regime_sampler(cond)
+            noise = G.sample_noise(n_streams, device, cond=cond)
             z_global = torch.cat([cond, noise], dim=1)
         else:
-            z_global = noise
+            z_global = torch.randn(n_streams, cfg.noise_dim, device=device)
         hidden = None   # initialised from z_global on first window
 
         for _ in range(windows_per_stream):
