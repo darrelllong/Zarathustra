@@ -230,6 +230,7 @@ random files per epoch. Easy change in the dataloader.
 - **#5 Regime sampler K=2 (alibaba only)** — validated: v18 reached combined=0.110★ NEW ALIBABA ATB. K=2 fails on tencent (v58).
 - **#8 Multi-scale critic (--multi-scale-critic)** — implemented (works on tencent, hurts alibaba)
 - **#13 Block sampling (--block-sample)** — implemented, testing in v21 (alibaba) and v60 (tencent)
+- **#6 PCF loss (--pcf-loss-weight)** — **BREAKTHROUGH**: alibaba_v71 eval 0.067 (50% better than any prior). Replaces all handcrafted aux losses. Adversarial frequency training critical (freqs in C optimizer, NOT G).
 
 ### 14. HRC (Hit Ratio Curve) evaluation — cache fidelity metric
 
@@ -311,7 +312,7 @@ prove it via cache evaluation (#14).
 
 ---
 
-## Execution order (updated 2026-04-06)
+## Execution order (updated 2026-04-11)
 
 1. ~~v40–v54: char-file, GMM, var_cond, regime sampler~~ (DONE)
 2. ~~v57: clip fix~~ (DONE — combined=0.108★, best single tencent run)
@@ -322,7 +323,9 @@ prove it via cache evaluation (#14).
 7. ~~v61/v22: Lower lr (8e-5/4e-5)~~ (DONE — v22 completed 0.111★, v61 killed at 0.124★)
 8. ~~Self-diagnosing (#9)~~ (FAILED — positive feedback loop destabilizes both corpora)
 9. ~~Multi-scale critic (#8) on alibaba~~ (FAILED — T=12 too short for multi-scale)
-10. **v63/v25 (running):** Clean lower-lr tencent (no block-sample); alibaba with higher KL (0.01)
-11. **URGENT:** HRC evaluation (#14) — add cache fidelity metric to eval suite
-12. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
-13. **Then:** Path-space critic (#6) — biggest swing, replaces all auxiliary losses
+10. ~~Path-space critic (#6)~~ (**BREAKTHROUGH** — alibaba_v71 eval 0.067, NEW ATB; replaces all handcrafted aux losses)
+11. **Running:** alibaba_v72 (PCF weight 1.0, w-stop 4.0); tencent_v99 (PCF weight 2.0, ep79, best 0.095★)
+12. **Next:** HRC evaluation (#14) — add cache fidelity metric to eval suite
+13. **Then:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
+14. **Then:** GP prior on latent trajectories (#4) — targets DMD-GEN
+15. **Then:** Mixed-type output heads (#7/#16) — validated by DiffGen results
