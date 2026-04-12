@@ -6,15 +6,30 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### tencent_v98 — v93 recipe + UNIFIED z_global (fresh)
-**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. **FIRST RUN WITH UNIFIED z_global.**
-**Status ep69**: Best **0.152★** ep60 (MMD²=0.018, recall=0.327). W stable (0.5-1.2). Still improving.
+### alibaba_v71 — PCF loss experiment (IDEAS.md #6, PCF-GAN)
+**Recipe**: v70 base (grad-clip 0.5, w-stop 3.0) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32**. ALL handcrafted auxiliary losses ZEROED (ACF, FFT, moment, quantile, cross-cov, locality = 0). Keeps feature-matching 1.0, supervisor 5.0, diversity 2.0. Using v48 pretrain. FIRST PCF experiment — single learned path characteristic function replaces 6 handcrafted losses.
 
-### alibaba_v70 — v59 recipe + UNIFIED z_global + tighter stability
-**Recipe**: v59 base (KL 0.01) + **grad-clip 0.5** (was 1.0) + **w-stop 3.0** (was 4.0). Using v48 pretrain. Stability-focused: v69 destabilized at ep56-69 (W collapsed to 0.01, then spiked to 2.4). Tighter grad-clip should prevent the oscillation.
+### tencent_v98 — v93 recipe + UNIFIED z_global (finishing)
+**Recipe**: v93 verbatim (KL 0.01, acf 0.3). Using v86 pretrain. UNIFIED z_global.
+**Status ep165**: Best **0.132★** ep165 (MMD²=0.013, recall=0.407). ~12 epochs to completion.
 
-**z_global unification (critical infrastructure fix):**
-Re-evaled v59 and v93 with unified eval path → both WORSE (v59: 0.111→0.145, v93: 0.100→0.164). Expected: these checkpoints were optimized for the divergent path. New runs (v69, v98, v70) select checkpoints optimized for the correct unified path.
+---
+
+## Post-Mortem: alibaba_v70 — grad-clip 0.5 + UNIFIED z_global (killed ep136 — eval 0.178)
+
+**Recipe**: v59 base (KL 0.01) + grad-clip 0.5 + w-stop 3.0. Using v48 pretrain. Stability-focused.
+
+**Training-log**: Best **0.110★** ep65 (MMD²=0.014, recall=0.522). Remarkably stable W (0.27-0.90) through ep65 — then destabilized (W 1.8-2.8 from ep75+, W=3.07 at ep136). Killed ep136. The grad-clip 0.5 produced the best *training* combined score under unified eval (0.110), matching v59's old-eval record.
+
+**Full eval: combined≈0.178** (MMD²=0.045, β-recall=0.333, α-precision=0.545, DMD-GEN=0.716, HRC-MAE=0.019). Train→eval gap: **62%** — WORSE than v69 (22%) and v65 (23%).
+
+**CRITICAL FINDING: Training stability does NOT predict eval quality.** v70 was the most stable training run (W<0.9 for 65 epochs) and produced the best training ★ (0.110), yet eval was WORSE than v69 (0.163) and v65 (0.135). The best alibaba eval remains v65's 0.135. Training-time combined scores are unreliable predictors of eval performance — the eval gap is stochastic and potentially dominated by preprocessor/dataset sampling variance.
+
+| Version | Grad-clip | Train ★ | Eval | Gap |
+|---------|-----------|---------|------|-----|
+| v65 (control) | 1.0 | 0.110 | **0.135** | 23% |
+| v69 (unified) | 1.0 | 0.134 | 0.163 | 22% |
+| v70 (unified+clip) | 0.5 | 0.110 | 0.178 | 62% |
 
 ---
 
