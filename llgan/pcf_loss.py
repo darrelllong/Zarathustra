@@ -7,19 +7,16 @@ distributions via their characteristic functions evaluated on path increments.
 
 The key idea (Horvath et al., PCF-GAN, NeurIPS 2023): two stochastic processes
 have the same law iff their characteristic functions agree on all frequencies.
-We approximate this by learning a finite set of frequency vectors and minimising
-the L2 distance between the characteristic functions of real and fake batches.
+We learn frequency vectors that MAXIMIZE the discrepancy between real and fake
+(adversarial), while G minimizes it. This is a minimax game on frequency space.
 
-Why this beats handcrafted losses:
-  - ACF only matches diagonal lag-k autocorrelations
-  - FFT matches marginal power spectra, not joint temporal structure
-  - Moment/quantile match marginal statistics, not dynamics
-  - Cross-cov matches lag-1 cross-feature covariance (one specific lag)
-  - PCF matches the FULL joint distribution over paths — all lags, all
-    cross-feature dependencies, all moments — in a single loss term.
+CRITICAL: The frequency parameters must be optimized by a SEPARATE optimizer
+that MAXIMIZES the PCF loss (or equivalently, by the critic optimizer with
+negated loss). If frequencies are co-optimized with G (which minimizes all
+losses), they collapse to zero — providing no gradient signal.
 
-Implementation is lightweight: no external libraries, no path signature
-computation (we use the simpler "development layer" approximation).
+v71 bug: frequencies were in G optimizer → collapsed to 0.0000 by epoch 10.
+v72 fix: frequencies in C optimizer with MAXIMIZATION (gradient ascent).
 
 Reference:
   Horvath et al., "PCF-GAN: Generating Sequential Data via the Characteristic
@@ -32,29 +29,26 @@ import torch.nn as nn
 
 class PCFLoss(nn.Module):
     """
-    Learnable path characteristic function loss.
+    Adversarial path characteristic function loss.
 
-    Given real sequences X_r and fake sequences X_f of shape (B, T, d),
-    computes a distributional distance based on the empirical characteristic
-    functions of their path increments.
+    Frequency vectors are trained to MAXIMIZE the characteristic function
+    distance (find frequencies where real and fake differ most), while the
+    generator is trained to MINIMIZE it (make fake match real at those
+    frequencies). This is a minimax game analogous to the GAN critic.
 
-    The characteristic function of a sequence X at frequency u is:
-        φ_X(u) = E[ exp(i Σ_t <u_t, ΔX_t>) ]
+    Usage:
+        pcf = PCFLoss(num_cols=5, timestep=12)
 
-    where ΔX_t = X_{t+1} - X_t are the path increments and u ∈ R^{(T-1)×d}
-    is a frequency vector.
+        # Frequency params go in C optimizer (or separate optimizer):
+        opt_C = Adam(list(C.parameters()) + list(pcf.parameters()), lr=lr_d)
 
-    We learn n_freqs frequency vectors and compute:
-        L_PCF = Σ_j |φ_real(u_j) - φ_fake(u_j)|²
+        # Critic step: MAXIMIZE PCF distance (train frequencies)
+        loss_pcf_c = pcf(real, fake.detach())
+        (-loss_pcf_c).backward()  # negate for gradient ascent
 
-    This is a consistent estimator: L_PCF = 0 iff the two processes have
-    the same finite-dimensional distributions (up to the resolution of n_freqs).
-
-    Parameters:
-        num_cols: feature dimension d
-        timestep: sequence length T
-        n_freqs: number of learnable frequency vectors (more = finer resolution)
-        freq_scale: initial scale of frequency vectors (controls sensitivity)
+        # Generator step: MINIMIZE PCF distance
+        loss_pcf_g = pcf(real.detach(), fake)
+        (pcf_weight * loss_pcf_g).backward()
     """
 
     def __init__(
@@ -62,24 +56,19 @@ class PCFLoss(nn.Module):
         num_cols: int,
         timestep: int,
         n_freqs: int = 32,
-        freq_scale: float = 0.1,
+        freq_scale: float = 1.0,
     ):
         super().__init__()
         self.num_cols = num_cols
         self.timestep = timestep
         self.n_freqs = n_freqs
 
-        # Learnable frequency vectors: (n_freqs, (T-1) * d)
-        # Each frequency vector probes a specific pattern across time and features.
-        # Initialised small (scale=0.1) so early gradients are smooth.
+        # Frequency vectors: (n_freqs, (T-1) * d)
+        # Initialized at scale=1.0 (not 0.1) so they start sensitive.
         inc_dim = (timestep - 1) * num_cols
         self.freqs = nn.Parameter(
             torch.randn(n_freqs, inc_dim) * freq_scale
         )
-
-        # Learnable scale per frequency (temperature): allows the network to
-        # control the sensitivity of each frequency independently.
-        self.log_scale = nn.Parameter(torch.zeros(n_freqs))
 
     def _char_fn(self, increments: torch.Tensor) -> torch.Tensor:
         """
@@ -89,22 +78,16 @@ class PCFLoss(nn.Module):
         Returns: (n_freqs, 2) — [Re(φ), Im(φ)] for each frequency
         """
         B = increments.shape[0]
-        # Flatten increments: (B, (T-1)*d)
-        inc_flat = increments.reshape(B, -1)
+        inc_flat = increments.reshape(B, -1)  # (B, (T-1)*d)
 
-        # Scale frequencies
-        scale = self.log_scale.exp()  # (n_freqs,)
-        freqs_scaled = self.freqs * scale.unsqueeze(1)  # (n_freqs, inc_dim)
-
-        # Inner product: (B, n_freqs) = inc_flat @ freqs_scaled.T
-        inner = inc_flat @ freqs_scaled.t()  # (B, n_freqs)
+        # Inner product: (B, n_freqs)
+        inner = inc_flat @ self.freqs.t()
 
         # Characteristic function: E[exp(i * inner)]
-        # = E[cos(inner)] + i * E[sin(inner)]
-        phi_real = inner.cos().mean(dim=0)  # (n_freqs,)
-        phi_imag = inner.sin().mean(dim=0)  # (n_freqs,)
+        phi_re = inner.cos().mean(dim=0)  # (n_freqs,)
+        phi_im = inner.sin().mean(dim=0)  # (n_freqs,)
 
-        return torch.stack([phi_real, phi_imag], dim=1)  # (n_freqs, 2)
+        return torch.stack([phi_re, phi_im], dim=1)  # (n_freqs, 2)
 
     def forward(
         self,
@@ -112,39 +95,20 @@ class PCFLoss(nn.Module):
         fake: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Compute PCF loss between real and fake sequences.
+        Compute PCF distance between real and fake sequences.
 
-        real: (B, T, d) real sequences (detached, no grad)
-        fake: (B, T, d) fake sequences (requires grad for G)
-
-        Returns: scalar loss (0 = distributions match perfectly)
+        Returns: scalar distance (0 = distributions match perfectly).
+                 Caller must negate for frequency maximization step.
         """
-        # Path increments: ΔX_t = X_{t+1} - X_t
-        real_inc = real[:, 1:, :] - real[:, :-1, :]  # (B, T-1, d)
+        # Path increments
+        real_inc = real[:, 1:, :] - real[:, :-1, :]
         fake_inc = fake[:, 1:, :] - fake[:, :-1, :]
 
-        # Also include level (raw values) for marginal matching.
-        # Concatenate: increments capture dynamics, levels capture marginals.
-        # This makes PCF match both temporal structure AND static distributions.
-        real_combined = torch.cat([
-            real_inc,
-            real[:, :-1, :],  # level at each step (aligned with increments)
-        ], dim=-1)  # (B, T-1, 2*d)
-        fake_combined = torch.cat([
-            fake_inc,
-            fake[:, :-1, :],
-        ], dim=-1)
-
-        # Recompute with combined dimension if needed
-        # Actually, let's keep it simple: just use increments for now.
-        # The level information is captured by the WGAN critic already.
         phi_real = self._char_fn(real_inc)
         phi_fake = self._char_fn(fake_inc)
 
         # L2 distance between characteristic functions
-        loss = ((phi_real - phi_fake) ** 2).sum()
-
-        return loss
+        return ((phi_real - phi_fake) ** 2).sum()
 
     def extra_repr(self) -> str:
         return (f"n_freqs={self.n_freqs}, "

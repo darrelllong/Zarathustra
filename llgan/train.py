@@ -578,7 +578,9 @@ def train(cfg: Config) -> None:
     # Beta1=0.5 (vs the usual 0.9) reduces gradient momentum, which helps with
     # GAN oscillations by making each update less "sticky".
     # PCF loss (path characteristic function, IDEAS.md #6):
-    # Learnable frequency vectors that replace handcrafted auxiliary losses.
+    # Learnable frequency vectors trained ADVERSARIALLY — frequencies in C
+    # optimizer (maximize PCF distance), G minimizes PCF distance.
+    # v71 bug: frequencies in G optimizer collapsed to zero in 10 epochs.
     pcf_loss_fn = None
     if getattr(cfg, 'pcf_loss_weight', 0) > 0:
         from pcf_loss import PCFLoss
@@ -586,17 +588,17 @@ def train(cfg: Config) -> None:
             num_cols=prep.num_cols,
             timestep=cfg.timestep,
             n_freqs=getattr(cfg, 'pcf_n_freqs', 32),
-            freq_scale=getattr(cfg, 'pcf_freq_scale', 0.1),
+            freq_scale=getattr(cfg, 'pcf_freq_scale', 1.0),
         ).to(device)
-        print(f"[PCF] Path characteristic function loss enabled: "
-              f"n_freqs={cfg.pcf_n_freqs}, scale={cfg.pcf_freq_scale}")
+        print(f"[PCF] Path characteristic function loss enabled (adversarial): "
+              f"n_freqs={cfg.pcf_n_freqs}")
 
-    # G optimizer includes PCF learnable frequencies when PCF is active.
-    g_params = list(G.parameters())
+    opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
+    # PCF frequency params go in C optimizer: trained to MAXIMIZE PCF distance.
+    c_params = list(C.parameters())
     if pcf_loss_fn is not None:
-        g_params += list(pcf_loss_fn.parameters())
-    opt_G = torch.optim.Adam(g_params, lr=cfg.lr_g, betas=(0.5, 0.9))
-    opt_C = torch.optim.Adam(C.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
+        c_params += list(pcf_loss_fn.parameters())
+    opt_C = torch.optim.Adam(c_params, lr=cfg.lr_d, betas=(0.5, 0.9))
 
     # BayesGAN (Saatci & Wilson, NeurIPS 2017): maintain a posterior over critics.
     # Particle 0 is C itself. Extra particles (1..M-1) are initialized from C
@@ -1226,6 +1228,24 @@ def train(cfg: Config) -> None:
                         nn.utils.clip_grad_norm_(C_feat.parameters(), cfg.grad_clip)
                     scaler_C.step(opt_C_feat)
                     scaler_C.update()
+
+            # --- PCF adversarial step (frequency maximization) ---
+            # Train frequency vectors to find where real and fake differ most.
+            # Uses decoded features (not latents) for feature-space comparison.
+            if pcf_loss_fn is not None and getattr(cfg, 'pcf_loss_weight', 0) > 0:
+                opt_C.zero_grad()
+                with torch.no_grad():
+                    z_g_pcf, _ = _make_z_global(B, cfg, device, real_features=real_batch,
+                                                file_cond=file_cond_batch, G=G)
+                    z_l_pcf = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                    H_fake_pcf = G(z_g_pcf, z_l_pcf)
+                    fake_decoded_pcf = R(H_fake_pcf) if latent_ae else H_fake_pcf
+                # Maximize PCF distance: negate loss for gradient ascent on frequencies
+                pcf_dist = pcf_loss_fn(real_batch.detach(), fake_decoded_pcf.detach())
+                (-pcf_dist).backward()  # gradient ASCENT on frequency params
+                if cfg.grad_clip > 0:
+                    nn.utils.clip_grad_norm_(pcf_loss_fn.parameters(), cfg.grad_clip)
+                opt_C.step()
 
             # --- Generator step ---
             z_g, kl_loss = _make_z_global(B, cfg, device, real_features=real_batch,
