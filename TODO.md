@@ -422,3 +422,18 @@ Items marked ✓ are done and in the repo.
 - [ ] `[P1]` Fix infrastructure debts BEFORE making mechanism claims: z_global unification (train vs eval path divergence) and preprocessor freezing. These control whether the conditioning story is even being measured cleanly.
 - [ ] `[P2]` On tencent only, reopen one critic-side structural test AFTER conditioning/locality work: full-eval multi-scale critic or path-space critic.
 - [ ] `[P2]` Treat v65's failure to reproduce v59 (training-log matched but eval diverged 23%) as evidence that scalar results are stability-dependent and unreliable without verbatim controls.
+
+## Reviewer Action Items (Round 10 — Stay On The Structural Path)
+
+- [x] `[P0]` **Fourier/spectral diagnostics implemented.** PSD metric added to mmd.py and eval.py (commit 0985c20). Finding: PSD match is already good; remaining gap is not simple frequency content but local/cross-step structure (reuse decisions, stride consistency, IRD dynamics).
+- [x] `[P0]` **Copy-path mechanism launched.** alibaba_v67 and tencent_v97 ran with per-timestep reuse BCE, stride-reuse consistency, and recovery-time stride gating. This is the structural locality bet Round 9 demanded.
+- [x] `[P0]` **PCF (path-space critic) launched.** alibaba_v71 eval **0.067** — new all-time best across both corpora. PCF replaces 6 handcrafted auxiliary losses with a single learned adversarial functional on path increments (PCF-GAN, NeurIPS 2023). This is the structural critic-side bet from the TODO list.
+- [ ] `[P1]` **Fix GEMINI eval blockers before drawing conclusions from structural runs.** Specific bugs:
+  - [ ] Conditional eval still does raw `torch.cat([cond, noise])` instead of the encoded conditioning path used in training (eval.py L450)
+  - [ ] HRC sampling uses padded cache-size pattern (eval.py L259)
+  - [ ] Reuse-rate metric hardcoded to column 3 instead of using `prep.col_names` (eval.py L545)
+  - [ ] Fallback descriptor path fixed at 10 dims while cond_dim can vary (dataset.py L203)
+- [ ] `[P1]` **Add locality-native diagnostics.** Reuse precision/recall, reuse streak distribution, stride-on-reuse violation rate, stack-distance or IRD comparisons. These are needed to properly evaluate copy-path and PCF structural changes.
+- [ ] `[P1]` **Judge structural bets on robustness, not luckiest number.** Non-reproducibility of scalar-era records means new structural work should be evaluated on: (a) more robust train→eval contract, (b) materially improved locality-facing metrics, (c) reduced seed sensitivity.
+- [ ] `[P2]` **Clean up accidental absolute-path mirror.** `Users/darrell/Zarathustra/` directory tree in repo root contains duplicated files (TODO.md, llgan/train.py). Remove before it multiplies.
+- [ ] `[P2]` **After copy-path/PCF stabilize, spend next structural budget on:** either path-space critic for tencent (if PCF approach needs corpus tuning) or conditioning redesign with file-level vs window-level separation.

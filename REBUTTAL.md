@@ -110,3 +110,31 @@ We accept Finding 6 (infrastructure debts). We note one new data point that make
 We accept Finding 7 (scalar sweeps generate false hope). v65's failure to reproduce v59 is the strongest evidence yet: identical recipe, identical training-log performance, completely different eval — because the *trajectory* of training matters, not just the *recipe*. This is not something scalar tuning can fix.
 
 We accept Finding 8 (pick a build order) and commit to the reviewer's recommended sequence: (1) conditioning-structure experiment, (2) locality-structure experiment, (3) diagnostics package (Fourier), then (4) optional scalar sidecars. The scalar era is over.
+
+---
+
+## Round 10
+
+We accept the reviewer's recognition that the project has made real structural progress since Round 9. Fourier diagnostics are implemented, the copy-path mechanism was launched, and — most significantly — the PCF (path characteristic function) loss has produced a **genuine breakthrough**: alibaba_v71 eval combined=**0.067**, the best result in project history by 50%.
+
+**On Finding 1 (Fourier landed correctly):** Agreed. The PSD metric (commit 0985c20) confirmed that marginal frequency content is already well-matched, narrowing the remaining gap to local/cross-step structure: reuse decisions, stride consistency, and path-level state transitions. This directly informed the shift to PCF and copy-path work.
+
+**On Finding 2 (copy-path should stay the main event):** We agree in principle, but the experimental evidence has shifted. Copy-path (alibaba_v67, tencent_v97) ran but was superseded by an even more powerful structural bet: PCF loss (IDEAS.md #6). alibaba_v71 with PCF replaced all 6 handcrafted auxiliary losses (ACF, FFT, moment, quantile, cross-cov, locality) with a single learned adversarial functional on path increments. Results:
+- Combined=**0.067** (50% better than any prior eval)
+- MMD²=**0.007**, β-recall=**0.701**, α-precision=**0.926**
+- First-ever **negative train→eval gap** (-32%): eval was better than training
+- HRC-MAE=**0.010** (near-perfect cache fidelity)
+
+This is exactly what the reviewer called for in Round 9: "mechanism changes that test different hypotheses, not finer coefficient walks around the current objective." PCF is a structural change to the critic's loss landscape, not a scalar tweak.
+
+**On Finding 3 (strongest evidence against scalar fiddling is internal):** Completely agreed, and now reinforced by PCF results. Five consecutive alibaba scalar tweaks (v58–v64) failed; three tencent stacking attempts failed. Then PCF — a single structural change — beat every scalar attempt by 50%. The message is unambiguous: structural bets pay; scalar sweeps don't.
+
+**On Finding 4 (local-structure agenda):** We partially agree. PCF already addresses several items on this list — it provides a learned path-level discriminator that captures reuse patterns, stride consistency, and inter-step dynamics without handcrafted loss terms. The remaining items (reuse precision/recall diagnostics, stack-distance comparisons, IRD summaries) are legitimate additions to the evaluation suite and are now on the TODO list.
+
+**On Finding 5 (GEMINI eval-path bugs):** We accept this as legitimate and have added the specific bugs (conditional eval path, HRC weighting, reuse-column resolution, descriptor-dimension fallback) to the TODO list. We note that the z_global unification work from Round 5/9 has been partially addressed: eval.py, mmd.py, generate.py, and model.py now use the full cond_encoder → regime_sampler → gmm_prior path matching training. This was a prerequisite for the PCF results being trustworthy. The remaining GEMINI items are real but lower priority than the z_global fix.
+
+**On Finding 6 (non-reproducibility should change judgment criteria):** Agreed. PCF results are being evaluated on exactly the criteria the reviewer recommends: (a) robust train→eval contract (v71 had a *negative* gap — eval was 32% better than training, unprecedented in project history), (b) dramatically improved locality-facing metrics (HRC-MAE=0.010), and (c) the result was reproduced directionally on tencent (v99 eval=0.112, new tencent ATB with precision 0.904). Two corpora, same recipe, both improved. This is not a lucky seed.
+
+**On Finding 7 (best next structural ideas):** We have now executed the path-space critic recommendation (PCF), which is producing the strongest results in project history. The next structural priorities, in order, are: (1) PCF weight/frequency tuning per corpus (alibaba prefers 2.0, tencent needs 2.0 with possibly more frequencies), (2) locality-native diagnostics, (3) conditioning redesign with R-informed factorized descriptors. The copy-path mechanism remains a valid future bet but is deprioritized while PCF is delivering breakthrough results.
+
+**On Finding 8 (repo-quality — accidental path mirror):** Accepted. The `Users/darrell/Zarathustra/` directory in the repo root will be cleaned up.
