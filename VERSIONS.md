@@ -6,11 +6,52 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v71 — PCF loss experiment (IDEAS.md #6, PCF-GAN)
-**Recipe**: v70 base (grad-clip 0.5, w-stop 3.0) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32**. ALL handcrafted auxiliary losses ZEROED (ACF, FFT, moment, quantile, cross-cov, locality = 0). Keeps feature-matching 1.0, supervisor 5.0, diversity 2.0. Using v48 pretrain. FIRST PCF experiment — single learned path characteristic function replaces 6 handcrafted losses.
+### alibaba_v72 — PCF loss (lower weight, higher w-stop)
+**Recipe**: v71 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 — lower PCF weight should reduce W pressure while maintaining distributional guidance. Using v48 pretrain.
 
-### tencent_v99 — PCF loss experiment (IDEAS.md #6, PCF-GAN)
+### tencent_v100 — PCF loss (lower weight, higher w-stop)
+**Recipe**: v99 base + **pcf-loss-weight 1.0** (was 2.0) + **w-stop 4.0** (was 3.0). v99 had W spikes to 3.6 with weight 2.0 — lower weight should improve stability. Matches alibaba_v72's recipe. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v99 — PCF loss (killed ep97, eval **0.112 — NEW TENCENT ATB**)
+
 **Recipe**: v98 base (n-regimes 8) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32 --grad-clip 0.5**. ALL handcrafted auxiliary losses ZEROED. Keeps feature-matching 1.0, supervisor 5.0, diversity 2.0. Using v86 pretrain.
+
+**Training-log**: Best **0.095★** ep60 (MMD²=0.013, recall=0.588). 7 consecutive stars ep5→60. Killed at ep97 after 37 epochs without improvement. W spiking regularly above 3.0 (peaks: 3.47, 3.66, 3.46).
+
+**Full eval: combined≈0.112** (MMD²=0.014, β-recall=0.508, α-precision=**0.904**, DMD-GEN=0.718, HRC-MAE=**0.0001**). Train→eval gap: 18%.
+
+**PCF validates on tencent too.** Precision 0.904 (was 0.771 in v98) and near-zero HRC-MAE. Combined 0.112 beats v98's 0.146 by 23%. Not as dramatic as alibaba v71's breakthrough (0.067) but still a clear improvement. W volatility with PCF weight 2.0 suggests lower weight (1.0) may be better for tencent.
+
+| Tencent eval | Combined | MMD² | Recall | Precision |
+|-------------|----------|------|--------|-----------|
+| v98 (unified) | 0.146 | 0.028 | 0.409 | 0.771 |
+| **v99 (PCF)** | **0.112** | **0.014** | **0.508** | **0.904** |
+
+---
+
+## Post-Mortem: alibaba_v71 — PCF loss (W-stopped ep64, eval **0.067 — NEW ALL-TIME BEST**)
+
+**Recipe**: v70 base (grad-clip 0.5) + **--pcf-loss-weight 2.0 --pcf-n-freqs 32**. ALL handcrafted auxiliary losses ZEROED. Adversarial PCF frequency training (v71 bug fix: freqs in C optimizer, gradient ascent). Using v48 pretrain.
+
+**Training-log**: Best **0.098★** ep60 (MMD²=0.019, recall=0.603). W-spike guard killed at ep64 (W=3.23 for 3 consecutive). Stars at ep5→10→50→55→60.
+
+**Full eval: combined≈0.067** (MMD²=**0.007**, β-recall=**0.701**, α-precision=**0.926**, density=1.464, DMD-GEN=0.702, HRC-MAE=0.010). Train→eval gap: **NEGATIVE** (eval 32% better than training — first time ever).
+
+**THIS IS THE PROJECT BREAKTHROUGH.** PCF (path characteristic function) replacing 6 handcrafted auxiliary losses produces:
+- 50% better combined than previous best eval (v65: 0.135)
+- 82% better MMD² (0.007 vs 0.039)
+- Recall 0.701 — generator covers 70% of real distribution (was 52%)
+- Precision 0.926 — 93% of generated samples are plausible (was 54%)
+- First negative train→eval gap in project history
+
+| Alibaba eval | Combined | MMD² | Recall | Precision |
+|-------------|----------|------|--------|-----------|
+| v65 (prev best) | 0.135 | 0.039 | 0.521 | 0.544 |
+| v69 (unified) | 0.163 | 0.019 | 0.280 | 0.770 |
+| v70 (grad-clip) | 0.178 | 0.045 | 0.333 | 0.545 |
+| **v71 (PCF)** | **0.067** | **0.007** | **0.701** | **0.926** |
 
 ---
 
