@@ -6,11 +6,31 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v75 — PCF loss + moment matching (hybrid)
-**Recipe**: v71 base (PCF 2.0, w-stop 3.0) + **moment-loss-weight 0.1**. Tests whether adding marginal moment matching on top of PCF's temporal dynamics improves MMD²/recall. All other aux losses still zeroed. Using v48 pretrain.
+### alibaba_v76 — PCF loss (v71 VERBATIM #2, seed bundle point 3)
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for alibaba reproducibility cluster. v71 eval=0.067 (ATB), v74 eval=0.093. Using v48 pretrain.
 
 ### tencent_v104 — PCF loss (v99 VERBATIM #2, seed bundle point 3)
 **Recipe**: v99 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for reproducibility cluster. v99 eval=0.112, v103 eval=0.098 (new ATB). Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v75 — PCF + moment hybrid (W-stopped ep41, eval 0.183 — MOMENT HYBRID FAILED)
+
+**Recipe**: v71 base (PCF 2.0, w-stop 3.0) + **moment-loss-weight 0.1**. Using v48 pretrain.
+
+**Training-log**: Best **0.145★** ep15. Stars at ep5→10→15. G_loss spiked from ep37 (5.2→6.1→7.0→8.1). W-stopped at ep41 (W=4.05 for 3 consecutive). Only 15 useful epochs.
+
+**Full eval: combined≈0.183** (MMD²=0.046, β-recall=0.314, α-precision=0.622, DMD-GEN=0.776, HRC-MAE=0.006). Train→eval gap: **+27%**.
+
+**MOMENT HYBRID DEAD.** Adding moment-loss-weight 0.1 on top of PCF 2.0 destabilizes G within 37 epochs — same G_loss spiral as tencent_v100 (PCF 1.0). The PCF loss already captures distributional matching; adding moment matching creates competing gradients that amplify G instability. Pure PCF (no handcrafted aux losses) remains the optimal recipe.
+
+| Alibaba PCF variants | Combined | Recipe | Stopped ep |
+|---------------------|----------|--------|------------|
+| **v71 (ATB)** | **0.067** | PCF 2.0 pure | 64 |
+| **v74 (verbatim)** | **0.093** | PCF 2.0 pure | 73 |
+| v72 (PCF 1.0) | 0.111 | PCF 1.0, w-stop 4.0 | 123 |
+| v73 (w-stop 4.0) | 0.166 | PCF 2.0, w-stop 4.0 | 70 |
+| **v75 (moment hybrid)** | **0.183** | PCF 2.0 + moment 0.1 | 41 |
 
 ---
 
