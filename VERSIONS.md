@@ -9,8 +9,8 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v73 — PCF loss (v71 recipe + higher w-stop)
 **Recipe**: v71 verbatim (PCF 2.0, grad-clip 0.5) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 but eval'd at 0.067 (ATB). v72 showed PCF 1.0 is too weak (eval 0.111). Giving the winning PCF 2.0 recipe more runway. Using v48 pretrain.
 
-### tencent_v101 — PCF loss (v99 recipe + higher w-stop)
-**Recipe**: v99 verbatim (PCF 2.0) + **w-stop 4.0** (was 3.0). v99 was the tencent ATB; higher w-stop gives it more runway. v100 proved PCF 1.0 too weak for tencent. Using v86 pretrain.
+### tencent_v102 — PCF loss (n_freqs 64, double frequency resolution)
+**Recipe**: v99 base (PCF 2.0) + **n_freqs 64** (was 32) + w-stop 4.0. Tencent has 13x more files than alibaba — may need finer-grained frequency discrimination. v101 proved w-stop alone doesn't help. Using v86 pretrain.
 
 ---
 
@@ -28,6 +28,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 |-------------|----------|------|--------|-----------|--------|-----|
 | **v71 (ATB)** | **0.067** | **0.007** | **0.701** | **0.926** | 2.0 | -32% |
 | v72 | 0.111 | 0.018 | 0.536 | 0.855 | 1.0 | +11% |
+
+---
+
+## Post-Mortem: tencent_v101 — PCF loss (killed ep81, eval 0.130 — worse than v99)
+
+**Recipe**: v99 verbatim (PCF 2.0) + **w-stop 4.0** (was 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.095★** ep40. 41 epochs without improvement. Killed at ep81. Same plateau pattern as v99.
+
+**Full eval: combined≈0.130** (MMD²=0.020, β-recall=0.452, α-precision=0.686, DMD-GEN=0.792, HRC-MAE=0.063). Train→eval gap: 37%.
+
+**Finding: w-stop 4.0 doesn't help tencent.** Peak came at ep40 (earlier than v99's ep60), but the early checkpoint wasn't robust (eval much worse). The tencent PCF recipe may need more frequency resolution to handle the 13x larger corpus diversity.
 
 ---
 
