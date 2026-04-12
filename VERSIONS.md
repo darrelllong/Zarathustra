@@ -6,11 +6,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v73 — PCF loss (v71 recipe + higher w-stop)
-**Recipe**: v71 verbatim (PCF 2.0, grad-clip 0.5) + **w-stop 4.0** (was 3.0). v71 was W-stopped at ep64 but eval'd at 0.067 (ATB). v72 showed PCF 1.0 is too weak (eval 0.111). Giving the winning PCF 2.0 recipe more runway. Using v48 pretrain.
+### alibaba_v74 — PCF loss (v71 VERBATIM reproducibility check)
+**Recipe**: v71 verbatim (PCF 2.0, grad-clip 0.5, w-stop 3.0). Reproducibility check — if v71's 0.067 eval reproduces, it's paper-grade evidence that PCF is the breakthrough. Using v48 pretrain.
 
 ### tencent_v102 — PCF loss (n_freqs 64, double frequency resolution)
 **Recipe**: v99 base (PCF 2.0) + **n_freqs 64** (was 32) + w-stop 4.0. Tencent has 13x more files than alibaba — may need finer-grained frequency discrimination. v101 proved w-stop alone doesn't help. Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v73 — PCF loss (killed ep70, eval 0.166 — w-stop 4.0 hurts)
+
+**Recipe**: v71 verbatim (PCF 2.0) + **w-stop 4.0** (was 3.0). Using v48 pretrain.
+
+**Training-log**: Best **0.115★** ep65. Stars at ep5→15→30→50→65. W climbing to 3.5 by ep70. Killed at ep70.
+
+**Full eval: combined≈0.166** (MMD²=0.041, β-recall=0.373, α-precision=0.679, DMD-GEN=0.694, HRC-MAE=0.015). Train→eval gap: **44%**.
+
+**KEY FINDING: w-stop 3.0 is OPTIMAL for alibaba PCF 2.0.** v71 was W-stopped at ep64 and eval'd at 0.067 (ATB). v73 trained 6 epochs longer with w-stop 4.0 and eval'd at 0.166 — 2.5× worse. The extra training past ep64 with elevated W degrades the model. The W-stop guard isn't just safety; it's capturing the model at its sweet spot before late-phase instability corrupts the learned distribution.
+
+| Alibaba PCF eval | Combined | w-stop | Killed ep | Gap |
+|-----------------|----------|--------|-----------|-----|
+| **v71 (ATB)** | **0.067** | **3.0** | 64 | -32% |
+| v72 (PCF 1.0) | 0.111 | 4.0 | 123 | +11% |
+| v73 (PCF 2.0) | 0.166 | 4.0 | 70 | +44% |
 
 ---
 
