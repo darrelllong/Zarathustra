@@ -9,6 +9,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v76 — PCF loss (v71 VERBATIM #2, seed bundle point 3)
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for alibaba reproducibility cluster. v71 eval=0.067 (ATB), v74 eval=0.093. Using v48 pretrain.
 
+### tencent_v105 — PCF loss + mixed-type recovery (IDEAS #16)
+**Recipe**: v99 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve quality. Binary cols: obj_id_reuse (opcode auto-dropped). Using v86 pretrain.
+
 ---
 
 ## Post-Mortem: tencent_v104 — PCF loss (W-stopped ep57, eval 0.134 — seed bundle point 3)
