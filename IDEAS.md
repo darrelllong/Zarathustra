@@ -324,8 +324,8 @@ prove it via cache evaluation (#14).
 8. ~~Self-diagnosing (#9)~~ (FAILED — positive feedback loop destabilizes both corpora)
 9. ~~Multi-scale critic (#8) on alibaba~~ (FAILED — T=12 too short for multi-scale)
 10. ~~Path-space critic (#6)~~ (**BREAKTHROUGH** — alibaba_v71 eval 0.067, NEW ATB; replaces all handcrafted aux losses)
-11. **Running:** alibaba_v72 (PCF weight 1.0, w-stop 4.0); tencent_v99 (PCF weight 2.0, ep79, best 0.095★)
-12. **Next:** HRC evaluation (#14) — add cache fidelity metric to eval suite
-13. **Then:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
-14. **Then:** GP prior on latent trajectories (#4) — targets DMD-GEN
-15. **Then:** Mixed-type output heads (#7/#16) — validated by DiffGen results
+11. ~~GP prior (#4)~~ (FAILED — alibaba_v81 eval 0.181, tencent_v110 eval 0.147; overfits noise structure)
+12. ~~HRC evaluation (#14)~~ (DONE — already integrated into eval.py)
+13. **Running:** alibaba_v82 (PCF + continuity loss 0.5); tencent_v111 (PCF + continuity loss 0.5 + mixed-type)
+14. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
+15. **Then:** Feature-space dual critic (--feat-critic-weight) — penalises decoded quality issues
