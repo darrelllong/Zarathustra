@@ -378,7 +378,8 @@ def _load_checkpoint(path: str, device):
 
 def _sample_fake(ckpt, n_samples: int, device,
                  batch_size: int = 256,
-                 real_windows: np.ndarray = None) -> np.ndarray:
+                 real_windows: np.ndarray = None,
+                 cond_noise_scale: float = 0.0) -> np.ndarray:
     """Generate fake samples.
 
     When cond_dim > 0, conditioning descriptors are computed from randomly
@@ -455,11 +456,16 @@ def _sample_fake(ckpt, n_samples: int, device,
                     rw = torch.tensor(real_windows[idx], dtype=torch.float32,
                                       device=device)
                     cond = compute_window_descriptors(rw)
-                # Unify z_global path with training (Round 5 TODO):
-                # Apply cond_encoder, regime_sampler, gmm_prior — same as
-                # _make_z_global(training=False) in train.py.
+                # Round 5 fix: optionally add scaled stochastic noise to
+                # conditioning at eval to match training distribution.
                 if getattr(G, 'cond_encoder', None) is not None:
-                    cond, _ = G.cond_encoder(cond, training=False)
+                    if cond_noise_scale > 0:
+                        mu = G.cond_encoder.mu_net(cond)
+                        logvar = G.cond_encoder.logvar_net(cond).clamp(-10, 2)
+                        std = (0.5 * logvar).exp()
+                        cond = mu + cond_noise_scale * std * torch.randn_like(mu)
+                    else:
+                        cond, _ = G.cond_encoder(cond, training=False)
                 if getattr(G, 'regime_sampler', None) is not None:
                     cond = G.regime_sampler(cond)
                 noise = G.sample_noise(n, device, cond=cond)
@@ -514,7 +520,7 @@ def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int) -> np.ndarray:
 
 def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
              n_samples: int = 2000, k: int = 5,
-             baseline_path: str = None) -> None:
+             baseline_path: str = None, args=None) -> None:
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     print(f"\n{'='*60}")
@@ -537,7 +543,8 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     # Pass real windows to _sample_fake so conditioning uses real descriptors
     cond_dim = getattr(cfg, "cond_dim", 0)
     fake_flat = _sample_fake(ckpt, n_samples, device,
-                             real_windows=real_seqs if cond_dim > 0 else None)
+                             real_windows=real_seqs if cond_dim > 0 else None,
+                             cond_noise_scale=getattr(args, 'cond_noise_scale', 0.0) if args else 0.0)
     fake_seqs = fake_flat.reshape(-1, timestep, num_cols)
 
     mmd  = mmd2_numpy(real_flat, fake_flat)
@@ -632,10 +639,12 @@ def parse_args():
     p.add_argument("--n-samples",  type=int, default=2000)
     p.add_argument("--k",          type=int, default=5,
                    help="Nearest-neighbour k for PRDC")
+    p.add_argument("--cond-noise-scale", type=float, default=0.0,
+                   help="Scale for stochastic conditioning noise at eval (0=deterministic)")
     return p.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
     evaluate(args.checkpoint, args.trace_dir, args.fmt,
-             args.n_samples, args.k, args.baseline)
+             args.n_samples, args.k, args.baseline, args=args)
