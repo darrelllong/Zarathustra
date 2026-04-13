@@ -6,11 +6,31 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v77 — PCF loss + mixed-type recovery (IDEAS #16)
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve alibaba quality. Using v48 pretrain.
+### alibaba_v78 — PCF loss (v71 VERBATIM #3, seed bundle attempt)
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, NO mixed-type-recovery). Pure PCF confirmed best for alibaba (reuse ~0%). Using v48 pretrain.
 
 ### tencent_v107 — PCF + mixed-type recovery (v105 VERBATIM, seed confirmation)
 **Recipe**: v105 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, --mixed-type-recovery). Confirms whether v105's ATB-tying result (0.098) is reproducible. Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v77 — PCF + mixed-type recovery (W-stopped ep76, eval 0.182 — MIXED-TYPE HURTS ALIBABA)
+
+**Recipe**: v71 base (PCF 2.0, w-stop 3.0) + **--mixed-type-recovery**. Using v48 pretrain.
+
+**Training-log**: Best **0.101★** ep65 (best training combined ever for alibaba). Stars at ep5→10→15→20→45→65. G_loss went negative ep71-76. W-stopped at ep76.
+
+**Full eval: combined≈0.182** (MMD²=0.061, β-recall=0.396, α-precision=0.900, DMD-GEN=0.703, HRC-MAE=0.011). Train→eval gap: **+80%**.
+
+**MIXED-TYPE RECOVERY HURTS ALIBABA.** Despite the best training trajectory ever (comb=0.101), eval is terrible (0.182). The sigmoid head for obj_id_reuse has no signal on alibaba (real reuse=0.000) — it adds noise. On tencent (real reuse=3-5%), the same head helps (v105 tied ATB). **Corpus-specific recipe**: mixed-type-recovery for tencent only.
+
+| Alibaba recipe comparison | Combined | Recipe | Gap |
+|--------------------------|----------|--------|-----|
+| **v71 (ATB)** | **0.067** | Pure PCF 2.0 | -32% |
+| v74 | 0.093 | Pure PCF 2.0 | -30% |
+| v77 (mixed-type) | 0.182 | PCF 2.0 + mixed-type | +80% |
+| v75 (moment) | 0.183 | PCF 2.0 + moment | +27% |
+| v76 (over-trained) | 0.179 | Pure PCF 2.0 (ep96) | +49% |
 
 ---
 
