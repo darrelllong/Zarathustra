@@ -334,6 +334,7 @@ prove it via cache evaluation (#14).
 18. ~~alibaba_v85~~ (v71 seed #8, W-stopped ep60 — train 0.091, eval 0.133, +46% gap)
 19. ~~tencent_v115~~ (v105 seed roll #2, killed ep36 — peaked 0.111, W-spiked to 2.93, recall collapsed)
 20. ~~alibaba_v86~~ (v71 seed #9, W-stopped ep54 — train 0.086, eval 0.155, **+80% gap**)
-21. **Running:** alibaba_v87 (v71 seed #10); tencent_v116 (v105 seed roll #3, best 0.156 ep5)
-22. **Next:** If v87/v116 fail, pivot from seed rolling to z_global path unification or self-diag (#12)
-23. **Systemic issue CONFIRMED:** Train→eval gap worsening: v84(+41%), v85(+46%), v86(+80%). Seed rolling is NOT the path. z_global divergence must be fixed structurally.
+21. ~~tencent_v116~~ (v105 seed roll #3, killed ep29 — peaked 0.120 ep15, regressed to 0.159, 14 stale)
+22. **Running:** alibaba_v87 (v71 seed #10, G warm-up); tencent_v117 (v105 seed roll #4, LAST attempt)
+23. **Next:** If v87/v117 fail, PIVOT from seed rolling to z_global path unification or self-diag (#12)
+24. **Systemic issue CONFIRMED:** Train→eval gap worsening: v84(+41%), v85(+46%), v86(+80%). Tencent seed rolling also exhausted (4 failures: v114-v116). Must fix structurally.

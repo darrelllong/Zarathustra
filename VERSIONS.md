@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v87 — v71 verbatim seed #10
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v86 (seed #9) eval 0.155 (+80% gap, worst yet).
 
-### tencent_v116 — v105 verbatim seed roll #3
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Joint GAN ep6, first star 0.156 at ep5.
+### tencent_v117 — v105 verbatim seed roll #4
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Last seed roll attempt — v116 stalled at 0.120 (ep15), regressed to 0.159.
+
+---
+
+## Post-Mortem: tencent_v116 — v105 verbatim seed roll #3 (killed ep29, best 0.120)
+
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.120★** ep15 (MMD²=0.016, recall=0.482). Two stars: ep5=0.156★, ep15=0.120★. Then stalled 14 epochs. Eval at ep25 regressed to 0.159 (recall collapsed to 0.354). W elevated 2.0-2.6 throughout.
+
+**Killed at ep29**: 14 epochs stale, eval regressing, recall in free-fall. No eval run. Fourth tencent seed roll failure (v114: 0.126, v115: 0.111, v116: 0.120). Same pattern each time — early promise then stall/regression. Seed rolling exhausted for tencent.
 
 ---
 
