@@ -345,5 +345,7 @@ prove it via cache evaluation (#14).
     - The conditioning fix is checkpoint-dependent, not universal. Need higher n_samples or multi-run averaging.
 25. ~~tencent_v118~~ (self-diag temp=1.0, W-stopped ep6 — W exploded 4.95→6.15→9.29, too aggressive)
 26. ~~alibaba_v88~~ (v71 seed #11, W-stopped ep55 — train 0.080 best ever, eval avg 0.145, **+81% gap**)
-27. **Running:** alibaba_v89 (self-diag temp=0.1); tencent_v119 (self-diag temp=0.1, G warm-up ep60)
-28. **Next:** If self-diag temp=0.1 fails on both, try BayesGAN (#2).
+27. ~~tencent_v119~~ (self-diag temp=0.1, W-exploded ep3 — even 0.1 too aggressive for tencent)
+28. **Self-diag DEAD on tencent** (temp=1.0 and 0.1 both W-explode; incompatible with mixed-type-recovery)
+29. **Running:** alibaba_v89 (self-diag temp=0.1, supervisor pretrain); tencent_v120 (BayesGAN 5 particles, IDEAS #2)
+30. **Next:** If BayesGAN fails, try deeper LSTM (#11) or projection discriminator (#10).
