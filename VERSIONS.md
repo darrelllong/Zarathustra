@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v81 — PCF + GP prior (IDEAS #4)
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--gp-prior** (GP-sampled temporally correlated z_local, RBF kernel, learnable lengthscale init=3.0, T=12). Targets DMD-GEN ~0.76 plateau. Compatible with v48 pretrain. Pretraining.
-
 ### tencent_v110 — PCF + GP prior + mixed-type (IDEAS #4)
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--gp-prior**. Tests GP prior on tencent. Using v86 pretrain. Pretraining.
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--gp-prior**. Tests GP prior on tencent. Using v86 pretrain. GAN ep24, best 0.137★ ep20 (MMD²=0.020, recall=0.413). W healthy 1.5-2.1.
+
+### alibaba_v82 — PCF + continuity loss (boundary coherence)
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--continuity-loss-weight 0.5** (boundary-continuity loss for multi-window coherence, targets DMD-GEN 0.74 plateau). Using v48 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v81 — PCF + GP prior (W-stopped ep47, eval 0.181)
+
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--gp-prior** (GP-sampled z_local, RBF kernel). Using v48 pretrain.
+
+**Training-log**: Best **0.119★** ep40 (MMD²=0.032, recall=0.562). W volatile after ep40: ep42=3.98, ep43=2.84, ep44=2.95, ep45=3.18, ep46=4.16, ep47=3.29. W-spike guard killed at ep47.
+
+**Full eval: combined≈0.181** (MMD²=0.049, β-recall=0.339, DMD-GEN=0.742, AutoCorr=0.059, Spectral=0.014). Train→eval gap: **+52%** (very bad).
+
+**GP PRIOR HURTS ALIBABA.** Despite promising training dynamics (stable W through ep40, recall=0.562), eval collapsed: recall dropped from 0.562→0.339, MMD² from 0.032→0.049. The GP-correlated noise structure that helped training stability created an eval-time distribution mismatch — the model learned to rely on temporally correlated input noise that the GP provides, but eval-time sampling may not match. GP prior adds learnable parameters that overfit to training data order. Far worse than v71 ATB (0.067). Closing GP prior for alibaba.
 
 ---
 
