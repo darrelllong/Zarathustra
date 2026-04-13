@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v81 — PCF + GP prior (IDEAS #4)
 **Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--gp-prior** (GP-sampled temporally correlated z_local, RBF kernel, learnable lengthscale init=3.0, T=12). Targets DMD-GEN ~0.76 plateau. Compatible with v48 pretrain. Pretraining.
 
-### tencent_v109 — PCF + mixed-type (v105 verbatim seed #3)
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0). Another seed of the ATB recipe. Using v86 pretrain.
+### tencent_v110 — PCF + GP prior + mixed-type (IDEAS #4)
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--gp-prior**. Tests GP prior on tencent. Using v86 pretrain. Pretraining.
+
+---
+
+## Post-Mortem: tencent_v109 — PCF + mixed-type v105 verbatim seed #3 (killed ep48, recall collapse)
+
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.129★** ep15 (MMD²=0.010, recall=0.404). Combined stuck 0.129–0.134 for ep15-35. Recall collapsed ep35→ep40: 0.393→0.275. Combined worsened to 0.155 at ep40. Killed at ep48.
+
+**RECALL COLLAPSE AGAIN.** Same pattern as v107 (also v105 verbatim). v105 recipe is not reproducible — 0/2 reproduction attempts both got recall collapse at ep35-52. The v105 ATB may have been a lucky seed. Switching to GP prior for tencent.
 
 ---
 
