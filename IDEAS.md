@@ -326,6 +326,7 @@ prove it via cache evaluation (#14).
 10. ~~Path-space critic (#6)~~ (**BREAKTHROUGH** — alibaba_v71 eval 0.067, NEW ATB; replaces all handcrafted aux losses)
 11. ~~GP prior (#4)~~ (FAILED — alibaba_v81 eval 0.181, tencent_v110 eval 0.147; overfits noise structure)
 12. ~~HRC evaluation (#14)~~ (DONE — already integrated into eval.py)
-13. **Running:** alibaba_v82 (PCF + continuity loss 0.5); tencent_v111 (PCF + continuity loss 0.5 + mixed-type)
-14. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement
-15. **Then:** Feature-space dual critic (--feat-critic-weight) — penalises decoded quality issues
+13. ~~Continuity loss~~ (FAILED — alibaba_v82 eval 0.130 precision collapse; tencent_v111 eval 0.167 mode collapse)
+14. **Running:** alibaba_v83 (PCF + feat-critic 0.5); tencent_v112 (PCF + feat-critic 0.5 + mixed-type)
+15. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement for tencent
+16. **Then:** Copy-path mechanism — structural reuse-vs-seek decision

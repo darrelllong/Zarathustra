@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v83 — PCF + feature-space dual critic
 **Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--feat-critic-weight 0.5** (dual discriminator: latent C + decoded feature C_feat). Using v48 pretrain.
 
-### tencent_v111 — PCF + continuity loss + mixed-type
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--continuity-loss-weight 0.5**. Targets DMD-GEN 0.76 plateau. Using v86 pretrain. GAN ep13, best 0.182★ ep10.
+### tencent_v112 — PCF + feature-space dual critic + mixed-type
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--feat-critic-weight 0.5** (dual discriminator). Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v111 — PCF + continuity loss + mixed-type (killed ep35, eval 0.167)
+
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--continuity-loss-weight 0.5**. Using v86 pretrain.
+
+**Training-log**: Best **0.170★** ep15 (MMD²=0.019, recall=0.244). Recall stuck 0.205-0.268 for 20 epochs — never improved. Combined oscillated 0.170-0.179. W spiked to 2.86 at ep30. Killed at ep35.
+
+**Full eval: combined≈0.167** (MMD²=0.018, β-recall=0.256 ⚠ mode collapse, α-precision=0.745, DMD-GEN=0.738). Train→eval gap: **-2%**.
+
+**CONTINUITY LOSS CAUSES MODE COLLAPSE ON TENCENT.** Recall stuck at 0.256 — much worse than v110's 0.366. The boundary-coherence constraint forces G to generate smoother, lower-diversity windows. **Continuity loss CLOSED for both corpora** (alibaba: precision collapse; tencent: mode collapse).
 
 ---
 
