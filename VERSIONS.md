@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v83 — PCF + feature-space dual critic
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--feat-critic-weight 0.5** (dual discriminator: latent C + decoded feature C_feat). Using v48 pretrain.
+### alibaba_v84 — PCF v71 verbatim seed #7
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Back to proven recipe after structural additions all failed eval.
 
 ### tencent_v112 — PCF + feature-space dual critic + mixed-type
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--feat-critic-weight 0.5** (dual discriminator). Using v86 pretrain.
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--feat-critic-weight 0.5** (dual discriminator). Using v86 pretrain. GAN ep34, best 0.135★ ep15.
+
+---
+
+## Post-Mortem: alibaba_v83 — PCF + feat-critic (killed ep57, eval 0.124)
+
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--feat-critic-weight 0.5**. Using v48 pretrain.
+
+**Training-log**: Best **0.088★** ep10 (MMD²=0.012, recall=0.619). Combined oscillated 0.088-0.136 for 47 epochs without new star. W volatile 2.4-3.2, nearly W-stopped multiple times. Killed at ep57 (ep55 cutoff).
+
+**Full eval: combined≈0.124** (MMD²=0.011, β-recall=0.438, α-precision=0.782, DMD-GEN=0.690, Spectral=0.004, Context-FID=0.12). Train→eval gap: **+41%**.
+
+**FEAT-CRITIC IMPROVES QUALITY BUT KILLS RECALL.** Best-ever DMD-GEN (0.690), Spectral (0.004), and Context-FID (0.12). But recall collapsed train→eval (0.619→0.438). Dual critic makes G generate high-quality in-distribution samples at the cost of mode coverage. Combined 0.124 far from ATB 0.067. **Every structural addition to v71 recipe has failed on alibaba** (GP prior: 0.181, continuity: 0.130, feat-critic: 0.124). v71 base recipe with good seed remains the only path to ATB.
 
 ---
 
