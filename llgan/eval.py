@@ -413,7 +413,16 @@ def _sample_fake(ckpt, n_samples: int, device,
 
     R = None
     if latent_ae:
-        R = Recovery(latent_dim, cfg.hidden_size, prep.num_cols).to(device)
+        # Detect mixed-type-recovery from checkpoint keys
+        r_keys = ckpt["R"].keys()
+        binary_cols = None
+        if any(k.startswith("fc_cont") for k in r_keys):
+            # Reconstruct binary_cols from saved column names
+            binary_cols = [i for i, col in enumerate(prep.col_names)
+                           if col.lower() in {"opcode", "type", "rw", "op"}
+                           or col.endswith("_reuse")]
+        R = Recovery(latent_dim, cfg.hidden_size, prep.num_cols,
+                     binary_cols=binary_cols).to(device)
         R.load_state_dict(ckpt["R"])
         R.eval()
 
