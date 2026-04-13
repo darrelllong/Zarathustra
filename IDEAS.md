@@ -327,6 +327,6 @@ prove it via cache evaluation (#14).
 11. ~~GP prior (#4)~~ (FAILED — alibaba_v81 eval 0.181, tencent_v110 eval 0.147; overfits noise structure)
 12. ~~HRC evaluation (#14)~~ (DONE — already integrated into eval.py)
 13. ~~Continuity loss~~ (FAILED — alibaba_v82 eval 0.130 precision collapse; tencent_v111 eval 0.167 mode collapse)
-14. **Running:** alibaba_v83 (PCF + feat-critic 0.5); tencent_v112 (PCF + feat-critic 0.5 + mixed-type)
-15. **Next:** Reuse rate amplification (#15) — targeted obj_id_reuse improvement for tencent
-16. **Then:** Copy-path mechanism — structural reuse-vs-seek decision
+14. ~~Feat-critic~~ (FAILED — alibaba_v83 eval 0.124, tencent_v112 eval 0.157; mode collapse on both)
+15. **Running:** alibaba_v84 (v71 verbatim seed #7); tencent_v113 (PCF + copy-path reuse amplification)
+16. **Next:** v105 seed roll for tencent if copy-path fails

@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v84 — PCF v71 verbatim seed #7
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Back to proven recipe after structural additions all failed eval.
 
-### tencent_v112 — PCF + feature-space dual critic + mixed-type
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--feat-critic-weight 0.5** (dual discriminator). Using v86 pretrain. GAN ep34, best 0.135★ ep15.
+### tencent_v113 — PCF + copy-path (reuse amplification #15)
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--copy-path** (per-timestep reuse BCE + stride consistency). Using v86 pretrain. Targets reuse rate gap (real=0.013, fake=0.001).
+
+---
+
+## Post-Mortem: tencent_v112 — PCF + feat-critic + mixed-type (killed ep37, eval 0.157)
+
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--feat-critic-weight 0.5**. Using v86 pretrain.
+
+**Training-log**: Best **0.135★** ep15 (MMD²=0.013, recall=0.391). Combined degraded after ep15: ep20=0.143, ep25=0.151, ep30=0.141, ep35=0.168. Recall collapsed 0.391→0.336. Killed at ep37.
+
+**Full eval: combined≈0.157** (MMD²=0.014, β-recall=0.282 ⚠ mode collapse, α-precision=0.884, DMD-GEN=0.685, Context-FID=0.05). Train→eval gap: **+16%**.
+
+**FEAT-CRITIC CAUSES MODE COLLAPSE ON BOTH CORPORA.** Same pattern as alibaba_v83: excellent quality metrics (DMD-GEN=0.685, Context-FID=0.05) but catastrophic recall loss. Dual critic makes G concentrate on high-quality in-distribution samples, sacrificing mode coverage. **Feat-critic CLOSED.**
 
 ---
 
