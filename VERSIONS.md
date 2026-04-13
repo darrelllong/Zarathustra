@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v77 — PCF loss + mixed-type recovery (IDEAS #16)
 **Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve alibaba quality. Using v48 pretrain.
 
-### tencent_v106 — PCF loss weight 3.0 (sweep)
-**Recipe**: v99 base + **pcf-loss-weight 3.0** (was 2.0). Tests whether stronger PCF pushes tencent ATB further. Using v86 pretrain.
+### tencent_v107 — PCF + mixed-type recovery (v105 VERBATIM, seed confirmation)
+**Recipe**: v105 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, --mixed-type-recovery). Confirms whether v105's ATB-tying result (0.098) is reproducible. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v106 — PCF 3.0 (W-stopped ep37, eval 0.139 — PCF 3.0 TOO AGGRESSIVE)
+
+**Recipe**: v99 base + **pcf-loss-weight 3.0** (was 2.0). Using v86 pretrain.
+
+**Training-log**: Best **0.123★** ep10. W-stopped at ep37 (W>3.0 for 3 consecutive). G_loss went near-zero/negative by ep27. Only 10 useful epochs.
+
+**Full eval: combined≈0.139** (MMD²=0.032, β-recall=0.464, α-precision=0.932, DMD-GEN=0.786, HRC-MAE=0.022). Train→eval gap: **+13%**.
+
+**PCF 3.0 CONFIRMED DEAD.** Stronger PCF gradient destabilizes training — W escalates quickly, G collapses. PCF 2.0 remains the optimal weight for both corpora.
 
 ---
 
