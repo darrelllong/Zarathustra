@@ -481,30 +481,19 @@ class GPPrior(nn.Module):
         # Pre-compute time indices (fixed)
         t = torch.arange(timestep, dtype=torch.float32)
         self.register_buffer("_t", t)
-        # Cache for Cholesky factor (recomputed when lengthscale changes)
-        self._cached_L: Optional[torch.Tensor] = None
-        self._cached_ls: Optional[float] = None
+        # Pre-compute squared distance matrix (fixed)
+        self.register_buffer("_sq_dist", (t.unsqueeze(1) - t.unsqueeze(0)) ** 2)
 
     def _cholesky(self) -> torch.Tensor:
-        """Compute Cholesky factor of RBF kernel matrix."""
+        """Compute Cholesky factor of RBF kernel matrix.
+
+        Recomputed each forward pass (12×12 is trivial) so the computation
+        graph stays fresh for autograd — no stale cached tensors.
+        """
         ls = self.log_lengthscale.exp()
-        ls_val = ls.item()
-
-        # Cache: only recompute if lengthscale changed
-        if self._cached_L is not None and abs(self._cached_ls - ls_val) < 1e-6:
-            return self._cached_L
-
-        t = self._t  # (T,)
-        # RBF kernel: K(i,j) = exp(-|t_i - t_j|^2 / (2 * ls^2))
-        sq_dist = (t.unsqueeze(1) - t.unsqueeze(0)) ** 2  # (T, T)
-        K = torch.exp(-sq_dist / (2.0 * ls ** 2))
-        # Add jitter for numerical stability
+        K = torch.exp(-self._sq_dist / (2.0 * ls ** 2))
         K = K + 1e-5 * torch.eye(self.timestep, device=K.device)
-        L = torch.linalg.cholesky(K)  # (T, T)
-
-        self._cached_L = L
-        self._cached_ls = ls_val
-        return L
+        return torch.linalg.cholesky(K)
 
     def sample(self, B: int, device: torch.device) -> torch.Tensor:
         """
