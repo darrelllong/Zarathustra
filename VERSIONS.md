@@ -6,11 +6,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v76 — PCF loss (v71 VERBATIM #2, seed bundle point 3)
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Third seed point for alibaba reproducibility cluster. v71 eval=0.067 (ATB), v74 eval=0.093. Using v48 pretrain.
+### alibaba_v77 — PCF loss + mixed-type recovery (IDEAS #16)
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve alibaba quality. Using v48 pretrain.
 
 ### tencent_v105 — PCF loss + mixed-type recovery (IDEAS #16)
 **Recipe**: v99 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve quality. Binary cols: obj_id_reuse (opcode auto-dropped). Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v76 — PCF loss (W-stopped ep96, eval 0.179 — OVER-TRAINED)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Using v48 pretrain.
+
+**Training-log**: Best **0.120★** ep95. Stars at ep5→10→15→20→35→40→50→80→95. W-stopped at ep96 (W>3.0 for 3 consecutive). Ran 32 epochs longer than v71 due to W bouncing under threshold.
+
+**Full eval: combined≈0.179** (MMD²=0.033, β-recall=0.269 ⚠ mode collapse, α-precision=0.496, DMD-GEN=0.782, HRC-MAE=0.011). Train→eval gap: **+49%**.
+
+**OVER-TRAINING CONFIRMED.** v76 is v71 verbatim but ran to ep96 vs v71's ep64. The extra 32 epochs degraded the model: precision dropped from 0.926→0.496, recall from 0.701→0.269. The W-stop guard caught v71 at the sweet spot; v76's W bounced just under 3.0 long enough to over-train. Reinforces that early W-stopping (not late survival) produces the best models.
+
+| Alibaba PCF verbatim | Combined | Stopped ep | Recall | Precision | Gap |
+|---------------------|----------|------------|--------|-----------|-----|
+| **v71 (ATB)** | **0.067** | 64 | **0.701** | **0.926** | -32% |
+| v74 | 0.093 | 73 | 0.613 | 0.846 | -30% |
+| v76 (over-trained) | 0.179 | 96 | 0.269 | 0.496 | +49% |
 
 ---
 
