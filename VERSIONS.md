@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v78 — PCF loss (v71 VERBATIM #3, seed bundle attempt)
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, NO mixed-type-recovery). Pure PCF confirmed best for alibaba (reuse ~0%). Using v48 pretrain.
 
-### tencent_v107 — PCF + mixed-type recovery (v105 VERBATIM, seed confirmation)
-**Recipe**: v105 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, --mixed-type-recovery). Confirms whether v105's ATB-tying result (0.098) is reproducible. Using v86 pretrain.
+### tencent_v108 — PCF + mixed-type + diversity 3.0
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss prevents the recall collapse seen in v107. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v107 — PCF + mixed-type recovery verbatim (killed ep52, recall collapse)
+
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.135★** ep25. Recall collapsed monotonically: ep25=0.395→ep30=0.357→ep35=0.306→ep40=0.302→ep45=0.281→ep50=0.275. Killed at ep52.
+
+**v105 RECIPE NOT REPRODUCIBLE on this seed.** v105 had a similar early plateau but surged at ep55-60. v107 never recovered — recall degraded continuously. High seed variance for mixed-type-recovery on tencent.
 
 ---
 
