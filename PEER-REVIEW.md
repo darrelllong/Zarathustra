@@ -567,3 +567,63 @@ The new state of the repo is better than it was a day ago. That should be said c
 ### Short Take
 
 PCF is the best progress the repo has made in a while, and it deserves to be treated as a real breakthrough. But it is a breakthrough in critic design, not proof that generator-side locality is solved. So the right next step is not to spend a week fiddling with `pcf-loss-weight`, `w-stop`, and `n_freqs`. It is to add the right generator abstractions for reuse, memory, and split target types, then judge them with locality-native diagnostics.
+
+---
+
+## Round 12
+
+### Stop Getting Conservative
+
+The newest results deserve a split verdict. There was real architectural effort here, and one of those bets actually worked. `tencent_v105` is not a fake win. Mixed-type recovery tied the Tencent all-time best while materially improving recall, precision, HRC-MAE, and density in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L209). That is exactly the kind of result the repo should have been looking for: not "one scalar beats another scalar," but "a better abstraction changes the shape of the outcome." The wrong conclusion to draw from the rest of the page is therefore the one the repo is drifting toward now: that after a few hard failures, the only remaining path is seed rolling on the known recipe. That is too conservative, and for a race it is the wrong instinct.
+
+1. `[P1]` The current live queue is a red flag. `alibaba_v85` is seed `#8` of the old `v71` recipe and `tencent_v114` is another seed roll of `v105` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L9). That is not a strategy. It is a holding pattern. Seed rolling has value as a measurement tool, but when it becomes the mainline plan it means the repo has stopped trying to invent its way out of the bottleneck. This project is supposed to win a race, not just estimate the variance of yesterday's model a little more accurately.
+
+2. `[P1]` The repo is also getting too quick to close entire idea families when what actually failed was one narrow implementation. The clearest example is copy-path. `tencent_v113` blew up by epoch 3 because the current design multiplies stride by `(1 - reuse_prob)` inside the same shared output path in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L27) and [llgan/model.py](/Users/darrell/Zarathustra/llgan/model.py#L169). That is evidence against this specific coupling, not against locality mechanisms in general. Closing "copy-path (#15)" from that result in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L33) is too aggressive. The lesson should be:
+   do not gate a continuous stride head by a soft binary prediction inside the same fragile adversarial forward path,
+   and do build a cleaner reuse architecture next.
+
+3. `[P1]` `tencent_v105` actually tells the repo what kind of boldness is working. Mixed-type recovery succeeded because it respected the fact that binary reuse and continuous stride are different targets in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L217) and [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L113). That should be treated as a design clue, not merely a new baseline to seed-roll. The obvious next step is not another pass through seeds or `diversity 2.0 vs 3.0`. It is the next typed abstraction:
+   reuse-vs-new routing,
+   recent-object memory or pointer selection on reuse steps,
+   and a separate continuous branch for non-reuse motion.
+   In other words, use the mixed-type win to justify a bolder mixed-mechanism generator.
+
+4. `[P1]` The recent experimental sequence still contains too much knob twisting disguised as exploration. `tencent_v106` is just `PCF 3.0` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L197). `tencent_v108` and `alibaba_v79` are diversity-weight turns in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L131) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L143). Those runs are useful as cleanup, but they are not where race-winning upside lives. The repo already knows this. The right reaction to that knowledge is not "great, now let's try seed #8." It is "stop spending prime cycles on safe perturbations and spend them on one or two bigger mechanism bets."
+
+5. `[P1]` The closure language around recent structural tries is too pessimistic and too flat. Feat-critic did not win on combined, but it clearly moved DMD-GEN, spectral, and Context-FID on Alibaba in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L49). Continuity loss did not win either, but it improved DMD-GEN in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L73). Those are not final winners, but they are not "nothing happened" outcomes either. The repo keeps flattening partial signal into binary alive/dead labels and then retreating. That wastes information. In a race, partial structure improvements should be used to compose the next hypothesis, not filed away as discouragement.
+
+6. `[P1]` The strongest pushback is simple: stop acting like "conservative" equals "scientific." Right now conservative means:
+   more seed rolls,
+   more confidence intervals around known recipes,
+   and faster closure of bold ideas after one unstable implementation.
+   That posture may optimize for short-term calm, but it does not optimize for passing other teams. The mixed-type result proves there is still real leverage in architecture. The right response is to lean in, not to get timid.
+
+7. `[P1]` If the team wants one concrete next bet, make it Tencent-specific and locality-native. Alibaba can keep serving as the stable PCF control lane. Tencent should carry the risky work. My recommendation is:
+   keep the mixed-type heads from `v105`,
+   add an explicit reuse router,
+   attach a recent-object memory or pointer readout only on reuse steps,
+   and judge it on reuse precision/recall plus IRD or stack-distance realism, not just combined score.
+   That is a real attempt to solve the remaining bottleneck. Another seed roll is not.
+
+8. `[P2]` If the team wants a second bold lane, use the conditioning side rather than another critic-side accessory. The repo keeps saying file-level descriptors, window regimes, and long-rollout structure matter. Then it keeps pushing everything through one local generator contract. The next architecture change after locality should be the file-level versus window-level split already sitting in the ideas and TODO lists. That is a larger leap than "slightly different PCF settings," and it is much more likely to create a new frontier rather than refine the current ceiling.
+
+### What I Would Do Right Now
+
+1. Treat `v105` as evidence that target-type-aware generation is a real direction, not just a seed-sensitive curiosity.
+
+2. Stop letting seed rolling become the mainline program. Keep it as background validation only.
+
+3. Reopen locality as a redesign problem, not a scalar problem and not a one-implementation verdict:
+   explicit reuse router,
+   recent-object memory or pointer retrieval,
+   separate non-reuse stride branch.
+
+4. Keep Alibaba as the control lane and spend the bold compute on Tencent, where the local-structure gap is still the real battleground.
+
+5. Queue one conditioning-side architecture bet after that:
+   file-level versus window-level latent split,
+   or the window characterization bridge.
+
+### Short Take
+
+The repo is in danger of learning the wrong lesson from the last batch of runs. The right lesson is not "be safer." It is "one real architectural change just worked, so stop twisting knobs and build the next one." `v105` should make the team bolder, not more conservative.
