@@ -138,3 +138,25 @@ This is exactly what the reviewer called for in Round 9: "mechanism changes that
 **On Finding 7 (best next structural ideas):** We have now executed the path-space critic recommendation (PCF), which is producing the strongest results in project history. The next structural priorities, in order, are: (1) PCF weight/frequency tuning per corpus (alibaba prefers 2.0, tencent needs 2.0 with possibly more frequencies), (2) locality-native diagnostics, (3) conditioning redesign with R-informed factorized descriptors. The copy-path mechanism remains a valid future bet but is deprioritized while PCF is delivering breakthrough results.
 
 **On Finding 8 (repo-quality — accidental path mirror):** Accepted. The `Users/darrell/Zarathustra/` directory in the repo root will be cleaned up.
+
+---
+
+## Round 11
+
+We accept the reviewer's framing: PCF is a door, not a destination. The evidence supports this clearly.
+
+**On Finding 1 (PCF follow-ups flashing warning light):** Agreed, and we have already acted. v72 (PCF 1.0), v73 (w-stop 4.0), v75 (moment+PCF), and tencent v100-v102 all underperformed the clean PCF recipe. We stopped scalar exploitation and froze the recipe: PCF 2.0, n_freqs=32, w-stop=3.0, all handcrafted aux losses zeroed. Current runs are seed rolls on the frozen recipe, not coefficient walks.
+
+**On Finding 2 (freeze PCF recipe as base camp):** Done. alibaba runs (v76→v84→v85) and tencent runs (v104→v114) all use the identical frozen PCF recipe. No scalar modifications. The only variation is random seed.
+
+**On Finding 3 (critic got smarter, generator still lacks local-state abstraction):** We agree this is the core remaining gap. PCF dramatically improved the critic's ability to detect path-level violations, but the generator still treats reuse as a regression target rather than a structural decision. The copy-path mechanism (v67/v97, v113) was our first attempt at generator-side locality structure but failed: v67/v97 were superseded by PCF, and v113 W-spiked at epoch 3 due to stride gating destabilizing the adversarial game. The mechanism idea is right; the implementation needs architectural redesign — likely a separate routing head rather than forward-pass gating on shared outputs.
+
+**On Finding 4 (mixed-type two-route generator for locality):** We agree this is the right next structural bet. The current copy-path implementation was too shallow — it gated stride in the Recovery forward pass without giving the generator an actual routing decision or memory mechanism. The reviewer's prescription (one head for reuse-vs-new, pointer/memory for reuse resolution, continuous branch for stride only on non-reuse) is more ambitious but architecturally sound. We note this requires a fresh pretrain since it changes Recovery's output structure.
+
+**On Finding 5 (file-level + window-level conditioning split):** Accepted as the second-best next abstraction. The current flat conditioning path concatenates file-level statistics into noise without separating temporal scales. A factorized approach (slow file context, medium window regime, fast per-step evolution) would better match the hierarchical structure the R analysis has revealed. This is complementary to, not competing with, the locality mechanism work.
+
+**On Finding 6 (locality-native diagnostics as architecture guidance):** Accepted. We will promote at least one locality metric (reuse precision/recall or IRD shape match) to a checkpoint promotion gate. The current combined metric (MMD² + 0.2*(1-recall)) captures distributional fidelity but not locality realism. A candidate that improves combined while worsening reuse statistics should not be promoted.
+
+**On Finding 7 (corpus-specificity):** Agreed. Alibaba's PCF results (v71 eval=0.067, HRC-MAE=0.010) show the distributional + cache story is already strong. Tencent (v103/v105 eval=0.098, DMD-GEN still ~0.71) is where locality and temporal dynamics remain the binding constraint. We will use tencent as the primary testbed for the next locality mechanism.
+
+**On Finding 8 (resist "not more depth = do nothing"):** Point taken. The remaining architectural space is concrete: mixed-type output heads, reuse-memory/pointer, multi-branch critics, file+window latent split, window-pseudo-label routing. We will not conflate "deeper LSTM" (which failed) with "structurally different generator" (which hasn't been tried). The next experiment after the current seed rolls will be a generator-side structural change, not a loss coefficient.
