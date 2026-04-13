@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v82 — PCF + continuity loss (boundary coherence)
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--continuity-loss-weight 0.5** (boundary-continuity loss for multi-window coherence, targets DMD-GEN 0.74 plateau). Using v48 pretrain. Phase 2.5 G warm-up ep60/100.
+### alibaba_v83 — PCF + feature-space dual critic
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--feat-critic-weight 0.5** (dual discriminator: latent C + decoded feature C_feat). Using v48 pretrain.
 
 ### tencent_v111 — PCF + continuity loss + mixed-type
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--continuity-loss-weight 0.5**. Targets DMD-GEN 0.76 plateau. Using v86 pretrain.
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--continuity-loss-weight 0.5**. Targets DMD-GEN 0.76 plateau. Using v86 pretrain. GAN ep13, best 0.182★ ep10.
+
+---
+
+## Post-Mortem: alibaba_v82 — PCF + continuity loss (killed ep52, eval 0.130)
+
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--continuity-loss-weight 0.5**. Using v48 pretrain.
+
+**Training-log**: Best **0.109★** ep25 (MMD²=0.026, recall=0.587). Combined oscillated after ep25: ep30=0.149, ep35=0.115, ep40=0.141, ep45=0.115, ep50=0.131. 27 epochs stale. W climbing 1.4→2.5. Killed at ep52.
+
+**Full eval: combined≈0.130** (MMD²=0.014, β-recall=0.421, α-precision=0.609, DMD-GEN=0.679, AutoCorr=0.050, Spectral=0.005). Train→eval gap: **+19%**.
+
+**CONTINUITY LOSS IMPROVES DMD-GEN BUT NOT COMBINED.** DMD-GEN improved from typical 0.74→0.679 — the continuity loss hit its target. But α-precision collapsed (0.609 vs typical 0.8+), suggesting the boundary-coherence constraint forces G to generate smoother but less realistic windows. Combined 0.130 far from ATB 0.067.
 
 ---
 
