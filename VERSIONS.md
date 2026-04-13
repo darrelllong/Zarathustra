@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v85 — v71 verbatim seed #8
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v84 (seed #7) peaked at 0.092, stalled 27 epochs.
+### alibaba_v86 — v71 verbatim seed #9
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v85 (seed #8) eval 0.133 (+46% gap).
 
 ### tencent_v115 — v105 verbatim seed roll #2
 **Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Seed rolling — v114 peaked at 0.126, stalled 20 epochs.
+
+---
+
+## Post-Mortem: alibaba_v85 — v71 verbatim seed #8 (W-stopped ep60, eval 0.133)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.091★** ep60 (MMD²=0.007, recall=0.581). Steady convergence: ep5=0.125, ep10=0.117★, ep25=0.111★, ep35=0.093★, ep55=0.091★, ep60=0.091★. W discipline excellent through ep50 (1.3-1.9) then spiked: ep55=3.05, ep58=3.30, ep59=4.44. W-stopped at ep60.
+
+**Full eval: combined≈0.133** (MMD²=0.019, β-recall=0.429, α-precision=0.542, DMD-GEN=0.780, AutoCorr=0.047, Spectral=0.010, Context-FID=0.28, HRC-MAE=0.017). Train→eval gap: **+46%**.
+
+**Best training trajectory this session** (steady convergence, excellent W discipline through ep50) but eval collapsed as usual. Precision dropped to 0.542, recall 0.581→0.429. The persistent train→eval gap (~40-50%) on all seeds suggests a structural issue (likely the z_global divergence between training and eval noted in PEER-REVIEW.md Round 5). Seed rolling continues but the gap problem is systemic, not seed-specific.
 
 ---
 

@@ -331,5 +331,7 @@ prove it via cache evaluation (#14).
 15. ~~Copy-path (#15)~~ (FAILED — tencent_v113 W-stopped ep3, W=13.24 immediate divergence)
 16. ~~alibaba_v84~~ (v71 seed #7, killed ep42 — peaked 0.092, stalled 27 epochs)
 17. ~~tencent_v114~~ (v105 seed roll #1, killed ep45 — peaked 0.126, stalled 20 epochs)
-18. **Running:** alibaba_v85 (v71 seed #8, combined=0.111 ep25 ★); tencent_v115 (v105 seed roll #2)
-19. **Next:** Continue seed rolling; then try self-diag (#12) or BayesGAN (#9)
+18. ~~alibaba_v85~~ (v71 seed #8, W-stopped ep60 — train 0.091, eval 0.133, +46% gap)
+19. **Running:** alibaba_v86 (v71 seed #9); tencent_v115 (v105 seed roll #2)
+20. **Next:** Continue seed rolling; then try self-diag (#12) or BayesGAN (#9)
+21. **Systemic issue:** All seeds show +40-50% train→eval gap. z_global path divergence (PEER-REVIEW Round 5) likely culprit. May need infrastructure fix before more seeds.
