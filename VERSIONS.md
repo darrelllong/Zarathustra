@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v78 — PCF loss (v71 VERBATIM #3, seed bundle attempt)
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, NO mixed-type-recovery). Pure PCF confirmed best for alibaba (reuse ~0%). Using v48 pretrain.
+### alibaba_v79 — PCF loss + diversity 3.0
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss improves mode coverage consistency. Using v48 pretrain.
 
 ### tencent_v108 — PCF + mixed-type + diversity 3.0
 **Recipe**: v105 base (PCF 2.0, mixed-type-recovery) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss prevents the recall collapse seen in v107. Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v78 — PCF loss (killed ep75, eval 0.158 — early peak, late degradation)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0). Using v48 pretrain.
+
+**Training-log**: Best **0.099★** ep25. Stars at ep5→10→25. Combined degraded after ep50: ep55=0.121→ep65=0.138→ep75=0.146. Killed at ep75 (50/60 patience used, clear downward trend).
+
+**Full eval: combined≈0.158** (MMD²=0.029, β-recall=0.355, α-precision=0.818, DMD-GEN=0.749). Train→eval gap: **+59%**.
+
+**EARLY PEAK PROBLEM.** v78 peaked at ep25 — too early for robust temporal structure. v71/v74 peaked at ep55/ep73 and eval'd much better. Seed variance drives when the model peaks, and early peaks don't generalize.
 
 ---
 
