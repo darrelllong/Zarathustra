@@ -14,11 +14,13 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## Post-Mortem: tencent_v108 — PCF + mixed-type + diversity 3.0 (killed ep71, eval pending)
+## Post-Mortem: tencent_v108 — PCF + mixed-type + diversity 3.0 (killed ep71, eval 0.117)
 
 **Recipe**: v105 base (PCF 2.0, mixed-type-recovery) + **diversity-loss-weight 3.0** (was 2.0). Using v86 pretrain.
 
 **Training-log**: Best **0.125★** ep45 (MMD²=0.009, recall=0.420). 26 epochs of plateau after peak: combined oscillated 0.134–0.143 with no improvement. W spikes at ep47=4.46, ep66=3.84, ep71=3.85. Killed at ep71.
+
+**Full eval: combined≈0.117** (MMD²=0.010, β-recall=0.465, α-precision=0.765, DMD-GEN=0.777). Train→eval gap: **-6%** (negative = good, PCF effect working).
 
 **DIVERSITY 3.0 PREVENTS COLLAPSE BUT CAPS IMPROVEMENT.** Unlike v107 (diversity 2.0, recall collapsed), v108's recall stayed healthy (0.35–0.46). But combined plateaued at 0.125 — never approaching ATB 0.098. Diversity 3.0 stabilizes training but doesn't improve peak quality. The v105 recipe (diversity 2.0) with a good seed remains the best tencent approach.
 
