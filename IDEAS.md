@@ -344,5 +344,6 @@ prove it via cache evaluation (#14).
     - ATB of 0.067 was a lucky draw. True v71 avg ≈ 0.095, v87 avg ≈ 0.135
     - The conditioning fix is checkpoint-dependent, not universal. Need higher n_samples or multi-run averaging.
 25. ~~tencent_v118~~ (self-diag temp=1.0, W-stopped ep6 — W exploded 4.95→6.15→9.29, too aggressive)
-26. **Running:** alibaba_v88 (v71 seed #11, best 0.091★ ep30, 4 stars); tencent_v119 (self-diag temp=0.1, gentler)
-27. **Next:** If self-diag temp=0.1 fails, try BayesGAN (#2).
+26. ~~alibaba_v88~~ (v71 seed #11, W-stopped ep55 — train 0.080 best ever, eval avg 0.145, **+81% gap**)
+27. **Running:** alibaba_v89 (self-diag temp=0.1); tencent_v119 (self-diag temp=0.1, G warm-up ep60)
+28. **Next:** If self-diag temp=0.1 fails on both, try BayesGAN (#2).

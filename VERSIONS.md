@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v88 — v71 verbatim seed #11 (final seed roll)
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Joint GAN ep42, best 0.091★ at ep30 (4 stars). W elevated 1.9-2.4.
+### alibaba_v89 — self-diag temp=0.1 (IDEAS #9)
+**Recipe**: v71 + self-diag-temp 0.1. First structural experiment on alibaba. Using v48 pretrain.
 
 ### tencent_v119 — self-diag temp=0.1 (IDEAS #9, gentler)
-**Recipe**: v105 + self-diag-temp 0.1. Second attempt — v118 (temp=1.0) W-stopped at ep6.
+**Recipe**: v105 + self-diag-temp 0.1. Second attempt — v118 (temp=1.0) W-stopped at ep6. G warm-up ep60/100.
+
+---
+
+## Post-Mortem: alibaba_v88 — v71 verbatim seed #11 (W-stopped ep55, eval avg 0.145)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.080★** ep45 (MMD²=0.010, recall=0.648). Five consecutive stars: ep5=0.118★, ep10=0.108★, ep15=0.093★, ep30=0.091★, ep45=0.080★. Longest sustained improvement of any seed. W elevated from ep48: 3.78→2.63→3.45→3.29→3.55→3.08→3.54. W-stopped at ep55.
+
+**Full eval (3-run avg): combined≈0.145** (individual runs: 0.161, 0.123, 0.152). Train→eval gap: **+81%**. Despite best training metric (0.080) of any seed, eval is worse than v87 (0.135) and v71 (0.095). 6th consecutive alibaba seed failure. Seed rolling definitively exhausted.
 
 ---
 
