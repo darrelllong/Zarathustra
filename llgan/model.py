@@ -129,6 +129,9 @@ class Recovery(nn.Module):
         self.copy_path = copy_path and reuse_col >= 0 and stride_col >= 0
         self.reuse_col = reuse_col
         self.stride_col = stride_col
+        if self.copy_path and self.binary_cols:
+            self._reuse_idx_in_binary = self.binary_cols.index(reuse_col)
+            self._stride_idx_in_cont = self.cont_cols.index(stride_col)
 
         self.gru = nn.GRU(latent_dim, hidden_size, num_layers=1, batch_first=True)
         if avatar:
@@ -160,20 +163,23 @@ class Recovery(nn.Module):
             return self.act(self.fc(out))
 
         # Mixed-type: assemble output in original column order
+        cont_out   = torch.tanh(self.fc_cont(out))
+        binary_out = torch.sigmoid(self.fc_binary(out)) * 2.0 - 1.0
+
+        # Copy-path: gate stride by (1 - reuse_prob) BEFORE writing to result.
+        # Operating on the raw head outputs avoids inplace autograd conflicts.
+        if self.copy_path:
+            reuse_val = binary_out[..., self._reuse_idx_in_binary]   # [-1, 1]
+            reuse_prob = (reuse_val + 1.0) / 2.0                    # [0, 1]
+            stride_val = cont_out[..., self._stride_idx_in_cont]
+            gated_stride = stride_val * (1.0 - reuse_prob)
+            cont_out = cont_out.clone()
+            cont_out[..., self._stride_idx_in_cont] = gated_stride
+
         result = torch.empty(*out.shape[:2], self.num_cols,
                               dtype=out.dtype, device=out.device)
-        result[..., self.cont_cols]   = torch.tanh(self.fc_cont(out))
-        # Sigmoid → [0,1] → scale to [-1,1] for consistency with real data range
-        result[..., self.binary_cols] = torch.sigmoid(self.fc_binary(out)) * 2.0 - 1.0
-
-        # Copy-path: gate stride by (1 - reuse_prob).
-        # When reuse is predicted (+1 → prob≈1), stride is zeroed out.
-        # When seek is predicted (-1 → prob≈0), stride passes through.
-        # No new parameters — just a structural constraint in the forward pass.
-        if self.copy_path:
-            reuse_val = result[..., self.reuse_col]      # [-1, 1]
-            reuse_prob = (reuse_val + 1.0) / 2.0         # [0, 1]
-            result[..., self.stride_col] = result[..., self.stride_col] * (1.0 - reuse_prob)
+        result[..., self.cont_cols]   = cont_out
+        result[..., self.binary_cols] = binary_out
 
         return result
 
