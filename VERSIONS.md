@@ -7,10 +7,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ## Currently Running
 
 ### alibaba_v88 — v71 verbatim seed #11 (final seed roll)
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. FINAL seed roll — v87 eval 0.124 (+61% gap). Next step is structural fix.
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Joint GAN ep42, best 0.091★ at ep30 (4 stars). W elevated 1.9-2.4.
 
-### tencent_v118 — self-diag temp=1.0 (IDEAS #9)
-**Recipe**: v105 + self-diag-temp 1.0. First structural change after seed rolling exhausted. Upweights under-covered real samples in critic and feature matching.
+### tencent_v119 — self-diag temp=0.1 (IDEAS #9, gentler)
+**Recipe**: v105 + self-diag-temp 0.1. Second attempt — v118 (temp=1.0) W-stopped at ep6.
+
+---
+
+## Post-Mortem: tencent_v118 — self-diag temp=1.0 (W-stopped ep6, FAILED)
+
+**Recipe**: v105 + self-diag-temp 1.0. First structural experiment after seed rolling.
+
+**Training-log**: W exploded immediately: ep4=4.95, ep5=6.15, ep6=9.29. W-stopped at ep6. Only one star at ep5 (combined=0.143).
+
+**Self-diag temp=1.0 is too aggressive.** The softmax upweighting with temp=1.0 creates extreme weight concentration on outlier real samples, destabilizing the critic. Retrying with temp=0.1 (tencent_v119) for gentler upweighting.
 
 ---
 

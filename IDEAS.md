@@ -343,5 +343,6 @@ prove it via cache evaluation (#14).
     - **KEY FINDING: eval variance is massive** — v71 ranges 0.076-0.114 (avg 0.095), NOT 0.067
     - ATB of 0.067 was a lucky draw. True v71 avg ≈ 0.095, v87 avg ≈ 0.135
     - The conditioning fix is checkpoint-dependent, not universal. Need higher n_samples or multi-run averaging.
-25. **Running:** alibaba_v88 (v71 seed #11 FINAL, joint GAN ep3); tencent_v118 (self-diag temp=1.0, IDEAS #9)
-26. **Next:** If self-diag works, try on alibaba too. If not, try BayesGAN (#2).
+25. ~~tencent_v118~~ (self-diag temp=1.0, W-stopped ep6 — W exploded 4.95→6.15→9.29, too aggressive)
+26. **Running:** alibaba_v88 (v71 seed #11, best 0.091★ ep30, 4 stars); tencent_v119 (self-diag temp=0.1, gentler)
+27. **Next:** If self-diag temp=0.1 fails, try BayesGAN (#2).
