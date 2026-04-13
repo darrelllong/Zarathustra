@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v86 — v71 verbatim seed #9
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v85 (seed #8) eval 0.133 (+46% gap).
+### alibaba_v87 — v71 verbatim seed #10
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v86 (seed #9) eval 0.155 (+80% gap, worst yet).
 
 ### tencent_v116 — v105 verbatim seed roll #3
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Seed rolling — v115 peaked at 0.111 ep20, W-spiked and recall collapsed.
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Joint GAN ep6, first star 0.156 at ep5.
+
+---
+
+## Post-Mortem: alibaba_v86 — v71 verbatim seed #9 (W-stopped ep54, eval 0.155)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.086★** ep30 (MMD²=0.008, recall=0.607). Strong early convergence: ep5=0.172, ep10=0.114★, ep15=0.105★, ep30=0.086★. W elevated from ep31 onward (2.4-2.7), then spiked: ep52=4.11, ep53=3.92, ep54=3.33. W-stopped at ep54.
+
+**Full eval: combined≈0.155** (MMD²=0.027, β-recall=0.359, α-precision=0.529, DMD-GEN=0.685, AutoCorr=0.049, Spectral=0.006, Context-FID=0.45, HRC-MAE=0.013). Train→eval gap: **+80%**.
+
+**Best training combined (0.086) of any seed roll this session**, but eval gap is the worst yet (+80%). Recall collapsed from 0.607 (train) to 0.359 (eval). Pattern now confirmed across 4 alibaba seeds: v84 (+41%), v85 (+46%), v86 (+80%). Seed rolling alone will not beat ATB — the z_global train→eval divergence (PEER-REVIEW Round 5) must be addressed structurally.
 
 ---
 
