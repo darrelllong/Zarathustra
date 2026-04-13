@@ -336,11 +336,12 @@ prove it via cache evaluation (#14).
 20. ~~alibaba_v86~~ (v71 seed #9, W-stopped ep54 — train 0.086, eval 0.155, **+80% gap**)
 21. ~~tencent_v116~~ (v105 seed roll #3, killed ep29 — peaked 0.120 ep15, regressed to 0.159, 14 stale)
 22. ~~alibaba_v87~~ (v71 seed #10, killed ep38 — train 0.077, eval 0.124, **+61% gap**, precision 0.889 best ever)
-23. **Running:** alibaba_v88 (v71 seed #11, FINAL); tencent_v117 (v105 seed roll #4, best 0.129 ep10)
+23. ~~tencent_v117~~ (v105 seed roll #4, killed ep35 — best 0.109 ep20, 4 stars then stalled, W-spike scare)
 24. **INVESTIGATION: z_global conditioning divergence (Round 5)**
     - Root cause: CondEncoder uses stochastic (μ+σε) during training, deterministic (μ) at eval
     - Added `--cond-noise-scale` to eval.py; scale=0.75 helps v87 (avg 0.107 vs 0.135) but hurts v71
     - **KEY FINDING: eval variance is massive** — v71 ranges 0.076-0.114 (avg 0.095), NOT 0.067
     - ATB of 0.067 was a lucky draw. True v71 avg ≈ 0.095, v87 avg ≈ 0.135
     - The conditioning fix is checkpoint-dependent, not universal. Need higher n_samples or multi-run averaging.
-25. **Next:** Try increasing n_samples to 5000+ for stable evals; or try self-diag (#9) / BayesGAN (#2)
+25. **Running:** alibaba_v88 (v71 seed #11 FINAL, joint GAN ep3); tencent_v118 (self-diag temp=1.0, IDEAS #9)
+26. **Next:** If self-diag works, try on alibaba too. If not, try BayesGAN (#2).

@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v88 — v71 verbatim seed #11 (final seed roll)
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. FINAL seed roll — v87 eval 0.124 (+61% gap). Next step is structural fix.
 
-### tencent_v117 — v105 verbatim seed roll #4
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Joint GAN ep10, first star 0.129 at ep10. W stable.
+### tencent_v118 — self-diag temp=1.0 (IDEAS #9)
+**Recipe**: v105 + self-diag-temp 1.0. First structural change after seed rolling exhausted. Upweights under-covered real samples in critic and feature matching.
+
+---
+
+## Post-Mortem: tencent_v117 — v105 verbatim seed roll #4 (killed ep35, best 0.109)
+
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.109★** ep20 (MMD²=0.010, recall=0.507). Four consecutive stars ep5-ep20 (0.134→0.129→0.112→0.109). Best early trajectory of any tencent seed. Then stalled 15 epochs. W spiked to 3.03/3.31 at ep31-32 (nearly auto-stopped), recovered to 1.98. ep35 eval=0.114, no star.
+
+**Killed at ep35**: 15 epochs stale, W instability, recall declining. Best tencent training metric (0.109) of any seed roll, closest to ATB (0.098). 5th consecutive tencent seed roll failure. Seed rolling exhausted for both corpora.
 
 ---
 
