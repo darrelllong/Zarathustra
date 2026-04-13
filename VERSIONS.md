@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### tencent_v110 — PCF + GP prior + mixed-type (IDEAS #4)
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--gp-prior**. Tests GP prior on tencent. Using v86 pretrain. GAN ep24, best 0.137★ ep20 (MMD²=0.020, recall=0.413). W healthy 1.5-2.1.
-
 ### alibaba_v82 — PCF + continuity loss (boundary coherence)
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--continuity-loss-weight 0.5** (boundary-continuity loss for multi-window coherence, targets DMD-GEN 0.74 plateau). Using v48 pretrain.
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--continuity-loss-weight 0.5** (boundary-continuity loss for multi-window coherence, targets DMD-GEN 0.74 plateau). Using v48 pretrain. Phase 2.5 G warm-up ep60/100.
+
+### tencent_v111 — PCF + continuity loss + mixed-type
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--continuity-loss-weight 0.5**. Targets DMD-GEN 0.76 plateau. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v110 — PCF + GP prior + mixed-type (killed ep42, eval 0.147)
+
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--gp-prior**. Using v86 pretrain.
+
+**Training-log**: Best **0.137★** ep20 (MMD²=0.020, recall=0.413). Combined degraded steadily after ep20: ep25=0.139, ep30=0.148, ep35=0.138, ep40=0.155. Recall collapsed: 0.413→0.316. W spiked to 3.51 at ep41. Killed at ep42.
+
+**Full eval: combined≈0.147** (MMD²=0.020, β-recall=0.366, DMD-GEN=0.761, AutoCorr=0.057, Spectral=0.008). Train→eval gap: **+7%**.
+
+**GP PRIOR FAILS ON TENCENT TOO.** Same pattern as alibaba_v81: GP-correlated z_local doesn't help and may hurt by overfitting noise structure to training data. Recall stuck ~0.37, never approaching the 0.5+ needed for ATB contention. Combined never improved past ep20 — the GP prior doesn't provide the mode coverage needed. **GP prior (#4) CLOSED for both corpora.**
 
 ---
 
