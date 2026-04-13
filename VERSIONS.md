@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v85 — v71 verbatim seed #8
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v84 (seed #7) peaked at 0.092, stalled 27 epochs.
 
-### tencent_v114 — v105 verbatim seed roll #1
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Seed rolling after copy-path failed.
+### tencent_v115 — v105 verbatim seed roll #2
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Seed rolling — v114 peaked at 0.126, stalled 20 epochs.
+
+---
+
+## Post-Mortem: tencent_v114 — v105 verbatim seed roll #1 (killed ep45, best 0.126)
+
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain.
+
+**Training-log**: Best **0.126★** ep25 (MMD²=0.011, recall=0.425). Combined stalled after ep25: ep30=0.138, ep35=0.138, ep40=0.135, ep45=0.135. W spiked to 3.17 at ep34 (nearly triggered W-stop). Recall stuck at 0.37-0.42. 20 epochs stale. Killed at ep45.
+
+**Failed seed** — peaked early, W elevated (2.0-2.5 range), recall never recovered past 0.425. ATB is 0.098; best was 28% worse. Seed #2 next.
 
 ---
 
