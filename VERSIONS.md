@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v79 — PCF loss + diversity 3.0
-**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss improves mode coverage consistency. Using v48 pretrain.
-
 ### tencent_v108 — PCF + mixed-type + diversity 3.0
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss prevents the recall collapse seen in v107. Using v86 pretrain.
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery) + **diversity-loss-weight 3.0** (was 2.0). Tests whether stronger diversity loss prevents the recall collapse seen in v107. Using v86 pretrain. GAN ep53, best 0.125★ at ep45. Recall climbing (0.172→0.420) but slight regression at ep50 (0.376).
+
+### alibaba_v80 — PCF loss (v71 verbatim seed #5)
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Another seed of the proven recipe. Using v48 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v79 — PCF + diversity 3.0 (W-stopped ep39, eval 0.140)
+
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **diversity-loss-weight 3.0** (was 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.079★** ep5. Combined hovered 0.090-0.093 at ep25-35. W spiked: ep34=3.66, ep37=4.02, ep38=3.77, ep39=3.27 → W-spike guard killed at ep39.
+
+**Full eval: combined≈0.140** (MMD²=0.024, β-recall=0.419, α-precision=0.740, DMD-GEN=0.775).
+
+**DIVERSITY 3.0 TOO AGGRESSIVE FOR ALIBABA.** Increased diversity loss elevated W throughout, causing W-stop at ep39 — far earlier than v71's sweet spot (ep55-73). Best.pt from ep5 was undertrained. Combined with v77 (mixed-type hurts alibaba) and v75 (moment hybrid destabilizes), the v71 recipe at diversity 2.0 remains optimal for alibaba. Seed variance is the remaining obstacle.
 
 ---
 
