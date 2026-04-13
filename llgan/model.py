@@ -444,6 +444,80 @@ class GMMPrior(nn.Module):
         return mu_z + std_z * torch.randn_like(mu_z)
 
 
+class GPPrior(nn.Module):
+    """
+    Gaussian Process prior for temporally correlated z_local noise.
+
+    Replaces i.i.d. z_local ~ N(0,I) with GP-sampled noise where consecutive
+    timesteps are correlated via an RBF kernel:
+
+        K(t, t') = exp(-|t - t'|² / (2 * lengthscale²))
+        z_local ~ N(0, K ⊗ I_d)
+
+    Implementation: Cholesky decompose K (T×T), then z = L @ ε where ε ~ N(0,I).
+    T is small (12) so Cholesky is trivial.
+
+    The lengthscale is a learnable parameter — lets the model discover the right
+    temporal correlation scale. Initialized at T/4 so initial correlations are
+    moderate. Zero lengthscale → i.i.d. (no effect); large → all timesteps identical.
+
+    Why this targets DMD-GEN: the LSTM generates temporally incoherent sequences
+    because z_local is i.i.d. — each timestep's innovation noise is independent.
+    A GP prior imposes smooth autocorrelation structure on the noise itself,
+    giving the LSTM a correlated input signal that naturally produces smoother,
+    more realistic temporal dynamics.
+    """
+
+    def __init__(self, timestep: int, noise_dim: int):
+        super().__init__()
+        self.timestep = timestep
+        self.noise_dim = noise_dim
+
+        # Learnable log-lengthscale, initialized at log(T/4) for moderate
+        # initial correlation. Using log ensures lengthscale stays positive.
+        init_ls = max(timestep / 4.0, 1.0)
+        self.log_lengthscale = nn.Parameter(torch.tensor(float(init_ls)).log())
+
+        # Pre-compute time indices (fixed)
+        t = torch.arange(timestep, dtype=torch.float32)
+        self.register_buffer("_t", t)
+        # Cache for Cholesky factor (recomputed when lengthscale changes)
+        self._cached_L: Optional[torch.Tensor] = None
+        self._cached_ls: Optional[float] = None
+
+    def _cholesky(self) -> torch.Tensor:
+        """Compute Cholesky factor of RBF kernel matrix."""
+        ls = self.log_lengthscale.exp()
+        ls_val = ls.item()
+
+        # Cache: only recompute if lengthscale changed
+        if self._cached_L is not None and abs(self._cached_ls - ls_val) < 1e-6:
+            return self._cached_L
+
+        t = self._t  # (T,)
+        # RBF kernel: K(i,j) = exp(-|t_i - t_j|^2 / (2 * ls^2))
+        sq_dist = (t.unsqueeze(1) - t.unsqueeze(0)) ** 2  # (T, T)
+        K = torch.exp(-sq_dist / (2.0 * ls ** 2))
+        # Add jitter for numerical stability
+        K = K + 1e-5 * torch.eye(self.timestep, device=K.device)
+        L = torch.linalg.cholesky(K)  # (T, T)
+
+        self._cached_L = L
+        self._cached_ls = ls_val
+        return L
+
+    def sample(self, B: int, device: torch.device) -> torch.Tensor:
+        """
+        Sample temporally correlated noise.
+
+        Returns: (B, T, noise_dim) — GP-sampled noise
+        """
+        L = self._cholesky().to(device)  # (T, T)
+        eps = torch.randn(B, self.timestep, self.noise_dim, device=device)
+        # L @ eps for each noise dimension: (T, T) @ (B, T, D) → einsum
+        return torch.einsum("ij,bjd->bid", L, eps)
+
+
 class Generator(nn.Module):
     """
     LSTM generator with split-latent noise design.
@@ -493,6 +567,8 @@ class Generator(nn.Module):
         var_cond: bool = False,
         n_regimes: int = 0,
         num_lstm_layers: int = 1,
+        gp_prior: bool = False,
+        timestep: int = 12,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -503,6 +579,12 @@ class Generator(nn.Module):
         self.cond_dim    = cond_dim
         self.film_cond   = film_cond and (cond_dim > 0)
         self.num_lstm_layers = num_lstm_layers
+
+        # GP prior for temporally correlated z_local (IDEAS.md idea #4)
+        if gp_prior:
+            self.gp_prior = GPPrior(timestep, noise_dim)
+        else:
+            self.gp_prior = None
 
         # Variational conditioning encoder (IDEAS.md idea #3): replaces fixed
         # char-file vector with a sampled distribution at training time.
@@ -589,6 +671,25 @@ class Generator(nn.Module):
             return self.gmm_prior(cond.to(device))
         return torch.randn(B, self.noise_dim, device=device)
 
+    def sample_z_local(
+        self,
+        B: int,
+        T: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Sample z_local noise, using GP prior when available.
+
+        Args:
+            B: batch size
+            T: number of timesteps
+            device: target device
+        Returns:
+            (B, T, noise_dim) noise tensor
+        """
+        if self.gp_prior is not None:
+            return self.gp_prior.sample(B, device)
+        return torch.randn(B, T, self.noise_dim, device=device)
+
     def _init_weights(self):
         _skip = {"gmm_prior", "cond_encoder"}   # these have their own init
         for name, p in self.named_parameters():
@@ -659,7 +760,7 @@ class Generator(nn.Module):
         else:
             noise = self.sample_noise(n_windows, device)
             z_global = noise
-        z_local  = torch.randn(n_windows, timestep, self.noise_dim, device=device)
+        z_local  = self.sample_z_local(n_windows, timestep, device)
         out = self(z_global, z_local)
         if opcode_col >= 0:
             # Hard-binarise opcode: the continuous generator output is a soft

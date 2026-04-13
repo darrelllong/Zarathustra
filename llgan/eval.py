@@ -404,6 +404,8 @@ def _sample_fake(ckpt, n_samples: int, device,
                   var_cond=getattr(cfg, "var_cond", False),
                   n_regimes=getattr(cfg, "n_regimes", 0),
                   num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
+                  gp_prior=getattr(cfg, "gp_prior", False),
+                  timestep=cfg.timestep,
                   ).to(device)
     # Prefer EMA weights: smoother, less oscillated, consistently produces
     # better samples than the instantaneous live weights at any given epoch.

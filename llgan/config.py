@@ -165,6 +165,7 @@ class Config:
                                           # regime (coarse) temporal scales simultaneously.
 
     # Mixed-type output heads in Recovery (IDEAS.md idea #7, CTGAN-style)
+    gp_prior: bool = False               # GP prior on z_local for temporally correlated noise (IDEAS #4)
     mixed_type_recovery: bool = False    # Enable type-aware Recovery output heads: binary columns
                                          # (opcode, obj_id_reuse) use sigmoid→scaled-to-[-1,1] instead
                                          # of Tanh; Phase 1 reconstruction uses BCE for these columns.

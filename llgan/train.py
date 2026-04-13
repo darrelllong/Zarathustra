@@ -468,10 +468,16 @@ def train(cfg: Config) -> None:
                   gmm_components=getattr(cfg, "gmm_components", 0),
                   var_cond=getattr(cfg, "var_cond", False),
                   n_regimes=getattr(cfg, "n_regimes", 0),
-                  num_lstm_layers=getattr(cfg, "num_lstm_layers", 1)).to(device)
+                  num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
+                  gp_prior=getattr(cfg, "gp_prior", False),
+                  timestep=cfg.timestep).to(device)
     if getattr(cfg, "n_regimes", 0) > 0 and cfg.cond_dim > 0:
         print(f"[regime-sampler] K={cfg.n_regimes} workload regimes, "
               f"τ: {G.regime_sampler.tau_start}→{G.regime_sampler.tau_end}")
+    if getattr(cfg, "gp_prior", False):
+        ls = G.gp_prior.log_lengthscale.exp().item()
+        print(f"[GP-prior] Temporally correlated z_local enabled "
+              f"(init lengthscale={ls:.1f}, T={cfg.timestep})")
     # Projection discriminator: pass cond_dim so critic adds inner(cond_proj(cond), pooled).
     # Only active when both proj_critic config flag is set AND cond_dim > 0.
     _proj_critic_dim = cfg.cond_dim if getattr(cfg, "proj_critic", False) else 0
@@ -983,7 +989,7 @@ def train(cfg: Config) -> None:
                 xb_dev = xb
                 z_g, _ = _make_z_global(B_pre, cfg, device, real_features=xb_dev,
                                         file_cond=fc_pre, G=G)
-                z_l = torch.randn(B_pre, cfg.timestep, cfg.noise_dim, device=device)
+                z_l = G.sample_z_local(B_pre, cfg.timestep, device)
                 opt_G.zero_grad()
                 with torch.amp.autocast(device.type, enabled=use_amp):
                     H_fake = G(z_g, z_l)
@@ -1119,7 +1125,7 @@ def train(cfg: Config) -> None:
             for _ in range(cfg.n_critic):
                 z_g, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                         file_cond=file_cond_batch, G=G)
-                z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                z_l = G.sample_z_local(B, cfg.timestep, device)
                 H_fake = G(z_g, z_l).detach()
 
                 # PacGAN packing (computed once, shared across BayesGAN particles)
@@ -1237,7 +1243,7 @@ def train(cfg: Config) -> None:
                 with torch.no_grad():
                     z_g_pcf, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                                 file_cond=file_cond_batch, G=G)
-                    z_l_pcf = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                    z_l_pcf = G.sample_z_local(B, cfg.timestep, device)
                     H_fake_pcf = G(z_g_pcf, z_l_pcf)
                     fake_decoded_pcf = R(H_fake_pcf) if latent_ae else H_fake_pcf
                 # Maximize PCF distance: negate loss for gradient ascent on frequencies
@@ -1250,7 +1256,7 @@ def train(cfg: Config) -> None:
             # --- Generator step ---
             z_g, kl_loss = _make_z_global(B, cfg, device, real_features=real_batch,
                                           file_cond=file_cond_batch, G=G)
-            z_l = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+            z_l = G.sample_z_local(B, cfg.timestep, device)
 
             opt_G.zero_grad()
             with torch.amp.autocast(device.type, enabled=use_amp):
@@ -1519,10 +1525,10 @@ def train(cfg: Config) -> None:
                     _fc2 = file_cond_batch[B2:B2*2] if file_cond_batch is not None else None
                     z_g1, _ = _make_z_global(B2, cfg, device, real_features=real_batch[:B2],
                                              file_cond=_fc1, G=G)
-                    z_l1 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
+                    z_l1 = G.sample_z_local(B2, cfg.timestep, device)
                     z_g2, _ = _make_z_global(B2, cfg, device, real_features=real_batch[B2:B2*2],
                                              file_cond=_fc2, G=G)
-                    z_l2 = torch.randn(B2, cfg.timestep, cfg.noise_dim, device=device)
+                    z_l2 = G.sample_z_local(B2, cfg.timestep, device)
                     f1 = G(z_g1, z_l1)   # (B2, T, out_dim)
                     f2 = G(z_g2, z_l2)
                     # L2 distance in noise and output spaces
@@ -1542,8 +1548,8 @@ def train(cfg: Config) -> None:
                 if cfg.continuity_loss_weight > 0:
                     z_gc, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                              file_cond=file_cond_batch, G=G)
-                    z_lc1 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
-                    z_lc2 = torch.randn(B, cfg.timestep, cfg.noise_dim, device=device)
+                    z_lc1 = G.sample_z_local(B, cfg.timestep, device)
+                    z_lc2 = G.sample_z_local(B, cfg.timestep, device)
                     H_cont_1, h_carry = G(z_gc, z_lc1, return_hidden=True)
                     H_cont_2 = G(z_gc, z_lc2, hidden=h_carry)
                     if latent_ae:
@@ -2057,6 +2063,11 @@ def parse_args() -> Config:
                         "3 independent LSTM critics at T, T//2, T//4 temporal scales. "
                         "G loss = mean over scales. Compatible with v28 pretrain (critic "
                         "is not pretrained). Targets burst/envelope/regime discrimination.")
+    p.add_argument("--gp-prior",             action="store_true", default=False,
+                   help="GP prior on z_local (IDEAS.md idea #4): replace i.i.d. per-timestep "
+                        "noise with GP-sampled temporally correlated noise (RBF kernel, "
+                        "learnable lengthscale). Targets DMD-GEN by giving LSTM correlated "
+                        "input signal. Compatible with existing pretrain checkpoints.")
     p.add_argument("--mixed-type-recovery",  action="store_true", default=False,
                    help="Mixed-type output heads in Recovery (IDEAS.md idea #7): "
                         "binary columns (opcode, obj_id_reuse) use sigmoid→[-1,1] heads "
@@ -2150,6 +2161,7 @@ def parse_args() -> Config:
     cfg.w_stop_threshold        = args.w_stop_threshold
     cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery
+    cfg.gp_prior                = args.gp_prior
     cfg.bayes_critics           = args.bayes_critics
     cfg.avatar                  = args.avatar
     cfg.dist_loss_weight        = args.dist_loss_weight

@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v80 — PCF loss (v71 verbatim seed #5)
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Another seed of the proven recipe. Using v48 pretrain. Pretraining (G warm-up).
+### alibaba_v81 — PCF + GP prior (IDEAS #4)
+**Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0) + **--gp-prior** (GP-sampled temporally correlated z_local, RBF kernel, learnable lengthscale init=3.0, T=12). Targets DMD-GEN ~0.76 plateau. Compatible with v48 pretrain. Pretraining.
 
 ### tencent_v109 — PCF + mixed-type (v105 verbatim seed #3)
 **Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0). Another seed of the ATB recipe. Using v86 pretrain.
+
+---
+
+## Post-Mortem: alibaba_v80 — PCF loss v71 verbatim seed #5 (killed ep39, eval 0.107)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.109★** ep15. Combined degraded after ep15: ep20=0.109→ep25=0.123→ep30=0.117→ep35=0.135. Killed at ep39 (24 epochs past best, clear degradation).
+
+**Full eval: combined≈0.107** (MMD²=0.020, β-recall=0.565, α-precision=0.767, DMD-GEN=0.761). Train→eval gap: **-2%** (minimal).
+
+**EARLY PEAK PATTERN AGAIN.** 5th seed of v71 recipe, 4th to miss ATB. Seed variance results: {v71=0.067, v74=0.093, v80=0.107, v79=0.140, v78=0.158, v76=0.179}. Only 1 in 5 hits ATB (~20% success rate). Diminishing returns on seed rolling — switching to GP prior (#4) for structural improvement.
 
 ---
 
