@@ -328,5 +328,6 @@ prove it via cache evaluation (#14).
 12. ~~HRC evaluation (#14)~~ (DONE — already integrated into eval.py)
 13. ~~Continuity loss~~ (FAILED — alibaba_v82 eval 0.130 precision collapse; tencent_v111 eval 0.167 mode collapse)
 14. ~~Feat-critic~~ (FAILED — alibaba_v83 eval 0.124, tencent_v112 eval 0.157; mode collapse on both)
-15. **Running:** alibaba_v84 (v71 verbatim seed #7); tencent_v113 (PCF + copy-path reuse amplification)
-16. **Next:** v105 seed roll for tencent if copy-path fails
+15. ~~Copy-path (#15)~~ (FAILED — tencent_v113 W-stopped ep3, W=13.24 immediate divergence)
+16. **Running:** alibaba_v84 (v71 verbatim seed #7, combined=0.092 ep15); tencent_v114 (v105 verbatim seed roll #1)
+17. **Next:** Continue seed rolling on both corpora; then try self-diag (#12) or BayesGAN (#9)

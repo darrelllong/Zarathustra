@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v84 — PCF v71 verbatim seed #7
 **Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Back to proven recipe after structural additions all failed eval.
 
-### tencent_v113 — PCF + copy-path (reuse amplification #15)
-**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--copy-path** (per-timestep reuse BCE + stride consistency). Using v86 pretrain. Targets reuse rate gap (real=0.013, fake=0.001).
+### tencent_v114 — v105 verbatim seed roll #1
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Seed rolling after copy-path failed.
+
+---
+
+## Post-Mortem: tencent_v113 — PCF + copy-path (W-stopped ep3, no eval)
+
+**Recipe**: v105 base (PCF 2.0, mixed-type-recovery, diversity 2.0, w-stop 3.0) + **--copy-path** (per-timestep reuse BCE + stride consistency gating). Using v86 pretrain.
+
+**Training-log**: W exploded immediately: ep1=4.21, ep2=10.09, ep3=13.24. W-spike guard killed at epoch 3. No eval checkpoint produced. Reuse BCE loss=1.46, stride consistency=0.008 — losses were reasonable but adversarial training diverged instantly.
+
+**COPY-PATH CAUSES IMMEDIATE W-SPIKE ON TENCENT.** The stride gating (stride × (1-reuse_prob)) creates a non-differentiable interaction between binary and continuous heads that destabilises the critic. Fixed the inplace autograd crash (read before clone) but the underlying approach is unstable. **Copy-path (#15) CLOSED** — every structural addition to the base recipes has failed (GP prior, continuity, feat-critic, copy-path). Seed rolling on proven recipes is the only remaining path.
 
 ---
 
