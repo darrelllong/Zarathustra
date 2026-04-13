@@ -335,6 +335,7 @@ prove it via cache evaluation (#14).
 19. ~~tencent_v115~~ (v105 seed roll #2, killed ep36 — peaked 0.111, W-spiked to 2.93, recall collapsed)
 20. ~~alibaba_v86~~ (v71 seed #9, W-stopped ep54 — train 0.086, eval 0.155, **+80% gap**)
 21. ~~tencent_v116~~ (v105 seed roll #3, killed ep29 — peaked 0.120 ep15, regressed to 0.159, 14 stale)
-22. **Running:** alibaba_v87 (v71 seed #10, G warm-up); tencent_v117 (v105 seed roll #4, LAST attempt)
-23. **Next:** If v87/v117 fail, PIVOT from seed rolling to z_global path unification or self-diag (#12)
-24. **Systemic issue CONFIRMED:** Train→eval gap worsening: v84(+41%), v85(+46%), v86(+80%). Tencent seed rolling also exhausted (4 failures: v114-v116). Must fix structurally.
+22. ~~alibaba_v87~~ (v71 seed #10, killed ep38 — train 0.077, eval 0.124, **+61% gap**, precision 0.889 best ever)
+23. **Running:** alibaba_v88 (v71 seed #11, FINAL); tencent_v117 (v105 seed roll #4, best 0.129 ep10)
+24. **PIVOT POINT:** Seed rolling exhausted (5 alibaba failures, 4 tencent failures). z_global train→eval divergence is THE blocker.
+25. **Next structural fix:** Investigate z_global path in train.py vs eval.py — unify the conditioning path to close the gap.

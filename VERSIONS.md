@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v87 — v71 verbatim seed #10
-**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. Seed rolling — v86 (seed #9) eval 0.155 (+80% gap, worst yet).
+### alibaba_v88 — v71 verbatim seed #11 (final seed roll)
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain. FINAL seed roll — v87 eval 0.124 (+61% gap). Next step is structural fix.
 
 ### tencent_v117 — v105 verbatim seed roll #4
-**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Last seed roll attempt — v116 stalled at 0.120 (ep15), regressed to 0.159.
+**Recipe**: v105 verbatim (PCF 2.0, mixed-type-recovery, n_regimes 8, diversity 2.0, w-stop 3.0). Using v86 pretrain. Joint GAN ep10, first star 0.129 at ep10. W stable.
+
+---
+
+## Post-Mortem: alibaba_v87 — v71 verbatim seed #10 (killed ep38, eval 0.124)
+
+**Recipe**: v71 verbatim (PCF 2.0, n_freqs 32, w-stop 3.0, diversity 2.0). Using v48 pretrain.
+
+**Training-log**: Best **0.077★** ep20 (MMD²=0.013, recall=0.681). Two stars: ep5=0.112★, ep20=0.077★. Recall 0.681 was highest of any seed. Then stalled 18 epochs — ep25=0.111, ep35=0.117. W elevated 1.9-2.7 from ep22 onward.
+
+**Full eval: combined≈0.124** (MMD²=0.034, β-recall=0.548, α-precision=0.889, DMD-GEN=0.785, AutoCorr=0.049, Spectral=0.007, Context-FID=0.36, HRC-MAE=0.016). Train→eval gap: **+61%**.
+
+**Precision exceptional (0.889, best ever) but recall collapsed 0.681→0.548.** 5th consecutive alibaba seed failure. Gap pattern: v84(+41%), v85(+46%), v86(+80%), v87(+61%). Seed rolling exhausted — gap is structural, not seed-specific.
 
 ---
 
