@@ -9,8 +9,27 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v77 — PCF loss + mixed-type recovery (IDEAS #16)
 **Recipe**: v71 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve alibaba quality. Using v48 pretrain.
 
-### tencent_v105 — PCF loss + mixed-type recovery (IDEAS #16)
-**Recipe**: v99 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery** (sigmoid head for binary columns). Tests whether type-aware output heads improve quality. Binary cols: obj_id_reuse (opcode auto-dropped). Using v86 pretrain.
+### tencent_v106 — PCF loss weight 3.0 (sweep)
+**Recipe**: v99 base + **pcf-loss-weight 3.0** (was 2.0). Tests whether stronger PCF pushes tencent ATB further. Using v86 pretrain.
+
+---
+
+## Post-Mortem: tencent_v105 — PCF + mixed-type recovery (W-stopped ep60, eval **0.098 — TIED TENCENT ATB**)
+
+**Recipe**: v99 base (PCF 2.0, n_freqs 32, w-stop 3.0) + **--mixed-type-recovery**. Using v86 pretrain.
+
+**Training-log**: Best **0.098★** ep60. Stars at ep5→10, then 45-epoch plateau, breakthrough at ep55→60. W-stopped at ep60 (W>3.0 for 3 consecutive).
+
+**Full eval: combined≈0.098** (MMD²=0.014, β-recall=**0.578**, α-precision=**0.868**, DMD-GEN=0.730, HRC-MAE=**0.005**, density=**1.490**). Train→eval gap: **0%** (no gap).
+
+**MIXED-TYPE RECOVERY VALIDATES ON TENCENT.** Ties v103 ATB on combined but with substantially better metrics: recall +16% (0.578 vs 0.499), precision +3%, HRC-MAE 12× better (0.005 vs 0.058), density nearly 2× higher. The sigmoid head for obj_id_reuse produces sharper binary outputs that improve both distributional and cache-fidelity metrics.
+
+| Tencent PCF variants | Combined | Recall | Precision | HRC-MAE | Density |
+|---------------------|----------|--------|-----------|---------|---------|
+| **v103 (prev ATB)** | **0.098** | 0.499 | 0.841 | 0.058 | — |
+| **v105 (mixed-type)** | **0.098** | **0.578** | **0.868** | **0.005** | **1.490** |
+| v99 | 0.112 | 0.470 | 0.846 | 0.050 | — |
+| v104 | 0.134 | 0.404 | 0.837 | 0.057 | — |
 
 ---
 
