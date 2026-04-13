@@ -329,5 +329,6 @@ prove it via cache evaluation (#14).
 13. ~~Continuity loss~~ (FAILED — alibaba_v82 eval 0.130 precision collapse; tencent_v111 eval 0.167 mode collapse)
 14. ~~Feat-critic~~ (FAILED — alibaba_v83 eval 0.124, tencent_v112 eval 0.157; mode collapse on both)
 15. ~~Copy-path (#15)~~ (FAILED — tencent_v113 W-stopped ep3, W=13.24 immediate divergence)
-16. **Running:** alibaba_v84 (v71 verbatim seed #7, combined=0.092 ep15); tencent_v114 (v105 verbatim seed roll #1)
-17. **Next:** Continue seed rolling on both corpora; then try self-diag (#12) or BayesGAN (#9)
+16. ~~alibaba_v84~~ (v71 seed #7, killed ep42 — peaked 0.092, stalled 27 epochs)
+17. **Running:** alibaba_v85 (v71 verbatim seed #8); tencent_v114 (v105 verbatim seed roll #1)
+18. **Next:** Continue seed rolling; then try self-diag (#12) or BayesGAN (#9)
