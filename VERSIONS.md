@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v100 — v71 base recipe, fresh seed roll #2
-**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed. GAN ep17, best 0.113★ ep5, recall 0.553.
+### alibaba_v101 — v71 base recipe, fresh seed roll #3
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
 ### tencent_v129 — base ATB recipe, fresh seed roll #3
-**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01. G warm-up ep40/100.
+
+---
+
+## Post-Mortem: alibaba_v100 — v71 base recipe, fresh seed (killed ep41, best 0.090★ ep20)
+
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
+
+**Training-log**: Stars at ep5=0.113★ (recall=0.553), ep10=0.118 (no star), ep20=0.090★ (recall=0.611, MMD²=0.012). Then regression: ep25=0.110, ep30 regressed further, ep35=0.125 (recall=0.503), ep40=0.100. W spiked to 3.41 at ep38. Killed at ep41 (21 stale).
+
+**Eval (5-run avg): combined=0.110** (range 0.087–0.133). Individual: 0.110, 0.113, 0.133, 0.087, 0.106. Avg recall=0.498. Run 4 hit 0.087 (would beat ATB alone!) but avg recall variance (0.401–0.593) drags average down. Train→eval gap +22% (0.090→0.110). Does NOT beat ATB 0.088.
+
+**Verdict**: Second-best alibaba seed after v98. Excellent ep20 star (0.090) but couldn't sustain it — W instability after ep35 and recall variance in eval. Demonstrates that seeds producing train 0.090 can eval 0.087 on lucky draws, confirming recipe strength.
 
 ---
 
