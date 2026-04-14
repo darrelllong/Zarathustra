@@ -402,4 +402,6 @@ prove it via cache evaluation (#14).
 50. **Running:** tencent_v125 (standard lr + 24 files, G warm-up ep30/100)
 51. **z_global det_prob fix IMPLEMENTED** — CondEncoder now accepts `det_prob` param; during training, randomly uses deterministic μ (no noise) to align train/eval distributions. Added `--var-cond-det-prob` CLI arg.
 52. **Running:** alibaba_v97 (z_global det_prob=0.3, standard lr, 12 files/epoch)
-53. **Restarted:** tencent_v125 (standard lr, 12 files/epoch — original killed during process cleanup)
+53. ~~tencent_v125~~ (standard lr, 12 files, killed ep30 — best 0.115★ ep10, 20 stale, W spiked 3.40, recall collapsed 0.481→0.298)
+54. **Running:** tencent_v126 (z_global det_prob=0.3, standard lr, 12 files/epoch)
+55. **alibaba_v97 ep30: comb=0.088★** (MMD²=0.011, recall=0.613) — z_global fix producing best-ever train recall!

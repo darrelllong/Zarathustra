@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v97 — z_global det_prob fix (var-cond-det-prob=0.3)
 **Recipe**: v71 base PCF recipe + `--var-cond-det-prob 0.3`. During training, 30% of batches use deterministic μ (no noise) in CondEncoder, matching eval behavior. Directly addresses the train→eval z_global gap identified in Round 5 peer review and investigation #24. Standard lr 8e-5/4e-5, files_per_epoch=12, var-cond-kl-weight=0.01.
 
-### tencent_v125 — standard lr (8e-5/4e-5) + files_per_epoch=12 (restarted)
-**Recipe**: v105 base PCF with standard lr. Originally launched with files_per_epoch=24 but process was killed during cleanup. Restarted with standard files_per_epoch=12. No pretrain checkpoint was saved.
+### tencent_v126 — z_global det_prob fix (var-cond-det-prob=0.3)
+**Recipe**: v105 base PCF recipe + `--var-cond-det-prob 0.3`. Same z_global fix as alibaba_v97. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+
+---
+
+## Post-Mortem: tencent_v125 — standard lr + files_per_epoch=12 (killed ep30, best 0.115★ ep10)
+
+**Recipe**: v105 base PCF with standard lr 8e-5/4e-5, files_per_epoch=12. Restarted from v86 pretrain after process cleanup.
+
+**Training-log**: Stars only at ep5=0.156★, ep10=0.115★. Then stagnation: ep15=0.138, ep20 saved checkpoint but no star, ep25=0.151, ep30=0.145. W spiked to 3.40 at ep26 (exceeding W-stop threshold of 3.0) but recovered to 2.72. Recall collapsed from 0.481 (ep10) to 0.298 (ep25) to 0.337 (ep30). Killed at ep30 (20 epochs stale).
+
+**Verdict**: Standard tencent recipe without z_global fix. W instability and recall collapse typical of standard lr runs. No eval run — clearly wouldn't beat ATB (0.098). Replaced by tencent_v126 with z_global det_prob fix.
 
 ---
 
