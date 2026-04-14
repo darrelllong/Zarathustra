@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v93 — BayesGAN 3 particles, lower lr (6e-5/3e-5)
 **Recipe**: v91 recipe but lr-g 6e-5 / lr-d 3e-5 (vs 8e-5/4e-5). v91's W climbed and stalled after ep25. Lower lr should extend productive training window.
 
-### tencent_v121 — BayesGAN 3 critic particles (IDEAS #2, reduced)
-**Recipe**: v105 + bayes-critics 3. 5 consecutive stars: ep5=0.168, ep10=0.146, ep15=0.128, ep20=0.124, ep25=0.111★. Excellent trajectory.
+### tencent_v122 — projection discriminator, no BayesGAN (IDEAS #10)
+**Recipe**: v105 + --proj-critic. BayesGAN failed on tencent (both 3 and 5 particles). Trying proj-critic alone — conditions critic on workload type.
+
+---
+
+## Post-Mortem: tencent_v121 — BayesGAN 3 particles (killed ep40, best 0.111★ ep25)
+
+**Recipe**: v105 + bayes-critics 3. Using v86 pretrain.
+
+**Training-log**: 5 consecutive stars: ep5=0.168★, ep10=0.146★, ep15=0.128★, ep20=0.124★, ep25=0.111★. Then plateaued: ep30=0.126, ep35=0.123, ep40=0.124. W elevated 1.2-1.7 throughout. Killed at ep40 (15 epochs stale).
+
+**5-run eval avg: combined=0.136** (range 0.126-0.141). Worse than v120's 0.126 (5 particles). **BayesGAN doesn't work for tencent** — neither 3 nor 5 particles beat ATB (0.098). The SGLD noise injection may interfere with mixed-type-recovery.
 
 ---
 
