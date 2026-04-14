@@ -408,5 +408,6 @@ prove it via cache evaluation (#14).
 56. **KEY FINDING:** Eval variance (recall 0.398–0.639) is the real problem, not train/eval distribution mismatch. Need higher n_samples or architectural fix for recall stability.
 57. ~~alibaba_v98~~ (v71 base recipe, fresh seed, killed ep60 — best 0.089★ ep30, **5-run eval avg 0.088 ★★★ NEW ALIBABA ATB ★★★** Beats v71's 0.095 by 7.4%. Recall avg 0.611 vs v71's ~0.50.)
 58. ~~tencent_v126~~ (z_global det_prob=0.3, killed ep36 — best 0.137★ ep15, 21 stale. **det_prob fix DEAD on both corpora.**)
-59. **Running:** tencent_v127 (base ATB recipe, fresh seed — 0.125★ ep5, GAN ep13)
-60. **Running:** alibaba_v99 (v71 base recipe, fresh seed — AE pretrain ep30/50)
+59. ~~tencent_v127~~ (base ATB recipe, fresh seed, killed ep51 — best 0.100★ ep35, **3-run eval avg 0.148**, +48% gap. Four consecutive stars but train→eval gap killed it.)
+60. **Running:** alibaba_v99 (v71 base recipe, fresh seed — 0.124★ ep10, GAN ep15)
+61. **Running:** tencent_v128 (base ATB recipe, fresh seed roll #2)

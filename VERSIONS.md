@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### tencent_v127 — base ATB recipe, fresh seed (no det_prob)
+### alibaba_v99 — v71 base recipe, fresh seed roll
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. GAN ep15, best 0.124★ ep10.
+
+### tencent_v128 — base ATB recipe, fresh seed roll #2
 **Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
 
-### alibaba_v99 — v71 base recipe, fresh seed roll
-**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Another seed roll attempt. AE pretraining in progress.
+---
+
+## Post-Mortem: tencent_v127 — base ATB recipe, fresh seed (killed ep51, best 0.100★ ep35)
+
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.125★ (recall=0.468), ep15=0.102★ (recall=0.547), ep30=0.101★ (recall=0.558), ep35=0.100★ (recall=0.533, MMD²=0.007). Then collapse: ep40=0.109, ep45=0.137 (recall=0.453), ep50=0.117 (recall=0.452). W climbed from 1.5 to 2.5+. Killed at ep51 (16 stale).
+
+**Eval (3-run): avg combined ~0.148** (individual: 0.143, 0.184, 0.117). Run 2 had mode collapse warning (recall=0.224). Massive train→eval gap (0.100 train → 0.148 eval, +48%). Does NOT beat ATB 0.098.
+
+**Verdict**: Best tencent training trajectory in a while (four consecutive stars ep5→ep35) but train→eval gap killed it. Same systemic gap pattern. Seed rolling continues.
 
 ---
 
