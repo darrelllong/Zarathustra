@@ -7,10 +7,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ## Currently Running
 
 ### alibaba_v93 — BayesGAN 3 particles, lower lr (6e-5/3e-5)
-**Recipe**: v91 recipe but lr-g 6e-5 / lr-d 3e-5 (vs 8e-5/4e-5). v91's W climbed and stalled after ep25. Lower lr should extend productive training window.
+**Recipe**: v91 recipe but lr-g 6e-5 / lr-d 3e-5. 4 stars: ep5=0.163, ep10=0.123, ep15=0.101, ep25=0.090★. W remarkably stable (0.52-0.68). Best alibaba trajectory yet.
 
-### tencent_v122 — projection discriminator, no BayesGAN (IDEAS #10)
-**Recipe**: v105 + --proj-critic. BayesGAN failed on tencent (both 3 and 5 particles). Trying proj-critic alone — conditions critic on workload type.
+### tencent_v123 — lower lr (6e-5/3e-5), base PCF recipe
+**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. Lower lr working great on alibaba — trying same approach.
+
+---
+
+## Post-Mortem: tencent_v122 — proj-critic, no BayesGAN (W-stopped ep5, FAILED)
+
+**Recipe**: v105 + --proj-critic (no BayesGAN). Using v86 pretrain.
+
+**Training-log**: W exploded catastrophically: ep1=0.99, ep2=2.70, ep3=5.06, ep4=9.51, ep5=19.29. G loss spiraled to -176. W-stopped at ep5.
+
+**Projection discriminator is DEAD on both corpora.** Failed with BayesGAN (v92, W=8.0 ep5) and without (v122, W=19.3 ep5). The proj-critic makes the discriminator too powerful for the current generator architecture. Would need significant architectural changes (larger G, different training schedule) to work.
 
 ---
 
