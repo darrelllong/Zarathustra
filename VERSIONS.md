@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v101 — v71 base recipe, fresh seed roll #3
+### alibaba_v102 — v71 base recipe, fresh seed roll #4
 **Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
 ### tencent_v130 — base ATB recipe, fresh seed roll #4
 **Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: alibaba_v101 — v71 base recipe, fresh seed roll #3 (killed ep71, best 0.097★ ep45)
+
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
+
+**Training-log**: Outstanding trajectory with 6 stars: ep5=0.131★ (recall=0.462), ep15=0.126★ (recall=0.509), ep20=0.123★ (recall=0.451), ep25=0.119★ (recall=0.513), ep40=0.105★ (recall=0.544), ep45=0.097★ (recall=0.585). Best training combined 0.097 is the best ever seen on alibaba. After ep45 plateaued around 0.100-0.112 with recall holding at 0.578-0.600 — quality plateau, not degradation. W stable throughout (never exceeded 2.5). Killed at ep71 after eval.
+
+**Eval (5-run avg): combined=0.123** (range 0.108–0.161). Individual: 0.161, 0.109, 0.108, 0.109, 0.127. Avg recall=0.457. Run 1 was outlier (recall=0.310). Runs 2-4 clustered at 0.108-0.109. Train→eval gap +27% (0.097→0.123). Does NOT beat ATB 0.088.
+
+**Verdict**: Best training seed ever (0.097★, recall 0.585) but train→eval gap (+27%) prevents ATB. Third consecutive alibaba run confirming the pattern: recipe can produce sub-0.100 training results, but eval variance (especially recall) pulls the average up. The gap appears structural, not seed-dependent.
 
 ---
 
