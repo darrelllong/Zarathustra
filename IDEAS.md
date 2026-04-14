@@ -354,5 +354,6 @@ prove it via cache evaluation (#14).
 33. ~~alibaba_v92~~ (BayesGAN 3 + proj-critic, W-stopped ep5 — W exploded 0.61→8.02, **proj-critic + BayesGAN incompatible**)
 34. ~~tencent_v121~~ (BayesGAN 3, killed ep40 — best 0.111★ ep25, **5-run eval avg 0.136**, worse than v120. **BayesGAN DEAD on tencent**)
 35. ~~tencent_v122~~ (proj-critic no BayesGAN, W-stopped ep5 — W=19.3, **proj-critic DEAD on both corpora**)
-36. **Running:** alibaba_v93 (BayesGAN 3 lower lr, ep27, best 0.090★ ep25, W=0.64!); tencent_v123 (lower lr 6e-5/3e-5, base PCF)
-37. **Next:** If lower lr works on tencent too, we have a new recipe. If not, try regime-first (#5) or Fourier analysis (#0).
+36. ~~alibaba_v93~~ (BayesGAN 3 + lower lr, killed ep43 — best 0.090★ ep25, **5-run eval avg 0.108**, worse than v91. BayesGAN doesn't beat base v71 0.095)
+37. **Running:** alibaba_v94 (base PCF + lower lr, no BayesGAN); tencent_v123 (lower lr, G warm-up)
+38. **KEY INSIGHT:** Base v71 recipe (0.095) is still alibaba ATB. BayesGAN reduces gap but doesn't win. Next: structural changes (z_global fix, locality engine).

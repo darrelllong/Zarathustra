@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v93 — BayesGAN 3 particles, lower lr (6e-5/3e-5)
-**Recipe**: v91 recipe but lr-g 6e-5 / lr-d 3e-5. 4 stars: ep5=0.163, ep10=0.123, ep15=0.101, ep25=0.090★. W remarkably stable (0.52-0.68). Best alibaba trajectory yet.
+### alibaba_v94 — base PCF recipe + lower lr (6e-5/3e-5), no BayesGAN
+**Recipe**: v71 base PCF but lr-g 6e-5 / lr-d 3e-5. v91 (BayesGAN 3) got 0.100, v93 (BayesGAN 3 + lower lr) got 0.108 — BayesGAN didn't beat base v71 (0.095). Trying lower lr on the proven recipe.
 
 ### tencent_v123 — lower lr (6e-5/3e-5), base PCF recipe
-**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. Lower lr working great on alibaba — trying same approach.
+**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. G warm-up phase.
+
+---
+
+## Post-Mortem: alibaba_v93 — BayesGAN 3 + lower lr (killed ep43, best 0.090★ ep25)
+
+**Recipe**: v91 + lr-g 6e-5 / lr-d 3e-5. Using v48 pretrain.
+
+**Training-log**: 4 stars: ep5=0.163★, ep10=0.123★, ep15=0.101★, ep25=0.090★. Matched v91's ep20 result 5 epochs earlier. W remarkably stable (0.52-0.68) through ep25, then climbed to 0.88-1.22. ep30=0.115, ep35=0.104, ep40=0.106. Killed at ep43 (18 epochs stale).
+
+**5-run eval avg: combined=0.108** (range 0.093-0.144). Recall avg=0.536. Train→eval gap: **+20%** (0.090→0.108). Worse than v91's 0.100. **Lower lr + BayesGAN doesn't beat base v71 (0.095).** The lower W stability was real but didn't translate to better eval quality.
 
 ---
 
