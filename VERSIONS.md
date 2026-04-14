@@ -6,6 +6,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
+### alibaba_v95 — lower lr + files_per_epoch=24 (broader coverage)
+**Recipe**: v94 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Peer review Round 13 recommended broader per-epoch coverage. v94 showed lower lr eliminates train→eval gap (<1%) — now testing if broader sampling improves base quality.
+
 ### tencent_v123 — lower lr (6e-5/3e-5), base PCF recipe
 **Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. GAN ep34, best comb=0.136★ ep30.
 
