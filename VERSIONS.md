@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v90 — BayesGAN 5 critic particles (IDEAS #2)
-**Recipe**: v71 + bayes-critics 5 (SGLD noise injection). Using v48 pretrain. Both corpora now testing BayesGAN.
+### alibaba_v91 — BayesGAN 3 critic particles (IDEAS #2, reduced)
+**Recipe**: v71 + bayes-critics 3. v90 (5 particles) had recall=0.000 — critic too weak. Trying fewer particles.
 
 ### tencent_v120 — BayesGAN 5 critic particles (IDEAS #2)
-**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). G warm-up ep40/100.
+**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). Joint GAN ep23, 3 stars (0.128→0.123→0.111). W<1.0 throughout — exceptional stability.
+
+---
+
+## Post-Mortem: alibaba_v90 — BayesGAN 5 particles (killed ep14, recall=0.000 FAILED)
+
+**Recipe**: v71 + bayes-critics 5 (SGLD noise injection). Using v48 pretrain.
+
+**Training-log**: recall=0.000 at both ep5 (MMD²=0.348, combined=0.548) and ep10 (MMD²=0.306, combined=0.507). W never exceeded 0.72 — the 5-particle critic ensemble provided no meaningful training signal. Generator produced garbage throughout.
+
+**BayesGAN with 5 particles is too weak for alibaba.** The SGLD noise smooths out the critic signal to the point where G can't learn. Tencent works fine with 5 particles (W=0.5-0.8, improving). Retrying with 3 particles (alibaba_v91).
 
 ---
 

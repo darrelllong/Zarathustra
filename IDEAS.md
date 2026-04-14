@@ -347,6 +347,7 @@ prove it via cache evaluation (#14).
 26. ~~alibaba_v88~~ (v71 seed #11, W-stopped ep55 — train 0.080 best ever, eval avg 0.145, **+81% gap**)
 27. ~~tencent_v119~~ (self-diag temp=0.1, W-exploded ep3 — even 0.1 too aggressive for tencent)
 28. ~~alibaba_v89~~ (self-diag temp=0.1, W-exploded ep3 — **self-diag DEAD on BOTH corpora**)
-29. **Running:** alibaba_v90 (BayesGAN 5 particles); tencent_v120 (BayesGAN 5 particles, G warm-up ep40)
-30. **Both corpora now testing BayesGAN (#2)** — posterior over discriminators, the strongest anti-mode-collapse technique.
-31. **Next:** If BayesGAN fails, try deeper LSTM (#11) or projection discriminator (#10).
+29. ~~alibaba_v90~~ (BayesGAN 5 particles, killed ep14 — recall=0.000, critic too weak for alibaba)
+30. **Running:** alibaba_v91 (BayesGAN 3 particles); tencent_v120 (BayesGAN 5 particles, best 0.111★ ep20, 3 stars, W<1.0!)
+31. **BayesGAN works on tencent** (exceptional W stability, steady improvement) but 5 particles too many for alibaba.
+32. **Next:** If BayesGAN 3 particles fails on alibaba, try deeper LSTM (#11) or projection discriminator (#10).
