@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v91 — BayesGAN 3 critic particles (IDEAS #2, reduced)
-**Recipe**: v71 + bayes-critics 3. v90 (5 particles) had recall=0.000 — critic too weak. Trying fewer particles.
+### alibaba_v92 — BayesGAN 3 particles + projection discriminator (IDEAS #2 + #10)
+**Recipe**: v91 recipe + --proj-critic. BayesGAN 3 reduced train→eval gap to 16%. Adding projection discriminator to condition critic on workload type.
 
 ### tencent_v121 — BayesGAN 3 critic particles (IDEAS #2, reduced)
 **Recipe**: v105 + bayes-critics 3. v120 (5 particles) stalled at 0.101 ep35, 5-run eval avg=0.126. Trying fewer particles like alibaba_v91.
+
+---
+
+## Post-Mortem: alibaba_v91 — BayesGAN 3 particles (killed ep40, best 0.086★ ep25)
+
+**Recipe**: v71 + bayes-critics 3. Using v48 pretrain.
+
+**Training-log**: 4 stars: ep5=0.169★, ep10=0.113★, ep20=0.101★, ep25=0.086★ (recall=0.648, ATR). ep30=0.097, ep35=0.099, ep40=0.117 — regression. W climbed from 0.8 to 1.2-1.6 range. Killed at ep40 (15 epochs stale).
+
+**5-run eval avg: combined=0.100** (range 0.071-0.122). Best single run 0.071 (nearly matching v71's 0.067). Recall avg=0.582, MMD² avg=0.016. Train→eval gap: **+16%** (0.086→0.100) — dramatically better than non-BayesGAN runs (40-80%). BayesGAN confirmed to reduce train→eval divergence.
+
+**Doesn't beat v71 ATB** (true avg 0.095 vs 0.100) but validates BayesGAN approach. Next: add projection discriminator (alibaba_v92).
 
 ---
 

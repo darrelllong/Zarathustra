@@ -350,5 +350,6 @@ prove it via cache evaluation (#14).
 29. ~~alibaba_v90~~ (BayesGAN 5 particles, killed ep14 — recall=0.000, critic too weak for alibaba)
 30. ~~tencent_v120~~ (BayesGAN 5 particles, killed ep50 — best 0.101 ep35, **5-run eval avg 0.126**, doesn't beat ATB)
 31. **BayesGAN 5 particles**: W stability exceptional but eval quality doesn't transfer. Train→eval gap persists.
-32. **Running:** alibaba_v91 (BayesGAN 3 particles, ep16, best 0.113 ep10); tencent_v121 (BayesGAN 3 particles, just launched)
-33. **Next:** If BayesGAN 3 particles fails on both, try projection discriminator (#10).
+32. ~~alibaba_v91~~ (BayesGAN 3 particles, killed ep40 — best 0.086★ ep25, **5-run eval avg 0.100**, gap only +16%! Doesn't beat ATB 0.095 but validates BayesGAN)
+33. **Running:** alibaba_v92 (BayesGAN 3 + proj-critic #10); tencent_v121 (BayesGAN 3 particles, G warm-up)
+34. **Next:** If proj-critic fails, try combining BayesGAN with cond-noise-scale at eval.
