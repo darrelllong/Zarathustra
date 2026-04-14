@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v101 — v71 base recipe, fresh seed roll #3
 **Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
-### tencent_v129 — base ATB recipe, fresh seed roll #3
-**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01. G warm-up ep40/100.
+### tencent_v130 — base ATB recipe, fresh seed roll #4
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: tencent_v129 — base ATB recipe, fresh seed roll #3 (killed ep67, best 0.134★ ep50)
+
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.175★ (recall=0.288), ep10=0.169★ (recall=0.257), ep15=0.153★ (recall=0.359), ep30=0.142★ (recall=0.372), ep45=0.138★ (recall=0.460), ep50=0.134★ (recall=0.430). Then W instability: W hit 3.98 at ep57, 3.20 at ep63, 3.30 at ep64, 3.30 at ep67. G_loss hit 4.03. ep55=0.135, ep60=0.145, ep65=0.148 — all regressed from best. Killed at ep67 (17 stale).
+
+**Verdict**: Produced 6 stars with steady improvement (0.175→0.134) but W became increasingly unstable in second half. Best training combined 0.134 is still far from ATB 0.098. No eval warranted — even without train→eval gap, 0.134 >> 0.098. Seed rolling continues.
 
 ---
 
