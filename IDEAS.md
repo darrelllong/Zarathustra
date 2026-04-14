@@ -410,5 +410,6 @@ prove it via cache evaluation (#14).
 58. ~~tencent_v126~~ (z_global det_prob=0.3, killed ep36 — best 0.137★ ep15, 21 stale. **det_prob fix DEAD on both corpora.**)
 59. ~~tencent_v127~~ (base ATB recipe, fresh seed, killed ep51 — best 0.100★ ep35, **3-run eval avg 0.148**, +48% gap. Four consecutive stars but train→eval gap killed it.)
 60. ~~alibaba_v99~~ (v71 base recipe, fresh seed, killed ep39 — best 0.108★ ep25, G_loss abnormally high 7-9, weak seed)
-61. **Running:** tencent_v128 (base ATB recipe, fresh seed roll #2 — G warm-up ep30/100)
-62. **Running:** alibaba_v100 (v71 base recipe, fresh seed roll #2)
+61. ~~tencent_v128~~ (base ATB recipe, fresh seed, killed ep28 — best 0.151★ ep15, recall never exceeded 0.308 then collapsed. Dead seed.)
+62. **Running:** alibaba_v100 (v71 base recipe, fresh seed — 0.113★ ep5, recall 0.553, GAN ep17)
+63. **Running:** tencent_v129 (base ATB recipe, fresh seed roll #3)

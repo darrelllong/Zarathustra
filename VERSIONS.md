@@ -7,10 +7,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ## Currently Running
 
 ### alibaba_v100 — v71 base recipe, fresh seed roll #2
-**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed. GAN ep17, best 0.113★ ep5, recall 0.553.
 
-### tencent_v128 — base ATB recipe, fresh seed roll #2
-**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01. G warm-up ep30/100.
+### tencent_v129 — base ATB recipe, fresh seed roll #3
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: tencent_v128 — base ATB recipe, fresh seed (killed ep28, best 0.151★ ep15)
+
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.177★ (recall=0.207), ep10=0.175★ (recall=0.233), ep15=0.151★ (recall=0.308). Then collapse: ep20=0.162 (recall=0.262), ep25=0.162 (recall=0.256). Recall went DOWN after ep15 — not just stalling, actively deteriorating. W climbed to 2.4. Killed at ep28 (13 stale).
+
+**Verdict**: Very weak seed. Recall never exceeded 0.308 — far below v127's 0.558 or ATB levels. The recall collapse (0.308→0.256) after ep15 is the hallmark of a dead seed. No eval warranted.
 
 ---
 
