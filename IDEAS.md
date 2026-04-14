@@ -6,9 +6,39 @@ Parameter tuning is unlikely to produce the breakthrough needed. The ideas below
 
 ---
 
-### 0. Fourier analysis
+### 0. ~~Fourier analysis~~ (DONE — 2026-04-13)
 
-Have we done a Fourier transform on the time series in the trace to look for dominant frequencies? Should R do that, or some other tool?
+**Method:** R spectral analysis (`traces/analysis/fourier_analysis.R`) on both corpora.
+Sampled 20 files per corpus (500k records each, ~10M total). Computed smoothed periodograms
+(Daniell kernel, spans=c(7,7), taper=0.1) on four derived series: ts_delta (inter-arrival
+times), obj_size, reuse (binary re-access flag), stride (distance to last same-object access).
+Heavy-tailed series (ts_delta, obj_size, stride) log1p-transformed before FFT.
+
+**Results:**
+
+| Series    | Alibaba entropy | Alibaba verdict     | Tencent entropy | Tencent verdict |
+|-----------|-----------------|---------------------|-----------------|-----------------|
+| ts_delta  | 0.9719          | White noise         | 0.9914          | White noise     |
+| obj_size  | 0.9854          | White noise         | 0.9837          | White noise     |
+| reuse     | 0.9768          | White noise         | 0.9717          | White noise     |
+| **stride**| **0.9442**      | **Mild periodicity**| 0.9784          | White noise     |
+
+Alibaba stride is the only series with mild periodicity (entropy < 0.95), showing a dominant
+period of ~253 samples. All other series across both corpora are spectrally white noise.
+Alibaba ts_delta and obj_size share a weak ~297-sample period. Reuse dominant frequencies
+on both corpora are at the DC/near-DC component (period ≈ window length) — just the
+non-zero mean, not real periodicity.
+
+**Implications for LLGAN:**
+1. **No long-range spectral structure to miss.** The LSTM's 12-step window is sufficient for
+   the temporal structure present. Longer windows or hierarchical modeling won't help.
+2. **Frequency-aware mechanisms are unnecessary.** FFT loss, spectral embeddings, and
+   explicit frequency-aware layers would be fitting noise. The peer review's repeated
+   request for spectral features is answered: there's nothing periodic to capture.
+3. **Improvement must come from distributional fidelity**, not temporal modeling — z_global
+   fix, locality engine, and conditioning architecture are the right targets.
+4. The mild alibaba stride periodicity (~253 samples) is interesting but too weak
+   (entropy 0.94, barely below threshold) to justify architectural changes.
 
 ### 1. Gaussian Mixture Prior on latent z (GMM-GAN)
 
@@ -231,6 +261,7 @@ random files per epoch. Easy change in the dataloader.
 - **#8 Multi-scale critic (--multi-scale-critic)** — implemented (works on tencent, hurts alibaba)
 - **#13 Block sampling (--block-sample)** — implemented, testing in v21 (alibaba) and v60 (tencent)
 - **#6 PCF loss (--pcf-loss-weight)** — **BREAKTHROUGH**: alibaba_v71 eval 0.067 (50% better than any prior). Replaces all handcrafted aux losses. Adversarial frequency training critical (freqs in C optimizer, NOT G).
+- **#0 Fourier analysis** — All series ≈ white noise on both corpora. No dominant periodicities. Frequency-aware mechanisms unnecessary.
 
 ### 14. HRC (Hit Ratio Curve) evaluation — cache fidelity metric
 
@@ -357,3 +388,4 @@ prove it via cache evaluation (#14).
 36. ~~alibaba_v93~~ (BayesGAN 3 + lower lr, killed ep43 — best 0.090★ ep25, **5-run eval avg 0.108**, worse than v91. BayesGAN doesn't beat base v71 0.095)
 37. **Running:** alibaba_v94 (base PCF + lower lr, no BayesGAN); tencent_v123 (lower lr, G warm-up)
 38. **KEY INSIGHT:** Base v71 recipe (0.095) is still alibaba ATB. BayesGAN reduces gap but doesn't win. Next: structural changes (z_global fix, locality engine).
+39. **Fourier analysis (#0) COMPLETE** — R spectral analysis on both corpora (10M records each). All series ≈ white noise (entropy > 0.95) except alibaba stride (0.9442, mild periodicity at ~253-sample period). No dominant periodicities for LSTM to capture. Frequency-aware mechanisms unnecessary. Confirms: improvement path is distributional (z_global, locality), not temporal.
