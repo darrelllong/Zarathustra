@@ -627,3 +627,52 @@ The newest results deserve a split verdict. There was real architectural effort 
 ### Short Take
 
 The repo is in danger of learning the wrong lesson from the last batch of runs. The right lesson is not "be safer." It is "one real architectural change just worked, so stop twisting knobs and build the next one." `v105` should make the team bolder, not more conservative.
+
+---
+
+## Round 13
+
+### Sampling Policy Is Part Of The Model
+
+One more point now needs to be stated explicitly: the repo keeps talking about model architecture as if the sampling policy were just background plumbing. It is not. The current trainer still defaults to `files_per_epoch = 8` in [config.py](/Users/darrell/Zarathustra/llgan/config.py#L41), fits the preprocessor on a seed set of only `n_seed = max(files_per_epoch, 4)` files in [train.py](/Users/darrell/Zarathustra/llgan/train.py#L368), and then trains each epoch on a random `8`-file slice in [train.py](/Users/darrell/Zarathustra/llgan/train.py#L1080). That is a perfectly reasonable engineering default. It is not obviously the right scientific default for these corpora.
+
+1. `[P1]` Tencent and Alibaba should not share the same interpretation of "broader sample." The R work is pretty clear on this. Tencent is structurally heterogeneous in a mixed-population sense: the cross-family summary describes it as bimodal in cluster balance in [R-REBUTTAL.md](/Users/darrell/Zarathustra/R-REBUTTAL.md#L228). Alibaba is different: less obviously multi-cluster, but highly persistent and non-exchangeable, with Hurst `0.98` in [R-REBUTTAL.md](/Users/darrell/Zarathustra/R-REBUTTAL.md#L132). So the correct sampling response is not one scalar knob called "more files per epoch" applied to both.
+
+2. `[P1]` For Tencent, a broader per-epoch sample is genuinely plausible as a win. If the corpus is bimodal or otherwise heterogeneous at the file level, then seeing only `8` files per epoch is an invitation to mode undercoverage and seed luck. The repo already hints at this in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L306), where "more `files_per_epoch` (24+)" is explicitly listed as a next experiment. I think that suggestion deserves to be promoted out of the TODO basement and into the mainline plan for Tencent. Not as a blind scalar sweep, but as a corpus-coverage intervention.
+
+3. `[P1]` For Alibaba, "broader sample" should mostly mean broader **structured** sample, not broader random sample. The R critique says this as plainly as it can: random file sampling loses temporal structure when Hurst is `0.98` and files are not exchangeable in [R-REBUTTAL.md](/Users/darrell/Zarathustra/R-REBUTTAL.md#L136). The same document explicitly recommends block sampling for Alibaba in [R-REBUTTAL.md](/Users/darrell/Zarathustra/R-REBUTTAL.md#L239). So for Alibaba, the real lever is not "8 vs 24 random files." It is "how many temporally adjacent files, in what block geometry, with what curriculum?"
+
+4. `[P1]` The preprocessor fit is also too narrow to ignore. Right now the normalization and schema are fit on a random seed set whose size is tied to `files_per_epoch` in [train.py](/Users/darrell/Zarathustra/llgan/train.py#L368). That means the repo is not only training on a small per-epoch slice; it is also standardizing the entire corpus through a small initial slice. On heterogeneous corpora, that can distort ranges, clipping, and even auto-dropped columns. If the team wants to test broader sampling honestly, it should broaden or freeze the preprocessor basis too.
+
+5. `[P1]` This is why "sampling policy is part of the model" is not rhetoric. The generator only learns from the file mixture it sees. The conditioner only learns on the descriptor geometry it sees. The critic only learns against the within-batch contrasts it sees. If Tencent is multi-mode, narrow random batches can suppress coverage. If Alibaba is temporally persistent, i.i.d. batches can actively destroy the very structure the model is supposed to imitate. That is not a side issue. That is part of the generative problem definition.
+
+6. `[P1]` There is already enough evidence in the repo to justify a split experiment rather than more arguing. The R follow-through says the highest-value next work includes block-vs-iid ablations on Alibaba in [R-REBUTTAL-RESPONSE.md](/Users/darrell/Zarathustra/R-REBUTTAL-RESPONSE.md#L244). The trainer already supports `--block-sample` in [config.py](/Users/darrell/Zarathustra/llgan/config.py#L44). The TODO already contemplates larger `files_per_epoch` in [TODO.md](/Users/darrell/Zarathustra/TODO.md#L306). So the repo does not need another philosophical discussion here. It has the ingredients to test the hypothesis directly.
+
+7. `[P2]` My practical recommendation is two separate sampling lanes:
+   Tencent:
+   raise `files_per_epoch` materially, keep random coverage, and measure whether recall stability and seed sensitivity improve.
+   Alibaba:
+   keep the corpus-specific PCF backbone, but test larger contiguous blocks rather than broader random file sets.
+   If the project wants a clean design, do this as a sampling-policy ablation family rather than mixing it with a new critic or locality mechanism in the same run.
+
+8. `[P2]` The bigger strategic point is that this is one of the few remaining levers that is both conceptually important and relatively cheap to test. It is not a moonshot refactor. It is also not just another scalar loss tweak. That makes it unusually attractive right now. If broader and better-structured sampling improves stability or recall, the whole next architecture phase gets easier to interpret.
+
+### What I Would Do Right Now
+
+1. On Tencent, run a true broader-coverage ablation:
+   same recipe,
+   same eval,
+   larger `files_per_epoch` such as `24+`,
+   and a broader or frozen preprocessor fit set.
+
+2. On Alibaba, run a structured-sampling ablation:
+   same recipe,
+   but compare i.i.d. random files vs larger contiguous block sampling.
+
+3. Keep these as sampling-policy experiments, not mixed with new critic or generator mechanisms, so the result is interpretable.
+
+4. If either corpus improves, treat sampling policy as a first-class design choice in the writeup and in future build order.
+
+### Short Take
+
+Yes, they probably can take a broader sample and do better. But the way to do that is corpus-specific: Tencent likely wants broader per-epoch coverage, while Alibaba likely wants broader temporal structure preservation. The current `8`-file random slice is a default, not a law of nature, and the R results say it is unlikely to be equally right for both corpora.
