@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v92 — BayesGAN 3 particles + projection discriminator (IDEAS #2 + #10)
-**Recipe**: v91 recipe + --proj-critic. BayesGAN 3 reduced train→eval gap to 16%. Adding projection discriminator to condition critic on workload type.
+### alibaba_v93 — BayesGAN 3 particles, lower lr (6e-5/3e-5)
+**Recipe**: v91 recipe but lr-g 6e-5 / lr-d 3e-5 (vs 8e-5/4e-5). v91's W climbed and stalled after ep25. Lower lr should extend productive training window.
 
 ### tencent_v121 — BayesGAN 3 critic particles (IDEAS #2, reduced)
-**Recipe**: v105 + bayes-critics 3. v120 (5 particles) stalled at 0.101 ep35, 5-run eval avg=0.126. Trying fewer particles like alibaba_v91.
+**Recipe**: v105 + bayes-critics 3. 5 consecutive stars: ep5=0.168, ep10=0.146, ep15=0.128, ep20=0.124, ep25=0.111★. Excellent trajectory.
+
+---
+
+## Post-Mortem: alibaba_v92 — BayesGAN 3 + proj-critic (W-stopped ep5, FAILED)
+
+**Recipe**: v91 + --proj-critic. Using v48 pretrain.
+
+**Training-log**: W exploded immediately: ep1=0.61, ep2=2.11, ep3=3.30, ep4=6.22, ep5=8.02. W-stopped at ep5. Only eval: combined=0.157 (MMD²=0.052, recall=0.472).
+
+**Projection discriminator + BayesGAN is incompatible.** The proj-critic conditions on workload type, making the critic too powerful. BayesGAN's SGLD noise couldn't compensate — W diverged catastrophically. Proj-critic may work without BayesGAN but that's a separate experiment.
 
 ---
 
