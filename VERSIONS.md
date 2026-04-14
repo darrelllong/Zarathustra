@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v96 — standard lr (8e-5/4e-5) + files_per_epoch=24
 **Recipe**: v71 base PCF recipe with standard lr but broader sampling. Lower lr experiments (v94, v95) showed zero gap but quality plateau at 0.103-0.115. Standard lr has better train quality (~0.080) but 40-80% gap. Testing if broader sampling also helps the standard lr recipe generalize.
 
-### tencent_v124 — lower lr + files_per_epoch=24 (broader coverage)
-**Recipe**: v123 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Round 13 recommended broader per-epoch coverage for tencent specifically.
+### tencent_v125 — standard lr (8e-5/4e-5) + files_per_epoch=24
+**Recipe**: v105 base PCF with standard lr but broader sampling. Lower lr + 24 files (v124) had worse eval gap (+27%) than lower lr + 12 files (v123, +3.7%). Testing standard lr recipe with broader sampling.
+
+---
+
+## Post-Mortem: tencent_v124 — lower lr + files_per_epoch=24 (killed ep46, best 0.114★ ep35)
+
+**Recipe**: v123 + files_per_epoch=24 (Round 13 broader coverage). Lower lr 6e-5/3e-5. Using v86 pretrain.
+
+**Training-log**: Five consecutive stars: ep5=0.133★, ep10=0.144, ep15=0.130★, ep20=0.122★, ep25=0.127, ep30=0.117★, ep35=0.114★. Remarkable streak. Then W spiked to 2.93 at ep39 (near W-stop 3.0), and quality collapsed: ep40=0.124, ep45=0.155, recall 0.490→0.355. Killed at ep46 (11 epochs stale).
+
+**Eval: combined=0.145** (MMD²=0.015, recall=0.353, precision=0.873). Train→eval gap: **+27%** (0.114→0.145). Worse than v123's +3.7%. Broader sampling increased eval gap on tencent — opposite of what Round 13 predicted. Doesn't beat ATB (0.098).
+
+**Verdict**: Broader sampling (24 files) produced best tencent train quality (0.114) but the W=2.93 spike broke training, and eval gap was worse than v123. The 24-file recipe improves train quality but doesn't generalize. Config-space largely exhausted.
 
 ---
 

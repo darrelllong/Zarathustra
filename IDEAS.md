@@ -394,5 +394,7 @@ prove it via cache evaluation (#14).
 42. **KEY FINDING:** Lower lr (6e-5/3e-5) eliminates train→eval gap (<1% vs 40-80% at standard lr). Combine with quality-improving structural change to capitalize.
 43. ~~tencent_v123~~ (lower lr, killed ep48 — best 0.136★ ep30, **eval 0.141, train→eval gap +3.7%**. Lower lr reduces gap but quality 0.141 far from ATB 0.098)
 44. ~~alibaba_v95~~ (lower lr + files_per_epoch=24, killed ep25 — best 0.103★ ep5, **eval 0.106, gap +2.9%**. Broader sampling strong early but unsustainable. Precision drop 0.627.)
-45. **Running:** tencent_v124 (lower lr + files_per_epoch=24, GAN ep14, best 0.133★ ep5)
-46. **Launched:** alibaba_v96 (standard lr 8e-5/4e-5 + files_per_epoch=24 — testing if broader sampling helps standard lr recipe generalize)
+45. ~~tencent_v124~~ (lower lr + files_per_epoch=24, killed ep46 — best 0.114★ ep35, **eval 0.145, gap +27%**. Five consecutive train stars but W=2.93 spike broke it. Broader sampling worsened eval gap on tencent.)
+46. **Running:** alibaba_v96 (standard lr + files_per_epoch=24, GAN ep11, best 0.117★ ep10)
+47. **Launched:** tencent_v125 (standard lr 8e-5/4e-5 + files_per_epoch=24)
+48. **CONFIG-SPACE EXHAUSTED.** Lower lr, broader sampling, BayesGAN, proj-critic all tested. None beat ATBs (alibaba 0.095, tencent 0.098). After v96/v125 complete, must move to structural code changes: z_global fix, locality engine.
