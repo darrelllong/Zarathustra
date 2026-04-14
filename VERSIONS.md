@@ -6,11 +6,19 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v89 — self-diag temp=0.1 (IDEAS #9)
-**Recipe**: v71 + self-diag-temp 0.1. First structural experiment on alibaba. Using v48 pretrain.
+### alibaba_v90 — BayesGAN 5 critic particles (IDEAS #2)
+**Recipe**: v71 + bayes-critics 5 (SGLD noise injection). Using v48 pretrain. Both corpora now testing BayesGAN.
 
 ### tencent_v120 — BayesGAN 5 critic particles (IDEAS #2)
-**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). First BayesGAN experiment. Anti-mode-collapse via posterior over discriminators.
+**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). G warm-up ep40/100.
+
+---
+
+## Post-Mortem: alibaba_v89 — self-diag temp=0.1 (W-exploded ep3, FAILED)
+
+**Recipe**: v71 + self-diag-temp 0.1. Using v48 pretrain.
+
+**Training-log**: W exploded immediately: ep1=1.16, ep2=2.09, ep3=5.11. Killed at ep3. **Self-diag is DEAD on both corpora** — upweighting mechanism fundamentally incompatible with PCF recipe at any temperature.
 
 ---
 
