@@ -6,11 +6,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v94 — base PCF recipe + lower lr (6e-5/3e-5), no BayesGAN
-**Recipe**: v71 base PCF but lr-g 6e-5 / lr-d 3e-5. v91 (BayesGAN 3) got 0.100, v93 (BayesGAN 3 + lower lr) got 0.108 — BayesGAN didn't beat base v71 (0.095). Trying lower lr on the proven recipe.
-
 ### tencent_v123 — lower lr (6e-5/3e-5), base PCF recipe
-**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. G warm-up phase.
+**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. GAN ep34, best comb=0.136★ ep30.
+
+---
+
+## Post-Mortem: alibaba_v94 — base PCF + lower lr (killed ep26, best 0.116★ ep10)
+
+**Recipe**: v71 base PCF but lr-g 6e-5 / lr-d 3e-5 (no BayesGAN). Using v48 pretrain.
+
+**Training-log**: 3 stars: ep5=0.126★ (recall=0.468), ep10=0.116★ (MMD²=0.015, recall=0.495). Then regressed — ep15=0.147, ep20=0.141, ep25=0.122. MMD² doubled from 0.015 to 0.031-0.037. Killed at ep26 (16 epochs stale).
+
+**Eval: combined=0.115** (MMD²=0.014, recall=0.493, precision=0.780).
+
+**KEY FINDING: train→eval gap <1%** (0.116 train → 0.115 eval). Lower lr completely eliminates the generalization gap that plagued all standard-lr runs (+40-80%). But base quality (0.115) doesn't beat ATB (0.095). The lower lr recipe needs a quality-improving structural change (z_global fix, locality engine) to capitalize on the zero-gap property.
 
 ---
 
