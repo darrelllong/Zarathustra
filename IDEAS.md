@@ -404,4 +404,6 @@ prove it via cache evaluation (#14).
 52. **Running:** alibaba_v97 (z_global det_prob=0.3, standard lr, 12 files/epoch)
 53. ~~tencent_v125~~ (standard lr, 12 files, killed ep30 — best 0.115★ ep10, 20 stale, W spiked 3.40, recall collapsed 0.481→0.298)
 54. **Running:** tencent_v126 (z_global det_prob=0.3, standard lr, 12 files/epoch)
-55. **alibaba_v97 ep30: comb=0.088★** (MMD²=0.011, recall=0.613) — z_global fix producing best-ever train recall!
+55. ~~alibaba_v97~~ (z_global det_prob=0.3, killed ep55 — best 0.088★ ep30, **6-run eval avg 0.111**, range 0.082-0.140. First eval 0.088 was lucky. Doesn't beat ATB 0.095. z_global mismatch is NOT the dominant gap source.)
+56. **KEY FINDING:** Eval variance (recall 0.398–0.639) is the real problem, not train/eval distribution mismatch. Need higher n_samples or architectural fix for recall stability.
+57. **Running:** alibaba_v98 (v71 base recipe, fresh seed — no det_prob, kl_weight=0.01)

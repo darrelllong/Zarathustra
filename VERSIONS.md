@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v97 — z_global det_prob fix (var-cond-det-prob=0.3)
-**Recipe**: v71 base PCF recipe + `--var-cond-det-prob 0.3`. During training, 30% of batches use deterministic μ (no noise) in CondEncoder, matching eval behavior. Directly addresses the train→eval z_global gap identified in Round 5 peer review and investigation #24. Standard lr 8e-5/4e-5, files_per_epoch=12, var-cond-kl-weight=0.01.
+### alibaba_v98 — v71 base recipe, fresh seed (no det_prob)
+**Recipe**: Identical to v71 ATB recipe. Fresh seed roll to accumulate more data points on the ATB recipe's eval variance. var-cond-kl-weight=0.01, no det_prob.
 
 ### tencent_v126 — z_global det_prob fix (var-cond-det-prob=0.3)
 **Recipe**: v105 base PCF recipe + `--var-cond-det-prob 0.3`. Same z_global fix as alibaba_v97. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+
+---
+
+## Post-Mortem: alibaba_v97 — z_global det_prob fix (killed ep55, best 0.088★ ep30)
+
+**Recipe**: v71 base PCF recipe + `--var-cond-det-prob 0.3`. 30% of training batches use deterministic μ in CondEncoder. Standard lr 8e-5/4e-5, files_per_epoch=12, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.118★, ep10=0.110★, ep20=0.097★, ep30=0.088★ (MMD²=0.011, recall=0.613 — best recall ever). Then regression: ep35=0.101, ep40=0.109, ep45 no star, ep50=0.114, ep55=0.117. Killed at ep55 (25 stale).
+
+**Eval (6-run avg): combined=0.111** (range 0.082–0.140). Single-run evals: 0.088, 0.140, 0.106, 0.082, 0.132, 0.120. Precision 0.925 (excellent) but recall variance massive (0.398–0.639). First eval (0.088) was a lucky draw. **Does NOT beat ATB (0.095).**
+
+**Verdict**: The det_prob fix produced exceptional train metrics (0.088★, recall 0.613) but eval variance remains massive. The z_global train/eval mismatch is NOT the dominant source of the gap — the fundamental issue is eval-time sampling variance in recall. The fix is architecturally clean but doesn't solve the problem. det_prob=0.3 goes into the "tried, didn't beat ATB" bucket.
 
 ---
 
