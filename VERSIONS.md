@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v91 — BayesGAN 3 critic particles (IDEAS #2, reduced)
 **Recipe**: v71 + bayes-critics 3. v90 (5 particles) had recall=0.000 — critic too weak. Trying fewer particles.
 
-### tencent_v120 — BayesGAN 5 critic particles (IDEAS #2)
-**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). Joint GAN ep23, 3 stars (0.128→0.123→0.111). W<1.0 throughout — exceptional stability.
+### tencent_v121 — BayesGAN 3 critic particles (IDEAS #2, reduced)
+**Recipe**: v105 + bayes-critics 3. v120 (5 particles) stalled at 0.101 ep35, 5-run eval avg=0.126. Trying fewer particles like alibaba_v91.
+
+---
+
+## Post-Mortem: tencent_v120 — BayesGAN 5 particles (killed ep50, stalled at 0.101)
+
+**Recipe**: v105 + bayes-critics 5 (SGLD noise injection). Using v86 pretrain.
+
+**Training-log**: 6 stars: ep5=0.128★, ep15=0.123★, ep20=0.111★, ep35=0.101★, ep40=0.0996★. W exceptionally stable (<1.0 for 43 epochs). But stalled after ep35 — ep45 regressed to 0.113, ep50=0.110. Killed at ep50 (15 epochs stale).
+
+**5-run eval avg: combined=0.126** (range 0.108-0.154). Recall avg=0.436, MMD² avg=0.013. Does NOT beat ATB (0.098). Training EMA of 0.101 was optimistic — real performance ~25% worse.
+
+**BayesGAN 5 particles on tencent**: W stability is exceptional but final quality doesn't translate to eval. The critic ensemble may be too smooth, allowing G to find training shortcuts that don't generalize. Trying 3 particles (tencent_v121).
 
 ---
 
