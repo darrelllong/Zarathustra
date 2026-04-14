@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v98 — v71 base recipe, fresh seed (no det_prob)
 **Recipe**: Identical to v71 ATB recipe. Fresh seed roll to accumulate more data points on the ATB recipe's eval variance. var-cond-kl-weight=0.01, no det_prob.
 
-### tencent_v126 — z_global det_prob fix (var-cond-det-prob=0.3)
-**Recipe**: v105 base PCF recipe + `--var-cond-det-prob 0.3`. Same z_global fix as alibaba_v97. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+### tencent_v127 — base ATB recipe, fresh seed (no det_prob)
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: tencent_v126 — z_global det_prob fix (killed ep36, best 0.137★ ep15)
+
+**Recipe**: v105 base PCF recipe + `--var-cond-det-prob 0.3`. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+
+**Training-log**: Stars at ep5=0.160★ (no star, first eval), ep10=0.159 (no star), ep15=0.137★. Then stagnation: ep20=0.163, ep25=0.152, ep30=0.144, ep35=0.142. Recall stuck 0.308-0.424 — never recovered from ep20 collapse. W stable 1.4-2.5. Killed at ep36 (21 stale).
+
+**Verdict**: z_global det_prob fix failed on tencent too. Best 0.137 not competitive with ATB (0.098). The det_prob fix doesn't help either corpus — eval variance is not caused by the CondEncoder train/eval mismatch.
 
 ---
 
