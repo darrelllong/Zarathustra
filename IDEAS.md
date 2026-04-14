@@ -392,4 +392,5 @@ prove it via cache evaluation (#14).
 40. ~~alibaba_v94~~ (base PCF + lower lr, killed ep26 — best 0.116★ ep10, **eval 0.115, train→eval gap <1%!!** Lower lr eliminates generalization gap but base quality 0.115 doesn't beat ATB 0.095)
 41. **Running:** tencent_v123 (lower lr, GAN ep34, best comb=0.136★ ep30)
 42. **KEY FINDING:** Lower lr (6e-5/3e-5) eliminates train→eval gap (<1% vs 40-80% at standard lr). Combine with quality-improving structural change to capitalize.
-43. **Launched:** alibaba_v95 (lower lr + files_per_epoch=24, Round 13 sampling policy test); tencent_v123 continuing (ep34, best 0.136★ ep30)
+43. ~~tencent_v123~~ (lower lr, killed ep48 — best 0.136★ ep30, **eval 0.141, train→eval gap +3.7%**. Lower lr reduces gap but quality 0.141 far from ATB 0.098)
+44. **Launched:** alibaba_v95 (lower lr + files_per_epoch=24); tencent_v124 (lower lr + files_per_epoch=24)

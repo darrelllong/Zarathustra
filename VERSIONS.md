@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v95 — lower lr + files_per_epoch=24 (broader coverage)
 **Recipe**: v94 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Peer review Round 13 recommended broader per-epoch coverage. v94 showed lower lr eliminates train→eval gap (<1%) — now testing if broader sampling improves base quality.
 
-### tencent_v123 — lower lr (6e-5/3e-5), base PCF recipe
-**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. BayesGAN and proj-critic both dead on tencent. GAN ep34, best comb=0.136★ ep30.
+### tencent_v124 — lower lr + files_per_epoch=24 (broader coverage)
+**Recipe**: v123 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Round 13 recommended broader per-epoch coverage for tencent specifically.
+
+---
+
+## Post-Mortem: tencent_v123 — lower lr (killed ep48, best 0.136★ ep30)
+
+**Recipe**: v105 but lr-g 6e-5 / lr-d 3e-5. Using v86 pretrain. Mixed-type-recovery enabled.
+
+**Training-log**: Stars at ep5=0.205★, ep10=0.165★, ep15=0.157★, ep25=0.150★, ep30=0.136★. Recall peaked at 0.443 (ep30). After ep30, regression: ep35=0.159, ep40=0.164, ep45=0.174. W oscillating 1.2–2.5 with spikes. Killed at ep48 (18 epochs stale).
+
+**Eval: combined=0.141** (MMD²=0.015, recall=0.368, precision=0.808). Train→eval gap: **+3.7%** (0.136→0.141). Lower lr reduces gap dramatically vs standard lr runs. But base quality (0.141) far from ATB (0.098). Lower lr alone is not enough — needs structural quality improvement.
 
 ---
 
