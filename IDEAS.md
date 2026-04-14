@@ -406,6 +406,7 @@ prove it via cache evaluation (#14).
 54. **Running:** tencent_v126 (z_global det_prob=0.3, standard lr, 12 files/epoch)
 55. ~~alibaba_v97~~ (z_global det_prob=0.3, killed ep55 — best 0.088★ ep30, **6-run eval avg 0.111**, range 0.082-0.140. First eval 0.088 was lucky. Doesn't beat ATB 0.095. z_global mismatch is NOT the dominant gap source.)
 56. **KEY FINDING:** Eval variance (recall 0.398–0.639) is the real problem, not train/eval distribution mismatch. Need higher n_samples or architectural fix for recall stability.
-57. ~~alibaba_v98~~ (v71 base recipe, fresh seed, killed ep55 — best 0.089★ ep30, **5-run eval avg 0.088 ★★★ NEW ALIBABA ATB ★★★** Beats v71's 0.095 by 7.4%. Recall avg 0.611 vs v71's ~0.50.)
+57. ~~alibaba_v98~~ (v71 base recipe, fresh seed, killed ep60 — best 0.089★ ep30, **5-run eval avg 0.088 ★★★ NEW ALIBABA ATB ★★★** Beats v71's 0.095 by 7.4%. Recall avg 0.611 vs v71's ~0.50.)
 58. ~~tencent_v126~~ (z_global det_prob=0.3, killed ep36 — best 0.137★ ep15, 21 stale. **det_prob fix DEAD on both corpora.**)
-59. **Running:** tencent_v127 (base ATB recipe, fresh seed — 0.125★ ep5, GAN ep8)
+59. **Running:** tencent_v127 (base ATB recipe, fresh seed — 0.125★ ep5, GAN ep13)
+60. **Running:** alibaba_v99 (v71 base recipe, fresh seed — AE pretrain ep30/50)

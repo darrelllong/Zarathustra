@@ -9,13 +9,16 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### tencent_v127 — base ATB recipe, fresh seed (no det_prob)
 **Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
 
+### alibaba_v99 — v71 base recipe, fresh seed roll
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Another seed roll attempt. AE pretraining in progress.
+
 ---
 
-## Post-Mortem: alibaba_v98 — v71 base recipe, fresh seed (killed ep55, best 0.089★ ep30) ★★★ NEW ALIBABA ATB ★★★
+## Post-Mortem: alibaba_v98 — v71 base recipe, fresh seed (killed ep60, best 0.089★ ep30) ★★★ NEW ALIBABA ATB ★★★
 
 **Recipe**: Identical to v71 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
-**Training-log**: Stars at ep5=0.119★, ep10=0.089★ (recall=0.617), ep30=0.089★ (recall=0.631). Sustained high recall (0.576-0.637) throughout — best sustained recall ever. W volatile (spiking to 3.5-3.8 multiple times but recovering). ep40=0.102, ep50=0.097, ep55=0.133 (collapse). Killed at ep55 (25 stale). G_loss stayed negative throughout — unusual training dynamic.
+**Training-log**: Stars at ep5=0.119★, ep10=0.089★ (recall=0.617), ep30=0.089★ (recall=0.631). Sustained high recall (0.576-0.637) throughout — best sustained recall ever. W volatile (spiking to 3.5-3.8 multiple times but recovering). ep40=0.102, ep50=0.097, ep55=0.133 (collapse), ep60=0.099. Killed at ep60 (30 stale, W spiking 3.6-4.5). G_loss stayed negative throughout — unusual training dynamic.
 
 **Eval (5-run avg): combined=0.088 ★★★ NEW ALIBABA ATB ★★★** (range 0.064–0.112). Individual runs: 0.075, 0.106, 0.064, 0.080, 0.112. Avg recall=0.611 (vs v71's ~0.50). Avg MMD²=0.010 (vs v71's ~0.015). Beats v71's true 5-run avg of 0.095 by **7.4%**.
 
