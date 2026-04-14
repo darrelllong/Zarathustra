@@ -398,3 +398,8 @@ prove it via cache evaluation (#14).
 46. **Running:** alibaba_v96 (standard lr + files_per_epoch=24, GAN ep11, best 0.117★ ep10)
 47. **Launched:** tencent_v125 (standard lr 8e-5/4e-5 + files_per_epoch=24)
 48. **CONFIG-SPACE EXHAUSTED.** Lower lr, broader sampling, BayesGAN, proj-critic all tested. None beat ATBs (alibaba 0.095, tencent 0.098). After v96/v125 complete, must move to structural code changes: z_global fix, locality engine.
+49. ~~alibaba_v96~~ (standard lr + 24 files, killed ep30 — best 0.097★ ep15 **BEST TRAIN EVER**, eval 0.119, gap +22%. Config-space CONCLUSIVELY exhausted.)
+50. **Running:** tencent_v125 (standard lr + 24 files, G warm-up ep30/100)
+51. **z_global det_prob fix IMPLEMENTED** — CondEncoder now accepts `det_prob` param; during training, randomly uses deterministic μ (no noise) to align train/eval distributions. Added `--var-cond-det-prob` CLI arg.
+52. **Running:** alibaba_v97 (z_global det_prob=0.3, standard lr, 12 files/epoch)
+53. **Restarted:** tencent_v125 (standard lr, 12 files/epoch — original killed during process cleanup)

@@ -144,6 +144,9 @@ class Config:
     var_cond_kl_weight: float = 0.001    # Weight for KL(q(cond|stats) || N(0,I)) in G loss.
                                          # Small (0.001) lets σ grow slowly; try 0.01 for
                                          # stronger regularization toward unit Gaussian.
+    var_cond_det_prob: float = 0.0       # Probability of using deterministic μ (no noise)
+                                         # during training.  Closes train→eval z_global gap
+                                         # by teaching G to handle both noisy and clean cond.
 
     # Regime-first two-stage generation (IDEAS.md idea #5)
     n_regimes: int = 0               # Number of workload regime prototypes (0 = off).

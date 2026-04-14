@@ -294,11 +294,14 @@ class CondEncoder(nn.Module):
         nn.init.zeros_(self.logvar_net.weight)
         nn.init.constant_(self.logvar_net.bias, -6.0)
 
-    def forward(self, cond: torch.Tensor, training: bool = True):
+    def forward(self, cond: torch.Tensor, training: bool = True,
+                det_prob: float = 0.0):
         """
         Args:
             cond:     (B, cond_dim) raw char-file conditioning vector
             training: sample if True; use μ deterministically if False
+            det_prob: during training, probability of using deterministic μ
+                      (closes train→eval gap by exposing G to both modes)
         Returns:
             encoded:  (B, cond_dim) — perturbed at train time, deterministic at eval
             kl:       scalar KL(N(μ,σ²) || N(0,I)) = 0.5*(σ²+μ²-1-log σ²).mean()
@@ -306,9 +309,14 @@ class CondEncoder(nn.Module):
         mu     = self.mu_net(cond)
         logvar = self.logvar_net(cond).clamp(-10, 2)   # σ in [e^-5, e^1]
         if training:
-            std     = (0.5 * logvar).exp()
-            encoded = mu + std * torch.randn_like(mu)
-            kl      = 0.5 * (logvar.exp() + mu.pow(2) - 1.0 - logvar).mean()
+            # Randomly use deterministic mode to align train/eval distributions
+            use_det = det_prob > 0 and torch.rand(()).item() < det_prob
+            if use_det:
+                encoded = mu
+            else:
+                std     = (0.5 * logvar).exp()
+                encoded = mu + std * torch.randn_like(mu)
+            kl = 0.5 * (logvar.exp() + mu.pow(2) - 1.0 - logvar).mean()
         else:
             encoded = mu
             kl      = cond.new_zeros(())

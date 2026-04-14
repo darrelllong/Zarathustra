@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v96 — standard lr (8e-5/4e-5) + files_per_epoch=24
-**Recipe**: v71 base PCF recipe with standard lr but broader sampling. Lower lr experiments (v94, v95) showed zero gap but quality plateau at 0.103-0.115. Standard lr has better train quality (~0.080) but 40-80% gap. Testing if broader sampling also helps the standard lr recipe generalize.
+### alibaba_v97 — z_global det_prob fix (var-cond-det-prob=0.3)
+**Recipe**: v71 base PCF recipe + `--var-cond-det-prob 0.3`. During training, 30% of batches use deterministic μ (no noise) in CondEncoder, matching eval behavior. Directly addresses the train→eval z_global gap identified in Round 5 peer review and investigation #24. Standard lr 8e-5/4e-5, files_per_epoch=12, var-cond-kl-weight=0.01.
 
-### tencent_v125 — standard lr (8e-5/4e-5) + files_per_epoch=24
-**Recipe**: v105 base PCF with standard lr but broader sampling. Lower lr + 24 files (v124) had worse eval gap (+27%) than lower lr + 12 files (v123, +3.7%). Testing standard lr recipe with broader sampling.
+### tencent_v125 — standard lr (8e-5/4e-5) + files_per_epoch=12 (restarted)
+**Recipe**: v105 base PCF with standard lr. Originally launched with files_per_epoch=24 but process was killed during cleanup. Restarted with standard files_per_epoch=12. No pretrain checkpoint was saved.
+
+---
+
+## Post-Mortem: alibaba_v96 — standard lr + files_per_epoch=24 (killed ep30, best 0.097★ ep15)
+
+**Recipe**: v71 base PCF recipe with standard lr 8e-5/4e-5 but files_per_epoch=24 (Round 13 broader coverage). Using v48 pretrain.
+
+**Training-log**: Stars at ep5=0.125★, ep10=0.117★, ep15=0.097★ (MMD²=0.012, recall=0.575). Best train metric EVER across all versions. Then regression: ep20=0.107, ep25=0.105, ep30=0.104. W climbing steadily: 0.91→1.39→1.54→1.69→1.95→2.01. Killed at ep30 (15 stale).
+
+**Eval: combined=0.119** (MMD²=0.018, recall=0.494, precision=0.678). Train→eval gap: **+22%** (0.097→0.119). Standard lr gap persists even with broader sampling. Best-ever train metric (0.097) produced mediocre eval. Doesn't beat ATB (0.095).
+
+**Verdict**: Broader sampling + standard lr produced extraordinary train quality (0.097) — better than even ATB single-run evals. But the train→eval gap remains substantial at standard lr. This conclusively proves: config-space is exhausted. Lower lr fixes gap but caps quality; standard lr has quality but gap; broader sampling helps train but not eval. **Structural code changes are the only remaining path.**
 
 ---
 

@@ -122,7 +122,9 @@ def _make_z_global(
             cond = compute_window_descriptors(real_features)
         # Variational conditioning: perturb cond at training time, use μ at eval
         if G is not None and getattr(G, "cond_encoder", None) is not None:
-            cond, kl_loss = G.cond_encoder(cond, training=training)
+            det_prob = getattr(cfg, "var_cond_det_prob", 0.0) if training else 0.0
+            cond, kl_loss = G.cond_encoder(cond, training=training,
+                                           det_prob=det_prob)
         # Regime sampler (IDEAS.md #5): map cond → discrete regime code via
         # Gumbel-Softmax.  Replaces raw cond with a regime prototype vector,
         # committing G to one workload type before generation.  Applied BEFORE
@@ -1864,6 +1866,10 @@ def parse_args() -> Config:
                    help="Weight for KL divergence term in G loss when --var-cond is set. "
                         "Small values (0.001) let σ grow slowly; larger values (0.01) "
                         "push μ toward 0 and σ toward 1 more aggressively.")
+    p.add_argument("--var-cond-det-prob", type=float, default=0.0,
+                   help="During training, probability of using deterministic μ (no noise) "
+                        "in CondEncoder. Closes train→eval z_global gap by exposing G "
+                        "to both stochastic and deterministic conditioning.")
     p.add_argument("--cond-drop-prob",   type=float, default=0.0,
                    help="Classifier-free guidance: drop conditioning with this probability (0=always condition)")
     p.add_argument("--hidden-size",      type=int,   default=256)
@@ -2148,6 +2154,7 @@ def parse_args() -> Config:
     cfg.gmm_components              = args.gmm_components
     cfg.var_cond                    = args.var_cond
     cfg.var_cond_kl_weight          = args.var_cond_kl_weight
+    cfg.var_cond_det_prob           = args.var_cond_det_prob
     cfg.latent_dim              = args.latent_dim
     cfg.pretrain_ae_epochs      = args.pretrain_ae_epochs
     cfg.pretrain_sup_epochs     = args.pretrain_sup_epochs
