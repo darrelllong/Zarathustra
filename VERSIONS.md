@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v102 — v71 base recipe, fresh seed roll #4
 **Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
-### tencent_v130 — base ATB recipe, fresh seed roll #4
+### tencent_v131 — base ATB recipe, fresh seed roll #5
 **Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: tencent_v130 — base ATB recipe, fresh seed roll #4 (killed ep25, best 0.122★ ep10)
+
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.173★ (recall=0.213), ep10=0.122★ (recall=0.495). Strong early trajectory — ep10 combined 0.122 was the best early tencent result seen. But recall collapsed: ep15=0.123 (recall=0.446), ep20=0.150 (recall=0.314), ep25=0.151 (recall=0.335). W spiked to 2.67 at ep22. Killed at ep25 (15 stale).
+
+**Verdict**: Promising early start (0.122★ at ep10) but recall collapsed from 0.495 to 0.335 after ep10. Classic tencent pattern — good early recall that doesn't sustain. No eval warranted.
 
 ---
 
