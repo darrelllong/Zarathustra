@@ -409,5 +409,6 @@ prove it via cache evaluation (#14).
 57. ~~alibaba_v98~~ (v71 base recipe, fresh seed, killed ep60 — best 0.089★ ep30, **5-run eval avg 0.088 ★★★ NEW ALIBABA ATB ★★★** Beats v71's 0.095 by 7.4%. Recall avg 0.611 vs v71's ~0.50.)
 58. ~~tencent_v126~~ (z_global det_prob=0.3, killed ep36 — best 0.137★ ep15, 21 stale. **det_prob fix DEAD on both corpora.**)
 59. ~~tencent_v127~~ (base ATB recipe, fresh seed, killed ep51 — best 0.100★ ep35, **3-run eval avg 0.148**, +48% gap. Four consecutive stars but train→eval gap killed it.)
-60. **Running:** alibaba_v99 (v71 base recipe, fresh seed — 0.124★ ep10, GAN ep15)
-61. **Running:** tencent_v128 (base ATB recipe, fresh seed roll #2)
+60. ~~alibaba_v99~~ (v71 base recipe, fresh seed, killed ep39 — best 0.108★ ep25, G_loss abnormally high 7-9, weak seed)
+61. **Running:** tencent_v128 (base ATB recipe, fresh seed roll #2 — G warm-up ep30/100)
+62. **Running:** alibaba_v100 (v71 base recipe, fresh seed roll #2)

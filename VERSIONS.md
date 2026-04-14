@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v99 — v71 base recipe, fresh seed roll
-**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. GAN ep15, best 0.124★ ep10.
+### alibaba_v100 — v71 base recipe, fresh seed roll #2
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
 ### tencent_v128 — base ATB recipe, fresh seed roll #2
-**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01. G warm-up ep30/100.
+
+---
+
+## Post-Mortem: alibaba_v99 — v71 base recipe, fresh seed (killed ep39, best 0.108★ ep25)
+
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
+
+**Training-log**: Stars at ep5=0.126★ (recall=0.487), ep10=0.124★ (recall=0.480), ep20=0.108★ (recall=0.568), ep25=0.108★ (recall=0.556). Then regression: ep30=0.121 (recall=0.471), ep35=0.135 (recall=0.494, MMD²=0.034). W spiked to 2.65 at ep36. G_loss unusually high (7.5-9.6) — very different from v98's negative-G pattern. PCF crossed 1.0. Killed at ep39 (14 stale).
+
+**Verdict**: Weak seed. G_loss stayed very high positive (vs v98's negative G_loss), suggesting different adversarial dynamic. Best train 0.108 is 23% from ATB 0.088, and with systemic ~48% train→eval gap would not be competitive. Seed rolling continues.
 
 ---
 
