@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v95 — lower lr + files_per_epoch=24 (broader coverage)
-**Recipe**: v94 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Peer review Round 13 recommended broader per-epoch coverage. v94 showed lower lr eliminates train→eval gap (<1%) — now testing if broader sampling improves base quality.
+### alibaba_v96 — standard lr (8e-5/4e-5) + files_per_epoch=24
+**Recipe**: v71 base PCF recipe with standard lr but broader sampling. Lower lr experiments (v94, v95) showed zero gap but quality plateau at 0.103-0.115. Standard lr has better train quality (~0.080) but 40-80% gap. Testing if broader sampling also helps the standard lr recipe generalize.
 
 ### tencent_v124 — lower lr + files_per_epoch=24 (broader coverage)
 **Recipe**: v123 recipe (lower lr 6e-5/3e-5, base PCF) + files_per_epoch=24 (up from 12). Round 13 recommended broader per-epoch coverage for tencent specifically.
+
+---
+
+## Post-Mortem: alibaba_v95 — lower lr + files_per_epoch=24 (killed ep25, best 0.103★ ep5)
+
+**Recipe**: v94 + files_per_epoch=24 (Round 13 broader coverage). Lower lr 6e-5/3e-5. Using v48 pretrain.
+
+**Training-log**: Stars only at ep5=0.103★ (MMD²=0.010, recall=0.533). Then regression: ep10=0.108, ep15=0.106, ep20=0.106, ep25=0.114. MMD² climbed from 0.010 to 0.028. Killed at ep25 (20 epochs stale).
+
+**Eval: combined=0.106** (MMD²=0.014, recall=0.541, precision=0.627). Train→eval gap: **+2.9%** (0.103→0.106). Low gap confirmed again. But precision dropped to 0.627 (vs v94's 0.780) — broader sampling makes fakes more diverse but less plausible. Doesn't beat ATB (0.095).
+
+**Verdict**: Broader sampling (24 files) gave a strong ep5 (0.103 vs v94's 0.126) but couldn't sustain it. Config-space is largely exhausted: lower lr fixes gap but caps quality; standard lr has quality but gap. Next: try standard lr + 24 files, then structural code changes.
 
 ---
 
