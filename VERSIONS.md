@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v102 — v71 base recipe, fresh seed roll #4
+### alibaba_v103 — v71 base recipe, fresh seed roll #5
 **Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
 ### tencent_v131 — base ATB recipe, fresh seed roll #5
 **Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+---
+
+## Post-Mortem: alibaba_v102 — v71 base recipe, fresh seed roll #4 (killed ep30, best 0.093★ ep10)
+
+**Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
+
+**Training-log**: Outstanding early trajectory. Stars at ep5=0.119★ (recall=0.538), ep10=0.093★ (recall=0.595). Best training combined 0.093 — the best ever on alibaba, beating v101's 0.097. ep15=0.123 (miss), ep20=0.097 (recall=0.609, near-miss), ep25=0.111, ep30=0.111. Plateaued around 0.097-0.111 after ep10. W stable throughout (never exceeded 2.1). Killed at ep30 (20 stale).
+
+**Eval (5-run avg): combined=0.113** (range 0.079–0.156). Individual: 0.106, 0.079, 0.156, 0.120, 0.106. Avg recall=0.517. **Run 2 hit 0.079 — best individual eval ever** (recall=0.642, MMD²=0.007). Run 3 was outlier (recall=0.377). Train→eval gap +22% (0.093→0.113). Does NOT beat ATB 0.088.
+
+**Verdict**: Best training seed ever (0.093★) and produced the best individual eval run ever (0.079). But eval variance (0.079–0.156) continues to prevent ATB. The recipe is clearly capable of ATB-beating quality — the bottleneck is eval consistency, not model capacity. Fifth consecutive alibaba seed roll confirming structural train→eval gap.
 
 ---
 
