@@ -420,5 +420,7 @@ prove it via cache evaluation (#14).
 68. ~~alibaba_v103~~ (v71 base recipe, fresh seed roll #5, killed during G warm-up ep90 — no GAN data. Pivoting to structural fix.)
 69. **STRUCTURAL FIX: CFG information leakage (Gemini Round 2 P1)** — CFG dropout moved BEFORE cond_encoder, regime_sampler, and GMM prior. Previously noise retained workload identity even when conditioning was dropped, defeating CFG's unconditional training. Fix ensures truly unconditional samples.
 70. ~~tencent_v132~~ (CFG info-leak fix, W-stopped ep30 — best 0.111★ ep15, ep25 combined=0.101 near ATB. W spiked 3.38→3.65→3.07. CFG fix changes critic dynamics on tencent.)
-71. **Running:** alibaba_v104 (v71 base recipe + CFG info-leak fix) — **FOUR CONSECUTIVE STARS: ep5=0.121, ep10=0.115, ep20=0.099, ep30=0.092★ (recall=0.596)**. Best structural-change result ever.
+71. ~~alibaba_v104~~ (CFG info-leak fix, killed ep41 — **FIVE consecutive stars**, best 0.092★ ep30 (recall=0.596). **5-run eval avg 0.121**, +31% gap. Run 4 hit 0.090. CFG fix improves training but does NOT reduce eval gap. Recall variance 0.364-0.608 remains bottleneck.)
 72. **Running:** tencent_v133 (CFG info-leak fix, fresh seed)
+73. **Running:** alibaba_v105 (CFG fix + fresh seed)
+74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.

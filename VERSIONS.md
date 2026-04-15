@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v104 — CFG info-leak fix (Gemini Round 2 P1)
-**Recipe**: v71/v98 ATB recipe + **CFG dropout moved before cond_encoder/regime_sampler/GMM prior**. Previously, CFG dropout was applied AFTER noise sampling, leaking workload identity through GMM cluster-specific noise. This fix ensures truly unconditional samples when cond is dropped. Expected to reduce train→eval gap by eliminating conditioning info leakage through noise channel.
+### alibaba_v105 — CFG fix + fresh seed
+**Recipe**: Same as v104 (CFG dropout reordering). Fresh seed. v104 produced best training trajectory ever (5 stars, 0.092★) but eval gap persisted (+31%).
 
 ### tencent_v133 — CFG info-leak fix, fresh seed (Gemini Round 2 P1)
 **Recipe**: Same as v132 (CFG dropout reordering). Fresh seed. v132 W-stopped at ep30 but showed promising trajectory (combined 0.101 at ep25).
+
+---
+
+## Post-Mortem: alibaba_v104 — CFG info-leak fix (killed ep41, best 0.092★ ep30)
+
+**Recipe**: v71/v98 ATB recipe + CFG dropout moved before cond_encoder/regime_sampler/GMM prior (Gemini Round 2 P1 fix).
+
+**Training-log**: **Five consecutive stars** — unprecedented. ep5=0.121★ (recall=0.544), ep10=0.115★ (recall=0.548), ep20=0.099★ (recall=0.611), ep25=0.096★ (recall=0.605), ep30=0.092★ (recall=0.596, MMD²=0.011). Best training combined 0.092 — the closest to ATB (0.088) from any structural change. After ep30 degraded: ep35=0.093, ep40=0.106. W stable throughout (1.44-2.77). Killed at ep41 after eval.
+
+**Eval (5-run avg): combined=0.121** (range 0.090–0.143). Individual: 0.143, 0.116, 0.136, 0.090, 0.120. Avg recall=0.462. Run 4 hit 0.090 (recall=0.608). Train→eval gap **+31%** (0.092→0.121). Does NOT beat ATB 0.088.
+
+**Verdict**: CFG fix produced the best training trajectory ever (5 consecutive stars, 0.092★) but **did NOT reduce the train→eval gap** (+31%, same as previous runs). Recall variance (0.364-0.608) remains the dominant bottleneck. CFG information leakage was NOT the source of train→eval divergence. The fix is worth keeping (improves training stability) but doesn't solve the eval problem.
 
 ---
 
