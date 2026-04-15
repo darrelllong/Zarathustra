@@ -9,8 +9,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v107 — Copy-path loss-only, lower weights
 **Recipe**: Same as v106 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v106 W-stopped at ep42; lower weights should reduce W pressure while retaining per-timestep reuse supervision.
 
-### tencent_v134 — Copy-path loss-only (no stride gating)
-**Recipe**: v103/v105 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Same approach as alibaba_v106.
+### tencent_v135 — Copy-path loss-only, lower weights
+**Recipe**: Same as v134 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v134 had W instability (spiked 3.83 at ep42); lower weights should help.
+
+---
+
+## Post-Mortem: tencent_v134 — Copy-path loss-only 0.5/0.5 (killed ep42, best 0.083★ ep20)
+
+**Recipe**: v103/v105 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`.
+
+**Training-log**: Four stars: ep5=0.143★ (recall=0.412), ep10=0.138★ (recall=0.435), ep15=0.110★ (recall=0.511), ep20=**0.083★** (recall=0.629, MMD²=0.008) — **best tencent training metric ever, below ATB 0.098**. After ep20, regressed: ep25=0.099 (tantalizingly close to ATB), ep30=0.105, ep35=0.100, ep40=0.108. W increasingly unstable: spiked 3.24 at ep25, 3.15 at ep40, 3.83 at ep42. Killed at ep42 (22 stale).
+
+**Eval**: 5-run eval pending on best.pt (ep20).
+
+**Verdict**: Copy-path-loss-only produced the best tencent training metric ever (0.083★) but W instability killed the run. Same pattern as alibaba_v106: copy-path losses at 0.5/0.5 eventually destabilize W. Halving to 0.25/0.25 for v135.
 
 ---
 
