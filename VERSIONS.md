@@ -20,9 +20,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Four stars: ep5=0.114★ (recall=0.516), ep10=0.110★ (recall=0.529), ep15=0.109★ (recall=0.525), ep35=0.096★ (recall=0.587, MMD²=0.013). Three consecutive early stars, regression at ep20-25 (0.120→0.135), then recovery to best star at ep35. W stable through ep39 (2.0-2.6), then spiked: ep40=3.22, ep41=3.13, ep42=3.03 → W-stopped. reuse_bce oscillated 0.4-12.0 throughout.
 
-**Eval**: 5-run eval pending on best.pt (ep35).
+**Eval (5-run avg): combined=0.103** (range 0.073–0.130). Individual: 0.088, 0.117, 0.073, 0.130, 0.108. Avg recall=0.542 (range 0.399-0.679). Run 3 hit **0.073** (recall=0.679) — best individual eval ever. Run 1 hit 0.088 (matches ATB exactly). Train→eval gap **only +7.3%** (0.096→0.103) — dramatically reduced from typical +30%.
 
-**Verdict**: Copy-path-loss-only is STABLE (no immediate W-explosion like v67/v113) and produces competitive training trajectories. Best star 0.096★ is close to ATB 0.088 but W instability eventually killed the run. The reuse BCE loss may add enough G_loss to destabilize the critic at higher epochs. Halving weights (0.25/0.25) for v107.
+**Verdict**: Copy-path-loss-only is STABLE and **dramatically reduces train→eval gap** (7.3% vs 30%). Best individual eval 0.073 is the best ever seen. But 5-run average 0.103 doesn't beat ATB 0.088 due to recall variance (0.399-0.679). W-stopped at ep42 — halving weights for v107. **KEY FINDING: per-timestep reuse supervision reduces the generalization gap.**
 
 ---
 
