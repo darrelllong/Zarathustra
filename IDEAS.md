@@ -416,5 +416,8 @@ prove it via cache evaluation (#14).
 64. ~~alibaba_v101~~ (v71 base recipe, fresh seed roll #3, killed ep71 — best 0.097★ ep45, recall=0.585, **5-run eval avg 0.123**, +27% gap. Best training seed ever but doesn't beat ATB 0.088.)
 65. ~~tencent_v130~~ (base ATB recipe, fresh seed roll #4, killed ep25 — best 0.122★ ep10, recall collapsed 0.495→0.335. No eval warranted.)
 66. ~~alibaba_v102~~ (v71 base recipe, fresh seed roll #4, killed ep30 — best 0.093★ ep10, **5-run eval avg 0.113**, Run 2 hit 0.079! Best individual eval ever but avg doesn't beat ATB 0.088.)
-67. **Running:** tencent_v131 (base ATB recipe, fresh seed roll #5)
-68. **Running:** alibaba_v103 (v71 base recipe, fresh seed roll #5)
+67. ~~tencent_v131~~ (base ATB recipe, fresh seed roll #5, killed ep23 — best 0.117★ ep10, 13 stale, regressing. Pivoting to structural fix.)
+68. ~~alibaba_v103~~ (v71 base recipe, fresh seed roll #5, killed during G warm-up ep90 — no GAN data. Pivoting to structural fix.)
+69. **STRUCTURAL FIX: CFG information leakage (Gemini Round 2 P1)** — CFG dropout moved BEFORE cond_encoder, regime_sampler, and GMM prior. Previously noise retained workload identity even when conditioning was dropped, defeating CFG's unconditional training. Fix ensures truly unconditional samples.
+70. **Running:** tencent_v132 (base ATB recipe + CFG info-leak fix)
+71. **Running:** alibaba_v104 (v71 base recipe + CFG info-leak fix)

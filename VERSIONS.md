@@ -6,11 +6,31 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v103 — v71 base recipe, fresh seed roll #5
+### alibaba_v104 — CFG info-leak fix (Gemini Round 2 P1)
+**Recipe**: v71/v98 ATB recipe + **CFG dropout moved before cond_encoder/regime_sampler/GMM prior**. Previously, CFG dropout was applied AFTER noise sampling, leaking workload identity through GMM cluster-specific noise. This fix ensures truly unconditional samples when cond is dropped. Expected to reduce train→eval gap by eliminating conditioning info leakage through noise channel.
+
+### tencent_v132 — CFG info-leak fix (Gemini Round 2 P1)
+**Recipe**: v105 base PCF recipe + **CFG dropout reordering** (same fix as alibaba_v104). Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+
+---
+
+## Post-Mortem: tencent_v131 — base ATB recipe, fresh seed roll #5 (killed ep23, best 0.117★ ep10)
+
+**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+
+**Training-log**: Stars at ep5=0.138★ (recall=0.454), ep10=0.117★ (recall=0.480). After ep10, combined regressed: ep15=0.120, ep20=0.124, ep22 W=1.29. W stable overall (0.63-1.41) but quality plateau. Killed at ep23 (13 stale, regressing).
+
+**Verdict**: Typical tencent seed roll — promising early (0.117★ at ep10) but regressed after. No eval warranted. Killed to pivot from seed rolling to structural CFG information leakage fix (Gemini Round 2 P1).
+
+---
+
+## Post-Mortem: alibaba_v103 — v71 base recipe, fresh seed roll #5 (killed during warmup)
+
 **Recipe**: Identical to v71/v98 ATB recipe. var-cond-kl-weight=0.01, no det_prob. Fresh seed.
 
-### tencent_v131 — base ATB recipe, fresh seed roll #5
-**Recipe**: v105 base PCF recipe. Fresh seed roll. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8, var-cond-kl-weight=0.01.
+**Training-log**: Completed AE pretrain + supervisor pretrain. Reached G warm-up ep90/100. Never entered GAN phase. Killed to pivot to CFG fix — no training data to evaluate.
+
+**Verdict**: Killed before GAN phase to pivot to structural CFG information leakage fix. Pretrain was valid but no GAN data generated.
 
 ---
 

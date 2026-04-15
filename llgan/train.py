@@ -120,28 +120,31 @@ def _make_z_global(
             cond = file_cond.to(device)
         else:
             cond = compute_window_descriptors(real_features)
+        # CFG dropout FIRST: zero conditioning BEFORE any downstream modules
+        # see it.  Previously dropout was applied AFTER cond_encoder,
+        # regime_sampler, and GMM prior, which leaked workload identity
+        # through the noise subspace (Gemini Round 2 P1).
+        drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
+        if training and drop_prob > 0:
+            mask = (torch.rand(B, 1, device=device) > drop_prob).float()
+            cond = cond * mask
         # Variational conditioning: perturb cond at training time, use μ at eval
         if G is not None and getattr(G, "cond_encoder", None) is not None:
             det_prob = getattr(cfg, "var_cond_det_prob", 0.0) if training else 0.0
             cond, kl_loss = G.cond_encoder(cond, training=training,
                                            det_prob=det_prob)
         # Regime sampler (IDEAS.md #5): map cond → discrete regime code via
-        # Gumbel-Softmax.  Replaces raw cond with a regime prototype vector,
-        # committing G to one workload type before generation.  Applied BEFORE
-        # CFG dropout so the regime selection is stable.
+        # Gumbel-Softmax.  Now sees zeroed cond for dropped samples, so regime
+        # selection is truly unconditional when CFG fires.
         if G is not None and getattr(G, "regime_sampler", None) is not None:
             cond = G.regime_sampler(cond)
-        # GMM prior: sample noise from conditioning-aware mixture.  Uses cond
-        # before CFG dropout so workload→noise mapping is stable.
+        # GMM prior: sample noise from conditioning-aware mixture.  Now sees
+        # zeroed cond for dropped samples, preventing info leakage through
+        # cluster-specific noise.
         if G is not None and getattr(G, "gmm_prior", None) is not None:
             noise = G.sample_noise(B, device, cond=cond)
         else:
             noise = torch.randn(B, cfg.noise_dim, device=device)
-        # Classifier-free guidance: randomly drop conditioning during training
-        drop_prob = getattr(cfg, "cond_drop_prob", 0.0)
-        if training and drop_prob > 0:
-            mask = (torch.rand(B, 1, device=device) > drop_prob).float()
-            cond = cond * mask
         return torch.cat([cond, noise], dim=1), kl_loss
     return torch.randn(B, cfg.noise_dim, device=device), kl_loss
 
