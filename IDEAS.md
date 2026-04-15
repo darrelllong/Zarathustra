@@ -424,7 +424,7 @@ prove it via cache evaluation (#14).
 72. ~~tencent_v133~~ (CFG fix, killed ep79 — best 0.105★ ep55, 24 stale, W spiking >3.0. 7% above ATB.)
 77. ~~tencent_v134~~ (copy-path-loss-only 0.5/0.5, killed ep42 — best **0.083★ ep20**, **5-run eval avg 0.126**, +52% gap! Copy-path reduces gap on alibaba but NOT tencent.)
 80. ~~tencent_v135~~ (copy-path-loss-only 0.25/0.25, killed ep28 — best 0.125★ ep15, W>3.0 three times, recall collapsed. **Copy-path DEAD on tencent.**)
-82. ~~tencent_v136~~ (multi-scale critic + PCF, killed ep52 — **FIVE consecutive stars**, best **0.073★** ep25 (recall=0.694). **BREAKTHROUGH: 25% below ATB in training.** Eval pending.)
+82. ~~tencent_v136~~ (multi-scale critic + PCF, killed ep52 — **FIVE consecutive stars**, best **0.073★** ep25 (recall=0.694). **5-run eval avg 0.094 ★★★ NEW TENCENT ATB ★★★** Beats 0.098 by 4.1%. Run 2 hit 0.071!)
 84. **Running:** tencent_v137 (multi-scale critic + PCF, fresh seed — confirming v136 wasn't a lucky draw)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.

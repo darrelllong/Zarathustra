@@ -42,9 +42,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: FIVE consecutive stars — best tencent run ever: ep5=0.117★ (recall=0.476), ep10=0.116★ (recall=0.490), ep15=0.099★ (recall=0.539), ep20=0.087★ (recall=0.595), ep25=**0.073★** (recall=0.694, MMD²=0.012). After ep25: gradual regression — ep30=0.077, ep35=0.074, ep40=0.080, ep45=0.089, ep50=0.101. W stable throughout (0.19–2.72, never hit 3.0). Recall declined from 0.694 peak to 0.522 by ep50. Killed at ep52 (27 stale).
 
-**Eval**: PENDING (5-run eval running on best.pt)
+**Eval (5-run avg): combined=0.094 ★★★ NEW TENCENT ATB ★★★** (range 0.071–0.135). Individual: 0.107, 0.071, 0.074, 0.135, 0.083. Avg recall=0.589 (range 0.392-0.694). Run 2 hit **0.071** (recall=0.694) — best individual tencent eval ever. Train→eval gap +29% (0.073→0.094).
 
-**Verdict**: Multi-scale critic is a **BREAKTHROUGH for tencent**. Training combined 0.073★ is 25% below ATB 0.098. Five consecutive stars with exceptional recall (0.694 peak). W remarkably stable — never hit 3.0 through 52 epochs. The multi-scale temporal discrimination gives the critic better signal across timescales, enabling the generator to improve continuously through ep25. Eval will determine if this translates.
+**Verdict**: Multi-scale critic is a **BREAKTHROUGH for tencent**. **NEW ATB 0.094** beats previous 0.098 by 4.1%. Five consecutive training stars with exceptional recall (0.694 peak). W remarkably stable — never hit 3.0 through 52 epochs. The multi-scale temporal discrimination gives the critic better signal across timescales. First technique to move tencent ATB since v103/v105.
 
 ---
 
