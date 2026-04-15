@@ -6,11 +6,40 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v111 — Multi-scale critic + PCF, fresh seed
-**Recipe**: Same as v110. Fresh seed to confirm multi-scale critic on alibaba.
+### alibaba_v112 — Multi-scale critic + self-diagnosing upweighting (temp=1.0)
+**Recipe**: Same as v110/v111 + `--self-diag-temp 1.0`. Self-diag upweights under-covered real modes in critic and feature matching. Previously failed pre-PCF (v24/v62 W-explosion), retesting with multi-scale critic stabilization.
 
-### tencent_v138 — Multi-scale critic + PCF, seed #3
+### tencent_v139 — Multi-scale critic + self-diagnosing upweighting (temp=1.0)
+**Recipe**: Same as v136/v137/v138 + `--self-diag-temp 1.0`. Same rationale as v112.
+
+---
+
+## Post-Mortem: alibaba_v111 — Multi-scale critic + PCF, seed #2 (killed ep53, best 0.083★ ep25)
+
+**Recipe**: Same as v110. Fresh seed #2 to confirm multi-scale critic on alibaba.
+
+**Training-log**: Five consecutive stars: ep5=0.131★ (recall=0.444), ep10=0.111★ (recall=0.567), ep15=0.096★ (recall=0.613), ep20=0.088★ (recall=0.609), ep25=**0.083★** (recall=0.661, MMD²=0.016) — **best alibaba training EVER**, below ATB 0.088. Then regressed: ep30=0.130, ep35=0.086, ep40=0.089, ep45=0.094, ep50=0.114. W stable through ep25 (1.0-1.8), then escalated: ep27=2.31, ep32=3.00 (spike), ep36=2.61, ep43=2.72, ep46=2.76. G_loss flipped positive at ep41. Killed at ep53 (28 stale).
+
+**Eval (5-run avg): combined=0.096** (range 0.075–0.119). Individual: 0.119, 0.100, 0.097, 0.088, **0.075**. Avg recall=0.580 (range 0.485-0.672). Run 5 hit **0.075** (recall=0.672) — **BEST INDIVIDUAL ALIBABA EVAL EVER**. Run 4 hit 0.088 = ATB. Train→eval gap **+16%** (0.083→0.096).
+
+**Verdict**: Second-best alibaba eval avg ever (0.096 vs ATB 0.088). Run 5's 0.075 is remarkable. Multi-scale critic on alibaba now confirmed across 2 seeds: v110=0.104, v111=0.096, avg=0.100. Both beat baseline 0.122 but neither avg beats ATB 0.088 (v98). Multi-scale critic is a clear improvement but seed variation remains high.
+
+---
+
+## Post-Mortem: tencent_v138 — Multi-scale critic + PCF, seed #3 (killed ep45, best 0.090★ ep20)
+
 **Recipe**: Same as v136/v137. Third multi-scale critic seed on tencent.
+
+**Training-log**: Four stars: ep5=0.171★ (recall=0.308), ep10=0.143★ (recall=0.367), ep15=0.121★ (recall=0.467), ep20=**0.090★** (recall=0.590, MMD²=0.007). Then regressed: ep25=0.108, ep30=0.098, ep35=0.099, ep40=0.100. W stable through ep25 (1.0-1.9), then escalated: ep29=2.61, ep35=2.65, ep39=2.09, ep43=3.50 (spike!). G_loss positive from ep28. Killed at ep45 (25 stale).
+
+**Eval (5-run avg): combined=0.112** (range 0.084–0.147). Individual: 0.100, **0.084**, 0.114, 0.147, 0.113. Avg recall=0.506 (range 0.355-0.639). Run 2 hit **0.084** (recall=0.639). Run 4 recall collapsed to 0.355. High variance. Train→eval gap **+24%** (0.090→0.112).
+
+**Verdict**: Worst of the 3 multi-scale critic tencent seeds (v136=0.094, v137=0.107, v138=0.112). v136 remains ATB. Multi-scale critic on tencent now 3 seeds: avg eval = (0.094+0.107+0.112)/3 = 0.104. Consistently better than pre-multi-scale but v136 was the lucky seed.
+
+**Multi-scale critic summary (6 seeds total)**:
+- Alibaba: v110=0.104, v111=0.096. Avg=0.100. Baseline=0.122. **18% improvement** over baseline. Neither beats ATB 0.088.
+- Tencent: v136=0.094★, v137=0.107, v138=0.112. Avg=0.104. v136 = ATB. **Universal improvement validated.**
+- Technique CLOSED for seed search. Moving to next idea.
 
 ---
 

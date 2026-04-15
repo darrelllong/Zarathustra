@@ -426,7 +426,10 @@ prove it via cache evaluation (#14).
 80. ~~tencent_v135~~ (copy-path-loss-only 0.25/0.25, killed ep28 — best 0.125★ ep15, W>3.0 three times, recall collapsed. **Copy-path DEAD on tencent.**)
 82. ~~tencent_v136~~ (multi-scale critic + PCF, killed ep52 — **FIVE consecutive stars**, best **0.073★** ep25 (recall=0.694). **5-run eval avg 0.094 ★★★ NEW TENCENT ATB ★★★** Beats 0.098 by 4.1%. Run 2 hit 0.071!)
 84. ~~tencent_v137~~ (multi-scale critic + PCF, killed ep50 — FOUR stars, best **0.082★** ep35. **5-run eval avg 0.107**, Run 2 hit 0.086. Confirms multi-scale critic reproducible.)
-87. **Running:** tencent_v138 (multi-scale critic + PCF, seed #3)
+87. ~~tencent_v138~~ (multi-scale critic + PCF, seed #3, killed ep45 — FOUR stars, best **0.090★** ep20. **5-run eval avg 0.112**, Run 2 hit 0.084. Doesn't beat ATB 0.094.)
+88. **MULTI-SCALE CRITIC CLOSED** (6 seeds total). Alibaba avg 0.100 (18% over baseline). Tencent avg 0.104. Universal improvement validated. Moving to next idea.
+89. **Running:** alibaba_v112 (multi-scale critic + self-diag temp=1.0 — retesting #9 with PCF/multi-scale stabilization)
+90. **Running:** tencent_v139 (multi-scale critic + self-diag temp=1.0 — same as above)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.
 75. **EVAL BUG FIXES:** (a) HRC-MAE padding: was padding to n_points by repeating final hit ratio, suppressing error at discriminative cache sizes. Fixed: compute MAE over actual sizes only. (b) Reuse metric hardcoded to col 3: was wrong when tenant column dropped. Fixed: dynamically resolve from preprocessor col_names.
@@ -436,4 +439,4 @@ prove it via cache evaluation (#14).
 81. ~~alibaba_v108~~ (copy-path-loss-only 0.25/0.25, W-stopped ep67 — best 0.110★ ep40, worst training quality of copy-path series despite best W stability. **Copy-path CLOSED on alibaba.**)
 83. ~~alibaba_v109~~ (base PCF recipe, W-stopped ep49 — best 0.091★ ep25, **5-run eval avg 0.122**, +34% gap. Recall collapsed 0.608→0.469. Baseline for v110 multi-scale critic comparison.)
 85. ~~alibaba_v110~~ (multi-scale critic + PCF, killed ep40 — best **0.090★** ep20. **5-run eval avg 0.104**, Run 4 hit 0.082! **Multi-scale critic improves alibaba eval 15% (0.122→0.104).** Gap reduced +34%→+16%.)
-86. **Running:** alibaba_v111 (multi-scale critic + PCF, fresh seed #2)
+86. ~~alibaba_v111~~ (multi-scale critic + PCF, seed #2, killed ep53 — **FIVE consecutive stars**, best **0.083★** ep25 (BEST ALIBABA TRAIN EVER). **5-run eval avg 0.096**, Run 5 hit **0.075** BEST INDIVIDUAL EVER. Doesn't beat ATB 0.088 avg.)
