@@ -6,8 +6,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v109 — Base PCF recipe, fresh seed (no copy-path)
-**Recipe**: v98 ATB recipe + CFG fix. No copy-path (exhausted — doesn't reliably reduce eval gap). Fresh seed. Back to base recipe that produced ATB 0.088.
+### alibaba_v110 — Multi-scale critic + PCF (testing universality)
+**Recipe**: v98 ATB recipe + CFG fix + `--multi-scale-critic`. Testing whether multi-scale critic (tencent_v136 breakthrough) works on alibaba too. Goal: universal recipe across trace families.
+
+---
+
+## Post-Mortem: alibaba_v109 — Base PCF recipe, fresh seed (W-stopped ep49, best 0.091★ ep25)
+
+**Recipe**: v98 ATB recipe + CFG fix. No copy-path, no multi-scale. Fresh seed baseline.
+
+**Training-log**: Four stars: ep5=0.133★ (recall=0.463), ep10=0.114★ (recall=0.569), ep20=0.106★ (recall=0.579), ep25=**0.091★** (recall=0.608, MMD²=0.012). Then regressed: ep30=0.100, ep35=0.092, ep40=0.144. W stable through ep45 (1.0–1.95), then spiked: ep46=2.67, ep47=3.09, ep48=3.25, ep49=3.68 → W-stopped.
+
+**Eval**: PENDING (5-run eval running on best.pt)
+
+**Verdict**: Strong seed — best training combined 0.091★ is only 3.4% above ATB 0.088. Recall peaked at 0.608. W-stopped at ep49 — typical lifespan for base recipe. Serves as baseline for alibaba_v110 (multi-scale critic) comparison.
 
 ---
 
