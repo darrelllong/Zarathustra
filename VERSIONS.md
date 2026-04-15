@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v106 — Copy-path loss-only (no stride gating)
 **Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Enables per-timestep reuse BCE + stride-reuse consistency losses WITHOUT the stride gating that caused W-explosion in v67/v113. Lower weights (0.5/0.5 vs original 2.0/1.0) for stability.
 
-### tencent_v133 — CFG info-leak fix, fresh seed (Gemini Round 2 P1)
-**Recipe**: Same as v132 (CFG dropout reordering). Fresh seed. v132 W-stopped at ep30 but showed promising trajectory (combined 0.101 at ep25).
+### tencent_v134 — Copy-path loss-only (no stride gating)
+**Recipe**: v103/v105 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Same approach as alibaba_v106.
+
+---
+
+## Post-Mortem: tencent_v133 — CFG fix, fresh seed (killed ep79, best 0.105★ ep55)
+
+**Recipe**: v132 base + CFG dropout reordering. Fresh seed.
+
+**Training-log**: Seven stars: ep5=0.156★, ep10=0.151★, ep15=0.128★, ep30=0.124★, ep35=0.121★, ep40=0.118★, ep55=0.105★ (recall=0.524, MMD²=0.010). Steady improvement across 55 epochs. After ep55, stalled: ep60=0.113, ep65=0.119, ep70=0.115, ep75=0.116. W increasingly unstable: hit 4.56 at ep72, 3.10 at ep75, 3.19 at ep76, 3.41 at ep79. Killed at ep79 (24 epochs stale).
+
+**Verdict**: Best tencent training trajectory in recent runs (7 stars, reached 0.105★) but still 7% above ATB 0.098. W instability worsened after ep70 with multiple spikes above 3.0. CFG fix improves training quality on tencent but W instability remains a problem. No eval warranted — training combined never reached ATB range.
 
 ---
 
