@@ -31,8 +31,20 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Verdict**: v106's reduced gap (7.3%) was NOT replicated — the gap reduction appears seed-dependent, not a systematic effect of copy-path-loss-only. Recall variance (0.398-0.686) remains the dominant bottleneck. Copy-path-loss-only produces excellent training (0.084★ consistently) but doesn't reliably close the eval gap.
 
-### tencent_v136 — Multi-scale critic + PCF (fresh combination)
-**Recipe**: Base tencent ATB recipe + CFG fix + `--multi-scale-critic`. Multi-scale critic was validated on tencent (pre-PCF) but never combined with PCF. No copy-path (doesn't help tencent). Testing whether multi-scale temporal discrimination improves eval coverage.
+### tencent_v137 — Multi-scale critic + PCF, fresh seed
+**Recipe**: Same as v136 (multi-scale critic + base PCF). Fresh seed to confirm v136 wasn't a lucky draw.
+
+---
+
+## Post-Mortem: tencent_v136 — Multi-scale critic + PCF (killed ep52, best 0.073★ ep25)
+
+**Recipe**: Base tencent ATB recipe + CFG fix + `--multi-scale-critic`. First test of multi-scale critic combined with PCF.
+
+**Training-log**: FIVE consecutive stars — best tencent run ever: ep5=0.117★ (recall=0.476), ep10=0.116★ (recall=0.490), ep15=0.099★ (recall=0.539), ep20=0.087★ (recall=0.595), ep25=**0.073★** (recall=0.694, MMD²=0.012). After ep25: gradual regression — ep30=0.077, ep35=0.074, ep40=0.080, ep45=0.089, ep50=0.101. W stable throughout (0.19–2.72, never hit 3.0). Recall declined from 0.694 peak to 0.522 by ep50. Killed at ep52 (27 stale).
+
+**Eval**: PENDING (5-run eval running on best.pt)
+
+**Verdict**: Multi-scale critic is a **BREAKTHROUGH for tencent**. Training combined 0.073★ is 25% below ATB 0.098. Five consecutive stars with exceptional recall (0.694 peak). W remarkably stable — never hit 3.0 through 52 epochs. The multi-scale temporal discrimination gives the critic better signal across timescales, enabling the generator to improve continuously through ep25. Eval will determine if this translates.
 
 ---
 
