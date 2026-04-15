@@ -20,9 +20,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Four stars: ep5=0.143★ (recall=0.412), ep10=0.138★ (recall=0.435), ep15=0.110★ (recall=0.511), ep20=**0.083★** (recall=0.629, MMD²=0.008) — **best tencent training metric ever, below ATB 0.098**. After ep20, regressed: ep25=0.099 (tantalizingly close to ATB), ep30=0.105, ep35=0.100, ep40=0.108. W increasingly unstable: spiked 3.24 at ep25, 3.15 at ep40, 3.83 at ep42. Killed at ep42 (22 stale).
 
-**Eval**: 5-run eval pending on best.pt (ep20).
+**Eval (5-run avg): combined=0.126** (range 0.092–0.164). Individual: 0.132, 0.133, 0.092, 0.164, 0.109. Avg recall=0.459 (range 0.375-0.591). Run 3 hit **0.092** (recall=0.591) — would beat ATB. Train→eval gap **+52%** (0.083→0.126).
 
-**Verdict**: Copy-path-loss-only produced the best tencent training metric ever (0.083★) but W instability killed the run. Same pattern as alibaba_v106: copy-path losses at 0.5/0.5 eventually destabilize W. Halving to 0.25/0.25 for v135.
+**Verdict**: Copy-path-loss-only produced the best tencent training metric ever (0.083★) but the train→eval gap is WORSE than alibaba (+52% vs +7.3%). The copy-path supervision reduces the gap on alibaba but not on tencent — the tencent eval gap appears to be a different structural problem (possibly related to the much larger corpus, 3234 files vs 239). W instability killed the run at ep42.
 
 ---
 
