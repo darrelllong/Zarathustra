@@ -21,8 +21,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Verdict**: v106's reduced gap (7.3%) was NOT replicated — the gap reduction appears seed-dependent, not a systematic effect of copy-path-loss-only. Recall variance (0.398-0.686) remains the dominant bottleneck. Copy-path-loss-only produces excellent training (0.084★ consistently) but doesn't reliably close the eval gap.
 
-### tencent_v135 — Copy-path loss-only, lower weights
-**Recipe**: Same as v134 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v134 had W instability (spiked 3.83 at ep42); lower weights should help.
+### tencent_v136 — Multi-scale critic + PCF (fresh combination)
+**Recipe**: Base tencent ATB recipe + CFG fix + `--multi-scale-critic`. Multi-scale critic was validated on tencent (pre-PCF) but never combined with PCF. No copy-path (doesn't help tencent). Testing whether multi-scale temporal discrimination improves eval coverage.
+
+---
+
+## Post-Mortem: tencent_v135 — Copy-path loss-only 0.25/0.25 (killed ep28, best 0.125★ ep15)
+
+**Recipe**: v103/v105 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.25 --stride-consistency-weight 0.25`.
+
+**Training-log**: Three stars: ep5=0.157★ (recall=0.368), ep10=0.132★ (recall=0.424), ep15=**0.125★** (recall=0.445). Then regressed: ep20=0.131, ep25=0.140. W repeatedly exceeded 3.0: ep19=3.10, ep22=3.78, ep28=3.28. Recall declining (0.445→0.421→0.361). G_loss abnormally high (5.3-6.3 throughout). Killed at ep28 (13 stale, W-unstable).
+
+**Verdict**: Copy-path-loss-only DEAD on tencent. Both weight levels tested (0.5/0.5 in v134, 0.25/0.25 in v135) — same outcome: W instability, recall collapse, massive eval gap. Copy-path supervision only helps alibaba (smaller corpus, simpler regime structure). Pivoting to multi-scale critic for tencent.
 
 ---
 
