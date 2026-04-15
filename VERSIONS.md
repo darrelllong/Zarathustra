@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v104 — CFG info-leak fix (Gemini Round 2 P1)
 **Recipe**: v71/v98 ATB recipe + **CFG dropout moved before cond_encoder/regime_sampler/GMM prior**. Previously, CFG dropout was applied AFTER noise sampling, leaking workload identity through GMM cluster-specific noise. This fix ensures truly unconditional samples when cond is dropped. Expected to reduce train→eval gap by eliminating conditioning info leakage through noise channel.
 
-### tencent_v132 — CFG info-leak fix (Gemini Round 2 P1)
-**Recipe**: v105 base PCF recipe + **CFG dropout reordering** (same fix as alibaba_v104). Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+### tencent_v133 — CFG info-leak fix, fresh seed (Gemini Round 2 P1)
+**Recipe**: Same as v132 (CFG dropout reordering). Fresh seed. v132 W-stopped at ep30 but showed promising trajectory (combined 0.101 at ep25).
+
+---
+
+## Post-Mortem: tencent_v132 — CFG info-leak fix (W-stopped ep30, best 0.111★ ep15)
+
+**Recipe**: v105 base PCF recipe + CFG dropout reordering fix. Standard lr 8e-5/4e-5, files_per_epoch=12, mixed-type-recovery, n-regimes=8.
+
+**Training-log**: Stars at ep5=0.144★ (recall=0.339), ep10=0.118★ (recall=0.482), ep15=0.111★ (recall=0.480, MMD²=0.007). ep25 combined=0.101 (very close to ATB 0.098). W elevated throughout (1.68-1.97), then spiked ep28=3.38, ep29=3.65, ep30=3.07 → W-stopped. Best training combined 0.111 at ep15, with ep25 reaching 0.101 late.
+
+**Verdict**: CFG fix produced the best tencent training trajectory in recent runs (3 consecutive stars, combined reaching 0.101). But W instability killed it — the elevated W throughout (1.7-2.0 vs typical 0.7-1.3) suggests the CFG fix changes critic dynamics on tencent. W may need dampening (lower lr_d or stronger grad clip). No eval warranted due to W-stop.
 
 ---
 
