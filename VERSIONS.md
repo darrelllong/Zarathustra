@@ -6,8 +6,35 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v110 — Multi-scale critic + PCF (testing universality)
-**Recipe**: v98 ATB recipe + CFG fix + `--multi-scale-critic`. Testing whether multi-scale critic (tencent_v136 breakthrough) works on alibaba too. Goal: universal recipe across trace families.
+### alibaba_v111 — Multi-scale critic + PCF, fresh seed
+**Recipe**: Same as v110. Fresh seed to confirm multi-scale critic on alibaba.
+
+### tencent_v138 — Multi-scale critic + PCF, seed #3
+**Recipe**: Same as v136/v137. Third multi-scale critic seed on tencent.
+
+---
+
+## Post-Mortem: alibaba_v110 — Multi-scale critic + PCF (killed ep40, best 0.090★ ep20)
+
+**Recipe**: v98 ATB recipe + CFG fix + `--multi-scale-critic`. First multi-scale critic test on alibaba.
+
+**Training-log**: Two stars: ep5=0.110★ (recall=0.498), ep20=**0.090★** (recall=0.615, MMD²=0.013). Then regressed: ep25=0.092, ep30=0.107, ep35=0.096, ep40=0.099. W remarkably stable throughout (0.19–1.64, never close to 3.0). G_loss flipped positive at ep25 (2.4–3.8) then unstable. Killed at ep40 (20 stale).
+
+**Eval**: PENDING (5-run eval running on best.pt)
+
+**Verdict**: Multi-scale critic WORKS on alibaba — training 0.090★ is only 2.3% above ATB 0.088. W stability exceptional (never exceeded 1.65 in 40 epochs). Recall peaked at 0.633. Compared to v109 baseline (0.091★ without multi-scale), training quality similar — eval will determine if multi-scale helps generalization.
+
+---
+
+## Post-Mortem: tencent_v137 — Multi-scale critic + PCF, fresh seed (killed ep50, best 0.082★ ep35)
+
+**Recipe**: Same as v136. Fresh seed to confirm multi-scale critic reproducibility.
+
+**Training-log**: Four stars: ep5=0.131★ (recall=0.408), ep10=0.111★ (recall=0.489), ep20=0.098★ (recall=0.557), ep35=**0.082★** (recall=0.628, MMD²=0.008). Then regressed: ep40=0.101, ep45=0.098, ep50=0.087. W stable (0.25–2.48, never hit 3.0). Recall peaked at 0.651 (ep50). Killed at ep50 (15 stale).
+
+**Eval**: PENDING (5-run eval running on best.pt)
+
+**Verdict**: Confirms multi-scale critic is reproducible on tencent — v137 also produced 4 stars with training 0.082★ (below new ATB 0.094). Slightly weaker than v136 (0.073★) but same strong trajectory. W stability consistent. Multi-scale critic is a validated technique for tencent.
 
 ---
 
