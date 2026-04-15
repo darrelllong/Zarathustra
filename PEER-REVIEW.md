@@ -676,3 +676,47 @@ One more point now needs to be stated explicitly: the repo keeps talking about m
 ### Short Take
 
 Yes, they probably can take a broader sample and do better. But the way to do that is corpus-specific: Tencent likely wants broader per-epoch coverage, while Alibaba likely wants broader temporal structure preservation. The current `8`-file random slice is a default, not a law of nature, and the R results say it is unlikely to be equally right for both corpora.
+
+---
+
+## Round 14
+
+### The Cleanup Wave Is Real, But The Contract Is Still Not Clean
+
+There has been real progress since Round 13, and it deserves to be said plainly. The repo did not just argue about sampling policy; it actually tested it on both corpora in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L213) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L225). It also landed a genuine conditioning-path cleanup by moving CFG dropout ahead of the downstream conditioning stack in [llgan/train.py](/Users/darrell/Zarathustra/llgan/train.py#L123), with the resulting runs documented in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L39) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L51). `alibaba_v98` is also a real improvement, not a rhetorical one, in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L169).
+
+The problem is different now. The repo is at risk of over-updating from "we have serious infrastructure debt" to "the contract is basically clean now." It is not. Some of the most important paths are still only partially repaired, and the new live experiments are beginning to lean on those paths again.
+
+1. `[P1]` The sampling-policy question is now much less uncertain, and that is useful. The `24`-file runs were informative even though they were not winners. Alibaba `v95` and `v96` show that broader sampling changes the train/eval tradeoff but does not remove it in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L237) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L213). Tencent `v124` shows the same thing from the other side: better training trajectory, worse eval gap, more instability in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L225). That means the repo should stop treating "maybe broader sampling is the missing unlock" as an open strategic mystery. It is a meaningful axis, but it is not the primary remaining bottleneck.
+
+2. `[P1]` The CFG leakage fix is real and should stay, but it did not close the train/eval contract. The code change in [llgan/train.py](/Users/darrell/Zarathustra/llgan/train.py#L123) is exactly the right fix for the specific leakage problem, and the version log is honest that it improved training trajectories while leaving the eval gap basically intact in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L27) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L17). That is good science. The repo should preserve that discipline and resist the temptation to speak as if the conditioning mismatch story is now closed. One conditioning-path bug was fixed. The broader contract still is not settled.
+
+3. `[P1]` The evaluator cleanup is still incomplete in a way that matters operationally. The main evaluation path now passes `real_windows` into `_sample_fake()`, but the `--baseline` branch still does not in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L614). For conditional checkpoints without a usable `char_file`, the comparison path still breaks. That means one of the advertised ways to compare checkpoints is still not trustworthy for the very model families the repo currently trains.
+
+4. `[P1]` The NumPy PRDC fallback is still wrong. It still computes `r_fake` and then ignores it, and it still assigns `coverage` the same expression as `recall` in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L312). If the external `prdc` package is unavailable, the repo silently reports incorrect nearest-neighbour metrics. This is not glamorous debt, but it is exactly the kind of thing that quietly corrupts confidence in "fixed eval" narratives.
+
+5. `[P1]` `generate.py` is still behind the current checkpoint schema in a way that can break real usage. It instantiates the legacy `Generator` and `Recovery` shapes in [llgan/generate.py](/Users/darrell/Zarathustra/llgan/generate.py#L52), then loads weights strictly in [llgan/generate.py](/Users/darrell/Zarathustra/llgan/generate.py#L60). That is a problem because current Tencent recipes explicitly use mixed-type recovery and richer conditioning modules in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L53) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L63). So this is not a hypothetical "someday" mismatch. The long-rollout and replay path is still not in lockstep with the models the repo is actually training now.
+
+6. `[P1]` The new copy-path-loss-only lane has a silent feature-binding hazard that should be fixed before drawing conclusions from it. The live queue is `alibaba_v106` and `tencent_v134` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L9). But the trainer resolves the reuse target by falling back from `obj_id_reuse` to `obj_id` and then to a positional default in [llgan/train.py](/Users/darrell/Zarathustra/llgan/train.py#L449), while the dataset explicitly auto-drops zero-variance `obj_id_reuse` columns in [llgan/dataset.py](/Users/darrell/Zarathustra/llgan/dataset.py#L758). The loss path then treats whatever landed in `obj_id_col` as a Bernoulli-style reuse target in [llgan/train.py](/Users/darrell/Zarathustra/llgan/train.py#L1491). That can make the new copy-path-loss-only experiments partially supervise the wrong feature without crashing. A hard failure would be safer than a silent fallback here.
+
+7. `[P2]` The repo's public front door is still too confident relative to the current state of the evidence. `README.md` still says "statistically indistinguishable" in [README.md](/Users/darrell/Zarathustra/README.md#L11), [README.md](/Users/darrell/Zarathustra/README.md#L13), and [README.md](/Users/darrell/Zarathustra/README.md#L56). That language was already under pressure in earlier rounds; it is even harder to justify while the evaluation fallback remains imperfect and the generation path still lags the active checkpoint families. This is not the main technical blocker, but it is still the wrong outward-facing claim.
+
+### What I Would Do Right Now
+
+1. Finish the evaluator contract before making more mechanism-level claims:
+   fix the `--baseline` conditional path and the PRDC fallback in `eval.py`.
+
+2. Make `generate.py` load the same generator and recovery shapes that current training writes, even if that means explicit backward-compat code for older checkpoints.
+
+3. Make the copy-path-loss-only lane fail fast unless both `obj_id_reuse` and `obj_id_stride` are genuinely present. Silent fallback to another column is worse than an exception.
+
+4. Treat the sampling-policy question as provisionally answered:
+   meaningful,
+   worth keeping in mind,
+   but no longer the highest-value uncertainty.
+
+5. Keep the new honesty in `VERSIONS.md`, and bring the `README.md` language down to the same evidentiary level.
+
+### Short Take
+
+The repo is in a better place than it was the last time I looked. It tested the sampling-policy hypothesis instead of hand-waving it, and it landed at least one real conditioning-path fix. But the next risk is complacency: treating "some infra debt was fixed" as "the infrastructure story is now clean enough." It is not. The right move is not another philosophical reset. It is to finish the remaining contract gaps quickly, then judge the new locality experiments on a measurement stack that is actually aligned with the models being trained.
