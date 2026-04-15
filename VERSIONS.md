@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v106 — Copy-path loss-only (no stride gating)
-**Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Enables per-timestep reuse BCE + stride-reuse consistency losses WITHOUT the stride gating that caused W-explosion in v67/v113. Lower weights (0.5/0.5 vs original 2.0/1.0) for stability.
+### alibaba_v107 — Copy-path loss-only, lower weights
+**Recipe**: Same as v106 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v106 W-stopped at ep42; lower weights should reduce W pressure while retaining per-timestep reuse supervision.
 
 ### tencent_v134 — Copy-path loss-only (no stride gating)
 **Recipe**: v103/v105 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Same approach as alibaba_v106.
+
+---
+
+## Post-Mortem: alibaba_v106 — Copy-path loss-only (W-stopped ep42, best 0.096★ ep35)
+
+**Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`.
+
+**Training-log**: Four stars: ep5=0.114★ (recall=0.516), ep10=0.110★ (recall=0.529), ep15=0.109★ (recall=0.525), ep35=0.096★ (recall=0.587, MMD²=0.013). Three consecutive early stars, regression at ep20-25 (0.120→0.135), then recovery to best star at ep35. W stable through ep39 (2.0-2.6), then spiked: ep40=3.22, ep41=3.13, ep42=3.03 → W-stopped. reuse_bce oscillated 0.4-12.0 throughout.
+
+**Eval**: 5-run eval pending on best.pt (ep35).
+
+**Verdict**: Copy-path-loss-only is STABLE (no immediate W-explosion like v67/v113) and produces competitive training trajectories. Best star 0.096★ is close to ATB 0.088 but W instability eventually killed the run. The reuse BCE loss may add enough G_loss to destabilize the critic at higher epochs. Halving weights (0.25/0.25) for v107.
 
 ---
 
