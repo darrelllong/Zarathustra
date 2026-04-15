@@ -97,6 +97,9 @@ class Config:
     #   (c) Recovery-level stride gating (stride * (1-reuse_prob))
     # Pretrain-compatible: no new parameters, just forward-pass gating + losses.
     copy_path: bool = False              # Enable copy-path mechanism (0 = off).
+    copy_path_loss_only: bool = False    # Enable copy-path LOSSES only (no stride gating).
+                                         # Uses reuse BCE + stride consistency losses
+                                         # without modifying the generator forward pass.
     reuse_bce_weight: float = 2.0        # Per-timestep BCE weight on reuse column.
                                          # Higher than locality_loss because this gives
                                          # per-timestep gradients, not just mean matching.

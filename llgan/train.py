@@ -457,8 +457,10 @@ def train(cfg: Config) -> None:
                   if hasattr(prep, "col_names") and "obj_id_stride" in prep.col_names
                   else -1)
 
-    if cfg.copy_path:
-        print(f"[copy-path] reuse_col={obj_id_col} stride_col={stride_col} "
+    _copy_path_losses = cfg.copy_path or cfg.copy_path_loss_only
+    if _copy_path_losses:
+        print(f"[copy-path{'(loss-only)' if cfg.copy_path_loss_only else ''}] "
+              f"reuse_col={obj_id_col} stride_col={stride_col} "
               f"bce_w={cfg.reuse_bce_weight} stride_w={cfg.stride_consistency_weight}")
 
     # WGAN-GP enforces Lipschitz via gradient penalty — spectral norm is
@@ -1486,7 +1488,7 @@ def train(cfg: Config) -> None:
                 # Copy-path: per-timestep reuse BCE + stride-reuse consistency.
                 # Structural replacement for scalar locality_loss: gives per-timestep
                 # gradient for reuse decisions + enforces stride=0 when reuse=+1.
-                if cfg.copy_path and stride_col >= 0:
+                if _copy_path_losses and stride_col >= 0:
                     obj_fake_reuse_cp = fake_decoded[:, :, obj_id_col]   # (B, T) in [-1, 1]
                     obj_real_reuse_cp = real_batch[:, :, obj_id_col]
                     # Map to [0,1] for BCE
@@ -2006,6 +2008,10 @@ def parse_args() -> Config:
                    help="Copy-path mechanism: per-timestep reuse BCE + stride-reuse "
                         "consistency loss + Recovery stride gating. Structural replacement "
                         "for scalar locality_loss. Pretrain-compatible.")
+    p.add_argument("--copy-path-loss-only", action="store_true", default=False,
+                   help="Copy-path LOSSES only (no stride gating in forward pass). "
+                        "Enables reuse BCE + stride consistency losses without modifying "
+                        "the Recovery output. Avoids the W-explosion from stride gating.")
     p.add_argument("--reuse-bce-weight", type=float, default=2.0,
                    help="Copy-path: per-timestep BCE weight on reuse column (default 2.0). "
                         "Class-weighted to handle seek/reuse imbalance.")
@@ -2142,6 +2148,7 @@ def parse_args() -> Config:
     cfg.gp_lambda                   = args.gp_lambda
     cfg.locality_loss_weight        = args.locality_loss_weight
     cfg.copy_path                   = args.copy_path
+    cfg.copy_path_loss_only         = args.copy_path_loss_only
     cfg.reuse_bce_weight            = args.reuse_bce_weight
     cfg.stride_consistency_weight   = args.stride_consistency_weight
     cfg.pcf_loss_weight             = args.pcf_loss_weight

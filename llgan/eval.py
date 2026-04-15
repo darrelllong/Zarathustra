@@ -279,16 +279,14 @@ def hrc_mae(real_seqs: np.ndarray, fake_seqs: np.ndarray,
                 hit_ratios[j] += _lru_hit_ratio(ids, int(cs))
         hit_ratios /= N
 
-        # Pad/truncate to n_points
-        if len(hit_ratios) < n_points:
-            hit_ratios = np.pad(hit_ratios, (0, n_points - len(hit_ratios)),
-                                constant_values=hit_ratios[-1] if len(hit_ratios) > 0 else 0)
-        return hit_ratios[:n_points]
+        return hit_ratios  # return actual points only, no padding
 
     real_hrc = _per_window_hrc(real_seqs, prep, n_points)
     fake_hrc = _per_window_hrc(fake_seqs, prep, n_points)
 
-    mae = float(np.abs(real_hrc - fake_hrc).mean())
+    # MAE over actual cache sizes only (no artificial padding)
+    n_actual = min(len(real_hrc), len(fake_hrc))
+    mae = float(np.abs(real_hrc[:n_actual] - fake_hrc[:n_actual]).mean())
     return mae, real_hrc, fake_hrc
 
 
@@ -563,13 +561,20 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     cfid = context_fid(real_seqs, fake_seqs, E, device) if E is not None else None
 
     # Reuse rate: fraction of accesses where obj_id_reuse > 0 (same object as prior).
-    # Uses the locality-split reuse column directly (col 3 for standard 5-col layout).
+    # Dynamically resolves the reuse column index from the preprocessor's col_names
+    # to handle column dropout (e.g. tenant column auto-dropped for single-tenant traces).
+    prep = ckpt["prep"]
     def _reuse_rate(seqs: np.ndarray) -> float:
-        # seqs: (N, T, d); obj_id_reuse is column 3 (after ts, obj_size, tenant)
         d = seqs.shape[2]
-        if d >= 4:
-            # Use the explicit reuse flag (locality split)
-            reuse = seqs[:, 1:, 3]   # skip first timestep (always miss)
+        # Resolve reuse column dynamically
+        reuse_col = None
+        if hasattr(prep, 'col_names'):
+            if 'obj_id_reuse' in prep.col_names:
+                reuse_col = prep.col_names.index('obj_id_reuse')
+        if reuse_col is None and d >= 4:
+            reuse_col = 3  # fallback for legacy layout
+        if reuse_col is not None and reuse_col < d:
+            reuse = seqs[:, 1:, reuse_col]   # skip first timestep (always miss)
             return float((reuse > 0).mean())
         # Fallback for legacy layout: check exact column-1 matches
         obj = seqs[:, :, 1]

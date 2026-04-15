@@ -6,11 +6,23 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v105 — CFG fix + fresh seed
-**Recipe**: Same as v104 (CFG dropout reordering). Fresh seed. v104 produced best training trajectory ever (5 stars, 0.092★) but eval gap persisted (+31%).
+### alibaba_v106 — Copy-path loss-only (no stride gating)
+**Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.5 --stride-consistency-weight 0.5`. Enables per-timestep reuse BCE + stride-reuse consistency losses WITHOUT the stride gating that caused W-explosion in v67/v113. Lower weights (0.5/0.5 vs original 2.0/1.0) for stability.
 
 ### tencent_v133 — CFG info-leak fix, fresh seed (Gemini Round 2 P1)
 **Recipe**: Same as v132 (CFG dropout reordering). Fresh seed. v132 W-stopped at ep30 but showed promising trajectory (combined 0.101 at ep25).
+
+---
+
+## Post-Mortem: alibaba_v105 — CFG fix + fresh seed (killed ep64, best 0.084★ ep35)
+
+**Recipe**: Same as v104 (CFG dropout reordering). Fresh seed.
+
+**Training-log**: Stars at ep5=0.117★ (recall=0.515), ep25=0.107★ (recall=0.572), ep35=0.084★ (recall=0.634, MMD²=0.011). Best training combined **0.084** — the best training metric ever recorded on alibaba. After ep35, regressed: ep40=0.138, ep45=0.095, ep50=0.101, ep55=0.096, ep60=0.098. W stable throughout (0.66-2.79). Killed at ep64 (29 epochs stale).
+
+**Eval (5-run avg): combined=0.113** (range 0.091–0.126). Individual: 0.126, 0.111, 0.091, 0.124, 0.113. Avg recall=0.511. Run 3 hit 0.091 (recall=0.587). Train→eval gap **+35%** (0.084→0.113). Does NOT beat ATB 0.088.
+
+**Verdict**: Best training metric ever (0.084★) but eval gap (+35%) remains unchanged. CFG fix produces strong training but the structural train→eval gap persists regardless of seed. Two CFG-fixed runs (v104: +31%, v105: +35%) confirm the gap is NOT caused by CFG leakage.
 
 ---
 
