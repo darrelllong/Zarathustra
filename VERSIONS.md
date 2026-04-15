@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v108 — Copy-path loss-only 0.25/0.25, fresh seed
-**Recipe**: Same as v107 (copy-path-loss-only 0.25/0.25). Fresh seed. v107 produced 0.084★ but W-stopped at ep36.
+### alibaba_v109 — Base PCF recipe, fresh seed (no copy-path)
+**Recipe**: v98 ATB recipe + CFG fix. No copy-path (exhausted — doesn't reliably reduce eval gap). Fresh seed. Back to base recipe that produced ATB 0.088.
+
+---
+
+## Post-Mortem: alibaba_v108 — Copy-path loss-only 0.25/0.25 (W-stopped ep67, best 0.110★ ep40)
+
+**Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.25 --stride-consistency-weight 0.25`.
+
+**Training-log**: Four stars: ep5=0.161★ (recall=0.301), ep10=0.134★ (recall=0.400), ep25=0.124★ (recall=0.480), ep40=**0.110★** (recall=0.503, MMD²=0.011). W remarkably stable through ep55 (1.0-2.4), then destabilized: ep58=3.34, ep61=4.49, ep65=3.29, ep66=3.41, ep67=4.01 → W-stopped (3 consecutive >3.0). Best training quality 0.110★ — significantly worse than v106/v107's 0.084-0.096★.
+
+**Verdict**: Best W stability of any copy-path run (survived to ep67 vs ep36-42 for v106/v107) but worst training quality (0.110★ vs 0.084★). Longer W stability didn't translate to better stars. Copy-path-loss-only **CLOSED on alibaba**: 3 runs tested (v106=0.096★/eval 0.103, v107=0.084★/eval 0.113, v108=0.110★/no eval). Gap reduction was seed-dependent (v106 only). Reverting to base recipe.
 
 ---
 
