@@ -433,5 +433,5 @@ prove it via cache evaluation (#14).
 79. **KEY FINDING:** Per-timestep reuse supervision (copy-path-loss-only) dramatically reduces the train→eval gap. v106 gap=7.3% vs v104/v105 gap=31-35%. This is the first technique to significantly reduce the structural gap.
 78. ~~alibaba_v107~~ (copy-path-loss-only 0.25/0.25, W-stopped ep36 — best **0.084★ ep30**, **5-run eval avg 0.113**, +34% gap. v106's 7% gap was NOT replicated — gap reduction is seed-dependent.)
 81. ~~alibaba_v108~~ (copy-path-loss-only 0.25/0.25, W-stopped ep67 — best 0.110★ ep40, worst training quality of copy-path series despite best W stability. **Copy-path CLOSED on alibaba.**)
-83. ~~alibaba_v109~~ (base PCF recipe, W-stopped ep49 — best 0.091★ ep25 (recall=0.608), 3.4% above ATB. Eval pending. Baseline for multi-scale critic comparison.)
+83. ~~alibaba_v109~~ (base PCF recipe, W-stopped ep49 — best 0.091★ ep25, **5-run eval avg 0.122**, +34% gap. Recall collapsed 0.608→0.469. Baseline for v110 multi-scale critic comparison.)
 85. **Running:** alibaba_v110 (multi-scale critic + PCF — testing universality of v136 breakthrough on alibaba)

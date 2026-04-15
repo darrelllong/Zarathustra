@@ -17,9 +17,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Four stars: ep5=0.133★ (recall=0.463), ep10=0.114★ (recall=0.569), ep20=0.106★ (recall=0.579), ep25=**0.091★** (recall=0.608, MMD²=0.012). Then regressed: ep30=0.100, ep35=0.092, ep40=0.144. W stable through ep45 (1.0–1.95), then spiked: ep46=2.67, ep47=3.09, ep48=3.25, ep49=3.68 → W-stopped.
 
-**Eval**: PENDING (5-run eval running on best.pt)
+**Eval (5-run avg): combined=0.122** (range 0.102–0.135). Individual: 0.114, 0.102, 0.128, 0.135, 0.131. Avg recall=0.469 (range 0.405-0.554). Train→eval gap **+34%** (0.091→0.122). Does NOT beat ATB 0.088.
 
-**Verdict**: Strong seed — best training combined 0.091★ is only 3.4% above ATB 0.088. Recall peaked at 0.608. W-stopped at ep49 — typical lifespan for base recipe. Serves as baseline for alibaba_v110 (multi-scale critic) comparison.
+**Verdict**: Good training seed (0.091★) but typical eval gap and low recall. Recall dropped from training 0.608 to eval avg 0.469 — the usual coverage collapse. Serves as baseline for alibaba_v110 (multi-scale critic) comparison.
 
 ---
 
