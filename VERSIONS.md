@@ -6,8 +6,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v107 — Copy-path loss-only, lower weights
-**Recipe**: Same as v106 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v106 W-stopped at ep42; lower weights should reduce W pressure while retaining per-timestep reuse supervision.
+### alibaba_v108 — Copy-path loss-only 0.25/0.25, fresh seed
+**Recipe**: Same as v107 (copy-path-loss-only 0.25/0.25). Fresh seed. v107 produced 0.084★ but W-stopped at ep36.
+
+---
+
+## Post-Mortem: alibaba_v107 — Copy-path loss-only 0.25/0.25 (W-stopped ep36, best 0.084★ ep30)
+
+**Recipe**: v98 ATB recipe + CFG fix + `--copy-path-loss-only --reuse-bce-weight 0.25 --stride-consistency-weight 0.25`.
+
+**Training-log**: Four stars: ep5=0.120★ (recall=0.490), ep10=0.103★ (recall=0.548), ep15=0.099★ (recall=0.576), ep30=**0.084★** (recall=0.713, MMD²=0.026) — ties best training metric ever. W stable through ep32 (1.1-2.7), then spiked: ep33=2.90, ep34=3.55, ep35=3.53, ep36=4.83 → W-stopped. Lower weights lasted 6 fewer epochs than v106 before W-stop — W instability may be seed-dependent, not weight-dependent.
+
+**Eval**: 5-run eval pending on best.pt (ep30).
 
 ### tencent_v135 — Copy-path loss-only, lower weights
 **Recipe**: Same as v134 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v134 had W instability (spiked 3.83 at ep42); lower weights should help.

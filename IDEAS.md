@@ -429,4 +429,5 @@ prove it via cache evaluation (#14).
 75. **EVAL BUG FIXES:** (a) HRC-MAE padding: was padding to n_points by repeating final hit ratio, suppressing error at discriminative cache sizes. Fixed: compute MAE over actual sizes only. (b) Reuse metric hardcoded to col 3: was wrong when tenant column dropped. Fixed: dynamically resolve from preprocessor col_names.
 76. ~~alibaba_v106~~ (copy-path-loss-only 0.5/0.5, W-stopped ep42 — best 0.096★ ep35, **5-run eval avg 0.103**, +7.3% gap! Run 3 hit 0.073 BEST EVER. **KEY: copy-path-loss-only reduces train→eval gap from 30% to 7%.**)
 79. **KEY FINDING:** Per-timestep reuse supervision (copy-path-loss-only) dramatically reduces the train→eval gap. v106 gap=7.3% vs v104/v105 gap=31-35%. This is the first technique to significantly reduce the structural gap.
-78. **Running:** alibaba_v107 (copy-path-loss-only 0.25/0.25 — halved weights to reduce W pressure)
+78. ~~alibaba_v107~~ (copy-path-loss-only 0.25/0.25, W-stopped ep36 — best **0.084★ ep30** (recall=0.713), ties best train ever. W-stop seed-dependent not weight-dependent. Eval pending.)
+81. **Running:** alibaba_v108 (copy-path-loss-only 0.25/0.25, fresh seed — hoping for W stability)
