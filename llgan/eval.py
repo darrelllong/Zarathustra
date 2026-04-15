@@ -331,8 +331,9 @@ def _compute_prdc_numpy(real: np.ndarray, fake: np.ndarray, k: int = 5) -> dict:
     # density: average number of fake points per real ball / k
     density = in_real_ball.sum(axis=1).mean() / k
 
-    # coverage: fraction of real balls that contain at least one fake point
-    coverage = in_real_ball.any(axis=1).mean()
+    # coverage: fraction of fake balls that contain at least one real point
+    in_fake_ball = (np.sqrt(rf.T) <= r_fake[:, None])  # (n_fake, n_real)
+    coverage = in_fake_ball.any(axis=1).mean()
 
     return {"precision": float(precision), "recall": float(recall),
             "density": float(density),    "coverage": float(coverage)}
@@ -615,7 +616,11 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
         print(f"\nBaseline   : {baseline_path}")
         b_ckpt = _load_checkpoint(baseline_path, device)
         b_real_flat = _sample_real(b_ckpt, trace_dir, fmt, n_samples)
-        b_fake_flat = _sample_fake(b_ckpt, n_samples, device)
+        b_cond_dim = getattr(b_ckpt["config"], "cond_dim", 0)
+        b_real_seqs_for_cond = (b_real_flat.reshape(-1, b_ckpt["config"].timestep,
+                                b_ckpt["prep"].num_cols) if b_cond_dim > 0 else None)
+        b_fake_flat = _sample_fake(b_ckpt, n_samples, device,
+                                   real_windows=b_real_seqs_for_cond)
         b_cfg  = b_ckpt["config"]
         b_seqs_real = b_real_flat.reshape(-1, b_cfg.timestep, b_ckpt["prep"].num_cols)
         b_seqs_fake = b_fake_flat.reshape(-1, b_cfg.timestep, b_ckpt["prep"].num_cols)

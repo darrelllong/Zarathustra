@@ -459,6 +459,20 @@ def train(cfg: Config) -> None:
 
     _copy_path_losses = cfg.copy_path or cfg.copy_path_loss_only
     if _copy_path_losses:
+        # Fail fast: copy-path requires explicit obj_id_reuse and obj_id_stride columns.
+        # Silent fallback to obj_id or positional defaults would supervise the wrong feature.
+        if not (hasattr(prep, "col_names") and "obj_id_reuse" in prep.col_names):
+            raise RuntimeError(
+                "copy-path requires 'obj_id_reuse' in preprocessor columns, "
+                f"but col_names={getattr(prep, 'col_names', 'N/A')}. "
+                "Cannot safely apply reuse BCE loss without explicit reuse column."
+            )
+        if stride_col < 0:
+            raise RuntimeError(
+                "copy-path requires 'obj_id_stride' in preprocessor columns, "
+                f"but col_names={getattr(prep, 'col_names', 'N/A')}. "
+                "Cannot safely apply stride consistency loss without explicit stride column."
+            )
         print(f"[copy-path{'(loss-only)' if cfg.copy_path_loss_only else ''}] "
               f"reuse_col={obj_id_col} stride_col={stride_col} "
               f"bce_w={cfg.reuse_bce_weight} stride_w={cfg.stride_consistency_weight}")
