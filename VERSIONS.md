@@ -17,7 +17,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Four stars: ep5=0.120★ (recall=0.490), ep10=0.103★ (recall=0.548), ep15=0.099★ (recall=0.576), ep30=**0.084★** (recall=0.713, MMD²=0.026) — ties best training metric ever. W stable through ep32 (1.1-2.7), then spiked: ep33=2.90, ep34=3.55, ep35=3.53, ep36=4.83 → W-stopped. Lower weights lasted 6 fewer epochs than v106 before W-stop — W instability may be seed-dependent, not weight-dependent.
 
-**Eval**: 5-run eval pending on best.pt (ep30).
+**Eval (5-run avg): combined=0.113** (range 0.092–0.146). Individual: 0.108, 0.104, 0.092, 0.146, 0.113. Avg recall=0.533 (range 0.398-0.686). Run 3 hit 0.092 (recall=0.686). Train→eval gap **+34%** (0.084→0.113).
+
+**Verdict**: v106's reduced gap (7.3%) was NOT replicated — the gap reduction appears seed-dependent, not a systematic effect of copy-path-loss-only. Recall variance (0.398-0.686) remains the dominant bottleneck. Copy-path-loss-only produces excellent training (0.084★ consistently) but doesn't reliably close the eval gap.
 
 ### tencent_v135 — Copy-path loss-only, lower weights
 **Recipe**: Same as v134 but halved copy-path weights: `--reuse-bce-weight 0.25 --stride-consistency-weight 0.25`. v134 had W instability (spiked 3.83 at ep42); lower weights should help.
