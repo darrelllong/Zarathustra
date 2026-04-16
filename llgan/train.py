@@ -370,9 +370,13 @@ def train(cfg: Config) -> None:
         else:
             print(f"Trace dir: {cfg.trace_dir}  ({len(all_files)} files found)")
 
-        # Fit preprocessor on a seed set of files (held constant across training)
+        # Fit preprocessor on a seed set of files (held constant across training).
+        # Use a dedicated, fixed-seed RNG so the preprocessor's min/max bounds are
+        # INVARIANT across cfg.seed values — otherwise rolling training seeds also
+        # rerolls normalisation, contaminating cross-seed comparisons (Gemini R1 #5).
         n_seed = min(max(cfg.files_per_epoch, 4), len(all_files))
-        seed_files = random.sample(all_files, n_seed)
+        _prep_rng = random.Random(0)
+        seed_files = _prep_rng.sample(sorted(all_files), n_seed)
         print(f"Fitting preprocessor on {n_seed} seed files …")
         prep = _fit_prep_on_files(seed_files, cfg.trace_format, cfg.records_per_file,
                                    obj_size_granularity=cfg.obj_size_granularity)

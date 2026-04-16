@@ -170,9 +170,12 @@ def _dmd_subspace(X: np.ndarray, r: int) -> np.ndarray:
     r_eff = min(r, min(X1.shape) - 1)
     U, s, Vh = np.linalg.svd(X1, full_matrices=False)
     U_r, S_r, Vh_r = U[:, :r_eff], s[:r_eff], Vh[:r_eff, :]
-    A_tilde = U_r.T @ X2 @ Vh_r.T @ np.diag(1.0 / S_r)
+    # pinv of diag(S_r) — zeroes out singular values below numpy's default tol,
+    # avoiding 1/0 blow-up when X1 is rank-deficient (Gemini R2 #3).
+    S_r_inv = np.linalg.pinv(np.diag(S_r))
+    A_tilde = U_r.T @ X2 @ Vh_r.T @ S_r_inv
     _, W = np.linalg.eig(A_tilde)
-    Phi = (X2 @ Vh_r.T @ np.diag(1.0 / S_r) @ W).real
+    Phi = (X2 @ Vh_r.T @ S_r_inv @ W).real
     Q, _ = np.linalg.qr(Phi)
     return Q[:, :r_eff]
 
