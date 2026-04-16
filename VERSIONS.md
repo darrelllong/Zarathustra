@@ -36,8 +36,8 @@ relevant.
 ### tencent_v144 — **Round 16 #17: retrieval memory** (FIRST architecture-bet experiment)
 **Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False (retrieval params freshly initialised). **Phase 1 AE pretrain just started**, will reach GAN training in ~1h. Per IDEAS.md "Recommended build order" + Round 16 peer review: this is the first of three architectural bets. Judging on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
-### alibaba_v117 — Multi-scale critic + continuity loss, seed #4 — **🎯 BEATS ATB 0.088**
-**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep65, ★ ep65 = 0.08479** (recall 0.633, MMD²=0.01149) — BEATS alibaba ATB 0.088. ★ trajectory ep5=0.157 → ep10=0.112 → ep20=0.111 → ep25=0.100 → ep45=0.103 → ep55=0.10019 → **ep65=0.08479 ★best** (jumped 16% in 10 epochs after long plateau). W stable 1.10-1.52, PCF saturated ~1.0, G loss 3-5. Stale=0; running. Frozen-eval pending. If holds → first alibaba run to beat ATB on training ★ since v114.
+### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep70, ★ ep65 = 0.08479** (training: recall 0.633, MMD²=0.01149). ★ trajectory ep5=0.157 → ep25=0.100 → ep55=0.10019 → **ep65=0.08479 ★best** → ep70=0.106. **Frozen-eval (snapshot, seed=42): MMD²=0.01328, β-recall=0.132 → combined ≈ 0.187** — worse than alibaba ATB 0.176. Training ★ did NOT transfer to frozen bundle: β-recall collapsed from 0.633 (training, val_tensor cond) to 0.132 (frozen, char_file cond) — mode-collapse warning at frozen eval. Training-★ is a misleading proxy here. Run continues — may produce a less-collapsed checkpoint at later epochs.
 
 ---
 
