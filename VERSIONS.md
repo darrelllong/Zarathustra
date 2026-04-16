@@ -4,6 +4,33 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## Frozen-Bundle Eval Baselines (2026-04-15, seed=42)
+
+Round 15 peer review revealed that the previous eval protocol resampled a
+random 4-file real bundle every run, conflating model/fake-sample variance
+with benchmark variance. `llgan/eval.py` now supports `--eval-real-seed 42`
+to freeze the real bundle. **All ATB-claiming evals should pass this flag.**
+Numbers under this protocol are NOT directly comparable to prior
+"5-run avg" entries — true performance is roughly 2x worse than the
+moving-bundle reports.
+
+| Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
+|---------|--------------------|---------|----------------------|-------|
+| Alibaba | **0.176** avg     | **v114** (continuity) | was "0.100"       | Ties v98 (0.182, was "0.088") within noise |
+| Tencent | **0.178** avg     | **v136** (multi-scale+PCF) | was "0.094" | v141 (continuity) 0.186 |
+
+**Reverted conclusions:**
+- "Continuity loss failed on alibaba" — actually competitive with base recipe
+- "Multi-scale critic CLOSED (universal improvement)" — needs frozen-bundle re-test
+- All prior post-mortems comparing techniques may have been measuring
+  benchmark variance as much as model differences.
+
+All new experiments eval with `--eval-real-seed 42`. Old numbers kept
+in-line for historical provenance but marked "moving-bundle" where
+relevant.
+
+---
+
 ## Currently Running
 
 ### alibaba_v115 — Multi-scale critic + continuity loss, seed #2
@@ -20,7 +47,9 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training-log**: Four stars: ep5=0.150★ (recall=0.322), ep10=0.116★ (recall=0.469), ep15=0.106★ (recall=0.511), ep20=**0.091★** (recall=0.592). Then stalled: ep25=0.107, ep30=0.100, ep35=0.109, ep40=0.092, ep45=0.105, ep50=0.117. W slowly escalating 1.27→2.14 but never hit 3.0. Killed at ep51 (31 stale from ep20).
 
-**Verdict**: Continuity loss does NOT help tencent. Best training 0.091★ is WORSE than v136 (0.073★), v137 (0.082★), v138 (0.090★). Expected eval ~0.11-0.12 given structural gap, far from ATB 0.094. Continuity loss CLOSED on tencent (2nd attempt — v111 also failed ep 2026-04-13).
+**Frozen-bundle eval (seed=42, 3-run)**: combined=**0.186** (range 0.186-0.187), recall avg 0.124 — tightly clustered. For comparison, tencent_v136 on same frozen bundle scores 0.178 (3-run, range 0.176-0.180). Continuity loss on tencent underperforms multi-scale+PCF baseline by ~5% on the real benchmark.
+
+**Verdict**: Continuity loss underperforms multi-scale+PCF on tencent, confirmed on frozen bundle (0.186 vs 0.178). The gap is small (~5%) but consistent. Moving-bundle pre-eval was unnecessary — training 0.091★ already ranked below v136 (0.073★), v137 (0.082★), v138 (0.090★). Continuity loss closed on tencent.
 
 ---
 
@@ -32,9 +61,11 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 **Training 0.073★ TIES tencent_v136's 0.073★** — best training ever on either corpus.
 
-**Eval (5-run avg): combined=0.100** (range 0.087–0.117). Individual: 0.101, 0.094, 0.102, **0.087**, 0.117. Avg MMD²=0.0112, avg recall=0.556 (range 0.481-0.617). Train→eval gap **+37%** (0.073→0.100) — larger than typical.
+**Moving-bundle eval (5-run avg): combined=0.100** (range 0.087–0.117). Individual: 0.101, 0.094, 0.102, **0.087**, 0.117. Avg MMD²=0.0112, avg recall=0.556. (This protocol is now known to inflate recall via random-file selection.)
 
-**Verdict**: Continuity loss produced BEST training ever on alibaba (0.073★) but eval 0.100 does NOT beat ATB 0.088. Large train→eval gap (+37%) suggests continuity loss overfits training-window boundary structure. v115 running to test reproducibility of 0.073★ training quality. If v115 also fails eval, continuity loss closes on alibaba too.
+**Frozen-bundle eval (seed=42, 5-run)**: combined=**0.176** avg (range 0.163-0.188). Individual: 0.182, 0.164, 0.163, 0.188, 0.182. MMD² avg=0.01514, recall avg=0.217. On the SAME frozen bundle, alibaba_v98 (prior ATB, "0.088" moving) scores **0.182** avg (range 0.177-0.187). **v114 is competitive with v98 within fake-sample noise** — the continuity loss technique is not dead after all. The moving-bundle "0.100 fails vs 0.088 ATB" framing was benchmark variance.
+
+**Verdict (revised)**: Continuity loss produces BEST training ever on alibaba (0.073★) and on the frozen benchmark EDGES OUT the prior "ATB" v98 base recipe (0.176 vs 0.182). v115 running to test reproducibility; if v115 confirms, continuity loss becomes the candidate alibaba ATB under frozen-bundle protocol.
 
 ---
 
