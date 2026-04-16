@@ -33,11 +33,25 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v115 — Multi-scale critic + continuity loss, seed #2
-**Recipe**: Same as v114. Fresh seed to confirm continuity loss reproducibility after v114 hit 0.073★ (best training ever) but failed eval (0.100 avg). Currently in AE pretraining.
-
 ### tencent_v142 — Multi-scale critic + PCF (ATB recipe, fresh seed #4)
-**Recipe**: v136/v137/v138 ATB recipe. Seed roll to gather more data on whether v136's 0.094 ATB is reproducible or a lucky outlier (v137=0.107, v138=0.112).
+**Recipe**: v136/v137/v138 ATB recipe. Seed roll to gather more data on whether v136's 0.094 ATB is reproducible or a lucky outlier (v137=0.107, v138=0.112). GAN ep48, **NEW BEST ★ ep45=0.0856** (recall=0.605, MMD²=0.0065) — moving-bundle improvement over v136's 0.094.
+
+### alibaba_v116 — Multi-scale critic + continuity loss, seed #3
+**Recipe**: Identical to v114/v115. Third continuity-loss seed to harden frozen-bundle ATB estimate. v114 frozen=0.176, v115 pending. Need 3+ consistent frozen results to lock in continuity loss as canonical alibaba ATB.
+
+---
+
+## Post-Mortem: alibaba_v115 — Multi-scale critic + continuity loss, seed #2 (killed ep85, best 0.083★ ep55)
+
+**Recipe**: Identical to v114. Continuity-loss seed retest of v114's training-best 0.073★.
+
+**Training-log**: Six stars: ep5=0.145★, ep10=0.112★, ep15=0.112★, ep20=0.106★, ep40=0.087★, **ep55=0.0827★** (recall=0.654, MMD²=0.0135). Notable: **ep55 ★ came after 15 epochs of stall** (ep40→ep55) — would have been killed under cron's 15-stale rule. 30-stale rule (per saved memory) was the right call. Then stalled: ep60=0.108, ep65=0.108, ep70=0.102, ep75=?, ep80=0.127, ep85=0.116. W elevated 1.6-2.9 throughout, never sustained ≥3.0. Killed at ep85 (30 stale from ep55).
+
+**vs v114**: v114 hit 0.073★ ep30 (training was sharper, faster); v115 hit 0.083★ ep55 (slower, slightly worse training peak). Both runs validated continuity loss's training-quality benefit but v115 is ~14% worse on the training-best metric.
+
+**Frozen-bundle eval**: pending (running in background as `eval_alibaba_v115_frozen.log`).
+
+**Verdict (provisional)**: Awaiting frozen-bundle eval. If v115 frozen lands ~0.18-0.19, continuity loss is still the alibaba ATB candidate (matches v114=0.176 within noise). If v115 frozen lands worse, continuity loss is more seed-sensitive than v114 alone suggested.
 
 ---
 

@@ -435,8 +435,9 @@ prove it via cache evaluation (#14).
 93. **SELF-DIAGNOSING (#9) CLOSED PERMANENTLY.** Tested temp=10/2/1.0/0.1 across 5 runs. Positive feedback loop is fundamental.
 94. ~~alibaba_v114~~ (multi-scale critic + continuity loss weight=1.0, killed ep72 — **best 0.073★ ep30 (TIES best train ever)**, **5-run eval avg 0.100**, +37% gap. Training breakthrough but eval doesn't beat ATB 0.088.)
 95. ~~tencent_v141~~ (multi-scale critic + continuity loss weight=1.0, killed ep51 — best 0.091★ ep20, 31 stale, worse than multi-scale+PCF baseline. **Continuity loss DEAD on tencent (2nd attempt).**)
-96. **Running:** alibaba_v115 (multi-scale critic + continuity loss, fresh seed #2 — testing reproducibility of v114's 0.073★ training before closing idea)
-97. **Running:** tencent_v142 (multi-scale critic + PCF ATB recipe, fresh seed #4 — more data on v136's 0.094 ATB reproducibility)
+96. ~~alibaba_v115~~ (continuity-loss seed #2, killed ep85 — best 0.083★ ep55 (LATE breakthrough, validates 30-stale rule), 30 stale at kill. Frozen-bundle eval pending.)
+97. **Running:** tencent_v142 (multi-scale critic + PCF ATB recipe, fresh seed #4, ep48 best 0.0856★ ep45 — beats v136 moving 0.094)
+98. **Running:** alibaba_v116 (continuity-loss seed #3 — third data point for v114 ATB recipe; v114=0.073★/0.176frozen, v115=0.083★/?)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.
 75. **EVAL BUG FIXES:** (a) HRC-MAE padding: was padding to n_points by repeating final hit ratio, suppressing error at discriminative cache sizes. Fixed: compute MAE over actual sizes only. (b) Reuse metric hardcoded to col 3: was wrong when tenant column dropped. Fixed: dynamically resolve from preprocessor col_names.
@@ -447,3 +448,371 @@ prove it via cache evaluation (#14).
 83. ~~alibaba_v109~~ (base PCF recipe, W-stopped ep49 — best 0.091★ ep25, **5-run eval avg 0.122**, +34% gap. Recall collapsed 0.608→0.469. Baseline for v110 multi-scale critic comparison.)
 85. ~~alibaba_v110~~ (multi-scale critic + PCF, killed ep40 — best **0.090★** ep20. **5-run eval avg 0.104**, Run 4 hit 0.082! **Multi-scale critic improves alibaba eval 15% (0.122→0.104).** Gap reduced +34%→+16%.)
 86. ~~alibaba_v111~~ (multi-scale critic + PCF, seed #2, killed ep53 — **FIVE consecutive stars**, best **0.083★** ep25 (BEST ALIBABA TRAIN EVER). **5-run eval avg 0.096**, Run 5 hit **0.075** BEST INDIVIDUAL EVER. Doesn't beat ATB 0.088 avg.)
+
+---
+
+## Literature refresh (2026-04-15) — new bets beyond the current list
+
+Most items above have now been tried, partially validated, or explicitly closed. The next serious gains
+probably require changing the abstraction, not adding one more scalar loss or critic garnish.
+
+Important honesty note: several papers below come from adjacent domains (LLMs, generic time series,
+network traffic). When I say they are relevant to Zarathustra, that is an **inference** from their
+mechanism, not a claim made by the paper authors about block I/O traces specifically.
+
+The common thread across these papers is clear:
+
+1. The strongest recent systems do **not** win by slightly better generic sequence modeling.
+2. They win by baking in one of:
+   explicit memory,
+   explicit workload descriptors,
+   explicit long-horizon state,
+   or explicit event-time structure.
+3. That is exactly where Zarathustra is still weakest:
+   reuse decisions,
+   cache behavior,
+   long-rollout coherence,
+   and timestamp/locality coupling.
+
+What follows is not a random literature dump. It is a proposed next architectural queue.
+
+### 17. Retrieval memory for locality: explicit reuse/new decision + object pointer
+
+**Core claim:** locality should become a structural decision, not a scalar penalty. Copy-path losses gave
+evidence that per-timestep reuse supervision matters, but the generator still has no explicit mechanism for
+"reuse a recent object" versus "create a fresh object." Right now the model is still trying to smuggle object
+memory through a generic hidden state and a continuous output head.
+
+**Why this fits the repo specifically:**
+- Reuse-rate remains the most stubborn realism gap.
+- The current `obj_id_reuse` and `obj_id_stride` split already defines the right latent decision:
+  first decide reuse vs new, then decide how to realize it.
+- Copy-path-loss-only runs suggest the signal is real, but the mechanism is missing.
+
+**Architecture sketch:**
+- Add a per-stream memory table of recent object embeddings and metadata.
+- At each timestep, the generator outputs:
+  `p_reuse`,
+  a retrieval query,
+  and a fresh-object proposal.
+- If `reuse=1`, use attention, kNN, or pointer selection over the memory table.
+- If `reuse=0`, emit a new object embedding and push it into memory.
+- Predict size/opcode/timestamp conditioned on the selected object state rather than independently.
+- Optionally: represent stride as retrieval rank or relative pointer distance instead of raw signed regression.
+
+**Minimal viable experiment:**
+- Keep the current generator backbone.
+- Add only:
+  a memory bank,
+  a reuse gate,
+  and a retrieval head.
+- Train first on alibaba with the multi-scale+PCF backbone frozen as the control recipe.
+- Use current mixed-type heads and reuse BCE as auxiliary supervision, but make retrieval the primary path.
+
+**Success criteria:**
+- Reuse rate materially improves without destroying precision.
+- HRC-MAE improves, not just MMD.
+- Reuse-native diagnostics improve:
+  reuse precision/recall,
+  reuse streak distribution,
+  stride-on-reuse violation rate.
+- Long-rollout replay does not immediately collapse into near-zero hit ratio.
+
+**Failure modes / risks:**
+- Memory may become a glorified nearest-neighbor copier and overfit recent context.
+- The generator may learn to over-trigger reuse to satisfy the loss while harming global realism.
+- Memory write policy can become unstable if every timestep inserts a noisy object state.
+
+**Why it is still worth it:** this is the cleanest direct response to the main unsolved problem in the repo.
+If this fails, it tells us something deep: not just that the loss was wrong, but that even explicit retrieval
+is insufficient under the current decomposition.
+
+**Primary sources:**
+- Yuhuai Wu et al., [Memorizing Transformers](pubs/Memorizing_Transformers_2022.pdf), ICLR 2022. [arXiv](https://arxiv.org/abs/2203.08913)
+- Ali Safaya and Deniz Yuret, [Neurocache: Efficient Vector Retrieval for Long-range Language Modeling](pubs/Neurocache_2024.pdf), NAACL 2024. [arXiv](https://arxiv.org/abs/2407.02486)
+
+### 18. Cache-descriptor distillation: make cache behavior part of training, not just evaluation
+
+**Core claim:** if cache fidelity is the real downstream target, cache-native descriptors should appear in
+training, not just post-hoc evaluation. Competitor systems keep winning by building compact workload
+descriptors that preserve recency/frequency/footprint structure. Zarathustra currently measures HRC after
+generation, but it does not ask the model to predict or preserve compact cache-behavior summaries.
+
+**Why this fits the repo specifically:**
+- The repo already has file-level characterization infrastructure.
+- HRC is now in the eval stack, so there is already a downstream operational target.
+- The current conditioning vector is still mostly scalar workload metadata, not cache-native structure.
+
+**Descriptor candidates:**
+- Footprint and object-popularity summaries
+- Reuse-distance or inter-reference-distance quantiles
+- Popularity-size footprint descriptors
+- Hit-ratio curve slices at fixed normalized cache sizes
+- Working-set growth / saturation summaries
+- Burst-locality interaction summaries:
+  reuse ratio conditioned on burst regime,
+  stride quantiles conditioned on opcode,
+  object-diversity bands
+
+**Architecture sketch:**
+- Add a descriptor encoder that consumes file-level or window-level descriptor targets.
+- Condition the generator on descriptor embeddings rather than only raw scalar characteristics.
+- Add a descriptor reconstruction head from generated windows or generated long traces.
+- Use descriptor mismatch as a training loss and also as a checkpoint tiebreaker.
+- Optionally: use descriptors to define pseudo-label regimes for routing or curriculum.
+
+**Minimal viable experiment:**
+- Do not start with differentiable cache simulation.
+- Start with 4-8 fixed descriptor targets computed offline from real windows/files.
+- Condition on them and add one descriptor reconstruction loss.
+- Run against the current best tencent recipe, since Tencent is where locality is most strategically important.
+
+**Success criteria:**
+- Better HRC-MAE and reuse realism without sacrificing combined score.
+- More stable seed behavior on fixed eval bundle.
+- Clear sensitivity to descriptor changes at generation time.
+
+**Failure modes / risks:**
+- Descriptor learning may collapse into superficial matching that ignores event-level realism.
+- Over-conditioning can recreate the old "raw cond_dim increased, quality worsened" failure mode.
+- File-level descriptors may be too coarse unless paired with window-level pseudo-labels.
+
+**Why it is still worth it:** this is the most direct way to stop optimizing proxy metrics while hoping cache
+behavior comes along for free.
+
+**Primary sources:**
+- Yirong Wang, Isaac Khor, and Peter Desnoyers, [2DIO: Configurable and Cache-Accurate Trace Generation for Storage Benchmarking](pubs/2DIO_CacheAccurate_2026.pdf), EuroSys 2026. [arXiv](https://arxiv.org/abs/2603.19971)
+- Anirudh Sabnis and Ramesh K. Sitaraman, [TRAGEN: A Synthetic Trace Generator for Realistic Cache Simulations](pubs/TRAGEN_IMC2021.pdf), IMC 2021
+- Anirudh Sabnis and Ramesh K. Sitaraman, [JEDI: Model-driven Trace Generation for Cache Simulations](pubs/JEDI_IMC2022.pdf), IMC 2022
+- Cheng Li et al., [TraceGen: A Block-level Storage System Performance Evaluation Tool for Analyzing and Generating I/O Traces](pubs/TraceGen_HPCC2024.pdf), HPCC 2024
+
+### 19. State-space backbone instead of a plain LSTM generator
+
+**Core claim:** the repo is still asking a short-window recurrent model to carry too much long-horizon state.
+Recent synthetic-trace work in adjacent networking domains suggests state-space models can preserve longer
+stateful structure better than ordinary recurrent or transformer baselines.
+
+**Why this fits the repo specifically:**
+- `timestep=12` is still tiny relative to the real trace problem.
+- `generate.py` already depends on hidden-state carry across windows, which means the repo has implicitly
+  admitted it needs a long-horizon state abstraction.
+- Continuity loss failed, which may mean the backbone rather than the loss is the bottleneck.
+
+**Architecture sketch:**
+- Replace the generator LSTM with an SSM block sequence.
+- Preserve:
+  `z_global`,
+  current conditioning stack,
+  mixed-type output heads,
+  and the current critic for the first ablation.
+- Feed one timestep at a time, but maintain a larger latent state with selective retention.
+- Later:
+  consider an SSM critic or file-level SSM regime model only if the generator-side swap helps.
+
+**Minimal viable experiment:**
+- Generator-only swap first.
+- Same preprocessing, same outputs, same checkpoint score, same eval.
+- One alibaba run and one tencent run on fixed recipes.
+
+**Success criteria:**
+- Better long-rollout stability without changing the evaluator.
+- Less chunk-boundary drift.
+- Better DMD-GEN / locality metrics at equal or better combined score.
+
+**Failure modes / risks:**
+- New backbone could increase training instability before showing any benefit.
+- Gains may show only on long rollouts, not on short-window eval, creating a measurement mismatch.
+- If evaluator variance is not fixed first, results could again be hard to interpret.
+
+**Why it is still worth it:** it is the lowest-risk serious backbone change short of a full model-family pivot.
+
+**Primary sources:**
+- Andrew Chu et al., [Feasibility of State Space Models for Network Traffic Generation](pubs/SSM_NetworkTrafficGen_2024.pdf), arXiv 2024. [arXiv](https://arxiv.org/abs/2406.02784)
+- Andrew Chu et al., [NetSSM: Multi-Flow and State-Aware Network Trace Generation using State Space Models](pubs/NetSSM_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2503.22663)
+
+### 20. Recast the problem as a marked temporal point process
+
+**Core claim:** timestamps are not just another feature column. Zarathustra is modeling event sequences,
+where event times are continuous and the marks attached to each event have their own dependencies.
+Treating `ts_delta` as one channel inside a generic vector may be conflating timing errors, locality errors,
+and mark dependence.
+
+**Why this fits the repo specifically:**
+- The repo already knows that event timing matters operationally for burstiness and cache replay.
+- Several persistent failures look like entangled timing/locality mistakes rather than pure marginal mismatch.
+- Mixed-type outputs already move in the direction of treating fields differently; point-process modeling is a
+  stronger version of the same insight.
+
+**Architecture sketch:**
+- Use a point-process module for event times.
+- Use mark heads for:
+  size,
+  opcode,
+  reuse/new,
+  and maybe a latent object-family label.
+- Couple the object identity path to retrieval memory from idea #17.
+- Score not just per-column fidelity, but time-mark dependence:
+  whether reuse events happen at the right times,
+  under the right burst conditions,
+  with the right size/opcode context.
+
+**Minimal viable experiment:**
+- Do not attempt full exact-likelihood MTPP training on day one.
+- Start with a hybrid:
+  point-process head for event times,
+  ordinary heads for marks.
+- Keep the rest of the architecture close to the current generator.
+
+**Success criteria:**
+- Better timing realism on long rollouts.
+- Better burst-locality coupling.
+- Better HRC or replay behavior if timing has been a hidden culprit.
+
+**Failure modes / risks:**
+- Extra complexity may buy little if timestamp modeling is not the real bottleneck.
+- This path will likely take longer to integrate with current windowed training.
+- It may be hard to compare apples-to-apples with current metrics unless the eval bundle is frozen first.
+
+**Why it is still worth it:** this is the cleanest conceptual way to stop pretending event time is just
+another regression target.
+
+**Primary sources:**
+- Yujee Song et al., [Decoupled Marked Temporal Point Process using Neural ODEs](pubs/Decoupled_MTPP_2024.pdf), ICLR 2024. [arXiv](https://arxiv.org/abs/2406.06149)
+- Hui Chen et al., [Marked Temporal Bayesian Flow Point Processes](pubs/BMTPP_2024.pdf), arXiv 2024. [arXiv](https://arxiv.org/abs/2410.19512)
+
+### 21. Chunk stitching / whole-trace generation with explicit boundary state
+
+**Core claim:** the repo still trains locally and hopes globally. Continuity loss failing does not mean the
+whole-trace problem is fake; it means the current continuity implementation was too weak or too scalar.
+The generation path already stitches windows by carrying hidden state, but training still does not supervise
+that contract directly.
+
+**Why this fits the repo specifically:**
+- `generate.py` already carries state across windows.
+- Long-rollout realism is still a project-level goal, not a side objective.
+- The current continuity loss was only one attempt, not a full chunk-generation design.
+
+**Architecture sketch:**
+- Generate overlapping chunks with explicit carried boundary state.
+- Train overlap-consistency on the shared region between adjacent chunks.
+- Add a boundary summarizer:
+  a latent state the next chunk must honor.
+- Permit parallel chunk generation, but learn a stitching or compatibility module.
+- Optionally: condition later chunks on compressed summaries of earlier chunks rather than raw carry state.
+
+**Minimal viable experiment:**
+- Keep the current backbone.
+- Replace scalar continuity loss with overlap-consistency training on paired adjacent windows.
+- Use the hidden-state carry from `generate.py` as the target behavior to imitate in training.
+
+**Success criteria:**
+- Better long-rollout drift curves.
+- Less distribution shift from early chunk to late chunk in a long generated stream.
+- Better HRC stability as generated length increases.
+
+**Failure modes / risks:**
+- More expensive training.
+- If the base generator is too weak, better stitching may just propagate bad state more faithfully.
+- Requires stronger long-rollout diagnostics to tell whether it helped.
+
+**Why it is still worth it:** this is a directly on-problem response to the "12-step training / long-trace
+inference" mismatch.
+
+**Primary sources:**
+- Aditya Shankar et al., [WaveStitch: Flexible and Fast Conditional Time Series Generation with Diffusion Models](pubs/WaveStitch_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2503.06231)
+- Xuan Hou et al., [Stage-Diff: Stage-wise Long-Term Time Series Generation Based on Diffusion Models](pubs/StageDiff_LongTS_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2508.21330)
+
+### 22. Full hybrid pivot: diffusion + autoregressive supervisor + critic
+
+**Core claim:** if the pure GAN family is saturating, the next major model-family bet should be a hybrid
+that gives each sub-problem its own tool:
+diffusion or latent denoising for global structure,
+autoregressive supervision for local consistency,
+and a critic for realism pressure.
+
+**Why this fits the repo specifically:**
+- The repo already has partial ingredients:
+  supervisors,
+  critics,
+  conditioning,
+  mixed-type heads.
+- Recent time-series work is moving toward hybrids, not single-mechanism purity.
+- DiTTO shows this direction is already reaching storage-trace generation specifically.
+
+**Architecture sketch:**
+- Stage 1:
+  generate a coarse latent or chunk-level trace with diffusion or adversarial autoencoding.
+- Stage 2:
+  refine with an autoregressive supervisor that repairs next-step or next-chunk dependencies.
+- Stage 3:
+  critic judges realism in decoded space or latent path space.
+- Keep current mixed-type output heads where possible rather than rebuilding everything at once.
+
+**Minimal viable experiment:**
+- Prefer AVATAR-lite or TIMED-lite before a full DiTTO-style rewrite.
+- Reuse existing recovery heads and conditioning code.
+- Run as a clean side branch, not mixed into the current GAN family piecemeal.
+
+**Success criteria:**
+- Better combined score on fixed eval.
+- Better long-rollout drift behavior.
+- Better locality and HRC simultaneously, not a trade where one goes up and the other down.
+
+**Failure modes / risks:**
+- Highest engineering cost of anything in this section.
+- Could easily turn into a new project rather than a next experiment.
+- Hardest path to interpret if infrastructure debt remains unresolved.
+
+**Why it is still worth it:** this is the high-ceiling pivot if the team decides it has learned most of
+what it can from pure GAN structural tweaks.
+
+**Primary sources:**
+- MohammadReza EskandariNasab et al., [TIMED: Adversarial and Autoregressive Refinement of Diffusion-Based Time Series Generation](pubs/TIMED_DiffusionTS_2025.pdf), ICDM 2025. [arXiv](https://arxiv.org/abs/2509.19638)
+- MohammadReza EskandariNasab et al., [AVATAR: Adversarial Autoencoders with Autoregressive Refinement for Time Series Generation](pubs/AVATAR_AAE_TimeSeriesGen_2025.pdf), SDM 2025. [arXiv](https://arxiv.org/abs/2501.01649)
+- Seohyun Kim et al., [A Diffusion-Based Framework for Configurable and Realistic Multi-Storage Trace Generation (DiTTO)](pubs/DiTTO_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2509.01919)
+
+### Recommended build order
+
+If we only spend mainline compute on three more architectural bets, the order should be:
+
+1. **Retrieval memory for locality (#17)** — strongest match to the reuse failure, smallest conceptual gap
+2. **Cache-descriptor distillation (#18)** — most direct way to make cache behavior a training target
+3. **Chunk stitching or SSM backbone (#21 or #19)** — pick one long-horizon abstraction before a full rewrite
+
+**Only after that** should we consider the full hybrid diffusion pivot (#22). It has the highest ceiling,
+but also the highest risk of becoming a research fork rather than an extension of the current codebase.
+
+### Concrete near-term execution plan
+
+To keep the next phase interpretable, do not launch these as mixed cocktails. Suggested order:
+
+1. **Infrastructure first**
+   - Freeze the eval file bundle.
+   - Fix PRDC fallback and generation-path parity.
+   - Add one locality-native checkpoint tiebreaker.
+
+2. **First architecture bet**
+   - Retrieval memory on alibaba first, then tencent.
+   - Judge on reuse realism and HRC, not just combined.
+
+3. **Second architecture bet**
+   - Descriptor distillation on tencent first.
+   - Use fixed descriptors, not a giant learned characterization stack.
+
+4. **Third architecture bet**
+   - Choose one of:
+     chunk stitching,
+     or SSM backbone.
+   - Do not do both at once.
+
+5. **Only then**
+   - Decide whether the repo still wants a full hybrid pivot.
+
+### Bottom line
+
+There really are more ideas. But they are no longer "another loss term" ideas. The next wave has to make
+one of the hidden assumptions in the current model explicit:
+memory,
+cache behavior,
+state,
+or event time.
