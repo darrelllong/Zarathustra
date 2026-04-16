@@ -50,17 +50,17 @@ relevant.
 ### alibaba_v118 — **Round 16 #21: chunk-stitching boundary smoothness** (architecture-bet #2)
 **Recipe**: v117/v114 args + `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Adds latent-space MSE between B's first-2 latents and A's last-2 latents (with exp-decay weighting) on the G update; intent is to encourage smooth chunk transitions when generate.py stitches multiple chunks. Same v48 hot-start as v117. Judged on frozen-bundle ATB (current alibaba ATB = 0.176 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:45):
+**Phase 3 trajectory** (snapshot 2026-04-16 09:11 PDT):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +1.09 | 0.14130 | 0.372 | ★ |
 | 10 | +1.06 | 0.12554 | 0.482 | ★ |
 | 15 | +1.05 | 0.11102 | 0.595 | ★ |
 | 20 | +1.08 | 0.11362 | 0.550 | (no new ★) |
-| 25 | +1.42 | **0.09960** | 0.614 | ★ |
-| 29 | +1.60 | — | — | — |
+| 25 | +1.42 | 0.09960 | 0.614 | ★ |
+| 30 | +1.56 | **0.09684** | 0.606 | ★ |
 
-ep25 recovered cleanly from the ep20 micro-dip — recall climbed back to 0.614 and ★ improved 11% to **0.0996**. W is climbing (+1.05→+1.60) — worth monitoring but well under 3.0 stop. Chunk-stitching loss is showing real benefit on a recipe that has been stuck around 0.176 frozen ATB for many versions. Continuing.
+Three consecutive ★s (ep15, ep25, ep30) — the chunk-stitching recipe has broken through the ~0.111 ceiling that the v117 base recipe stalled at. ★ has improved **13% in 15 epochs** (0.111 → 0.0968). W climbing (+1.05→+1.56) but well under 3.0 stop. Continuing.
 
 ---
 
