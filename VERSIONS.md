@@ -6,11 +6,21 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v112 — Multi-scale critic + self-diagnosing upweighting (temp=1.0)
-**Recipe**: Same as v110/v111 + `--self-diag-temp 1.0`. Self-diag upweights under-covered real modes in critic and feature matching. Previously failed pre-PCF (v24/v62 W-explosion), retesting with multi-scale critic stabilization.
+### alibaba_v113 — Multi-scale critic + self-diagnosing upweighting (temp=0.1)
+**Recipe**: Same as v110/v111 + `--self-diag-temp 0.1`. Very conservative upweighting after v112 (temp=1.0) W-exploded at ep6.
 
 ### tencent_v139 — Multi-scale critic + self-diagnosing upweighting (temp=1.0)
 **Recipe**: Same as v136/v137/v138 + `--self-diag-temp 1.0`. Same rationale as v112.
+
+---
+
+## Post-Mortem: alibaba_v112 — Multi-scale critic + self-diag temp=1.0 (killed ep6, W-exploded)
+
+**Recipe**: v110/v111 recipe + `--self-diag-temp 1.0`. Retesting self-diagnosing upweighting (Idea #9) with multi-scale critic stabilization.
+
+**Training-log**: ep1-3 normal (W=0.23-0.52). ep4: W=**2.90** (near W-stop). ep5: W=2.13, first star 0.175★. ep6: W=**6.57** — catastrophic W-explosion. Killed immediately.
+
+**Verdict**: Self-diag at temp=1.0 re-confirmed DEAD on alibaba. Same positive feedback loop as v24 (temp=10) and v62 (temp=2). Multi-scale critic does NOT stabilize the feedback loop. Trying temp=0.1 next (v113).
 
 ---
 

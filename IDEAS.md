@@ -428,7 +428,8 @@ prove it via cache evaluation (#14).
 84. ~~tencent_v137~~ (multi-scale critic + PCF, killed ep50 — FOUR stars, best **0.082★** ep35. **5-run eval avg 0.107**, Run 2 hit 0.086. Confirms multi-scale critic reproducible.)
 87. ~~tencent_v138~~ (multi-scale critic + PCF, seed #3, killed ep45 — FOUR stars, best **0.090★** ep20. **5-run eval avg 0.112**, Run 2 hit 0.084. Doesn't beat ATB 0.094.)
 88. **MULTI-SCALE CRITIC CLOSED** (6 seeds total). Alibaba avg 0.100 (18% over baseline). Tencent avg 0.104. Universal improvement validated. Moving to next idea.
-89. **Running:** alibaba_v112 (multi-scale critic + self-diag temp=1.0 — retesting #9 with PCF/multi-scale stabilization)
+89. ~~alibaba_v112~~ (multi-scale critic + self-diag temp=1.0, killed ep6 — **W=6.57 at ep6, same feedback loop explosion.** Self-diag temp=1.0 DEAD even with multi-scale.)
+91. **Running:** alibaba_v113 (multi-scale critic + self-diag temp=0.1 — very conservative upweighting)
 90. **Running:** tencent_v139 (multi-scale critic + self-diag temp=1.0 — same as above)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.
