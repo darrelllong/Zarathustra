@@ -720,3 +720,54 @@ The problem is different now. The repo is at risk of over-updating from "we have
 ### Short Take
 
 The repo is in a better place than it was the last time I looked. It tested the sampling-policy hypothesis instead of hand-waving it, and it landed at least one real conditioning-path fix. But the next risk is complacency: treating "some infra debt was fixed" as "the infrastructure story is now clean enough." It is not. The right move is not another philosophical reset. It is to finish the remaining contract gaps quickly, then judge the new locality experiments on a measurement stack that is actually aligned with the models being trained.
+
+---
+
+## Round 15
+
+### Do Not Drink Evaluator Variance And Call It Mechanism
+
+There is genuinely good news here. The multi-scale critic wave looks like one of the strongest critic-side ideas the repo has tested in a while. The Tencent result in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L145) is not fake, and the Alibaba follow-through in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L84) is also meaningful. The self-diagnosing closure looks more justified now too: repeated explosions across temperatures and corpora are a real pattern, not a single unlucky run, in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L431).
+
+The bad news is methodological. The repo is still very close to drinking its own variance and calling it understanding.
+
+1. `[P1]` The headline problem is unchanged: the so-called "full eval" is still not a fixed benchmark. `_sample_real()` in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L497) draws a fresh random 4-file subset every time in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L507). That means every "5-run avg" in `VERSIONS.md` is blending at least three things together:
+   model variance,
+   fake-sample variance,
+   and evaluator-corpus variance.
+   This is not a subtle issue. It directly weakens the confidence of claims like "`v136` is a new Tencent ATB" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L151), "`v106` reduced the gap to 7%" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L67), and "multi-scale critic closed" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L77). If the real-file bundle changes every run, then a large part of what the repo keeps naming "eval variance" is benchmark variance.
+
+2. `[P1]` The NumPy PRDC fallback is still wrong, even after the recent bug-fix commit. Official PRDC defines recall as "fraction of real points inside the fake manifold" and coverage as "fraction of real points covered by a real-ball criterion" in the reference implementation and README at [clovaai/generative-evaluation-prdc](https://github.com/clovaai/generative-evaluation-prdc). But the fallback in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L318) still computes `recall` from real-ball coverage in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L328), which is actually the coverage-style quantity, and computes `coverage` from fake-ball occupancy in [llgan/eval.py](/Users/darrell/Zarathustra/llgan/eval.py#L334), which is not the published coverage metric. So the fallback path is still not PRDC-compatible. If `prdc` is unavailable in any environment, the repo is still mismeasuring diversity-side behavior.
+
+3. `[P1]` This matters more now because the repo is using small deltas to justify closure language. Tencent multi-scale is the clearest example. `v136` beats the previous Tencent ATB by only 4.1% in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L153), while its own 5-run spread is huge in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L151): `0.071` to `0.135`. Then the next two seeds land at `0.107` and `0.112` in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L32) and [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L73). That is not "nothing happened" — the signal is probably real — but it is also not clean enough to say "universal improvement validated" and "technique CLOSED" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L77). The right conclusion is:
+   promising,
+   directionally supported,
+   still entangled with evaluator noise,
+   not yet epistemically closed.
+
+4. `[P1]` The repo should be especially careful with single-run triumph language. It keeps highlighting individual draws like "Run 2 hit `0.071`" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L151), "Run 4 hit `0.082`" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L90), and "Run 2 hit `0.084`" in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L73). Under a random-eval-bundle protocol, these are not pure glimpses of model potential. They are partially lucky benchmark draws. The repo should stop letting the best individual number inside a noisy 5-run bundle shape the narrative so strongly.
+
+5. `[P1]` `generate.py` is still behind the live checkpoint schema, which means the long-rollout path remains less trustworthy than the training path. It still instantiates the legacy `Generator` and `Recovery` shapes in [llgan/generate.py](/Users/darrell/Zarathustra/llgan/generate.py#L52) and loads weights strictly in [llgan/generate.py](/Users/darrell/Zarathustra/llgan/generate.py#L60). The current mainline models use richer conditioning modules and, on Tencent, mixed-type recovery in the base recipe family. So even while the repo is making stronger claims about coverage, locality, and replay-adjacent structure, its actual generation tool is still not aligned with the checkpoints being celebrated.
+
+6. `[P2]` The self-diagnosing closure is the one place where the repo is probably being appropriately hard-nosed. Five runs across temperatures and corpora ending in the same feedback-loop failure is enough to close that lane for now in [VERSIONS.md](/Users/darrell/Zarathustra/VERSIONS.md#L431). That contrast is worth noting because it clarifies the standard the repo should use everywhere else:
+   repeated failures with the same failure mode justify closure;
+   narrow wins under a moving benchmark justify follow-up, not closure.
+
+### What I Would Do Right Now
+
+1. Freeze a real full-eval bundle:
+   fixed file list,
+   fixed sampled windows or a deterministic seed,
+   and version it in the repo.
+
+2. Fix the PRDC fallback to match the official definitions exactly before trusting environments where `prdc` is absent.
+
+3. Reframe multi-scale critic as the current best critic-side lane, not a closed and fully validated solved technique.
+
+4. Stop foregrounding best individual runs inside a noisy 5-run bundle as evidence of mechanism.
+
+5. Bring `generate.py` up to parity with the live checkpoint families before making stronger long-rollout or replay-adjacent claims.
+
+### Short Take
+
+The good news is that Tencent probably did get a real lift from multi-scale critic plus PCF. The bad news is that the repo still cannot measure that lift cleanly enough to talk like the question is settled. Right now the biggest remaining risk is not lack of ideas. It is overconfidence built on a moving benchmark.

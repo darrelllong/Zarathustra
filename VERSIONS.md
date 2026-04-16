@@ -6,11 +6,35 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v114 — Multi-scale critic + continuity loss (weight=1.0)
-**Recipe**: v110/v111 recipe + `--continuity-loss-weight 1.0`. Continuity loss generates two adjacent windows with LSTM hidden state carry-over and penalizes distributional mismatch at boundary. Directly targets train→eval gap. Was tried in v33 (pre-PCF/pre-multi-scale) — retesting with current recipe.
+### alibaba_v115 — Multi-scale critic + continuity loss, seed #2
+**Recipe**: Same as v114. Fresh seed to confirm continuity loss reproducibility after v114 hit 0.073★ (best training ever) but failed eval (0.100 avg). Currently in AE pretraining.
 
-### tencent_v141 — Multi-scale critic + continuity loss (weight=1.0)
-**Recipe**: v136/v137/v138 recipe + `--continuity-loss-weight 1.0`. Same rationale as v114.
+### tencent_v142 — Multi-scale critic + PCF (ATB recipe, fresh seed #4)
+**Recipe**: v136/v137/v138 ATB recipe. Seed roll to gather more data on whether v136's 0.094 ATB is reproducible or a lucky outlier (v137=0.107, v138=0.112).
+
+---
+
+## Post-Mortem: tencent_v141 — Multi-scale critic + continuity loss weight=1.0 (killed ep51, best 0.091★ ep20)
+
+**Recipe**: v136/v137/v138 recipe + `--continuity-loss-weight 1.0`. Attempting continuity loss on tencent after v114 showed promise on alibaba.
+
+**Training-log**: Four stars: ep5=0.150★ (recall=0.322), ep10=0.116★ (recall=0.469), ep15=0.106★ (recall=0.511), ep20=**0.091★** (recall=0.592). Then stalled: ep25=0.107, ep30=0.100, ep35=0.109, ep40=0.092, ep45=0.105, ep50=0.117. W slowly escalating 1.27→2.14 but never hit 3.0. Killed at ep51 (31 stale from ep20).
+
+**Verdict**: Continuity loss does NOT help tencent. Best training 0.091★ is WORSE than v136 (0.073★), v137 (0.082★), v138 (0.090★). Expected eval ~0.11-0.12 given structural gap, far from ATB 0.094. Continuity loss CLOSED on tencent (2nd attempt — v111 also failed ep 2026-04-13).
+
+---
+
+## Post-Mortem: alibaba_v114 — Multi-scale critic + continuity loss weight=1.0 (killed ep72, best 0.073★ ep30, eval 0.100)
+
+**Recipe**: v110/v111 recipe + `--continuity-loss-weight 1.0`. Continuity loss generates two adjacent windows with LSTM hidden state carry-over, penalizes distributional mismatch at boundary. Retest of v33 idea with current recipe (PCF + multi-scale critic + CFG fix).
+
+**Training-log**: Four stars: ep5=0.153★ (recall=0.416), ep10=0.108★ (recall=0.578), ep25=0.093★ (recall=0.669), ep30=**0.073★** (recall=0.694, MMD²=0.012). Then oscillating: ep40=0.083, ep45=0.102, ep50=0.094, ep55=0.096, ep60=0.105, ep65=0.129, ep70=0.093. W remarkably stable (0.28→2.65, never hit 3.0). W-spike at ep66=3.00 but recovered. Killed at ep72 (42 stale from ep30).
+
+**Training 0.073★ TIES tencent_v136's 0.073★** — best training ever on either corpus.
+
+**Eval (5-run avg): combined=0.100** (range 0.087–0.117). Individual: 0.101, 0.094, 0.102, **0.087**, 0.117. Avg MMD²=0.0112, avg recall=0.556 (range 0.481-0.617). Train→eval gap **+37%** (0.073→0.100) — larger than typical.
+
+**Verdict**: Continuity loss produced BEST training ever on alibaba (0.073★) but eval 0.100 does NOT beat ATB 0.088. Large train→eval gap (+37%) suggests continuity loss overfits training-window boundary structure. v115 running to test reproducibility of 0.073★ training quality. If v115 also fails eval, continuity loss closes on alibaba too.
 
 ---
 

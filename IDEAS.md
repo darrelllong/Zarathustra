@@ -433,8 +433,10 @@ prove it via cache evaluation (#14).
 91. ~~alibaba_v113~~ (multi-scale critic + self-diag temp=0.1, W-stopped ep5 — W=3.04→4.02→5.79. **Self-diag DEFINITIVELY DEAD at ALL temperatures.**)
 92. ~~tencent_v140~~ (multi-scale critic + self-diag temp=0.1, killed during pretrain — preemptive after v113 died)
 93. **SELF-DIAGNOSING (#9) CLOSED PERMANENTLY.** Tested temp=10/2/1.0/0.1 across 5 runs. Positive feedback loop is fundamental.
-94. **Running:** alibaba_v114 (multi-scale critic + continuity loss weight=1.0 — retesting v33 idea with current recipe)
-95. **Running:** tencent_v141 (multi-scale critic + continuity loss weight=1.0 — targets train→eval gap directly)
+94. ~~alibaba_v114~~ (multi-scale critic + continuity loss weight=1.0, killed ep72 — **best 0.073★ ep30 (TIES best train ever)**, **5-run eval avg 0.100**, +37% gap. Training breakthrough but eval doesn't beat ATB 0.088.)
+95. ~~tencent_v141~~ (multi-scale critic + continuity loss weight=1.0, killed ep51 — best 0.091★ ep20, 31 stale, worse than multi-scale+PCF baseline. **Continuity loss DEAD on tencent (2nd attempt).**)
+96. **Running:** alibaba_v115 (multi-scale critic + continuity loss, fresh seed #2 — testing reproducibility of v114's 0.073★ training before closing idea)
+97. **Running:** tencent_v142 (multi-scale critic + PCF ATB recipe, fresh seed #4 — more data on v136's 0.094 ATB reproducibility)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.
 75. **EVAL BUG FIXES:** (a) HRC-MAE padding: was padding to n_points by repeating final hit ratio, suppressing error at discriminative cache sizes. Fixed: compute MAE over actual sizes only. (b) Reuse metric hardcoded to col 3: was wrong when tenant column dropped. Fixed: dynamically resolve from preprocessor col_names.
