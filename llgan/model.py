@@ -572,6 +572,13 @@ class Generator(nn.Module):
         num_lstm_layers: int = 1,
         gp_prior: bool = False,
         timestep: int = 12,
+        retrieval_memory: bool = False,
+        retrieval_mem_size: int = 32,
+        retrieval_key_dim: int = 32,
+        retrieval_val_dim: int = 32,
+        retrieval_decay: float = 0.85,
+        retrieval_tau_write: float = 0.5,
+        retrieval_n_warmup: int = 4,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -653,6 +660,37 @@ class Generator(nn.Module):
             self.film_gamma = None
             self.film_beta  = None
 
+        # Retrieval memory (IDEAS.md idea #17): per-window object memory with
+        # learned reuse gate. Initialised with identity-on-h, zero-on-e fusion
+        # so the module is initially a passthrough — gradient learning lets
+        # G adopt the retrieval signal gradually rather than dominate from
+        # step 0.
+        self.retrieval_memory_enabled = retrieval_memory
+        if retrieval_memory:
+            from retrieval_memory import RetrievalMemory
+            self.retrieval = RetrievalMemory(
+                hidden_size=hidden_size,
+                mem_size=retrieval_mem_size,
+                key_dim=retrieval_key_dim,
+                val_dim=retrieval_val_dim,
+                decay=retrieval_decay,
+                tau_write=retrieval_tau_write,
+                n_warmup=retrieval_n_warmup,
+            )
+            self.retrieval_proj = nn.Linear(hidden_size + retrieval_val_dim,
+                                            hidden_size)
+            with torch.no_grad():
+                self.retrieval_proj.weight.zero_()
+                self.retrieval_proj.weight[:, :hidden_size].copy_(
+                    torch.eye(hidden_size))
+                self.retrieval_proj.bias.zero_()
+        else:
+            self.retrieval = None
+            self.retrieval_proj = None
+        # Side channel for trainer: stores most recent retrieval aux dict
+        # (p_reuse_seq, etc.) for BCE supervision. Reset to None each forward.
+        self._last_retrieval_aux: Optional[dict] = None
+
         self._init_weights()
 
     def sample_noise(
@@ -694,7 +732,9 @@ class Generator(nn.Module):
         return torch.randn(B, T, self.noise_dim, device=device)
 
     def _init_weights(self):
-        _skip = {"gmm_prior", "cond_encoder"}   # these have their own init
+        # These submodules have their own init (or carefully-set identity
+        # init that must survive the parent's normal-init sweep).
+        _skip = {"gmm_prior", "cond_encoder", "retrieval", "retrieval_proj"}
         for name, p in self.named_parameters():
             if any(s in name for s in _skip):
                 continue
@@ -734,6 +774,27 @@ class Generator(nn.Module):
             gamma = self.film_gamma(z_global).unsqueeze(1)  # (B, 1, H)
             beta  = self.film_beta(z_global).unsqueeze(1)
             h = (1.0 + gamma) * h + beta
+
+        # Retrieval memory (IDEAS.md idea #17): per-step iteration, fuse
+        # retrieved object state e_t back into h_t via identity-init proj.
+        # Side-channel emits p_reuse_seq for trainer's optional BCE aux loss.
+        if self.retrieval is not None:
+            B, T, H = h.shape
+            state = self.retrieval.init_state(B, h.device, h.dtype)
+            p_reuse_steps = []
+            h_aug_steps = []
+            for t in range(T):
+                e_t, p_reuse_t, state = self.retrieval(h[:, t, :], state)
+                p_reuse_steps.append(p_reuse_t)
+                cat_t = torch.cat([h[:, t, :], e_t], dim=-1)
+                h_aug_steps.append(self.retrieval_proj(cat_t))
+            h = torch.stack(h_aug_steps, dim=1)
+            self._last_retrieval_aux = {
+                "p_reuse_seq": torch.stack(p_reuse_steps, dim=1),  # (B, T)
+            }
+        else:
+            self._last_retrieval_aux = None
+
         out = self.out_act(self.fc(h))
         if return_hidden:
             return out, hidden_out

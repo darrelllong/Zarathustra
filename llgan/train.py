@@ -495,7 +495,22 @@ def train(cfg: Config) -> None:
                   n_regimes=getattr(cfg, "n_regimes", 0),
                   num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
                   gp_prior=getattr(cfg, "gp_prior", False),
-                  timestep=cfg.timestep).to(device)
+                  timestep=cfg.timestep,
+                  retrieval_memory=getattr(cfg, "retrieval_memory", False),
+                  retrieval_mem_size=getattr(cfg, "retrieval_mem_size", 32),
+                  retrieval_key_dim=getattr(cfg, "retrieval_key_dim", 32),
+                  retrieval_val_dim=getattr(cfg, "retrieval_val_dim", 32),
+                  retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
+                  retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
+                  retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
+                  ).to(device)
+    if getattr(cfg, "retrieval_memory", False):
+        n_ret = sum(p.numel() for p in G.retrieval.parameters()) \
+                + sum(p.numel() for p in G.retrieval_proj.parameters())
+        print(f"[retrieval-memory] enabled: M={cfg.retrieval_mem_size}, "
+              f"key={cfg.retrieval_key_dim}, val={cfg.retrieval_val_dim}, "
+              f"decay={cfg.retrieval_decay}, tau_write={cfg.retrieval_tau_write}, "
+              f"warmup={cfg.retrieval_n_warmup}, params={n_ret:,}")
     if getattr(cfg, "n_regimes", 0) > 0 and cfg.cond_dim > 0:
         print(f"[regime-sampler] K={cfg.n_regimes} workload regimes, "
               f"τ: {G.regime_sampler.tau_start}→{G.regime_sampler.tau_end}")
@@ -2115,6 +2130,34 @@ def parse_args() -> Config:
                         "Saatci & Wilson, NeurIPS 2017. Recommended: 5. "
                         "Requires wgan-sn (incompatible with wgan-gp/r1/r2). "
                         "Memory: M × ~1MB per particle (trivial on GB10 124GB).")
+    p.add_argument("--retrieval-memory",     action="store_true", default=False,
+                   help="Per-window retrieval memory (IDEAS.md idea #17): RetrievalMemory "
+                        "module fuses a learned reuse gate + attention over a small per-window "
+                        "object bank into the LSTM hidden state. Identity-init projection: "
+                        "module starts as passthrough, GAN learns to use it. Targets reuse "
+                        "realism (most stubborn alibaba/tencent gap). Backward compatible: "
+                        "default off, no behaviour change.")
+    p.add_argument("--retrieval-mem-size",   type=int,   default=32,
+                   help="Retrieval memory: number of slots in the per-window bank. "
+                        "Default 32 covers typical reuse horizon on alibaba/tencent.")
+    p.add_argument("--retrieval-key-dim",    type=int,   default=32,
+                   help="Retrieval memory: attention key/query dimensionality (default 32).")
+    p.add_argument("--retrieval-val-dim",    type=int,   default=32,
+                   help="Retrieval memory: stored value vector dimensionality (default 32).")
+    p.add_argument("--retrieval-decay",      type=float, default=0.85,
+                   help="Retrieval memory: per-step geometric decay on slot freshness "
+                        "(lower = faster eviction). Default 0.85.")
+    p.add_argument("--retrieval-tau-write",  type=float, default=0.5,
+                   help="Retrieval memory: p_reuse threshold below which a memory write "
+                        "is performed (default 0.5).")
+    p.add_argument("--retrieval-n-warmup",   type=int,   default=4,
+                   help="Retrieval memory: initial steps where writes are forced "
+                        "regardless of the reuse gate (cold-start seeding; default 4).")
+    p.add_argument("--retrieval-reuse-bce-weight", type=float, default=0.0,
+                   help="Retrieval memory: weight on BCE(p_reuse, gt_reuse) auxiliary loss "
+                        "(default 0.0 = off; module is then a pure architectural prior). "
+                        "Reading gt_reuse from the obj_id_reuse channel of the real window "
+                        "is added in a follow-up commit; for now this flag is reserved.")
     args = p.parse_args()
 
     cfg = Config()
@@ -2201,6 +2244,14 @@ def parse_args() -> Config:
     cfg.avatar                  = args.avatar
     cfg.dist_loss_weight        = args.dist_loss_weight
     cfg.latent_disc_weight      = args.latent_disc_weight
+    cfg.retrieval_memory             = args.retrieval_memory
+    cfg.retrieval_mem_size           = args.retrieval_mem_size
+    cfg.retrieval_key_dim            = args.retrieval_key_dim
+    cfg.retrieval_val_dim            = args.retrieval_val_dim
+    cfg.retrieval_decay              = args.retrieval_decay
+    cfg.retrieval_tau_write          = args.retrieval_tau_write
+    cfg.retrieval_n_warmup           = args.retrieval_n_warmup
+    cfg.retrieval_reuse_bce_weight   = args.retrieval_reuse_bce_weight
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

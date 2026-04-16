@@ -413,6 +413,13 @@ def _sample_fake(ckpt, n_samples: int, device,
                   num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
                   gp_prior=getattr(cfg, "gp_prior", False),
                   timestep=cfg.timestep,
+                  retrieval_memory=getattr(cfg, "retrieval_memory", False),
+                  retrieval_mem_size=getattr(cfg, "retrieval_mem_size", 32),
+                  retrieval_key_dim=getattr(cfg, "retrieval_key_dim", 32),
+                  retrieval_val_dim=getattr(cfg, "retrieval_val_dim", 32),
+                  retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
+                  retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
+                  retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
                   ).to(device)
     # Prefer EMA weights: smoother, less oscillated, consistently produces
     # better samples than the instantaneous live weights at any given epoch.

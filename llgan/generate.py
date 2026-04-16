@@ -63,6 +63,13 @@ def generate(
                   num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
                   gp_prior=getattr(cfg, "gp_prior", False),
                   timestep=cfg.timestep,
+                  retrieval_memory=getattr(cfg, "retrieval_memory", False),
+                  retrieval_mem_size=getattr(cfg, "retrieval_mem_size", 32),
+                  retrieval_key_dim=getattr(cfg, "retrieval_key_dim", 32),
+                  retrieval_val_dim=getattr(cfg, "retrieval_val_dim", 32),
+                  retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
+                  retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
+                  retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
                   ).to(device)
     # Prefer EMA weights for generation: they are the time-averaged model that
     # has been smoothed over recent training oscillations and consistently
