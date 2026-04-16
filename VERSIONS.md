@@ -9,8 +9,18 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 ### alibaba_v113 — Multi-scale critic + self-diagnosing upweighting (temp=0.1)
 **Recipe**: Same as v110/v111 + `--self-diag-temp 0.1`. Very conservative upweighting after v112 (temp=1.0) W-exploded at ep6.
 
-### tencent_v139 — Multi-scale critic + self-diagnosing upweighting (temp=1.0)
-**Recipe**: Same as v136/v137/v138 + `--self-diag-temp 1.0`. Same rationale as v112.
+### tencent_v140 — Multi-scale critic + self-diagnosing upweighting (temp=0.1)
+**Recipe**: Same as v136/v137/v138 + `--self-diag-temp 0.1`. Very conservative upweighting after v139 (temp=1.0) W-stopped at ep8.
+
+---
+
+## Post-Mortem: tencent_v139 — Multi-scale critic + self-diag temp=1.0 (W-stopped ep8)
+
+**Recipe**: v136/v137/v138 recipe + `--self-diag-temp 1.0`. Testing self-diagnosing upweighting on tencent.
+
+**Training-log**: ep1-3 normal (W=0.43-0.90). ep4: W=**3.12** (above W-stop). ep5: W=2.46, first star 0.198★ (recall=0.192). ep6: W=**3.79**. ep7: W=**5.26**. ep8: W=4.95 → W-spike guard triggered (3 consecutive W>3.0). Auto-stopped.
+
+**Verdict**: Self-diag at temp=1.0 confirmed DEAD on BOTH corpora. W-explodes within 6-8 epochs regardless of multi-scale critic. The positive feedback loop (high critic score → more weight → higher score) overwhelms any stabilization. Trying temp=0.1 next (v140).
 
 ---
 
