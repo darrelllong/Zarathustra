@@ -771,3 +771,64 @@ The bad news is methodological. The repo is still very close to drinking its own
 ### Short Take
 
 The good news is that Tencent probably did get a real lift from multi-scale critic plus PCF. The bad news is that the repo still cannot measure that lift cleanly enough to talk like the question is settled. Right now the biggest remaining risk is not lack of ideas. It is overconfidence built on a moving benchmark.
+
+---
+
+## Round 16
+
+### Stop Saying The Design Space Is Exhausted
+
+The repo is at a point where many of the old items really have been exhausted. That part is true. A lot of
+the obvious scalar tweaks, light critic modifications, and small conditioning variants have now been tried,
+and the version log is much more honest about that than it used to be. But there is a dangerous next step
+from there:
+
+"we exhausted most of the old list" becoming "there are no serious new ideas left."
+
+That conclusion would be wrong.
+
+The right move now is to look at the ideas that were **added** to [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L453), not keep squeezing the last drops out of already-tested families. Those new sections are not filler. They are exactly the kind of next-wave bets the repo still needs:
+
+1. **Retrieval memory for locality** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L466)
+   This is the most direct response to the reuse gap. The copy-path experiments already showed that reuse is not a fake problem. What is missing is a real mechanism.
+
+2. **Cache-descriptor distillation** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L508)
+   Competitor systems keep winning by building explicit workload descriptors tied to cache behavior. Zarathustra now measures cache fidelity; it should start training toward it too.
+
+3. **State-space backbone** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L552)
+   The repo is still trying to get long-horizon structure out of a short-window recurrent generator. If continuity is still weak, backbone change is now a serious question.
+
+4. **Marked temporal point process formulation** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L585)
+   This is the cleanest way to stop treating event timing as just another feature column. It is a real modeling alternative, not a loss tweak.
+
+5. **Chunk stitching / whole-trace generation** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L619)
+   Continuity loss failing did not settle the whole-trace question. It only settled one weak implementation of it.
+
+6. **Hybrid diffusion + AR + critic pivot** in [IDEAS.md](/Users/darrell/Zarathustra/IDEAS.md#L655)
+   This is the high-cost, high-ceiling branch if the team decides the pure GAN family has taught it most of what it can.
+
+The key point is strategic. These newly added ideas share one virtue that much of the recent exploration did
+not: each of them changes the *representation* of the problem. They do not just lean harder on the existing
+representation.
+
+That is exactly what the repo should want now.
+
+### My Recommendation
+
+1. Stop saying the project is out of ideas. It is out of easy ideas, not serious ones.
+
+2. Treat the newly added `IDEAS.md` sections as the next official architecture queue.
+
+3. Do not mix them together. Pick one, run it cleanly, and judge it on a fixed benchmark.
+
+4. My recommended order remains:
+   retrieval memory,
+   cache-descriptor distillation,
+   then either chunk stitching or SSM backbone.
+
+5. Only after those should the repo consider the full hybrid pivot.
+
+### Short Take
+
+The project does not need another motivational speech about boldness. It needs to go read the ideas that
+were just added to `IDEAS.md` and start building from there.

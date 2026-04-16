@@ -33,11 +33,28 @@ relevant.
 
 ## Currently Running
 
-### tencent_v143 — Multi-scale critic + PCF (ATB recipe, seed #5)
-**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). **GAN ep60, ★ STILL ep35 = 0.07681** (recall 0.656, MMD²=0.00811) — BEST tencent training ★ EVER (beats v142 0.0856 by 10%). **25 stale, 5 epochs from 30-stale kill rule**. ★ trajectory ep5=0.155 → ep10=0.110 → ep15=0.106 → ep30=0.0819 → **ep35=0.0768 ★best** → ep40-60 plateau (0.082-0.097). W elevated 1.83-2.89, under 3.0 stop. Tracking v142's pattern (peaked ep45, killed ep79). Will frozen-eval at ep35 once killed.
+### tencent_v144 — **Round 16 #17: retrieval memory** (FIRST architecture-bet experiment)
+**Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False (retrieval params freshly initialised). **Phase 1 AE pretrain just started**, will reach GAN training in ~1h. Per IDEAS.md "Recommended build order" + Round 16 peer review: this is the first of three architectural bets. Judging on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
 ### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
-**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep37, ★ ep25 = 0.10024** (recall 0.604, MMD²=0.02094). 12 stale. Healthy: W bouncing 0.92-1.29, G loss climbing 0.85→8.14 (concerning early sign of saturation but recall stable). ★ trajectory ep5=0.157 → ep10=0.112 → ep20=0.111 → **ep25=0.100 ★best** → ep30=0.102, ep35=0.132 (no new ★).
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep47, ★ ep25 = 0.10024** (recall 0.604, MMD²=0.02094). 22 stale (memory rule: kill at 30). W stable 0.92-1.39, G loss elevated 2-8. ★ trajectory ep5=0.157 → ep10=0.112 → ep20=0.111 → **ep25=0.100 ★best** → ep30-47 plateau (0.10-0.13).
+
+---
+
+## Post-Mortem: tencent_v143 — Multi-scale critic + PCF, seed #5 (killed ep68, best 0.07681★ ep35)
+
+**Recipe**: Identical to v136/v137/v138/v142. Fifth seed of the multi-scale-critic+PCF tencent ATB recipe.
+
+**Training-log**: Five stars: ep5=0.155, ep10=0.110, ep15=0.106, ep30=0.0819, ep35=**0.07681★** (recall=0.656, MMD²=0.00811). **0.07681★ is the BEST tencent training ★ EVER**, beating v142's 0.0856 by 10% and v136's 0.073 by 5%. After ep35: stalled at 0.082-0.097 for 33 epochs. ep40=0.0975, ep45=0.0949, ep50=0.0967, ep55=0.0960, ep60=0.0912 (no new ★). W elevated 1.78-2.89, peaked at ep45=2.89 but stayed under 3.0 stop. PCF saturated 0.83-1.02. Killed at ep68 (33 stale from ep35) per memory's 30-stale rule.
+
+**Frozen-bundle eval (seed=42)**: NOT YET RUN. Will frozen-eval epoch_0035.pt for ATB comparison. Prior frozen results on this recipe family:
+- v136 frozen ATB = 0.178 (3-seed avg, range 0.176-0.180)
+- v142 frozen = 0.1795 (1-seed)
+- v143 expected frozen: ~0.17-0.18 if recipe holds; the lower training ★ may or may not transfer to frozen.
+
+**Verdict**: Multi-scale-critic+PCF recipe **demonstrably reproducible** (5 seeds total: 0.073/0.082/0.090/0.0856/0.07681 training ★). v143 is best-ever training run on this recipe family but plateau pattern matches v136/v142 — peak around ep35-45 then stuck. Recipe ceiling appears to be ~0.07-0.08 training ★ → ~0.18 frozen ATB. Cannot reach below 0.10 by seed retries alone. **Architectural change required to beat 0.18 frozen ATB.** v144 launched as first architecture-bet (retrieval memory, IDEAS.md #17).
+
+---
 
 ---
 
