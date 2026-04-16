@@ -36,27 +36,31 @@ relevant.
 ### tencent_v144 — **Round 16 #17: retrieval memory** (architecture-bet #1)
 **Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False. Judged on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:15):
+**Phase 3 trajectory** (snapshot 2026-04-16 09:45):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +0.39 | 0.10494 | 0.537 | ★ |
 | 10 | +0.73 | 0.08655 | 0.619 | ★ |
 | 15 | +0.95 | **0.08191** | 0.631 | ★ |
+| 20 | +0.98 | 0.09709 | 0.555 | (no new ★) |
+| 21 | +1.14 | — | — | — |
 
-`comb=0.082` at ep15 is the **best early-epoch tencent training-★ ever recorded** (21% better than v143 same-epoch). W stable around +0.95, well below the 3.0 stop. Retrieval memory is doing real work — recall is rising along with combined falling, the opposite of mode collapse. Continuing.
+`comb=0.082` at ep15 is the **best early-epoch tencent training-★ ever recorded** (21% better than v143 same-epoch). ep20 micro-regression in recall (0.631→0.555) — within noise, not yet a trend. W still stable +0.95–1.14. 6 ep stale, far from 30-stale kill. Continuing.
 
 ### alibaba_v118 — **Round 16 #21: chunk-stitching boundary smoothness** (architecture-bet #2)
 **Recipe**: v117/v114 args + `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Adds latent-space MSE between B's first-2 latents and A's last-2 latents (with exp-decay weighting) on the G update; intent is to encourage smooth chunk transitions when generate.py stitches multiple chunks. Same v48 hot-start as v117. Judged on frozen-bundle ATB (current alibaba ATB = 0.176 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:15):
+**Phase 3 trajectory** (snapshot 2026-04-16 09:45):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +1.09 | 0.14130 | 0.372 | ★ |
 | 10 | +1.06 | 0.12554 | 0.482 | ★ |
-| 15 | +1.05 | **0.11102** | 0.595 | ★ |
-| 20 | +1.08 | 0.11362 | 0.550 | (★ed at 15) |
+| 15 | +1.05 | 0.11102 | 0.595 | ★ |
+| 20 | +1.08 | 0.11362 | 0.550 | (no new ★) |
+| 25 | +1.42 | **0.09960** | 0.614 | ★ |
+| 29 | +1.60 | — | — | — |
 
-W stable +1.05, healthy. Best ★ at ep15 (0.111). ep20 micro-regression (recall dipped 595→550) — within noise but worth monitoring next 10 ep. Continuing.
+ep25 recovered cleanly from the ep20 micro-dip — recall climbed back to 0.614 and ★ improved 11% to **0.0996**. W is climbing (+1.05→+1.60) — worth monitoring but well under 3.0 stop. Chunk-stitching loss is showing real benefit on a recipe that has been stuck around 0.176 frozen ATB for many versions. Continuing.
 
 ---
 
