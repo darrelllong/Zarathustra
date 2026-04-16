@@ -1621,6 +1621,25 @@ def train(cfg: Config) -> None:
                     loss_cont = loss_cont_mean + loss_cont_std
                     g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
 
+                # L_boundary_smooth: chunk-stitching latent-space boundary loss
+                # (IDEAS.md #21). Per-step exponential-decay weighted MSE on
+                # the LSTM latent across the train→inference boundary.
+                # Complements continuity_loss_weight (feature-space mean/std).
+                if getattr(cfg, "boundary_smoothness_weight", 0.0) > 0:
+                    from chunk_stitching import boundary_latent_smoothness
+                    z_gb, _ = _make_z_global(B, cfg, device, real_features=real_batch,
+                                             file_cond=file_cond_batch, G=G)
+                    z_lb1 = G.sample_z_local(B, cfg.timestep, device)
+                    z_lb2 = G.sample_z_local(B, cfg.timestep, device)
+                    H_b1, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
+                    H_b2 = G(z_gb, z_lb2, hidden=h_b_carry)
+                    loss_bs = boundary_latent_smoothness(
+                        H_b1, H_b2,
+                        k=int(getattr(cfg, "boundary_smoothness_k", 2)),
+                        decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
+                    )
+                    g_loss = g_loss + cfg.boundary_smoothness_weight * loss_bs
+
                 # Feature-space critic in generator loss (dual discriminator).
                 # C_feat operates in decoded feature space — it sees what the
                 # downstream evaluator sees, preventing the generator from hiding
@@ -2238,6 +2257,22 @@ def parse_args() -> Config:
     p.add_argument("--cache-descriptor-monitor-samples", type=int, default=256,
                    help="Number of generated windows used for the descriptor monitor "
                         "(default 256; only fires at ★ epochs so cost is bounded).")
+    p.add_argument("--boundary-smoothness-weight", type=float, default=0.0,
+                   help="Chunk-stitching latent-space boundary smoothness loss "
+                        "(IDEAS.md idea #21, chunk_stitching.boundary_latent_smoothness). "
+                        "Generates a 2nd window with hidden=hidden_A and penalises "
+                        "MSE between A's last-k and B's first-k latent steps with "
+                        "exponential decay. Operates in latent space (does NOT decode "
+                        "through R), so it complements --continuity-loss-weight which "
+                        "operates in feature space. Default 0.0 = off; 1.0 is the "
+                        "intended baseline weight.")
+    p.add_argument("--boundary-smoothness-k", type=int, default=2,
+                   help="Number of boundary steps on each side compared by the "
+                        "boundary smoothness loss (default 2).")
+    p.add_argument("--boundary-smoothness-decay", type=float, default=0.5,
+                   help="Exponential weight decay across boundary steps "
+                        "(default 0.5; weight on step i = decay**i, so the boundary "
+                        "step counts most).")
     args = p.parse_args()
 
     cfg = Config()
@@ -2334,6 +2369,9 @@ def parse_args() -> Config:
     cfg.retrieval_reuse_bce_weight   = args.retrieval_reuse_bce_weight
     cfg.cache_descriptor_file        = args.cache_descriptor_file
     cfg.cache_descriptor_monitor_samples = args.cache_descriptor_monitor_samples
+    cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
+    cfg.boundary_smoothness_k        = args.boundary_smoothness_k
+    cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
