@@ -503,6 +503,8 @@ def train(cfg: Config) -> None:
                   retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
                   retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
                   retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
+                  ssm_backbone=getattr(cfg, "ssm_backbone", False),
+                  ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
                   ).to(device)
     if getattr(cfg, "retrieval_memory", False):
         n_ret = sum(p.numel() for p in G.retrieval.parameters()) \
@@ -2273,6 +2275,17 @@ def parse_args() -> Config:
                    help="Exponential weight decay across boundary steps "
                         "(default 0.5; weight on step i = decay**i, so the boundary "
                         "step counts most).")
+    p.add_argument("--ssm-backbone", action="store_true",
+                   help="IDEAS.md #19: replace nn.LSTM with SelectiveDiagonalSSM "
+                        "(Mamba-lite). Drop-in replacement preserving forward "
+                        "signature; uses one combined z_to_state projection "
+                        "instead of separate z_to_h0/z_to_c0. ~2-3x slower than "
+                        "LSTM at H=256, N=16. CANNOT hot-start from LSTM "
+                        "checkpoints — fresh pretrain required. Default off.")
+    p.add_argument("--ssm-state-dim", type=int, default=16,
+                   help="SSM state vector size N per channel (default 16). "
+                        "Larger N captures more long-range structure but costs "
+                        "linearly more compute.")
     args = p.parse_args()
 
     cfg = Config()
@@ -2372,6 +2385,8 @@ def parse_args() -> Config:
     cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
     cfg.boundary_smoothness_k        = args.boundary_smoothness_k
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
+    cfg.ssm_backbone                 = args.ssm_backbone
+    cfg.ssm_state_dim                = args.ssm_state_dim
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

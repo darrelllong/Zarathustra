@@ -579,6 +579,8 @@ class Generator(nn.Module):
         retrieval_decay: float = 0.85,
         retrieval_tau_write: float = 0.5,
         retrieval_n_warmup: int = 4,
+        ssm_backbone: bool = False,
+        ssm_state_dim: int = 16,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -626,16 +628,34 @@ class Generator(nn.Module):
         # bias, c_0 sets the long-term memory content. In practice this lets
         # z_global influence both "what the generator is doing now" (h) and
         # "what it will tend to do over the window" (c).
+        # SSM backbone (IDEAS.md #19) replaces LSTM entirely; uses one combined
+        # state projection (B, H*N) instead of separate h0/c0.
         z_input_dim = noise_dim + cond_dim
-        self.z_to_h0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
-        self.z_to_c0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
-
-        self.lstm = nn.LSTM(
-            input_size=noise_dim,
-            hidden_size=hidden_size,
-            num_layers=num_lstm_layers,
-            batch_first=True,
-        )
+        self.ssm_backbone_enabled = ssm_backbone
+        self.ssm_state_dim = ssm_state_dim
+        if ssm_backbone:
+            from ssm_backbone import SelectiveDiagonalSSM
+            self.lstm = SelectiveDiagonalSSM(
+                input_size=noise_dim,
+                hidden_size=hidden_size,
+                d_state=ssm_state_dim,
+            )
+            # Single projection: z_global → initial state (B, H, N)
+            self.z_to_state = nn.Linear(z_input_dim, hidden_size * ssm_state_dim)
+            # Keep the LSTM-style projections as None so old code paths fail
+            # loudly rather than silently producing garbage.
+            self.z_to_h0 = None
+            self.z_to_c0 = None
+        else:
+            self.z_to_h0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
+            self.z_to_c0 = nn.Linear(z_input_dim, hidden_size * num_lstm_layers)
+            self.lstm = nn.LSTM(
+                input_size=noise_dim,
+                hidden_size=hidden_size,
+                num_layers=num_lstm_layers,
+                batch_first=True,
+            )
+            self.z_to_state = None
         self.fc      = nn.Linear(hidden_size, out_dim)
         # AVATAR: unbounded output (matching Encoder's unbounded N(0,1) space)
         if avatar and latent_dim is not None:
@@ -734,7 +754,14 @@ class Generator(nn.Module):
     def _init_weights(self):
         # These submodules have their own init (or carefully-set identity
         # init that must survive the parent's normal-init sweep).
+        # SSM has carefully-set parameter inits (A_log uniform-log, dt_bias
+        # inv_softplus) that must survive the parent's normal-init sweep.
+        # Only skip "lstm" when it actually is the SSM module (otherwise we
+        # change pre-existing nn.LSTM init behavior).
         _skip = {"gmm_prior", "cond_encoder", "retrieval", "retrieval_proj"}
+        if getattr(self, "ssm_backbone_enabled", False):
+            _skip.add("lstm")
+            _skip.add("z_to_state")
         for name, p in self.named_parameters():
             if any(s in name for s in _skip):
                 continue
@@ -761,11 +788,16 @@ class Generator(nn.Module):
         """
         if hidden is None:
             B = z_global.size(0)
-            L = self.num_lstm_layers
             H = self.hidden_size
-            h0 = self.z_to_h0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
-            c0 = self.z_to_c0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
-            hidden = (h0, c0)
+            if self.ssm_backbone_enabled:
+                # SSM init state: (B, H, N) reshape from one projection.
+                state0 = self.z_to_state(z_global).view(B, H, self.ssm_state_dim)
+                hidden = (state0, None)
+            else:
+                L = self.num_lstm_layers
+                h0 = self.z_to_h0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
+                c0 = self.z_to_c0(z_global).view(B, L, H).permute(1, 0, 2).contiguous()
+                hidden = (h0, c0)
         h, hidden_out = self.lstm(z_local, hidden)
         # FiLM: reinject workload conditioning at every timestep so it cannot
         # fade through the LSTM forget gate over the T-step window.
