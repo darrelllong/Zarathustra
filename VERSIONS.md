@@ -42,14 +42,20 @@ relevant.
 
 **Status**: PID 3880115, started 10:03 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min.
 
-### tencent_v145 — **Chunk stitching on tencent (IDEA #21, first test)**
-**Why**: v144 (retrieval memory #17) trained out at ★=0.0819 — did not beat base-recipe seeds (v142=0.086, v143=0.077). Next architecture-bet from Round 16 backlog is IDEA #21 chunk stitching: an adversarial boundary smoothness penalty in latent space that pairs adjacent windows and penalises mismatch at the seam. Already wired (`--boundary-smoothness-weight`, committed), tested on alibaba only (v118 at 0.1 weight, v119 at 0.1 weight). Never tested on tencent. Peer Review R16 recommended order: #17 → #18 → (#21 OR #19) → #22. #18 Phase A is monitor-only (no gradient contribution); #21 is a real mechanism change with an existing flag, so it is the cleanest next single-variable architecture test on tencent.
+### tencent_v146 — **Chunk stitching + MTPP timing head (IDEAs #21 + #20, first combined test)**
+**Why**: v145 (IDEA #21 chunk-stitching alone on tencent) launched at 10:51 and was still in warm-up at 11:13 when the Round 16 wiring work landed: `llgan/timing_head.LogNormalTimingHead` is now consumed by `train.py` under `--mtpp-timing` (Generator emits per-step (μ, σ) for log(IAT) from the LSTM hidden state, log-Normal NLL added to G loss). v146 replaces v145 with the same chunk-stitching recipe plus the new MTPP head: two mechanism-level changes in one run, saving a GPU slot. If combined beats v143's ★=0.0768 / frozen 0.178, a follow-up ablation will split them; if it doesn't, neither mechanism is a tencent winner.
 
-**Recipe**: v143 base (multi-scale critic + PCF 2.0 + mixed-type-recovery + K=8 regimes + var-cond + gmm-8 + char-file + block-sample) + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. 10x the weight of alibaba_v118/v119 (0.1) to stress the mechanism on tencent. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` with reset optimizer (lr_g=8e-5, lr_d=4e-5, n_critic=2). `--w-stop-threshold 3.0 --early-stop-patience 60`.
+**Recipe**: v145 recipe (v143 base + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` with reset optimizer; strict=False correctly detects `timing_head.fc.{weight,bias}` as freshly-initialised (log confirms).
 
-**Hypothesis**: If boundary artefacts are a real contributor to tencent's frozen ATB ceiling (~0.178), smoothness penalty should yield a training-★ below v143's 0.0768 and — more importantly — better frozen-bundle β-recall. Worst case: flat seed-quality retry of v143 (harmless). Best case: first tencent run below 0.177 frozen.
+**Hypothesis**: MTPP NLL supervises the LSTM hidden state to encode per-step timing distribution — a different gradient signal from the regression-only ts column. If tencent's frozen ATB ceiling is driven by burst-structure mismatch (not just locality), the NLL should shave β-recall by a measurable margin. Combined with chunk-stitching (boundary smoothness) this stacks two complementary mechanisms without changing the base GAN recipe.
 
-**Status**: PID 3897635 (child of 3896970), started ~13:05 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min. Log: `/home/darrell/train_tencent_v145.log`.
+**Status**: PID 3908773, started 11:17 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in Gwarm-up; 22 min sunk, no GAN epochs run).
+
+---
+
+## Post-Mortem: tencent_v145 — chunk stitching (IDEA #21, killed pre-GAN, 2026-04-16)
+
+**Killed** at 11:16 PDT while still in G warm-up phase (1/100). No GAN epochs run. Sunk: 22 min. Replaced by v146 which bundles the same chunk-stitching plus the newly-wired MTPP timing head. Pure #21-on-tencent data is not lost — can be re-run later if the v146 combo shows signal and an ablation is warranted.
 
 ---
 
