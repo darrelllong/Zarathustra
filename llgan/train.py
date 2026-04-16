@@ -46,6 +46,9 @@ from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
                      _OPCODE_COLS)
 from model import Generator, Critic, MultiScaleCritic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
+from chunk_stitching import boundary_latent_smoothness
+from timing_head import log_normal_nll
+from hybrid_diffusion import LatentDenoiser, LatentDiffusion
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +122,8 @@ def _make_z_global(
         if file_cond is not None:
             cond = file_cond.to(device)
         else:
-            cond = compute_window_descriptors(real_features)
+            cond = compute_window_descriptors(
+                real_features, col_names=getattr(cfg, "col_names", None))
         # CFG dropout FIRST: zero conditioning BEFORE any downstream modules
         # see it.  Previously dropout was applied AFTER cond_encoder,
         # regime_sampler, and GMM prior, which leaked workload identity
@@ -441,6 +445,11 @@ def train(cfg: Config) -> None:
         print(f"  train windows: {len(train_ds):,}  val: {len(val_ds):,}")
         val_tensor = torch.stack([val_ds[i] for i in range(len(val_ds))])
 
+    # Publish preprocessor col_names on cfg so _make_z_global can pass them
+    # to compute_window_descriptors (avoids shape-shift when zero-variance
+    # columns are auto-dropped; Gemini R1 #1).
+    cfg.col_names = list(prep.col_names) if hasattr(prep, "col_names") else None
+
     # -----------------------------------------------------------------------
     # Models
     # -----------------------------------------------------------------------
@@ -449,6 +458,13 @@ def train(cfg: Config) -> None:
     # In latent AE mode the critic operates on latent sequences; in legacy mode
     # it operates directly on feature sequences.
     critic_input_dim = cfg.latent_dim if latent_ae else prep.num_cols
+
+    # Column index of ts (used by MTPP timing-head NLL loss).  Delta-encoded
+    # ts column is in [-1, 1] after preprocessing; NLL maps it through
+    # (x+1)/2 to keep it positive for log-Normal likelihood.
+    ts_col = (prep.col_names.index("ts")
+              if hasattr(prep, "col_names") and "ts" in prep.col_names
+              else 0)
 
     # Column index of obj_id_reuse in the feature vector (used by locality loss).
     # v15+: obj_id is split into obj_id_reuse (+1=reuse, -1=seek) and obj_id_stride.
@@ -505,6 +521,8 @@ def train(cfg: Config) -> None:
                   retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
                   ssm_backbone=getattr(cfg, "ssm_backbone", False),
                   ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
+                  mtpp_timing=getattr(cfg, "mtpp_timing", False),
+                  mtpp_sigma_min=getattr(cfg, "mtpp_sigma_min", 0.05),
                   ).to(device)
     if getattr(cfg, "retrieval_memory", False):
         n_ret = sum(p.numel() for p in G.retrieval.parameters()) \
@@ -642,6 +660,28 @@ def train(cfg: Config) -> None:
               f"n_freqs={cfg.pcf_n_freqs}")
 
     opt_G = torch.optim.Adam(G.parameters(), lr=cfg.lr_g, betas=(0.5, 0.9))
+
+    # IDEAS.md #22 (Stage-1): side-trained LatentDenoiser on E(real).detach().
+    # Fully decoupled from G/C updates — provides a future-use denoiser
+    # checkpoint without perturbing GAN dynamics.  Requires latent_ae=True.
+    denoiser = None
+    diffusion = None
+    opt_denoiser = None
+    if getattr(cfg, "hybrid_diffusion_aux", False):
+        if not latent_ae:
+            raise RuntimeError("--hybrid-diffusion-aux requires --latent-dim > 0 "
+                               "(operates on the encoded latent).")
+        denoiser = LatentDenoiser(
+            latent_dim=cfg.latent_dim,
+            cond_dim=cfg.cond_dim,
+            channels=cfg.hybrid_channels,
+        ).to(device)
+        diffusion = LatentDiffusion(n_steps=cfg.hybrid_diffusion_steps)
+        opt_denoiser = torch.optim.Adam(denoiser.parameters(), lr=cfg.lr_g, betas=(0.9, 0.999))
+        print(f"[hybrid-diffusion] LatentDenoiser side-trained "
+              f"(channels={cfg.hybrid_channels}, n_steps={cfg.hybrid_diffusion_steps}, "
+              f"params={sum(p.numel() for p in denoiser.parameters()):,})")
+
     # PCF frequency params go in C optimizer: trained to MAXIMIZE PCF distance.
     c_params = list(C.parameters())
     if pcf_loss_fn is not None:
@@ -1565,6 +1605,39 @@ def train(cfg: Config) -> None:
                     g_loss = g_loss + cfg.stride_consistency_weight * loss_stride_cons
                     cp_stride_losses.append(loss_stride_cons.item())
 
+                # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
+                # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
+                # that the LSTM is reusing a prior object.  Train it to match
+                # the real obj_id_reuse column (±1 → [0,1]).  Requires that
+                # the retrieval module be active AND obj_id_reuse be present.
+                _rw = getattr(cfg, "retrieval_reuse_bce_weight", 0.0)
+                if (_rw > 0 and getattr(cfg, "retrieval_memory", False)
+                        and getattr(G, "_last_retrieval_aux", None) is not None
+                        and obj_id_col >= 0):
+                    p_reuse = G._last_retrieval_aux["p_reuse_seq"]  # (B, T)
+                    gt_reuse = ((real_batch[:, :, obj_id_col] + 1.0) / 2.0).detach()
+                    loss_ret_bce = nn.functional.binary_cross_entropy(
+                        p_reuse.clamp(1e-6, 1.0 - 1e-6), gt_reuse,
+                        reduction='mean',
+                    )
+                    g_loss = g_loss + _rw * loss_ret_bce
+
+                # L_mtpp: marked temporal point process NLL (IDEAS.md #20).
+                # Log-Normal timing head emits (μ, σ) for log(IAT) from h_t;
+                # NLL against the real (shifted) ts column nudges the LSTM
+                # hidden state to encode per-step timing distribution.
+                _mw = getattr(cfg, "mtpp_timing_weight", 0.0)
+                if (_mw > 0 and getattr(cfg, "mtpp_timing", False)
+                        and getattr(G, "_last_timing_aux", None) is not None):
+                    mu_t     = G._last_timing_aux["mu"]     # (B, T)
+                    sigma_t  = G._last_timing_aux["sigma"]  # (B, T)
+                    # Shift ts column [-1,1] → [eps, 2+eps] so log-Normal is
+                    # defined (strictly positive).  No inverse-transform back
+                    # to physical IAT — the head learns in normalised space.
+                    real_ts  = real_batch[:, :, ts_col].detach() + 1.0 + 1e-4
+                    loss_mtpp = log_normal_nll(mu_t, sigma_t, real_ts)
+                    g_loss = g_loss + _mw * loss_mtpp
+
                 # L_div: MSGAN mode-seeking diversity loss.
                 # For two independently sampled noise pairs, maximise the ratio of
                 # output distance to input distance — directly combats mode collapse
@@ -1628,7 +1701,6 @@ def train(cfg: Config) -> None:
                 # the LSTM latent across the train→inference boundary.
                 # Complements continuity_loss_weight (feature-space mean/std).
                 if getattr(cfg, "boundary_smoothness_weight", 0.0) > 0:
-                    from chunk_stitching import boundary_latent_smoothness
                     z_gb, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                              file_cond=file_cond_batch, G=G)
                     z_lb1 = G.sample_z_local(B, cfg.timestep, device)
@@ -1739,6 +1811,21 @@ def train(cfg: Config) -> None:
                 scaler.step(opt_ER)
                 scaler.update()
 
+                # IDEAS.md #22 Stage-1: side-train LatentDenoiser on frozen E(real).
+                # Detached from E so gradients do not flow back into the encoder —
+                # this is a pure side-channel denoiser, not a loss term on G/E.
+                if denoiser is not None:
+                    opt_denoiser.zero_grad()
+                    with torch.amp.autocast(device.type, enabled=use_amp):
+                        with torch.no_grad():
+                            H_for_diff = E(real_batch).detach()
+                        diff_cond = file_cond_batch if cfg.cond_dim > 0 else None
+                        loss_diff = diffusion.training_loss(
+                            denoiser, H_for_diff, cond=diff_cond)
+                    scaler.scale(loss_diff).backward()
+                    scaler.step(opt_denoiser)
+                    scaler.update()
+
         c_mean = sum(c_losses) / len(c_losses)
         g_mean = sum(g_losses) / len(g_losses)
         w_mean = sum(w_dists)  / len(w_dists) if w_dists else float("nan")
@@ -1769,6 +1856,7 @@ def train(cfg: Config) -> None:
                 recovery=R if latent_ae else None,
                 dmd_weight=cfg.dmd_ckpt_weight,
                 cond_pool=_eval_cond_pool,
+                col_names=getattr(cfg, "col_names", None),
             )
             G.load_state_dict(live_G_state)   # restore live weights for training
             mmd_history.append((epoch, mmd_val, recall_val, combined_val))
@@ -1801,6 +1889,8 @@ def train(cfg: Config) -> None:
                 if C_extra:
                     ckpt_data["C_extra"] = [_Ci.state_dict() for _Ci in C_extra]
                     ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
+                if denoiser is not None:
+                    ckpt_data["denoiser"] = denoiser.state_dict()
                 torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
 
@@ -2275,6 +2365,31 @@ def parse_args() -> Config:
                    help="Exponential weight decay across boundary steps "
                         "(default 0.5; weight on step i = decay**i, so the boundary "
                         "step counts most).")
+    p.add_argument("--hybrid-diffusion-aux", action="store_true",
+                   help="IDEAS.md #22 (Stage-1 only): side-train a "
+                        "LatentDenoiser on E(real).detach() in the joint-GAN "
+                        "phase. Decoupled from G/C training — produces a "
+                        "standalone denoiser checkpointed in best.pt for "
+                        "later pipeline use. Does not modify G loss. "
+                        "Requires --latent-dim > 0. Default off.")
+    p.add_argument("--hybrid-diffusion-steps", type=int, default=500,
+                   help="LatentDiffusion DDPM step count (default 500). "
+                        "Shorter schedules train faster but may lose fidelity.")
+    p.add_argument("--hybrid-channels", type=int, default=64,
+                   help="LatentDenoiser hidden channel width (default 64).")
+    p.add_argument("--mtpp-timing", action="store_true",
+                   help="IDEAS.md #20: add a parallel log-Normal timing head "
+                        "to the Generator that emits (μ, σ) for log(IAT_{t+1}) "
+                        "from the LSTM hidden state h_t. Consumed as an NLL "
+                        "auxiliary loss (mtpp_nll) against the real IAT. "
+                        "Purely additive to the main output path — does not "
+                        "modify the existing ts regression column. Default off.")
+    p.add_argument("--mtpp-timing-weight", type=float, default=0.5,
+                   help="Weight on the mtpp_nll auxiliary loss (default 0.5). "
+                        "Only active when --mtpp-timing is set.")
+    p.add_argument("--mtpp-sigma-min", type=float, default=0.05,
+                   help="Numerical floor on σ in the log-Normal head "
+                        "(default 0.05). Prevents σ→0 collapse / NLL blow-up.")
     p.add_argument("--ssm-backbone", action="store_true",
                    help="IDEAS.md #19: replace nn.LSTM with SelectiveDiagonalSSM "
                         "(Mamba-lite). Drop-in replacement preserving forward "
@@ -2387,6 +2502,12 @@ def parse_args() -> Config:
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
     cfg.ssm_backbone                 = args.ssm_backbone
     cfg.ssm_state_dim                = args.ssm_state_dim
+    cfg.mtpp_timing                  = args.mtpp_timing
+    cfg.mtpp_timing_weight           = args.mtpp_timing_weight
+    cfg.mtpp_sigma_min               = args.mtpp_sigma_min
+    cfg.hybrid_diffusion_aux         = args.hybrid_diffusion_aux
+    cfg.hybrid_diffusion_steps       = args.hybrid_diffusion_steps
+    cfg.hybrid_channels              = args.hybrid_channels
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

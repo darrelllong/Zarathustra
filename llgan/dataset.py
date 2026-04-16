@@ -200,31 +200,45 @@ def load_file_characterizations(
 # Per-window workload descriptors (z_global conditioning, fallback)
 # ---------------------------------------------------------------------------
 
-def compute_window_descriptors(windows: torch.Tensor) -> torch.Tensor:
+def compute_window_descriptors(
+    windows: torch.Tensor,
+    col_names: Optional[List[str]] = None,
+) -> torch.Tensor:
     """Compute per-window workload descriptors from preprocessed windows.
 
+    Resolves column indices dynamically via ``col_names`` (from the
+    ``TracePreprocessor``) so that auto-dropped zero-variance columns do
+    not shift feature indices silently. Missing columns are filled with
+    zeros.
+
     Args:
-        windows: (B, T, 6) tensor with columns [ts, obj_size, opcode,
-                 tenant, obj_id_reuse, obj_id_stride], already normalized
-                 to [-1, 1].
+        windows:   (B, T, D) tensor in [-1, 1]; D matches ``len(col_names)``.
+        col_names: preprocessor ``col_names`` list. When None, falls back to
+                   the legacy fixed layout
+                   [ts, obj_size, opcode, tenant, obj_id_reuse, obj_id_stride].
 
     Returns:
-        (B, 10) tensor of descriptors (same device as input):
-          ts_mean, ts_std, obj_size_mean, obj_size_std, opcode_mean,
-          tenant_mean, obj_id_reuse_mean, obj_id_stride_mean, obj_id_stride_std
-        ... wait, that's 9.  We add a 10th: ts inter-arrival std-of-diff
-        (second-order burstiness).
-
-    All computed from normalized values; no inversion needed.
+        (B, 10) tensor of descriptors.
     """
-    # Ensure float32 for stability under AMP
     w = windows.float()
-    ts       = w[:, :, 0]  # (B, T)
-    obj_size = w[:, :, 1]
-    opcode   = w[:, :, 2]
-    tenant   = w[:, :, 3]
-    reuse    = w[:, :, 4]
-    stride   = w[:, :, 5]
+    B, T, D = w.shape
+    if col_names is None:
+        col_names = ["ts", "obj_size", "opcode", "tenant",
+                     "obj_id_reuse", "obj_id_stride"][:D]
+    name_to_idx = {n: i for i, n in enumerate(col_names)}
+
+    def _col(name: str) -> torch.Tensor:
+        idx = name_to_idx.get(name)
+        if idx is None or idx >= D:
+            return torch.zeros(B, T, dtype=w.dtype, device=w.device)
+        return w[:, :, idx]
+
+    ts       = _col("ts")
+    obj_size = _col("obj_size")
+    opcode   = _col("opcode")
+    tenant   = _col("tenant")
+    reuse    = _col("obj_id_reuse")
+    stride   = _col("obj_id_stride")
 
     descs = torch.stack([
         ts.mean(dim=1),                          # 0: ts mean
@@ -236,7 +250,7 @@ def compute_window_descriptors(windows: torch.Tensor) -> torch.Tensor:
         reuse.mean(dim=1),                       # 6: obj_id_reuse mean
         stride.mean(dim=1),                      # 7: obj_id_stride mean
         stride.std(dim=1).clamp(min=1e-6),       # 8: obj_id_stride std
-        ts.diff(dim=1).std(dim=1).clamp(min=1e-6),  # 9: ts diff-of-diff std (burstiness)
+        ts.diff(dim=1).std(dim=1).clamp(min=1e-6),  # 9: ts diff-of-diff burstiness
     ], dim=1)  # (B, 10)
     return descs
 

@@ -581,6 +581,8 @@ class Generator(nn.Module):
         retrieval_n_warmup: int = 4,
         ssm_backbone: bool = False,
         ssm_state_dim: int = 16,
+        mtpp_timing: bool = False,
+        mtpp_sigma_min: float = 0.05,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -711,6 +713,20 @@ class Generator(nn.Module):
         # (p_reuse_seq, etc.) for BCE supervision. Reset to None each forward.
         self._last_retrieval_aux: Optional[dict] = None
 
+        # MTPP timing head (IDEAS.md idea #20): parallel log-Normal head on
+        # the LSTM hidden state; emits (μ, σ) for log(IAT).  Consumed as an
+        # NLL auxiliary loss in train.py — does not modify the main output
+        # path, so it's backward compatible.
+        if mtpp_timing:
+            from timing_head import LogNormalTimingHead
+            self.timing_head = LogNormalTimingHead(
+                hidden_size=hidden_size,
+                sigma_min=mtpp_sigma_min,
+            )
+        else:
+            self.timing_head = None
+        self._last_timing_aux: Optional[dict] = None
+
         self._init_weights()
 
     def sample_noise(
@@ -826,6 +842,14 @@ class Generator(nn.Module):
             }
         else:
             self._last_retrieval_aux = None
+
+        # MTPP timing head: produce (μ, σ) for log(IAT) from h.  Stored on
+        # the side channel so train.py can compute NLL vs. real IAT.
+        if self.timing_head is not None:
+            mu_t, sigma_t = self.timing_head(h)
+            self._last_timing_aux = {"mu": mu_t, "sigma": sigma_t}
+        else:
+            self._last_timing_aux = None
 
         out = self.out_act(self.fc(h))
         if return_hidden:

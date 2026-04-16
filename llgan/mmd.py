@@ -274,6 +274,7 @@ def evaluate_metrics(
     k: int = 5,
     dmd_weight: float = 0.0,
     cond_pool: "Optional[torch.Tensor]" = None,
+    col_names: "Optional[list]" = None,
 ) -> tuple[float, float, float]:
     """
     Compute MMD², β-recall, and combined score for checkpoint selection.
@@ -308,7 +309,7 @@ def evaluate_metrics(
                 cond = cond_pool[cidx].to(device)
             else:
                 from dataset import compute_window_descriptors
-                cond = compute_window_descriptors(real)
+                cond = compute_window_descriptors(real, col_names=col_names)
             # Unify z_global path with training (Round 5 TODO):
             # Apply cond_encoder (deterministic μ), regime_sampler, and
             # gmm_prior — the same stack _make_z_global uses at train time.
