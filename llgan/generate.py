@@ -50,9 +50,20 @@ def generate(
     latent_dim = getattr(cfg, "latent_dim", 0) if latent_ae else None
 
     cond_dim = getattr(cfg, "cond_dim", 0)
+    # Mirror eval.py: pass every cfg-driven Generator kwarg so modern
+    # checkpoints (regime sampler, GMM prior, FiLM, multi-LSTM, GP prior)
+    # load cleanly. Without this, generate.py silently builds a smaller
+    # Generator and load_state_dict raises on shape mismatch.
     G = Generator(cfg.noise_dim, prep.num_cols, cfg.hidden_size,
-                  latent_dim=latent_dim,
-                  cond_dim=cond_dim).to(device)
+                  latent_dim=latent_dim, cond_dim=cond_dim,
+                  film_cond=getattr(cfg, "film_cond", False),
+                  gmm_components=getattr(cfg, "gmm_components", 0),
+                  var_cond=getattr(cfg, "var_cond", False),
+                  n_regimes=getattr(cfg, "n_regimes", 0),
+                  num_lstm_layers=getattr(cfg, "num_lstm_layers", 1),
+                  gp_prior=getattr(cfg, "gp_prior", False),
+                  timestep=cfg.timestep,
+                  ).to(device)
     # Prefer EMA weights for generation: they are the time-averaged model that
     # has been smoothed over recent training oscillations and consistently
     # produce better samples than the instantaneous live weights.
@@ -62,7 +73,15 @@ def generate(
 
     R = None
     if latent_ae:
-        R = Recovery(latent_dim, cfg.hidden_size, prep.num_cols).to(device)
+        # Detect mixed-type-recovery from checkpoint keys (matches eval.py).
+        r_keys = ckpt["R"].keys()
+        binary_cols = None
+        if any(k.startswith("fc_cont") for k in r_keys):
+            binary_cols = [i for i, col in enumerate(prep.col_names)
+                           if col.lower() in {"opcode", "type", "rw", "op"}
+                           or col.endswith("_reuse")]
+        R = Recovery(latent_dim, cfg.hidden_size, prep.num_cols,
+                     binary_cols=binary_cols).to(device)
         R.load_state_dict(ckpt["R"])
         R.eval()
 
