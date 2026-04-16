@@ -310,30 +310,37 @@ def _pairwise_sq_dist(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _compute_prdc_numpy(real: np.ndarray, fake: np.ndarray, k: int = 5) -> dict:
-    """Compute PRDC via k-NN manifold estimation (no external library)."""
+    """Compute PRDC via k-NN manifold estimation (no external library).
+
+    Matches the official definitions from Naeem et al. 2020 as implemented in
+    clovaai/generative-evaluation-prdc (Round 15 peer review P1 fix):
+      - precision: fraction of fake inside any real k-NN ball (uses r_real)
+      - recall:    fraction of real inside any fake k-NN ball (uses r_fake)
+      - density:   mean number of real balls containing each fake, scaled by 1/k
+      - coverage:  fraction of real whose nearest fake lies inside real's own ball
+    """
     rr = _pairwise_sq_dist(real, real)
     ff = _pairwise_sq_dist(fake, fake)
-    rf = _pairwise_sq_dist(real, fake)   # (n_real, n_fake)
+    rf_sq = _pairwise_sq_dist(real, fake)   # (n_real, n_fake)
+    rf = np.sqrt(rf_sq)
 
     # k-th nearest neighbour radius for each real / fake point (exclude self → k+1)
     r_real = np.sqrt(np.partition(rr, k + 1, axis=1)[:, k + 1])  # (n_real,)
     r_fake = np.sqrt(np.partition(ff, k + 1, axis=1)[:, k + 1])  # (n_fake,)
 
-    # precision: fake[j] is "plausible" if it falls inside any real ball
-    # (min dist from fake[j] to any real ≤ r_real of that real)
-    # shape: (n_real, n_fake) — is fake[j] inside real[i]'s ball?
-    in_real_ball = (np.sqrt(rf) <= r_real[:, None])  # (n_real, n_fake)
-    precision = in_real_ball.any(axis=0).mean()       # fraction of fake that is plausible
+    # precision: fake[j] inside real[i]'s ball for some i
+    in_real_ball = (rf < r_real[:, None])             # (n_real, n_fake)
+    precision = in_real_ball.any(axis=0).mean()
 
-    # recall: real[i] is "covered" if any fake falls inside real[i]'s ball
-    recall = in_real_ball.any(axis=1).mean()          # fraction of real covered
+    # recall: real[i] inside fake[j]'s ball for some j  (uses r_fake, not r_real)
+    in_fake_ball = (rf < r_fake[None, :])             # (n_real, n_fake)
+    recall = in_fake_ball.any(axis=1).mean()
 
-    # density: average number of fake points per real ball / k
-    density = in_real_ball.sum(axis=1).mean() / k
+    # density: average over fakes of #real-balls containing it, divided by k
+    density = (1.0 / float(k)) * in_real_ball.sum(axis=0).mean()
 
-    # coverage: fraction of fake balls that contain at least one real point
-    in_fake_ball = (np.sqrt(rf.T) <= r_fake[:, None])  # (n_fake, n_real)
-    coverage = in_fake_ball.any(axis=1).mean()
+    # coverage: fraction of real whose nearest fake lies within real's own ball
+    coverage = (rf.min(axis=1) < r_real).mean()
 
     return {"precision": float(precision), "recall": float(recall),
             "density": float(density),    "coverage": float(coverage)}
@@ -494,7 +501,15 @@ def _load_encoder(ckpt, device):
     return E
 
 
-def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int) -> np.ndarray:
+def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int,
+                 real_seed: int = None) -> np.ndarray:
+    """Sample real windows for evaluation.
+
+    When real_seed is provided, file selection and window subsampling are
+    deterministic, so the "real bundle" is frozen across runs. This isolates
+    fake-sample variance from benchmark variance (Round 15 peer review P1).
+    Use the same seed across evals intended to be directly compared.
+    """
     import random
     sys.path.insert(0, ".")
     from train import _collect_files, _load_epoch_dataset
@@ -504,11 +519,19 @@ def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int) -> np.ndarray:
     all_files = _collect_files(trace_dir, fmt)
     if not all_files:
         raise RuntimeError(f"No files found in {trace_dir}")
-    files = random.sample(all_files, min(4, len(all_files)))
+
+    if real_seed is not None:
+        file_rng = random.Random(real_seed)
+        win_rng  = np.random.RandomState(real_seed)
+        files = file_rng.sample(sorted(all_files), min(4, len(all_files)))
+    else:
+        files = random.sample(all_files, min(4, len(all_files)))
+        win_rng = np.random
+
     ds, _ = _load_epoch_dataset(files, fmt, 15000, prep, cfg.timestep)
     if ds is None or len(ds) == 0:
         raise RuntimeError("Could not load real data for evaluation.")
-    idx = np.random.choice(len(ds), min(n_samples, len(ds)), replace=False)
+    idx = win_rng.choice(len(ds), min(n_samples, len(ds)), replace=False)
     windows = np.stack([ds[i].numpy() for i in idx])
     return windows.reshape(len(idx), -1)
 
@@ -530,8 +553,10 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
     if "mmd" in ckpt:
         print(f"Saved MMD² : {ckpt['mmd']:.5f}")
 
-    print(f"\nSampling {n_samples} real and fake windows …")
-    real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples)
+    real_seed = getattr(args, 'eval_real_seed', None) if args else None
+    bundle_note = f" (frozen bundle seed={real_seed})" if real_seed is not None else ""
+    print(f"\nSampling {n_samples} real and fake windows{bundle_note} …")
+    real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples, real_seed=real_seed)
 
     cfg  = ckpt["config"]
     timestep  = cfg.timestep
@@ -651,6 +676,12 @@ def parse_args():
                    help="Nearest-neighbour k for PRDC")
     p.add_argument("--cond-noise-scale", type=float, default=0.0,
                    help="Scale for stochastic conditioning noise at eval (0=deterministic)")
+    p.add_argument("--eval-real-seed", type=int, default=None,
+                   help="Seed for deterministic real-bundle selection (file list + "
+                        "window subsample). If unset, sampling is random (legacy "
+                        "behaviour). Use a fixed seed across runs to isolate "
+                        "fake-sample variance from benchmark variance. Evals using "
+                        "the same seed on the same trace_dir are directly comparable.")
     return p.parse_args()
 
 
