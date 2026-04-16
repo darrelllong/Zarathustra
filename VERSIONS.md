@@ -34,10 +34,27 @@ relevant.
 ## Currently Running
 
 ### tencent_v143 — Multi-scale critic + PCF (ATB recipe, seed #5)
-**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). **GAN ep44, ★ ep35 = 0.07681 (recall 0.656, MMD²=0.00811) — BEST tencent training ★ EVER (beats v142 0.0856 by 10%)**. 9 stale. ★ trajectory ep5=0.155 → ep10=0.110 → ep15=0.106 → ep30=0.0819 → **ep35=0.0768 ★best**. ep40 dipped to 0.0975 (recall 0.539, no ★). W rising 1.78→2.59 — watch for 3.0 stop. Will frozen-eval at ep35 once run completes.
+**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). **GAN ep60, ★ STILL ep35 = 0.07681** (recall 0.656, MMD²=0.00811) — BEST tencent training ★ EVER (beats v142 0.0856 by 10%). **25 stale, 5 epochs from 30-stale kill rule**. ★ trajectory ep5=0.155 → ep10=0.110 → ep15=0.106 → ep30=0.0819 → **ep35=0.0768 ★best** → ep40-60 plateau (0.082-0.097). W elevated 1.83-2.89, under 3.0 stop. Tracking v142's pattern (peaked ep45, killed ep79). Will frozen-eval at ep35 once killed.
 
 ### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
-**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). GAN ep12, ★ ep10 = 0.1122 (recall 0.503, MMD²=0.01294). 2 stale. Early phase, healthy.
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep37, ★ ep25 = 0.10024** (recall 0.604, MMD²=0.02094). 12 stale. Healthy: W bouncing 0.92-1.29, G loss climbing 0.85→8.14 (concerning early sign of saturation but recall stable). ★ trajectory ep5=0.157 → ep10=0.112 → ep20=0.111 → **ep25=0.100 ★best** → ep30=0.102, ep35=0.132 (no new ★).
+
+---
+
+## Round 16 Architecture Backlog — Wiring Phase
+
+All 6 standalone modules from IDEAS.md backlog now committed with smoke tests:
+
+| Idea | Module | Status |
+|------|--------|--------|
+| #17 retrieval memory | `llgan/retrieval_memory.py` | **WIRED into Generator** (commit 6ca1a5d) — backward compatible, --retrieval-memory flag added |
+| #18 cache descriptor | `llgan/cache_descriptor.py` | committed (commit history), monitor wiring NEXT in build order |
+| #19 SSM backbone | `llgan/ssm_backbone.py` | committed (d154e8f) |
+| #20 MTPP timing head | `llgan/timing_head.py` | committed (3501844) |
+| #21 chunk stitching | `llgan/chunk_stitching.py` | committed |
+| #22 hybrid diffusion | `llgan/hybrid_diffusion.py` | committed (2709330) |
+
+**Per IDEAS.md "Recommended build order"**: #17 → #18 → (#21 OR #19) → #22. Currently in step 1 (#17 wired). Next: when v143 hits 30-stale kill, launch tencent_v144 with `--retrieval-memory --resume-from /home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` (strict=False load handles new retrieval params). Step 2 (#18 monitor wiring) is the next code change.
 
 ---
 
