@@ -6,11 +6,29 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ## Currently Running
 
-### alibaba_v113 — Multi-scale critic + self-diagnosing upweighting (temp=0.1)
-**Recipe**: Same as v110/v111 + `--self-diag-temp 0.1`. Very conservative upweighting after v112 (temp=1.0) W-exploded at ep6.
+### alibaba_v114 — Multi-scale critic + continuity loss (weight=1.0)
+**Recipe**: v110/v111 recipe + `--continuity-loss-weight 1.0`. Continuity loss generates two adjacent windows with LSTM hidden state carry-over and penalizes distributional mismatch at boundary. Directly targets train→eval gap. Was tried in v33 (pre-PCF/pre-multi-scale) — retesting with current recipe.
 
-### tencent_v140 — Multi-scale critic + self-diagnosing upweighting (temp=0.1)
-**Recipe**: Same as v136/v137/v138 + `--self-diag-temp 0.1`. Very conservative upweighting after v139 (temp=1.0) W-stopped at ep8.
+### tencent_v141 — Multi-scale critic + continuity loss (weight=1.0)
+**Recipe**: v136/v137/v138 recipe + `--continuity-loss-weight 1.0`. Same rationale as v114.
+
+---
+
+## Post-Mortem: alibaba_v113 — Multi-scale critic + self-diag temp=0.1 (W-stopped ep5)
+
+**Recipe**: v110/v111 recipe + `--self-diag-temp 0.1`. Very conservative upweighting.
+
+**Training-log**: ep1: W=0.72. ep2: W=1.95. ep3: W=**3.04**. ep4: W=**4.02**. ep5: W=**5.79** → W-spike guard triggered (3 consecutive W>3.0). First star 0.169★ at ep5 (recall=0.321). Auto-stopped.
+
+**Verdict**: Self-diag DEFINITIVELY DEAD at ALL temperatures. Tested: temp=10 (v24), temp=2 (v62), temp=1.0 (v112/v139), temp=0.1 (v113). The positive feedback loop is fundamental to the mechanism — even 0.1 temperature amplifies W instability catastrophically. **Idea #9 CLOSED permanently.**
+
+---
+
+## Post-Mortem: tencent_v140 — Multi-scale critic + self-diag temp=0.1 (killed during pretrain)
+
+**Recipe**: v136/v137/v138 recipe + `--self-diag-temp 0.1`.
+
+**Verdict**: Killed preemptively after alibaba_v113 (same temp=0.1) W-stopped at ep5. No GAN data. Self-diag DEAD at all temperatures.
 
 ---
 
