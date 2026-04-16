@@ -33,23 +33,6 @@ relevant.
 
 ## Currently Running
 
-### tencent_v144 — **Round 16 #17: retrieval memory** (architecture-bet #1)
-**Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False. Judged on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
-
-**Phase 3 trajectory** (snapshot 2026-04-16 10:08 PDT):
-| ep | W | comb | recall | ★ |
-|---|---|---|---|---|
-| 5 | +0.39 | 0.10494 | 0.537 | ★ |
-| 10 | +0.73 | 0.08655 | 0.619 | ★ |
-| 15 | +0.95 | **0.08191** | 0.631 | ★ |
-| 20 | +0.98 | 0.09709 | 0.555 | (no new ★) |
-| 25 | +1.05 | 0.09802 | 0.577 | (no new ★) |
-| 30 | +1.00 | 0.10441 | 0.549 | (no new ★) |
-| 35 | +1.17 | 0.10083 | 0.535 | (no new ★) |
-| 36 | +1.13 | — | — | — |
-
-★=0.08191 stands. Plateau persists ep20–35 (~0.098–0.104). W stable +0.95–1.17 (under 3.0 stop). 21 ep stale, 9 to kill. If no new ★ by ep45 this run is dead. Recipe remains the validated tencent-eval recipe (multi-scale + PCF + retrieval, all eval-aligned per model-aware analysis).
-
 ### alibaba_v119 — **Round 16 eval-corrected recipe** (drop multi-scale + PCF)
 **Why**: 2026-04-16 model-aware R analysis (`characterizations/MODEL-LEARNINGS.md`, `model_corpus_summary.csv`) showed alibaba `eval_multiscale_diff=+0.050` and `eval_pcf_diff=+0.009` — both EVAL-NEGATIVE despite training-★ improvements. v118's recipe stacked both eval-negative knobs; predicted frozen ATB ≈ 0.20 (worse than 0.176 baseline). v119 strips them.
 
@@ -58,6 +41,20 @@ relevant.
 **Hypothesis**: If model-aware analysis is right, v119 should land near v114's frozen ATB 0.176 (potentially better via chunk-stitching). Worst case: same as v114, no harm done. Best case: chunk-stitching shaves the boundary artifacts that hurt frozen-bundle β-recall.
 
 **Status**: PID 3880115, started 10:03 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min.
+
+---
+
+## Post-Mortem: tencent_v144 — retrieval memory #17 (killed ep47, 2026-04-16, 32 ep stale from ★=0.08191 ep15)
+
+**Recipe**: v143 args (multi-scale critic + PCF 2.0 + mixed-type-recovery) + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` via strict=False. First architecture-bet from Round 16 backlog (IDEAS.md #17).
+
+**Training-log**: Three consecutive stars in the first 15 ep: ep5=0.10494★ (recall=0.537), ep10=0.08655★ (recall=0.619), ep15=**0.08191★** (recall=0.631, EMA MMD²=0.00811). Then flat: ep20=0.09709, ep25=0.09802, ep30=0.10441, ep35=0.10083, ep40=0.10373, ep45=0.10187. W stable throughout (0.66–1.69, never near 3.0). PCF saturated 0.70–0.93. No new ★ after ep15.
+
+**Why killed**: 32 epochs stale from ep15 ★, past the 30-ep threshold. W was well-behaved so this is not a blowup — it is a plateau. The retrieval module did not produce a second-half breakthrough on tencent.
+
+**Frozen-bundle eval**: NOT YET RUN. best.pt (ep15, 24MB) preserved at `/home/darrell/checkpoints/tencent_v144/best.pt`, along with epoch_0010–0040 snapshots. Prior tencent frozen ATB on the plain multi-scale+PCF recipe = 0.178 (v136, 3-seed). Training ★=0.08191 sits between v142=0.0856 and v143=0.07681 — i.e. the retrieval module did NOT improve the training-★ ceiling vs seed-only retries of the base recipe.
+
+**Verdict (provisional)**: Retrieval memory did not measurably beat base multi-scale+PCF on tencent training trajectory. Whether it helps FROZEN-bundle (which is the ATB-claim benchmark, not training ★) is worth checking — the locality mechanism could in principle help β-recall on the held-out bundle even if training-★ looks similar. If frozen-eval of v144 best.pt lands at ~0.178 it's a null result; if it lands materially below, the architecture still has upside and a seed retry is warranted. If it lands above 0.178 it's a clear miss and IDEA #17 closes on tencent. Next tencent slot: run frozen-eval on v144 best.pt, then either seed-retry (if frozen is promising) or pivot to **IDEA #18 cache-descriptor distillation** (next in Round 16 architecture queue per IDEAS.md recommended build order; module `llgan/cache_descriptor.py` already committed, monitor wiring pending).
 
 ---
 
