@@ -26,34 +26,57 @@ That paper established that LSTM-based GANs (LLGANs) can learn and reproduce the
 
 ## Approach
 
-### Architecture
+The original LLGAN paper used a single-layer LSTM Generator and Critic trained under Wasserstein loss. Zarathustra has since grown into a **four-phase curriculum** with a latent autoencoder, a teacher-forcing supervisor, optional FiLM/GMM/regime/retrieval/state-space modules, multi-scale critics, and a Path-Characteristic-Function adversarial loss. The Generator and Critic are still the heart of the system; everything else exists to put them in a good basin and keep them honest.
 
-The core model is an **LLGAN** (LSTM + GAN):
+### Pipeline
 
-- **Generator**: a single-layer LSTM that maps random noise vectors to sequences of I/O requests. Each timestep receives the same noise vector; the LSTM hidden state carries temporal context forward. Output is passed through a tanh projection to produce normalized `(timestamp_delta, object_id, object_size, opcode)` tuples.
-- **Critic**: a single-layer LSTM with a spectrally-normalized output projection. Trained under Wasserstein loss to score sequences as real or generated. Spectral normalization enforces the Lipschitz constraint without gradient penalty, which avoids second-order autograd limitations on Apple MPS hardware.
+```
+   real traces                       latent space                feature space
+  ─────────────                     ───────────────             ─────────────
+   raw windows  ──Encoder──►    H_real ── Critic / GAN  ◄──   fake windows
+   (B, T, F)                    (B, T, L)                     ▲
+                                       ▲                      │
+                                  z_global ────► Generator    │
+                                  z_local                     │
+                                  (cond, regime, …)           │
+                                       │                      │
+                                       └──Recovery─►   fake_decoded
+                                                       (B, T, F)
+```
 
-### Training
+- **Autoencoder (E + R)**: maps raw feature windows to a compact latent space (`latent_dim`, default 24). The Generator never sees raw features; it produces latent windows that the Recovery decoder maps back to feature space. This decouples generation from preprocessing.
+- **Generator**: produces latent windows from `(z_global, z_local)`. `z_global` is sampled once per stream (via optional GMM prior conditioned on workload descriptors); `z_local` is per-step innovation noise. Default backbone is a single-layer LSTM; `--ssm-backbone` swaps in a Mamba-lite SelectiveDiagonalSSM. Optional modules: `--film-cond` (FiLM modulation per step), `--gmm-components` (mixture prior over workload regimes), `--var-cond` (variational conditioning), `--n-regimes` (Gumbel-Softmax regime sampler), `--retrieval-memory` (per-window object memory with reuse gate), `--gp-prior` (GP prior on `z_local`).
+- **Supervisor**: a small auxiliary network trained alongside the autoencoder to predict the next latent step from the previous one (teacher forcing). Provides a stable supervisory signal in the early phases before the GAN takes over.
+- **Critic**: spectrally-normalized LSTM that scores latent (and optionally decoded) windows. `--multi-scale-critic` adds critics at scales `T`, `T/2`, `T/4` for hierarchical realism. `--pcf-loss-weight` adds an adversarial Path-Characteristic-Function head that matches the empirical characteristic function of fake to real on each batch.
+- **Recovery**: a small decoder mirroring the Encoder; turns latent windows back into feature space at training time (for feature-space losses) and at generation time.
 
-Training uses **Wasserstein loss** with spectral normalization (WGAN + SN), which is more stable than the original BCE formulation and well-suited to sequence data with heavy-tailed distributions.
+### Four-phase curriculum
 
-The key preprocessing choices:
+1. **AE pretrain** (50 ep) — Encoder + Recovery learn to round-trip real windows. Pure reconstruction loss.
+2. **Supervisor pretrain** (50 ep) — Supervisor learns to predict next-step latent from real trajectories.
+3. **G warm-up** (100 ep) — Generator learns to imitate the supervisor's outputs (no Critic gradients yet); stabilises against the latent geometry before adversarial training begins.
+4. **Joint GAN** (200 ep) — Full WGAN-SN training of G vs Critic with all auxiliary losses live. Best checkpoint selected by combined metric on a held-out val bundle every 5 epochs (`★`).
 
-- **Delta-encoded timestamps**: inter-arrival times rather than absolute timestamps make the distribution stationary and far easier for an LSTM to model. Inverse-transform via cumsum reconstructs absolute times at generation time.
-- **Opcode binarization**: read → +1, write → −1, aligning with tanh output range.
-- **Min-max normalization** to [−1, 1] per column, fit on training data only.
+Hot-starting from a prior pretrain checkpoint via `--resume-from` is the norm; only the wall-time-cheap Phase 4 is repeated when sweeping recipes.
 
-### Multi-file streaming training
+### Conditioning
 
-Rather than training on a single trace file, Zarathustra samples a random subset of files from the trace corpus each epoch. This forces the model to learn the shared statistical structure across workloads rather than overfitting to one volume's access pattern. A preprocessor is fitted once on a seed sample of files and held fixed; normalization statistics remain consistent across all epochs and at generation time.
+Per-file workload characterisations live in `traces/characterization/trace_characterizations.jsonl` (30,628 files, derived offline from R analysis: write_ratio, burstiness_cv, reuse_ratio, stride stats, IAT quantiles, …). At training time, each window's `cond` vector is the precomputed file-level descriptor; at generation time, the user supplies a target descriptor (or samples one from the corpus distribution).
 
-### Trace corpus
-
-Training data comes from the [libCacheSim cache-datasets](https://github.com/1a1a11a/libCacheSim) corpus, hosted in a public AWS S3 bucket.  Both `oracleGeneral` and native `lcs` binary formats are supported.  See [**Downloading the traces**](#downloading-the-traces) below for instructions.
+Classifier-Free Guidance (`--cond-drop-prob`, default 0.25) randomly nulls the conditioning during training so the Generator learns both conditional and unconditional distributions.
 
 ### Evaluation
 
-Quality is tracked during training using **Maximum Mean Discrepancy (MMD²)** combined with **β-recall** (mode coverage) against a held-out validation set.  The combined score `MMD² + 0.2·(1−recall)` is used for checkpoint selection, which prevents saving mode-collapsed checkpoints that achieve low MMD² by ignoring rare burst events.  Lower is better; the target is statistical indistinguishability.
+Training-time scoring uses **MMD² + 0.2·(1−β-recall)** on a held-out validation bundle every 5 epochs; the lowest-combined checkpoint is saved as `best.pt` (★). Lower is better. β-recall is the mode-coverage component of PRDC and prevents the model from gaming MMD² by collapsing to a few modes.
+
+**Frozen-bundle protocol** (Round 15 P1 fix): pass `--eval-real-seed 42` to `eval.py` to pin the same 4 real files across runs. The original moving-bundle protocol conflated model variance with benchmark variance; under the frozen protocol numbers are roughly 2× higher than the legacy "5-run avg" reports. **All ATB-claiming evals must use the frozen protocol.** Current frozen-bundle bests:
+
+| Corpus | Best frozen ATB | Version | Recipe |
+|---|---|---|---|
+| Alibaba | 0.176 | v114 | multi-scale critic + continuity loss |
+| Tencent | 0.178 | v136 | multi-scale critic + PCF |
+
+Full evaluation (`eval.py`) additionally reports **PRDC** (precision/recall/density/coverage), **DMD-GEN** (dynamic-mode-decomposition similarity), **Context-FID**, **autocorrelation distance**, and **HRC-MAE** (hit-ratio-curve fidelity — a cache-native metric).
 
 ## Downloading the traces
 
@@ -166,45 +189,76 @@ and the cache-dataset collection paper:
 
 ## Usage
 
-### Training (single file)
+### Pretrain once, sweep many
+
+The autoencoder, supervisor, and warm-up Generator (Phases 1–2.5) are corpus-level work; only the Joint-GAN phase changes between recipes. Build a Phase-1+2+2.5 checkpoint once per corpus, then `--resume-from` it for every Phase-3 sweep.
 
 ```bash
-cd llgan
-python train.py \
-    --trace /path/to/trace.oracleGeneral.zst \
-    --fmt oracle_general \
-    --loss wgan-gp \
-    --epochs 300
+# One-time pretrain (alibaba)
+python -u llgan/train.py \
+    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
+    --files-per-epoch 12 --records-per-file 20000 \
+    --char-file traces/characterization/trace_characterizations.jsonl \
+    --epochs 0 \
+    --checkpoint-dir checkpoints/alibaba_pretrain
 ```
 
-### Training (multi-file streaming, recommended)
+### Training a recipe (Phase-3 only)
+
+A representative production launch — multi-scale critic + PCF + chunk-stitching, with frozen-bundle eval pinned for ATB tracking:
 
 ```bash
-# oracleGeneral format (fastest; 382 files for tencentBlock)
-python train.py \
-    --trace-dir /path/to/cache_dataset_oracleGeneral/2020_tencentBlock \
-    --fmt oracle_general \
-    --files-per-epoch 8 \
-    --records-per-file 15000 \
-    --epochs 300 \
-    --checkpoint-dir checkpoints/tencent_v14
-
-# LCS format (richer metadata; 4,482 files for tencentBlock)
-python train.py \
-    --trace-dir /path/to/cache_dataset_lcs/tencentBlock \
-    --fmt lcs \
-    --files-per-epoch 8 \
-    --records-per-file 15000 \
-    --epochs 300 \
-    --checkpoint-dir checkpoints/tencent_lcs_v1
+python -u llgan/train.py \
+    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
+    --char-file traces/characterization/trace_characterizations.jsonl \
+    --resume-from checkpoints/alibaba_pretrain/pretrain_complete.pt \
+    --files-per-epoch 12 --records-per-file 20000 \
+    --epochs 200 \
+    --multi-scale-critic --multi-scale-weight 0.5 \
+    --pcf-loss-weight 0.3 \
+    --continuity-loss-weight 0.2 \
+    --boundary-smoothness 0.1 \
+    --cond-drop-prob 0.25 \
+    --eval-real-seed 42 \
+    --checkpoint-dir checkpoints/alibaba_v118
 ```
+
+Frequently-used capability flags (full list in `train.py --help`):
+
+| Flag | Effect |
+|---|---|
+| `--multi-scale-critic` (+ `--multi-scale-weight`) | Hierarchical critics at T, T/2, T/4 |
+| `--pcf-loss-weight W` | Path-Characteristic-Function adversarial head |
+| `--continuity-loss-weight W` | Penalises latent jumps between consecutive steps (alibaba bread-and-butter) |
+| `--boundary-smoothness W` | Chunk-stitching loss for cross-window continuity |
+| `--retrieval-memory` | Per-window object memory + reuse gate (tencent recipe) |
+| `--ssm-backbone` (+ `--ssm-state-dim`) | Replace Generator LSTM with Mamba-lite SelectiveDiagonalSSM |
+| `--film-cond` / `--var-cond` | FiLM modulation / variational conditioning |
+| `--gmm-components K` / `--n-regimes K` | GMM prior / Gumbel regime sampler |
+| `--gp-prior` | Gaussian-process smoothness prior on z_local |
+| `--cond-drop-prob P` | Classifier-Free Guidance dropout (default 0.25) |
+| `--eval-real-seed 42` | **Frozen-bundle protocol — required for ATB-claiming runs** |
+
+### Full evaluation
+
+```bash
+python -u llgan/eval.py \
+    --checkpoint checkpoints/alibaba_v118/best.pt \
+    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
+    --char-file traces/characterization/trace_characterizations.jsonl \
+    --eval-real-seed 42 \
+    --report eval_reports/alibaba_v118.json
+```
+
+Reports: MMD², β-recall + combined ATB, PRDC, DMD-GEN, Context-FID, autocorrelation distance, HRC-MAE.
 
 ### Generating synthetic traces
 
 ```bash
-python generate.py \
-    --checkpoint checkpoints/tencent_multifile/final.pt \
-    --n 1000000 \
+python -u llgan/generate.py \
+    --checkpoint checkpoints/alibaba_v118/best.pt \
+    --char-file traces/characterization/trace_characterizations.jsonl \
+    --n-records 1000000 \
     --output synthetic.csv
 ```
 
@@ -225,17 +279,46 @@ python generate.py \
 
 ```
 Zarathustra/
-├── llgan/
-│   ├── config.py       # Hyperparameter dataclass
-│   ├── dataset.py      # Trace loading, preprocessing, sliding-window dataset
-│   ├── model.py        # Generator and Critic (LSTM + spectral norm)
-│   ├── mmd.py          # MMD² training-time evaluation
-│   ├── eval.py         # Full evaluation: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr
-│   ├── train.py        # Training loop (single-file and multi-file modes)
-│   └── generate.py     # Inference: checkpoint → synthetic CSV
-├── pubs/               # Reference papers
-└── assets/
+├── llgan/                       # Core training + generation library
+│   ├── config.py                # Hyperparameter dataclass
+│   ├── dataset.py               # Multi-format trace loading, sliding-window dataset
+│   ├── model.py                 # Generator (LSTM/SSM) + Critic + Encoder/Recovery + Supervisor
+│   ├── ssm_backbone.py          # SelectiveDiagonalSSM (Mamba-lite) generator backbone
+│   ├── retrieval_memory.py      # Per-window object memory + reuse gate
+│   ├── chunk_stitching.py       # Cross-window boundary smoothness loss
+│   ├── pcf_loss.py              # Path-Characteristic-Function adversarial head
+│   ├── multi_scale_critic.py    # Hierarchical critics at T, T/2, T/4 (in model.py)
+│   ├── cache_descriptor.py      # 8-dim cache-native descriptor monitor
+│   ├── precompute_descriptors.py# Offline corpus-wide descriptor precomputation
+│   ├── timing_head.py           # MTPP timing head (standalone, pending wiring)
+│   ├── hybrid_diffusion.py      # Diffusion refinement head (standalone)
+│   ├── trace_profile.py         # Per-trace statistical profiler
+│   ├── mmd.py                   # MMD² + β-recall combined metric
+│   ├── eval.py                  # Full eval: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr, HRC-MAE
+│   ├── compare.py               # Side-by-side checkpoint comparison
+│   ├── lcs_survey.py            # LCS corpus inventory tool
+│   ├── train.py                 # Training loop (4-phase curriculum)
+│   └── generate.py              # Inference: checkpoint → synthetic CSV
+├── traces/
+│   └── characterization/        # Per-file workload descriptors (30,628 files)
+├── characterizations/           # Aggregate corpus-level characterizations
+├── R-scripts/                   # R analyses (Hurst, changepoints, regime detection)
+├── parsers/                     # Trace-format parsers (SNIA, ETW, etc.)
+├── scripts/                     # Operational + ad-hoc shell scripts
+├── paper/                       # NAS 2024 paper sources + revisions
+├── pubs/                        # Reference papers
+├── assets/                      # Images
+├── VERSIONS.md                  # Per-version experiment log (the run book)
+├── IDEAS.md                     # Backlog of architecture / loss / curriculum ideas
+├── PEER-REVIEW.md               # Darrell's peer-review notes
+└── PEER-REVIEW-GEMINI.md        # Gemini peer-review notes
 ```
+
+The active workflow lives in three files at the repo root:
+
+- **`VERSIONS.md`** — append-only log of every Phase-3 launch: recipe, hyperparameters, motivation, training-★ trajectory, frozen-bundle ATB on completion, post-mortem.
+- **`IDEAS.md`** — numbered backlog of pending architecture / loss / curriculum bets, with status (queued / wired / running / closed).
+- **`PEER-REVIEW.md`** + **`PEER-REVIEW-GEMINI.md`** — the two outside reviewers' running feedback. Read both at the start of each session.
 
 ---
 
