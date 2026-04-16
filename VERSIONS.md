@@ -36,7 +36,7 @@ relevant.
 ### tencent_v144 — **Round 16 #17: retrieval memory** (architecture-bet #1)
 **Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False. Judged on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:39 PDT):
+**Phase 3 trajectory** (snapshot 2026-04-16 10:08 PDT):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +0.39 | 0.10494 | 0.537 | ★ |
@@ -44,26 +44,34 @@ relevant.
 | 15 | +0.95 | **0.08191** | 0.631 | ★ |
 | 20 | +0.98 | 0.09709 | 0.555 | (no new ★) |
 | 25 | +1.05 | 0.09802 | 0.577 | (no new ★) |
-| 28 | +1.04 | — | — | — |
+| 30 | +1.00 | 0.10441 | 0.549 | (no new ★) |
+| 35 | +1.17 | 0.10083 | 0.535 | (no new ★) |
+| 36 | +1.13 | — | — | — |
 
-★=0.08191 stands. Plateau at ~0.097 (ep20–25). W stable +0.95–1.05. 13 ep stale, 17 to kill. Better-behaved than v118 (no recall collapse), just stuck.
+★=0.08191 stands. Plateau persists ep20–35 (~0.098–0.104). W stable +0.95–1.17 (under 3.0 stop). 21 ep stale, 9 to kill. If no new ★ by ep45 this run is dead. Recipe remains the validated tencent-eval recipe (multi-scale + PCF + retrieval, all eval-aligned per model-aware analysis).
 
-### alibaba_v118 — **Round 16 #21: chunk-stitching boundary smoothness** (architecture-bet #2)
-**Recipe**: v117/v114 args + `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Adds latent-space MSE between B's first-2 latents and A's last-2 latents (with exp-decay weighting) on the G update; intent is to encourage smooth chunk transitions when generate.py stitches multiple chunks. Same v48 hot-start as v117. Judged on frozen-bundle ATB (current alibaba ATB = 0.176 frozen).
+### alibaba_v119 — **Round 16 eval-corrected recipe** (drop multi-scale + PCF)
+**Why**: 2026-04-16 model-aware R analysis (`characterizations/MODEL-LEARNINGS.md`, `model_corpus_summary.csv`) showed alibaba `eval_multiscale_diff=+0.050` and `eval_pcf_diff=+0.009` — both EVAL-NEGATIVE despite training-★ improvements. v118's recipe stacked both eval-negative knobs; predicted frozen ATB ≈ 0.20 (worse than 0.176 baseline). v119 strips them.
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:39 PDT):
-| ep | W | comb | recall | ★ |
-|---|---|---|---|---|
-| 5 | +1.09 | 0.14130 | 0.372 | ★ |
-| 10 | +1.06 | 0.12554 | 0.482 | ★ |
-| 15 | +1.05 | 0.11102 | 0.595 | ★ |
-| 20 | +1.08 | 0.11362 | 0.550 | (no new ★) |
-| 25 | +1.42 | 0.09960 | 0.614 | ★ |
-| 30 | +1.56 | **0.09684** | 0.606 | ★ |
-| 35 | +1.73 | 0.10886 | 0.576 | (no new ★) |
-| 40 | +1.97 | 0.12630 | **0.497** | (recall dropping) |
+**Recipe** (delta from v118): drop `--multi-scale-critic`, set `--pcf-loss-weight 0`. Keep `--continuity-loss-weight 1.0` + chunk-stitching `--boundary-smoothness-weight 0.1` + `--block-sample` + `--char-file` + v48 hot-start. This is the validated "v114 baseline + chunk-stitching" recipe with the 2 eval-negative knobs removed.
 
-★=0.09684 stands. ep40 shows recall collapsing (0.606→0.497 over 10 ep) and W climbing (+1.56→+1.97). Mode-collapse signature. 13 ep stale, 17 to kill threshold. If trajectory doesn't recover by ep45, this run is hopeless. Continuing one more sweep before kill.
+**Hypothesis**: If model-aware analysis is right, v119 should land near v114's frozen ATB 0.176 (potentially better via chunk-stitching). Worst case: same as v114, no harm done. Best case: chunk-stitching shaves the boundary artifacts that hurt frozen-bundle β-recall.
+
+**Status**: PID 3880115, started 10:03 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min.
+
+---
+
+## Post-Mortem: alibaba_v118 — chunk-stitching + 2 eval-negative knobs (killed ep53, 2026-04-16, NOT eval'd)
+
+**Recipe**: v117/v114 args + chunk-stitching `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Multi-scale critic + PCF (loss weight 2.0) inherited from v114 family. Hot-start from v48.
+
+**Training-log**: Six stars: ep5=0.14130, ep10=0.12554, ep15=0.11102, ep25=0.09960, ep30=0.09684, ep45=**0.09332★** (recall=0.635, MMD²=0.02042). Beat v114's ep35=0.073★ on combined? No — 0.093 > 0.073. But better than v117's 0.085★ ceiling on the same family. After ep45: W escalating +1.83→+2.74 (ep49), recall 0.545. Killed ep53 (W still climbing, still under 3.0 stop).
+
+**Why killed mid-trajectory** (NOT 30-stale): The 2026-04-16 model-aware R analysis arrived mid-run. Joining 118 alibaba train logs with 33 alibaba eval logs revealed `eval_multiscale_diff=+0.0499` and `eval_pcf_diff=+0.0086` — both EVAL-NEGATIVE for alibaba. v118's recipe stacked both. Projected frozen ATB ≈ training-★ 0.093 + eval-negative cost 0.06 + frozen inflation 0.04 ≈ **0.19**, worse than the 0.176 baseline. Continuing to 30-stale kill would have wasted ~1 hr GPU on a recipe whose ceiling is below the baseline.
+
+**Frozen-bundle eval**: NOT RUN. The 0.09332★ checkpoint is preserved at `/home/darrell/checkpoints/alibaba_v118/best.pt` (22.4 MB, ep45) and `epoch_0050.pt`, in case future analysis wants to verify the projection.
+
+**Verdict**: Multi-scale critic + PCF for alibaba is dead. Confirmed by 2 frozen-bundle data points (v115=0.195, v116=0.180 — both worse than v114's 0.176 baseline). v119 launched as the eval-corrected recipe (chunk-stitching + continuity, no multi-scale, no PCF).
 
 ---
 
