@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: Retrieval memory's p_reuse gate learns an implicit reuse-vs-new decision from adversarial gradients alone in v120. With explicit BCE supervision against `obj_id_reuse`, the gate learns directly from the data distribution rather than the D signal — which should (a) accelerate convergence past v120's ep25 peak and (b) prevent the mode-collapse-adjacent drift observed in v120's ep30+.
 
-**Status** (2026-04-16): PID TBD via `by9fxrk9m` background task, launched ~16:20 PDT. Phase 1 AE pretraining started (recon=0.00001). Retrieval memory enabled (98,913 params). Log: `/home/darrell/train_alibaba_v121.log`.
+**Status** (2026-04-16, ~30 min in): PID 3946227, launched 16:01 PDT. **Phase 2.5 G warm-up ep 30/100** (still pre-GAN; no ★ yet). AE pretrain clean (recon=0.00001); Supervisor pretrain 0.0319→0.0331 (tight); G warm-up sup=0.00164→0.00069 at ep30. Retrieval memory enabled (98,913 params). ETA to first GAN epoch: ~10 min. Log: `/home/darrell/train_alibaba_v121.log`.
 
 ### tencent_v146 — **Chunk stitching + MTPP timing head (IDEAs #21 + #20, first combined test)**
 **Why**: v145 (IDEA #21 chunk-stitching alone on tencent) launched at 10:51 and was still in warm-up at 11:13 when the Round 16 wiring work landed: `llgan/timing_head.LogNormalTimingHead` is now consumed by `train.py` under `--mtpp-timing` (Generator emits per-step (μ, σ) for log(IAT) from the LSTM hidden state, log-Normal NLL added to G loss). v146 replaces v145 with the same chunk-stitching recipe plus the new MTPP head: two mechanism-level changes in one run, saving a GPU slot. If combined beats v143's ★=0.0768 / frozen 0.178, a follow-up ablation will split them; if it doesn't, neither mechanism is a tencent winner.
@@ -49,7 +49,7 @@ relevant.
 
 **Hypothesis**: MTPP NLL supervises the LSTM hidden state to encode per-step timing distribution — a different gradient signal from the regression-only ts column. If tencent's frozen ATB ceiling is driven by burst-structure mismatch (not just locality), the NLL should shave β-recall by a measurable margin. Combined with chunk-stitching (boundary smoothness) this stacks two complementary mechanisms without changing the base GAN recipe.
 
-**Status** (2026-04-16, ~5.5h in): PID 3908775, started 11:16 PDT. **Phase 3 ep 81/200**. Best training ★=**0.07667** at ep80 — another new record. Trajectory: ep5=0.14596 → ep10=0.10502 → ep30=0.10087 → ep35=0.09685 → ep40=0.09510 → ep55=0.08294 → ep70=0.08010 → **ep80=0.07667**. Stale=1. W scare at ep73 (+2.85) resolved, back to +1.82 at ep81 (safe). Training ★=0.077 is **57.0% below tencent ATB 0.178** and **matches v143's training ★=0.0768 baseline**. MTPP + chunk-stitching combo producing strongest tencent signal observed to date. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in G warm-up; 22 min sunk, no GAN epochs run).
+**Status** (2026-04-16, ~5.5h in): PID 3908775, started 11:16 PDT. **Phase 3 ep 97/200**. Best training ★=**0.07467** at ep95 — another new record. Trajectory: ep5=0.14596 → ep10=0.10502 → ep30=0.10087 → ep35=0.09685 → ep40=0.09510 → ep55=0.08294 → ep70=0.08010 → ep80=0.07667 → **ep95=0.07467** (recall=0.651, EMA MMD²=0.00497). Stale=2. W oscillating +1.80 to +2.85, all well under 3.0 stop. Training ★=0.0747 is **58.1% below tencent ATB 0.178** and **now 2.7% better than v143's training ★=0.0768 baseline**. MTPP + chunk-stitching combo producing strongest tencent signal observed to date. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in G warm-up; 22 min sunk, no GAN epochs run).
 
 ---
 
