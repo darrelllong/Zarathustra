@@ -33,11 +33,27 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v116 — Multi-scale critic + continuity loss, seed #3
-**Recipe**: Identical to v114/v115. Third continuity-loss seed to harden frozen-bundle ATB estimate. v114 frozen=0.176, v115 frozen=0.195 (1-seed). GAN ep10, two early stars, ★ ep10=0.110 (recall=0.588).
-
 ### tencent_v143 — Multi-scale critic + PCF (ATB recipe, seed #5)
-**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). Recipe shows reproducibility — need more data to claim significance.
+**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). GAN ep13, ★ ep10=0.110.
+
+### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). Currently in AE pretrain.
+
+---
+
+## Post-Mortem: alibaba_v116 — Multi-scale critic + continuity loss, seed #3 (killed ep67, best 0.0692★ ep35)
+
+**Recipe**: Identical to v114/v115. Third continuity-loss seed.
+
+**Training-log**: Six stars: ep5=0.149★, ep10=0.110★, ep20=0.099★, ep25=0.099★, ep30=0.091★, ep35=**0.0692★** (recall=0.703, MMD²=0.00978). **0.0692★ is the BEST ALIBABA TRAINING EVER**, beating v114's 0.073★ by 5%. After ep35, stalled: ep40=0.082, ep45=0.082, ep50=0.122, ep55=NA, ep60=0.095, ep65=0.103. W elevated 1.6-2.4 with ep45 single-spike to 3.30 (recovered). PCF saturated >1.0. Killed at ep67 (32 stale from ep35) per memory's 30-stale rule.
+
+**Frozen-bundle eval (seed=42, 1-seed initial)**: combined=**0.1799** (MMD²=0.01213, recall=0.161, precision=0.849). For comparison:
+- v114 frozen ATB = 0.176 (5-seed avg, range 0.163-0.188) ← canonical alibaba ATB
+- v115 frozen = 0.195 (1-seed)
+- v98 (base PCF) frozen = 0.182 (5-seed)
+- v116 single seed = **0.180** — within v114's noise band, ~1% off
+
+**Verdict**: Continuity-loss recipe **reproducible across 3 seeds** at frozen-bundle level (0.176/0.195/0.180). v116 is BEST training run on this recipe family (0.069★) but frozen eval lands at 0.180 — within v114's noise band, not better. Insight: training-best ★ does NOT predict frozen-bundle quality reliably (v114 had 0.073★ → 0.176, v116 has 0.069★ → 0.180). v117 launched as 4th seed for additional confidence.
 
 ---
 

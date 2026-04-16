@@ -437,8 +437,9 @@ prove it via cache evaluation (#14).
 95. ~~tencent_v141~~ (multi-scale critic + continuity loss weight=1.0, killed ep51 — best 0.091★ ep20, 31 stale, worse than multi-scale+PCF baseline. **Continuity loss DEAD on tencent (2nd attempt).**)
 96. ~~alibaba_v115~~ (continuity-loss seed #2, killed ep85 — best 0.083★ ep55 (LATE breakthrough, validates 30-stale rule). Frozen-bundle 0.195 (1 seed, ~10% worse than v114's 0.176).)
 97. ~~tencent_v142~~ (multi-scale+PCF seed #4, killed ep79 — best **0.0856★ ep45** (BEST tencent training ever this recipe), 34 stale + W rising 3.07→3.32. Frozen-bundle 0.1795 (1 seed) — TIES v136 ATB 0.178. Recipe reproducible.)
-98. **Running:** alibaba_v116 (continuity-loss seed #3 — third data point for v114 ATB recipe; v114=0.073★/0.176frozen, v115=0.083★/0.195frozen)
+98. ~~alibaba_v116~~ (continuity-loss seed #3, killed ep67 — best **0.0692★ ep35** (BEST ALIBABA TRAINING EVER, beats v114's 0.073★), 32 stale at kill. Frozen-bundle 0.1799 (1 seed) — within noise of v114's 0.176, recipe consistent.)
 99. **Running:** tencent_v143 (multi-scale+PCF ATB recipe, seed #5 — fifth data point for v136's 0.178 frozen ATB)
+100. **Running:** alibaba_v117 (continuity-loss seed #4 — fourth data point. Continuity-loss frozens so far: 0.176/0.195/0.180.)
 73. ~~alibaba_v105~~ (CFG fix + fresh seed, killed ep64 — best 0.084★ ep35 **BEST TRAIN EVER**, **5-run eval avg 0.113**, +35% gap. Does NOT beat ATB 0.088.)
 74. **KEY FINDING:** CFG information leakage fix (Gemini R2 P1) produces best-ever training (5 stars, 0.092★) but train→eval gap unchanged at +31%. Fix kept for training stability. Eval variance in recall is the true bottleneck — not conditioning leakage, not seed luck.
 75. **EVAL BUG FIXES:** (a) HRC-MAE padding: was padding to n_points by repeating final hit ratio, suppressing error at discriminative cache sizes. Fixed: compute MAE over actual sizes only. (b) Reuse metric hardcoded to col 3: was wrong when tenant column dropped. Fixed: dynamically resolve from preprocessor col_names.
