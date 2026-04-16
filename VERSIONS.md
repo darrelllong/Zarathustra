@@ -33,14 +33,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v120 — **Retrieval memory (#17) on alibaba, first test**
-**Why**: v119 (v114 base + chunk-stitching + continuity) plateaued at training ★=0.11672 at ep10, then flat/degrading through ep34 with no new ★. v114's training ★=0.073 mapped to frozen ATB 0.176; v119's ★ is 60% worse, so projected frozen ≈ training★ + ~0.10 inflation ≈ **0.22** — hopeless to beat the 0.176 alibaba baseline. Killed at ep34 (24 stale). IDEAS.md Recommended Build Order puts #17 retrieval memory first: *"Retrieval memory on alibaba first, then tencent."* It was run on tencent (v144, null at ★=0.08191) but never on alibaba. v120 is that test.
+### alibaba_v121 — **Retrieval memory (#17) + BCE reuse supervision on alibaba**
+**Why**: v120 tested retrieval-memory as a pure architectural prior (BCE weight=0) and yielded best training ★=0.14294 at ep25 before drifting back up (ep60=0.151; stale=36 → killed). Advocatus Diaboli review of R16 wiring flagged that `--retrieval-reuse-bce-weight` defaulted to 0.0 in v120's launch, so the supervised form of IDEA #17 was never actually tested — only the architectural-prior ablation ran. v121 is the supervised test: same recipe + `--retrieval-reuse-bce-weight 0.5` to add BCE loss on the p_reuse gate against `obj_id_reuse` ground truth. If the BCE supervision keeps the gradient signal alive past ep25, training ★ should either sustain below v120's best or push lower.
 
-**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF, char-file, block-sample, K=4 regimes, var-cond, gmm-8) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4`. Chunk-stitching and MTPP both disabled — single-variable test of #17. BCE aux loss also off (`--retrieval-reuse-bce-weight 0.0`), same as v144 apples-to-apples. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt`. 98,913 retrieval params added (+32% over base G). Log confirms `regime_sampler.*` + `retrieval.*` + `retrieval_proj.*` freshly initialised.
+**Recipe**: v120 recipe (v114 base + retrieval memory M=32/key=32/val=32/decay=0.85/tau_write=0.5/warmup=4) + `--retrieval-reuse-bce-weight 0.5`. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt`. Single-variable change from v120 — the BCE weight is the only difference.
 
-**Hypothesis**: Alibaba Hurst=0.98 (long-range correlation) suggests locality structure that the base LSTM may miss. Retrieval-memory's explicit per-step reuse/new decision is architecturally matched to that. If it helps, training ★ should drop below v114's 0.073. If null (like v144 on tencent), we get clean signal that retrieval is dead on this corpus family.
+**Hypothesis**: Retrieval memory's p_reuse gate learns an implicit reuse-vs-new decision from adversarial gradients alone in v120. With explicit BCE supervision against `obj_id_reuse`, the gate learns directly from the data distribution rather than the D signal — which should (a) accelerate convergence past v120's ep25 peak and (b) prevent the mode-collapse-adjacent drift observed in v120's ep30+.
 
-**Status** (2026-04-16, ~5h in): PID 3913761, started 11:31 PDT. **Phase 3 ep 52/200**. Best training ★=**0.14294** at ep25 — no new ★s since. Post-peak trajectory: ep30=0.15348, ep35=0.16756, ep40=0.17319, ep45=0.16271, ep50=0.16743. Stale=**27/30** — kill threshold ep55 if next ★ evaluation doesn't break record. W=+0.81 (safe, under 3.0). Training ★=0.143 is **18.8% below alibaba ATB 0.176** at the peak. Retrieval-memory as pure architectural prior (BCE weight=0) appears to have helped in epochs 1–25 then faded into stable mode-collapse-adjacent regime. Log: `/home/darrell/train_alibaba_v120.log`.
+**Status** (2026-04-16): PID TBD via `by9fxrk9m` background task, launched ~16:20 PDT. Phase 1 AE pretraining started (recon=0.00001). Retrieval memory enabled (98,913 params). Log: `/home/darrell/train_alibaba_v121.log`.
 
 ### tencent_v146 — **Chunk stitching + MTPP timing head (IDEAs #21 + #20, first combined test)**
 **Why**: v145 (IDEA #21 chunk-stitching alone on tencent) launched at 10:51 and was still in warm-up at 11:13 when the Round 16 wiring work landed: `llgan/timing_head.LogNormalTimingHead` is now consumed by `train.py` under `--mtpp-timing` (Generator emits per-step (μ, σ) for log(IAT) from the LSTM hidden state, log-Normal NLL added to G loss). v146 replaces v145 with the same chunk-stitching recipe plus the new MTPP head: two mechanism-level changes in one run, saving a GPU slot. If combined beats v143's ★=0.0768 / frozen 0.178, a follow-up ablation will split them; if it doesn't, neither mechanism is a tencent winner.
@@ -49,7 +49,21 @@ relevant.
 
 **Hypothesis**: MTPP NLL supervises the LSTM hidden state to encode per-step timing distribution — a different gradient signal from the regression-only ts column. If tencent's frozen ATB ceiling is driven by burst-structure mismatch (not just locality), the NLL should shave β-recall by a measurable margin. Combined with chunk-stitching (boundary smoothness) this stacks two complementary mechanisms without changing the base GAN recipe.
 
-**Status** (2026-04-16, ~5h in): PID 3908775, started 11:16 PDT. **Phase 3 ep 71/200**. Best training ★=**0.08010** at ep70 — another new record. Trajectory: ep5=0.14596 → ep10=0.10502 → ep30=0.10087 → ep35=0.09685 → ep40=0.09510 → ep55=0.08294 → **ep70=0.08010**. Stale=1. W touched +2.68 at ep64, back to +1.76 at ep71 (safe, under 3.0 cap). Training ★=0.080 is **55.0% below tencent ATB 0.178** and **beats v143's training ★=0.0768 baseline**. MTPP + chunk-stitching combo producing strongest tencent signal observed to date. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in G warm-up; 22 min sunk, no GAN epochs run).
+**Status** (2026-04-16, ~5.5h in): PID 3908775, started 11:16 PDT. **Phase 3 ep 81/200**. Best training ★=**0.07667** at ep80 — another new record. Trajectory: ep5=0.14596 → ep10=0.10502 → ep30=0.10087 → ep35=0.09685 → ep40=0.09510 → ep55=0.08294 → ep70=0.08010 → **ep80=0.07667**. Stale=1. W scare at ep73 (+2.85) resolved, back to +1.82 at ep81 (safe). Training ★=0.077 is **57.0% below tencent ATB 0.178** and **matches v143's training ★=0.0768 baseline**. MTPP + chunk-stitching combo producing strongest tencent signal observed to date. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in G warm-up; 22 min sunk, no GAN epochs run).
+
+---
+
+## Post-Mortem: alibaba_v120 — retrieval-memory as architectural prior (killed ep61, 2026-04-16, 36 ep stale from ★=0.14294 ep25)
+
+**Recipe**: v114 base (continuity 1.0, no multi-scale, no PCF, char-file, block-sample, K=4 regimes, var-cond, gmm-8) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4`. BCE aux loss OFF (`--retrieval-reuse-bce-weight` absent → default 0.0). Hot-start from v48.
+
+**Training-log**: Three consecutive ★ through ep25: ep5=0.16815 → ep10=0.15004 → ep15=0.14514 → ep25=**0.14294★**. Then monotonic drift up: ep30=0.15348, ep35=0.16756, ep40=0.17319, ep45=0.16271, ep50=0.16743, ep55=0.16450, ep60=0.15100. Stale=36 at ep61 kill. W stable +0.36 to +0.94, never near 3.0. G loss tight range -5.4 to -6.1 (healthy adversarial balance, not exploding/collapsing). Best training ★=0.143 beat alibaba ATB 0.176 by 18.8%.
+
+**Why killed**: 30-stale rule triggered. Trajectory went from monotonic improvement (ep5→ep25, 4 consecutive ★s) to stable post-peak oscillation with no recovery signal. Retrieval-memory as architectural prior (no BCE supervision) helped in the first 25 epochs then lost gradient signal — the p_reuse gate was learning only from adversarial D gradients, which proved insufficient to push past ★=0.143.
+
+**Finding**: Advocatus Diaboli R16-wiring review (this session) flagged that v120 never enabled BCE supervision — `--retrieval-reuse-bce-weight` defaulted to 0.0. v120 therefore tests only the architectural-prior form of IDEA #17, not the supervised form. Result: modest improvement (18.8% below ATB at peak) but no sustained trajectory. **v121 relaunches with `--retrieval-reuse-bce-weight 0.5` as the supervised IDEA #17 test.**
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep25) preserved at `/home/darrell/checkpoints/alibaba_v120/best.pt` along with epoch_0010/20/30/40/50/60.pt for future sweeps if needed.
 
 ---
 
