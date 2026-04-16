@@ -34,10 +34,10 @@ relevant.
 ## Currently Running
 
 ### tencent_v143 — Multi-scale critic + PCF (ATB recipe, seed #5)
-**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). **GAN ep31, ★ ep30 = 0.0819 (recall 0.616, MMD²=0.00504) — BEST tencent training ★ EVER on this recipe** (beats v142's 0.0856 ep45). 0 stale, strongly improving. W stable 1.87–2.28, below stop. ★ history this run: ep5=0.155, ep10=0.110, ep15=0.106, ep30=**0.0819**.
+**Recipe**: Identical to v136/v137/v138/v142. Fifth seed to harden frozen-bundle ATB. v136 frozen=0.178, v141(continuity)=0.186, v142 frozen=0.1795 (1-seed). **GAN ep44, ★ ep35 = 0.07681 (recall 0.656, MMD²=0.00811) — BEST tencent training ★ EVER (beats v142 0.0856 by 10%)**. 9 stale. ★ trajectory ep5=0.155 → ep10=0.110 → ep15=0.106 → ep30=0.0819 → **ep35=0.0768 ★best**. ep40 dipped to 0.0975 (recall 0.539, no ★). W rising 1.78→2.59 — watch for 3.0 stop. Will frozen-eval at ep35 once run completes.
 
 ### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
-**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). G warm-up ep60/100 (Phase 2.5 of pretrain).
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). GAN ep12, ★ ep10 = 0.1122 (recall 0.503, MMD²=0.01294). 2 stale. Early phase, healthy.
 
 ---
 
