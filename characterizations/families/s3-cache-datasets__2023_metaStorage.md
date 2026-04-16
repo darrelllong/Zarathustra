@@ -86,3 +86,18 @@
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_3.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_4.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_5.csv.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.68)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: no
+- PCF: not-primary
+- Multi-scale critic: not-primary
+- Mixed-type recovery: not-primary
+- Retrieval memory: not-primary
+- Why: formats/parsers are mixed

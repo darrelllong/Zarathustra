@@ -86,3 +86,18 @@
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/prestage-mon01.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/stage-dal09.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/syd01.parquet | parquet | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.68)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: no
+- PCF: not-primary
+- Multi-scale critic: not-primary
+- Mixed-type recovery: not-primary
+- Retrieval memory: not-primary
+- Why: no single pathological axis dominates this family

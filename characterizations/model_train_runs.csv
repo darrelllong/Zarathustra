@@ -1,0 +1,251 @@
+"run","corpus","train_log","trace_dir","files_found","sampling_mode","retrieval_memory","regime_sampler","multi_scale_critic","mixed_type_recovery","pcf","eval_points","best_train_epoch","best_train_mmd2","best_train_recall","best_train_combined","last_train_epoch","last_train_combined"
+"alibaba_v1","alibaba","train_alibaba_v1.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,8,25,0.02397,0.509,0.12217,40,0.14877
+"alibaba_v10","alibaba","train_alibaba_v10.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,13,55,0.02445,0.306,0.16325,65,0.17127
+"alibaba_v100","alibaba","train_alibaba_v100.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,20,0.01175,0.611,0.08965,40,0.10037
+"alibaba_v101","alibaba","train_alibaba_v101.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,14,45,0.0134,0.585,0.0965,70,0.10277
+"alibaba_v102","alibaba","train_alibaba_v102.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,9,10,0.0119,0.595,0.0929,45,0.10668
+"alibaba_v103","alibaba","train_alibaba_v103.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,0,NA,NA,NA,NA,NA,NA
+"alibaba_v104","alibaba","train_alibaba_v104.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,12,60,0.0099,0.624,0.0851,60,0.0851
+"alibaba_v105","alibaba","train_alibaba_v105.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,16,35,0.01056,0.634,0.08376,80,0.08471
+"alibaba_v106","alibaba","train_alibaba_v106.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,35,0.01343,0.587,0.09603,40,0.10516
+"alibaba_v107","alibaba","train_alibaba_v107.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,7,30,0.02644,0.713,0.08384,35,0.1005
+"alibaba_v108","alibaba","train_alibaba_v108.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,13,40,0.01111,0.503,0.11041,65,0.13486
+"alibaba_v109","alibaba","train_alibaba_v109.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,9,25,0.01208,0.608,0.09058,45,0.09862
+"alibaba_v11","alibaba","train_alibaba_v11.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,12,60,0.02659,0.314,0.16379,60,0.16379
+"alibaba_v110","alibaba","train_alibaba_v110.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,8,20,0.01287,0.615,0.08987,40,0.0985
+"alibaba_v111","alibaba","train_alibaba_v111.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,10,25,0.01553,0.661,0.08333,50,0.11432
+"alibaba_v112","alibaba","train_alibaba_v112.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,1,5,0.06116,0.43,0.17516,5,0.17516
+"alibaba_v113","alibaba","train_alibaba_v113.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,1,5,0.03275,0.321,0.16865,5,0.16865
+"alibaba_v114","alibaba","train_alibaba_v114.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,14,30,0.01151,0.694,0.07281,70,0.09314
+"alibaba_v115","alibaba","train_alibaba_v115.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,17,55,0.01354,0.654,0.08274,85,0.11575
+"alibaba_v116","alibaba","train_alibaba_v116.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,13,35,0.00978,0.703,0.06918,65,0.1034
+"alibaba_v117","alibaba","train_alibaba_v117.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,14,65,0.01149,0.633,0.08479,70,0.10603
+"alibaba_v118","alibaba","train_alibaba_v118.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,TRUE,FALSE,TRUE,8,30,0.01804,0.606,0.09684,40,0.1263
+"alibaba_v12","alibaba","train_alibaba_v12.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,12,60,0.01627,0.46,0.12437,60,0.12437
+"alibaba_v13","alibaba","train_alibaba_v13.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,11,25,0.03526,0.287,0.17776,55,0.20098
+"alibaba_v14_pretrain","alibaba","train_alibaba_v14_pretrain.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,TRUE,FALSE,0,NA,NA,NA,NA,NA,NA
+"alibaba_v15","alibaba","train_alibaba_v15.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,8,FALSE,FALSE,FALSE,17,60,0.04203,0.368,0.16843,85,0.20128
+"alibaba_v16","alibaba","train_alibaba_v16.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,8,FALSE,FALSE,FALSE,22,55,0.03995,0.413,0.15725,110,0.192
+"alibaba_v17","alibaba","train_alibaba_v17.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,8,FALSE,FALSE,FALSE,7,15,0.06795,0.173,0.23325,35,0.24246
+"alibaba_v18","alibaba","train_alibaba_v18.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,20,100,0.01576,0.527,0.11026,100,0.11026
+"alibaba_v19","alibaba","train_alibaba_v19.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,7,5,0.05303,0.197,0.21363,35,0.23828
+"alibaba_v2","alibaba","train_alibaba_v2.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,6,10,0.0346,0.354,0.1637,30,0.18834
+"alibaba_v20","alibaba","train_alibaba_v20.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,3,5,0.10647,0.151,0.27617,15,0.30661
+"alibaba_v21","alibaba","train_alibaba_v21.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,2,FALSE,FALSE,FALSE,14,50,0.02449,0.408,0.14289,70,0.14955
+"alibaba_v22","alibaba","train_alibaba_v22.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,125,0.01487,0.52,0.11087,200,0.11619
+"alibaba_v23","alibaba","train_alibaba_v23.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,TRUE,FALSE,FALSE,12,50,0.05611,0.287,0.19861,60,0.20812
+"alibaba_v24","alibaba","train_alibaba_v24.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,9,45,0.02488,0.391,0.14668,45,0.14668
+"alibaba_v25","alibaba","train_alibaba_v25.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,30,45,0.02312,0.513,0.12042,150,0.1394
+"alibaba_v26","alibaba","train_alibaba_v26.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,6,25,0.05907,0.305,0.19797,30,0.20374
+"alibaba_v27","alibaba","train_alibaba_v27.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,32,155,0.01408,0.584,0.09728,160,0.10256
+"alibaba_v28","alibaba","train_alibaba_v28.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,25,75,0.02345,0.586,0.10635,125,0.12794
+"alibaba_v29","alibaba","train_alibaba_v29.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,35,115,0.00964,0.548,0.10004,175,0.11046
+"alibaba_v3","alibaba","train_alibaba_v3.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,2,10,0.03632,0.152,0.20592,10,0.20592
+"alibaba_v30","alibaba","train_alibaba_v30.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,2,5,0.07884,0.233,0.23224,10,0.23693
+"alibaba_v31","alibaba","train_alibaba_v31.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,1,5,0.05221,0.185,0.21521,5,0.21521
+"alibaba_v32","alibaba","train_alibaba_v32.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,1,5,0.07175,0.207,0.23025,5,0.23025
+"alibaba_v33","alibaba","train_alibaba_v33.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,5,10,0.0371,0.407,0.1556,25,0.18639
+"alibaba_v34","alibaba","train_alibaba_v34.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,195,0.0146,0.568,0.101,200,0.11084
+"alibaba_v35","alibaba","train_alibaba_v35.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,1,5,0.03006,0.51,0.12796,5,0.12796
+"alibaba_v36","alibaba","train_alibaba_v36.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,130,0.01883,0.576,0.10373,200,0.12597
+"alibaba_v37","alibaba","train_alibaba_v37.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,36,110,0.01628,0.616,0.09318,180,0.10738
+"alibaba_v38","alibaba","train_alibaba_v38.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,2,FALSE,FALSE,FALSE,40,180,0.01185,0.592,0.09355,200,0.10112
+"alibaba_v39","alibaba","train_alibaba_v39.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,TRUE,FALSE,FALSE,27,125,0.01668,0.51,0.11468,135,0.13133
+"alibaba_v4","alibaba","train_alibaba_v4.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,5,20,0.04709,0.29,0.18909,25,0.19173
+"alibaba_v40","alibaba","train_alibaba_v40.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,130,0.0147,0.575,0.0997,200,0.11861
+"alibaba_v41","alibaba","train_alibaba_v41.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,3,15,0.0341,0.435,0.147,15,0.147
+"alibaba_v42","alibaba","train_alibaba_v42.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,38,190,0.01255,0.603,0.09195,190,0.09195
+"alibaba_v43","alibaba","train_alibaba_v43.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,165,0.01605,0.577,0.10075,200,0.11415
+"alibaba_v44","alibaba","train_alibaba_v44.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,40,130,0.01372,0.566,0.10052,200,0.15815
+"alibaba_v45","alibaba","train_alibaba_v45.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,2,FALSE,FALSE,FALSE,8,15,0.03096,0.379,0.15516,40,0.17307
+"alibaba_v46","alibaba","train_alibaba_v46.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,4,FALSE,FALSE,FALSE,40,75,0.01503,0.6,0.09513,200,0.12092
+"alibaba_v47","alibaba","train_alibaba_v47.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,8,FALSE,FALSE,FALSE,36,160,0.00966,0.56,0.09756,180,0.11383
+"alibaba_v48","alibaba","train_alibaba_v48.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,27,110,0.01407,0.553,0.10347,135,0.10826
+"alibaba_v49","alibaba","train_alibaba_v49.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,4,FALSE,FALSE,FALSE,10,10,0.04019,0.415,0.15709,50,0.17784
+"alibaba_v5","alibaba","train_alibaba_v5.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,17,50,0.01981,0.56,0.10781,85,0.14325
+"alibaba_v50","alibaba","train_alibaba_v50.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,22,85,0.02477,0.505,0.12367,110,0.12869
+"alibaba_v51","alibaba","train_alibaba_v51.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,32,155,0.00704,0.679,0.07124,160,0.10911
+"alibaba_v52","alibaba","train_alibaba_v52.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,17,80,0.03008,0.491,0.13188,85,0.14225
+"alibaba_v53","alibaba","train_alibaba_v53.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,35,140,0.01474,0.632,0.08834,175,0.0938
+"alibaba_v54","alibaba","train_alibaba_v54.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,5,20,0.05421,0.341,0.18611,25,0.21668
+"alibaba_v55","alibaba","train_alibaba_v55.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,40,145,0.0101,0.617,0.0868,200,0.10433
+"alibaba_v56","alibaba","train_alibaba_v56.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,7,15,0.03675,0.469,0.14295,35,0.18141
+"alibaba_v57","alibaba","train_alibaba_v57.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,40,195,0.00907,0.61,0.08707,200,0.08974
+"alibaba_v58","alibaba","train_alibaba_v58.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,6,FALSE,FALSE,FALSE,17,20,0.01791,0.442,0.12961,85,0.15555
+"alibaba_v59","alibaba","train_alibaba_v59.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,40,105,0.01353,0.578,0.09793,200,0.11769
+"alibaba_v6","alibaba","train_alibaba_v6.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,6,75,0.01832,0.452,0.12802,80,0.16999
+"alibaba_v60","alibaba","train_alibaba_v60.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,40,135,0.00842,0.578,0.09282,200,0.098
+"alibaba_v61","alibaba","train_alibaba_v61.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,0,NA,NA,NA,NA,NA,NA
+"alibaba_v62","alibaba","train_alibaba_v62.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,37,155,0.01127,0.546,0.10207,185,0.12601
+"alibaba_v63","alibaba","train_alibaba_v63.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,29,70,0.01871,0.496,0.11951,145,0.12768
+"alibaba_v64","alibaba","train_alibaba_v64.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,20,90,0.02104,0.569,0.10734,100,0.12018
+"alibaba_v65","alibaba","train_alibaba_v65.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,36,180,0.0176,0.538,0.11,180,0.11
+"alibaba_v66","alibaba","train_alibaba_v66.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,17,80,0.05107,0.339,0.18337,85,0.18585
+"alibaba_v67","alibaba","train_alibaba_v67.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,12,35,0.03446,0.35,0.16446,60,0.17936
+"alibaba_v68","alibaba","train_alibaba_v68.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,23,65,0.0179,0.526,0.1127,115,0.14888
+"alibaba_v69","alibaba","train_alibaba_v69.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,13,40,0.02047,0.432,0.13407,65,0.18075
+"alibaba_v7","alibaba","train_alibaba_v7.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,4,20,0.04647,0.18,0.21037,20,0.21037
+"alibaba_v70","alibaba","train_alibaba_v70.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,FALSE,27,65,0.01441,0.522,0.11001,135,0.14113
+"alibaba_v71","alibaba","train_alibaba_v71.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,12,60,0.01851,0.603,0.09791,60,0.09791
+"alibaba_v72","alibaba","train_alibaba_v72.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,24,90,0.01692,0.584,0.10022,120,0.13417
+"alibaba_v73","alibaba","train_alibaba_v73.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,14,65,0.01846,0.517,0.11496,70,0.12203
+"alibaba_v74","alibaba","train_alibaba_v74.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,14,55,0.02706,0.473,0.13236,70,0.13254
+"alibaba_v75","alibaba","train_alibaba_v75.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,15,0.03084,0.431,0.14464,40,0.16371
+"alibaba_v76","alibaba","train_alibaba_v76.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,19,95,0.01953,0.495,0.12043,95,0.12043
+"alibaba_v77","alibaba","train_alibaba_v77.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,TRUE,TRUE,15,65,0.01221,0.558,0.10051,75,0.10428
+"alibaba_v78","alibaba","train_alibaba_v78.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,15,25,0.0091,0.549,0.0993,75,0.14604
+"alibaba_v79","alibaba","train_alibaba_v79.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,7,5,0.01147,0.663,0.07887,35,0.09199
+"alibaba_v8","alibaba","train_alibaba_v8.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,5,15,0.19076,0.001,0.39066,25,0.46856
+"alibaba_v80","alibaba","train_alibaba_v80.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,7,15,0.02748,0.594,0.10878,35,0.13454
+"alibaba_v81","alibaba","train_alibaba_v81.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,9,40,0.03195,0.562,0.11945,45,0.13777
+"alibaba_v82","alibaba","train_alibaba_v82.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,10,25,0.02604,0.587,0.10874,50,0.13091
+"alibaba_v83","alibaba","train_alibaba_v83.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,11,10,0.01199,0.619,0.08829,55,0.09072
+"alibaba_v84","alibaba","train_alibaba_v84.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,15,0.01681,0.624,0.09201,40,0.11059
+"alibaba_v85","alibaba","train_alibaba_v85.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,12,60,0.00693,0.581,0.09083,60,0.09083
+"alibaba_v86","alibaba","train_alibaba_v86.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,10,30,0.00775,0.607,0.08635,50,0.13253
+"alibaba_v87","alibaba","train_alibaba_v87.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,7,20,0.01301,0.681,0.07681,35,0.11718
+"alibaba_v88","alibaba","train_alibaba_v88.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,11,45,0.01008,0.648,0.08048,55,0.08883
+"alibaba_v89","alibaba","train_alibaba_v89.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,0,NA,NA,NA,NA,NA,NA
+"alibaba_v9","alibaba","train_alibaba_v9.log","/tiamat/zarathustra/traces/alibaba",239,"random",FALSE,0,FALSE,FALSE,FALSE,6,5,0.04935,0.117,0.22605,30,0.26598
+"alibaba_v90","alibaba","train_alibaba_v90.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,2,10,0.30645,0,0.50645,10,0.50645
+"alibaba_v91","alibaba","train_alibaba_v91.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,25,0.01582,0.648,0.08612,40,0.11673
+"alibaba_v92","alibaba","train_alibaba_v92.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,1,5,0.05174,0.472,0.15724,5,0.15724
+"alibaba_v93","alibaba","train_alibaba_v93.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,8,25,0.01516,0.626,0.08986,40,0.1055
+"alibaba_v94","alibaba","train_alibaba_v94.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,5,10,0.01471,0.495,0.11561,25,0.12192
+"alibaba_v95","alibaba","train_alibaba_v95.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,5,5,0.00956,0.533,0.10296,25,0.11411
+"alibaba_v96","alibaba","train_alibaba_v96.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,6,15,0.01242,0.575,0.09742,30,0.10414
+"alibaba_v97","alibaba","train_alibaba_v97.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,11,30,0.01102,0.613,0.08842,55,0.1171
+"alibaba_v98","alibaba","train_alibaba_v98.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,12,30,0.01492,0.631,0.08862,60,0.09885
+"alibaba_v99","alibaba","train_alibaba_v99.log","/tiamat/zarathustra/traces/alibaba",239,"block sampling",FALSE,4,FALSE,FALSE,TRUE,7,25,0.01956,0.556,0.10836,35,0.13479
+"tencent_v100","tencent","train_tencent_v100.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,15,25,0.00984,0.524,0.10494,75,0.11348
+"tencent_v101","tencent","train_tencent_v101.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,16,40,0.00942,0.571,0.09522,80,0.11429
+"tencent_v102","tencent","train_tencent_v102.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,11,30,0.00935,0.553,0.09875,55,0.09912
+"tencent_v103","tencent","train_tencent_v103.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,11,30,0.00778,0.579,0.09198,55,0.09202
+"tencent_v104","tencent","train_tencent_v104.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,11,45,0.01025,0.597,0.09095,55,0.10138
+"tencent_v105","tencent","train_tencent_v105.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,12,60,0.01107,0.567,0.09767,60,0.09767
+"tencent_v106","tencent","train_tencent_v106.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,7,10,0.01358,0.451,0.12338,35,0.124
+"tencent_v107","tencent","train_tencent_v107.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,10,25,0.01402,0.395,0.13502,50,0.16048
+"tencent_v108","tencent","train_tencent_v108.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,14,45,0.00936,0.42,0.12526,70,0.13368
+"tencent_v109","tencent","train_tencent_v109.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,9,15,0.01015,0.404,0.12935,45,0.14593
+"tencent_v110","tencent","train_tencent_v110.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,8,20,0.01984,0.413,0.13724,40,0.15485
+"tencent_v111","tencent","train_tencent_v111.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,7,15,0.01866,0.244,0.16986,35,0.17057
+"tencent_v112","tencent","train_tencent_v112.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,7,15,0.0132,0.391,0.1351,35,0.16833
+"tencent_v113","tencent","train_tencent_v113.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,0,NA,NA,NA,NA,NA,NA
+"tencent_v114","tencent","train_tencent_v114.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,9,25,0.0106,0.425,0.1255,45,0.13459
+"tencent_v115","tencent","train_tencent_v115.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,7,20,0.01217,0.505,0.11117,35,0.13697
+"tencent_v116","tencent","train_tencent_v116.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,6,15,0.01638,0.482,0.11988,30,0.14647
+"tencent_v117","tencent","train_tencent_v117.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,7,25,0.00953,0.503,0.10893,35,0.11423
+"tencent_v118","tencent","train_tencent_v118.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,1,5,0.02041,0.387,0.14311,5,0.14311
+"tencent_v119","tencent","train_tencent_v119.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,0,NA,NA,NA,NA,NA,NA
+"tencent_v120","tencent","train_tencent_v120.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,10,40,0.00983,0.551,0.09963,50,0.11043
+"tencent_v121","tencent","train_tencent_v121.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,8,25,0.01236,0.506,0.11106,40,0.12357
+"tencent_v122","tencent","train_tencent_v122.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,1,5,0.04784,0.266,0.19474,5,0.19474
+"tencent_v123","tencent","train_tencent_v123.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,9,30,0.0242,0.443,0.1356,45,0.17415
+"tencent_v124","tencent","train_tencent_v124.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,9,35,0.01182,0.49,0.11372,45,0.15503
+"tencent_v125","tencent","train_tencent_v125.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,6,10,0.01164,0.481,0.11534,30,0.14454
+"tencent_v126","tencent","train_tencent_v126.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,9,45,0.01429,0.48,0.11829,45,0.11829
+"tencent_v127","tencent","train_tencent_v127.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,10,35,0.00665,0.533,0.10005,50,0.11669
+"tencent_v128","tencent","train_tencent_v128.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,5,15,0.01235,0.308,0.15075,25,0.16224
+"tencent_v129","tencent","train_tencent_v129.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,13,50,0.01995,0.43,0.13395,65,0.14832
+"tencent_v130","tencent","train_tencent_v130.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,12,10,0.02082,0.495,0.12182,60,0.17528
+"tencent_v131","tencent","train_tencent_v131.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,4,10,0.01292,0.48,0.11692,20,0.12401
+"tencent_v132","tencent","train_tencent_v132.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,6,20,0.01044,0.575,0.09544,30,0.1113
+"tencent_v133","tencent","train_tencent_v133.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,18,85,0.0111,0.533,0.1044,90,0.12095
+"tencent_v134","tencent","train_tencent_v134.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,10,20,0.00844,0.629,0.08254,50,0.09844
+"tencent_v135","tencent","train_tencent_v135.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,TRUE,TRUE,5,15,0.01366,0.445,0.12466,25,0.14009
+"tencent_v136","tencent","train_tencent_v136.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,10,25,0.01189,0.694,0.07319,50,0.10072
+"tencent_v137","tencent","train_tencent_v137.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,10,35,0.00771,0.628,0.08201,50,0.08727
+"tencent_v138","tencent","train_tencent_v138.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,9,20,0.00748,0.59,0.08958,45,0.09344
+"tencent_v139","tencent","train_tencent_v139.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,1,5,0.03599,0.192,0.19759,5,0.19759
+"tencent_v140","tencent","train_tencent_v140.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,0,NA,NA,NA,NA,NA,NA
+"tencent_v141","tencent","train_tencent_v141.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,10,20,0.00948,0.592,0.09108,50,0.11712
+"tencent_v142","tencent","train_tencent_v142.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,15,45,0.0065,0.605,0.0856,75,0.09841
+"tencent_v143","tencent","train_tencent_v143.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,TRUE,TRUE,TRUE,13,35,0.00811,0.656,0.07681,65,0.08671
+"tencent_v144","tencent","train_tencent_v144.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",TRUE,8,TRUE,TRUE,TRUE,5,15,0.00811,0.631,0.08191,25,0.09802
+"tencent_v55","tencent","train_tencent_v55.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,1,5,0.04338,0.386,0.16618,5,0.16618
+"tencent_v56","tencent","train_tencent_v56.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,18,40,0.02372,0.362,0.15122,90,0.16706
+"tencent_v57","tencent","train_tencent_v57.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,22,110,0.01968,0.558,0.10808,110,0.10808
+"tencent_v58","tencent","train_tencent_v58.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,2,FALSE,FALSE,FALSE,14,50,0.05369,0.293,0.19509,70,0.21591
+"tencent_v59","tencent","train_tencent_v59.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,14,25,0.02422,0.307,0.16272,70,0.21044
+"tencent_v60","tencent","train_tencent_v60.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,26,115,0.01314,0.472,0.11874,130,0.13453
+"tencent_v61","tencent","train_tencent_v61.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,28,120,0.01805,0.422,0.13365,200,0.16342
+"tencent_v62","tencent","train_tencent_v62.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,12,60,0.02214,0.505,0.12104,60,0.12104
+"tencent_v63","tencent","train_tencent_v63.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,175,0.00671,0.518,0.10301,200,0.1101
+"tencent_v64","tencent","train_tencent_v64.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,36,150,0.00721,0.543,0.09861,180,0.12963
+"tencent_v65","tencent","train_tencent_v65.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,195,0.00711,0.548,0.09741,200,0.10389
+"tencent_v66","tencent","train_tencent_v66.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,185,0.00688,0.651,0.07658,200,0.09439
+"tencent_v67","tencent","train_tencent_v67.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,65,0.00937,0.518,0.10567,200,0.11502
+"tencent_v68","tencent","train_tencent_v68.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,29,70,0.02055,0.592,0.10215,145,0.10839
+"tencent_v69","tencent","train_tencent_v69.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,60,0.01259,0.531,0.10629,200,0.11422
+"tencent_v70","tencent","train_tencent_v70.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,TRUE,FALSE,FALSE,14,70,0.00974,0.537,0.10224,70,0.10224
+"tencent_v71","tencent","train_tencent_v71.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,1,5,0.04208,0.387,0.16478,5,0.16478
+"tencent_v72","tencent","train_tencent_v72.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,1,5,0.06399,0.354,0.19309,5,0.19309
+"tencent_v73","tencent","train_tencent_v73.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,26,90,0.01289,0.444,0.12419,130,0.16611
+"tencent_v74","tencent","train_tencent_v74.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,195,0.00466,0.7,0.06476,200,0.08624
+"tencent_v75","tencent","train_tencent_v75.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,200,0.0077,0.583,0.0912,200,0.0912
+"tencent_v76","tencent","train_tencent_v76.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,200,0.01053,0.571,0.09633,200,0.09633
+"tencent_v77","tencent","train_tencent_v77.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,40,125,0.00846,0.544,0.09956,200,0.11388
+"tencent_v78","tencent","train_tencent_v78.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,39,110,0.00645,0.615,0.08355,195,0.10978
+"tencent_v79","tencent","train_tencent_v79.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,22,80,0.01201,0.477,0.11661,110,0.121
+"tencent_v80","tencent","train_tencent_v80.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,19,50,0.01285,0.445,0.12385,95,0.13674
+"tencent_v81","tencent","train_tencent_v81.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,17,60,0.00812,0.524,0.10332,85,0.19121
+"tencent_v82","tencent","train_tencent_v82.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,200,0.0061,0.621,0.082,200,0.082
+"tencent_v83","tencent","train_tencent_v83.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,23,115,0.01238,0.48,0.11628,115,0.11628
+"tencent_v84","tencent","train_tencent_v84.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,22,80,0.01038,0.524,0.10548,110,0.11977
+"tencent_v85","tencent","train_tencent_v85.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,155,0.00919,0.568,0.09569,200,0.13387
+"tencent_v86","tencent","train_tencent_v86.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,170,0.01262,0.548,0.10302,200,0.11799
+"tencent_v87","tencent","train_tencent_v87.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,15,40,0.02601,0.457,0.13461,75,0.1568
+"tencent_v88","tencent","train_tencent_v88.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,36,125,0.01387,0.532,0.10737,180,0.12934
+"tencent_v89","tencent","train_tencent_v89.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,13,25,0.02592,0.454,0.13522,65,0.16253
+"tencent_v90","tencent","train_tencent_v90.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,95,0.01598,0.53,0.10998,200,0.11341
+"tencent_v91","tencent","train_tencent_v91.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,6,25,0.03839,0.336,0.17129,30,0.17998
+"tencent_v92","tencent","train_tencent_v92.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,24,70,0.01936,0.41,0.13726,120,0.14691
+"tencent_v93","tencent","train_tencent_v93.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,185,0.01194,0.517,0.10854,200,0.11712
+"tencent_v94","tencent","train_tencent_v94.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,22,110,0.01901,0.415,0.13591,110,0.13591
+"tencent_v95","tencent","train_tencent_v95.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,14,20,0.0224,0.447,0.133,70,0.13928
+"tencent_v96","tencent","train_tencent_v96.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,40,115,0.01826,0.497,0.11876,200,0.13259
+"tencent_v97","tencent","train_tencent_v97.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,20,60,0.02556,0.41,0.14346,100,0.14984
+"tencent_v98_resumed","tencent","train_tencent_v98_resumed.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,28,165,0.01292,0.407,0.13152,200,0.15176
+"tencent_v98","tencent","train_tencent_v98.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,FALSE,13,60,0.01773,0.327,0.15243,65,0.16296
+"tencent_v99","tencent","train_tencent_v99.log","/home/darrell/traces/tencent_block_1M",3234,"block sampling",FALSE,8,FALSE,FALSE,TRUE,19,60,0.01301,0.588,0.09541,95,0.10729
+"v15","other","train_v15.log","/home/darrell/traces/tencent_block_1M",2234,"random",FALSE,0,FALSE,FALSE,FALSE,29,100,0.02909,0.294,0.17029,145,0.18759
+"v16","other","train_v16.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,30,130,0.0536,0.117,0.2303,150,0.27621
+"v17","other","train_v17.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,190,0.00701,0.466,0.11391,200,0.13428
+"v18","other","train_v18.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,50,205,0.0116,0.478,0.1159,250,0.13443
+"v19","other","train_v19.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,50,225,0.00945,0.367,0.17745,250,0.19945
+"v20","other","train_v20.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,60,210,0.00755,0.549,0.13095,300,0.15038
+"v21","other","train_v21.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,47,35,0.02163,0.334,0.18827,235,0.20542
+"v22","other","train_v22.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,190,0.01059,0.45,0.15446,200,0.21635
+"v23","other","train_v23.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,39,165,0.0137,0.379,0.16924,195,0.21535
+"v24","other","train_v24.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,22,170,0.0065,0.545,0.0974,200,0.11145
+"v25","other","train_v25.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,14,50,0.02425,0.278,0.16875,70,0.18694
+"v26","other","train_v26.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,190,0.01255,0.521,0.10835,200,0.12123
+"v27","other","train_v27.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,7,20,0.05484,0.172,0.22054,35,0.24382
+"v28","other","train_v28.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,22,70,0.01183,0.508,0.11023,110,0.30419
+"v29","other","train_v29.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,19,20,0.00971,0.674,0.07491,95,0.20559
+"v30","other","train_v30.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,10,25,0.01386,0.37,0.13986,50,0.14824
+"v31","other","train_v31.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,70,0.01167,0.591,0.09357,200,0.14161
+"v32","other","train_v32.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,28,110,0.00666,0.594,0.08786,140,0.13144
+"v33","other","train_v33.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,70,0.01551,0.683,0.07881,200,0.31369
+"v34","other","train_v34.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,150,0.01071,0.619,0.08701,200,0.10863
+"v35","other","train_v35.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,65,0.0133,0.609,0.0915,200,0.12073
+"v36","other","train_v36.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,100,0.00956,0.613,0.08696,200,0.23239
+"v37","other","train_v37.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,15,60,0.00756,0.577,0.09226,75,0.11546
+"v38","other","train_v38.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,1,5,0.04632,0.29,0.18832,5,0.18832
+"v39","other","train_v39.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,6,25,0.04161,0.218,0.19791,30,0.22061
+"v40","other","train_v40.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,12,30,0.02006,0.402,0.13976,60,0.15544
+"v41","other","train_v41.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,10,35,0.01718,0.406,0.13608,50,0.2242
+"v42","other","train_v42.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,5,5,0.0324,0.291,0.1741,25,0.18429
+"v43","other","train_v43.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,20,75,0.01191,0.476,0.11671,100,0.12171
+"v44","other","train_v44.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,40,160,0.01213,0.444,0.12343,200,0.14086
+"v45","other","train_v45.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,26,120,0.01632,0.483,0.11962,130,0.12895
+"v46","other","train_v46.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,19,90,0.01737,0.463,0.12477,95,0.13944
+"v47","other","train_v47.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,13,65,0.02583,0.385,0.14893,65,0.14893
+"v48","other","train_v48.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,11,20,0.02284,0.309,0.16104,55,0.17513
+"v49","other","train_v49.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,7,10,0.0262,0.37,0.1522,35,0.20124
+"v50","other","train_v50.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,7,15,0.04745,0.31,0.18545,35,0.19812
+"v51","other","train_v51.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,5,5,0.0293,0.426,0.1441,25,0.15538
+"v52","other","train_v52.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,FALSE,FALSE,9,20,0.02046,0.383,0.14396,45,0.15395
+"v53_pretrain","other","train_v53_pretrain.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,TRUE,FALSE,0,NA,NA,NA,NA,NA,NA
+"v53","other","train_v53.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,0,FALSE,TRUE,FALSE,4,20,0.02162,0.237,0.17412,20,0.17412
+"v54","other","train_v54.log","/home/darrell/traces/tencent_block_1M",3234,"random",FALSE,8,FALSE,FALSE,FALSE,22,75,0.01792,0.55,0.10792,110,0.13772

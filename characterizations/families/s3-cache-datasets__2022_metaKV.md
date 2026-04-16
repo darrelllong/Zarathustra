@@ -59,12 +59,12 @@
 | 4 | 2404647468314093568 | 0.807 |
 | 5 | 1523060352168586752 | 0.806 |
 | 6 | 1509158103059552256 | 0.716 |
-| 7 | 613253242332020480 | 0.678 |
-| 8 | 269895456856252288 | 0.64 |
-| 9 | 255491885062816896 | 0.595 |
+| 7 | 626772848742221312 | 0.657 |
+| 8 | 256375850446051520 | 0.66 |
+| 9 | 611159267163318272 | 0.675 |
 | 10 | 254846892040225408 | 0.495 |
-| 11 | 253955027678082080 | 0.538 |
-| 12 | 253776988310089120 | 0.562 |
+| 11 | 1750420373533485 | 0.636 |
+| 12 | 254342005072965312 | 0.4 |
 
 ## Strongest Correlations
 
@@ -142,3 +142,19 @@
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202206_kv_traces_all.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202210_kv_traces_all_sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 37.034)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: reuse/locality is not negligible; burstiness is materially above the calmer families; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

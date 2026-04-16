@@ -86,3 +86,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2018_tencentPhoto/tencent_photo2.oracleGeneral.zst | oracle_general | 0 | 0.009 | 28.601 | 5 |
 | s3-cache-datasets/cache_dataset_txt/2018_tencentPhoto/tencentPhoto1.sort.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2018_tencentPhoto/tencentPhoto2.sort.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.524)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

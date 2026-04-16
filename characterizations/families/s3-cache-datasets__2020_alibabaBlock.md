@@ -51,7 +51,7 @@
 | Ordered PC1 changepoints | 21 |
 | PCA variance explained by PC1 | 0.219 |
 | Hurst exponent on ordered PC1 | 0.978 |
-| Block/random distance ratio | 0.521 |
+| Block/random distance ratio | 0.556 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
@@ -172,3 +172,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/100K/alibabaBlock_831.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/100K/alibabaBlock_838.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/100K/alibabaBlock_839.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: alibaba (distance 0.539)
+- Sampling: split-by-format-first
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: promising
+- Multi-scale critic: promising
+- Mixed-type recovery: mixed
+- Retrieval memory: unknown
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

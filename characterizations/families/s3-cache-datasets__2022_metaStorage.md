@@ -110,3 +110,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_5.oracleGeneral.bin.zst | oracle_general | 0 | 0.242 | 7.272 | 76 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_4.oracleGeneral.bin.zst | oracle_general | 0 | 0.225 | 7.224 | 77 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaStorage/block_traces_3.oracleGeneral.bin.zst | oracle_general | 0 | 0.263 | 7.221 | 79 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 250.486)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: reuse/locality is not negligible; burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

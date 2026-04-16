@@ -47,28 +47,28 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | DBSCAN clusters | 5 |
-| DBSCAN noise fraction | 0.078 |
+| DBSCAN noise fraction | 0.076 |
 | Ordered PC1 changepoints | 23 |
 | PCA variance explained by PC1 | 0.213 |
 | Hurst exponent on ordered PC1 | 0.792 |
-| Block/random distance ratio | 0.694 |
+| Block/random distance ratio | 0.615 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 29411196477719631060008960 | 0.94 |
-| 3 | 18186204651239461695258624 | 0.846 |
-| 4 | 13732868104073988358012928 | 0.499 |
-| 5 | 12108415229834564890263552 | 0.504 |
-| 6 | 8862879306843843559686144 | 0.479 |
-| 7 | 7595940575834472116649984 | 0.483 |
-| 8 | 7390846807947293004660736 | 0.496 |
-| 9 | 5661895870982251884838912 | 0.499 |
-| 10 | 5337891443868216059756544 | 0.464 |
-| 11 | 5254519393605403151433728 | 0.4 |
-| 12 | 5155126932747642308919296 | 0.435 |
+| 2 | 37088965710773430085746688 | 0.91 |
+| 3 | 23026187318546070599892992 | 0.884 |
+| 4 | 13944683680108564390608896 | 0.859 |
+| 5 | 11313146636521699194961920 | 0.503 |
+| 6 | 10121161864929031902724096 | 0.504 |
+| 7 | 9743688138637375375933440 | 0.471 |
+| 8 | 7891928727637300265091072 | 0.478 |
+| 9 | 7787775750266413429817344 | 0.433 |
+| 10 | 7508922458803506411208704 | 0.396 |
+| 11 | 7671763868706897854988288 | 0.426 |
+| 12 | 6007281203405707936792576 | 0.441 |
 
 ## Regime Transition Drivers
 
@@ -174,3 +174,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_25621.oracleGeneral.zst | oracle_general | 0 | 0.021 | 42.146 | 61 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_25467.oracleGeneral.zst | oracle_general | 0 | 0.083 | 41.654 | 172841 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_25585.oracleGeneral.zst | oracle_general | 0 | 0.041 | 40.796 | 60 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: alibaba (distance 0.553)
+- Sampling: split-by-format-first
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: promising
+- Multi-scale critic: promising
+- Mixed-type recovery: mixed
+- Retrieval memory: unknown
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

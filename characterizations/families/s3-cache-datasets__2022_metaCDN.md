@@ -81,3 +81,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaCDN/meta_rprn.oracleGeneral.zst | oracle_general | 0 | 0.066 | 28.338 | 101 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaCDN/meta_reag.oracleGeneral.zst | oracle_general | 0 | 0.169 | 26.064 | 145 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaCDN/meta_rnha.oracleGeneral.zst | oracle_general | 0 | 0.084 | 8.905 | 51 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 7.353)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

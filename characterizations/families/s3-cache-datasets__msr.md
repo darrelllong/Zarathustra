@@ -48,7 +48,7 @@
 | Ordered PC1 changepoints | 5 |
 | PCA variance explained by PC1 | 0.369 |
 | Hurst exponent on ordered PC1 | 0.543 |
-| Block/random distance ratio | 1.134 |
+| Block/random distance ratio | 1.131 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
@@ -56,16 +56,16 @@
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
 | 2 | 735142116474531584 | 0.892 |
-| 3 | 385853306064195904 | 0.823 |
+| 3 | 385740882566079040 | 0.841 |
 | 4 | 263979881798210144 | 0.687 |
 | 5 | 254384194195490912 | 0.454 |
-| 6 | 67692631425003728 | 0.466 |
-| 7 | 63923950052348432 | 0.391 |
-| 8 | 45875923665502288 | 0.492 |
+| 6 | 238295237804183968 | 0.472 |
+| 7 | 232679909934106368 | 0.495 |
+| 8 | 47743821982717160 | 0.453 |
 | 9 | 44496907444467160 | 0.451 |
-| 10 | 43318594600786912 | 0.448 |
-| 11 | 40462105047630216 | 0.433 |
-| 12 | 6916243222411154 | 0.462 |
+| 10 | 43689787694926664 | 0.426 |
+| 11 | 7654132004679103 | 0.408 |
+| 12 | 39908775803439288 | 0.429 |
 
 ## Regime Transition Drivers
 
@@ -153,3 +153,19 @@
 | s3-cache-datasets/cache_dataset_lcs/msr/src1_0.csv.lcs.zst | lcs | 0.821 | 0 | 38.673 | 8036 |
 | s3-cache-datasets/cache_dataset_lcs/msr/mds_1.csv.lcs.zst | lcs | 0.124 | 0 | 37.962 | 1296 |
 | s3-cache-datasets/cache_dataset_lcs/msr/prxy_1.csv.lcs.zst | lcs | 0.404 | 0.009 | 36.932 | 3 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 0.827)
+- Sampling: random-ok
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: family looks multi-regime or high-heterogeneity; burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr

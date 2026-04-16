@@ -53,7 +53,7 @@
 | Ordered PC1 changepoints | 5 |
 | PCA variance explained by PC1 | 0.301 |
 | Hurst exponent on ordered PC1 | 0.754 |
-| Block/random distance ratio | 0.796 |
+| Block/random distance ratio | 0.794 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
@@ -64,13 +64,13 @@
 | 3 | 230661324012885212000584779795498270720 | 0.654 |
 | 4 | 159424726336036321898670417895101562880 | 0.544 |
 | 5 | 129418390509840183833688668006091063296 | 0.481 |
-| 6 | 98627952872992457686281104823114792960 | 0.549 |
-| 7 | 94923206264952209068403969167630270464 | 0.477 |
-| 8 | 68389440741088705290761486051114483712 | 0.464 |
-| 9 | 86756845455010307626549531242154426368 | 0.253 |
-| 10 | 77046349388830155182197475330628780032 | 0.286 |
-| 11 | 73748398385013079408522047003912306688 | 0.273 |
-| 12 | 51178017838513009708017277652348960768 | 0.267 |
+| 6 | 96330114261316736338069391609824280576 | 0.511 |
+| 7 | 92277820610406880584171293018360381440 | 0.296 |
+| 8 | 89477445437924821696656377593397772288 | 0.277 |
+| 9 | 86029369060538569910045291925571895296 | 0.274 |
+| 10 | 79840180815364962358868565776576544768 | 0.277 |
+| 11 | 77930603940891037139352572967488847872 | 0.228 |
+| 12 | 47086406154802371517816543006917918720 | 0.26 |
 
 ## Regime Transition Drivers
 
@@ -158,3 +158,19 @@
 | s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/cluster21.oracleGeneral.zst | oracle_general | 0 | 0 | 63.984 | 1 |
 | s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/cluster23.oracleGeneral.zst | oracle_general | 0 | 0.027 | 63.984 | 1 |
 | s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/cluster25.oracleGeneral.zst | oracle_general | 0 | 0.22 | 63.984 | 1 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.582)
+- Sampling: split-by-format-first
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; burstiness is materially above the calmer families; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

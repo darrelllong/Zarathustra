@@ -118,3 +118,19 @@
 | s3-cache-datasets/cache_dataset_lcs/metaKV/202210_kv_traces_all_sort.csv.lcs.sample0.01.zst | lcs | 0.125 | 0.507 | 4.479 | 204 |
 | s3-cache-datasets/cache_dataset_lcs/metaKV/202206_kv_traces_all.csv.lcs.sample0.01.zst | lcs | 0.093 | 0.694 | N/A | 0 |
 | s3-cache-datasets/cache_dataset_lcs/metaKV/202206_kv_traces_all.csv.lcs.sample0.1.zst | lcs | 0.066 | 0.73 | N/A | 0 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 31.234)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: reuse/locality is not negligible; burstiness is materially above the calmer families
+- Candidate conditioning additions: signed_stride_lag1_autocorr,obj_size_std

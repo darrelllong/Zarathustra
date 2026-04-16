@@ -17,7 +17,6 @@
 
 - High cross-file heterogeneity; favor regime conditioning or multiple family-specific GAN runs over a single unconditional model.
 - Ordered PC1 changepoints suggest 666 regimes when files are ordered by trace start time.
-- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Strongest feature coupling in this pass: disk_usage_mean vs disk_usage_q50 (corr=0.99).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
 
@@ -41,29 +40,29 @@
 |---|---|
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
-| DBSCAN clusters | 3 |
-| DBSCAN noise fraction | 0.075 |
+| DBSCAN clusters | 4 |
+| DBSCAN noise fraction | 0.069 |
 | Ordered PC1 changepoints | 665 |
 | PCA variance explained by PC1 | 0.343 |
 | Hurst exponent on ordered PC1 | 0.5 |
-| Block/random distance ratio | 0.768 |
-| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+| Block/random distance ratio | 0.899 |
+| Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 157570723830562 | 0.963 |
-| 3 | 45380343534160 | 0.57 |
-| 4 | 144158071781173 | 0.572 |
-| 5 | 31772892421037 | 0.545 |
-| 6 | 28983023914162 | 0.547 |
-| 7 | 19753484932524 | 0.389 |
-| 8 | 14462288465316 | 0.42 |
-| 9 | 13516940659475 | 0.503 |
-| 10 | 10790480398630 | 0.43 |
-| 11 | 10061529655761 | 0.434 |
-| 12 | 9144354114822 | 0.412 |
+| 2 | 147653035443648 | 0.989 |
+| 3 | 137693618579900 | 0.953 |
+| 4 | 133518188766394 | 0.547 |
+| 5 | 129695423268484 | 0.523 |
+| 6 | 18630991471181 | 0.535 |
+| 7 | 13271660964015 | 0.519 |
+| 8 | 11835303531926 | 0.55 |
+| 9 | 10956997592229 | 0.523 |
+| 10 | 9855285008859 | 0.517 |
+| 11 | 9198232839002 | 0.439 |
+| 12 | 8752816940199 | 0.427 |
 
 ## Regime Transition Drivers
 
@@ -796,3 +795,18 @@
 | tencent/Cloud_Disk_dataset/disk_load_data/001f1661-72fe-4800-a06a-4b17723ffc03 | tencent_cloud_disk | N/A | N/A | N/A | 1228500 |
 | tencent/Cloud_Disk_dataset/disk_load_data/001f31fe-e8fd-4fba-86b4-5a0f78be94a0 | tencent_cloud_disk | N/A | N/A | N/A | 1228500 |
 | tencent/Cloud_Disk_dataset/disk_load_data/00223656-80e7-48b6-a12e-a0ec751464b8 | tencent_cloud_disk | N/A | N/A | N/A | 1228500 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: alibaba (distance 4.56)
+- Sampling: random-ok
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: promising
+- Multi-scale critic: promising
+- Mixed-type recovery: not-primary
+- Retrieval memory: not-primary
+- Why: family looks multi-regime or high-heterogeneity

@@ -49,24 +49,24 @@
 | Ordered PC1 changepoints | 21 |
 | PCA variance explained by PC1 | 0.219 |
 | Hurst exponent on ordered PC1 | 0.979 |
-| Block/random distance ratio | 0.503 |
+| Block/random distance ratio | 0.537 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 17366892647652245882535936 | 0.881 |
+| 2 | 17360793461069954276130816 | 0.883 |
 | 3 | 9438996643215217885446144 | 0.797 |
 | 4 | 5420951043535495896236032 | 0.78 |
-| 5 | 4968278502014545093984256 | 0.721 |
+| 5 | 4135037713399320680595456 | 0.775 |
 | 6 | 4225221846738098855084032 | 0.695 |
-| 7 | 3289002128413959020085248 | 0.668 |
+| 7 | 3289008419059508355006464 | 0.666 |
 | 8 | 3152888840553245471408128 | 0.632 |
-| 9 | 2131245473685927964442624 | 0.633 |
+| 9 | 3095231218888217009848320 | 0.434 |
 | 10 | 3052330031702617618382848 | 0.437 |
 | 11 | 3016717209072445257940992 | 0.465 |
-| 12 | 2997538162872244693368832 | 0.4 |
+| 12 | 2980016134260502841786368 | 0.462 |
 
 ## Regime Transition Drivers
 
@@ -170,3 +170,19 @@
 | alibaba/100K/alibabaBlock_831.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
 | alibaba/100K/alibabaBlock_838.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
 | alibaba/100K/alibabaBlock_839.oracleGeneral.zst | oracle_general | 0 | 0.001 | 45.238 | 2 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: alibaba (distance 0)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: promising
+- Multi-scale critic: promising
+- Mixed-type recovery: mixed
+- Retrieval memory: unknown
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

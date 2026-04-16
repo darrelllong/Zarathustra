@@ -111,3 +111,19 @@
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN1.csv.sort.zst | text_zst | 0.642 | 0 | 2.702 | 38.485 |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN0.csv.sort.zst | text_zst | 0.198 | 0.001 | 1.361 | 9.233 |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN2.csv.sort.zst | text_zst | 0.181 | 0 | 1.307 | 9.109 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.208)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: no single pathological axis dominates this family
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

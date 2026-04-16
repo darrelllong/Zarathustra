@@ -36,21 +36,22 @@ relevant.
 ### tencent_v144 — **Round 16 #17: retrieval memory** (architecture-bet #1)
 **Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False. Judged on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:45):
+**Phase 3 trajectory** (snapshot 2026-04-16 09:39 PDT):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +0.39 | 0.10494 | 0.537 | ★ |
 | 10 | +0.73 | 0.08655 | 0.619 | ★ |
 | 15 | +0.95 | **0.08191** | 0.631 | ★ |
 | 20 | +0.98 | 0.09709 | 0.555 | (no new ★) |
-| 21 | +1.14 | — | — | — |
+| 25 | +1.05 | 0.09802 | 0.577 | (no new ★) |
+| 28 | +1.04 | — | — | — |
 
-`comb=0.082` at ep15 is the **best early-epoch tencent training-★ ever recorded** (21% better than v143 same-epoch). ep20 micro-regression in recall (0.631→0.555) — within noise, not yet a trend. W still stable +0.95–1.14. 6 ep stale, far from 30-stale kill. Continuing.
+★=0.08191 stands. Plateau at ~0.097 (ep20–25). W stable +0.95–1.05. 13 ep stale, 17 to kill. Better-behaved than v118 (no recall collapse), just stuck.
 
 ### alibaba_v118 — **Round 16 #21: chunk-stitching boundary smoothness** (architecture-bet #2)
 **Recipe**: v117/v114 args + `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Adds latent-space MSE between B's first-2 latents and A's last-2 latents (with exp-decay weighting) on the G update; intent is to encourage smooth chunk transitions when generate.py stitches multiple chunks. Same v48 hot-start as v117. Judged on frozen-bundle ATB (current alibaba ATB = 0.176 frozen).
 
-**Phase 3 trajectory** (snapshot 2026-04-16 09:11 PDT):
+**Phase 3 trajectory** (snapshot 2026-04-16 09:39 PDT):
 | ep | W | comb | recall | ★ |
 |---|---|---|---|---|
 | 5 | +1.09 | 0.14130 | 0.372 | ★ |
@@ -59,8 +60,10 @@ relevant.
 | 20 | +1.08 | 0.11362 | 0.550 | (no new ★) |
 | 25 | +1.42 | 0.09960 | 0.614 | ★ |
 | 30 | +1.56 | **0.09684** | 0.606 | ★ |
+| 35 | +1.73 | 0.10886 | 0.576 | (no new ★) |
+| 40 | +1.97 | 0.12630 | **0.497** | (recall dropping) |
 
-Three consecutive ★s (ep15, ep25, ep30) — the chunk-stitching recipe has broken through the ~0.111 ceiling that the v117 base recipe stalled at. ★ has improved **13% in 15 epochs** (0.111 → 0.0968). W climbing (+1.05→+1.56) but well under 3.0 stop. Continuing.
+★=0.09684 stands. ep40 shows recall collapsing (0.606→0.497 over 10 ep) and W climbing (+1.56→+1.97). Mode-collapse signature. 13 ep stale, 17 to kill threshold. If trajectory doesn't recover by ep45, this run is hopeless. Continuing one more sweep before kill.
 
 ---
 

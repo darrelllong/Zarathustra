@@ -81,3 +81,19 @@
 |---|---|---:|---:|---:|---:|
 | s3-cache-datasets/cache_dataset_oracleGeneral/other/tencent_block.oracleGeneral.zst | oracle_general | 0.015 | 0.051 | 63.984 | 1 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/other/alibaba_block2020.oracleGeneral.zst | oracle_general | 0.017 | 0 | N/A | 0 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 4.115)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

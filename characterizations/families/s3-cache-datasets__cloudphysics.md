@@ -19,6 +19,7 @@
 
 - Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants.
 - Ordered PC1 changepoints suggest 3 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
@@ -50,8 +51,8 @@
 | Ordered PC1 changepoints | 2 |
 | PCA variance explained by PC1 | 0.282 |
 | Hurst exponent on ordered PC1 | 0.662 |
-| Block/random distance ratio | 0.853 |
-| Sampling recommendation | random_sampling_is_less_problematic |
+| Block/random distance ratio | 0.847 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
@@ -60,13 +61,13 @@
 | 2 | 64198718851476414464 | 0.861 |
 | 3 | 17620092236779698176 | 0.868 |
 | 4 | 7204102018602645504 | 0.808 |
-| 5 | 4876422119149501440 | 0.798 |
+| 5 | 5200152786371604480 | 0.734 |
 | 6 | 4449795845681904640 | 0.616 |
-| 7 | 2122115946228761088 | 0.613 |
-| 8 | 3991353661505692160 | 0.591 |
+| 7 | 4208923499800092672 | 0.639 |
+| 8 | 1881243600346949120 | 0.636 |
 | 9 | 1663673762052548608 | 0.589 |
-| 10 | 1569006735741307392 | 0.486 |
-| 11 | 1167568130608715008 | 0.511 |
+| 10 | 1373983890265530880 | 0.477 |
+| 11 | 1523881161140181504 | 0.485 |
 | 12 | 1506528322292702464 | 0.496 |
 
 ## Regime Transition Drivers
@@ -152,3 +153,19 @@
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w30_vscsi1.vscsitrace.lcs.zst | lcs | 0.999 | 0 | 63.984 | 17 |
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w54_vscsi2.vscsitrace.lcs.zst | lcs | 0 | 0 | 63.411 | 893 |
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w20_vscsi1.vscsitrace.lcs.zst | lcs | 0.042 | 0.004 | 45.238 | 2 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 0.656)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; burstiness is materially above the calmer families; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr

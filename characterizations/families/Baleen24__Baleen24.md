@@ -49,7 +49,7 @@
 | Ordered PC1 changepoints | 35 |
 | PCA variance explained by PC1 | 0.337 |
 | Hurst exponent on ordered PC1 | 0.961 |
-| Block/random distance ratio | 0.353 |
+| Block/random distance ratio | 0.342 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
@@ -57,16 +57,16 @@
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
 | 2 | 14921684591957014528 | 0.976 |
-| 3 | 13569605214776494080 | 0.843 |
+| 3 | 11145993694647515136 | 0.784 |
 | 4 | 223420333441869952 | 0.847 |
-| 5 | 13489379162946998272 | 0.693 |
-| 6 | 149997725930480672 | 0.588 |
-| 7 | 145749703886544832 | 0.545 |
-| 8 | 121658415783095664 | 0.536 |
-| 9 | 115367004443761296 | 0.558 |
-| 10 | 114707330129062448 | 0.492 |
-| 11 | 111745680703889296 | 0.527 |
-| 12 | 111083569153877920 | 0.526 |
+| 5 | 13496182607265103872 | 0.584 |
+| 6 | 173950468462876544 | 0.373 |
+| 7 | 127649585874184320 | 0.544 |
+| 8 | 120075366507085600 | 0.56 |
+| 9 | 116943402401459248 | 0.535 |
+| 10 | 113821793875128368 | 0.548 |
+| 11 | 110851714527838144 | 0.542 |
+| 12 | 110218087189753760 | 0.515 |
 
 ## Regime Transition Drivers
 
@@ -184,3 +184,19 @@
 | Baleen24/extracted/storage_10/storage/202110/Region4/full_7_1.trace | baleen24 | 0.69 | 0.204 | 2.196 | 1195 |
 | Baleen24/extracted/storage/storage/202110/Region4/full_7_1.trace | baleen24 | 0.69 | 0.204 | 2.196 | 1195 |
 | Baleen24/extracted/storage_10/storage/202110/Region4/full_1_1.trace | baleen24 | 0.699 | 0.193 | 2.141 | 1334 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 111.661)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; reuse/locality is not negligible
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

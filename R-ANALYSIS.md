@@ -16,6 +16,7 @@ Main entrypoints:
 - [analyze_family.R](/Users/darrell/Zarathustra/R-scripts/analyze_family.R)
 - [render_family_report.R](/Users/darrell/Zarathustra/R-scripts/render_family_report.R)
 - [run_corpus_analysis.R](/Users/darrell/Zarathustra/R-scripts/run_corpus_analysis.R)
+- [run_model_aware_analysis.R](/Users/darrell/Zarathustra/R-scripts/run_model_aware_analysis.R)
 
 ## Data Flow
 
@@ -883,6 +884,224 @@ The report guidance bullets are deterministic rules on top of the computed stati
 - if the conditioning audit recommends additions, mention those candidate features
 
 No learned classifier or optimizer chooses these text bullets.
+
+## Model-Aware R Layer
+
+The newer pass adds a second R analysis that consumes:
+
+- family rollups from the characterization pass
+- train logs from `/home/darrell/train_*.log`
+- eval logs from `/home/darrell/eval_*.log`
+
+This layer does not retrain models. It summarizes observed behavior from prior Tencent and Alibaba runs and projects those lessons back onto every family.
+
+### Per-Run Scores
+
+For eval logs, the combined score is
+
+$$
+\mathrm{combined} = \mathrm{MMD}^2 + 0.2 (1 - \mathrm{recall})
+$$
+
+where lower is better.
+
+For train logs, the script parses the logged EMA values
+
+$$
+\mathrm{train\_combined}_e = \mathrm{EMA\_MMD}^2_e + 0.2 (1 - \mathrm{EMA\_recall}_e)
+$$
+
+for each logged epoch \( e \), then keeps
+
+$$
+\mathrm{best\_train\_combined} = \min_e \mathrm{train\_combined}_e
+$$
+
+The best evaluated checkpoint for a corpus is the run with minimum `combined`.  
+The best evaluated recall checkpoint is the run with maximum recall.  
+The frontier train-only checkpoint is the run with minimum `best_train_combined`.
+
+### Feature-On Minus Feature-Off Deltas
+
+For each corpus and each switchable training feature such as PCF, multi-scale critic, mixed-type recovery, retrieval memory, or block sampling, R computes
+
+$$
+\Delta = \overline{s}_{\mathrm{on}} - \overline{s}_{\mathrm{off}}
+$$
+
+where \( s \) is either `combined` for evaluated runs or `best_train_combined` for train-history runs.
+
+For example, the eval-time PCF effect is
+
+$$
+\Delta_{\mathrm{pcf, eval}} =
+\frac{1}{n_{\mathrm{on}}} \sum_{i : \mathrm{pcf}_i = 1} \mathrm{combined}_i
+-
+\frac{1}{n_{\mathrm{off}}} \sum_{i : \mathrm{pcf}_i = 0} \mathrm{combined}_i
+$$
+
+Negative values mean the feature helped because lower combined score is better.
+
+### Status Labels
+
+Each feature status is assigned deterministically from these deltas.
+
+`validated` means:
+
+$$
+\Delta_{\mathrm{eval}} < 0 \quad \text{and} \quad n_{\mathrm{eval,on}} \geq 3
+$$
+
+`promising` means the eval evidence above is absent but:
+
+$$
+\Delta_{\mathrm{train}} < 0 \quad \text{and} \quad n_{\mathrm{train,on}} \geq 2
+$$
+
+`mixed` means some finite evidence exists but the sign is not favorable.  
+`unknown` means there is not enough finite evidence.  
+`not-primary` is forced for methods that are not a good fit for the family type:
+
+- structured-table families: PCF, multi-scale critic, mixed-type recovery, retrieval memory
+- aggregate-time-series families: mixed-type recovery, retrieval memory
+
+### Anchor Distance
+
+Each family is mapped to the closest learned anchor:
+
+- `alibaba__alibaba`
+- `s3-cache-datasets__tencentBlock` if present, otherwise `s3-cache-datasets__2020_tencentBlock`
+
+The feature-space distance uses a robustly scaled root-mean-square gap over
+
+- `heterogeneity_score`
+- `suggested_modes`
+- `write_ratio`
+- `reuse_ratio`
+- `burstiness_cv`
+- `iat_q50`
+- `obj_size_q50`
+- `tenant_unique`
+- `hurst`
+- `block_random_distance_ratio`
+
+For feature \( j \), let \( r_j \) be the median absolute deviation over all families:
+
+$$
+r_j = \mathrm{median}_i \left| x_{ij} - \mathrm{median}_k x_{kj} \right|
+$$
+
+If \( r_j \) is zero or unavailable, the script falls back to the sample standard deviation for that feature.
+
+For a family \( f \) and anchor \( a \), the anchor distance is
+
+$$
+d(f, a) =
+\sqrt{
+\frac{1}{|J^\ast|}
+\sum_{j \in J^\ast}
+\left( \frac{x_{fj} - x_{aj}}{r_j} \right)^2
+}
+$$
+
+where \( J^\ast \) is the set of features with finite values for both the family and the anchor and a nonzero scale.
+
+The chosen anchor is
+
+$$
+a^\ast(f) = \arg \min_a d(f, a)
+$$
+
+### Family-Level Recommendation Rules
+
+R derives four binary workload traits:
+
+Persistent ordering:
+
+$$
+\mathrm{persistent} =
+\mathbf{1}\{
+\mathrm{block\_random\_distance\_ratio} < 0.85
+\text{ or }
+\mathrm{hurst} \geq 0.75
+\}
+$$
+
+Multimodal family:
+
+$$
+\mathrm{multimodal} =
+\mathbf{1}\{
+\mathrm{suggested\_modes} \geq 4
+\text{ or }
+\mathrm{heterogeneity\_score} \geq 1.5
+\}
+$$
+
+Bursty family:
+
+$$
+\mathrm{bursty} =
+\mathbf{1}\{
+\mathrm{burstiness\_cv} \geq 5
+\}
+$$
+
+Locality-sensitive family:
+
+$$
+\mathrm{locality\_sensitive} =
+\mathbf{1}\{
+\mathrm{reuse\_ratio} \geq 0.2
+\}
+$$
+
+Sampling advice is then
+
+$$
+\mathrm{sampling\_recommendation} =
+\begin{cases}
+\text{split-by-format-first}, & \text{if } \mathrm{split\_by\_format} = 1 \\
+\text{block}, & \text{if } \mathrm{persistent} = 1 \\
+\text{random-ok}, & \text{otherwise}
+\end{cases}
+$$
+
+Regime advice is
+
+$$
+\mathrm{regime\_recommendation} =
+\begin{cases}
+\text{K≈8}, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} \geq 6 \\
+\text{K≈4}, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} < 6 \\
+\text{single}, & \text{otherwise}
+\end{cases}
+$$
+
+Char-file conditioning is recommended exactly when
+
+$$
+\mathrm{family\_kind} \in
+\{
+\text{request\_sequence},
+\text{aggregate\_time\_series}
+\}
+$$
+
+Candidate conditioning additions are only surfaced for `request_sequence` families, and they come directly from the earlier conditioning audit.
+
+### Model-Aware Outputs
+
+This layer writes:
+
+- [characterizations/MODEL-LEARNINGS.md](/Users/darrell/Zarathustra/characterizations/MODEL-LEARNINGS.md)
+- [characterizations/FAMILY-MODEL-GUIDANCE.md](/Users/darrell/Zarathustra/characterizations/FAMILY-MODEL-GUIDANCE.md)
+- [characterizations/model_train_runs.csv](/Users/darrell/Zarathustra/characterizations/model_train_runs.csv)
+- [characterizations/model_eval_runs.csv](/Users/darrell/Zarathustra/characterizations/model_eval_runs.csv)
+- [characterizations/model_corpus_summary.csv](/Users/darrell/Zarathustra/characterizations/model_corpus_summary.csv)
+- [characterizations/family_model_guidance.csv](/Users/darrell/Zarathustra/characterizations/family_model_guidance.csv)
+
+It also appends `## Model-Aware Guidance` to each family report under [characterizations/families](/Users/darrell/Zarathustra/characterizations/families).
 
 ## Resource Policy On `vinge.local`
 

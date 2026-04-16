@@ -47,7 +47,7 @@
 | Ordered PC1 changepoints | 0 |
 | PCA variance explained by PC1 | 0.292 |
 | Hurst exponent on ordered PC1 | 0.5 |
-| Block/random distance ratio | 1.056 |
+| Block/random distance ratio | 1.133 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
@@ -57,13 +57,13 @@
 | 2 | 61693954746090695324043153175339859968 | 0.803 |
 | 3 | 44962931981881171325324723553359101952 | 0.504 |
 | 4 | 40173071196567184267151186411237933056 | 0.505 |
-| 5 | 36978764325263951856358887451520925696 | 0.447 |
-| 6 | 34853343132528287620119535883005198336 | 0.328 |
-| 7 | 33478874848687229133665450532628594688 | 0.297 |
+| 5 | 37922609639450106903966986443409063936 | 0.279 |
+| 6 | 16467299134758093709065041870755725312 | 0.285 |
+| 7 | 15393179163499718411050880512921960448 | 0.264 |
 | 8 | 12217395539109555052375819068366651392 | 0.287 |
-| 9 | 10977538722140370510078947468494503936 | 0.317 |
-| 10 | 9978775318906152363534399165773643776 | 0.357 |
-| 11 | 9496494337145339247475028496492789760 | 0.358 |
+| 9 | 11208461316520716739929368209802657792 | 0.348 |
+| 10 | 10712787949052197130401572300485820416 | 0.302 |
+| 11 | 9725614863188632074123102456490491904 | 0.327 |
 | 12 | 4738810408117532063879937679664611328 | 0.34 |
 
 ## Strongest Correlations
@@ -142,3 +142,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster27.oracleGeneral.sample10.zst | oracle_general | 0 | 0.05 | 31.98 | 4 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster46.oracleGeneral.sample10.zst | oracle_general | 0 | 0.006 | 31.98 | 4 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster16.oracleGeneral.sample10.zst | oracle_general | 0 | 0.104 | 31.98 | 4 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.059)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

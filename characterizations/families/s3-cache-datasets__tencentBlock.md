@@ -18,6 +18,7 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 17 regimes when files are ordered by trace start time.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: iat_std vs iat_q99 (corr=0.98).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
@@ -43,29 +44,29 @@
 |---|---|
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
-| DBSCAN clusters | 3 |
-| DBSCAN noise fraction | 0.077 |
+| DBSCAN clusters | 2 |
+| DBSCAN noise fraction | 0.086 |
 | Ordered PC1 changepoints | 16 |
 | PCA variance explained by PC1 | 0.287 |
 | Hurst exponent on ordered PC1 | 0.711 |
-| Block/random distance ratio | 0.897 |
-| Sampling recommendation | random_sampling_is_less_problematic |
+| Block/random distance ratio | 0.79 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 912711130451567050752 | 0.957 |
-| 3 | 694830797802674061312 | 0.907 |
-| 4 | 176559793923085598720 | 0.904 |
-| 5 | 149732600456342765568 | 0.825 |
-| 6 | 99847691812393762816 | 0.624 |
-| 7 | 99196610065203183616 | 0.65 |
-| 8 | 84912207065050087424 | 0.673 |
-| 9 | 84317788072516255744 | 0.657 |
-| 10 | 76539145940746010624 | 0.667 |
-| 11 | 76322041021864099840 | 0.558 |
-| 12 | 74715715982277722112 | 0.542 |
+| 2 | 527297788483818422272 | 0.967 |
+| 3 | 304677339890828312576 | 0.899 |
+| 4 | 128580940680274558976 | 0.867 |
+| 5 | 99801948400413851648 | 0.87 |
+| 6 | 60832859777726365696 | 0.749 |
+| 7 | 59895985909072887808 | 0.697 |
+| 8 | 49582148562966478848 | 0.727 |
+| 9 | 45529490095888162816 | 0.702 |
+| 10 | 41362543973464809472 | 0.603 |
+| 11 | 36414797969684811776 | 0.634 |
+| 12 | 35893808979438878720 | 0.527 |
 
 ## Regime Transition Drivers
 
@@ -164,3 +165,19 @@
 | s3-cache-datasets/cache_dataset_lcs/tencentBlock/12200.lcs.zst | lcs | 0.022 | 0.016 | 63.984 | 1 |
 | s3-cache-datasets/cache_dataset_lcs/tencentBlock/1252.lcs.zst | lcs | 0.996 | 0.003 | 63.984 | 1 |
 | s3-cache-datasets/cache_dataset_lcs/tencentBlock/12695.lcs.zst | lcs | 1 | 0.002 | 63.984 | 1 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 0)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr

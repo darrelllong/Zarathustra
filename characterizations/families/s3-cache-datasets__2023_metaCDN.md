@@ -72,3 +72,18 @@
 | s3-cache-datasets/cache_dataset_txt/2023_metaCDN/reag0c01_20230315_20230322_0.2000.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaCDN/rnha0c01_20230315_20230322_0.8000.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaCDN/rprn0c01_20230315_20230322_0.2000.csv.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.483)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: no
+- PCF: not-primary
+- Multi-scale critic: not-primary
+- Mixed-type recovery: not-primary
+- Retrieval memory: not-primary
+- Why: no single pathological axis dominates this family

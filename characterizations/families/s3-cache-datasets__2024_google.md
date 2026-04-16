@@ -52,13 +52,13 @@
 | 3 | 137107353725581656064 | 0.814 |
 | 4 | 137057435953505189888 | 0.662 |
 | 5 | 137040024146018451456 | 0.583 |
-| 6 | 6989292575567142912 | 0.623 |
-| 7 | 137021644620906151936 | 0.543 |
+| 6 | 137026875258400292864 | 0.542 |
+| 7 | 6983958577416497152 | 0.615 |
 | 8 | 137016736640469139456 | 0.543 |
-| 9 | 137014214651307835392 | 0.524 |
-| 10 | 137012298763576737792 | 0.539 |
-| 11 | 137010593831663583232 | 0.549 |
-| 12 | 1698244135441288192 | 0.546 |
+| 9 | 6961647027463412736 | 0.548 |
+| 10 | 6979172260604485632 | 0.613 |
+| 11 | 137010393504188350464 | 0.541 |
+| 12 | 137010716208710008832 | 0.546 |
 
 ## Strongest Correlations
 
@@ -103,3 +103,18 @@
 | s3-cache-datasets/cache_dataset_parquet/2024_google/cluster3_18TB.sort.sample100.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB.sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB/20240115.sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.68)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: no
+- PCF: not-primary
+- Multi-scale critic: not-primary
+- Mixed-type recovery: not-primary
+- Retrieval memory: not-primary
+- Why: formats/parsers are mixed

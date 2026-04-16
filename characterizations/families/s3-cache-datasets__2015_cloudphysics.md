@@ -48,7 +48,7 @@
 | Ordered PC1 changepoints | 8 |
 | PCA variance explained by PC1 | 0.199 |
 | Hurst exponent on ordered PC1 | 0.701 |
-| Block/random distance ratio | 1.092 |
+| Block/random distance ratio | 1.137 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
@@ -58,14 +58,14 @@
 | 2 | 49052887092172562432 | 0.984 |
 | 3 | 15368729563236937728 | 0.797 |
 | 4 | 12912626014622765056 | 0.58 |
-| 5 | 8826949501259444224 | 0.584 |
-| 6 | 8379242046393213952 | 0.584 |
-| 7 | 7274001190067757056 | 0.569 |
-| 8 | 3906510552262976000 | 0.606 |
-| 9 | 5354161389259911168 | 0.328 |
-| 10 | 5248206810790833152 | 0.337 |
-| 11 | 5008914523528914944 | 0.292 |
-| 12 | 4844564904266328064 | 0.295 |
+| 5 | 8941009339380649984 | 0.586 |
+| 6 | 8495683496859533312 | 0.499 |
+| 7 | 5839730640489888768 | 0.595 |
+| 8 | 5934437919950324736 | 0.483 |
+| 9 | 3527489832560058368 | 0.495 |
+| 10 | 5321257961867694080 | 0.278 |
+| 11 | 5009774094765510656 | 0.286 |
+| 12 | 4974509179891025920 | 0.304 |
 
 ## Regime Transition Drivers
 
@@ -156,3 +156,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w05.oracleGeneral.bin.zst | oracle_general | 0 | 0 | 26.106 | 6 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w16.oracleGeneral.bin.zst | oracle_general | 0 | 0 | 20.211 | 10 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w87.oracleGeneral.bin.zst | oracle_general | 0 | 0.002 | 19.268 | 11 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.2)
+- Sampling: random-ok
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: family looks multi-regime or high-heterogeneity; burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

@@ -109,3 +109,19 @@
 | s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.raw.csv.zst | text_zst | N/A | N/A | 63.984 | 1 |
 | s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample10.csv.zst | text_zst | N/A | 0.027 | 17.073 | 14 |
 | s3-cache-datasets/cache_dataset_txt/2007_wiki/wiki/2007/wiki.2007.sort.hash.sample100.csv.zst | text_zst | N/A | 0.029 | 4.959 | 160 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 3.396)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr

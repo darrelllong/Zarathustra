@@ -18,7 +18,6 @@
 ## GAN Guidance
 
 - Ordered PC1 changepoints suggest 8 regimes when files are ordered by trace start time.
-- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Tenant diversity is high; tenant/context conditioning is likely useful.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
@@ -43,29 +42,29 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 4 |
+| Best silhouette K | 4 |
 | DBSCAN clusters | 1 |
 | DBSCAN noise fraction | 0.042 |
 | Ordered PC1 changepoints | 7 |
 | PCA variance explained by PC1 | 0.346 |
 | Hurst exponent on ordered PC1 | 0.786 |
-| Block/random distance ratio | 0.842 |
-| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+| Block/random distance ratio | 0.918 |
+| Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
 | 2 | 340593544697580116508672 | 0.497 |
-| 3 | 203394640854876816408576 | 0.476 |
-| 4 | 150101986367924351270912 | 0.481 |
+| 3 | 203235772159621146345472 | 0.476 |
+| 4 | 147543836690037965062144 | 0.507 |
 | 5 | 109318100474162311069696 | 0.469 |
 | 6 | 78884462175117018923008 | 0.49 |
 | 7 | 63061686007813810159616 | 0.495 |
 | 8 | 54982145782752600915968 | 0.458 |
-| 9 | 49693255828232416002048 | 0.396 |
-| 10 | 43096805986950675693568 | 0.402 |
+| 9 | 48687915632673557577728 | 0.42 |
+| 10 | 44884653517751350984704 | 0.377 |
 | 11 | 37507104160922218790912 | 0.427 |
 | 12 | 33436859146828469239808 | 0.42 |
 
@@ -157,3 +156,19 @@
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-31-AM.trace.csv.gz | exchange_etw | 0.13 | 0 | 6.22 | 639570 |
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-12-2007.09-43-PM.trace.csv.gz | exchange_etw | 0.84 | 0.003 | 6.171 | 15091830 |
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.12-29-AM.trace.csv.gz | exchange_etw | 0.89 | 0 | 6.064 | 21284125 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.81)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

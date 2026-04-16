@@ -56,11 +56,11 @@
 | 2 | 231644117329442167062528 | 0.693 |
 | 3 | 56263123749828374298624 | 0.647 |
 | 4 | 37631854305759727714304 | 0.55 |
-| 5 | 21165546246712854577152 | 0.467 |
-| 6 | 14337987981660395667456 | 0.392 |
-| 7 | 17112371933416326692864 | 0.352 |
-| 8 | 5544227565860910268416 | 0.341 |
-| 9 | 3443022721465262800896 | 0.295 |
+| 5 | 30871683420196362518528 | 0.496 |
+| 6 | 17615442438336840466432 | 0.414 |
+| 7 | 10787884173284381556736 | 0.339 |
+| 8 | 10352201047852961497088 | 0.298 |
+| 9 | 5041157060940396494848 | 0.279 |
 | 10 | 2376255311507161612288 | 0.244 |
 | 11 | 275050467111513915392 | 0.211 |
 | 12 | 91237103860140441600 | 0.138 |
@@ -148,3 +148,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prn_1.oracleGeneral.zst | oracle_general | 0 | 0.029 | 13.227 | 32 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prn_0.oracleGeneral.zst | oracle_general | 0 | 0.118 | 7.338 | 112 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prxy_0.oracleGeneral.zst | oracle_general | 0 | 0.005 | 6.06 | 168 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.102)
+- Sampling: random-ok
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

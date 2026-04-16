@@ -89,3 +89,19 @@
 | s3-cache-datasets/cache_dataset_txt/2019_wiki/wiki/2019/wiki.upload.2019.short | text | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2019_wiki/wiki/2019/wiki.txt.2019.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2019_wiki/wiki/2019/wiki.upload.2019.zst | text_zst | N/A | N/A | N/A | N/A |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 2.197)
+- Sampling: split-by-format-first
+- Regime recipe: single
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: burstiness is materially above the calmer families; formats/parsers are mixed
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

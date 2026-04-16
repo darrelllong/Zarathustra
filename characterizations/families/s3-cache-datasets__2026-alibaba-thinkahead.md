@@ -51,7 +51,7 @@
 | Ordered PC1 changepoints | 7 |
 | PCA variance explained by PC1 | 0.238 |
 | Hurst exponent on ordered PC1 | 0.5 |
-| Block/random distance ratio | 0.717 |
+| Block/random distance ratio | 0.728 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
@@ -61,14 +61,14 @@
 | 2 | 106776690978223506325504 | 0.938 |
 | 3 | 35431607872077827145728 | 0.87 |
 | 4 | 19829828452379996979200 | 0.882 |
-| 5 | 5302177802903527358464 | 0.907 |
+| 5 | 19781653324182675521536 | 0.795 |
 | 6 | 5254002674706204852224 | 0.822 |
-| 7 | 5203954043661199605760 | 0.848 |
+| 7 | 5193513253169503666176 | 0.782 |
 | 8 | 5202476924867592585216 | 0.81 |
-| 9 | 5202446310692827955200 | 0.557 |
+| 9 | 5202440609969667571712 | 0.684 |
 | 10 | 5202420337260752797696 | 0.628 |
-| 11 | 5202402168337430740992 | 0.638 |
-| 12 | 5199452190222011334656 | 0.616 |
+| 11 | 63527868641057570816 | 0.619 |
+| 12 | 5202399732524923224064 | 0.626 |
 
 ## Regime Transition Drivers
 
@@ -158,3 +158,19 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c37.oracleGeneral.zst | oracle_general | 0 | 0.04 | 38.382 | 5 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c12.oracleGeneral.zst | oracle_general | 0 | 0.002 | 36.932 | 3 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c13.oracleGeneral.zst | oracle_general | 0 | 0.001 | 36.932 | 3 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 1.894)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr

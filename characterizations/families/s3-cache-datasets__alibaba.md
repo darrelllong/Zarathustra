@@ -49,7 +49,7 @@
 | Ordered PC1 changepoints | 22 |
 | PCA variance explained by PC1 | 0.274 |
 | Hurst exponent on ordered PC1 | 0.695 |
-| Block/random distance ratio | 0.688 |
+| Block/random distance ratio | 0.634 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
@@ -60,13 +60,13 @@
 | 3 | 648575049005363888128 | 0.941 |
 | 4 | 622952439118409891840 | 0.779 |
 | 5 | 504104469511542931456 | 0.791 |
-| 6 | 496918499784578826240 | 0.79 |
+| 6 | 208097742730248159232 | 0.792 |
 | 7 | 495712727490412281856 | 0.718 |
 | 8 | 495283243302627704832 | 0.667 |
-| 9 | 199528512111614427136 | 0.724 |
-| 10 | 494794491241867837440 | 0.648 |
-| 11 | 198939014722948497408 | 0.612 |
-| 12 | 198812720734478630912 | 0.617 |
+| 9 | 495111781842737102848 | 0.676 |
+| 10 | 199105055061442396160 | 0.677 |
+| 11 | 198978942889973841920 | 0.677 |
+| 12 | 185615348197989810176 | 0.518 |
 
 ## Regime Transition Drivers
 
@@ -171,3 +171,19 @@
 | s3-cache-datasets/cache_dataset_lcs/alibaba/824.lcs.zst | lcs | 0 | 0.101 | 63.984 | 6 |
 | s3-cache-datasets/cache_dataset_lcs/alibaba/829.lcs.zst | lcs | 0.038 | 0.001 | 63.984 | 1 |
 | s3-cache-datasets/cache_dataset_lcs/alibaba/831.lcs.zst | lcs | 0 | 0.001 | 63.984 | 1 |
+
+
+
+
+## Model-Aware Guidance
+
+- Closest learned anchor: tencent_block (distance 0.344)
+- Sampling: block
+- Regime recipe: K≈8
+- Char-file conditioning: yes
+- PCF: validated
+- Multi-scale critic: promising
+- Mixed-type recovery: promising
+- Retrieval memory: mixed
+- Why: ordered files show temporal persistence; family looks multi-regime or high-heterogeneity; burstiness is materially above the calmer families
+- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr
