@@ -42,6 +42,15 @@ relevant.
 
 **Status**: PID 3880115, started 10:03 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min.
 
+### tencent_v145 — **Chunk stitching on tencent (IDEA #21, first test)**
+**Why**: v144 (retrieval memory #17) trained out at ★=0.0819 — did not beat base-recipe seeds (v142=0.086, v143=0.077). Next architecture-bet from Round 16 backlog is IDEA #21 chunk stitching: an adversarial boundary smoothness penalty in latent space that pairs adjacent windows and penalises mismatch at the seam. Already wired (`--boundary-smoothness-weight`, committed), tested on alibaba only (v118 at 0.1 weight, v119 at 0.1 weight). Never tested on tencent. Peer Review R16 recommended order: #17 → #18 → (#21 OR #19) → #22. #18 Phase A is monitor-only (no gradient contribution); #21 is a real mechanism change with an existing flag, so it is the cleanest next single-variable architecture test on tencent.
+
+**Recipe**: v143 base (multi-scale critic + PCF 2.0 + mixed-type-recovery + K=8 regimes + var-cond + gmm-8 + char-file + block-sample) + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. 10x the weight of alibaba_v118/v119 (0.1) to stress the mechanism on tencent. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` with reset optimizer (lr_g=8e-5, lr_d=4e-5, n_critic=2). `--w-stop-threshold 3.0 --early-stop-patience 60`.
+
+**Hypothesis**: If boundary artefacts are a real contributor to tencent's frozen ATB ceiling (~0.178), smoothness penalty should yield a training-★ below v143's 0.0768 and — more importantly — better frozen-bundle β-recall. Worst case: flat seed-quality retry of v143 (harmless). Best case: first tencent run below 0.177 frozen.
+
+**Status**: PID 3897635 (child of 3896970), started ~13:05 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min. Log: `/home/darrell/train_tencent_v145.log`.
+
 ---
 
 ## Post-Mortem: tencent_v144 — retrieval memory #17 (killed ep47, 2026-04-16, 32 ep stale from ★=0.08191 ep15)
