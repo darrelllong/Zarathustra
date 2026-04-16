@@ -719,6 +719,21 @@ def train(cfg: Config) -> None:
     mmd_history: list  = []             # [(epoch, mmd, recall, combined), ...]
     w_spike_epochs     = 0             # consecutive epochs with W-dist above w_stop_threshold
 
+    # Cache-descriptor monitor (IDEAS.md #18 Phase A): load global target if a
+    # descriptors JSONL is provided. We aggregate per-file descriptors into one
+    # global target via element-wise mean (already-normalised), then fire MSE
+    # against generated descriptors at each ★ epoch.
+    cache_desc_target = None
+    if getattr(cfg, "cache_descriptor_file", "") and Path(cfg.cache_descriptor_file).exists():
+        from cache_descriptor import load_descriptor_jsonl
+        _desc_lookup = load_descriptor_jsonl(cfg.cache_descriptor_file)
+        if _desc_lookup:
+            _all = torch.stack(list(_desc_lookup.values()), dim=0)  # (N, D)
+            cache_desc_target = _all.mean(dim=0).cpu().numpy()
+            print(f"[cache-descriptor] Phase A monitor enabled: "
+                  f"{len(_desc_lookup)} file targets → global mean target "
+                  f"(D={cache_desc_target.shape[0]})", flush=True)
+
     # Resume
     # --resume-from <path>  : load a specific checkpoint file (overrides auto-detect)
     # --reset-optimizer     : load model weights only; fresh optimizers + schedulers
@@ -1767,6 +1782,61 @@ def train(cfg: Config) -> None:
                     ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
                 torch.save(ckpt_data, ckpt_dir / "best.pt")
                 log += "  ★"
+
+                # Phase A descriptor monitor: only at ★ epochs to keep cost bounded.
+                if cache_desc_target is not None:
+                    try:
+                        from cache_descriptor import descriptor_monitor_mse
+                        n_mon = int(getattr(cfg, "cache_descriptor_monitor_samples", 256))
+                        # Generate from EMA weights (matches the ★ checkpoint we just saved).
+                        # G currently holds live weights (restored above); swap → EMA → restore.
+                        _live_for_mon = copy.deepcopy(G.state_dict())
+                        G.load_state_dict({k: v.to(device) for k, v in ema_G_state.items()})
+                        with torch.no_grad():
+                            if getattr(G, 'cond_dim', 0) > 0 and _eval_cond_pool is not None:
+                                _cidx = torch.randint(len(_eval_cond_pool), (n_mon,))
+                                _cond_m = _eval_cond_pool[_cidx].to(device)
+                                if getattr(G, 'cond_encoder', None) is not None:
+                                    _cond_m, _ = G.cond_encoder(_cond_m, training=False)
+                                if getattr(G, 'regime_sampler', None) is not None:
+                                    _cond_m = G.regime_sampler(_cond_m)
+                                _noise_m = G.sample_noise(n_mon, device, cond=_cond_m)
+                                _zg_m = torch.cat([_cond_m, _noise_m], dim=1)
+                            else:
+                                _zg_m = torch.randn(n_mon, G.noise_dim, device=device)
+                            _zl_m = torch.randn(n_mon, cfg.timestep, G.noise_dim, device=device)
+                            _fake_m = G(_zg_m, _zl_m)
+                            if latent_ae:
+                                _fake_m = R(_fake_m)
+                        _fake_np = _fake_m.cpu().numpy()
+                        # Inverse-transform per window → obj_id + ts arrays.
+                        _ids_list, _iats_list = [], []
+                        for _b in range(n_mon):
+                            try:
+                                _df = prep.inverse_transform(_fake_np[_b])
+                                if "obj_id" in _df.columns:
+                                    _ids_list.append(_df["obj_id"].to_numpy())
+                                if "ts" in _df.columns and len(_df) > 1:
+                                    _ts = _df["ts"].to_numpy().astype(np.float64)
+                                    _iats_list.append(np.concatenate([[0.0],
+                                                                       np.diff(_ts)]))
+                            except Exception:
+                                continue
+                        if _ids_list:
+                            _ids_arr = np.stack(_ids_list, axis=0)
+                            _iats_arr = (np.stack(_iats_list, axis=0)
+                                         if _iats_list else None)
+                            _desc_mse = descriptor_monitor_mse(
+                                _ids_arr, _iats_arr, cache_desc_target)
+                            log += f"  desc_mse={_desc_mse:.4f}"
+                        # Restore live weights so training resumes from where it was.
+                        G.load_state_dict(_live_for_mon)
+                    except Exception as _exc:  # never break training on monitor failure
+                        log += f"  desc_mse=ERR({type(_exc).__name__})"
+                        try:
+                            G.load_state_dict(_live_for_mon)
+                        except Exception:
+                            pass
             else:
                 epochs_no_improve += 1
             G.train()
@@ -2158,6 +2228,16 @@ def parse_args() -> Config:
                         "(default 0.0 = off; module is then a pure architectural prior). "
                         "Reading gt_reuse from the obj_id_reuse channel of the real window "
                         "is added in a follow-up commit; for now this flag is reserved.")
+    p.add_argument("--cache-descriptor-file", default="",
+                   metavar="JSONL",
+                   help="Cache-descriptor distillation (IDEAS.md idea #18, Phase A): "
+                        "path to per-file descriptors JSONL produced by "
+                        "precompute_descriptors.py. When set, at each ★ epoch "
+                        "a non-differentiable descriptor MSE is logged (desc_mse=). "
+                        "Phase A is monitor-only; Phase B promotes to a loss term.")
+    p.add_argument("--cache-descriptor-monitor-samples", type=int, default=256,
+                   help="Number of generated windows used for the descriptor monitor "
+                        "(default 256; only fires at ★ epochs so cost is bounded).")
     args = p.parse_args()
 
     cfg = Config()
@@ -2252,6 +2332,8 @@ def parse_args() -> Config:
     cfg.retrieval_tau_write          = args.retrieval_tau_write
     cfg.retrieval_n_warmup           = args.retrieval_n_warmup
     cfg.retrieval_reuse_bce_weight   = args.retrieval_reuse_bce_weight
+    cfg.cache_descriptor_file        = args.cache_descriptor_file
+    cfg.cache_descriptor_monitor_samples = args.cache_descriptor_monitor_samples
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
