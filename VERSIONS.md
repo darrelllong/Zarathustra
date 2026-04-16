@@ -33,14 +33,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v119 — **Round 16 eval-corrected recipe** (drop multi-scale + PCF)
-**Why**: 2026-04-16 model-aware R analysis (`characterizations/MODEL-LEARNINGS.md`, `model_corpus_summary.csv`) showed alibaba `eval_multiscale_diff=+0.050` and `eval_pcf_diff=+0.009` — both EVAL-NEGATIVE despite training-★ improvements. v118's recipe stacked both eval-negative knobs; predicted frozen ATB ≈ 0.20 (worse than 0.176 baseline). v119 strips them.
+### alibaba_v120 — **Retrieval memory (#17) on alibaba, first test**
+**Why**: v119 (v114 base + chunk-stitching + continuity) plateaued at training ★=0.11672 at ep10, then flat/degrading through ep34 with no new ★. v114's training ★=0.073 mapped to frozen ATB 0.176; v119's ★ is 60% worse, so projected frozen ≈ training★ + ~0.10 inflation ≈ **0.22** — hopeless to beat the 0.176 alibaba baseline. Killed at ep34 (24 stale). IDEAS.md Recommended Build Order puts #17 retrieval memory first: *"Retrieval memory on alibaba first, then tencent."* It was run on tencent (v144, null at ★=0.08191) but never on alibaba. v120 is that test.
 
-**Recipe** (delta from v118): drop `--multi-scale-critic`, set `--pcf-loss-weight 0`. Keep `--continuity-loss-weight 1.0` + chunk-stitching `--boundary-smoothness-weight 0.1` + `--block-sample` + `--char-file` + v48 hot-start. This is the validated "v114 baseline + chunk-stitching" recipe with the 2 eval-negative knobs removed.
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF, char-file, block-sample, K=4 regimes, var-cond, gmm-8) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4`. Chunk-stitching and MTPP both disabled — single-variable test of #17. BCE aux loss also off (`--retrieval-reuse-bce-weight 0.0`), same as v144 apples-to-apples. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt`. 98,913 retrieval params added (+32% over base G). Log confirms `regime_sampler.*` + `retrieval.*` + `retrieval_proj.*` freshly initialised.
 
-**Hypothesis**: If model-aware analysis is right, v119 should land near v114's frozen ATB 0.176 (potentially better via chunk-stitching). Worst case: same as v114, no harm done. Best case: chunk-stitching shaves the boundary artifacts that hurt frozen-bundle β-recall.
+**Hypothesis**: Alibaba Hurst=0.98 (long-range correlation) suggests locality structure that the base LSTM may miss. Retrieval-memory's explicit per-step reuse/new decision is architecturally matched to that. If it helps, training ★ should drop below v114's 0.073. If null (like v144 on tencent), we get clean signal that retrieval is dead on this corpus family.
 
-**Status**: PID 3880115, started 10:03 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min.
+**Status**: PID 3913759, started 11:46 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min. Log: `/home/darrell/train_alibaba_v120.log`.
 
 ### tencent_v146 — **Chunk stitching + MTPP timing head (IDEAs #21 + #20, first combined test)**
 **Why**: v145 (IDEA #21 chunk-stitching alone on tencent) launched at 10:51 and was still in warm-up at 11:13 when the Round 16 wiring work landed: `llgan/timing_head.LogNormalTimingHead` is now consumed by `train.py` under `--mtpp-timing` (Generator emits per-step (μ, σ) for log(IAT) from the LSTM hidden state, log-Normal NLL added to G loss). v146 replaces v145 with the same chunk-stitching recipe plus the new MTPP head: two mechanism-level changes in one run, saving a GPU slot. If combined beats v143's ★=0.0768 / frozen 0.178, a follow-up ablation will split them; if it doesn't, neither mechanism is a tencent winner.
@@ -50,6 +50,20 @@ relevant.
 **Hypothesis**: MTPP NLL supervises the LSTM hidden state to encode per-step timing distribution — a different gradient signal from the regression-only ts column. If tencent's frozen ATB ceiling is driven by burst-structure mismatch (not just locality), the NLL should shave β-recall by a measurable margin. Combined with chunk-stitching (boundary smoothness) this stacks two complementary mechanisms without changing the base GAN recipe.
 
 **Status**: PID 3908773, started 11:17 PDT, in Phase 1 AE pretraining. Phase 3 ETA ~30 min. Log: `/home/darrell/train_tencent_v146.log`. v145 killed (still in Gwarm-up; 22 min sunk, no GAN epochs run).
+
+---
+
+## Post-Mortem: alibaba_v119 — chunk-stitching + continuity (killed ep34, 2026-04-16, 24 ep stale from ★=0.11672 ep10, hopeless vs 0.176)
+
+**Recipe**: v114 base (continuity 1.0, no multi-scale, no PCF, char-file, block-sample, K=4 regimes, var-cond, gmm-8) + chunk-stitching `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Hot-start from v48.
+
+**Training-log**: Two ★: ep5=0.16642 (recall 0.429), ep10=**0.11672★** (recall 0.495, MMD²=0.01582). Then flat/degrading: ep15=0.13916, ep20=0.13898, ep25=0.13991, ep30=0.14095, no new ★ through ep34. W stable +0.20→+0.45, well below 3.0 stop. G ranging -0.33 to -1.04 (not exploding).
+
+**Why killed (hopeless projection, not 30-stale)**: v114's training ★=0.073 mapped to frozen ATB 0.176 (inflation ≈ 0.103). v119's ★=0.11672 is 60% worse at training. Applying the same inflation: projected frozen ≈ 0.22 — decisively worse than 0.176. Running to the 30-stale threshold would have burned another ~6 epochs (~6 min) for a projected loss. Race-mode decision: kill early, move to next idea.
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep10, ~24MB) preserved at `/home/darrell/checkpoints/alibaba_v119/best.pt` alongside `epoch_0010.pt`, `epoch_0020.pt`, `epoch_0030.pt`. If a future sweep wants to validate the projection, eval on that.
+
+**Verdict**: Chunk-stitching at weight 0.1 on top of continuity did NOT help alibaba reach v114's training ★=0.073 ceiling. Boundary-smoothness may still help frozen β-recall (not measured), but the training gap is too large to justify compute. Closes "chunk-stitching + continuity" cocktail on alibaba. Next alibaba bet: v120 = v114 base + retrieval memory (IDEA #17, never tested on alibaba; top of IDEAS.md R16 recommended build order).
 
 ---
 
