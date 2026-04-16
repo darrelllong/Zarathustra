@@ -33,11 +33,23 @@ relevant.
 
 ## Currently Running
 
-### tencent_v144 — **Round 16 #17: retrieval memory** (FIRST architecture-bet experiment)
-**Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False (retrieval params freshly initialised). **Phase 1 AE pretrain just started**, will reach GAN training in ~1h. Per IDEAS.md "Recommended build order" + Round 16 peer review: this is the first of three architectural bets. Judging on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
+### tencent_v144 — **Round 16 #17: retrieval memory** (architecture-bet #1)
+**Recipe**: v143 args + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from v86 pretrain via strict=False. **Phase 2.5 G warm-up** — pretraining onward, no GAN ★ yet. Judged on frozen-bundle ATB (current tencent ATB = 0.178 frozen).
 
-### alibaba_v117 — Multi-scale critic + continuity loss, seed #4
-**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed. Frozen-bundle history: v114=0.176 (5-seed), v115=0.195 (1-seed), v116=0.180 (1-seed). **GAN ep70, ★ ep65 = 0.08479** (training: recall 0.633, MMD²=0.01149). ★ trajectory ep5=0.157 → ep25=0.100 → ep55=0.10019 → **ep65=0.08479 ★best** → ep70=0.106. **Frozen-eval (snapshot, seed=42): MMD²=0.01328, β-recall=0.132 → combined ≈ 0.187** — worse than alibaba ATB 0.176. Training ★ did NOT transfer to frozen bundle: β-recall collapsed from 0.633 (training, val_tensor cond) to 0.132 (frozen, char_file cond) — mode-collapse warning at frozen eval. Training-★ is a misleading proxy here. Run continues — may produce a less-collapsed checkpoint at later epochs.
+### alibaba_v118 — **Round 16 #21: chunk-stitching boundary smoothness** (architecture-bet #2)
+**Recipe**: v117/v114 args + `--boundary-smoothness-weight 0.1 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. Adds latent-space MSE between B's first-2 latents and A's last-2 latents (with exp-decay weighting) on the G update; intent is to encourage smooth chunk transitions when generate.py stitches multiple chunks. Same v48 hot-start as v117. Judged on frozen-bundle ATB (current alibaba ATB = 0.176 frozen). Just launched (PID 3842928).
+
+---
+
+## Post-Mortem: alibaba_v117 — Multi-scale critic + continuity loss, seed #4 (killed ep70, hopeless to BEAT 0.176)
+
+**Recipe**: Identical to v114/v115/v116. Fourth continuity-loss seed.
+
+**Training-log**: Five stars: ep5=0.157, ep10=0.112, ep20=0.111, ep25=0.100, ep55=0.10019, **ep65=0.08479★** (recall=0.633, MMD²=0.01149). After ep65: ep70=0.106 (drift back). 5 epochs stale at kill time.
+
+**Frozen-bundle eval (seed=42, snapshot of best.pt at ep65)**: MMD²=0.01328, β-recall=**0.132** → combined ≈ **0.187**. β-recall collapsed from 0.633 (training, val_tensor cond) to 0.132 (frozen, char_file cond). Within recipe-ceiling noise of v114=0.176 / v115=0.195 / v116=0.180 — NOT a path to BEATING 0.176.
+
+**Verdict**: v114 continuity-loss recipe ceiling is firmly established at ~0.176-0.195 frozen across 4 seeds. Cannot beat 0.176 by additional continuity-loss seeding. Killed at ep70 to free the alibaba slot for **alibaba_v118** which adds chunk-stitching boundary smoothness (#21) on top of the same recipe.
 
 ---
 
