@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If n_critic=1 keeps G competitive and SSM training ★ pushes below 0.06156 at non-trivial stale-budget, we get a deeper alibaba ATB. (b) If n_critic=1 causes faster G overshoot, w_stop_threshold=2.5 triggers early and we fall back to v124's best.pt. (c) If training ★ plateaus at ~0.06, v124 was near the SSM ceiling on alibaba — IDEA #19 closes with v124 as its champion.
 
-**Status** (2026-04-17, 00:32 PDT, ~46 min in): PID 4081005. **Phase 2.5 G warm-up ep 80/100** (sup=0.00196). Two small warm-up bumps (ep60, ep80) both recovered. Phase 3 GAN ETA ~6-10 min. Log: `/home/darrell/train_alibaba_v125.log`.
+**Status** (2026-04-17, 00:39 PDT, ~53 min in): PID 4081005. **Phase 3 GAN ep 1/200 STARTED**. Pretrain complete + saved. ep1: W=+0.068 (very healthy), G=-0.90. First ★ eval at ep5. Log: `/home/darrell/train_alibaba_v125.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-17, 00:32 PDT, ~90 min in): PID 4063053. **Phase 3 GAN ep 2/200**. W=+0.2967 (healthy, ep1=+0.1941), G=-3.97 (ep1=-2.64), pcf=0.25. First ★ eval at ep5. Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 00:39 PDT, ~96 min in): PID 4063053. **Phase 3 GAN ep 3/200**. W trajectory: +0.19→+0.30→+0.39 (+0.10/ep, far from 3.0 W-stop). G=-3.97, pcf=0.33. First ★ eval at ep5. Log: `/home/darrell/train_tencent_v148.log`.
 
 ---
 
