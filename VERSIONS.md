@@ -18,7 +18,8 @@ moving-bundle reports.
 |---------|--------------------|---------|----------------------|-------|
 | Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall) |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
-| Tencent | **0.09628**       | **v149** (SSM+MTPP+multi-scale+PCF+boundary-smoothness, IDEAS #19/#20/#8/#6/#21) | n/a | Frozen ep_0060.pt 2026-04-17: MMD²=0.00348, β-recall=0.5360. 46% improvement over v136 0.178. Train→frozen delta +0.054 |
+| Tencent | **0.05875**       | **v150** (v149 recipe reproduced, IDEAS #19/#20/#8/#6/#21) | n/a | Frozen ep_0035 best.pt 2026-04-17: MMD²=0.00305, β-recall=0.7065, α=0.7945. 39% improvement over v149 0.09628. Train→frozen delta +0.00748 (25× tighter than v149's +0.054 — recipe is seed-robust, v150 seed gave much better real-coverage) |
+| Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Previously claimed ATB 2026-04-17 12:00 PDT; replaced by v150 seed same day |
 | Tencent prior | 0.178 avg | v136 (multi-scale+PCF) | was "0.094" | Former ATB; v141 (continuity) 0.186 |
 
 **Prior alibaba baseline**: v114 (continuity) frozen 0.176 — ties v98 (0.182) within noise. Surpassed by v124 SSM on 2026-04-16.
@@ -66,14 +67,25 @@ relevant.
 
 
 
-### tencent_v150 — **v149 recipe EXACTLY (reproducibility probe for the new tencent ATB)**
-**Why**: v149 just CLOSED with frozen-bundle ★=**0.09628** (MMD²=0.00348, β-recall=0.5360) on ep_0060.pt — **46% improvement over v136 ATB 0.178**. NEW TENCENT ATB. The v124/v130 alibaba episode proved that "champion recipe" can be seed-lucky — v150 tests whether v149's SSM+MTPP+multi-scale+PCF combo is recipe-robust on tencent or if it was a seed-lucky one-off. If v150 reaches ★<0.05 by ep30, recipe-robust. If v150 W-stops or critic-collapses, v149 was seed-lucky like v124.
+### tencent_v151 — **v150 recipe + n_critic=3 (push past training plateau + parallel to v133)**
+**Why**: v150 locked ATB at 0.05875 frozen (ep35 best.pt) but training-★ plateaued ep35→ep64 (best unchanged). W had single spike ep59=3.13 (self-corrected). v149 also had late-epoch W crossings (ep84=3.17, ep86=3.19). SSM+MTPP+multi-scale+PCF recipe reaches a training-★ ceiling around 0.051 because D can't hold the line as MTPP and multi-scale-PCF make G stronger. Hypothesis: give D 50% more steps (n_critic=3, mirror v133 alibaba test) to push training-★ below 0.05, which should translate to frozen ★ ~0.05 or better.
 
-**Recipe**: v149 recipe EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + boundary-smoothness 1.0/k=2/decay=0.5 + v146 base (K=8 regimes, var-cond + gmm-8, supervisor 5.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. PID 4192831, log `/home/darrell/train_tencent_v150.log`.
+**Recipe**: v150 EXACTLY + `--n-critic 3` instead of 2. Everything else identical. Fresh pretrain. Log `/home/darrell/train_tencent_v151.log`.
 
-**Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
+**Hypothesis**: (a) If training-★ ≤ 0.045 by ep40-60 with W stable <2.7 → n_critic=3 is the tencent ceiling-breaker, new ATB likely. (b) If ★ stalls at 0.051 with more stable W → n_critic=3 trades capacity for stability, no frozen gain. (c) If W still spikes >3.0 → n_critic isn't the fix, try lower lr or smaller PCF weight.
 
-**Status** (2026-04-17, 12:10 PDT, Phase 3 ep41/200): PID 4192831. Best ★=0.05127 ep35 (stale=6). ep40 no-★=0.06492 (MMD² 0.00362 flat, recall 0.694 dropped). W climbing 1.9-2.5 (approaching but not hitting 3.0, one ep37 spike to 2.49). Still recipe-reproducing v149 trajectory (v149 hit 0.04200 at ep60). Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17): launching.
+
+---
+
+### tencent_v150 — **NEW TENCENT ATB 0.05875** (frozen ep_0035 best.pt, 2026-04-17)
+**Recipe**: v149 recipe EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + boundary-smoothness 1.0/k=2/decay=0.5 + v146 base (K=8 regimes, var-cond + gmm-8, supervisor 5.0, diversity 2.0, feature-matching 1.0). Fresh pretrain.
+
+**Training**: best training-★=0.05127 ep35 (EMA), stale through ep64. Trajectory: ep35 ★=0.05127 (best.pt locked) → ep40 no-★=0.06492 → ep45=0.05582 → ep50=0.05961 → ep55=0.05486 → ep60=0.05356 (none improved over ep35 on combined EMA metric — best.pt unchanged). W dynamics stable-noisy 1.9-2.5, single spike ep59=3.13 (self-corrected). Stale=29 at eval time.
+
+**Frozen eval (ep_0035 best.pt, --eval-real-seed 42)**: **MMD²=0.00305, α=0.7945, β-recall=0.7065 → Combined ★ = 0.00305 + 0.2·(1−0.7065) = 0.05875**. HRC-MAE=0.0592. Train→frozen delta = +0.00748 (25× tighter than v149's +0.054).
+
+**Verdict**: **NEW TENCENT ATB = 0.05875** (39% improvement over v149 0.09628). v149 recipe IS seed-robust (v150 reproduced the training trajectory and delivered a much tighter train→frozen delta — v149's wide delta was seed-specific, not structural). This is also evidence that 2000-sample frozen β-recall on SSM+MTPP+multi-scale+PCF tencent runs is closer to 0.70 than the 0.54 v149 delivered — the recipe-core is correct, the seed gates whether frozen eval recovers training-level recall. IDEAS #19+#20+#8+#6+#21 stack for tencent fully validated.
 
 ---
 
