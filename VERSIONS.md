@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.06 by ep10-15 → SSM capacity was the bottleneck, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → SSM saturated at state-dim 16, IDEA #19 closed. (c) If critic dominance still trips W-stop by ep20 → SSM inherently destabilizes alibaba critic regardless of capacity.
 
-**Status** (2026-04-17, 02:00 PDT, ~28 min in): PID 4102807. **Phase 2.5 G warm-up ep 90/100** (sup=0.00346). Phase 3 ETA ~3-5 min. Log: `/home/darrell/train_alibaba_v126.log`.
+**Status** (2026-04-17, 02:07 PDT, ~35 min in): PID 4102807. **Phase 3 GAN ep 8/200 — BREAKTHROUGH ★ ep5=0.05556** (MMD²=0.00916, recall=0.768). BELOW v124 ATB 0.0656 AND v125 ep10 0.06104. Projected frozen ~0.0596 (9% below v124). **But critic collapse emerging**: W=+1.26→+1.15→+1.57→+2.09, G=-1.18→-0.58→-0.02→**+0.86 (POSITIVE ep8)**. Classic v122 pre-collapse signal. W-stop=3.0 likely trips ep9-10. ep5 best.pt critical artifact. Log: `/home/darrell/train_alibaba_v126.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-17, 01:56 PDT, ~169 min in): PID 4063053. **Phase 3 GAN ep 26/200 — NEW ★ ep25=0.09655**! (MMD²=0.00825, recall=0.558, desc_mse=0.0381). Down 8.4% from ep10's 0.10540. Stale=1. W=+0.85, G=-4.06 healthy, pcf=0.83. Projected frozen 0.09655+0.107 ≈ 0.20 vs ATB 0.178 (13% above, but trending down). Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 02:07 PDT, ~180 min in): PID 4063053. **Phase 3 GAN ep 31/200**. Best ★=0.09655 ep25, ep30 no-★ (0.10740). Stale=6. W climbing 0.85→1.06→1.09→0.93 (watch). G healthy -3.56 to -4.05. Projected frozen ~0.20 vs ATB 0.178. Log: `/home/darrell/train_tencent_v148.log`.
 
 ---
 
