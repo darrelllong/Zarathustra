@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v127 — **v124 SSM base + retrieval memory (BCE 0.5) — unexplored SSM+retrieval combo on alibaba**
-**Why**: v126 (SSM state-dim 32) frozen avg 0.08201, 25% WORSE than v124 0.0656 — early ep5 ★=0.05556 was a pre-collapse transient, not converged quality. SSM family closed with v124 as champion. Remaining Round-16 item on alibaba is #22 hybrid diffusion (expensive). Cheaper probe: combine SSM champion (IDEA #19) with retrieval memory (IDEA #17) which closed individually on alibaba at 0.126 (v120/v121). Hypothesis: retrieval's reuse-aware architecture may complement SSM's selective state on alibaba's smaller corpus.
+### alibaba_v128 — **v124 SSM base + boundary-smoothness (G-side regularizer, not capacity — orthogonal to failed v125/v126/v127 changes)**
+**Why**: v127 killed ep6 on 4 consecutive G-positive epochs (ep3-6, v126-style critic collapse) with ep5 ★=0.09541 (55% WORSE than v124's 0.06156). Three consecutive attempts to modify v124's SSM champion have all destabilized WGAN-SN dynamics: v125 (tune n_critic), v126 (scale state-dim up), v127 (add retrieval capacity). **Pattern**: any D-side balance change or G-side capacity boost triggers critic collapse. v128 probes a qualitatively different axis: G-side *regularizer* (boundary-smoothness, used successfully on tencent v146). Pulls G's outputs toward smooth boundary transitions — does NOT change D capacity or D/G balance. If this also fails, SSM+v114-base = alibaba stability frontier, and next mechanism must be architectural (IDEA #21 chunk-stitching or #22 hybrid diffusion).
 
-**Recipe**: v124 recipe exactly + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5`. SSM state-dim 16 (the champion setting). Fresh pretrain. PID 4117641, log `/home/darrell/train_alibaba_v127.log`.
+**Recipe**: v124 recipe exactly + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (parameters from v146 tencent). SSM state-dim 16 (champion setting). Fresh pretrain. PID 4142957, log `/home/darrell/train_alibaba_v128.log`.
 
-**Hypothesis**: (a) If training ★ < 0.06 with converged dynamics → combo is synergistic, new alibaba ATB candidate. (b) If ★ ≈ v124's 0.06156 → retrieval adds nothing over SSM alone on alibaba (independent additive penalty). (c) If critic collapses like v126 → adding mechanisms destabilizes alibaba's WGAN-SN dynamics regardless of capacity.
+**Hypothesis**: (a) If training ★ < 0.06 with stable G sign → boundary regularizer breaks the alibaba-SSM ceiling, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → regularizer is neutral, SSM+v114 is the local optimum. (c) If critic collapses again → even G-side regularization destabilizes alibaba's SSM dynamics, confirming architectural change is needed next.
 
-**Status** (2026-04-17, 03:09 PDT, ~2 min in): PID 4117641. **Phase 1 AE pretrain ep 10/50**. Retrieval memory enabled (98,913 params). Phase 3 ETA ~55 min. Log: `/home/darrell/train_alibaba_v127.log`.
+**Status** (2026-04-17, 04:52 PDT, just launched): PID 4142957. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min to Phase 3. Log: `/home/darrell/train_alibaba_v128.log`.
 
 
 
@@ -54,6 +54,38 @@ relevant.
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
 **Status** (2026-04-17, 03:35 PDT, ~4 min in): PID 4124709. **Phase 1 AE pretrain ep 10/50** (recon=0.00578). Multi-scale + PCF + mixed-type + SSM all initialized cleanly. Phase 3 ETA ~60 min. Log: `/home/darrell/train_tencent_v149.log`.
+
+---
+
+## Post-Mortem: alibaba_v127 — v124 SSM base + IDEA #17 retrieval memory (killed ep6, 2026-04-17, critic collapse + hopeless — confirms SSM+capacity destabilizes alibaba)
+
+**Recipe**: v124 recipe exactly (continuity 1.0, reuse-bce 2.0, stride-cons 1.0, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, SSM state-dim 16) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5`. Fresh pretrain. PID 4117643, ran 03:06–04:49 PDT (~103 min, killed ep6).
+
+**Training-log**: ONE ★ then critic collapse (earlier onset than v126):
+- ep1: W=+0.09, G=-0.95 (healthy)
+- ep2: W=+0.58, G=-0.37 (healthy)
+- **ep3: G=+0.001 (FIRST positive)**
+- ep4: G=+0.23
+- **ep5 ★=0.09541** (MMD²=0.02131, recall=0.629) — already 55% ABOVE v124's converged 0.06156
+- ep5: G=+0.59, ep6: W=+1.43, G=+0.78
+- 4 consecutive G-positive epochs (ep3-6) = v126-style critic collapse signal
+
+**Why killed**: Three signals simultaneously:
+1. ★ baseline 55% worse than v124 champion at equivalent epoch
+2. G positive for 4 consecutive epochs (earlier onset than v126's 3-epoch trigger)
+3. W climbing fast (0.09→1.43 in 6 epochs, 48% of W-stop reached)
+No path to beat ATB 0.0656; dynamics worsening, not recovering.
+
+**Finding — SSM+capacity pattern on alibaba**: Three attempts to modify v124's SSM champion all destabilized WGAN-SN dynamics in the same critic-collapse direction:
+- v125 (n_critic=1): W-stopped ep22, frozen within noise of v124
+- v126 (state-dim 32): G positive ep8-10, frozen 25% worse
+- v127 (+ retrieval memory 98,913 params): G positive ep3-6 (fastest onset), training ★ 55% worse
+
+Each added either D-side balance change, G-side capacity, or G-side pluggable mechanism. All destabilize. **Conclusion**: v124 SSM+v114-base is at alibaba's stability frontier. Next mechanism on alibaba must either be a G-side regularizer (no capacity, no balance change — tested as v128) or a full architectural change (IDEA #21 chunk-stitching, #22 hybrid diffusion).
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep5, 12.8MB) preserved but ★=0.09541 already > v124 ATB 0.0656 in training, no point running frozen.
+
+**Verdict**: v128 launched on same day, testing G-side regularizer hypothesis (boundary-smoothness from v146 tencent recipe) on v124 SSM base.
 
 ---
 
