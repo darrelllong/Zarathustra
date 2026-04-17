@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ ≈ 0.055-0.065 by ep10-15 with stable W → MTPP beats v124 champion and IDEA #20 is universal (both corpora). (b) If ★ ≈ 0.07-0.08 with stable dynamics → MTPP doesn't help alibaba, but the SSM base is still the right frontier. (c) If W climbs fast like v130 → SSM+alibaba remains seed-lottery regardless of G-head changes, pivot to LSTM+MTPP next.
 
-**Status** (2026-04-17, 10:00 PDT, ~66 min in, Phase 3 ep11): PID 4188458. **ep5 ★=0.05232** (best, 15% below v124 ep5). **ep10 no-★ = 0.08174** (MMD² 0.01142→0.01774, recall **0.795→0.680** drop). Stale=**5 ep**. W oscillating 0.9-2.9 (ep8 peak 2.86, self-corrected to 1.63 ep10) — **volatile but NOT monotonic climb** — different from v130's W=0.12→3.71 collapse. G bounced negative ep6-7 (-3.13/-3.28) then recovered to -1.7 range. Not critic-dominance. ep5 best.pt preserved. Need ep15 data to judge. Log: `/home/darrell/train_alibaba_v131.log`.
+**Status** (2026-04-17, 10:20 PDT, ~86 min in, Phase 3 ep19): PID 4188458. **ep5 ★=0.05232** (best, 15% below v124 ep5). ep10=0.08174, **ep15=0.07367** (recall 0.721, partial recovery from ep10's 0.680). Stale=**10 ep** (half of kill threshold). W oscillating 1.7-2.8 sustained for 10+ epochs — **stable-but-noisy plateau**, clearly NOT v130's monotonic climb. G stable -1.5 to -2.8. Not critic-dominance. Best.pt ep5 preserved. Need ep20 ★ to judge recovery vs slow-drift. Log: `/home/darrell/train_alibaba_v131.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 09:47 PDT, ~45 min in, Phase 2.5 G warm-up ep60/100): PID 4192831. Pretrain AE clean (recon=0.00001 ep50). Sup clean (sup=0.03096 ep50). Phase 2.5 ep60/100 (sup=0.00080). Phase 3 entry ETA ~15 min. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 10:20 PDT, ~80 min in, Phase 3 ep4/200): PID 4192831. Pretrain clean. **Phase 3 ep1-4**: W=+0.07→+0.13→+0.16→+0.19 (tiny stable growth, matches v149 early behavior), G=-2.99→-1.89→-0.60→+0.19 (climbing steadily into positive territory). pcf=0.14→0.18→0.29→0.38 growing. First ★ at ep5. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
