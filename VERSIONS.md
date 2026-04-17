@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ ≈ 0.055-0.065 by ep10-15 with stable W → MTPP beats v124 champion and IDEA #20 is universal (both corpora). (b) If ★ ≈ 0.07-0.08 with stable dynamics → MTPP doesn't help alibaba, but the SSM base is still the right frontier. (c) If W climbs fast like v130 → SSM+alibaba remains seed-lottery regardless of G-head changes, pivot to LSTM+MTPP next.
 
-**Status** (2026-04-17, 08:55 PDT, just launched): PID 4188458. Phase 1 AE pretrain ep10/50 (recon=0.00006 — healthy). Fresh pretrain ETA ~50 min to Phase 3. Log: `/home/darrell/train_alibaba_v131.log`.
+**Status** (2026-04-17, 09:47 PDT, ~53 min in, Phase 3 ep5 FIRST ★): PID 4188458. Pretrain all phases clean. **Phase 3 ep5 ★=0.05232** (MMD²=0.01142, **recall=0.795**) — **15% BELOW v124's ep5 ★=0.06156, 42% below v130's failed 0.08995**. Strongest alibaba Phase-3 start EVER. W trajectory 0.24→0.43→0.73→0.61→1.95 (climb but not catastrophic); G oscillating -1.6 to -2.6 (not collapse pattern). Early signal that MTPP timing may be the stabilizer that was missing for SSM+alibaba seed fragility. Log: `/home/darrell/train_alibaba_v131.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 09:15 PDT, just launched): PID 4192831. Phase 1 AE pretrain ep1 (recon=0.13751). Fresh pretrain ETA ~50 min to Phase 3. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 09:47 PDT, ~45 min in, Phase 2.5 G warm-up ep60/100): PID 4192831. Pretrain AE clean (recon=0.00001 ep50). Sup clean (sup=0.03096 ep50). Phase 2.5 ep60/100 (sup=0.00080). Phase 3 entry ETA ~15 min. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
