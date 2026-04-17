@@ -123,7 +123,8 @@ def _make_z_global(
             cond = file_cond.to(device)
         else:
             cond = compute_window_descriptors(
-                real_features, col_names=getattr(cfg, "col_names", None))
+                real_features, col_names=getattr(cfg, "col_names", None),
+                cond_dim=cfg.cond_dim)
         # CFG dropout FIRST: zero conditioning BEFORE any downstream modules
         # see it.  Previously dropout was applied AFTER cond_encoder,
         # regime_sampler, and GMM prior, which leaked workload identity

@@ -68,6 +68,12 @@ def mmd(
     """
     Unbiased multi-scale RBF MMD².
 
+    Uses the Gretton et al. 2012 unbiased estimator: the on-diagonal
+    terms K(x_i, x_i) = 1 are excluded from Kxx/Kyy averages so the
+    estimator has zero expectation when P = Q. Previously the diagonal
+    was included via plain ``.mean()``, which introduced a systematic
+    +1/n bias (Gemini R2 P2).
+
     Args:
         real : (n, d) tensor  — samples from the real distribution
         fake : (m, d) tensor  — samples from the generated distribution
@@ -77,12 +83,25 @@ def mmd(
     """
     real = real.float()
     fake = fake.float()
+    n = real.shape[0]
+    m = fake.shape[0]
 
     mmd2 = 0.0
     for sigma in sigmas:
-        kxx = _rbf_kernel(real, real, sigma).mean()
-        kyy = _rbf_kernel(fake, fake, sigma).mean()
-        kxy = _rbf_kernel(real, fake, sigma).mean()
+        Kxx = _rbf_kernel(real, real, sigma)
+        Kyy = _rbf_kernel(fake, fake, sigma)
+        Kxy = _rbf_kernel(real, fake, sigma)
+        # Off-diagonal averages for Kxx, Kyy (unbiased MMD² U-statistic).
+        # Falls back to the biased mean for degenerate n=1 / m=1.
+        if n > 1:
+            kxx = (Kxx.sum() - Kxx.diagonal().sum()) / (n * (n - 1))
+        else:
+            kxx = Kxx.mean()
+        if m > 1:
+            kyy = (Kyy.sum() - Kyy.diagonal().sum()) / (m * (m - 1))
+        else:
+            kyy = Kyy.mean()
+        kxy = Kxy.mean()
         mmd2 += (kxx + kyy - 2 * kxy).item()
 
     return mmd2 / len(sigmas)

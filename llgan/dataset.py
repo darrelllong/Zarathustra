@@ -203,6 +203,7 @@ def load_file_characterizations(
 def compute_window_descriptors(
     windows: torch.Tensor,
     col_names: Optional[List[str]] = None,
+    cond_dim: int = 10,
 ) -> torch.Tensor:
     """Compute per-window workload descriptors from preprocessed windows.
 
@@ -216,9 +217,13 @@ def compute_window_descriptors(
         col_names: preprocessor ``col_names`` list. When None, falls back to
                    the legacy fixed layout
                    [ts, obj_size, opcode, tenant, obj_id_reuse, obj_id_stride].
+        cond_dim:  output dimension. Truncated to first cond_dim descriptors
+                   when cond_dim <= 10; zero-padded when cond_dim > 10.
+                   Matches ``profile_to_cond_vector`` behaviour so the file-
+                   level path and the window-level fallback agree on shape.
 
     Returns:
-        (B, 10) tensor of descriptors.
+        (B, cond_dim) tensor of descriptors.
     """
     w = windows.float()
     B, T, D = w.shape
@@ -252,7 +257,14 @@ def compute_window_descriptors(
         stride.std(dim=1).clamp(min=1e-6),       # 8: obj_id_stride std
         ts.diff(dim=1).std(dim=1).clamp(min=1e-6),  # 9: ts diff-of-diff burstiness
     ], dim=1)  # (B, 10)
-    return descs
+    D = descs.shape[1]
+    if cond_dim == D:
+        return descs
+    if cond_dim < D:
+        return descs[:, :cond_dim]
+    pad = torch.zeros(descs.shape[0], cond_dim - D,
+                      device=descs.device, dtype=descs.dtype)
+    return torch.cat([descs, pad], dim=1)
 
 
 # ---------------------------------------------------------------------------

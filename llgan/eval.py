@@ -473,7 +473,8 @@ def _sample_fake(ckpt, n_samples: int, device,
                     rw = torch.tensor(real_windows[idx], dtype=torch.float32,
                                       device=device)
                     cond = compute_window_descriptors(
-                        rw, col_names=getattr(prep, "col_names", None))
+                        rw, col_names=getattr(prep, "col_names", None),
+                        cond_dim=cond_dim)
                 # Round 5 fix: optionally add scaled stochastic noise to
                 # conditioning at eval to match training distribution.
                 if getattr(G, 'cond_encoder', None) is not None:
