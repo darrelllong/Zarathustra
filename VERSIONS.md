@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v128 — **v124 SSM base + boundary-smoothness (G-side regularizer, not capacity — orthogonal to failed v125/v126/v127 changes)**
-**Why**: v127 killed ep6 on 4 consecutive G-positive epochs (ep3-6, v126-style critic collapse) with ep5 ★=0.09541 (55% WORSE than v124's 0.06156). Three consecutive attempts to modify v124's SSM champion have all destabilized WGAN-SN dynamics: v125 (tune n_critic), v126 (scale state-dim up), v127 (add retrieval capacity). **Pattern**: any D-side balance change or G-side capacity boost triggers critic collapse. v128 probes a qualitatively different axis: G-side *regularizer* (boundary-smoothness, used successfully on tencent v146). Pulls G's outputs toward smooth boundary transitions — does NOT change D capacity or D/G balance. If this also fails, SSM+v114-base = alibaba stability frontier, and next mechanism must be architectural (IDEA #21 chunk-stitching or #22 hybrid diffusion).
+### alibaba_v129 — **v124 SSM base + --ssm-state-dim 8 (probe DOWN, untested direction)**
+**Why**: v125 (n_critic=1), v126 (state-dim 32), v127 (+retrieval), v128 (+boundary-smoothness) all tried to modify v124's SSM champion — all failed. Capacity UP (v126 32) destabilized. Capacity ADDITIONS (v127 retrieval) destabilized. G-side regularizer (v128 boundary-smoothness) did not destabilize but was neutral-to-worse vs v124 baseline. Only unexplored direction is capacity DOWN: state-dim 8 vs v124's 16. Tests whether v124's state-dim 16 is optimal or whether smaller SSM state is stable-and-viable.
 
-**Recipe**: v124 recipe exactly + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (parameters from v146 tencent). SSM state-dim 16 (champion setting). Fresh pretrain. PID 4142957, log `/home/darrell/train_alibaba_v128.log`.
+**Recipe**: v124 recipe EXACTLY + `--ssm-state-dim 8` (was 16). Fresh pretrain. PID 4159761, log `/home/darrell/train_alibaba_v129.log`.
 
-**Hypothesis**: (a) If training ★ < 0.06 with stable G sign → boundary regularizer breaks the alibaba-SSM ceiling, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → regularizer is neutral, SSM+v114 is the local optimum. (c) If critic collapses again → even G-side regularization destabilizes alibaba's SSM dynamics, confirming architectural change is needed next.
+**Hypothesis**: (a) If training ★ ≈ 0.06 with stable dynamics → state-dim 8 viable alternative, might seed-lucky into sub-0.0616 territory. (b) If ★ ≈ 0.07-0.08 with worse quality → state-dim 16 is the right capacity, v124 is the local optimum. (c) If critic collapses → even reducing capacity doesn't help, SSM family fundamentally at alibaba ceiling.
 
-**Status** (2026-04-17, 06:20 PDT, ~88 min in, Phase 3 ep11): PID 4142957. **ep5 ★=0.06703 (recall=0.705), ep10 no-★ (0.07452 — 11% regression)**. 21% WORSE than v124 at same epoch. G stable +0.1 to +1.4 (NOT climbing like v127 — boundary-smoothness does regularize) but W climbing monotonically 0.91→1.62→1.31→1.08→1.68→1.90→2.05 (ep11 = 68% of W-stop). Stale=6. Log: `/home/darrell/train_alibaba_v128.log`.
+**Status** (2026-04-17, 06:36 PDT, just launched): PID 4159761. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min. Log: `/home/darrell/train_alibaba_v129.log`.
 
 
 
@@ -54,6 +54,29 @@ relevant.
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
 **Status** (2026-04-17, 06:20 PDT, ~165 min in, Phase 3 ep33): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep15 no-★ → ep20=0.04740 ★ → ep25 no-★ → ep30=0.04552 ★** — ep30 MMD²=0.00332, recall=0.789, best tencent training ★ ever by 36% margin over v146's 0.07048. G runs hot (oscillating +3 to +5.88 at ep33) but ★ STILL IMPROVING. W climbing 1.0→1.72 (57% of W-stop, watch). Projected frozen ~0.153 vs ATB 0.178 = **14% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+
+---
+
+## Post-Mortem: alibaba_v128 — v124 SSM base + boundary-smoothness 1.0/k=2/decay=0.5 (killed ep16, 2026-04-17, hopeless projection — boundary-smoothness CLOSED on alibaba)
+
+**Recipe**: v124 recipe exactly + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (parameters from v146 tencent). SSM state-dim 16. Fresh pretrain. PID 4142957, ran 04:52–06:36 PDT (~104 min, killed ep16).
+
+**Training-log**: ONE ★ then monotonic regression:
+- ep1-4: G declining +0.78→+1.17→+0.43→+0.10 (healthier than v127)
+- **ep5 ★=0.06703** (MMD²=0.00803, recall=0.705) — only 9% above v124 champion 0.06156
+- ep6-14: W spiked 1.62→2.05 (68% of W-stop) then receded 1.25, G stable +0.2 to +1.4
+- ep10 no-★ (0.07452 = 11% regression), ep15 no-★ (0.08271 = 23% regression — MMD² jumped to 0.02601)
+- Three consecutive ★ data points monotonically worsening: 0.06703 → 0.07452 → 0.08271
+
+**Why killed**: Projected frozen = 0.06703 (ep5 best) + v124-family delta (+0.004) = **0.0710 vs ATB 0.0656 (8% worse)**. Even best training ★ cannot produce ATB-beating frozen. Trajectory reversing (★ regressing ep5→ep10→ep15). W unstable. No path to beat v124.
+
+**Finding — boundary-smoothness is NEUTRAL-to-WORSE on alibaba**: Unlike v127 (retrieval = critic collapse), v128 did NOT destabilize WGAN-SN dynamics. G stayed in healthy range (+0.1 to +1.4). But ★ was worse than v124 baseline at every epoch, and MMD² grew as boundary-smoothness regularized G toward smoother transitions. Alibaba's 239-file corpus doesn't benefit from boundary supervision the way tencent's 3234-file corpus does. **Boundary-smoothness CLOSED on alibaba**.
+
+**SSM-alibaba modification graveyard (five attempts)**: v125 (n_critic=1), v126 (state-dim=32), v127 (+retrieval), v128 (+boundary-smoothness), all failed. Only untested SSM-family direction is state-dim DOWN (v129 probes state-dim=8).
+
+**Frozen-bundle eval**: NOT RUN. best.pt ep5 preserved but training ★ already > ATB.
+
+**Verdict**: v129 launched — v124 recipe + `--ssm-state-dim 8`. If this fails too, next alibaba mechanism must be architectural (IDEA #21 chunk-stitching or #22 hybrid diffusion).
 
 ---
 
