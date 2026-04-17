@@ -46,14 +46,31 @@ relevant.
 
 
 
-### tencent_v149 — **v146 recipe + SSM backbone (IDEA #19 cross-corpus test on tencent)**
-**Why**: v148 retrieval memory (IDEA #17) killed ep38 hopeless (training ★=0.09655 ep25, monotonic degradation through ep35, recall decay 0.558→0.424, projected frozen ~0.20 vs ATB 0.178). With retrieval closed on both corpora and SSM the alibaba champion (v124 ATB 0.0656 = 62.7% improvement over prior baseline), the next untested Round-16 mechanism on tencent is IDEA #19 SSM backbone. Cross-corpus test: does the selective-state architecture that dominated alibaba also help tencent's 13.5×-larger corpus with K=8 regimes?
+### tencent_v150 — **v149 recipe EXACTLY (reproducibility probe for the new tencent ATB)**
+**Why**: v149 just CLOSED with frozen-bundle ★=**0.09628** (MMD²=0.00348, β-recall=0.5360) on ep_0060.pt — **46% improvement over v136 ATB 0.178**. NEW TENCENT ATB. The v124/v130 alibaba episode proved that "champion recipe" can be seed-lucky — v150 tests whether v149's SSM+MTPP+multi-scale+PCF combo is recipe-robust on tencent or if it was a seed-lucky one-off. If v150 reaches ★<0.05 by ep30, recipe-robust. If v150 W-stops or critic-collapses, v149 was seed-lucky like v124.
 
-**Recipe**: v146 recipe exactly (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes) + `--ssm-backbone --ssm-state-dim 16` (v124 champion setting). Fresh SSM pretrain (no hot-start; SSM requires matching-arch pretrain). PID 4124709, log `/home/darrell/train_tencent_v149.log`.
+**Recipe**: v149 recipe EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + boundary-smoothness 1.0/k=2/decay=0.5 + v146 base (K=8 regimes, var-cond + gmm-8, supervisor 5.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. PID 4192831, log `/home/darrell/train_tencent_v150.log`.
 
-**Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
+**Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 08:55 PDT, ~322 min in, Phase 3 ep85): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. Post-best: ep65=0.04521 → ep70=0.05278 → ep75=0.05035 → ep80=0.05238 → **ep85=0.05088** (all no-★, oscillating 0.050-0.053). Stale=**25 ep**, 5 ep from 30-ep kill threshold. ep84 W spiked to **+3.17** (crossed threshold; self-corrected to 2.37 ep85 — not auto-killed). If ep90 no-★ → kill at stale=30 and promote ep_0060.pt to frozen eval. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 09:15 PDT, just launched): PID 4192831. Phase 1 AE pretrain ep1 (recon=0.13751). Fresh pretrain ETA ~50 min to Phase 3. Log: `/home/darrell/train_tencent_v150.log`.
+
+---
+
+### tencent_v149 — CLOSED (new tencent ATB 0.09628 frozen-bundle ep_0060.pt, 2026-04-17)
+**Recipe**: v146 recipe exactly + `--ssm-backbone --ssm-state-dim 16` (v124 champion setting) + MTPP timing 0.5/σ_min=0.05 + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + boundary-smoothness 1.0/k=2/decay=0.5 + K=8 regimes. Fresh SSM pretrain. Ran 03:31–09:14 PDT (~344 min, killed ep88 stale=28, ep60 best promoted).
+
+**Training result**: SIX ★s ep5-60 monotonically improving: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200**. Post-ep60: 5 consecutive ★ checks (ep65-85) all 0.045-0.053 no-★, W crossed threshold twice (ep84=3.17, ep86=3.19, both self-corrected). Killed at stale=28 (2 ep shy of formal 30-ep threshold) per race directive — trajectory clearly saturated.
+
+**Frozen-bundle eval (ep_0060.pt, --eval-real-seed 42)**:
+- **Combined ★ = 0.00348 + 0.2·(1−0.5360) = 0.09628** → **46% IMPROVEMENT OVER v136 ATB 0.178**
+- MMD² = 0.00348 (low)
+- α-precision = 0.8135 (good plausibility)
+- β-recall = 0.5360 (moderate — training showed 0.821 on val; 2000-sample frozen pull drops recall ~35pp)
+- HRC-MAE = 0.0688 (real HRC [0.02,0.02,0.02] vs fake [0.09,0.09,0.09] — cache-fidelity room to improve)
+- Train→frozen delta = 0.04200→0.09628 = +0.054 (v146 seed-lucky had +0.107; v124 had +0.004 — v149 delta is intermediate)
+
+**Verdict**: **NEW TENCENT ATB = 0.09628** (v149, SSM+MTPP+multi-scale+PCF+boundary-smoothness combo). v150 launched as reproducibility probe (parallels v130 for alibaba).
 
 ---
 
