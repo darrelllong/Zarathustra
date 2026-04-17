@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v126 — **v124 recipe + --ssm-state-dim 32 (SSM capacity probe — double state dim from 16)**
-**Why**: v125 (v124 + n_critic=1 + w_stop 2.5) hit W-stop at ep22, frozen 5-run avg 0.06383 — within noise of v124's 0.0656 (spread overlaps). Conclusion: SSM@state-dim 16 is at its alibaba ceiling with n_critic variation alone. Cheap next probe: double SSM state capacity to 32. If training ★ pushes below 0.06, SSM had headroom; if plateaus at ~0.06, state-dim 16 was sufficient and SSM family is fully closed on alibaba.
+### alibaba_v127 — **v124 SSM base + retrieval memory (BCE 0.5) — unexplored SSM+retrieval combo on alibaba**
+**Why**: v126 (SSM state-dim 32) frozen avg 0.08201, 25% WORSE than v124 0.0656 — early ep5 ★=0.05556 was a pre-collapse transient, not converged quality. SSM family closed with v124 as champion. Remaining Round-16 item on alibaba is #22 hybrid diffusion (expensive). Cheaper probe: combine SSM champion (IDEA #19) with retrieval memory (IDEA #17) which closed individually on alibaba at 0.126 (v120/v121). Hypothesis: retrieval's reuse-aware architecture may complement SSM's selective state on alibaba's smaller corpus.
 
-**Recipe**: v124 recipe exactly + `--ssm-state-dim 32` (was 16). Back to n_critic=2, w_stop_threshold=3.0 (v125 failed at 2.5). Fresh pretrain required (SSM). PID 4102807, log `/home/darrell/train_alibaba_v126.log`.
+**Recipe**: v124 recipe exactly + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5`. SSM state-dim 16 (the champion setting). Fresh pretrain. PID 4117641, log `/home/darrell/train_alibaba_v127.log`.
 
-**Hypothesis**: (a) If training ★ < 0.06 by ep10-15 → SSM capacity was the bottleneck, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → SSM saturated at state-dim 16, IDEA #19 closed. (c) If critic dominance still trips W-stop by ep20 → SSM inherently destabilizes alibaba critic regardless of capacity.
+**Hypothesis**: (a) If training ★ < 0.06 with converged dynamics → combo is synergistic, new alibaba ATB candidate. (b) If ★ ≈ v124's 0.06156 → retrieval adds nothing over SSM alone on alibaba (independent additive penalty). (c) If critic collapses like v126 → adding mechanisms destabilizes alibaba's WGAN-SN dynamics regardless of capacity.
 
-**Status** (2026-04-17, 02:07 PDT, ~35 min in): PID 4102807. **Phase 3 GAN ep 8/200 — BREAKTHROUGH ★ ep5=0.05556** (MMD²=0.00916, recall=0.768). BELOW v124 ATB 0.0656 AND v125 ep10 0.06104. Projected frozen ~0.0596 (9% below v124). **But critic collapse emerging**: W=+1.26→+1.15→+1.57→+2.09, G=-1.18→-0.58→-0.02→**+0.86 (POSITIVE ep8)**. Classic v122 pre-collapse signal. W-stop=3.0 likely trips ep9-10. ep5 best.pt critical artifact. Log: `/home/darrell/train_alibaba_v126.log`.
+**Status** (2026-04-17, 03:09 PDT, ~2 min in): PID 4117641. **Phase 1 AE pretrain ep 10/50**. Retrieval memory enabled (98,913 params). Phase 3 ETA ~55 min. Log: `/home/darrell/train_alibaba_v127.log`.
 
 
 
@@ -54,6 +54,30 @@ relevant.
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
 **Status** (2026-04-17, 02:07 PDT, ~180 min in): PID 4063053. **Phase 3 GAN ep 31/200**. Best ★=0.09655 ep25, ep30 no-★ (0.10740). Stale=6. W climbing 0.85→1.06→1.09→0.93 (watch). G healthy -3.56 to -4.05. Projected frozen ~0.20 vs ATB 0.178. Log: `/home/darrell/train_tencent_v148.log`.
+
+---
+
+## Post-Mortem: alibaba_v126 — v124 recipe + --ssm-state-dim 32 (SSM@32 capacity probe — FAILED, frozen 0.08201 vs v124 0.0656, 25% worse)
+
+**Recipe**: v124 recipe + `--ssm-state-dim 32` (was 16). Fresh SSM pretrain. PID 4102807, ran 01:32–03:03 PDT (~91 min, killed ep10 manually).
+
+**Training-log**: ONE ★ then critic collapse:
+- ep1-4: W=+0.22 → +0.97 (climbing), G=-0.63 → -1.15 (reasonable)
+- ep5=**0.05556** ★ (MMD²=0.00916, recall=0.768) — appeared below v124 ATB 0.0656
+- ep6: G=-0.58, ep7: G=-0.02, **ep8: G=+0.86 (POSITIVE — critic collapse)**, ep9: G=+0.45, ep10: G=+0.93
+- ep10 no-★ (0.08835, recall=0.658, MMD²=0.01995) — regressed sharply
+
+**Killed manually at ep10** when G sustained positive for 3 consecutive epochs (ep8-10). Classic v122-style pre-collapse signal. Best.pt ep5 preserved for frozen eval.
+
+**Frozen-bundle eval (seed=42, 5 runs on best.pt ep5)**: 0.07443, 0.07954, 0.08233, 0.08423, 0.08954 → **avg=0.08201**. Spread 0.01511. β-recall 0.619-0.695 (much lower than v124's converged 0.72-0.75).
+
+**Training-to-frozen delta**: 0.05556 → 0.08201 = **+0.02645**. 6.6× wider than v124's +0.004. Early-epoch ★ during unstable critic dynamics is NOT a converged measurement — the EMA hadn't stabilized and the model was in pre-collapse regime.
+
+**Finding — SSM@state-dim 16 is the alibaba optimum**: Doubling state capacity to 32 destabilizes the critic faster than 16 without quality benefit. The combined v124/v125/v126 evidence: SSM@16 reaches 0.065 ± noise before critic collapse; SSM@32 reaches same range but collapses earlier (ep5 vs ep10). State-dim 16 is genuinely the sweet spot.
+
+**Finding — Pre-convergence ★ warning**: v126 ep5 ★=0.05556 looked like a potential 15% improvement, but frozen eval (0.08201) was 25% WORSE than v124. Going forward, treat early-epoch ★ on unstable runs as untrustworthy until at least 2-3 consecutive ★s or stable W/G dynamics confirm convergence. This is a new pattern not seen before because v146/v147 were late-epoch wins.
+
+**Verdict**: SSM family fully closed on alibaba with **v124 (state-dim 16) as champion (ATB 0.0656)**. IDEA #19 CLOSED on alibaba. v127 launched next: SSM+retrieval combo to test if mechanism stacking helps.
 
 ---
 
