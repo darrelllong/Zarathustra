@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.06 by ep10-15 → SSM capacity was the bottleneck, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → SSM saturated at state-dim 16, IDEA #19 closed. (c) If critic dominance still trips W-stop by ep20 → SSM inherently destabilizes alibaba critic regardless of capacity.
 
-**Status** (2026-04-17, 01:56 PDT, ~24 min in): PID 4102807. **Phase 2.5 G warm-up ep 80/100** (sup=0.00019, noisy 0.00019-0.00829 range). Phase 3 ETA ~5-10 min. Log: `/home/darrell/train_alibaba_v126.log`.
+**Status** (2026-04-17, 02:00 PDT, ~28 min in): PID 4102807. **Phase 2.5 G warm-up ep 90/100** (sup=0.00346). Phase 3 ETA ~3-5 min. Log: `/home/darrell/train_alibaba_v126.log`.
 
 
 
