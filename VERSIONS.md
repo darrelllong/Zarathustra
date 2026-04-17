@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 06:20 PDT, ~165 min in, Phase 3 ep33): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep15 no-★ → ep20=0.04740 ★ → ep25 no-★ → ep30=0.04552 ★** — ep30 MMD²=0.00332, recall=0.789, best tencent training ★ ever by 36% margin over v146's 0.07048. G runs hot (oscillating +3 to +5.88 at ep33) but ★ STILL IMPROVING. W climbing 1.0→1.72 (57% of W-stop, watch). Projected frozen ~0.153 vs ATB 0.178 = **14% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 07:08 PDT, ~213 min in, Phase 3 ep50): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep20=0.04740 → ep30=0.04552 → ep50=0.04377 ★** (ep35/40/45 no-★ interim). ep50 MMD²=0.00797, recall=**0.821** (new recall high). **38% below v146's 0.07048**. G stays hot +5 to +6.8, W oscillating 1.17-1.99 (max 66% of W-stop). Projected frozen ~0.151 vs ATB 0.178 = **15% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
