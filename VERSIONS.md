@@ -33,14 +33,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v121 — **Retrieval memory (#17) + BCE reuse supervision on alibaba**
-**Why**: v120 tested retrieval-memory as a pure architectural prior (BCE weight=0) and yielded best training ★=0.14294 at ep25 before drifting back up (ep60=0.151; stale=36 → killed). Advocatus Diaboli review of R16 wiring flagged that `--retrieval-reuse-bce-weight` defaulted to 0.0 in v120's launch, so the supervised form of IDEA #17 was never actually tested — only the architectural-prior ablation ran. v121 is the supervised test: same recipe + `--retrieval-reuse-bce-weight 0.5` to add BCE loss on the p_reuse gate against `obj_id_reuse` ground truth. If the BCE supervision keeps the gradient signal alive past ep25, training ★ should either sustain below v120's best or push lower.
+### alibaba_v122 — **v114 base + IDEA #20 MTPP timing head + IDEA #18 Phase A cache-descriptor monitor**
+**Why**: v121 (retrieval memory + BCE supervision) peaked ★=0.12575 at ep10 and plateaued (ep30–42 all in 0.15–0.17 range with recall=0.27–0.33), killed at stale=32. IDEA #17 (retrieval) does not beat v114 base on alibaba in either the architectural-prior form (v120: ★=0.143) or BCE-supervised form (v121: ★=0.126). Next idea per IDEAS.md build order is #18 (cache-descriptor). Phase A wiring exists (monitor-only); Phase B is deferred. v122 pairs the Phase A descriptor monitor with the first alibaba test of **IDEA #20 MTPP timing head** — the mechanism that drove v146 to tencent-strongest training ★=0.07048. MTPP is a real dynamics change (log-Normal NLL supervising LSTM hidden state); monitor is a cheap diagnostic that costs ~0 at non-★ epochs.
 
-**Recipe**: v120 recipe (v114 base + retrieval memory M=32/key=32/val=32/decay=0.85/tau_write=0.5/warmup=4) + `--retrieval-reuse-bce-weight 0.5`. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt`. Single-variable change from v120 — the BCE weight is the only difference.
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives rule, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, char-file, block-sample) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` + `--cache-descriptor-file /home/darrell/traces/characterization/alibaba_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt` via strict=False (freshly-initialised `timing_head.fc.{weight,bias}` and `regime_sampler.*` reported by log; v48 pretrain predates both).
 
-**Hypothesis**: Retrieval memory's p_reuse gate learns an implicit reuse-vs-new decision from adversarial gradients alone in v120. With explicit BCE supervision against `obj_id_reuse`, the gate learns directly from the data distribution rather than the D signal — which should (a) accelerate convergence past v120's ep25 peak and (b) prevent the mode-collapse-adjacent drift observed in v120's ep30+.
+**Hypothesis**: (a) If MTPP helps alibaba like it helped tencent, training ★ should push below v114's ★=0.073 peak, giving a new alibaba candidate. (b) If desc_mse at ★ epochs correlates with ★ trajectory on alibaba, Phase B investment is justified universally (not just on tencent). (c) Retrieval-memory is OUT — no architectural bloat, back to v114's lean base.
 
-**Status** (2026-04-16, ~151 min in): PID 3946227, launched 16:01 PDT. **Phase 3 ep 25/200**. Best ★=**0.12575** at ep10 (recall=0.497). Trajectory: ep5=0.14286★ → ep10=0.12575★ → ep15=0.155 → ep20=0.194 → **ep25=0.17986** (recall=0.248 worst yet, MMD²=0.02946). Stale=**15/30**. W +0.33 to +0.63 stable. G=−5.12 mode-collapse signal continuing. 28.5% below alibaba ATB from ep10 best. BCE supervision fix validated (12% improvement over v120 ★=0.14294), but post-peak trajectory is deteriorating faster than v120's. If no recovery by ep40, kill triggers. Log: `/home/darrell/train_alibaba_v121.log`.
+**Status** (2026-04-16, 19:43 PDT): PID 3981717. AE pretrain 1/50 starting. Log confirms `[cache-descriptor] Phase A monitor enabled: 1368 file targets → global mean target (D=8)`. Log: `/home/darrell/train_alibaba_v122.log`.
 
 ### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
 **Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
@@ -50,6 +50,22 @@ relevant.
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
 **Status** (2026-04-16): PID 3971602, started ~19:03 PDT. Pretrain in progress. Log confirms `[cache-descriptor] Phase A monitor enabled: 3234 file targets → global mean target (D=8)`. Log: `/home/darrell/train_tencent_v147.log`.
+
+---
+
+## Post-Mortem: alibaba_v121 — retrieval memory #17 + BCE supervision (killed ep42, 2026-04-16, stale=32 from ★=0.12575 ep10)
+
+**Recipe**: v120 recipe (v114 base + retrieval memory M=32/key=32/val=32/decay=0.85/tau_write=0.5/warmup=4) + `--retrieval-reuse-bce-weight 0.5`. Single-variable change from v120. Hot-start from v48 pretrain. PID 3946227, ran 16:01–~19:43 PDT (~3.7h, 42 GAN epochs).
+
+**Training-log**: Two ★s in the first 10 epochs, then plateau: ep5=0.14286★ (recall=0.404, MMD²=0.02366), ep10=**0.12575**★ (recall=0.497, MMD²=0.02515). Then no new ★: ep15=0.155, ep20=0.194, ep25=0.17986 (recall=0.248 nadir), ep30=0.15226, ep35=0.15211, ep40=0.16791 (recall=0.269). W remained stable 0.2–1.3 throughout — no instability. G loss gradually worsened from −4.0 at ep5 to −5.65 at ep42 (mode-collapse-adjacent drift, same pattern as v120).
+
+**Why killed**: 32 epochs stale from ep10 ★, past 30-stale threshold. Trajectory was monotonic plateau in [0.15, 0.19] post-peak with recall stuck at 0.27–0.33 (vs 0.497 at peak). No recovery signal through ep42. Projected frozen: 0.12575 + v114 training-to-frozen inflation (0.103) ≈ 0.229 frozen, well above alibaba ATB 0.176 — hopeless.
+
+**Finding**: BCE supervision fix (the Advocatus Diaboli R16-wiring finding) *did* help early training — v121's ep5 ★=0.14286 matched v120's *entire-run best* of 0.14294, and ep10=0.12575 beat it by 12%. But the post-peak plateau is identical in shape to v120's, just at a slightly lower floor. **Conclusion: BCE supervision is the correct form of IDEA #17, but retrieval memory as a whole does not produce a sustained training-★ trajectory on alibaba.** The gate learns the reuse distribution quickly then loses gradient signal the same way v120 did.
+
+**IDEA #17 status on alibaba**: Both forms tested (v120 arch-prior, v121 BCE-supervised). Neither beats v114's ★=0.073. **Closing IDEA #17 on alibaba.** (On tencent: v144 also failed to beat base multi-scale+PCF recipe — a separate closure decision pending frozen-eval.)
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep10, 14.4MB) preserved at `/home/darrell/checkpoints/alibaba_v121/best.pt` along with epoch_0010/20/30/40 snapshots.
 
 ---
 
