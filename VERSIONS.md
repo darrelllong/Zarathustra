@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 05:09 PDT, ~94 min in, Phase 3 ep10): PID 4124709. **ep5 ★=0.07204 (recall=0.662, MMD²=0.00454), ep10 ★=0.05571 (recall=0.755, MMD²=0.00681)** — ep10 is 22% below v146's seed-lucky 0.07048, best tencent training ★ ever observed. G went positive ep3-8 (peak +3.33 ep8), now declining ep9=+1.07, ep10=+1.77 (delayed recovery, not collapse). W stable 0.17–0.90. Potential tencent ATB break — if training→frozen delta holds near v146's ~0.107, projected frozen ~0.163 vs ATB 0.178. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 05:38 PDT, ~123 min in, Phase 3 ep20): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep15 no-★ (0.05919) → ep20=0.04740 ★** — ep20 MMD²=0.00420, recall=0.784, best tencent training ★ ever by 33% margin over v146's 0.07048. G runs hot (oscillating +1.9 to +4.3, peak +4.33 ep19) but DOES NOT block improvement — ★ still dropping. W=0.99 ep20 (recovered from 1.51 ep19). If training→frozen delta holds near v146's +0.107, projected frozen **~0.154 vs ATB 0.178 = 13% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
