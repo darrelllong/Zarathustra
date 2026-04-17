@@ -33,14 +33,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v122 — **v114 base + IDEA #20 MTPP timing head + IDEA #18 Phase A cache-descriptor monitor**
-**Why**: v121 (retrieval memory + BCE supervision) peaked ★=0.12575 at ep10 and plateaued (ep30–42 all in 0.15–0.17 range with recall=0.27–0.33), killed at stale=32. IDEA #17 (retrieval) does not beat v114 base on alibaba in either the architectural-prior form (v120: ★=0.143) or BCE-supervised form (v121: ★=0.126). Next idea per IDEAS.md build order is #18 (cache-descriptor). Phase A wiring exists (monitor-only); Phase B is deferred. v122 pairs the Phase A descriptor monitor with the first alibaba test of **IDEA #20 MTPP timing head** — the mechanism that drove v146 to tencent-strongest training ★=0.07048. MTPP is a real dynamics change (log-Normal NLL supervising LSTM hidden state); monitor is a cheap diagnostic that costs ~0 at non-★ epochs.
+### alibaba_v123 — **v114 base + MTPP at LOW weight 0.1 (1/5 of v122's 0.5) + Phase A descriptor monitor**
+**Why**: v122 hit critic collapse at ep 29-33 (G loss went POSITIVE, W shrank below 0.2) — MTPP weight 0.5 was dominating G loss on alibaba. v123 tests whether MTPP at weight 0.1 avoids critic dominance while still providing timing-distribution gradient signal. Single-variable change from v122. If critic stays healthy AND v123 pushes below v114's ★=0.073, MTPP has a viable alibaba dose. If critic still collapses, MTPP closes on alibaba.
 
-**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives rule, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, char-file, block-sample) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` + `--cache-descriptor-file /home/darrell/traces/characterization/alibaba_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from `/home/darrell/checkpoints/alibaba_v48/pretrain_complete.pt` via strict=False (freshly-initialised `timing_head.fc.{weight,bias}` and `regime_sampler.*` reported by log; v48 pretrain predates both).
+**Recipe**: Identical to v122 except `--mtpp-timing-weight 0.1` (was 0.5). v114 base (continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0) + `--mtpp-timing --mtpp-timing-weight 0.1 --mtpp-sigma-min 0.05` + `--cache-descriptor-file alibaba_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from v48 pretrain.
 
-**Hypothesis**: (a) If MTPP helps alibaba like it helped tencent, training ★ should push below v114's ★=0.073 peak, giving a new alibaba candidate. (b) If desc_mse at ★ epochs correlates with ★ trajectory on alibaba, Phase B investment is justified universally (not just on tencent). (c) Retrieval-memory is OUT — no architectural bloat, back to v114's lean base.
+**Hypothesis**: With MTPP contributing 1/5 the gradient magnitude to G loss, the adversarial signal should stay dominant. W should remain in v114-like range (0.3–2.0) and G loss should stay in -3 to -6 range (not collapse to 0). If training ★ still ends up above v114's 0.073, MTPP doesn't help alibaba at any dose. If ★ goes below 0.073 with healthy W, weight 0.1 is the alibaba recipe.
 
-**Status** (2026-04-16, 20:53 PDT, ~82 min in): PID 3981719. **Phase 3 ep 20/200**. Three ★s: ep 5 ★=0.15455 (desc_mse=0.0414) → ep 15 ★=0.13777 (desc_mse=0.0298) → ep 20 ★=**0.13655** (recall=0.402, MMD²=0.01685, desc_mse=**0.0381**). Stale=**0**. W=+0.47 rising. **Phase A signal inconsistent: desc_mse went UP ep15→20 (0.0298→0.0381) despite ★ improving — matches v147's broken correlation at ep15. Weakens universal Phase B case.** Pace concern: v114 at ep25 was ★=0.093; v122 ep20=0.137 is 47% worse. Projected frozen ≈0.24 vs alibaba ATB 0.176. Holding until ep 25-30 — if no push below 0.10 by ep 30, hopeless-kill triggers. Log: `/home/darrell/train_alibaba_v122.log`.
+**Status** (2026-04-16, 21:03 PDT): PID 4007894. AE pretrain 1/50 starting. Phase A descriptor monitor active. Log: `/home/darrell/train_alibaba_v123.log`.
 
 ### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
 **Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
@@ -50,6 +50,33 @@ relevant.
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
 **Status** (2026-04-16, 20:48 PDT, ~105 min in): PID 3971604. **Phase 3 ep 15/200**. Three consecutive ★s: ep 5 ★=0.15377 (desc_mse=0.0230) → ep 10 ★=0.10454 (desc_mse=0.0186) → ep 15 ★=**0.09446** (recall=0.597, MMD²=0.01386, desc_mse=**0.0285**). Stale=**0**. W=+1.21 healthy. **Phase A signal update: desc_mse broke correlation at ep15 (went UP from 0.0186 to 0.0285 while ★ improved) — weakens Phase B case vs ep5→10 drop.** v147 ep15 already close to v146's first ★ (0.08294 at ep55) — significantly hotter early trajectory. Log: `/home/darrell/train_tencent_v147.log`.
+
+---
+
+## Post-Mortem: alibaba_v122 — v114 base + MTPP timing head weight=0.5 (killed ep33, 2026-04-16, critic collapse + hopeless)
+
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` + Phase A cache-descriptor monitor. Hot-start from v48 pretrain. PID 3981719, ran 19:31–21:03 PDT (~92 min, 33 GAN epochs).
+
+**Training-log**: Four consecutive ★s then catastrophic critic collapse:
+- ep 5 ★=0.15455 (recall=0.412, MMD²=0.03695, desc_mse=0.0414) — first ★
+- ep 15 ★=0.13777 (recall=0.424, MMD²=0.02257, desc_mse=0.0298)
+- ep 20 ★=0.13655 (recall=0.402, MMD²=0.01685, desc_mse=0.0381)
+- ep 25 ★=**0.13101** (recall=0.435, MMD²=0.01801, desc_mse=0.0432) — best ★
+- ep 30 comb=0.13748 no ★ (recall=0.440, MMD²=0.02538)
+- W trajectory collapsed ep 27→32: +0.47 → +0.38 → +0.29 → +0.19 → +0.12 → +0.08
+- G loss inverted: ep 28=−3.52 → ep 29=**−0.71** → ep 30=**+0.02** (POSITIVE) → ep 31=−0.26 → ep 32=−0.98
+
+**Why killed (critic collapse + hopeless)**: Two concurrent failure signals:
+1. **Critic collapse**: G loss inverting to ~0 means the critic lost its discrimination. W collapsing below 0.2 confirms the critic is gradient-starved. This is NOT a w-stop event (W≠3.0) but a mirror-image failure: instead of critic dominating, the critic is being dominated.
+2. **Hopeless projection**: Best ★=0.13101 + v114 training-to-frozen inflation (0.103) ≈ 0.234 projected frozen, 33% above alibaba ATB 0.176.
+
+**Finding — MTPP weight 0.5 overloads alibaba G loss**: Tencent v146 used MTPP weight 0.5 successfully — W stayed in 1.7–2.6 range, G in -1.5 to -5 range, no critic collapse. Alibaba v122 with same weight: W collapsed to 0.08 by ep 32, G inverted to 0. The difference must be alibaba's smaller training corpus (239 files vs tencent's 3234), simpler locality structure (K=4 vs K=8 regimes), or the continuity-loss interaction (alibaba uses continuity, tencent uses boundary-smoothness + PCF). Hypothesis: the MTPP NLL gradient scales differently when the base G loss (alibaba's no-multi-scale, no-PCF) is smaller, so relative weight 0.5 is effectively much higher on alibaba than on tencent.
+
+**Phase A desc_mse signal**: Increased monotonically alongside ★ improvement (0.0414 → 0.0298 → 0.0381 → 0.0432). No consistent correlation — matches v147's broken correlation at ep15. **Both runs now suggest Phase A signal is NOT a reliable Phase B justification.** If this pattern holds through v123, Phase B (differentiable soft descriptors) can be cheaply closed.
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep25, 12.5MB) preserved at `/home/darrell/checkpoints/alibaba_v122/best.pt` with epoch_0010/20/30 snapshots.
+
+**Verdict**: v123 retests MTPP at weight 0.1 (1/5 of v122). If critic stays healthy AND ★ pushes below v114's 0.073, MTPP 0.1 is the alibaba recipe. If critic still collapses, MTPP closes on alibaba (IDEA #20 is tencent-only).
 
 ---
 
