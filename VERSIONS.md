@@ -16,8 +16,10 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.176** avg     | **v114** (continuity) | was "0.100"       | Ties v98 (0.182, was "0.088") within noise |
+| Alibaba | **0.0656** avg    | **v124** (SSM backbone) | n/a             | 5-run 0.06000–0.06962, beats v114's 0.176 by 62.7% |
 | Tencent | **0.178** avg     | **v136** (multi-scale+PCF) | was "0.094" | v141 (continuity) 0.186 |
+
+**Prior alibaba baseline**: v114 (continuity) frozen 0.176 — ties v98 (0.182) within noise. Surpassed by v124 SSM on 2026-04-16.
 
 **Reverted conclusions:**
 - "Continuity loss failed on alibaba" — actually competitive with base recipe
@@ -33,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v124 — **v114 base + IDEA #19 SSM backbone (Mamba-lite, --ssm-backbone --ssm-state-dim 16)**
-**Why**: After v120 (retrieval arch-prior), v121 (retrieval + BCE), v119 (chunk-stitching), v122 (MTPP 0.5), v123 (MTPP 0.1), the alibaba Round-16 queue has closed IDEAs #17, #20, #21 on this corpus. IDEA #18 Phase A monitor shows flat desc_mse across all runs — Phase B not justified by current data. IDEA #19 (SSM backbone) is the last untested Round-16 mechanism. The repo is still trying to get long-horizon structure out of a short-window recurrent generator; Mamba-lite SSM is a genuine representation change, not a loss tweak.
+### alibaba_v125 — **v124 recipe + n_critic=1 + w_stop_threshold=2.5 (SSM follow-up to tame critic)**
+**Why**: v124 (SSM backbone, Mamba-lite, --ssm-state-dim 16) beat alibaba ATB by 62.7% (frozen 0.0656 vs v114 0.176) but entered critic dominance at ep10 and was proactively killed at ep18 (W=+3.0008, G sustained positive). Advocatus Diaboli audit (VERDICT: HOLDS) recommends extending with `n_critic=1` to slow discriminator updates and a stricter W-stop (2.5) to fail-fast if critic still dominates. Goal: push training ★ below v124's ep10 0.06156 to claim deeper frozen ATB margin.
 
-**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0) + `--ssm-backbone --ssm-state-dim 16`. **Fresh pretrain required** (SSM cannot hot-start from v48 LSTM checkpoints). PID 4040753, log `/home/darrell/train_alibaba_v124.log`.
+**Recipe**: v124 recipe (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0, --ssm-backbone --ssm-state-dim 16) + `--n-critic 1` (was 2) + `--w-stop-threshold 2.5` (was 3.0). **Fresh pretrain required** (SSM). PID 4081005, log `/home/darrell/train_alibaba_v125.log`.
 
-**Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
+**Hypothesis**: (a) If n_critic=1 keeps G competitive and SSM training ★ pushes below 0.06156 at non-trivial stale-budget, we get a deeper alibaba ATB. (b) If n_critic=1 causes faster G overshoot, w_stop_threshold=2.5 triggers early and we fall back to v124's best.pt. (c) If training ★ plateaus at ~0.06, v124 was near the SSM ceiling on alibaba — IDEA #19 closes with v124 as its champion.
 
-**Status** (2026-04-16, 23:25 PDT, ~73 min in): PID 4040753. **Phase 3 ep 16/200**. **TWO ★s — ep10 ★=0.06156 (recall=0.750, MMD²=0.01146) — BELOW v114's 0.073 baseline**. Projected frozen: 0.06156 + alibaba delta 0.103 ≈ **0.165, would beat alibaba ATB 0.176 by 6.3%** (first alibaba ATB-beating candidate in the race). ★ trajectory: ep5=0.09369, ep10=**0.06156**. ep15 no-★ (0.07972, recall=0.673 — regressing from ep10). Stale=6. **CRITIC DOMINANCE emerging**: G has been positive 11 of last 12 epochs, increasing: ep10 G=+0.15, ep11=+0.49, ep13=+0.82, ep14=+0.90, ep16=+0.95. W climbing from +0.17 at ep1 to +2.27 at ep16 — approaching 3.0 W-stop. If W triggers, best.pt ep10 preserved. Log: `/home/darrell/train_alibaba_v124.log`.
+**Status** (2026-04-16, 23:50 PDT, ~4 min in): PID 4081005. **Phase 1 AE pretrain ep 20/50** (recon=0.00001). Fresh pretrain (no hot-start). Phase 3 GAN ETA ~1h. Log: `/home/darrell/train_alibaba_v125.log`.
 
 
 
@@ -51,7 +53,33 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-16, 23:25 PDT, ~28 min in): PID 4063050. **Phase 2.5 G warm-up starting**. AE pretrain complete. Sup pretrain complete (sup=0.04152). Phase 3 GAN ETA ~1-1.5h. Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-16, 23:50 PDT, ~48 min in): PID 4063053. **Phase 2.5 G warm-up ep 40/100** (sup=0.00003). AE pretrain + Sup pretrain complete. Phase 3 GAN ETA ~1h. Log: `/home/darrell/train_tencent_v148.log`.
+
+---
+
+## Post-Mortem: alibaba_v124 — **v114 base + IDEA #19 SSM backbone (ALIBABA ATB WIN: frozen 5-run avg 0.0656, beats 0.176 by 62.7%, killed ep18 critic dominance)**
+
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0) + `--ssm-backbone --ssm-state-dim 16`. Fresh pretrain (SSM cannot hot-start from LSTM checkpoints). PID 4040753, ran ~22:12→23:35 PDT (~83 min GAN, killed ep18).
+
+**Training-log**: TWO ★s then critic dominance:
+- ep5=0.09369 (recall=0.654, first ★)
+- ep10=**0.06156** (recall=0.750, MMD²=0.01146, second ★) — new alibaba training-★ record (below v114's 0.073)
+- ep15 no-★ (0.07972, recall=0.673 — regressing)
+- ep16-18: G positive 11 of 12 last epochs, rising +0.15→+0.49→+0.82→+0.90→+0.95; W climbed +0.17 (ep1)→+2.27 (ep16)→**+3.0008 (ep18)**, at W-stop threshold
+
+**Why killed (proactive)**: W reached 3.0008 at ep18 but W-stop requires 3 consecutive epochs above threshold — killed manually before it could revisit. best.pt ep10 preserved. Decision driven by (a) frozen eval was already defensible from ep10 snapshot, (b) freeing GPU for v125 follow-up with n_critic=1.
+
+**Frozen-bundle eval (seed=42, 5 runs on best.pt ep10)**: 0.06922, 0.06962, 0.06536, 0.06000, 0.06400 → **avg=0.0656**. **Beats v114 alibaba ATB 0.176 by 62.7%.** Tight run-to-run variance (0.00962 spread) indicates low fake-side noise; SSM-generated samples are consistent.
+
+**Training-to-frozen delta**: 0.06156 (ep10 training ★) → 0.0656 (frozen avg) = **+0.004**. 25× tighter than v114's +0.103 delta. Explained by Round 5 Gemini fix aligning train-path MMD² with eval-path MMD² (previous v114 delta was partly artifact of unaligned paths, not purely model generalization gap).
+
+**Advocatus Diaboli audit (VERDICT: HOLDS)**: Independent review confirmed (1) SSM architecture correctly loaded at eval — no silent LSTM fallback; (2) frozen-bundle determinism — same 4 real files across all 5 runs; (3) variance is pure fake-side sampling noise; (4) caveats: DMD-GEN 0.72-0.76 remains recipe-wide weakness (not SSM-specific); frozen files overlap training pool (same caveat as v114 — does not invalidate relative comparison).
+
+**Finding — IDEA #19 SSM backbone works on alibaba**: First genuine architectural representation change in the Round-16 queue to beat an ATB. SSM's selective state updates capture reuse/temporal structure that LSTM misses on alibaba's smaller (239 files) corpus. Next: test SSM on tencent (v126+ queue) to determine if IDEA #19 is alibaba-specific or corpus-universal.
+
+**Finding — n_critic=2 enables critic dominance on SSM**: With LSTM-era base recipe, n_critic=2 worked; with SSM the critic outpaces G starting ep10. v125 tests n_critic=1 to slow D.
+
+**Verdict**: v124 ATB champion on alibaba. v125 launched as follow-up (n_critic=1 + w_stop_threshold=2.5) to attempt pushing ★ below 0.06156 and claim deeper frozen margin. IDEA #19 marked **OPEN** (SSM works on alibaba; tencent test pending).
 
 ---
 
