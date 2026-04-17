@@ -35,14 +35,25 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v131 — **v124 recipe + MTPP timing (IDEA #20 on alibaba — first test)**
-**Why**: v130 just killed ep9 — v124 recipe EXACTLY failed to reproduce (W climbed 0.12→3.71 in 9 ep, ★ep5=0.08995 = 37% above v124's 0.06156). **v124 was seed-lucky, not recipe-robust.** SSM+alibaba has high seed variance: 5 failures (v125-v129) + v130 confirm. Need a representational change on alibaba, not another SSM seed. MTPP timing (IDEA #20) is working in v149 tencent (trajectory ★=0.04200 ep60, 40% below v146 seed-lucky best) — bring the same SSM+MTPP combo to alibaba for first time. Replaces linear timing head with mixture-density point-process, treating ts as event mark rather than feature column.
+### alibaba_v132 — **v131 recipe + boundary-smoothness (IDEA #21 chunk-stitching first test on alibaba)**
+**Why**: v131 just closed — MTPP improved training-★ on alibaba by 15% (ep5 ★=0.05232 vs v124's 0.06156) but W-stopped ep22 AND frozen eval=0.09141 did NOT beat v124's 0.0656 (train→frozen delta widened to +0.039 vs v124's +0.004). IDEA #20 MTPP generalized from tencent to alibaba training dynamics but NOT frozen eval — v124 recipe remains alibaba frontier. Round 16 queue next item is **#21 chunk-stitching** per RESPONSE.md. Implementation: `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (same as v149 tencent). Stacked on v131 recipe (v124+MTPP) since MTPP is the best training-★ regularizer found for alibaba, even if frozen doesn't reflect it.
 
-**Recipe**: v124 recipe + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` (same MTPP params as v149 tencent). SSM state-dim 16 retained. Everything else identical to v124/v130. Fresh pretrain. PID 4188458, log `/home/darrell/train_alibaba_v131.log`.
+**Caveat**: v128 previously tested boundary-smoothness on vanilla v124 (no MTPP) and regressed to frozen ~0.071. This run tests whether combining MTPP's training improvement with boundary-smoothness could break the alibaba train→frozen structural gap.
 
-**Hypothesis**: (a) If ★ ≈ 0.055-0.065 by ep10-15 with stable W → MTPP beats v124 champion and IDEA #20 is universal (both corpora). (b) If ★ ≈ 0.07-0.08 with stable dynamics → MTPP doesn't help alibaba, but the SSM base is still the right frontier. (c) If W climbs fast like v130 → SSM+alibaba remains seed-lottery regardless of G-head changes, pivot to LSTM+MTPP next.
+**Recipe**: v131 base + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. PID 22473, log `/home/darrell/train_alibaba_v132.log`.
 
-**Status** (2026-04-17, 10:20 PDT, ~86 min in, Phase 3 ep19): PID 4188458. **ep5 ★=0.05232** (best, 15% below v124 ep5). ep10=0.08174, **ep15=0.07367** (recall 0.721, partial recovery from ep10's 0.680). Stale=**10 ep** (half of kill threshold). W oscillating 1.7-2.8 sustained for 10+ epochs — **stable-but-noisy plateau**, clearly NOT v130's monotonic climb. G stable -1.5 to -2.8. Not critic-dominance. Best.pt ep5 preserved. Need ep20 ★ to judge recovery vs slow-drift. Log: `/home/darrell/train_alibaba_v131.log`.
+**Hypothesis**: (a) If frozen ≤ 0.066 → IDEA #21 ports to alibaba, new ATB candidate. (b) If ★ <0.05 training but frozen ≥ 0.08 → alibaba's structural gap is not solved by boundary-smoothness. (c) If W-stops early like v131 → MTPP+boundary-smoothness stack is unstable, revert to cleaner IDEA tests.
+
+**Status** (2026-04-17, 10:36 PDT): Phase 1 AE pretrain ep10/50 (recon=0.00003). Log: `/home/darrell/train_alibaba_v132.log`.
+
+---
+
+### alibaba_v131 — CLOSED (W-stopped ep22, frozen 0.09141 did NOT beat v124 ATB 0.0656)
+**Recipe**: v124 + MTPP timing (IDEA #20 first alibaba test).
+**Training ★**: ep5=**0.05232** (best, 15% below v124's ep5 0.06156), ep20=0.05916 (second ★).
+**W trajectory**: stable-noisy 1.7-2.8 ep11-19, then spiked ep20=3.94, ep21=3.26, ep22=3.88 → W-stop.
+**Frozen eval** (ep_0005 best.pt, --eval-real-seed 42): MMD²=0.01271, β-recall=0.6065, α=0.8095 → **Combined ★=0.09141**. Train→frozen delta +0.039 (wider than v124's +0.004, similar to v149's +0.054).
+**Verdict**: MTPP improves alibaba training-★ dynamics by 15% but does NOT survive frozen eval. Structural train→eval gap is real on alibaba under MTPP+SSM as well. v124 remains alibaba frontier. IDEA #20 partially generalized (tencent win + alibaba train-★ win, but no alibaba frozen win).
 
 
 
@@ -53,7 +64,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 10:20 PDT, ~80 min in, Phase 3 ep4/200): PID 4192831. Pretrain clean. **Phase 3 ep1-4**: W=+0.07→+0.13→+0.16→+0.19 (tiny stable growth, matches v149 early behavior), G=-2.99→-1.89→-0.60→+0.19 (climbing steadily into positive territory). pcf=0.14→0.18→0.29→0.38 growing. First ★ at ep5. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 10:36 PDT, Phase 3 ep9/200): PID 4192831. **ep5 ★=0.05774** (MMD²=0.00714, recall=0.747). W climbing slowly 0.07→0.21→0.58→0.80→0.36→0.43 (stable low). G oscillating -3.0 to +0.3. First ★ beats v149's ep10 ★=0.07204 by 20%. Next ★ at ep10. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
