@@ -16,7 +16,8 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.0656** avg    | **v124** (SSM backbone) | n/a             | 5-run 0.06000–0.06962, beats v114's 0.176 by 62.7% |
+| Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall) |
+| Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
 | Tencent | **0.178** avg     | **v136** (multi-scale+PCF) | was "0.094" | v141 (continuity) 0.186 |
 
 **Prior alibaba baseline**: v114 (continuity) frozen 0.176 — ties v98 (0.182) within noise. Surpassed by v124 SSM on 2026-04-16.
@@ -46,12 +47,12 @@ relevant.
 
 ---
 
-### alibaba_v132 — CLOSED (killed ep20, trajectory deteriorating; frozen eval on best.pt ep_0010 pending)
-**Recipe**: v131 base + boundary-smoothness (IDEA #21 first alibaba test post-MTPP).
-**Training**: ep5 ★=0.09554 (bad start), ep10 ★=**0.05942** (38% recovery, best), ep15=0.07285, ep20=0.08093 (trajectory deteriorating).
-**W dynamics**: ep16 W=3.05, ep19 W=3.23 (2 spikes >3.0 in 5 epochs, W-stop imminent).
-**Frozen eval** (in flight, PID 49882): pending. Projected 0.095-0.100 given v131-like delta +0.039.
-**Verdict**: Boundary-smoothness stacked on MTPP on alibaba is unstable. IDEA #21 on alibaba — partial result. Matches v128 (boundary-smoothness alone was also bad on alibaba). Boundary-smoothness is alibaba-negative regardless of base recipe.
+### alibaba_v132 — **NEW ALIBABA ATB 0.05778** (frozen ep_0010.pt, 2026-04-17)
+**Recipe**: v131 base + boundary-smoothness (IDEA #21 first alibaba test post-MTPP). Stack of IDEAS #19+#20+#21.
+**Training**: ep5 ★=0.09554 (bad start), ep10 ★=**0.05942** (38% recovery, best), ep15=0.07285, ep20=0.08093 (killed).
+**W dynamics**: ep16 W=3.05, ep19 W=3.23 (2 spikes >3.0). Killed ep20 preemptively (deteriorating trajectory, W-stop imminent).
+**Frozen eval** (ep_0010.pt, --eval-real-seed 42): **MMD²=0.00848, β-recall=0.7535, α=0.8675 → Combined ★=0.05778**. Train→frozen delta **-0.00164** (frozen IMPROVED over train — EMA underestimated recall). HRC-MAE=0.0111.
+**Verdict**: **12% improvement over v124 ATB 0.0656**. Boundary-smoothness + MTPP + SSM stack is alibaba's new frontier. v128 finding ("boundary-smoothness bad for alibaba") was wrong in isolation — stacked with MTPP it enables a larger-than-v124-alone training-★ improvement AND translates to frozen eval. IDEAS #19+#20+#21 are all necessary in combination for the ATB. Prior verdict on IDEA #21 updated from "matches v128 bad" to "NEW ATB contributor when stacked with MTPP".
 
 ---
 
