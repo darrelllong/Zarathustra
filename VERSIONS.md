@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: (a) If MTPP helps alibaba like it helped tencent, training ★ should push below v114's ★=0.073 peak, giving a new alibaba candidate. (b) If desc_mse at ★ epochs correlates with ★ trajectory on alibaba, Phase B investment is justified universally (not just on tencent). (c) Retrieval-memory is OUT — no architectural bloat, back to v114's lean base.
 
-**Status** (2026-04-16, 19:43 PDT): PID 3981717. AE pretrain 1/50 starting. Log confirms `[cache-descriptor] Phase A monitor enabled: 1368 file targets → global mean target (D=8)`. Log: `/home/darrell/train_alibaba_v122.log`.
+**Status** (2026-04-16, 20:40 PDT, ~69 min in): PID 3981719. **Phase 3 ep 11/200**. First ★ captured: ep 5 ★=0.15455 (recall=0.412, MMD²=0.03695, **desc_mse=0.0414**) → ep 10 comb=0.17800 NO ★ (recall=0.384, MMD²=0.05470). Stale=**6**. W=+0.19 — **unusually low** vs v114's typical 0.3–2.0 range (under-critic'd; may reflect MTPP dominating G loss). Compare v114: ep5=0.153 match, ep10=0.108★ (v122 missed this). Alibaba MTPP signal looks weak early; monitoring for ep 15–25 turnaround since v114 hit ★=0.073 at ep 30. Log: `/home/darrell/train_alibaba_v122.log`.
 
 ### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
 **Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
@@ -49,7 +49,7 @@ relevant.
 
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16): PID 3971602, started ~19:03 PDT. Pretrain in progress. Log confirms `[cache-descriptor] Phase A monitor enabled: 3234 file targets → global mean target (D=8)`. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 20:40 PDT, ~96 min in): PID 3971604. **Phase 3 ep 13/200**. Two ★s captured: ep 5 ★=0.15377 (recall=0.302, MMD²=0.01417, **desc_mse=0.0230**) → ep 10 ★=**0.10454** (recall=0.532, MMD²=0.01104, **desc_mse=0.0186**). Stale=**3**. W=+1.25 healthy. **Phase A signal: desc_mse dropped 19% alongside 32% ★ improvement** — early correlation, 2 datapoints only. Compare v146 first-★ was ep 55=0.08294 (v147 is running much hotter early). Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
