@@ -44,14 +44,40 @@ relevant.
 
 
 
-### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
-**Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
+### tencent_v148 — **v146 recipe + IDEA #17 retrieval memory + BCE 0.5 (first retrieval test on tencent)**
+**Why**: v147 closed with training ★=0.08451 (20% above v146's 0.07048 — reproducibility test shows v146 was seed-lucky), projected frozen 0.19 above 0.178 ATB, trajectory reversing at ep85. To push tencent below 0.178 ATB, need a mechanism change, not a reseed. Retrieval memory (IDEA #17) was only tested on alibaba (v120/v121) where it plateaued at 0.126 — but tencent has 13.5× more training files, K=8 regimes, and stronger reuse structure (v146 MTPP worked where alibaba MTPP failed). Retrieval + BCE 0.5 is the natural next Round-16 mechanism on tencent.
 
-**Recipe**: Identical to v146 (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--cache-descriptor-file /home/darrell/traces/characterization/tencent_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt`.
+**Recipe**: v146 recipe (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5` + cache-descriptor Phase A monitor (kept as diagnostic). Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt`. PID 4063050, log `/home/darrell/train_tencent_v148.log`.
 
-**Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
+**Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-16, 22:51 PDT, ~226 min in): PID 3971604. **Phase 3 ep 85/200**. SEVEN ★s, best ★=0.08451 ep70. Stale=15. **Trajectory reversal signs**: ep80 comb=0.08948 (recall=0.598), ep85 **comb=0.10102** (recall=0.548, MMD²=0.01062) — 20% above best, recall decaying monotonically 0.622→0.598→0.548. **W=+2.98 at ep85 — 99.3% of W-stop 3.0**, one high-W epoch away from auto-stop. G=-0.59 at ep85 (healthy) despite W spike. No critic collapse. 15 epochs of stale budget remain. If no ★ by ep100, kill or allow 30-stale trigger. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 22:57 PDT, starting): Phase 1 AE pretrain 1/50 (recon=0.01978). Retrieval memory enabled (98,913 new params, all fresh-initialised). Phase 3 GAN in ~30-40 min.
+
+---
+
+## Post-Mortem: tencent_v147 — v146 recipe + IDEA #18 Phase A cache-descriptor monitor (killed ep88, 2026-04-16, hopeless projection + trajectory reversing)
+
+**Recipe**: v146 recipe (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--cache-descriptor-file tencent_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from v86. PID 3971604, ran 19:04–22:56 PDT (~232 min, 88 GAN epochs).
+
+**Training-log**: SEVEN ★s over 70 epochs, then 18 stale:
+- ep5=0.15377 → ep10=0.10454 → ep15=0.09446 (three early ★s)
+- ep30=0.08742 → ep35=0.08660 (plateau improvement)
+- ep65=0.08469 → **ep70=0.08451** (best) — saved from near-kill at stale=29 by ep65 ★
+- ep75-85: trajectory reversing — ep75=0.09100, ep80=0.08948, ep85=0.10102 (no ★), recall monotonically decaying 0.622→0.598→0.548
+- ep87 G=+0.0139 (POSITIVE — v122-style early critic collapse signal), ep88 recovered G=-1.21
+- W spiked to +2.9848 at ep85 (99.3% of 3.0 W-stop)
+
+**Why killed (hopeless + reversal)**: Best training ★=0.08451 + v146 training-to-frozen delta (0.107) ≈ projected frozen **0.192** — 8% ABOVE tencent ATB 0.178. For v148 to beat ATB, training ★ must reach ~0.071. v147 gained only 0.2% in 5 epochs (ep65→ep70), rate far too slow to close 16% gap in remaining 12 stale-budget epochs. Combined with three consecutive no-★ evals + monotonic recall decay + early critic-instability signals, v147 was hopeless for beating ATB.
+
+**Finding — v146's 0.07048 was seed-lucky**: Identical recipe reproduction landed at 0.08451 training (20% worse). v146's 0.07048 and its resulting 0.178 ATB frozen eval were partially a lucky seed draw, not purely recipe-robust. Future tencent runs should budget the reproducibility margin: **baseline-with-recipe ≈ 0.085 training, occasional 0.07 draws possible**. This validates Round 15 peer review's concern about evaluator variance masquerading as mechanism.
+
+**Finding — Phase A desc_mse signal confirmed flat across corpora**: Third data point (v122, v123 on alibaba; now v147 on tencent) all show desc_mse uncorrelated or anti-correlated with training-★. **IDEA #18 Phase B (differentiable soft descriptors) closed on both corpora.** Keep Phase A as cheap diagnostic.
+
+**Finding — Critic-dominance spikes are transient at n_critic=2**: ep59 W=+2.95 + G=+0.358 and ep87 G=+0.0139 both recovered within 1-2 epochs. Not the same as true critic collapse (v122 W<0.2 sustained). These are transient critic-dominance spikes; the run can self-correct unless they cluster.
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep70, 22.5MB) preserved at `/home/darrell/checkpoints/tencent_v147/best.pt` with epoch_0010/20/30/40/50/60/70/80 snapshots.
+
+**Verdict**: v148 launched as next untested Round-16 mechanism on tencent: IDEA #17 retrieval memory + BCE 0.5. First retrieval test on tencent corpus (only alibaba tested so far — closed at 0.126).
 
 ---
 
