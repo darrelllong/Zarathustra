@@ -18,7 +18,8 @@ moving-bundle reports.
 |---------|--------------------|---------|----------------------|-------|
 | Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall) |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
-| Tencent | **0.178** avg     | **v136** (multi-scale+PCF) | was "0.094" | v141 (continuity) 0.186 |
+| Tencent | **0.09628**       | **v149** (SSM+MTPP+multi-scale+PCF+boundary-smoothness, IDEAS #19/#20/#8/#6/#21) | n/a | Frozen ep_0060.pt 2026-04-17: MMD²=0.00348, β-recall=0.5360. 46% improvement over v136 0.178. Train→frozen delta +0.054 |
+| Tencent prior | 0.178 avg | v136 (multi-scale+PCF) | was "0.094" | Former ATB; v141 (continuity) 0.186 |
 
 **Prior alibaba baseline**: v114 (continuity) frozen 0.176 — ties v98 (0.182) within noise. Surpassed by v124 SSM on 2026-04-16.
 
