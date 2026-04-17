@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v129 — **v124 SSM base + --ssm-state-dim 8 (probe DOWN, untested direction)**
-**Why**: v125 (n_critic=1), v126 (state-dim 32), v127 (+retrieval), v128 (+boundary-smoothness) all tried to modify v124's SSM champion — all failed. Capacity UP (v126 32) destabilized. Capacity ADDITIONS (v127 retrieval) destabilized. G-side regularizer (v128 boundary-smoothness) did not destabilize but was neutral-to-worse vs v124 baseline. Only unexplored direction is capacity DOWN: state-dim 8 vs v124's 16. Tests whether v124's state-dim 16 is optimal or whether smaller SSM state is stable-and-viable.
+### alibaba_v130 — **v124 recipe EXACTLY (reproducibility probe)**
+**Why**: v125/v126/v127/v128/v129 all modified v124's SSM champion in different directions — ALL FAILED. Six runs with ★ ranging 0.064-0.121. The question now: is v124's 0.0656 frozen **recipe-robust** (reproducible at similar ★ on rerun) or **seed-lucky** (one-time stroke)? v130 launches v124 EXACTLY with no changes — fresh pretrain, different random draw. If v130 lands near 0.0616 training ★, v124 is the recipe-champion and alibaba is locked at 0.0656 ATB for now. If v130 lands at 0.08-0.10 like the other variants, v124 was seed-lucky and frozen eval needs re-examination.
 
-**Recipe**: v124 recipe EXACTLY + `--ssm-state-dim 8` (was 16). Fresh pretrain. PID 4159761, log `/home/darrell/train_alibaba_v129.log`.
+**Recipe**: v124 recipe EXACTLY — SSM state-dim 16, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0. Fresh pretrain. PID 4173744, log `/home/darrell/train_alibaba_v130.log`.
 
-**Hypothesis**: (a) If training ★ ≈ 0.06 with stable dynamics → state-dim 8 viable alternative, might seed-lucky into sub-0.0616 territory. (b) If ★ ≈ 0.07-0.08 with worse quality → state-dim 16 is the right capacity, v124 is the local optimum. (c) If critic collapses → even reducing capacity doesn't help, SSM family fundamentally at alibaba ceiling.
+**Hypothesis**: (a) If ★ ≈ 0.06-0.07 by ep10-15 → v124 is recipe-robust, champion confirmed. (b) If ★ ≈ 0.08-0.10 → v124 was seed-lucky and its frozen 0.0656 was also seed-lucky; need more-principled re-evaluation. (c) If critic collapses (G positive, ★ > 0.10) → even the exact recipe is fragile and we're hitting the fundamental SSM-alibaba stability frontier.
 
-**Status** (2026-04-17, 06:36 PDT, just launched): PID 4159761. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min. Log: `/home/darrell/train_alibaba_v129.log`.
+**Status** (2026-04-17, 07:39 PDT, just launched): PID 4173744. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min to Phase 3. Log: `/home/darrell/train_alibaba_v130.log`.
 
 
 
@@ -53,7 +53,28 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 07:08 PDT, ~213 min in, Phase 3 ep50): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep20=0.04740 → ep30=0.04552 → ep50=0.04377 ★** (ep35/40/45 no-★ interim). ep50 MMD²=0.00797, recall=**0.821** (new recall high). **38% below v146's 0.07048**. G stays hot +5 to +6.8, W oscillating 1.17-1.99 (max 66% of W-stop). Projected frozen ~0.151 vs ATB 0.178 = **15% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 07:39 PDT, ~244 min in, Phase 3 ep60): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep20=0.04740 → ep30=0.04552 → ep50=0.04377 → ep60=0.04200 ★** — SIX ★s, monotonically improving at each 10-epoch checkpoint (with interim oscillation). ep60 MMD²=0.00360, recall=0.808. **40% below v146's 0.07048**. W spiked to **+2.95 ep58 (98% of W-stop)** but keeps self-correcting. G hot +5-7. Projected frozen ~0.149 vs ATB 0.178 = **16% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+
+---
+
+## Post-Mortem: alibaba_v129 — v124 SSM base + --ssm-state-dim 8 (killed ep6, 2026-04-17, critic collapse — SSM capacity DOWN also destabilizes alibaba)
+
+**Recipe**: v124 recipe EXACTLY + `--ssm-state-dim 8` (was 16). Fresh pretrain. PID 4159761, ran 06:36–07:38 PDT (~62 min, killed ep6).
+
+**Training-log**: ONE ★ (terrible) then critic collapse:
+- ep1: G=-1.66 (healthy) → ep2: G=-0.71 → **ep3: G=+2.01** → ep4: G=+3.05 → **ep5 ★=0.12126** (MMD²=0.05176, recall=0.652 — 85% WORSE than v124's 0.06156) → ep6: W=+2.79, G=+4.70
+- G monotonic climb +2.0→+3.1→+4.2→+4.7 from ep3-6
+- W climbed to 2.79 (93% of W-stop) at ep6
+
+**Why killed**: ★=0.12126 is 85% ABOVE v124's champion 0.06156, worse even than v127 (+retrieval, 0.09541). No path to beat ATB 0.0656. Critic-collapse pattern active.
+
+**Finding — SSM capacity DOWN also destabilizes alibaba**: State-dim 8 = HALF v124's capacity. Smaller G state → G dominates discriminator EVEN FASTER (critic collapse at ep3-6, earlier than v127's ep3 onset). This was the only untested SSM capacity direction on alibaba. **All SSM variants on alibaba (v125-v129) now closed**: state-dim 8 collapses fastest, state-dim 32 (v126) collapses at ep8, retrieval (v127) at ep3, boundary-smoothness (v128) is neutral, n_critic=1 (v125) W-stops.
+
+**SSM-alibaba conclusion**: v124 recipe is the only stable configuration found. Either (a) v124 is recipe-robust (tested by v130 reproducibility probe) or (b) v124 was seed-lucky and the true SSM-alibaba ceiling is ~0.08-0.10 training. v130 will answer.
+
+**Frozen-bundle eval**: NOT RUN. best.pt ep5 preserved but ★ already 85% above ATB.
+
+**Verdict**: v130 launched same day — v124 recipe EXACTLY, no modifications. Reproducibility test.
 
 ---
 
