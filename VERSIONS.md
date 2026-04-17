@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If n_critic=1 keeps G competitive and SSM training ★ pushes below 0.06156 at non-trivial stale-budget, we get a deeper alibaba ATB. (b) If n_critic=1 causes faster G overshoot, w_stop_threshold=2.5 triggers early and we fall back to v124's best.pt. (c) If training ★ plateaus at ~0.06, v124 was near the SSM ceiling on alibaba — IDEA #19 closes with v124 as its champion.
 
-**Status** (2026-04-17, 00:39 PDT, ~53 min in): PID 4081005. **Phase 3 GAN ep 1/200 STARTED**. Pretrain complete + saved. ep1: W=+0.068 (very healthy), G=-0.90. First ★ eval at ep5. Log: `/home/darrell/train_alibaba_v125.log`.
+**Status** (2026-04-17, 00:45 PDT, ~59 min in): PID 4081005. **Phase 3 GAN ep 10/200 — TWO ★s, ep10 ★=0.06104 BELOW v124's 0.06156**. ep5 ★=0.07162 → ep10 ★=**0.06104** (recall=0.753, MMD²=0.01164). epoch_0010.pt saved. **Projected frozen: 0.06104 + v124 delta 0.004 ≈ 0.065 — would tie/beat v124 ATB 0.0656**. But critic dominance emerging: W=+0.45 (ep6) → +0.92 → +1.23 → +1.21 → +2.16 (ep10). W-stop=2.5, likely trips ep11-13. G healthy negative (-1.68 → -3.57, no collapse). Stale=0. Log: `/home/darrell/train_alibaba_v125.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-17, 00:39 PDT, ~96 min in): PID 4063053. **Phase 3 GAN ep 3/200**. W trajectory: +0.19→+0.30→+0.39 (+0.10/ep, far from 3.0 W-stop). G=-3.97, pcf=0.33. First ★ eval at ep5. Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 00:45 PDT, ~102 min in): PID 4063053. **Phase 3 GAN ep 7/200**. **FIRST ★ ep5=0.11635** (MMD²=0.01225, recall=0.479, desc_mse=0.0345). Projected frozen: 0.11635 + tencent delta 0.107 ≈ 0.22, 24% ABOVE tencent ATB 0.178 at this stage (very early). W: +0.59 (ep5 peak) → +0.42 → +0.33, G=-5.70 healthy. Stale=2. Log: `/home/darrell/train_tencent_v148.log`.
 
 ---
 
