@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v125 — **v124 recipe + n_critic=1 + w_stop_threshold=2.5 (SSM follow-up to tame critic)**
-**Why**: v124 (SSM backbone, Mamba-lite, --ssm-state-dim 16) beat alibaba ATB by 62.7% (frozen 0.0656 vs v114 0.176) but entered critic dominance at ep10 and was proactively killed at ep18 (W=+3.0008, G sustained positive). Advocatus Diaboli audit (VERDICT: HOLDS) recommends extending with `n_critic=1` to slow discriminator updates and a stricter W-stop (2.5) to fail-fast if critic still dominates. Goal: push training ★ below v124's ep10 0.06156 to claim deeper frozen ATB margin.
+### alibaba_v126 — **v124 recipe + --ssm-state-dim 32 (SSM capacity probe — double state dim from 16)**
+**Why**: v125 (v124 + n_critic=1 + w_stop 2.5) hit W-stop at ep22, frozen 5-run avg 0.06383 — within noise of v124's 0.0656 (spread overlaps). Conclusion: SSM@state-dim 16 is at its alibaba ceiling with n_critic variation alone. Cheap next probe: double SSM state capacity to 32. If training ★ pushes below 0.06, SSM had headroom; if plateaus at ~0.06, state-dim 16 was sufficient and SSM family is fully closed on alibaba.
 
-**Recipe**: v124 recipe (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0, --ssm-backbone --ssm-state-dim 16) + `--n-critic 1` (was 2) + `--w-stop-threshold 2.5` (was 3.0). **Fresh pretrain required** (SSM). PID 4081005, log `/home/darrell/train_alibaba_v125.log`.
+**Recipe**: v124 recipe exactly + `--ssm-state-dim 32` (was 16). Back to n_critic=2, w_stop_threshold=3.0 (v125 failed at 2.5). Fresh pretrain required (SSM). PID 4102807, log `/home/darrell/train_alibaba_v126.log`.
 
-**Hypothesis**: (a) If n_critic=1 keeps G competitive and SSM training ★ pushes below 0.06156 at non-trivial stale-budget, we get a deeper alibaba ATB. (b) If n_critic=1 causes faster G overshoot, w_stop_threshold=2.5 triggers early and we fall back to v124's best.pt. (c) If training ★ plateaus at ~0.06, v124 was near the SSM ceiling on alibaba — IDEA #19 closes with v124 as its champion.
+**Hypothesis**: (a) If training ★ < 0.06 by ep10-15 → SSM capacity was the bottleneck, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → SSM saturated at state-dim 16, IDEA #19 closed. (c) If critic dominance still trips W-stop by ep20 → SSM inherently destabilizes alibaba critic regardless of capacity.
 
-**Status** (2026-04-17, 00:52 PDT, ~76 min in): PID 4081005. **Phase 3 GAN ep 12/200**. Best **ep10 ★=0.06104** (recall=0.753, MMD²=0.01164) — below v124's 0.06156. epoch_0010.pt saved. **Projected frozen 0.06104 + v124 delta 0.004 ≈ 0.065 — tie/beat v124 ATB 0.0656**. W trajectory: +2.16 (ep10 peak) → +1.55 → +1.77, **critic dominance EASING** (peak receded). G: -3.92 → -3.75 (healthy negative). Stale=2. Log: `/home/darrell/train_alibaba_v125.log`.
+**Status** (2026-04-17, 01:34 PDT, ~2 min in): PID 4102807. **Phase 1 AE pretrain ep 10/50** (recon=0.00008). Fresh SSM pretrain. Phase 3 ETA ~1h. Log: `/home/darrell/train_alibaba_v126.log`.
 
 
 
@@ -53,7 +53,28 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-17, 00:52 PDT, ~119 min in): PID 4063053. **Phase 3 GAN ep 8/200**. Only ★ ep5=0.11635. W: +0.59 (ep5 peak) → +0.42 → +0.33 → +0.43, G=-5.36 healthy, pcf=0.60. Stale=3. Projected frozen ~0.22 vs ATB 0.178 (very early, keep going). Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 01:34 PDT, ~140 min in): PID 4063053. **Phase 3 GAN ep 13/200**. TWO ★s: ep5=0.11635, **ep10=0.10540** (MMD²=0.00970, recall=0.521, desc_mse=0.0291). Projected frozen ~0.21 vs ATB 0.178 (still above, but improving). W: +0.48 (ep10) → +0.71 → +0.51 → +0.50 (healthy, far from 3.0). G=-4.78 healthy. Stale=3. Log: `/home/darrell/train_tencent_v148.log`.
+
+---
+
+## Post-Mortem: alibaba_v125 — v124 recipe + n_critic=1 + w_stop 2.5 (W-stopped ep22, frozen 0.06383 within noise of v124)
+
+**Recipe**: v124 recipe (SSM state-dim 16, continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0) + `--n-critic 1` + `--w-stop-threshold 2.5`. Fresh pretrain. PID 4081005, ran ~23:46–01:24 PDT (~98 min, 22 GAN epochs).
+
+**Training-log**: FOUR ★s then W-stop:
+- ep5=0.07162, ep10=**0.06104** (recall=0.753, MMD²=0.01164) — best, saved to best.pt
+- ep15 no-★ (0.07610), ep20 no-★ (0.08543), ep22 W-stop trip
+- W: +0.45 (ep6) → +2.16 (ep10) → +1.55 → +1.77 → +1.87 → +2.21 → +2.03 → +1.65 → +3.13 → +2.85 → +2.32 → +2.93 → +2.86 → **+3.23** (3-consecutive above 2.5 trip at ep22)
+
+**Frozen-bundle eval (seed=42, 5 runs on best.pt ep10)**: 0.06129, 0.06331, 0.06410, 0.06426, 0.06618 → **avg=0.06383**. Spread 0.00489.
+
+**Comparison to v124 (ATB 0.0656, spread 0.00962 on runs 0.06000-0.06962)**: v125 0.06383 is nominally 2.7% better, but v125's spread [0.06129, 0.06618] overlaps v124's spread [0.06000, 0.06962]. **Improvement is within noise.**
+
+**Finding — SSM at alibaba ceiling with state-dim 16**: n_critic=1 did not tame critic dominance (still hit +3.23 W-spike at ep22), and best training ★ (0.06104) matched v124's (0.06156) within 1%. v124's SSM@16 was already near the corpus ceiling; n_critic variation alone cannot push below 0.06.
+
+**ATB status**: Conservative call — **v125's 0.06383 marginally beats v124's 0.0656, but within statistical noise**. Per the "seed-lucky" lesson from v146/v147 (user-flagged: 20% training variance can be seed luck), do not claim ATB transition. Kept alibaba ATB as v124's 0.0656 pending larger-margin improvement.
+
+**Verdict**: v126 launched to probe SSM capacity ceiling (state-dim 16 → 32). If v126 pushes ★ below 0.06 decisively, SSM had headroom; if v126 plateaus, IDEA #19 closes with v124 as champion.
 
 ---
 
