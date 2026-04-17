@@ -38,14 +38,21 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v133 — **v131 recipe + n_critic=3 (stabilize MTPP advantage on alibaba)**
-**Why**: v131 had **best alibaba training ★ ever recorded** (ep5=0.05232, 15% below v124's ep5) but W-stopped ep22 (n_critic=2, W climbed 3.9→3.3→3.9). v132 (v131+boundary-smoothness) ep10 ★=0.05942 recovered briefly but deteriorated ep15/20 with 2x W-spike >3.0 — killed ep20. Both runs show MTPP is the alibaba training-★ improver but WGAN-SN dynamics fail under standard n_critic=2. Hypothesis: give D 50% more steps (n_critic=3) to hold the line and let MTPP's good trajectory survive to ep40-60 where v149 shows frozen delta stabilizes.
+### alibaba_v134 — **v132 recipe EXACTLY (reproducibility probe for NEW ALIBABA ATB 0.05778)**
+**Why**: v132 ATB 0.05778 came from ep10 of a run killed ep20 (deteriorating training-★ trajectory). v124 ATB was seed-lucky (v130 = exact reproduction failed). v134 tests whether v132 stack (SSM+MTPP+BS) is recipe-robust or seed-lucky like v124. Parallels v150 strategy on tencent (which confirmed v149 recipe robust).
 
-**Recipe**: v131 base (v124+MTPP) + `--n-critic 3` instead of 2. Everything else identical. Fresh pretrain. PID 49883, log `/home/darrell/train_alibaba_v133.log`.
+**Recipe**: v132 recipe EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + boundary-smoothness 1.0/k=2/decay=0.5 + v124 base (K=4 regimes, var-cond + gmm-8, supervisor 5.0, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. n_critic=2 (v133 proved n_critic=3 breaks alibaba dynamics — W=5.85 ep5).
 
-**Hypothesis**: (a) If ★ ≤ 0.05 by ep15-25 with W stable <2.5 → n_critic=3 solves alibaba's WGAN-SN fragility, test more MTPP variants. (b) If ★ stalls at 0.06 with stable W → n_critic=3 trades capacity for stability, neutral result. (c) If W still spikes >3.0 → n_critic isn't the fix, need to try lower lr or different regularizer.
+**Hypothesis**: (a) If v134 ep10 ★ ≤ 0.065 with W stable <2.5 → v132 recipe is seed-robust, ATB 0.05778 confirmed. (b) If v134 W-stops or critic-collapses → v132 was seed-lucky, need new seed or different stabilizer.
 
-**Status** (2026-04-17, 12:39 PDT): Phase 1 AE pretrain ep10/50 (recon=0.00005). Log: `/home/darrell/train_alibaba_v133.log`.
+**Status** (2026-04-17): launching.
+
+---
+
+### alibaba_v133 — CLOSED (W-stopped ep5, n_critic=3 breaks alibaba WGAN-SN dynamics, 2026-04-17)
+**Recipe**: v131 base (v124+MTPP, SSM state-dim 16) + `--n-critic 3` instead of 2.
+**Training**: W climbed 0.24→1.63→3.89→4.40→5.85 in 5 epochs. ep5 ★=0.09181 (well above ATB 0.05778). W-spike guard triggered automatically.
+**Verdict**: n_critic=3 on alibaba makes D too strong relative to G's MTPP-enhanced output. Critic overshoots from the first phase-3 epochs, G can't keep up. n_critic=2 is the alibaba ceiling — going higher destabilizes, as does going lower (v125 n_critic=1 also W-stopped). **n_critic=3 CLOSED on alibaba.** On tencent parallel v151 may behave differently (larger 3234-file corpus, multi-scale+PCF regularizers in base).
 
 ---
 
