@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
 
-**Status** (2026-04-16, 22:46 PDT, ~29 min in): PID 4040753. **Phase 2.5 G warm-up 40/100** (sup=0.00009, converging cleanly). AE + Sup pretrain complete. SSM running on par with LSTM on alibaba. Phase 3 GAN ETA ~20-25 min (60 warmup epochs to go). Log: `/home/darrell/train_alibaba_v124.log`.
+**Status** (2026-04-16, 22:51 PDT, ~34 min in): PID 4040753. **Phase 2.5 G warm-up 50/100** (sup=0.00014, converged). AE + Sup pretrain complete. SSM running on par with LSTM on alibaba. Phase 3 GAN ETA ~15 min (50 warmup epochs to go). Log: `/home/darrell/train_alibaba_v124.log`.
 
 
 
@@ -51,7 +51,7 @@ relevant.
 
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16, 22:46 PDT, ~221 min in): PID 3971604. **Phase 3 ep 83/200**. SEVEN ★s, best ★=0.08451 ep70. Stale=13. ep80 eval no-★ (comb=0.08948, recall=0.598). ep83 W=+2.59 (still well below 3.0 W-stop), G=-0.27 (mild uptick). ep81-82 G healthy -1.83/-1.75. No critic collapse, no W-stop. 20% above v146's 0.07048, 52% below 0.178 ATB. 17 epochs of stale budget remain. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 22:51 PDT, ~226 min in): PID 3971604. **Phase 3 ep 85/200**. SEVEN ★s, best ★=0.08451 ep70. Stale=15. **Trajectory reversal signs**: ep80 comb=0.08948 (recall=0.598), ep85 **comb=0.10102** (recall=0.548, MMD²=0.01062) — 20% above best, recall decaying monotonically 0.622→0.598→0.548. **W=+2.98 at ep85 — 99.3% of W-stop 3.0**, one high-W epoch away from auto-stop. G=-0.59 at ep85 (healthy) despite W spike. No critic collapse. 15 epochs of stale budget remain. If no ★ by ep100, kill or allow 30-stale trigger. Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
