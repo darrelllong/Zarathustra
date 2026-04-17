@@ -74,14 +74,23 @@ relevant.
 
 
 
-### tencent_v151 — **v150 recipe + n_critic=3 (push past training plateau + parallel to v133)**
-**Why**: v150 locked ATB at 0.05875 frozen (ep35 best.pt) but training-★ plateaued ep35→ep64 (best unchanged). W had single spike ep59=3.13 (self-corrected). v149 also had late-epoch W crossings (ep84=3.17, ep86=3.19). SSM+MTPP+multi-scale+PCF recipe reaches a training-★ ceiling around 0.051 because D can't hold the line as MTPP and multi-scale-PCF make G stronger. Hypothesis: give D 50% more steps (n_critic=3, mirror v133 alibaba test) to push training-★ below 0.05, which should translate to frozen ★ ~0.05 or better.
+### tencent_v152 — **v150 recipe MINUS boundary-smoothness (Round 16 clean ablation: is BS load-bearing on tencent?)**
+**Why**: Round 16 peer review flagged v149/v150 for stacking 5 ideas (#19/#20/#8/#6/#21) without per-component attribution. BS (#21) is closed on alibaba (v128 neutral-to-worse). Clean single-variable ablation from v150: remove BS, keep SSM+MTPP+multi-scale+PCF. Three outcomes: (a) frozen ≈ 0.058 → BS neutral on tencent, simplify recipe; (b) frozen < 0.058 → BS was hurting, new ATB; (c) frozen > 0.058 → BS is load-bearing, confirms stack.
 
-**Recipe**: v150 EXACTLY + `--n-critic 3` instead of 2. Everything else identical. Fresh pretrain. Log `/home/darrell/train_tencent_v151.log`.
+**Recipe**: v150 EXACTLY MINUS `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. n_critic=2. Fresh pretrain. Log `/home/darrell/train_tencent_v152.log`. PID 113120.
 
-**Hypothesis**: (a) If training-★ ≤ 0.045 by ep40-60 with W stable <2.7 → n_critic=3 is the tencent ceiling-breaker, new ATB likely. (b) If ★ stalls at 0.051 with more stable W → n_critic=3 trades capacity for stability, no frozen gain. (c) If W still spikes >3.0 → n_critic isn't the fix, try lower lr or smaller PCF weight.
+**Status** (2026-04-17): launched 15:33 PDT.
 
-**Status** (2026-04-17): launching.
+---
+
+### tencent_v151 — CLOSED (ep10 ★=0.05980 = 1.8% above ATB, ep16 W=3.16 crossed threshold, G collapsed, 2026-04-17)
+**Recipe**: v150 EXACTLY + `--n-critic 3` instead of 2. Fresh pretrain. PID 74987. Ran 13:34–15:30 PDT (~116 min, killed ep17).
+
+**Training**: ep5 ★=0.07930 → **ep10 ★=0.05980** (best, MMD²=0.00550, recall=0.729) → ep15 no-★=0.06271 (regression) → ep16 W=3.16 (crossed 3.0 threshold; W dynamics self-corrected briefly ep17 W=2.32). G trajectory −7 → −0.47 at ep16 (classic critic-dominance failure mode, identical to v133 on alibaba).
+
+**Why killed**: ep10 training ★=0.05980 + historical v150 train→frozen delta +0.00748 = projected frozen ~0.067, clearly NOT beating ATB 0.05875. Skipped frozen eval (saves ~10 min GPU in race context). 7 epochs stale + G collapsed.
+
+**Verdict**: **n_critic=3 CLOSED on tencent (mirrors v133 alibaba closure).** n_critic=2 remains the only stable setting for WGAN-SN + SSM+MTPP+multi-scale+PCF stack on both corpora. Hypothesis (a) fully refuted — giving D more steps doesn't push training-★ below 0.05; it breaks G. v150's ★ plateau at 0.051 is NOT a capacity problem solvable by n_critic. Need either seed variance explanation, component ablation (v152 = −BS), or architectural change.
 
 ---
 
