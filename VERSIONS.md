@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.06 with stable G sign → boundary regularizer breaks the alibaba-SSM ceiling, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → regularizer is neutral, SSM+v114 is the local optimum. (c) If critic collapses again → even G-side regularization destabilizes alibaba's SSM dynamics, confirming architectural change is needed next.
 
-**Status** (2026-04-17, 04:52 PDT, just launched): PID 4142957. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min to Phase 3. Log: `/home/darrell/train_alibaba_v128.log`.
+**Status** (2026-04-17, 06:20 PDT, ~88 min in, Phase 3 ep11): PID 4142957. **ep5 ★=0.06703 (recall=0.705), ep10 no-★ (0.07452 — 11% regression)**. 21% WORSE than v124 at same epoch. G stable +0.1 to +1.4 (NOT climbing like v127 — boundary-smoothness does regularize) but W climbing monotonically 0.91→1.62→1.31→1.08→1.68→1.90→2.05 (ep11 = 68% of W-stop). Stale=6. Log: `/home/darrell/train_alibaba_v128.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 05:38 PDT, ~123 min in, Phase 3 ep20): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep15 no-★ (0.05919) → ep20=0.04740 ★** — ep20 MMD²=0.00420, recall=0.784, best tencent training ★ ever by 33% margin over v146's 0.07048. G runs hot (oscillating +1.9 to +4.3, peak +4.33 ep19) but DOES NOT block improvement — ★ still dropping. W=0.99 ep20 (recovered from 1.51 ep19). If training→frozen delta holds near v146's +0.107, projected frozen **~0.154 vs ATB 0.178 = 13% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 06:20 PDT, ~165 min in, Phase 3 ep33): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep15 no-★ → ep20=0.04740 ★ → ep25 no-★ → ep30=0.04552 ★** — ep30 MMD²=0.00332, recall=0.789, best tencent training ★ ever by 36% margin over v146's 0.07048. G runs hot (oscillating +3 to +5.88 at ep33) but ★ STILL IMPROVING. W climbing 1.0→1.72 (57% of W-stop, watch). Projected frozen ~0.153 vs ATB 0.178 = **14% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
