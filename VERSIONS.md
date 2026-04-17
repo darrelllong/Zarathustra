@@ -44,7 +44,7 @@ relevant.
 
 **Hypothesis**: (a) If frozen ≤ 0.066 → IDEA #21 ports to alibaba, new ATB candidate. (b) If ★ <0.05 training but frozen ≥ 0.08 → alibaba's structural gap is not solved by boundary-smoothness. (c) If W-stops early like v131 → MTPP+boundary-smoothness stack is unstable, revert to cleaner IDEA tests.
 
-**Status** (2026-04-17, 11:56 PDT, Phase 3 ep6/200): PID 22475. **ep5 ★=0.09554** (MMD²=0.02644, recall=0.654). W stable 0.7-0.9. **BAD START**: 45% worse than v131 ep5 (0.05232), 55% worse than v124 ep5 (0.06156), similar territory to v127's failed start (0.09541). Consistent with v128 (boundary-smoothness alone → frozen regression). Boundary-smoothness appears to hurt alibaba even stacked with MTPP. Letting ep10 confirm before kill — need ep10 to drop below 0.06 to be worth continuing. Log: `/home/darrell/train_alibaba_v132.log`.
+**Status** (2026-04-17, 12:10 PDT, Phase 3 ep11/200): PID 22475. **ep5 ★=0.09554** → **ep10 ★=0.05942** (MMD² 0.02644→0.00932, recall 0.654→0.750). **38% improvement, MAJOR RECOVERY**. ep10 ★ is 3.5% BETTER than v124's ep5 training ★ (0.06156). Boundary-smoothness took 5 epochs to kick in. W stable 1.0-1.99 (well below 3.0). Projected frozen depends on train→frozen delta: +0.004 (v124-like) → 0.063 beats v124 ATB 0.0656; +0.039 (v131-like) → 0.098 loses. NEED ep15-20 to confirm trajectory. Log: `/home/darrell/train_alibaba_v132.log`.
 
 ---
 
@@ -64,7 +64,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 11:56 PDT, Phase 3 ep36/200): PID 4192831. **NEW ★ ep35=0.05127** (MMD²=0.00367, recall=0.762) — fourth ★ (ep5/10/25/35), 7% better than ep25. W climbing 1.6→2.0 stable (still well below 3.0). Recipe reproducibility CONFIRMED, trajectory continuing to improve. v149 hit 0.04200 at ep60 — v150 on track. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 12:10 PDT, Phase 3 ep41/200): PID 4192831. Best ★=0.05127 ep35 (stale=6). ep40 no-★=0.06492 (MMD² 0.00362 flat, recall 0.694 dropped). W climbing 1.9-2.5 (approaching but not hitting 3.0, one ep37 spike to 2.49). Still recipe-reproducing v149 trajectory (v149 hit 0.04200 at ep60). Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
