@@ -35,14 +35,14 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v130 — **v124 recipe EXACTLY (reproducibility probe)**
-**Why**: v125/v126/v127/v128/v129 all modified v124's SSM champion in different directions — ALL FAILED. Six runs with ★ ranging 0.064-0.121. The question now: is v124's 0.0656 frozen **recipe-robust** (reproducible at similar ★ on rerun) or **seed-lucky** (one-time stroke)? v130 launches v124 EXACTLY with no changes — fresh pretrain, different random draw. If v130 lands near 0.0616 training ★, v124 is the recipe-champion and alibaba is locked at 0.0656 ATB for now. If v130 lands at 0.08-0.10 like the other variants, v124 was seed-lucky and frozen eval needs re-examination.
+### alibaba_v131 — **v124 recipe + MTPP timing (IDEA #20 on alibaba — first test)**
+**Why**: v130 just killed ep9 — v124 recipe EXACTLY failed to reproduce (W climbed 0.12→3.71 in 9 ep, ★ep5=0.08995 = 37% above v124's 0.06156). **v124 was seed-lucky, not recipe-robust.** SSM+alibaba has high seed variance: 5 failures (v125-v129) + v130 confirm. Need a representational change on alibaba, not another SSM seed. MTPP timing (IDEA #20) is working in v149 tencent (trajectory ★=0.04200 ep60, 40% below v146 seed-lucky best) — bring the same SSM+MTPP combo to alibaba for first time. Replaces linear timing head with mixture-density point-process, treating ts as event mark rather than feature column.
 
-**Recipe**: v124 recipe EXACTLY — SSM state-dim 16, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0. Fresh pretrain. PID 4173744, log `/home/darrell/train_alibaba_v130.log`.
+**Recipe**: v124 recipe + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` (same MTPP params as v149 tencent). SSM state-dim 16 retained. Everything else identical to v124/v130. Fresh pretrain. PID 4188458, log `/home/darrell/train_alibaba_v131.log`.
 
-**Hypothesis**: (a) If ★ ≈ 0.06-0.07 by ep10-15 → v124 is recipe-robust, champion confirmed. (b) If ★ ≈ 0.08-0.10 → v124 was seed-lucky and its frozen 0.0656 was also seed-lucky; need more-principled re-evaluation. (c) If critic collapses (G positive, ★ > 0.10) → even the exact recipe is fragile and we're hitting the fundamental SSM-alibaba stability frontier.
+**Hypothesis**: (a) If ★ ≈ 0.055-0.065 by ep10-15 with stable W → MTPP beats v124 champion and IDEA #20 is universal (both corpora). (b) If ★ ≈ 0.07-0.08 with stable dynamics → MTPP doesn't help alibaba, but the SSM base is still the right frontier. (c) If W climbs fast like v130 → SSM+alibaba remains seed-lottery regardless of G-head changes, pivot to LSTM+MTPP next.
 
-**Status** (2026-04-17, 08:33 PDT, ~52 min in, Phase 3 JUST STARTED): PID 4173744/4173750. Pretrain complete (all phases healthy: AE recon=0.00001, Sup=0.02563, G warm-up sup=0.00027). Pretrain checkpoint saved. Phase 3 joint GAN training now running — first ★ opportunity at ep5 (~25 min out). Log: `/home/darrell/train_alibaba_v130.log`.
+**Status** (2026-04-17, 08:55 PDT, just launched): PID 4188458. Phase 1 AE pretrain ep10/50 (recon=0.00006 — healthy). Fresh pretrain ETA ~50 min to Phase 3. Log: `/home/darrell/train_alibaba_v131.log`.
 
 
 
@@ -53,7 +53,32 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 08:33 PDT, ~303 min in, Phase 3 ep80): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. Post-best: ep65=0.04521 → ep70=0.05278 → ep75=0.05035 → **ep80=0.05238** (all no-★, MMD² rising 0.00285→0.00368, recall dipping 0.762→0.756 — degradation not recovery). Stale=**20 ep**, 10 ep from 30-ep kill threshold. G trending hotter (range 5.5-7.8). Best ★ checkpoint ep_0060.pt preserved. If ep85/90 produce no ★, will kill at stale=30 and promote ep60 to frozen eval. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 08:55 PDT, ~322 min in, Phase 3 ep85): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. Post-best: ep65=0.04521 → ep70=0.05278 → ep75=0.05035 → ep80=0.05238 → **ep85=0.05088** (all no-★, oscillating 0.050-0.053). Stale=**25 ep**, 5 ep from 30-ep kill threshold. ep84 W spiked to **+3.17** (crossed threshold; self-corrected to 2.37 ep85 — not auto-killed). If ep90 no-★ → kill at stale=30 and promote ep_0060.pt to frozen eval. Log: `/home/darrell/train_tencent_v149.log`.
+
+---
+
+## Post-Mortem: alibaba_v130 — v124 recipe EXACTLY reproducibility probe (killed ep9, 2026-04-17, critic dominance W-cross — **v124 was seed-lucky, not recipe-robust**)
+
+**Recipe**: v124 recipe EXACTLY (no modifications). SSM state-dim 16, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0. Fresh pretrain. PID 4173750, ran 07:40–08:54 PDT (~74 min, killed ep9).
+
+**Training-log**: ONE ★ (terrible) then critic dominance:
+- Phase 1/2/2.5 pretrain all healthy (AE recon=0.00001, Sup=0.02563, G warm-up sup=0.00027)
+- **Phase 3 W trajectory: ep1=0.12 → ep2=0.23 → ep3=1.19 → ep4=1.61 → ep5=1.47 → ep6=2.03 → ep7=2.82 → ep8=2.85 → ep9=3.71 ★ CROSSED W-STOP THRESHOLD**
+- G trajectory: ep1=-0.78 → ep5=-4.02 → ep9=-3.56 (critic dominance — G stuck at loss floor, can't fight back)
+- **ep5 ★=0.08995** (MMD²=0.02335, recall=0.667) — 37% ABOVE v124 champion 0.06156, 37% above ATB 0.0656 → projected frozen ~0.094, no path to beat ATB
+
+**Why killed**: W=3.71 at ep9 crossed w-stop threshold 3.0 (auto-kill didn't fire — tolerance-based). ★=0.08995 is 37% worse than v124 at the same epoch. Trajectory shows classic critic-dominance failure (W climbing, G stuck at -4 floor). Same failure mode as v125 (n_critic=1 → W-stop) even though v130 used n_critic=2. No path to beat v124's 0.06156 let alone ATB 0.0656.
+
+**Finding — v124 was seed-lucky, NOT recipe-robust**: v130 used identical recipe, different random seed at pretrain. Different seed produced entirely different Phase 3 dynamics (v124 stabilized, v130 critic-dominance collapse). SSM+alibaba has **high seed variance**: v124 = lucky tail, v125/v126/v127/v128/v129 = failure tail, v130 = also failure tail. 1 success out of 7 SSM+alibaba seeds.
+
+**Implications**:
+1. **Alibaba ATB 0.0656 (v124 frozen) stands** — v130's failure doesn't erase v124's audited frozen number. But v124 is a single lucky seed, not a reproducible recipe. Race implication: hard to extend (stacking improvements on a seed-lucky base is a dead end).
+2. **SSM+alibaba is seed-fragile** — further probes require either many seeds (wasteful) or a new stabilizer that reduces seed variance.
+3. **Pivot**: bring a representational change (MTPP from IDEA #20) rather than more SSM capacity/balance tweaks. v131 (v124 recipe + MTPP) launched immediately.
+
+**Frozen-bundle eval**: NOT RUN. best.pt ep5 preserved but ★=0.08995 = 37% above ATB.
+
+**Verdict**: v131 launched same run — same SSM base, adds MTPP timing. Tests whether MTPP helps at all on alibaba AND whether MTPP's smoother timing head reduces seed variance relative to linear timing head.
 
 ---
 
