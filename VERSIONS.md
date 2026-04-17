@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
 
-**Status** (2026-04-16, 22:26 PDT, starting): Phase 1 AE pretrain 1/50 (recon=0.04194, consistent with fresh init — confirms no LSTM hot-start). Phase 3 GAN starts in ~2-3h.
+**Status** (2026-04-16, 22:58 PDT, ~12 min in): PID 4040753. **Phase 2 Sup pretrain 40/50** (sup=0.05271). Phase 1 AE complete (recon 0.04194→0.00001 converged by ep 20). SSM running much faster than expected on alibaba's small corpus — at this rate Phase 3 GAN starts in ~20-30 min (not 2-3h as projected). Log: `/home/darrell/train_alibaba_v124.log`.
 
 
 
@@ -51,7 +51,7 @@ relevant.
 
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16, 22:46 PDT, ~223 min in): PID 3971604. **Phase 3 ep 75/200**. **SEVEN ★s — ep 70 new best ★=0.08451** (recall=0.622, MMD²=0.00881, desc_mse=0.0287). Trajectory: ep5=0.15377 → ep10=0.10454 → ep15=0.09446 → ep30=0.08742 → ep35=0.08660 → ep65=0.08469 → **ep70=0.08451**. Stale=5. ep 75 eval no-★ comb=0.09100 (recall=0.591). G recovered to healthy range (-0.56 to -1.20 across ep 67-75), W healthy +1.7-2.5. Critic stabilized post-ep59 spike. Still 20% above v146's 0.07048 peak but three consecutive-ish ★ improvements post-kill-scare. 52% below 0.178 ATB. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 22:58 PDT, ~224 min in): PID 3971604. **Phase 3 ep 77/200**. SEVEN ★s, best ★=0.08451 ep70. Stale=7. Recent G/W: ep71=-0.57/+2.49, ep72=-0.63/+2.34, ep73=-1.05/+1.70, ep74=-0.83/+2.48, ep75=-0.62/+2.21, ep76=-0.12/+2.04 (slight G uptick — watch for ep80 eval), ep77=-0.42/+2.04. No critic collapse, no W-stop. 20% above v146's 0.07048, 52% below 0.178 ATB. Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
