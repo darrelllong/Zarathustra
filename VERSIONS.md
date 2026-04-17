@@ -64,7 +64,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 10:51 PDT, Phase 3 ep11/200): PID 4192831. **ep5 ★=0.05774**, **ep10 ★=0.05703** (two consecutive ★s, MMD² 0.00714→0.00773, recall 0.747→0.753). W stable 0.4-0.8 (well below 3.0 stop). G stable -2.0 to -2.5. **Recipe reproducibility CONFIRMED at ep10** — trajectory matches v149 and slightly improving. v149's SSM+MTPP+multi-scale+PCF+boundary-smoothness is recipe-robust on tencent, unlike v124 on alibaba. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 11:24 PDT, Phase 3 ep26/200): PID 4192831. **ep5 ★=0.05774**, **ep10 ★=0.05703**, **ep25 ★=0.05497** (three ★s, MMD² trending down 0.00714→0.00773→0.00417, recall rebounded 0.703→0.742→0.746). W stable 0.5-1.2 (far below 3.0). **Recipe reproducibility CONFIRMED**, trajectory AHEAD of v149 at same epoch (v149 ep25 was ~0.055 range). Epoch times slowed to 260-280s under v132 GPU contention. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
