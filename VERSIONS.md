@@ -33,14 +33,16 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v123 — **v114 base + MTPP at LOW weight 0.1 (1/5 of v122's 0.5) + Phase A descriptor monitor**
-**Why**: v122 hit critic collapse at ep 29-33 (G loss went POSITIVE, W shrank below 0.2) — MTPP weight 0.5 was dominating G loss on alibaba. v123 tests whether MTPP at weight 0.1 avoids critic dominance while still providing timing-distribution gradient signal. Single-variable change from v122. If critic stays healthy AND v123 pushes below v114's ★=0.073, MTPP has a viable alibaba dose. If critic still collapses, MTPP closes on alibaba.
+### alibaba_v124 — **v114 base + IDEA #19 SSM backbone (Mamba-lite, --ssm-backbone --ssm-state-dim 16)**
+**Why**: After v120 (retrieval arch-prior), v121 (retrieval + BCE), v119 (chunk-stitching), v122 (MTPP 0.5), v123 (MTPP 0.1), the alibaba Round-16 queue has closed IDEAs #17, #20, #21 on this corpus. IDEA #18 Phase A monitor shows flat desc_mse across all runs — Phase B not justified by current data. IDEA #19 (SSM backbone) is the last untested Round-16 mechanism. The repo is still trying to get long-horizon structure out of a short-window recurrent generator; Mamba-lite SSM is a genuine representation change, not a loss tweak.
 
-**Recipe**: Identical to v122 except `--mtpp-timing-weight 0.1` (was 0.5). v114 base (continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0) + `--mtpp-timing --mtpp-timing-weight 0.1 --mtpp-sigma-min 0.05` + `--cache-descriptor-file alibaba_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from v48 pretrain.
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF per alibaba eval-negatives, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, reuse-bce 2.0, stride-consistency 1.0) + `--ssm-backbone --ssm-state-dim 16`. **Fresh pretrain required** (SSM cannot hot-start from v48 LSTM checkpoints). PID 4040753, log `/home/darrell/train_alibaba_v124.log`.
 
-**Hypothesis**: With MTPP contributing 1/5 the gradient magnitude to G loss, the adversarial signal should stay dominant. W should remain in v114-like range (0.3–2.0) and G loss should stay in -3 to -6 range (not collapse to 0). If training ★ still ends up above v114's 0.073, MTPP doesn't help alibaba at any dose. If ★ goes below 0.073 with healthy W, weight 0.1 is the alibaba recipe.
+**Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
 
-**Status** (2026-04-16, 22:26 PDT, ~84 min in): PID 4007894. **Phase 3 ep 28/200**. **Two ★s**: ep 5=0.13959 → **ep 10 ★=0.13447**. Stale=**18**. ep 25 eval comb=0.14924 (MMD² recovering). Training dynamics healthy: G=-4.79 to -5.06, W=0.91-1.15. Log: `/home/darrell/train_alibaba_v123.log`.
+**Status** (2026-04-16, 22:26 PDT, starting): Phase 1 AE pretrain 1/50 (recon=0.04194, consistent with fresh init — confirms no LSTM hot-start). Phase 3 GAN starts in ~2-3h.
+
+
 
 ### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
 **Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
@@ -50,6 +52,24 @@ relevant.
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
 **Status** (2026-04-16, 22:26 PDT, ~203 min in): PID 3971604. **Phase 3 ep 66/200**. **SIX ★s — ep 65 new best ★=0.08469** (recall=**0.624 new run high**, MMD²=0.00939, desc_mse=0.0217). Run saved from 30-stale kill at the last epoch. Trajectory: ep5=0.15377 → ep10=0.10454 → ep15=0.09446 → ep30=0.08742 → ep35=0.08660 → **ep65=0.08469**. Stale=1. G=-0.72 (healthy negative), W=+1.83 (healthy). Still 19.5% above v146's 0.07048 peak but trending right direction. 52% below 0.178 ATB. Log: `/home/darrell/train_tencent_v147.log`.
+
+---
+
+## Post-Mortem: alibaba_v123 — v114 base + MTPP timing head weight=0.1 + Phase A descriptor monitor (killed ep30, 2026-04-16, hopeless projection)
+
+**Recipe**: v114 base (continuity 1.0, NO multi-scale, NO PCF, K=4 regimes, var-cond + gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0) + `--mtpp-timing --mtpp-timing-weight 0.1 --mtpp-sigma-min 0.05` + `--cache-descriptor-file alibaba_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from v48 pretrain. PID 4007896, ran 21:03–22:26 PDT (~83 min, 30 GAN epochs).
+
+**Training-log**: Two ★s early, then plateau: ep 5 ★=0.13959 (recall=0.451, MMD²=0.02969, desc_mse=0.0037), ep 10 ★=**0.13447** (recall=0.408, MMD²=0.01617, desc_mse=0.0295). Then monotonic recall decay: ep 15=0.13521 (recall 0.414), ep 20=0.16197 (recall 0.399), ep 25=0.14924 (recall 0.386), ep 30=0.15284 (**recall 0.356 new low**). G healthy -4.0 to -5.1, W healthy 0.59-1.19 — **no critic collapse** (MTPP 0.1 hypothesis confirmed re: v122's weight 0.5 failure mode). Training dynamics stable; the generator simply plateaued.
+
+**Why killed (hopeless)**: Best training ★=0.13447 + v114 training-to-frozen inflation (0.103) ≈ projected frozen **0.237**, 35% above alibaba ATB 0.176 — same hopeless territory as v120 (0.246) and v121 (0.229) which were killed. Monotonic recall decay post-peak confirms no recovery signal. Race-mode decision: kill early, move to next queue item.
+
+**Finding — MTPP dose curve on alibaba**: Tested at weight 0.5 (v122 → critic collapse at ep 29-33) and weight 0.1 (v123 → stable critic, trajectory plateau). Conclusion: MTPP either dominates G loss (weight 0.5) or is too weak to change trajectory (weight 0.1) — there is no alibaba dose that both keeps critic healthy AND pushes below v114's 0.073. **IDEA #20 CLOSED on alibaba** (works on tencent v146 at weight 0.5 where larger corpus provides stronger base G loss).
+
+**Finding — Phase A descriptor signal is not a Phase B justifier**: Third alibaba data point (v122, v123) plus v147 on tencent all show desc_mse flat or anti-correlated with training ★. **IDEA #18 Phase B not justified by this data.** Keep Phase A monitor on future runs only as a cheap diagnostic; do not invest in differentiable soft descriptors.
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep10, ~14MB) preserved at `/home/darrell/checkpoints/alibaba_v123/best.pt` along with epoch_0010/20/30 snapshots.
+
+**Verdict**: v124 launched as next untested Round-16 mechanism on alibaba: SSM backbone (IDEA #19). Last serious architectural bet remaining in the queue.
 
 ---
 
