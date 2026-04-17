@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
 
-**Status** (2026-04-16, 23:00 PDT, ~48 min in): PID 4040753. **Phase 3 Joint GAN ep 1/200 STARTED**. pretrain_complete.pt saved. G warm-up converged cleanly (100/100 sup=0.00014). ep1: W=+0.17, G=-1.04, t=94s/ep. W still low (critic warming up, not W-stop). First SSM-on-alibaba ★ eval at ep5. Log: `/home/darrell/train_alibaba_v124.log`.
+**Status** (2026-04-16, 23:25 PDT, ~73 min in): PID 4040753. **Phase 3 ep 16/200**. **TWO ★s — ep10 ★=0.06156 (recall=0.750, MMD²=0.01146) — BELOW v114's 0.073 baseline**. Projected frozen: 0.06156 + alibaba delta 0.103 ≈ **0.165, would beat alibaba ATB 0.176 by 6.3%** (first alibaba ATB-beating candidate in the race). ★ trajectory: ep5=0.09369, ep10=**0.06156**. ep15 no-★ (0.07972, recall=0.673 — regressing from ep10). Stale=6. **CRITIC DOMINANCE emerging**: G has been positive 11 of last 12 epochs, increasing: ep10 G=+0.15, ep11=+0.49, ep13=+0.82, ep14=+0.90, ep16=+0.95. W climbing from +0.17 at ep1 to +2.27 at ep16 — approaching 3.0 W-stop. If W triggers, best.pt ep10 preserved. Log: `/home/darrell/train_alibaba_v124.log`.
 
 
 
@@ -51,7 +51,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-16, 23:00 PDT, ~3 min in): PID 4063050. **Phase 1 AE pretrain 1/50** (recon=0.01978). Retrieval memory enabled (98,913 new params, all fresh-initialised). Phase 3 GAN in ~2-3h (tencent's 3234-file corpus is slower than alibaba's 239-file).
+**Status** (2026-04-16, 23:25 PDT, ~28 min in): PID 4063050. **Phase 2.5 G warm-up starting**. AE pretrain complete. Sup pretrain complete (sup=0.04152). Phase 3 GAN ETA ~1-1.5h. Log: `/home/darrell/train_tencent_v148.log`.
 
 ---
 
