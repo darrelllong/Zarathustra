@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.06 by ep10-15 → SSM capacity was the bottleneck, new ATB candidate. (b) If ★ ≈ v124's 0.06156 → SSM saturated at state-dim 16, IDEA #19 closed. (c) If critic dominance still trips W-stop by ep20 → SSM inherently destabilizes alibaba critic regardless of capacity.
 
-**Status** (2026-04-17, 01:45 PDT, ~13 min in): PID 4102807. **Phase 2.5 G warm-up ep 20/100** (sup=0.00061). AE + Sup pretrain complete. Phase 3 ETA ~25-30 min. Log: `/home/darrell/train_alibaba_v126.log`.
+**Status** (2026-04-17, 01:51 PDT, ~19 min in): PID 4102807. **Phase 2.5 G warm-up ep 30/100** (sup=0.00700, bump from 0.00061 at ep20 — monitor). Phase 3 ETA ~25-30 min. Log: `/home/darrell/train_alibaba_v126.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-17, 01:45 PDT, ~160 min in): PID 4063053. **Phase 3 GAN ep 20/200**. Best **ep10 ★=0.10540** still holds; ep15=0.10886 (+3.3%), ep20=0.11165 (+5.9%) — slight regression. Stale=10. W healthy (0.51–0.79), G healthy (-3.50 to -5.28), pcf climbing 0.71→0.82. Projected frozen ~0.21 vs ATB 0.178. Next ★ at ep25 decisive. Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 01:51 PDT, ~165 min in): PID 4063053. **Phase 3 GAN ep 21/200**. Best **ep10 ★=0.10540** still holds. Stale=11. W=+0.57 healthy, G=-5.53 healthy, pcf=0.76. Next ★ at ep25 decisive. Projected frozen ~0.21 vs ATB 0.178. Log: `/home/darrell/train_tencent_v148.log`.
 
 ---
 
