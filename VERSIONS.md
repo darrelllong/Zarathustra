@@ -51,7 +51,7 @@ relevant.
 
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16, 22:26 PDT, ~203 min in): PID 3971604. **Phase 3 ep 66/200**. **SIX ★s — ep 65 new best ★=0.08469** (recall=**0.624 new run high**, MMD²=0.00939, desc_mse=0.0217). Run saved from 30-stale kill at the last epoch. Trajectory: ep5=0.15377 → ep10=0.10454 → ep15=0.09446 → ep30=0.08742 → ep35=0.08660 → **ep65=0.08469**. Stale=1. G=-0.72 (healthy negative), W=+1.83 (healthy). Still 19.5% above v146's 0.07048 peak but trending right direction. 52% below 0.178 ATB. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 22:46 PDT, ~223 min in): PID 3971604. **Phase 3 ep 75/200**. **SEVEN ★s — ep 70 new best ★=0.08451** (recall=0.622, MMD²=0.00881, desc_mse=0.0287). Trajectory: ep5=0.15377 → ep10=0.10454 → ep15=0.09446 → ep30=0.08742 → ep35=0.08660 → ep65=0.08469 → **ep70=0.08451**. Stale=5. ep 75 eval no-★ comb=0.09100 (recall=0.591). G recovered to healthy range (-0.56 to -1.20 across ep 67-75), W healthy +1.7-2.5. Critic stabilized post-ep59 spike. Still 20% above v146's 0.07048 peak but three consecutive-ish ★ improvements post-kill-scare. 52% below 0.178 ATB. Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
