@@ -46,14 +46,34 @@ relevant.
 
 
 
-### tencent_v148 — **v146 recipe + IDEA #17 retrieval memory + BCE 0.5 (first retrieval test on tencent)**
-**Why**: v147 closed with training ★=0.08451 (20% above v146's 0.07048 — reproducibility test shows v146 was seed-lucky), projected frozen 0.19 above 0.178 ATB, trajectory reversing at ep85. To push tencent below 0.178 ATB, need a mechanism change, not a reseed. Retrieval memory (IDEA #17) was only tested on alibaba (v120/v121) where it plateaued at 0.126 — but tencent has 13.5× more training files, K=8 regimes, and stronger reuse structure (v146 MTPP worked where alibaba MTPP failed). Retrieval + BCE 0.5 is the natural next Round-16 mechanism on tencent.
+### tencent_v149 — **v146 recipe + SSM backbone (IDEA #19 cross-corpus test on tencent)**
+**Why**: v148 retrieval memory (IDEA #17) killed ep38 hopeless (training ★=0.09655 ep25, monotonic degradation through ep35, recall decay 0.558→0.424, projected frozen ~0.20 vs ATB 0.178). With retrieval closed on both corpora and SSM the alibaba champion (v124 ATB 0.0656 = 62.7% improvement over prior baseline), the next untested Round-16 mechanism on tencent is IDEA #19 SSM backbone. Cross-corpus test: does the selective-state architecture that dominated alibaba also help tencent's 13.5×-larger corpus with K=8 regimes?
 
-**Recipe**: v146 recipe (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5` + cache-descriptor Phase A monitor (kept as diagnostic). Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt`. PID 4063050, log `/home/darrell/train_tencent_v148.log`.
+**Recipe**: v146 recipe exactly (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes) + `--ssm-backbone --ssm-state-dim 16` (v124 champion setting). Fresh SSM pretrain (no hot-start; SSM requires matching-arch pretrain). PID 4124709, log `/home/darrell/train_tencent_v149.log`.
 
-**Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
+**Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 02:07 PDT, ~180 min in): PID 4063053. **Phase 3 GAN ep 31/200**. Best ★=0.09655 ep25, ep30 no-★ (0.10740). Stale=6. W climbing 0.85→1.06→1.09→0.93 (watch). G healthy -3.56 to -4.05. Projected frozen ~0.20 vs ATB 0.178. Log: `/home/darrell/train_tencent_v148.log`.
+**Status** (2026-04-17, 03:35 PDT, ~4 min in): PID 4124709. **Phase 1 AE pretrain ep 10/50** (recon=0.00578). Multi-scale + PCF + mixed-type + SSM all initialized cleanly. Phase 3 ETA ~60 min. Log: `/home/darrell/train_tencent_v149.log`.
+
+---
+
+## Post-Mortem: tencent_v148 — v146 recipe + IDEA #17 retrieval memory + BCE 0.5 (killed ep38, 2026-04-17, hopeless + recall decay — retrieval CLOSED on tencent)
+
+**Recipe**: v146 recipe (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-decay 0.85 --retrieval-tau-write 0.5 --retrieval-n-warmup 4 --retrieval-reuse-bce-weight 0.5`. Hot-start from v86. PID 4063053, ran ~23:05 PDT (2026-04-16) → 03:30 PDT (2026-04-17), killed ep38.
+
+**Training-log**: TWO ★s early, then monotonic degradation:
+- ep5=0.11635 → **ep10=0.10540** ★ (first) → ep15=0.10886 → ep20=0.11165 → **ep25=0.09655** ★ (best) → ep30=0.10740 → ep35=0.12308
+- recall decay ep25→ep35: 0.558 → 0.513 → 0.424 (monotonic)
+- W stayed healthy 0.85–1.09 (no critic trip), G stayed healthy -3.5 to -4.0 (no collapse)
+- Stale counter: 0 at ep25 → 13 at ep38 when killed
+
+**Why killed (hopeless + reversal)**: Best training ★=0.09655 + v146 training-to-frozen delta (~0.107) ≈ projected frozen **~0.20** — 12% ABOVE tencent ATB 0.178. Trajectory monotonically worsening (0.09655→0.12308 over 10 epochs) with recall collapsing. Killed early at stale=13 (before 30-stale rule) because trajectory was unambiguously hopeless — no path to beating ATB.
+
+**Finding — IDEA #17 retrieval memory CLOSED on both corpora**: Previously closed on alibaba (v120/v121 plateau 0.126). Now closed on tencent: retrieval mechanism fires cleanly (BCE head trains, gate active) but does not help ★ and accelerates recall decay. Corpus-size hypothesis (that tencent's 13.5×-larger corpus would enable retrieval) DISPROVEN. Root cause: LLGAN already has strong reuse supervision via `reuse_bce_weight 2.0` on the main head; retrieval's additional BCE gate is redundant and adds noise.
+
+**Frozen-bundle eval**: NOT RUN. best.pt (ep25, 24.5MB) preserved at `/home/darrell/checkpoints/tencent_v148/best.pt`.
+
+**Verdict**: v149 launched as next Round-16 mechanism on tencent: IDEA #19 SSM backbone (cross-corpus test, state-dim 16 = v124 alibaba champion setting). If SSM fails on tencent, only IDEA #22 hybrid diffusion remains untested on tencent.
 
 ---
 
