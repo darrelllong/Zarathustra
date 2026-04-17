@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ ≈ 0.055-0.065 by ep10-15 with stable W → MTPP beats v124 champion and IDEA #20 is universal (both corpora). (b) If ★ ≈ 0.07-0.08 with stable dynamics → MTPP doesn't help alibaba, but the SSM base is still the right frontier. (c) If W climbs fast like v130 → SSM+alibaba remains seed-lottery regardless of G-head changes, pivot to LSTM+MTPP next.
 
-**Status** (2026-04-17, 09:47 PDT, ~53 min in, Phase 3 ep5 FIRST ★): PID 4188458. Pretrain all phases clean. **Phase 3 ep5 ★=0.05232** (MMD²=0.01142, **recall=0.795**) — **15% BELOW v124's ep5 ★=0.06156, 42% below v130's failed 0.08995**. Strongest alibaba Phase-3 start EVER. W trajectory 0.24→0.43→0.73→0.61→1.95 (climb but not catastrophic); G oscillating -1.6 to -2.6 (not collapse pattern). Early signal that MTPP timing may be the stabilizer that was missing for SSM+alibaba seed fragility. Log: `/home/darrell/train_alibaba_v131.log`.
+**Status** (2026-04-17, 10:00 PDT, ~66 min in, Phase 3 ep11): PID 4188458. **ep5 ★=0.05232** (best, 15% below v124 ep5). **ep10 no-★ = 0.08174** (MMD² 0.01142→0.01774, recall **0.795→0.680** drop). Stale=**5 ep**. W oscillating 0.9-2.9 (ep8 peak 2.86, self-corrected to 1.63 ep10) — **volatile but NOT monotonic climb** — different from v130's W=0.12→3.71 collapse. G bounced negative ep6-7 (-3.13/-3.28) then recovered to -1.7 range. Not critic-dominance. ep5 best.pt preserved. Need ep15 data to judge. Log: `/home/darrell/train_alibaba_v131.log`.
 
 
 
