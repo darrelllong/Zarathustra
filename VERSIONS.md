@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: If SSM's selective state updates capture reuse/temporal structure that LSTM misses, training ★ should push below v114's 0.073. If training ★ lands at or above v114's 0.073 at comparable stale-budget, LSTM is not the bottleneck and SSM closes on alibaba. Expected ~2-3x slower than LSTM runs (H=256, N=16) → 12-20h total runtime vs ~3-4h for v123.
 
-**Status** (2026-04-16, 22:51 PDT, ~34 min in): PID 4040753. **Phase 2.5 G warm-up 50/100** (sup=0.00014, converged). AE + Sup pretrain complete. SSM running on par with LSTM on alibaba. Phase 3 GAN ETA ~15 min (50 warmup epochs to go). Log: `/home/darrell/train_alibaba_v124.log`.
+**Status** (2026-04-16, 23:00 PDT, ~48 min in): PID 4040753. **Phase 3 Joint GAN ep 1/200 STARTED**. pretrain_complete.pt saved. G warm-up converged cleanly (100/100 sup=0.00014). ep1: W=+0.17, G=-1.04, t=94s/ep. W still low (critic warming up, not W-stop). First SSM-on-alibaba ★ eval at ep5. Log: `/home/darrell/train_alibaba_v124.log`.
 
 
 
@@ -51,7 +51,7 @@ relevant.
 
 **Hypothesis**: (a) If retrieval memory fires meaningfully (p_reuse gate active, BCE loss dropping), and training ★ pushes below 0.0705 (v146's best), IDEA #17 works on tencent where it didn't on alibaba — implies corpus-size threshold for retrieval. (b) If training ★ plateaus at ~0.08 (v147 territory), retrieval adds nothing over v146 baseline — IDEA #17 closes on both corpora. (c) If retrieval causes critic collapse (G → 0), BCE 0.5 is too strong and we'd need a dose-curve retest.
 
-**Status** (2026-04-16, 22:57 PDT, starting): Phase 1 AE pretrain 1/50 (recon=0.01978). Retrieval memory enabled (98,913 new params, all fresh-initialised). Phase 3 GAN in ~30-40 min.
+**Status** (2026-04-16, 23:00 PDT, ~3 min in): PID 4063050. **Phase 1 AE pretrain 1/50** (recon=0.01978). Retrieval memory enabled (98,913 new params, all fresh-initialised). Phase 3 GAN in ~2-3h (tencent's 3234-file corpus is slower than alibaba's 239-file).
 
 ---
 
