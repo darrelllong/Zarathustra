@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 03:35 PDT, ~4 min in): PID 4124709. **Phase 1 AE pretrain ep 10/50** (recon=0.00578). Multi-scale + PCF + mixed-type + SSM all initialized cleanly. Phase 3 ETA ~60 min. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 05:09 PDT, ~94 min in, Phase 3 ep10): PID 4124709. **ep5 ★=0.07204 (recall=0.662, MMD²=0.00454), ep10 ★=0.05571 (recall=0.755, MMD²=0.00681)** — ep10 is 22% below v146's seed-lucky 0.07048, best tencent training ★ ever observed. G went positive ep3-8 (peak +3.33 ep8), now declining ep9=+1.07, ep10=+1.77 (delayed recovery, not collapse). W stable 0.17–0.90. Potential tencent ATB break — if training→frozen delta holds near v146's ~0.107, projected frozen ~0.163 vs ATB 0.178. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
