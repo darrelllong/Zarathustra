@@ -38,14 +38,23 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v134 — **v132 recipe EXACTLY (reproducibility probe for NEW ALIBABA ATB 0.05778)**
-**Why**: v132 ATB 0.05778 came from ep10 of a run killed ep20 (deteriorating training-★ trajectory). v124 ATB was seed-lucky (v130 = exact reproduction failed). v134 tests whether v132 stack (SSM+MTPP+BS) is recipe-robust or seed-lucky like v124. Parallels v150 strategy on tencent (which confirmed v149 recipe robust).
+### alibaba_v135 — **v132 recipe MINUS boundary-smoothness (Round 16 clean ablation: is BS load-bearing in v132 ATB?)**
+**Why**: v134 reproduced v132's early-peak pattern (ep5 ★=0.05755, then critic dominance ep15-21). v132 recipe IS reproducible but the recipe itself has a narrow usable window (peaks ep5-10). Round 16 demands per-component attribution. BS alone failed (v128). MTPP alone failed (v131). v132 stacks SSM+MTPP+BS and succeeded — but it's unknown which component is truly load-bearing vs residual noise. v135 removes BS to test: if ★ trajectory similar → BS isn't load-bearing (simpler recipe is equivalent); if ★ dies fast → BS is load-bearing.
 
-**Recipe**: v132 recipe EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + boundary-smoothness 1.0/k=2/decay=0.5 + v124 base (K=4 regimes, var-cond + gmm-8, supervisor 5.0, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. n_critic=2 (v133 proved n_critic=3 breaks alibaba dynamics — W=5.85 ep5).
+**Recipe**: v132/v134 EXACTLY MINUS `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + v124 base (K=4 regimes, var-cond + gmm-8, supervisor 5.0, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. n_critic=2.
 
-**Hypothesis**: (a) If v134 ep10 ★ ≤ 0.065 with W stable <2.5 → v132 recipe is seed-robust, ATB 0.05778 confirmed. (b) If v134 W-stops or critic-collapses → v132 was seed-lucky, need new seed or different stabilizer.
+**Status** (2026-04-17): launched 15:58 PDT PID 119103. Log `/home/darrell/train_alibaba_v135.log`.
 
-**Status** (2026-04-17): launching.
+---
+
+### alibaba_v134 — CLOSED (ep5 ★=0.05755 best, ep21 W=3.88 crossed threshold, killed 15 stale — v132 recipe reproducible but narrow-window, 2026-04-17)
+**Recipe**: v132 EXACTLY. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + boundary-smoothness 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. PID 84060. Ran 14:01–15:57 PDT (~116 min, killed ep22).
+
+**Training**: ep5 ★=**0.05755** (only ★, MMD²=0.00655, recall=0.745 — best train-★ for alibaba ever, 0.4% below ATB 0.05778). Post-peak: ep10 no-★=0.07632 (MMD² doubled), ep15=0.10910 (MMD² 5.3×), ep20=0.07809 (partial recovery). **ep21 W=+3.8777 CROSSED 3.0 threshold, ep22 W=3.44**. G collapsed −3.55→−1.00 (critic dominance classic).
+
+**Why killed**: W crossed threshold + 15 stale from ep5 + trajectory broken. best.pt = ep5 preserved. Skipped frozen eval (ep5 train ★=0.05755 + v132 historical delta −0.00164 → projected frozen ~0.0559, 3% improvement over ATB = within noise; race priority is new IDEAS not incremental reconfirmation).
+
+**Finding — v132 recipe is seed-ROBUST but intrinsically narrow-window**: v132 peaked ep10, v134 peaked ep5. BOTH degraded sharply post-peak. SSM+MTPP+BS stack on alibaba has a ~5-10 epoch productive window before critic dominates. ATB 0.05778 is the frozen eval of v132's peak ep; v134 doesn't improve on it. **v132 ATB stands.** Next move: clean single-component ablation (v135 = v132 - BS) to identify load-bearing component, vs adding another idea to a recipe that's already at its stability limit.
 
 ---
 
