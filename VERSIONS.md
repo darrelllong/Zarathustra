@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ ≈ 0.06-0.07 by ep10-15 → v124 is recipe-robust, champion confirmed. (b) If ★ ≈ 0.08-0.10 → v124 was seed-lucky and its frozen 0.0656 was also seed-lucky; need more-principled re-evaluation. (c) If critic collapses (G positive, ★ > 0.10) → even the exact recipe is fragile and we're hitting the fundamental SSM-alibaba stability frontier.
 
-**Status** (2026-04-17, 07:39 PDT, just launched): PID 4173744. Phase 1 AE pretrain starting. Fresh pretrain ETA ~55 min to Phase 3. Log: `/home/darrell/train_alibaba_v130.log`.
+**Status** (2026-04-17, 08:06 PDT, ~26 min in, Phase 2.5 G warm-up ep 20/100): PID 4173744/4173750. Phase 1 AE done (recon=0.00001 ep50). Phase 2 Sup done (sup=0.02563 ep50). Phase 2.5 G warm-up ep 20/100 (sup=0.00022). Phase 3 entry ETA ~25 min. Log: `/home/darrell/train_alibaba_v130.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 07:39 PDT, ~244 min in, Phase 3 ep60): PID 4124709. **★ TRAJECTORY: ep5=0.07204 → ep10=0.05571 → ep20=0.04740 → ep30=0.04552 → ep50=0.04377 → ep60=0.04200 ★** — SIX ★s, monotonically improving at each 10-epoch checkpoint (with interim oscillation). ep60 MMD²=0.00360, recall=0.808. **40% below v146's 0.07048**. W spiked to **+2.95 ep58 (98% of W-stop)** but keeps self-correcting. G hot +5-7. Projected frozen ~0.149 vs ATB 0.178 = **16% margin over ATB**. Stale=0. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 08:06 PDT, ~276 min in, Phase 3 ep71): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. ep65 no-★ (0.04521), ep70 no-★ (0.05278, MMD²=0.00358, recall=0.754 regression from 0.808). Stale=**11 ep**, well below 30 kill threshold. W spiked to **+2.93 ep70 (98% W-stop, SECOND near-threshold event)**, self-corrected to 1.63 ep71. G climbing hotter (peaked 7.24 ep70). Projected frozen still ~0.149 vs ATB 0.178 = **16% margin over ATB** if ★=0.04200 holds. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
