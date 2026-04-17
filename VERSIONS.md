@@ -44,7 +44,7 @@ relevant.
 
 **Hypothesis**: (a) If frozen ≤ 0.066 → IDEA #21 ports to alibaba, new ATB candidate. (b) If ★ <0.05 training but frozen ≥ 0.08 → alibaba's structural gap is not solved by boundary-smoothness. (c) If W-stops early like v131 → MTPP+boundary-smoothness stack is unstable, revert to cleaner IDEA tests.
 
-**Status** (2026-04-17, 11:42 PDT, Phase 3 ep1/200): PID 22475. Pretrain clean (AE recon=0.00003 ep50, sup=0.03532 ep50, G warm-up sup=0.00000 stable). **Phase 3 ep1**: W=+0.1959 (low, stable start), G=-1.1865. First ★ at ep5. Log: `/home/darrell/train_alibaba_v132.log`.
+**Status** (2026-04-17, 11:56 PDT, Phase 3 ep6/200): PID 22475. **ep5 ★=0.09554** (MMD²=0.02644, recall=0.654). W stable 0.7-0.9. **BAD START**: 45% worse than v131 ep5 (0.05232), 55% worse than v124 ep5 (0.06156), similar territory to v127's failed start (0.09541). Consistent with v128 (boundary-smoothness alone → frozen regression). Boundary-smoothness appears to hurt alibaba even stacked with MTPP. Letting ep10 confirm before kill — need ep10 to drop below 0.06 to be worth continuing. Log: `/home/darrell/train_alibaba_v132.log`.
 
 ---
 
@@ -64,7 +64,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 11:42 PDT, Phase 3 ep31/200): PID 4192831. **Best ★=0.05497 at ep25** (ep5/10/25 all ★s). ep30 no-★=0.05984 (MMD² 0.00384 down, recall 0.720 dropped from 0.746). Stale=6 ep. W climbing slowly 1.3→1.5 but far from 3.0. Recipe reproducibility CONFIRMED. Epoch times slowed to 180-280s under v132 GPU contention. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 11:56 PDT, Phase 3 ep36/200): PID 4192831. **NEW ★ ep35=0.05127** (MMD²=0.00367, recall=0.762) — fourth ★ (ep5/10/25/35), 7% better than ep25. W climbing 1.6→2.0 stable (still well below 3.0). Recipe reproducibility CONFIRMED, trajectory continuing to improve. v149 hit 0.04200 at ep60 — v150 on track. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
