@@ -35,16 +35,23 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v132 — **v131 recipe + boundary-smoothness (IDEA #21 chunk-stitching first test on alibaba)**
-**Why**: v131 just closed — MTPP improved training-★ on alibaba by 15% (ep5 ★=0.05232 vs v124's 0.06156) but W-stopped ep22 AND frozen eval=0.09141 did NOT beat v124's 0.0656 (train→frozen delta widened to +0.039 vs v124's +0.004). IDEA #20 MTPP generalized from tencent to alibaba training dynamics but NOT frozen eval — v124 recipe remains alibaba frontier. Round 16 queue next item is **#21 chunk-stitching** per RESPONSE.md. Implementation: `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (same as v149 tencent). Stacked on v131 recipe (v124+MTPP) since MTPP is the best training-★ regularizer found for alibaba, even if frozen doesn't reflect it.
+### alibaba_v133 — **v131 recipe + n_critic=3 (stabilize MTPP advantage on alibaba)**
+**Why**: v131 had **best alibaba training ★ ever recorded** (ep5=0.05232, 15% below v124's ep5) but W-stopped ep22 (n_critic=2, W climbed 3.9→3.3→3.9). v132 (v131+boundary-smoothness) ep10 ★=0.05942 recovered briefly but deteriorated ep15/20 with 2x W-spike >3.0 — killed ep20. Both runs show MTPP is the alibaba training-★ improver but WGAN-SN dynamics fail under standard n_critic=2. Hypothesis: give D 50% more steps (n_critic=3) to hold the line and let MTPP's good trajectory survive to ep40-60 where v149 shows frozen delta stabilizes.
 
-**Caveat**: v128 previously tested boundary-smoothness on vanilla v124 (no MTPP) and regressed to frozen ~0.071. This run tests whether combining MTPP's training improvement with boundary-smoothness could break the alibaba train→frozen structural gap.
+**Recipe**: v131 base (v124+MTPP) + `--n-critic 3` instead of 2. Everything else identical. Fresh pretrain. PID 49883, log `/home/darrell/train_alibaba_v133.log`.
 
-**Recipe**: v131 base + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. PID 22473, log `/home/darrell/train_alibaba_v132.log`.
+**Hypothesis**: (a) If ★ ≤ 0.05 by ep15-25 with W stable <2.5 → n_critic=3 solves alibaba's WGAN-SN fragility, test more MTPP variants. (b) If ★ stalls at 0.06 with stable W → n_critic=3 trades capacity for stability, neutral result. (c) If W still spikes >3.0 → n_critic isn't the fix, need to try lower lr or different regularizer.
 
-**Hypothesis**: (a) If frozen ≤ 0.066 → IDEA #21 ports to alibaba, new ATB candidate. (b) If ★ <0.05 training but frozen ≥ 0.08 → alibaba's structural gap is not solved by boundary-smoothness. (c) If W-stops early like v131 → MTPP+boundary-smoothness stack is unstable, revert to cleaner IDEA tests.
+**Status** (2026-04-17, 12:39 PDT): Phase 1 AE pretrain ep10/50 (recon=0.00005). Log: `/home/darrell/train_alibaba_v133.log`.
 
-**Status** (2026-04-17, 12:10 PDT, Phase 3 ep11/200): PID 22475. **ep5 ★=0.09554** → **ep10 ★=0.05942** (MMD² 0.02644→0.00932, recall 0.654→0.750). **38% improvement, MAJOR RECOVERY**. ep10 ★ is 3.5% BETTER than v124's ep5 training ★ (0.06156). Boundary-smoothness took 5 epochs to kick in. W stable 1.0-1.99 (well below 3.0). Projected frozen depends on train→frozen delta: +0.004 (v124-like) → 0.063 beats v124 ATB 0.0656; +0.039 (v131-like) → 0.098 loses. NEED ep15-20 to confirm trajectory. Log: `/home/darrell/train_alibaba_v132.log`.
+---
+
+### alibaba_v132 — CLOSED (killed ep20, trajectory deteriorating; frozen eval on best.pt ep_0010 pending)
+**Recipe**: v131 base + boundary-smoothness (IDEA #21 first alibaba test post-MTPP).
+**Training**: ep5 ★=0.09554 (bad start), ep10 ★=**0.05942** (38% recovery, best), ep15=0.07285, ep20=0.08093 (trajectory deteriorating).
+**W dynamics**: ep16 W=3.05, ep19 W=3.23 (2 spikes >3.0 in 5 epochs, W-stop imminent).
+**Frozen eval** (in flight, PID 49882): pending. Projected 0.095-0.100 given v131-like delta +0.039.
+**Verdict**: Boundary-smoothness stacked on MTPP on alibaba is unstable. IDEA #21 on alibaba — partial result. Matches v128 (boundary-smoothness alone was also bad on alibaba). Boundary-smoothness is alibaba-negative regardless of base recipe.
 
 ---
 
