@@ -44,7 +44,7 @@ relevant.
 
 **Hypothesis**: (a) If frozen ≤ 0.066 → IDEA #21 ports to alibaba, new ATB candidate. (b) If ★ <0.05 training but frozen ≥ 0.08 → alibaba's structural gap is not solved by boundary-smoothness. (c) If W-stops early like v131 → MTPP+boundary-smoothness stack is unstable, revert to cleaner IDEA tests.
 
-**Status** (2026-04-17, 10:36 PDT): Phase 1 AE pretrain ep10/50 (recon=0.00003). Log: `/home/darrell/train_alibaba_v132.log`.
+**Status** (2026-04-17, 11:42 PDT, Phase 3 ep1/200): PID 22475. Pretrain clean (AE recon=0.00003 ep50, sup=0.03532 ep50, G warm-up sup=0.00000 stable). **Phase 3 ep1**: W=+0.1959 (low, stable start), G=-1.1865. First ★ at ep5. Log: `/home/darrell/train_alibaba_v132.log`.
 
 ---
 
@@ -64,7 +64,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ reaches 0.045-0.055 by ep30-60 → v149 is recipe-robust, tencent ATB confirmed at 0.09628 frozen. (b) If ★ stalls at 0.07-0.08 → seed-lucky, need more SSM+MTPP seeds or different stabilizer. (c) If W-stops or critic-collapses → SSM+MTPP on tencent is also seed-fragile like SSM on alibaba.
 
-**Status** (2026-04-17, 11:24 PDT, Phase 3 ep26/200): PID 4192831. **ep5 ★=0.05774**, **ep10 ★=0.05703**, **ep25 ★=0.05497** (three ★s, MMD² trending down 0.00714→0.00773→0.00417, recall rebounded 0.703→0.742→0.746). W stable 0.5-1.2 (far below 3.0). **Recipe reproducibility CONFIRMED**, trajectory AHEAD of v149 at same epoch (v149 ep25 was ~0.055 range). Epoch times slowed to 260-280s under v132 GPU contention. Log: `/home/darrell/train_tencent_v150.log`.
+**Status** (2026-04-17, 11:42 PDT, Phase 3 ep31/200): PID 4192831. **Best ★=0.05497 at ep25** (ep5/10/25 all ★s). ep30 no-★=0.05984 (MMD² 0.00384 down, recall 0.720 dropped from 0.746). Stale=6 ep. W climbing slowly 1.3→1.5 but far from 3.0. Recipe reproducibility CONFIRMED. Epoch times slowed to 180-280s under v132 GPU contention. Log: `/home/darrell/train_tencent_v150.log`.
 
 ---
 
