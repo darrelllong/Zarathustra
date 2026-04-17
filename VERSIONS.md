@@ -40,7 +40,7 @@ relevant.
 
 **Hypothesis**: With MTPP contributing 1/5 the gradient magnitude to G loss, the adversarial signal should stay dominant. W should remain in v114-like range (0.3–2.0) and G loss should stay in -3 to -6 range (not collapse to 0). If training ★ still ends up above v114's 0.073, MTPP doesn't help alibaba at any dose. If ★ goes below 0.073 with healthy W, weight 0.1 is the alibaba recipe.
 
-**Status** (2026-04-16, 22:12 PDT, ~70 min in): PID 4007894. **Phase 3 ep 23/200**. **Two ★s**: ep 5=0.13959 → **ep 10 ★=0.13447**. Stale=**13**. ep 20 eval regression: comb=0.16197 (MMD² spiked to 0.04167, recall=0.399). Training dynamics healthy: G=-4.94 to -5.14, W=0.84-0.93 (nowhere near w-stop). Eval regression but training run has budget. Log: `/home/darrell/train_alibaba_v123.log`.
+**Status** (2026-04-16, 22:22 PDT, ~80 min in): PID 4007894. **Phase 3 ep 25/200**. **Two ★s**: ep 5=0.13959 → **ep 10 ★=0.13447**. Stale=**15**. ep 25 eval: comb=0.14924 (recall=0.386, MMD²=0.02634 — recovering from ep 20's 0.04167). Training dynamics healthy: G=-4.99 stable, W=0.90. Log: `/home/darrell/train_alibaba_v123.log`.
 
 ### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
 **Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
@@ -49,7 +49,7 @@ relevant.
 
 **Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16, 22:12 PDT, ~189 min in): PID 3971604. **Phase 3 ep 62/200**. **Five ★s**, best=**ep 35 ★=0.08660**. Stale=**27/30**. ep 60 eval no-★ comb=0.09453 (recall=0.571). **ep 59 anomaly**: G=+0.358 (first positive) with W=+2.95 (near w-stop 3.0) — critic-DOMINANCE spike, not v122-style collapse. Recovered ep 60-62: G back negative (-0.39/-1.54/-0.89), W dropped to 1.6-2.0. Next ★ eval ep 65 = 30-stale kill decision. Log: `/home/darrell/train_tencent_v147.log`.
+**Status** (2026-04-16, 22:22 PDT, ~199 min in): PID 3971604. **Phase 3 ep 64/200**. **Five ★s**, best=**ep 35 ★=0.08660**. Stale=**29/30 — one epoch from kill**. ep 65 eval imminent. G recovered ep 61-64 (-1.54/-0.89/-0.58/-0.67 healthy negatives), W +1.59 to +1.91 healthy — ep 59 G+ spike was transient. If ep 65 produces new ★ run survives; else kill + launch next idea. Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
