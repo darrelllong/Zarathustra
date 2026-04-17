@@ -42,14 +42,14 @@ relevant.
 
 **Status** (2026-04-16, ~151 min in): PID 3946227, launched 16:01 PDT. **Phase 3 ep 25/200**. Best ★=**0.12575** at ep10 (recall=0.497). Trajectory: ep5=0.14286★ → ep10=0.12575★ → ep15=0.155 → ep20=0.194 → **ep25=0.17986** (recall=0.248 worst yet, MMD²=0.02946). Stale=**15/30**. W +0.33 to +0.63 stable. G=−5.12 mode-collapse signal continuing. 28.5% below alibaba ATB from ep10 best. BCE supervision fix validated (12% improvement over v120 ★=0.14294), but post-peak trajectory is deteriorating faster than v120's. If no recovery by ep40, kill triggers. Log: `/home/darrell/train_alibaba_v121.log`.
 
-### tencent_v146 — **Chunk stitching + MTPP timing head (IDEAs #21 + #20, first combined test)**
-**Why**: v145 (IDEA #21 chunk-stitching alone on tencent) launched at 10:51 and was still in warm-up at 11:13 when the Round 16 wiring work landed: `llgan/timing_head.LogNormalTimingHead` is now consumed by `train.py` under `--mtpp-timing` (Generator emits per-step (μ, σ) for log(IAT) from the LSTM hidden state, log-Normal NLL added to G loss). v146 replaces v145 with the same chunk-stitching recipe plus the new MTPP head: two mechanism-level changes in one run, saving a GPU slot. If combined beats v143's ★=0.0768 / frozen 0.178, a follow-up ablation will split them; if it doesn't, neither mechanism is a tencent winner.
+### tencent_v147 — **v146 recipe (MTPP + chunk stitching) + IDEA #18 Phase A cache-descriptor monitor**
+**Why**: v146 hit tencent-strongest training ★=0.07048 at ep115 (60.4% below tencent ATB 0.178) and then oscillated in [0.07,0.09] for 35 epochs before the 30-stale kill triggered. v147 carries the v146 recipe forward and adds the Round 16 #18 Phase A cache-descriptor monitor (`--cache-descriptor-file tencent_descriptors.jsonl`), which computes the 8-dim cache-native descriptor (working-set, top-k popularity, reuse-distance quartiles, reuse_share, burstiness) on generated windows at each ★ epoch and logs MSE against the file-level median target. Phase A is non-differentiable — it does NOT change training dynamics — but collects the signal needed to justify (or rule out) the Phase B investment of writing differentiable soft descriptors. Concurrent goal: a second realization of the MTPP+chunk-stitching combo to check whether v146's ★=0.07048 is reproducible or seed-lucky.
 
-**Recipe**: v145 recipe (v143 base + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` with reset optimizer; strict=False correctly detects `timing_head.fc.{weight,bias}` as freshly-initialised (log confirms).
+**Recipe**: Identical to v146 (multi-scale critic, PCF 2.0 + n_freqs=32, mixed-type-recovery, supervisor 5.0, diversity 2.0, feature-matching 1.0, boundary-smoothness 1.0/k=2/decay=0.5, MTPP timing 0.5 / σ_min=0.05, var-cond + gmm-8, K=8 regimes, reset-optimizer) + `--cache-descriptor-file /home/darrell/traces/characterization/tencent_descriptors.jsonl --cache-descriptor-monitor-samples 256`. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt`.
 
-**Hypothesis**: MTPP NLL supervises the LSTM hidden state to encode per-step timing distribution — a different gradient signal from the regression-only ts column. If tencent's frozen ATB ceiling is driven by burst-structure mismatch (not just locality), the NLL should shave β-recall by a measurable margin. Combined with chunk-stitching (boundary smoothness) this stacks two complementary mechanisms without changing the base GAN recipe.
+**Hypothesis**: (a) If desc_mse at ★ epochs tracks training-★ trajectory, Phase B (promoting desc_mse to a real loss with soft differentiable descriptors) is justified. If desc_mse is flat or anti-correlated with ★, Phase B is closed cheaply. (b) If v147 best training-★ reproduces v146's ~0.070 the recipe is robust; if it lands above 0.080 v146 was seed-lucky and the MTPP+chunk-stitching combo should be retested before declaring a tencent winner.
 
-**Status** (2026-04-16, ~7.0h in): PID 3908775, started 11:16 PDT. **Phase 3 ep 140/200**. Best ★=**0.07048** at ep115 (recall=0.675, EMA MMD²=0.00548). Post-peak oscillation: ep115=0.07048★ → ep120=0.09258 → ep125=0.07462 → ep130=0.07143 → ep135=0.07523 → **ep140=0.07272** (recall=0.660, MMD²=**0.00482** — new low below ★). Stale=**25/30**. Oscillating near peak, not decaying: four consecutive MMD measurements within 3% of ★. Only recall drag (0.660 vs 0.675) keeps ep140 from new record. Next MMD at ep145 (stale=30 if no ★, kill triggers). Training ★=0.07048 remains **60.4% below tencent ATB 0.178**. Log: `/home/darrell/train_tencent_v146.log`.
+**Status** (2026-04-16): PID 3971602, started ~19:03 PDT. Pretrain in progress. Log confirms `[cache-descriptor] Phase A monitor enabled: 3234 file targets → global mean target (D=8)`. Log: `/home/darrell/train_tencent_v147.log`.
 
 ---
 
@@ -78,6 +78,29 @@ relevant.
 **Frozen-bundle eval**: NOT RUN. best.pt (ep10, ~24MB) preserved at `/home/darrell/checkpoints/alibaba_v119/best.pt` alongside `epoch_0010.pt`, `epoch_0020.pt`, `epoch_0030.pt`. If a future sweep wants to validate the projection, eval on that.
 
 **Verdict**: Chunk-stitching at weight 0.1 on top of continuity did NOT help alibaba reach v114's training ★=0.073 ceiling. Boundary-smoothness may still help frozen β-recall (not measured), but the training gap is too large to justify compute. Closes "chunk-stitching + continuity" cocktail on alibaba. Next alibaba bet: v120 = v114 base + retrieval memory (IDEA #17, never tested on alibaba; top of IDEAS.md R16 recommended build order).
+
+---
+
+## Post-Mortem: tencent_v146 — MTPP timing head + chunk stitching (killed ep150, 2026-04-16, stale=35/30 + second W-breach ep148)
+
+**Recipe**: v143 base (multi-scale critic + PCF 2.0 + mixed-type-recovery + supervisor 5.0 + diversity 2.0 + feature-matching 1.0 + var-cond + gmm-8 + K=8 regimes) + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` (IDEA #21 chunk stitching) + `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05` (IDEA #20 log-Normal timing head). Hot-start from v86 pretrain. PID 3908775, ran 11:16–~19:05 PDT (~7.8h, 150 GAN epochs of planned 200).
+
+**Training-log**: Six consecutive ★s through the first half of training, best ★=**0.07048** at ep115:
+- ep55=0.08294★ (recall=0.612, MMD²=0.00524)
+- ep70=0.08010★ (recall=0.628, MMD²=0.00570)
+- ep80=0.07667★ (recall=0.646, MMD²=0.00597)
+- ep95=0.07467★ (recall=0.651, MMD²=0.00497)
+- ep115=**0.07048**★ (recall=0.675, MMD²=0.00548) ← peak
+- Post-peak oscillation in [0.07, 0.09]: ep120=0.09258 → ep125=0.07462 → ep130=0.07143 → ep135=0.07523 → ep140=0.07272 (new MMD² low 0.00482 but recall drag prevented ★) → ep145=0.07541 (near-miss) → ep150=0.08786 (breakdown).
+- W trajectory: generally stable 1.7–2.5, two breaches: ep129=+3.22 (recovered ep130 to +2.41), **ep148=+3.88** (second, larger breach), ep149=+2.84, ep150=+2.76.
+
+**Why killed**: (1) ep145 triggered 30-stale threshold from ep115 ★; (2) ep148 W=+3.88 above w-stop 3.0 (second breach of the run, worse than ep129's +3.22); (3) ep150 recall dropped to 0.587 (worst post-peak), ★ regressing toward 0.09. Combined signals = definitive plateau + instability.
+
+**Finding**: Tencent-strongest training ★=0.07048 ever recorded in this project — **60.4% below the tencent frozen-bundle ATB of 0.178**. Whether this training improvement transfers to frozen-bundle eval is the critical unknown. Prior tencent recipes: v142=0.0856★, v143=0.07681★, v144=0.08191★ — v146 meaningfully below all of them at peak, suggesting the MTPP+chunk-stitching combo adds signal beyond the multi-scale+PCF base. Ablation pending (v145 was killed pre-GAN; would need pure #20 or pure #21 run to attribute). Trainer tolerated one W-breach at ep129 cleanly; the second at ep148 was more severe and coincided with ★ regression — suggests the optimizer's cosine-decayed lr (1.56e-5 at ep150) was too low to correct adversarial drift in the last 10 epochs.
+
+**Frozen-bundle eval**: NOT YET RUN. best.pt (22.4MB, ep115) preserved at `/home/darrell/checkpoints/tencent_v146/best.pt`. Epoch-level snapshots preserved: epoch_0010 through epoch_0150 at every 10-ep tick. **Frozen-eval of v146/best.pt is the highest-signal single experiment available** — if it lands below 0.178, v146 is a new tencent ATB candidate; if it lands at 0.17–0.18, the training gains are absorbed by fake-sample variance and we need to think harder about eval protocol; if above 0.18, training ★ does not transfer at all.
+
+**Verdict**: v146 is the strongest tencent training run to date. Recipe carries forward to v147 which adds the IDEA #18 Phase A cache-descriptor monitor to collect signal for future Phase B work, and also serves as a second-realization reproducibility check on v146's peak.
 
 ---
 
