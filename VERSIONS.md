@@ -42,7 +42,7 @@ relevant.
 
 **Hypothesis**: (a) If ★ ≈ 0.06-0.07 by ep10-15 → v124 is recipe-robust, champion confirmed. (b) If ★ ≈ 0.08-0.10 → v124 was seed-lucky and its frozen 0.0656 was also seed-lucky; need more-principled re-evaluation. (c) If critic collapses (G positive, ★ > 0.10) → even the exact recipe is fragile and we're hitting the fundamental SSM-alibaba stability frontier.
 
-**Status** (2026-04-17, 08:29 PDT, ~48 min in, Phase 2.5 G warm-up ep 90/100): PID 4173744/4173750. Phase 1 AE done (recon=0.00001 ep50). Phase 2 Sup done (sup=0.02563 ep50). Phase 2.5 G warm-up ep 90/100 (sup=0.00003, converged). Phase 3 entry ETA ~10 min. Log: `/home/darrell/train_alibaba_v130.log`.
+**Status** (2026-04-17, 08:33 PDT, ~52 min in, Phase 3 JUST STARTED): PID 4173744/4173750. Pretrain complete (all phases healthy: AE recon=0.00001, Sup=0.02563, G warm-up sup=0.00027). Pretrain checkpoint saved. Phase 3 joint GAN training now running — first ★ opportunity at ep5 (~25 min out). Log: `/home/darrell/train_alibaba_v130.log`.
 
 
 
@@ -53,7 +53,7 @@ relevant.
 
 **Hypothesis**: (a) If training ★ < 0.07 (below v146 seed-lucky best 0.07048), SSM universal → new tencent ATB candidate, promoted to frozen eval. (b) If ★ ≈ v147 territory (~0.08), SSM adds nothing on tencent — architecture ceiling may be corpus-specific. (c) If critic collapses like alibaba v126, SSM+MTPP+multi-scale stack is too aggressive for tencent WGAN-SN dynamics.
 
-**Status** (2026-04-17, 08:29 PDT, ~299 min in, Phase 3 ep79): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. Post-best: ep65=0.04521, ep70=0.05278, ep75=0.05035 (all no-★, U-shape — ep70 was the worst, ep75 recovering). Stale=**19 ep**, 11 ep from 30-ep kill threshold. G trending hotter (peaked 7.77 ep74); W oscillating 1.5-2.7 below 3.0 (no third near-threshold event since ep70). MMD² at ep75=0.00285 (low) — projection still clears ATB 0.178 by comfortable margin if the trajectory bottoms out. Log: `/home/darrell/train_tencent_v149.log`.
+**Status** (2026-04-17, 08:33 PDT, ~303 min in, Phase 3 ep80): PID 4124709. **★ TRAJECTORY through ep60**: 0.07204→0.05571→0.04740→0.04552→0.04377→**0.04200 ★**. Post-best: ep65=0.04521 → ep70=0.05278 → ep75=0.05035 → **ep80=0.05238** (all no-★, MMD² rising 0.00285→0.00368, recall dipping 0.762→0.756 — degradation not recovery). Stale=**20 ep**, 10 ep from 30-ep kill threshold. G trending hotter (range 5.5-7.8). Best ★ checkpoint ep_0060.pt preserved. If ep85/90 produce no ★, will kill at stale=30 and promote ep60 to frozen eval. Log: `/home/darrell/train_tencent_v149.log`.
 
 ---
 
