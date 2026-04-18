@@ -112,6 +112,13 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
+### alibaba_v161 — v157 recipe + **fixed BS+OC overlap-mode** (Round 19 P1 fix: independent forward pairs), seed-5, 2026-04-18
+**Why**: v160 was confounded — BS=1.0 silently lost its adjacent-window semantics because OC's overlap-mode split forward was reused for BS. Commit `dce95a0` separates BS and OC onto two independent forward pairs (BS always uses B-from-A-final-hidden; OC-overlap uses B-from-h_mid). v161 re-runs v160's intent on clean code. Seed=5 (v160 used seed-4; change to avoid cross-contaminating seed sweep results).
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 5`. Fresh pretrain. Launched ~14:45 PDT, PID 581633. Log `/home/darrell/train_alibaba_v161.log`.
+**Status** (2026-04-18): Phase 1 AE pretrain starting. Cost now ~2x per G-step (two G forwards when both BS and OC active). Kill criteria: (a) G collapse below -6 like v139, (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+
+---
+
 ### tencent_v160 — v158 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)** (IDEA #21 full on tencent stack), seed-4, 2026-04-18
 **Why**: v159 CLOSED confirmed v153-family seed-farming is exhausted (frozen-best 0.07176 vs ATB 0.03942). v158 is near the ceiling of the current architecture at seeds-3/4. Representation-level move: add WaveStitch-style overlap-mode OC as the ONLY boundary-region regularizer on the tencent stack (tencent recipe has no BS — v152 ablation established BS is DEAD WEIGHT on tencent). Tests whether feature-space noise-invariance in the overlap region (trained at paired adjacent windows sharing h_mid) breaks past v158's 0.03942 floor.
 **Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 13:16 PDT, PID 563498. Log `/home/darrell/train_tencent_v160.log`.
