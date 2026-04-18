@@ -133,10 +133,32 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
-### tencent_v160 — v158 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)** (IDEA #21 full on tencent stack), seed-4, 2026-04-18
-**Why**: v159 CLOSED confirmed v153-family seed-farming is exhausted (frozen-best 0.07176 vs ATB 0.03942). v158 is near the ceiling of the current architecture at seeds-3/4. Representation-level move: add WaveStitch-style overlap-mode OC as the ONLY boundary-region regularizer on the tencent stack (tencent recipe has no BS — v152 ablation established BS is DEAD WEIGHT on tencent). Tests whether feature-space noise-invariance in the overlap region (trained at paired adjacent windows sharing h_mid) breaks past v158's 0.03942 floor.
-**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 13:16 PDT, PID 563498. Log `/home/darrell/train_tencent_v160.log`.
-**Status** (2026-04-18): Phase 1 AE pretrain starting. Kill criteria: (a) G collapse below -6 (chunk-stitching on tencent has blown G before), (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+### tencent_v160 — CLOSED-FAILED (OC overlap-mode on v158 stack; frozen-best ep25 ★=0.05194 = +31.7% vs ATB 0.03942, killed ep52, 2026-04-18)
+**Why (closed)**: 32 epochs stale from train-best ep20 (comb=0.03906★), past 30-ep threshold. ep20 was already known mis-ranked (frozen ★=0.07189). Overlap-mode OC as sole boundary regularizer on the tencent stack did not break v158's 0.03942 floor.
+**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. PID 563498.
+**Training (Phase 3)**: ep5 comb=0.05719★, ep10=0.05465★, ep15=0.05702, **ep20=0.03906★** (train-best), ep25=0.04259, ep30=0.05324, ep35=0.04515, ep40=0.04790, ep45=0.05029, ep50=0.04764, ep52 killed (32 stale).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0025.pt** | **0.00184** | **0.7495** | **★=0.05194** (frozen-best) |
+| epoch_0035.pt | 0.00204 | 0.7445 | 0.05314 |
+| epoch_0045.pt | 0.00242 | 0.6925 | 0.06392 |
+| epoch_0015.pt | 0.00329 | 0.6720 | 0.06889 |
+| epoch_0040.pt | 0.00308 | 0.6630 | 0.07048 |
+| epoch_0010.pt | 0.00329 | 0.6590 | 0.07149 |
+| epoch_0020.pt / best.pt | 0.00309 | 0.6560 | 0.07189 |
+| epoch_0050.pt | 0.00314 | 0.6355 | 0.07604 |
+| epoch_0030.pt | 0.00483 | 0.6040 | 0.08403 |
+| epoch_0005.pt | 0.00358 | 0.5890 | 0.08578 |
+
+**Conclusion**: frozen-best ep25 ★=0.05194 is +31.7% behind ATB 0.03942. Recall peaked at 0.75 (ep25), below v158's ~0.82. best.pt (ep20) at ★=0.07189 was +38.4% worse than frozen-best — 7th confirmation of best.pt mis-rank. **OC overlap-mode alone does not beat v158's ceiling on tencent.** IDEA #21 full-form (BS-less overlap) is closed on tencent; if pursued further, needs combination with structural additions (#28 cross-window retrieval, #31 chained-window training) not yet in tree.
+
+---
+
+### tencent_v163 — v158 recipe + `--fft-loss-weight 1.0` (TSGDiff-motivated Fourier reconstruction loss, IDEA #22 diffusion-lit insight), seed-5, 2026-04-18
+**Why**: IDEA #0 said our corpora are near-white-noise so FFT-aware losses "unnecessary", but TSGDiff (arXiv 2511.12174, AAAI 2026) ablation shows Fourier reconstruction loss nearly halves Context-FID (0.224→0.407 without it on ETTh). Fourier-domain MSE can supervise higher-order spectral moments (power distribution across frequency bins) even in spectrally white series. Single-flag test; cheap; can close or open the FFT-loss question on our corpora definitively.
+**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--fft-loss-weight 1.0` + `--seed 5`. Fresh pretrain. Launched 2026-04-18 PM PDT.
+**Status**: launching. Kill criteria: (a) W≥3.0 for 3 consecutive (auto-stop), (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
 
 ---
 
