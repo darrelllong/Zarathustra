@@ -1722,17 +1722,18 @@ def train(cfg: Config) -> None:
                             decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
                         )
                         g_loss = g_loss + _bs_w * loss_bs
-                    if _oc_w > 0:
-                        if latent_ae:
-                            feat_b1 = R(H_b1)
-                            feat_b2 = R(H_b2)
-                        else:
-                            feat_b1 = H_b1
-                            feat_b2 = H_b2
+                    if _oc_w > 0 and latent_ae:
                         # Reuse the same decay-weighted boundary MSE math but
                         # on decoded features — this is what eval.py actually
                         # measures, so it targets the train→inference gap
-                        # directly in output space.
+                        # directly in output space.  NOTE: feature scale
+                        # (post-R, bounded) differs from latent scale
+                        # (unbounded) by roughly an order of magnitude, so
+                        # _oc_w is NOT directly comparable to _bs_w — tune
+                        # independently. Skipped when latent_ae=False (would
+                        # collapse to sub-loss (a) on raw H).
+                        feat_b1 = R(H_b1)
+                        feat_b2 = R(H_b2)
                         loss_oc = boundary_latent_smoothness(
                             feat_b1, feat_b2,
                             k=int(getattr(cfg, "overlap_consistency_k", 2)),
@@ -2398,7 +2399,11 @@ def parse_args() -> Config:
                         "generated with hidden=chunk A's final hidden), but applies "
                         "the decay-weighted boundary MSE on DECODED features (post-R) "
                         "instead of latents. This targets the train→inference gap in "
-                        "the output space that eval.py measures. Default 0.0 = off.")
+                        "the output space that eval.py measures. Default 0.0 = off. "
+                        "NOTE: feature scale (post-R, bounded) differs from latent "
+                        "scale (unbounded) by roughly an order of magnitude, so this "
+                        "weight is NOT directly comparable to --boundary-smoothness-"
+                        "weight — tune each independently. No-op when latent_ae=False.")
     p.add_argument("--overlap-consistency-k", type=int, default=2,
                    help="Number of boundary steps on each side compared by the "
                         "feature-space overlap consistency loss (default 2).")
