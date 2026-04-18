@@ -1124,3 +1124,101 @@ for #23, point processes for #26, forecasting MoE for #24, RNN training for #27)
 papers target block-level I/O traces. The inference that they apply here is ours, not the authors'.
 Each idea therefore carries *interpretation risk* in addition to *implementation risk*: if it fails,
 part of the failure may be that the mechanism just does not transfer to this problem domain.
+
+---
+
+## External-audit addenda (2026-04-18, Grok)
+
+Grok's proposal audit produced four additions that survive de-dup against #1–#27. Proposals 2
+(hybrid diffusion) and 7 (regime-conditioned diffusion) already live as #22/#24; Proposal 5
+(frozen-bundle as primary selector) is an operational fix, not an architectural idea — tracked
+outside IDEAS.md. The remaining four are kept here so their motivation is not lost when the
+current #21 arc closes.
+
+### 28. Cross-window persistent retrieval bank (extends #17)
+
+**Gap attacked**: reuse_rate / HRC-MAE drift in long rollouts. The existing retrieval memory is
+per-window; `generate.py` resets it at each window boundary, so cross-window reuse — which is
+where real I/O locality lives — never matches.
+
+**Proposal**: extend `retrieval_memory.py` to carry a persistent global bank (size 128–256) across
+windows in BOTH training and generation. At window end, write final bank state to a global
+buffer; next window's initial bank is sampled from that buffer with probability proportional to
+the real trace's reuse-distance distribution. Add an auxiliary loss on the global bank's eviction
+statistics vs. real trace's reuse-distance histogram.
+
+**Why this is on-target**: the per-window retrieval memory made local reuse better but does nothing
+for the window boundary — exactly where `generate.py` carries hidden state but not memory state.
+This is the memory-state analogue of IDEA #21.
+
+**Cost**: 2–4h implementation; negligible compute overhead; risk is that the global bank gets
+dominated by early training noise and never converges. Mitigation: freeze the bank after warm-up
+and only update inside a moving window.
+
+### 29. Adaptive PCF frequencies with frequency-discriminator (extends #9-style PCF)
+
+**Gap attacked**: β-recall ceiling on hard modes. Current PCF frequencies are fixed after
+initialization; the critic learns to ignore the easy frequencies and the pressure collapses.
+
+**Proposal**: every N epochs, re-sample frequencies from a tiny "frequency-GAN" trained to
+maximize real/fake discrepancy on the currently-hardest modes (identified via PRDC low-recall
+bins). Add a small frequency discriminator that scores how well the current frequency set
+separates real vs fake. This keeps PCF adversarial pressure alive throughout training.
+
+**Why this is on-target**: we already know PCF helps tencent and hurts alibaba (frozen-eval
+pairing shows +0.009 on alibaba). An adaptive-frequency PCF could close that gap in both
+directions by letting the loss self-tune to whichever modes matter for the current corpus.
+
+**Cost**: 4–8h; adds a second tiny network + its update step. Risk: interaction with regime
+sampler and multi-scale critic creates adversarial-soup instability.
+
+### 30. Multi-scale overlap consistency + adversarial boundary critic (extends #21)
+
+**Gap attacked**: DMD-GEN stuck >0.3; temporal modes don't match at long horizons. Current
+`--overlap-consistency-mode=overlap` is single-scale (k=2); the multi-scale critic isn't applied
+to boundaries.
+
+**Proposal**: extend OC to 3-scale (fine k=2, medium k=6, coarse k=12) mirroring the multi-scale
+critic. Add an adversarial boundary critic scoring ONLY the stitched boundary region (last-k of
+A + first-k of B). Weight boundary steps higher than bulk. Once wired, lift
+`--boundary-smoothness-weight` into the 1.5–2.0 range.
+
+**Why this is on-target**: DMD-GEN measures dynamical modes across time; a single-scale overlap
+loss cannot supervise multiple dynamical scales simultaneously. The boundary critic is the
+adversarial version of what BS (MSE on latents) does non-adversarially.
+
+**Cost**: 6–10h; one new tiny critic + multi-scale OC machinery. Risk: adds another critic to an
+already-three-critic architecture (main, PCF, multi-scale) — GAN stability concerns.
+
+### 31. Chained-window training augmentation (extends #21)
+
+**Gap attacked**: train→inference mismatch. Training generates ONE window; `generate.py`
+auto-regresses 2–4+ windows. Even with BS/OC, the training signal only covers one boundary.
+
+**Proposal**: randomly sample chained windows (2–4 consecutive) from the real trace each batch.
+Generate the same length with hidden-state carry inside the batch. Apply BS at every internal
+boundary and OC at every overlap region. This directly trains on the inference distribution.
+
+**Why this is on-target**: chunk_stitching only supervises a single boundary. Chained training
+teaches the model that hidden state must compound through many windows, not just survive one.
+This is the most direct fix to DMD-GEN and the "drift over long rollouts" failure mode.
+
+**Cost**: 4–6h; mostly batch-assembly and loss accounting. Memory: 2–4x per batch (can be
+mitigated by halving files-per-epoch). Risk: with only 12–24 windows per epoch, chaining 4
+collapses effective batch diversity.
+
+### Ordering vs. current plan
+
+All four of these attack live failure modes that #21 (now running) cannot close on its own. Order
+of attack once the current tencent_v160/alibaba_v161 runs complete:
+
+1. **#28 cross-window retrieval bank** — single biggest reuse/HRC target; isolated to
+   retrieval_memory.py + generate.py; low blast radius.
+2. **#31 chained-window training** — directly reshapes the training distribution to match
+   inference. Biggest expected Δ on DMD-GEN.
+3. **#30 multi-scale OC + boundary critic** — only if #28+#31 leave DMD-GEN elevated.
+4. **#29 adaptive PCF** — only if β-recall is still the dominant gap after the first three.
+
+This ordering is orthogonal to the 2026-04-18 list above (#25, #27, #24, #23). Those five are
+cheaper architectural experiments; #28–#31 are targeted attacks on documented failure modes from
+the frozen-sweep history.
