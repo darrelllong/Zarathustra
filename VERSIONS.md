@@ -60,7 +60,7 @@ priority after the current hyperparameter ablation loop (v138) closes.
 - If v140 ★ < 0.05778 → OC is BETTER than BS (NEW alibaba ATB candidate).
 - If v140 G-collapses like v135 → OC can't replace BS's regularization role on alibaba; chunk-stitching family on alibaba is BS-only.
 
-**Status** (2026-04-17): launched ~22:33 PDT. Log `/home/darrell/train_alibaba_v140.log`.
+**Status** (2026-04-17): first launch ~22:33 PDT HUNG at Phase 2.5 ep1 for 54+ min (Python burned 96% CPU, log mtime stuck, empty checkpoints dir). Killed PID 239026. Initial relaunch attempt seeded with v139's pretrain failed at load — v139 pretrain Recovery shape `fc.{weight,bias}` mismatched v140's `fc_cont.{weight,bias} + fc_binary.{weight,bias}` (v139 omitted `--mixed-type-recovery`, v140 keeps it per v132 recipe). Cleared seed, fresh-relaunched 22:39 PDT as PID 254660. Log `/home/darrell/train_alibaba_v140.log`. Hang root cause unknown — possibly transient NFS issue on /tiamat (v154 on local-disk tencent unaffected). If second attempt hangs again at the same point, pivot to local-copy alibaba dir.
 
 ---
 
