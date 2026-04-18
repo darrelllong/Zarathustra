@@ -884,3 +884,37 @@ The repo did the right thing by running clean reproductions. But it should not l
 ### Short Take
 
 I read the response, and the main thing that changed since it was written is this: the bottleneck is now checkpoint selection, not just architecture choice. If the repo fixes that, the next big bet will be much easier to trust. If it does not, then even good ideas will keep getting judged through the wrong control surface.
+
+---
+
+## Round 19
+
+### Sweep Repair Worked; WaveStitch Has A Hidden Semantics Bug
+
+1. `[P1]` The new overlap-mode branch silently changes the meaning of `boundary_smoothness_weight` whenever `overlap_consistency_weight > 0`. The comments say sub-loss `(a)` is adjacent-window continuity, with chunk B starting from A's final hidden state in [llgan/train.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/train.py#L1700). But the new overlap branch enters at [llgan/train.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/train.py#L1721), splits A at `T-k`, and then computes `loss_bs = boundary_latent_smoothness(H_b1, H_b2, ...)` where `H_b2` starts from `h_mid`, not from A's final hidden state, in [llgan/train.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/train.py#L1731). That means `boundary_latent_smoothness()` is now comparing A's suffix to B's prefix over the **same absolute timesteps**, not across the real chunk boundary. For `tencent_v160` this may not matter because the recipe has no BS, but `alibaba_v160` is documented as "v157 exactly + OC" in [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L124), and v157/v132 includes `--boundary-smoothness-weight 1.0`. So the live Alibaba run is not actually v157 plus true overlap. It is v157 with the original adjacent-boundary BS path replaced by latent overlap-invariance plus feature overlap-invariance. That confounds the result before it starts.
+
+2. `[P1]` Fix the overlap implementation before interpreting `alibaba_v160`. The intended clean test should run two distinct forwards when both losses are enabled: one adjacent pair for BS (`B` hidden = A final hidden), and one split-at-`T-k` overlap pair for OC (`B` hidden = `h_mid`). If cost is a concern, choose explicitly: either disable BS and call it "OC-only overlap mode," or keep BS and pay for the extra forward. What should not happen is the current implicit mode switch where a flag for sub-loss `(b)` changes sub-loss `(a)`'s target while the version log still describes the recipe as v157 plus OC.
+
+3. `[P1]` The checkpoint-selection repair is real and important. `llgan/frozen_sweep.py` now evaluates saved epoch checkpoints plus `best.pt` and `final.pt`, writes `frozen_sweep.json`, and promotes `frozen_best.pt` in [llgan/frozen_sweep.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/frozen_sweep.py#L69). The response's core claim is supported by the new version history: Alibaba `v157` and Tencent `v158` both promote `final.pt`, while `best.pt` is materially worse in [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L68) and [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L83). This is exactly the control-surface repair Round 18 asked for. Keep it mandatory for ATB claims.
+
+4. `[P1]` The deterministic fake-seed patch materially changes the Tencent story and should reset the project's rhetoric. The earlier "v158 failed to reproduce v153" conclusion is now reversed in [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L91): including `final.pt` and adding `--eval-fake-seed 42` makes `v158` the Tencent ATB at `0.03942`. That is a big methodological win, but it also means several older closure decisions based on partial sweeps or unseeded fake draws should be treated as lower-confidence historical evidence. The repo should not re-litigate everything, but it should stop using pre-sweep-era single-checkpoint failures as hard proof against mechanism families.
+
+5. `[P2]` The PRDC fallback criticism from prior rounds appears addressed. The fallback now uses `r_fake` for recall and implements coverage as nearest fake within the real radius in [llgan/eval.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/eval.py#L312). That closes one of the more embarrassing evaluation-trust gaps. The remaining eval risk is less "PRDC is broken" and more "the exact frozen-bundle protocol must be the one used consistently everywhere."
+
+6. `[P2]` The chunk-stitching module docs are now internally stale in a way that can mislead future runs. The top status says both sub-losses are wired in [llgan/chunk_stitching.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/chunk_stitching.py#L4), but later text still says "Phase A ships only the latent smoothness loss" and labels the integration sketch "NOT YET WIRED" in [llgan/chunk_stitching.py](/Users/darrell/.codex/worktrees/b29e/Zarathustra/llgan/chunk_stitching.py#L57). That is not just documentation clutter; this repo uses doc text to decide whether an idea is open or closed. Clean the module comments so the next reviewer does not have to reverse-engineer which parts are live.
+
+### What I Would Do Next
+
+1. Patch the overlap branch so BS and OC keep separate semantics when both are enabled.
+
+2. Restart or relabel `alibaba_v160` after that patch. If the current run continues unchanged, interpret it as "overlap-mode replaced BS semantics," not as "v157 + true OC."
+
+3. Keep `frozen_sweep` as the required post-train promotion path and stop publishing ATB claims from `best.pt` alone.
+
+4. Re-read old closures through the new sweep lens, but do not sink the project into archaeology. Use the new protocol going forward.
+
+5. Update `chunk_stitching.py` comments so the idea state, the code path, and the version-log language all agree.
+
+### Short Take
+
+This was a strong measurement turn. The frozen sweep and fake-seed fix are exactly the kind of infrastructure repair the project needed, and they changed the actual Tencent frontier. The problem is that the next architecture bet has a live semantics bug: overlap mode currently hijacks boundary smoothness when both are on. Fix that before using `alibaba_v160` to judge IDEA #21.
