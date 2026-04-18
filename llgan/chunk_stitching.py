@@ -5,18 +5,19 @@ Status
 ------
 WIRED. Sub-loss (a) boundary_latent_smoothness and sub-loss (b)
 feature-space overlap-consistency are both integrated into the joint-GAN
-training step (llgan/train.py). Sub-loss (b) is driven by
---overlap-consistency-weight and controlled by
---overlap-consistency-mode:
+training step (llgan/train.py). BS and OC are computed on INDEPENDENT
+forward pairs so BS always carries adjacent-window semantics regardless
+of OC mode. Sub-loss (b) is driven by --overlap-consistency-weight and
+controlled by --overlap-consistency-mode:
   * mode=overlap (default, 2026-04-18): TRUE WaveStitch-style overlap.
     Chunk A is split at step T-k to capture h_mid. A's suffix and B's
     prefix both start from h_mid with INDEPENDENT local noise — so A's
     last k and B's first k decoded features refer to the same absolute
     timesteps. loss = overlap_consistency(feat_A, feat_B, k). Drives
     noise-invariance in the overlap region.
-  * mode=boundary (legacy): reuses sub-loss (a)'s adjacent-window
-    forward pair, applies decay-weighted boundary MSE on decoded
-    features. Kept for provenance of pre-2026-04-18 runs (v140).
+  * mode=boundary (legacy): adjacent-window pair, decay-weighted MSE
+    on decoded features. Kept for provenance of pre-2026-04-18 runs
+    (v140).
 Backward compatible: when both weights are 0, training is byte-identical
 to the prior recipe.
 
@@ -54,31 +55,30 @@ Two complementary losses
    columns (post-Recovery). Cheap, but requires generation in
    "overlap mode" (re-using the same hidden state offset).
 
-Phase A (this commit) ships only the latent smoothness loss. Phase B
-adds overlap-mode generation if Phase A shows signal.
+Wiring (see llgan/train.py, G-update block)
+-------------------------------------------
+BS and OC are computed on SEPARATE forward pairs when both are enabled,
+so BS's adjacent-window semantics are stable regardless of OC mode:
 
-Integration sketch (NOT YET WIRED)
-----------------------------------
-In the joint-GAN training step (train.py, around the G update):
+  BS pair (always adjacent): A full forward → h_b_carry; B starts from
+    h_b_carry. loss = boundary_latent_smoothness(H_A, H_B).
+  OC pair (mode=overlap): A split at T-k producing h_mid; A's suffix
+    and B's prefix both start from h_mid with INDEPENDENT local noise.
+    loss = overlap_consistency(R(H_A), R(H_B), k).
+  OC pair (mode=boundary, legacy): adjacent pair, decay-weighted MSE on
+    decoded features — retained for v140-era reproducibility.
 
-    z_global, z_local_A = sample(...)              # current code
-    latent_A, hidden_A = G(z_global, z_local_A, return_hidden=True)
-    if cfg.boundary_smoothness_weight > 0:
-        z_local_B = sample_z_local(B, T, device)
-        latent_B, _ = G(z_global, z_local_B, hidden=hidden_A,
-                         return_hidden=True)
-        bs_loss = boundary_latent_smoothness(latent_A, latent_B)
-        g_loss = g_loss + cfg.boundary_smoothness_weight * bs_loss
+Cost: ~2x per G-step when both losses enabled (two extra G forwards);
+~1.5x when only one is enabled. Memory: +1-2x batch in activations.
 
-    # rest of G update unchanged
-
-Cost: ~1.5x per G-step (one extra forward through G; no extra critic
-or supervisor work). Memory: roughly +1x batch in activations.
-
-CLI flag (to add):
+CLI flags:
   --boundary-smoothness-weight FLOAT   default 0.0 (off)
-  --boundary-smoothness-k INT          default 2 (steps to compare)
+  --boundary-smoothness-k INT          default 2
   --boundary-smoothness-decay FLOAT    default 0.5
+  --overlap-consistency-weight FLOAT   default 0.0 (off)
+  --overlap-consistency-mode {overlap,boundary}  default overlap
+  --overlap-consistency-k INT          default 2
+  --overlap-consistency-decay FLOAT    default 0.5  (boundary mode only)
 
 Why this is on-target
 ---------------------

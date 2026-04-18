@@ -119,10 +119,20 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
-### alibaba_v160 — v132 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)**, IDEA #21 full (R17 P3 / R18 P2), seed-4, 2026-04-18
-**Why**: RESPONSE.md commitment after v159 closed the v132-seed sweep (range 0.050–0.058, std 0.004). v157's 0.04982 ATB is real but recipe is not reliably sub-0.05 — representation-level change needed. Before 2026-04-18, `--overlap-consistency-weight` reused boundary-smoothness math on two adjacent non-overlapping windows (v139 blew up stacking it; v140 replaced BS with it → 0.0714). New `--overlap-consistency-mode=overlap` (default) splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise → A's last k and B's first k refer to the SAME absolute timesteps. Loss = `overlap_consistency(R(H_A), R(H_B), k=2)`. Drives feature-space noise-invariance in the overlap region — the exact gap between training (each window sampled i.i.d.) and inference (generate.py carries hidden state across window boundaries).
+### alibaba_v160 — CLOSED-CONFOUNDED (BS+OC overlap-mode semantics bug; frozen-best ep20 ★=0.06887 = +38% vs ATB 0.04982, killed ep24, 2026-04-18)
+**Why (closed)**: first test of TRUE WaveStitch overlap-mode sub-loss (b) layered on v157 (BS=1.0 recipe). **Implementation bug surfaced by Round 19 peer review**: in the original wiring, when `--boundary-smoothness-weight > 0 AND --overlap-consistency-mode overlap`, BS was computed on `H_b2` that started from `h_mid` (not A's final hidden) — so BS silently changed from adjacent-window continuity to same-absolute-timestep overlap compare. alibaba_v160 has BS=1.0, so the run is confounded and can't cleanly attribute any result to overlap-mode OC. tencent_v160 is NOT affected (no BS in recipe).
+**Original rationale**: RESPONSE.md commitment after v159 closed the v132-seed sweep. New `--overlap-consistency-mode=overlap` splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise.
 **Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 12:27 PDT, PID 544183. Log `/home/darrell/train_alibaba_v160.log`.
-**Status** (2026-04-18): Phase 1 AE pretrain starting. Forward-pair cost ~1.5x per G-step (one extra G call to split A; one extra R decode vs legacy sub-loss (b)). Kill criteria: (a) G collapse below -6 like v139, (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+**Training (Phase 3)**: ep5 ★=0.12476, ep10 ★=0.09153, **ep15 ★=0.07352 (train-best)**, ep20 ★=0.07576 (regressed), ep21-24 W spiked to 2.97/3.12/3.13/2.76. Killed ep24 — 9 stale from ep15, trajectory hopeless (+48% vs ATB), AND recipe confounded.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| epoch_0005.pt | 0.03230 | 0.4210 | 0.14810 |
+| epoch_0010.pt | 0.01321 | 0.6265 | 0.08791 |
+| epoch_0015.pt / best.pt | 0.00869 | 0.6820 | 0.07229 |
+| **epoch_0020.pt** | **0.01017** | **0.7065** | **★=0.06887** (frozen-best) |
+
+**Conclusion**: frozen-best ep20 ★=0.06887 is +38% behind ATB 0.04982. Even if the recipe weren't confounded, this trajectory wasn't beating v157. `best.pt` was +5.0% worse than frozen-best (5th confirmation of best.pt mis-rank). **Fix committed (train.py independent BS+OC forward pairs); alibaba_v161 relaunches with corrected code.**
 
 ---
 

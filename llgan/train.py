@@ -1718,53 +1718,50 @@ def train(cfg: Config) -> None:
                 if _bs_w > 0 or _oc_w > 0:
                     z_gb, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                              file_cond=file_cond_batch, G=G)
-                    if _oc_w > 0 and _oc_mode == "overlap" and latent_ae:
-                        # TRUE overlap mode: split A's forward at step T-k so A's
-                        # suffix and B's prefix share h_mid (same absolute-time
-                        # semantics). A and B use INDEPENDENT local noise in the
-                        # overlap region → loss drives noise-invariance there.
-                        T = int(cfg.timestep)
-                        k = int(getattr(cfg, "overlap_consistency_k", 2))
-                        k = max(1, min(k, T - 1))
-                        z_lb1 = G.sample_z_local(B, T, device)
-                        z_lb2 = G.sample_z_local(B, T, device)
-                        # A prefix: steps [0..T-k)
-                        H_b1_pre, h_mid = G(z_gb, z_lb1[:, :T - k, :], return_hidden=True)
-                        # A suffix: steps [T-k..T) — starts from h_mid
-                        H_b1_suf = G(z_gb, z_lb1[:, T - k:, :], hidden=h_mid)
-                        H_b1 = torch.cat([H_b1_pre, H_b1_suf], dim=1)
-                        # B full: also starts from h_mid. Its first k steps refer to
-                        # the same absolute timesteps as A's last k steps.
-                        H_b2 = G(z_gb, z_lb2, hidden=h_mid)
-                        if _bs_w > 0:
-                            loss_bs = boundary_latent_smoothness(
-                                H_b1, H_b2,
-                                k=int(getattr(cfg, "boundary_smoothness_k", 2)),
-                                decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
-                            )
-                            g_loss = g_loss + _bs_w * loss_bs
-                        feat_b1 = R(H_b1)
-                        feat_b2 = R(H_b2)
-                        loss_oc = overlap_consistency(feat_b1, feat_b2, k_overlap=k)
-                        g_loss = g_loss + _oc_w * loss_oc
-                    else:
-                        # Legacy boundary mode: B starts from A's FINAL hidden.
+                    # BS (sub-loss a) ALWAYS uses adjacent-window semantics:
+                    # B starts from A's FINAL hidden. This holds regardless of
+                    # OC mode so BS's meaning is stable across recipes.
+                    if _bs_w > 0:
                         z_lb1 = G.sample_z_local(B, cfg.timestep, device)
                         z_lb2 = G.sample_z_local(B, cfg.timestep, device)
-                        H_b1, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
-                        H_b2 = G(z_gb, z_lb2, hidden=h_b_carry)
-                        if _bs_w > 0:
-                            loss_bs = boundary_latent_smoothness(
-                                H_b1, H_b2,
-                                k=int(getattr(cfg, "boundary_smoothness_k", 2)),
-                                decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
-                            )
-                            g_loss = g_loss + _bs_w * loss_bs
-                        if _oc_w > 0 and latent_ae:
-                            feat_b1 = R(H_b1)
-                            feat_b2 = R(H_b2)
+                        H_b1_adj, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
+                        H_b2_adj = G(z_gb, z_lb2, hidden=h_b_carry)
+                        loss_bs = boundary_latent_smoothness(
+                            H_b1_adj, H_b2_adj,
+                            k=int(getattr(cfg, "boundary_smoothness_k", 2)),
+                            decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
+                        )
+                        g_loss = g_loss + _bs_w * loss_bs
+                    # OC (sub-loss b) runs its OWN forward pair, independent of BS.
+                    if _oc_w > 0 and latent_ae:
+                        if _oc_mode == "overlap":
+                            # TRUE overlap mode: split A at T-k so A's suffix and
+                            # B's prefix both start from h_mid with INDEPENDENT
+                            # local noise → loss drives noise-invariance over the
+                            # SAME absolute timesteps.
+                            T = int(cfg.timestep)
+                            k = int(getattr(cfg, "overlap_consistency_k", 2))
+                            k = max(1, min(k, T - 1))
+                            z_lc1 = G.sample_z_local(B, T, device)
+                            z_lc2 = G.sample_z_local(B, T, device)
+                            H_c1_pre, h_mid = G(z_gb, z_lc1[:, :T - k, :], return_hidden=True)
+                            H_c1_suf = G(z_gb, z_lc1[:, T - k:, :], hidden=h_mid)
+                            H_c1 = torch.cat([H_c1_pre, H_c1_suf], dim=1)
+                            H_c2 = G(z_gb, z_lc2, hidden=h_mid)
+                            feat_c1 = R(H_c1)
+                            feat_c2 = R(H_c2)
+                            loss_oc = overlap_consistency(feat_c1, feat_c2, k_overlap=k)
+                            g_loss = g_loss + _oc_w * loss_oc
+                        else:
+                            # Legacy boundary mode: adjacent-pair feature MSE with decay.
+                            z_lc1 = G.sample_z_local(B, cfg.timestep, device)
+                            z_lc2 = G.sample_z_local(B, cfg.timestep, device)
+                            H_c1, h_c_carry = G(z_gb, z_lc1, return_hidden=True)
+                            H_c2 = G(z_gb, z_lc2, hidden=h_c_carry)
+                            feat_c1 = R(H_c1)
+                            feat_c2 = R(H_c2)
                             loss_oc = boundary_latent_smoothness(
-                                feat_b1, feat_b2,
+                                feat_c1, feat_c2,
                                 k=int(getattr(cfg, "overlap_consistency_k", 2)),
                                 decay=float(getattr(cfg, "overlap_consistency_decay", 0.5)),
                             )
