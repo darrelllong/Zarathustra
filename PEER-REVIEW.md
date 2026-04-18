@@ -850,3 +850,37 @@ were just added to `IDEAS.md` and start building from there.
 ### Short Take
 
 The repo did the right thing by running clean reproductions. But it should not let proxy monitors and partial implementations turn into idea closures. Right now the most important correction is epistemic: do not declare `#18` weak or `#21` closed on evidence that does not yet match the intended mechanisms. After the current reproduce pair resolves, the project should get back to a real architecture bet, not another round of watered-down proxy interpretation.
+
+---
+
+## Round 18
+
+### Checkpoint Selection Is Now The Bottleneck
+
+1. `[P1]` The strongest current correctness problem is no longer "did the recipe reproduce?" It is that the training loop is still selecting and preserving the wrong checkpoint. `llgan/train.py` still writes `best.pt` from training-time EMA combined score in [llgan/train.py](/Users/darrell/.codex/worktrees/2458/Zarathustra/llgan/train.py#L1891) and then explicitly says that after a W-stop "`best.pt` is safe to use" in [llgan/train.py](/Users/darrell/.codex/worktrees/2458/Zarathustra/llgan/train.py#L2001). The newest results now refute that assumption on **both** corpora. Alibaba `v157` improves monotonically in training but frozen-best is the intermediate `ep_0010.pt`, not `best.pt`, in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L19) and [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L78). Tencent `v158` does the same thing even more dramatically: train-best beats `v153` in training, but frozen-best lands much earlier and much worse than the Tencent ATB in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L122) and [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L136). At this point, `best.pt` is not just a rough proxy. It is a systematically misleading artifact for the benchmark the repo actually cares about.
+
+2. `[P1]` The current response/roadmap is now stale in one important way. [RESPONSE.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/RESPONSE.md#L90) says chunk stitching is next after the current queue resolves, and the new version log keeps turning the handle on seed sweeps in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L53) and [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L60). One more Tencent seed (`v159`) is defensible because `v153` vs `v158` is a real reproducibility question. But if the repo keeps spending prime cycles on "seed-3, seed-4, seed-5" before fixing checkpoint selection, that is just a more respectable version of the same local-tweak trap the project keeps falling into. Right now the main loop still asks the wrong question during training, so more seeds mostly sharpen the distribution of a broken selection rule.
+
+3. `[P1]` Alibaba no longer needs the same amount of reproducibility panic as Tencent, and the repo should stop acting as if the two lanes are symmetric. `v157` cleanly reproduces and slightly beats `v132` under the frozen protocol in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L19) and [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L70). That means the old "maybe `v132` was just lucky" story has been materially weakened. Tencent is different: `v158` fails to reproduce `v153` under the same recipe in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L136). So the next steps should split:
+   Alibaba should move back toward a real idea or a real control-surface fix.
+   Tencent should finish the tie-breaker, but then stop mistaking seed churn for understanding.
+
+4. `[P1]` The repo should not let `v157` quietly reopen descriptor-distillation enthusiasm. The current Alibaba status line explicitly lists "proceed to IDEA #18 Phase B / new direction" as one of the next moves in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L82). But the Phase A monitor is still a corpus-level global-mean target in [llgan/train.py](/Users/darrell/.codex/worktrees/2458/Zarathustra/llgan/train.py#L765), not the file-level target described in [llgan/cache_descriptor.py](/Users/darrell/.codex/worktrees/2458/Zarathustra/llgan/cache_descriptor.py#L41), and the newer log entries still show `desc_mse` staying weakly related to the quality metric in [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L89) and [VERSIONS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/VERSIONS.md#L165). So the evidence is still not "descriptor loss is ready." The evidence is "the current descriptor proxy is not yet a trustworthy selector."
+
+5. `[P2]` The strongest next engineering move is not another loss weight and not even immediately another new architecture. It is a benchmark-contract repair: make checkpoint selection honor the frozen protocol the repo actually uses for claims. That could mean a lightweight shadow sweep over saved `epoch_*.pt` checkpoints at kill time, or a periodic fixed-bundle eval lane that promotes a separate frozen-best artifact. Only after that would I spend bold-idea budget on the next real mechanism:
+   actual overlap-mode chunk stitching for `#21`,
+   or the `#22` hybrid pivot if Tencent `v159` confirms that the current recipe family is living on a lucky low tail.
+
+### What I Would Do Next
+
+1. Add one canonical post-train checkpoint sweep over the saved epoch checkpoints and promote the **frozen-best** checkpoint, not `best.pt`, as the result that counts.
+
+2. Let `tencent_v159` answer the narrow seed question, but do not authorize an open-ended Tencent seed farm after that.
+
+3. Treat Alibaba as sufficiently reproduced for now and spend its next serious slot either on the selection-fix machinery or on a real representation change, not more "clean replay" bookkeeping.
+
+4. Keep IDEA `#18` out of the priority lane until the monitor is upgraded from global-mean proxy to something that actually matches the design intent.
+
+### Short Take
+
+I read the response, and the main thing that changed since it was written is this: the bottleneck is now checkpoint selection, not just architecture choice. If the repo fixes that, the next big bet will be much easier to trust. If it does not, then even good ideas will keep getting judged through the wrong control surface.
