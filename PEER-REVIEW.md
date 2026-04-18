@@ -918,3 +918,42 @@ I read the response, and the main thing that changed since it was written is thi
 ### Short Take
 
 This was a strong measurement turn. The frozen sweep and fake-seed fix are exactly the kind of infrastructure repair the project needed, and they changed the actual Tencent frontier. The problem is that the next architecture bet has a live semantics bug: overlap mode currently hijacks boundary smoothness when both are on. Fix that before using `alibaba_v160` to judge IDEA #21.
+
+---
+
+## Round 20
+
+### The New Ideas Need A Gate, Not A Bigger Queue
+
+1. `[P1]` The best new idea is not "#28 or #32"; it is **#28 plus #32 as one mechanism-target pair**. The cross-window persistent retrieval bank in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1138) gives the generator a way to produce long-range reuse, but by itself it can over-copy or learn arbitrary eviction habits. The explicit IRD footprint model in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1228) gives the distributional target, but by itself it has no mechanism that can realize long reuse distances across windows. Treating these as separate queue items would be a mistake. The high-upside branch is persistent memory whose reads/evictions are trained against IRD or stack-distance summaries.
+
+2. `[P1]` Do not launch global memory until the long-rollout diagnostic exists. Short-window frozen eval can easily miss the thing #28/#32 are supposed to fix. The new idea text correctly says the failure is HRC-MAE and reuse drift in long rollouts in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1140), but the current frozen-bundle headline score is still mostly a short-window selector. Before spending a serious run on persistent memory, add a deterministic long-rollout sidecar: fixed generation seed, fixed char-file pool, HRC curve, reuse rate, IRD/stack-distance buckets, and first-half vs second-half drift. Otherwise a real cache-fidelity win can look like a combined-score wash, or worse, a combined-score win can hide over-copying.
+
+3. `[P1]` The frozen selector is no longer an "idea"; it is an acceptance criterion. [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L53) documents `frozen_sweep.py`, dual seeds, and `frozen_best.pt`, and [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L82) shows why this matters: Tencent `v158` flipped from a failed reproduce to the ATB only after `final.pt` and fake-seed determinism were included. Every new idea in #28-#32 should be judged by `frozen_sweep` plus the long-rollout sidecar, not by `best.pt`, not by a live training star, and not by expected-delta claims from an external audit.
+
+4. `[P1]` Be careful with #29 and #30; they are plausible but also the easiest path back into "adversarial soup." Adaptive PCF frequencies in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1158) and a multi-scale boundary critic in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1175) both add adversarial pressure to an already delicate WGAN-SN stack. Round 19 found that even the simpler overlap path had a semantics bug, and [VERSIONS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/VERSIONS.md#L115) now shows `alibaba_v161` was launched specifically to repair that. Let `v160/v161` answer the clean overlap question first. If #21 still leaves DMD-GEN elevated, then #30 is a reasonable follow-up; before that, it is likely to confound the result.
+
+5. `[P1]` Chained-window training (#31) should be treated as the training surface for #28/#32, not as a disconnected later experiment. The proposal in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1193) is the first one in the new batch that actually trains on the same distribution `generate.py` uses: multiple windows with carried state. That is exactly what persistent memory needs. A global bank trained only through isolated windows will mostly learn a synthetic boundary condition, not the real cross-window reuse law. The clean build order is: long-rollout diagnostic, two-window chained batches, persistent memory carry, then IRD-conditioned eviction/read targets.
+
+6. `[P2]` The diffusion references are useful, but they should not become permission to pivot before the current mechanism tests finish. The verified `IDEAS.md` note now correctly frames DiTTO, TSGDiff, Stage-Diff, and WaveStitch as implementation references under #22 in [IDEAS.md](/Users/darrell/.codex/worktrees/b29e/Zarathustra/IDEAS.md#L1261). That is the right posture. DiTTO is storage-trace-specific and relevant; Stage-Diff maps cleanly onto coarse-to-fine long-horizon generation; TSGDiff is graph-structured and may be useful but was originally misstated by the external audit. These papers support keeping #22 alive. They do not prove the repo should skip the cheaper memory/IRD/chained-window tests.
+
+7. `[P2]` Tighten the citation standard for future idea imports. The external batch contained useful concepts, but it also misstated titles and overreached on expected gains. That is normal for a brainstorming dump, but it should not enter `IDEAS.md` or the paper unfiltered. The repo should keep the current pattern: add the idea if it survives de-dup, verify titles/authors/claims before citation, and clearly mark when a claim is an inference rather than something the source actually demonstrated on block I/O traces.
+
+### What I Would Do Next
+
+1. Let the repaired `alibaba_v161` and current `tencent_v160` report under deterministic `frozen_sweep`.
+
+2. Add the deterministic long-rollout HRC/IRD/reuse sidecar before launching #28.
+
+3. Implement #28 and #32 together, with #31 as the training surface:
+   persistent memory carry,
+   two-window chained batches,
+   and IRD/stack-distance diagnostics from the start.
+
+4. Hold #29 and #30 until the clean #21 result is known.
+
+5. Keep #22 as the high-ceiling pivot, but do not use diffusion papers as a reason to abandon the more direct locality/cache-fidelity branch.
+
+### Short Take
+
+The new `IDEAS.md` additions are useful, but the queue needs discipline. The strongest next move is not more adversarial cleverness or an immediate diffusion rewrite. It is a cache-native locality branch: persistent cross-window memory with an explicit IRD target, trained on chained windows, judged by frozen sweep plus long-rollout cache diagnostics.
