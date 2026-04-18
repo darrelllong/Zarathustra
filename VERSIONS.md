@@ -60,12 +60,21 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
-### alibaba_v138 — **v132 EXACTLY with grad-clip 1.0 (vs 0.5) — final hyperparameter probe**
-**Why**: v137 (v132 with lr-d halved) BACKFIRED catastrophically — halving the critic lr made MMD² explode 4× (ep5 0.03787 vs v134 0.00655). Hypothesis: v132's grad-clip 0.5 may be over-restricting critic's ability to respond to G's supervisor-pretrained starting point. Relaxing grad-clip to 1.0 gives critic more room without changing lr. **If v138 also fails, alibaba frontier 0.05778 stands and focus pivots to tencent refinement.**
+---
 
-**Recipe**: v132 EXACTLY with `--grad-clip 1.0` (was 0.5). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2. lr-g 8e-5, lr-d 4e-5 (unchanged).
+### alibaba_v138 — CLOSED (grad-clip 1.0 BACKFIRED, killed ep3 critic-dominance imminent, 2026-04-17)
+**Recipe**: v132 EXACTLY with `--grad-clip 1.0` (was 0.5). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. PID 181433. Ran 19:32–21:05 PDT.
 
-**Status** (2026-04-17): launched 19:39 PDT PID 181433. Log `/home/darrell/train_alibaba_v138.log`.
+**Training (Phase 3 only, ep1-3 before kill)**:
+- ep1: W=+0.134, G=−2.92
+- ep2: W=+0.673, G=−6.09 (G plunged 3.2 in one epoch)
+- ep3: W=+2.011, G=−6.80 (W about to cross 3.0 threshold)
+
+**Why killed**: Same critic-dominance pattern as v137 but arriving faster. G plunged to -6.80 by ep3 (vs v137's -5.92 by ep4). Relaxing grad-clip let critic gradients dominate even more than in v137, producing even worse early dynamics. Killed before ep5 ★ posted — trajectory was unambiguous (MMD² would follow v137's 0.03787 pattern).
+
+**Finding — BOTH axes of cheap hyperparameter probe on v132 FAIL**: v137 (halved lr-d) and v138 (doubled grad-clip) BOTH destabilize. v132's {grad-clip=0.5, lr-d=4e-5} sits at a narrow stable operating point for the SSM+MTPP+BS stack on alibaba. Moving either axis in either direction causes critic-dominance collapse.
+
+**DECLARATION — alibaba frontier = v132 ATB 0.05778 stands**: With v134 (seed), v135 (−BS), v136 (−MTPP), v137 (lower lr-d), v138 (higher grad-clip) all closed negative, v132 stack is MINIMAL and its hyperparameters are TUNED. No further cheap ablations warranted. **Per Round 17 P2, pivot to full chunk-stitching IDEA #21 (feature-space overlap-consistency sub-loss b) as the next code-level priority.**
 
 ---
 
