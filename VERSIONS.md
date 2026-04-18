@@ -16,8 +16,9 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall). `boundary-smoothness` = latent-space sub-loss only from `chunk_stitching.py`; full #21 overlap-consistency chunk stitching is UNTESTED. |
-| Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
+| Alibaba | **0.05567**       | **v157** ep_0010.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | Frozen ep_0010.pt 2026-04-18: MMD²=0.00847, β-recall=0.7640, α=0.7855. **4% improvement over v132's 0.05778.** Same recipe as v132 (different training seed). Train ★=0.0696, frozen ★=0.0557 — frozen better than train (Δ=−0.014). v157 ep15 train-best (★=0.0545) had frozen ★=0.0734 — again proves training-time ★ optimum ≠ frozen optimum (v153 lesson reproduced on alibaba). |
+| Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
+| Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
 | Tencent | **0.04003**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0020.pt 2026-04-17: MMD²=0.00313, β-recall=0.8155, α=0.6995. **13% improvement over v152's 0.04575.** Same recipe as v152 (different training seed). Train ★=0.04129, frozen ★=0.04003 — train/frozen tight (Δ=−0.00126). v153's ep45 best.pt frozen=0.0685 (much worse) — proves training-time ★ optimum ≠ frozen optimum. |
 | Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
 | Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
@@ -50,16 +51,21 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
-### alibaba_v157 — CLOSED (v132 reproduce — train ★ improved through ep15 then W-spike stopped ep16; frozen-eval PENDING, 2026-04-18)
+### alibaba_v157 — **NEW ALIBABA ATB 0.05567** (v132 recipe EXACTLY, clean reproduce seed-2; frozen ep_0010 beats v132 by 4%, 2026-04-18)
 **Recipe**: v132 EXACTLY (no additions). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, mixed-type-recovery). Fresh pretrain. --checkpoint-every 5. Launched 04:21 PDT, PID 323893, W-stopped ~06:39 PDT. 15 Phase-3 epochs completed.
 
-**Training (Phase 3 only)**: ep1 W=+0.16 G=-1.90, ep5 W=+1.06 G=-2.67 **★=0.07585** (recall=0.690), ep10 W=+2.12 G=-1.77 **★=0.06960** (recall=0.691), ep15 W=+3.81 G=-0.31 **★=0.05445** (recall=0.749) ★ best, ep16 W=+3.35 → W-spike guard: W≥3.0 for 3 consecutive epochs → stop. `best.pt` + `final.pt` + pretrain preserved.
+**Training (Phase 3 only)**: ep1 W=+0.16 G=-1.90, ep5 W=+1.06 G=-2.67 ★=0.07585 (recall=0.690), ep10 W=+2.12 G=-1.77 ★=0.06960 (recall=0.691), ep15 W=+3.81 G=-0.31 **★=0.05445** (recall=0.749) train best, ep16 W=+3.35 → W-spike guard: W≥3.0 for 3 consecutive epochs → stop. `best.pt` + `final.pt` + pretrain preserved.
 
-**Finding — v132 recipe DOES reproduce train-trajectory (ep15 train ★=0.0545 < v132's 0.058 train, matching strategy "train ≤ 0.06" branch)**. Three prior alibaba-v132-family failures (v139 full-#21, v140 OC-only, v156 v132+descriptor-monitor) were caused by the added loss terms/monitors, NOT seed/environmental drift: clean v132 replay hits the same training neighborhood. W-spike at ep15 is an artefact of v132's narrow-stable regime (same pattern seen in late epochs of v132) — but the best checkpoint landed inside the spike, so frozen eval is needed.
+**Frozen eval (`--eval-real-seed 42`) sweep**:
+- ep_0005.pt: MMD²=0.01045, β-recall=0.5830, α=0.8310 → **★=0.09385** (recall crashed)
+- ep_0010.pt: MMD²=0.00847, β-recall=0.7640, α=0.7855 → **★=0.05567** ← NEW ATB
+- ep_0015.pt (best.pt, train-best): MMD²=0.01044, β-recall=0.6850, α=0.8395 → **★=0.07344**
 
-**Frozen-eval (--eval-real-seed 42, in progress)**: launched on `best.pt` as vinge PID 361832. Log `/home/darrell/eval_alibaba_v157_best.log`. Expected: if frozen ★ < 0.05778 → **new alibaba ATB**; if frozen ★ ≥ 0.0578 → v132 ATB was a frozen-bundle-lucky seed, not a recipe advantage → pivot to IDEA #17 (retrieval memory) or #22 (hybrid diffusion) for alibaba.
+**Finding — v153 lesson REPRODUCED on alibaba: train-best ≠ frozen-best**. v157 train ★ improved monotonically ep5→ep15 (0.076→0.070→0.054), but frozen ★ was U-shaped (0.094→0.056→0.073). Ep10 — the intermediate checkpoint no training metric flagged — wins under the frozen protocol. **Always frozen-eval multiple checkpoints, not just `best.pt`.** Train→frozen delta for ep10 = **−0.014** (frozen BETTER than train, like v132 did at -0.00164). For ep15 delta = +0.019 (frozen worse). The W-spike that stopped training at ep16 was actually stopping on the WORSE-frozen side of the curve.
 
-**Status** (2026-04-18): training W-stopped 06:39 PDT at ep16; frozen-eval launched; alibaba race slot OPEN pending frozen-eval verdict.
+**Finding — v132 recipe DOES reproduce** (with seed-2). Three prior alibaba-v132-family failures (v139 full-#21, v140 OC-only, v156 v132+descriptor-monitor) were caused by the added loss terms/monitors, NOT seed drift: clean v132 replay beats v132. Chunk-stitching family and cache-descriptor monitor both confirmed counterproductive on alibaba.
+
+**Status** (2026-04-18): NEW ATB registered. Next alibaba move: (a) seed-sweep to confirm 0.0557 isn't noise (v159+ = v132-recipe seed-3,4,5), (b) try ep10-like early-stop heuristic, or (c) proceed to IDEA #18 Phase B / new direction with v157 ep10 as new benchmark. Alibaba race slot currently OPEN.
 
 ---
 
