@@ -259,3 +259,108 @@ seeds 42/42.
 3. IDEA #22 hybrid pivot stays held until #21 reports.
 4. IDEA #18 Phase B stays held until the monitor uses per-file targets.
 
+---
+
+# Response to External Technical Audit — Grok (2026-04-18)
+
+**Responding to**: Grok's live-repo technical audit (9.4/10 technical, 6.7/10 maintainability,
+8.6/10 release-readiness). Full-history, file-tree, code-level review of 609 commits.
+
+## Summary
+
+Grok's audit separates into three buckets: (1) **specific live-bug claims** — two
+disproved on inspection, two are valid safety gaps not bugs; (2) **engineering-debt
+observations** — mostly agreed; (3) **recommendations** — most aspirational, a few
+actionable. This response records the inspection verdicts so the claims don't
+regress-test themselves later.
+
+## Specific bug claims — inspection verdicts
+
+### DISPROVED: `model.py` Generator retrieval-aux state leak
+**Grok**: "`_last_retrieval_aux` is written but never cleared between calls. Long
+rollouts in `generate.py` could leak state."
+
+**Inspection**: `model.py:714` initializes to `None`; `model.py:840` overwrites with
+fresh dict each forward when retrieval is active; `model.py:844` explicitly resets to
+`None` on the `else` branch (retrieval off). There is no leak path. The field is
+overwritten every G forward, regardless of retrieval state.
+
+### DISPROVED: `dataset.py _encode_opcode` vs `compare.py` convention mismatch
+**Grok**: "Inconsistent with the ±1 convention documented in compare.py. Negative
+sentinels and the mapping logic could silently flip read/write in some trace formats."
+
+**Inspection**: `dataset.py:958-982` produces signed `+1=read, -1=write`, with negative
+sentinels explicitly mapped to read (documented at line 964-966). `compare.py:93-102`
+accepts exactly this convention and converts to binary for metric scoring. Line 102:
+"synthetic CSVs from generate.py + inverse_transform therefore have opcode ∈ {+1.0,
+-1.0} where +1.0 means read, -1.0 write." Fully consistent.
+
+### VALID (safety gap, not live bug): `pcf_loss.py` minimax-direction guard
+**Grok**: "The minimax direction (frequencies must be maximized) is not enforced
+inside the loss class. Easy regression if someone forgets to negate the loss in
+train.py."
+
+**Verdict**: agreed. The v71–v72 collapse was exactly this failure mode. Current
+call sites in train.py are correct, but the loss class should refuse ambiguous
+use. Adding a guard (e.g., separate `loss_for_G` / `loss_for_C_freqs` methods or
+an explicit `mode=` kwarg that panics on mismatch) is the right defense. Low cost,
+high value — scheduled before the next IDEA iteration.
+
+### VALID (safety gap, not live bug): `chunk_stitching.overlap_consistency` contract
+**Grok**: "No runtime validation that the caller actually generated the chunks with
+the correct hidden-state offset. Silent mismatch possible."
+
+**Verdict**: agreed. The function can't know its inputs were produced by the
+split-at-T-k protocol; it just computes MSE on `[:, -k:, :]` vs `[:, :k, :]`. The
+right fix is a contract marker — the caller (train.py) attaches a tag to the
+tensors or passes a sentinel the loss validates, failing loudly on misuse. Same
+rationale: the 2026-04-18 BS+OC semantics bug went undetected for a full run
+because nothing in the loss complained about confused semantics. Scheduled.
+
+### CHECK-NEEDED: `generate.py` z_global fallback on older checkpoints
+**Grok**: "Now correctly calls cond_encoder/regime_sampler/gmm_prior, but older
+checkpoints will silently fall back to raw noise (the exact train/eval gap you
+spent many commits fixing)."
+
+**Verdict**: to verify. If true, `generate.py` should fail loudly on checkpoints
+that predate the full z_global unification rather than silently degrade. Adding a
+checkpoint-version tag on save + version check on load is the right fix. Not
+blocking current runs (v157/v158/v160/v161 all post-date the unification).
+
+## Engineering-debt observations — agreed (most)
+
+- **train.py monolith (152kB, 100+ flags)**: agreed. Refactor into `LLGANTrainer`
+  is the right direction but high-risk mid-race. Deferred until after the current
+  #21 arc closes.
+- **Half-wired features** (hybrid diffusion stages 2-3, SSM hot-start, retrieval-BCE
+  on ground-truth reuse, cache-descriptor Phase B, mtpp-timing head): agreed.
+  "Wire-or-delete" policy is sensible; IDEAS.md will be annotated with "DORMANT"
+  tags for held features so they're not mistaken for active code.
+- **No pytest suite**: acknowledged. Current tests are smoke-level. A targeted
+  suite (PCF minimax direction, overlap semantics, retrieval BCE, generate→compare
+  round-trip on synthetic) is the right first batch.
+- **Frozen-best not the default selector**: acknowledged. `frozen_sweep` is run
+  post-hoc; promoting it to the in-training selector would close the train-★/
+  frozen-★ divergence path we keep patching. Scheduled after #21 closes.
+- **No `requirements.txt` / Dockerfile / environment lock**: acknowledged.
+  Operationally we use a single pinned conda env on vinge.local; a portable lock
+  file is overdue.
+
+## What is NOT being adopted
+
+- **"Make v161 the official release tag"** (Grok's nice-to-have). v161 is
+  mid-experiment and the eval protocol is still tightening. Tagging a frontier
+  run as stable would mis-signal maturity. Official tagging waits for the #21
+  closure post-mortem.
+- **"Wire hybrid diffusion full pipeline before shipping"**: #22 is explicitly
+  held per the original Round 16 response. Grok's audit confirms the held state;
+  nothing changes.
+
+## Net
+
+Two of Grok's bug claims don't survive inspection. Two are real safety gaps worth
+fixing before the next architectural bet (PCF minimax guard, overlap-consistency
+contract). The engineering-debt items are agreed and will be worked after the
+current chunk-stitching experiment closes. No new IDEAS.md entries — Grok's
+review is code-quality, not architectural.
+
