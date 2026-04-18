@@ -99,16 +99,37 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
-### tencent_v155 — **v153 recipe (no boundary losses) + cache-descriptor monitor (IDEA #18 Phase A diagnostic)**
-**Why**: v154 confirmed OC ALONE doesn't help tencent (best training ★=0.04764 at ep5, drifted 0.049+, killed ep19 hopeless). Tencent boundary-regularizer family (BS, OC, both) now EXHAUSTED — all dead weight or worse. Pivot to IDEA #18 per Round 16's recommended build order. v155 adds cache-descriptor MONITOR (Phase A, non-differentiable): logs `desc_mse` each ★ epoch. Also functions as a fresh-seed retry of v153 recipe (same recipe produced 0.04003 at ep20 via seed variance alone).
+### tencent_v158 — **v153 recipe EXACTLY (clean, no cache-descriptor monitor)**
+**Why**: v155 (v153 recipe + descriptor monitor) produced promising training-★ (best 0.03873 @ ep65, beats ATB 0.04003 train-★ by 3.3%) but ALL frozen evals WORSE: ep40 frozen ★=0.0704, ep65 frozen ★=0.0816 (76-104% above ATB). Train→frozen gap +60-110%, versus v153's tight +3%. Either (a) monitor subtly interfered (non-differentiable but changes file-loading order / GPU memory layout), or (b) v153 was lucky, or (c) v155 was unlucky seed. v158 tests (a) first: clean v153 recipe, no monitor, fresh seed.
 
-**Recipe**: v153/v152 recipe (no BS, no OC) + `--cache-descriptor-file /home/darrell/traces/characterization/tencent_descriptors.jsonl`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain. --checkpoint-every 5 per v153 lesson.
+**Recipe**: v153/v152 recipe EXACTLY (no BS, no OC, no descriptor monitor). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain.
 
 **Strategy**:
-- If v155 ★ < 0.04003 → NEW tencent ATB (pure seed luck reproducing v153's win).
-- Regardless of ★: desc_mse trajectory informs IDEA #18 Phase B decision. If desc_mse strongly correlates with ★ across epochs → Phase B (differentiable descriptor distillation) is worth the code cost. If uncorrelated → close #18 cheaply.
+- If v158 frozen ★ < 0.04003 → confirms monitor was interfering; v155 CLOSED as methodology artifact; retain v153 ATB.
+- If v158 also frozen-fails → v153's ATB may have been lucky seed; consider seed-sweep (v159 seed-N) or pivot to new idea.
 
-**Status** (2026-04-17): launched ~23:32 PDT as PID 273688. Log `/home/darrell/train_tencent_v155.log`. Cache-descriptor monitor active (3234 file targets, D=8 descriptor).
+**Status** (2026-04-18): launched 05:03 PDT as PID 330376. Log `/home/darrell/train_tencent_v158.log`.
+
+---
+
+### tencent_v155 — CLOSED (training-★ beat ATB but ALL frozen evals 76-120% worse; killed ep66 W=3.83, 2026-04-18)
+**Recipe**: v153/v152 recipe + `--cache-descriptor-file tencent_descriptors.jsonl` (IDEA #18 Phase A monitor, non-differentiable).
+
+**Training ★ progression**: ep5=0.0662, ep10=0.0523, ep20=0.0482, ep25=0.0472, ep40=**0.0441**, ep45=0.0558, ep50=**0.0397** ★ (beat train-ATB), ep55=0.0483, ep60=0.0535, ep65=**0.0387** ★ (peak), ep66 W=3.83 (3rd breach of 3.0, killed).
+
+**Frozen eval sweep (--eval-real-seed 42)**:
+| epoch | MMD² | β-recall | ★ frozen | vs ATB 0.04003 |
+|-------|------|----------|----------|----------------|
+| 20 | 0.00246 | 0.6515 | **0.0722** | +80% |
+| 25 | 0.00289 | 0.6550 | 0.0719 | +80% |
+| 40 | 0.00268 | 0.6615 | **0.0704** (best frozen) | +76% |
+| 50 | 0.00455 | 0.6555 | 0.0735 | +84% |
+| 65 | 0.00337 | 0.6090 | 0.0816 | +104% |
+| best.pt (ep65) | 0.00329 | 0.5700 | 0.0893 | +123% |
+
+**Finding — train→frozen gap MASSIVE (+60-110%)**: unlike v153 where train 0.0413 → frozen 0.0400 (tight +3%), v155 train 0.0387 → frozen 0.0816 (+110%). β-recall particularly low (0.57-0.66 frozen vs 0.74-0.82 train). **Train-★ is NOT reliable on this recipe when cache-descriptor monitor is attached** — either monitor subtly affects data ordering/batching, or v155 hit a different optimum the frozen set can't see. v158 clean recipe test will discriminate.
+
+**desc_mse also weakly correlated with ★**: across v155 (0.0399→0.0530) and v156 (0.0083→0.0221), desc_mse varied <2x while ★ varied 2x — **IDEA #18 Phase B (differentiable descriptor loss) now weakly justified**. Close cheaply if v158 clean run succeeds.
 
 ---
 
