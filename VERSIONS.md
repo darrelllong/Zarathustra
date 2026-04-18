@@ -51,6 +51,20 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
+### alibaba_v159 — v132 recipe EXACTLY + --seed 3 (seed-sweep firming of v157's new ATB 0.05567)
+**Why**: v157 (seed-2) beat v132's ATB 0.0578 with 0.05567 frozen. v132 (original seed) had 0.0578. Two seeds = two points below 0.0580. v159 seed-3 tests whether v132-recipe frozen distribution is tight (confirms ATB) or has high variance (reveals true benchmark).
+**Recipe**: v132/v157 EXACTLY + explicit --seed 3. Fresh pretrain.
+**Status** (2026-04-18): launched ~10:20 PDT as PID 370903. Log `/home/darrell/train_alibaba_v159.log`.
+
+---
+
+### tencent_v159 — v153 recipe EXACTLY + --seed 3 (reproducibility arbiter after v158 failed to reproduce v153 ATB)
+**Why**: v158 frozen-best 0.0528 = 32% worse than v153's 0.04003, same recipe, clean replay. Two outcomes: (a) v153 seed-lucky (→ tencent ATB overstated), (b) v158 seed-unlucky (→ tencent ATB holds). v159 seed-3 is the tie-breaker.
+**Recipe**: v153/v152/v158 EXACTLY + explicit --seed 3. Fresh pretrain. K=8, SSM+MTPP+multi-scale+PCF.
+**Status** (2026-04-18): launched ~10:20 PDT as PID 371121. Log `/home/darrell/train_tencent_v159.log`.
+
+---
+
 ### alibaba_v157 — **NEW ALIBABA ATB 0.05567** (v132 recipe EXACTLY, clean reproduce seed-2; frozen ep_0010 beats v132 by 4%, 2026-04-18)
 **Recipe**: v132 EXACTLY (no additions). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, mixed-type-recovery). Fresh pretrain. --checkpoint-every 5. Launched 04:21 PDT, PID 323893, W-stopped ~06:39 PDT. 15 Phase-3 epochs completed.
 
@@ -105,16 +119,29 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
-### tencent_v158 — **v153 recipe EXACTLY (clean, no cache-descriptor monitor)**
-**Why**: v155 (v153 recipe + descriptor monitor) produced promising training-★ (best 0.03873 @ ep65, beats ATB 0.04003 train-★ by 3.3%) but ALL frozen evals WORSE: ep40 frozen ★=0.0704, ep65 frozen ★=0.0816 (76-104% above ATB). Train→frozen gap +60-110%, versus v153's tight +3%. Either (a) monitor subtly interfered (non-differentiable but changes file-loading order / GPU memory layout), or (b) v153 was lucky, or (c) v155 was unlucky seed. v158 tests (a) first: clean v153 recipe, no monitor, fresh seed.
+### tencent_v158 — CLOSED (clean v153-recipe replay FAILED to reproduce ATB; frozen-best ★=0.05282 = 32% above ATB 0.04003; tencent reproducibility crisis, 2026-04-18)
+**Recipe**: v153/v152 recipe EXACTLY (no BS, no OC, no descriptor monitor). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain. Launched 05:03 PDT PID 330376, W-stopped ~14:00 PDT at ep109 (W=3.08, 3 consecutive). 109 Phase-3 epochs completed.
 
-**Recipe**: v153/v152 recipe EXACTLY (no BS, no OC, no descriptor monitor). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain.
+**Training ★ progression**: ep40 ★=0.04340 (first ★), ep60 ★=0.04642, ep75 ★=0.04888, ep85 ★=0.04774, ep90 ★=0.04265, ep95 ★=0.03925, **ep100 ★=0.03767** (train best, BEATS v153's train 0.04129), ep105 ★=0.04340, then W-spike to 3.08+ ep107/108/109 → stop. Monotonic training improvement through ep100.
 
-**Strategy**:
-- If v158 frozen ★ < 0.04003 → confirms monitor was interfering; v155 CLOSED as methodology artifact; retain v153 ATB.
-- If v158 also frozen-fails → v153's ATB may have been lucky seed; consider seed-sweep (v159 seed-N) or pivot to new idea.
+**Frozen eval (`--eval-real-seed 42`) sweep**:
+| epoch | MMD² | β-recall | α-prec | ★ frozen |
+|-------|------|----------|--------|----------|
+| 20 | 0.00218 | 0.7170 | 0.7745 | 0.0588 |
+| 50 | 0.00701 | 0.7625 | 0.6225 | 0.0545 |
+| 75 | 0.00348 | 0.6750 | 0.7735 | 0.0685 |
+| **95** | 0.00242 | 0.7480 | 0.7510 | **0.0528** ← frozen-best |
+| 100 (best.pt) | 0.00478 | 0.6370 | 0.7280 | 0.0804 |
 
-**Status** (2026-04-18): launched 05:03 PDT as PID 330376. Log `/home/darrell/train_tencent_v158.log`.
+**Finding — v153's ATB 0.04003 DID NOT REPRODUCE on clean replay**. v158 frozen-best 0.0528 is **32% WORSE** than v153's 0.0400, even though v158 train-best ★=0.0377 is BETTER than v153's 0.0413. This is a reproducibility crisis:
+- Same recipe, same codebase, no cache-descriptor monitor (which v155 had).
+- Different seed (v153=seed-2, v158=default random).
+- Both corpora now show "v158-type" behavior where train-★ monotonically improves while frozen-★ is U-shaped with minimum at mid-training.
+- v157 alibaba reproduced/improved v132's ATB (seed-variance was FRIENDLY). v158 tencent failed to reproduce v153 (seed-variance was PUNITIVE). **Tencent recipe appears much more seed-sensitive than alibaba.**
+
+**Hypothesis**: v153's 0.04003 was a seed-lucky outlier. True v153-recipe frozen distribution may be centered ~0.045-0.055 with v153 as low tail. Need v159 seed-3 for third data point to test this.
+
+**Status** (2026-04-18): CLOSED. Tencent slot filled by v159 (v153 recipe seed-3).
 
 ---
 
