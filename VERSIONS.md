@@ -49,6 +49,17 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
+### alibaba_v139 — **v132 EXACTLY + full IDEA #21 (sub-loss (b) overlap-consistency 0.5)**
+**Why**: Round 17 P2 pivot. Per v134–v138 closure, v132's {SSM+MTPP+BS} stack is MINIMAL and its hyperparameters are TUNED at a narrow stable operating point. Further progress on alibaba requires new *code* features, not scalar twiddling. Full IDEA #21 adds sub-loss (b) feature-space overlap-consistency on paired adjacent windows with hidden-state carry — the decoded-feature counterpart to sub-loss (a). This closes the train→inference gap in *output* space, which is what eval.py actually scores.
+
+**Recipe**: v132 EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + **OC 0.5/k=2/decay=0.5** + v124 base. Fresh pretrain. n_critic=2. grad-clip 0.5 (unchanged).
+
+**Weight rationale**: Feature-scale (post-R, bounded) is ~1 OOM smaller than latent-scale (unbounded), so OC=0.5 produces comparable-to-slightly-smaller gradient magnitude vs BS=1.0. Conservative start; if OC=0.5 has no effect (v139 ★ ≈ v132 ★), raise to 1.0 or 2.0 next round; if it triggers critic dominance (v135-pattern), lower.
+
+**Status** (2026-04-17): launched ~21:10 PDT. Log `/home/darrell/train_alibaba_v139.log`. Phase 3 ep1 expected ~22:30 PDT, first ★ ~22:40 PDT.
+
+---
+
 ### tencent_v153 — **v152 EXACTLY (reproducibility probe for new tencent ATB 0.04575)**
 **Why**: v152 frozen eval yielded ★=0.04575, NEW TENCENT ATB — 22% improvement over v150's 0.05875. Before declaring the recipe stable, reproduce with a fresh seed. Parallels v149→v150 ATB confirmation strategy (v149 seed was wide-delta, v150 seed was tight-delta — same recipe, seed-dependent quality).
 
@@ -56,9 +67,7 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 **Hypothesis**: If v153 lands within ±0.005 of 0.04575, recipe is seed-robust and ATB is load-bearing. If v153 lands at v150-level (~0.058), v152 was seed-lucky (single-run peak). Expect Phase 3 start ~18:00-18:10 PDT, first ★ ep5 ~18:15-18:25 PDT.
 
-**Status** (2026-04-17): launched 17:31 PDT PID 148580 (wrapper; train.py PID in nohup). Log `/home/darrell/train_tencent_v153.log`.
-
----
+**Status** (2026-04-17 21:10 PDT): launched 17:31 PDT PID 148582. Log `/home/darrell/train_tencent_v153.log`. Training ★ progression: ep10 0.04568 (matched v152 frozen ATB) → ep25 0.04129 → ep35 0.03946 → ep45 **0.03535** (9 stale at ep54). ep50 comb=0.04410 no-★. W 2.0-2.8 healthy. best.pt = ep_0045.pt. Frozen eval queued at kill.
 
 ---
 
