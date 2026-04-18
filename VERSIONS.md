@@ -16,10 +16,10 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall) |
+| Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall). `boundary-smoothness` = latent-space sub-loss only from `chunk_stitching.py`; full #21 overlap-consistency chunk stitching is UNTESTED. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
 | Tencent | **0.04575**       | **v152** (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt 2026-04-17: MMD²=0.00195, β-recall=0.7810, α=0.7095. **22% improvement over v150's 0.05875.** Train→frozen delta **−0.00589** (frozen improved over train, EMA underestimated recall). HRC-MAE=0.0607. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
-| Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/#21)      | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. |
+| Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
 | Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Claimed ATB 2026-04-17 AM; replaced by v150 same day |
 | Tencent prior | 0.178 avg | v136 (multi-scale+PCF) | was "0.094" | Former ATB; v141 (continuity) 0.186 |
 
@@ -34,6 +34,16 @@ moving-bundle reports.
 All new experiments eval with `--eval-real-seed 42`. Old numbers kept
 in-line for historical provenance but marked "moving-bundle" where
 relevant.
+
+**Labeling clarification (Round 17 peer review, 2026-04-17)**: Prior
+entries tagged `--boundary-smoothness-*` as IDEA #21. That was inaccurate.
+`boundary-smoothness` implements only the latent-space sub-loss (a) from
+`chunk_stitching.py`; the full IDEA #21 also requires (b) feature-space
+overlap-consistency training on paired adjacent windows with hidden-state
+carry from `generate.py`. Sub-loss (b) is NOT wired, so true IDEA #21
+remains **untested**. Entries now read "partial-#21 (BS only)" where only
+sub-loss (a) was used. Full #21 chunk stitching is the next code-level
+priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
@@ -141,7 +151,7 @@ Train→frozen delta **−0.00589** (frozen better than train — EMA underestim
 ---
 
 ### alibaba_v132 — **NEW ALIBABA ATB 0.05778** (frozen ep_0010.pt, 2026-04-17)
-**Recipe**: v131 base + boundary-smoothness (IDEA #21 first alibaba test post-MTPP). Stack of IDEAS #19+#20+#21.
+**Recipe**: v131 base + boundary-smoothness (partial IDEA #21 — latent-space sub-loss only from `chunk_stitching.py`; full #21 overlap-consistency UNTESTED). Stack of IDEAS #19+#20+partial-#21.
 **Training**: ep5 ★=0.09554 (bad start), ep10 ★=**0.05942** (38% recovery, best), ep15=0.07285, ep20=0.08093 (killed).
 **W dynamics**: ep16 W=3.05, ep19 W=3.23 (2 spikes >3.0). Killed ep20 preemptively (deteriorating trajectory, W-stop imminent).
 **Frozen eval** (ep_0010.pt, --eval-real-seed 42): **MMD²=0.00848, β-recall=0.7535, α=0.8675 → Combined ★=0.05778**. Train→frozen delta **-0.00164** (frozen IMPROVED over train — EMA underestimated recall). HRC-MAE=0.0111.
