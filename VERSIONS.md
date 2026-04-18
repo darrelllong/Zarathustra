@@ -50,14 +50,31 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
-### alibaba_v139 — **v132 EXACTLY + full IDEA #21 (sub-loss (b) overlap-consistency 0.5)**
-**Why**: Round 17 P2 pivot. Per v134–v138 closure, v132's {SSM+MTPP+BS} stack is MINIMAL and its hyperparameters are TUNED at a narrow stable operating point. Further progress on alibaba requires new *code* features, not scalar twiddling. Full IDEA #21 adds sub-loss (b) feature-space overlap-consistency on paired adjacent windows with hidden-state carry — the decoded-feature counterpart to sub-loss (a). This closes the train→inference gap in *output* space, which is what eval.py actually scores.
+### alibaba_v140 — **v132 MINUS BS PLUS overlap-consistency 0.5 (sub-loss (b) as REPLACEMENT for sub-loss (a))**
+**Why**: v139 (v132 + OC stacked on top of BS) failed catastrophically — ep1 G=−4.19, ep2 G=−6.29, ep3 G=−7.03 (worse than v137's ep5 of −6.62). BS + OC stacked is too much gradient pressure on G. Round 17 P2 said "stop stacking" — full IDEA #21 may mean EITHER sub-loss (a) OR sub-loss (b), not both. v140 tests OC as a REPLACEMENT for BS: keeps v132's stack but swaps the boundary regularizer from latent-space to feature-space. v135 already showed v132 minus BS alone fails (G-collapse) — so this also tests whether OC can fill BS's regularizing role.
 
-**Recipe**: v132 EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + **OC 0.5/k=2/decay=0.5** + v124 base. Fresh pretrain. n_critic=2. grad-clip 0.5 (unchanged).
+**Recipe**: v132 EXACTLY MINUS `--boundary-smoothness-*` flags PLUS `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + **OC 0.5/k=2/decay=0.5** (no BS) + v124 base. Fresh pretrain. n_critic=2. grad-clip 0.5. **--checkpoint-every 5** (was 10) per v153 lesson.
 
-**Weight rationale**: Feature-scale (post-R, bounded) is ~1 OOM smaller than latent-scale (unbounded), so OC=0.5 produces comparable-to-slightly-smaller gradient magnitude vs BS=1.0. Conservative start; if OC=0.5 has no effect (v139 ★ ≈ v132 ★), raise to 1.0 or 2.0 next round; if it triggers critic dominance (v135-pattern), lower.
+**Decision tree**:
+- If v140 ★ ≈ v132 0.05778 → OC and BS are interchangeable boundary regularizers (good — proves chunk-stitching family viable in feature space).
+- If v140 ★ < 0.05778 → OC is BETTER than BS (NEW alibaba ATB candidate).
+- If v140 G-collapses like v135 → OC can't replace BS's regularization role on alibaba; chunk-stitching family on alibaba is BS-only.
 
-**Status** (2026-04-17): launched ~21:10 PDT. Log `/home/darrell/train_alibaba_v139.log`. Phase 3 ep1 expected ~22:30 PDT, first ★ ~22:40 PDT.
+**Status** (2026-04-17): launched ~22:33 PDT. Log `/home/darrell/train_alibaba_v140.log`.
+
+---
+
+### alibaba_v139 — CLOSED (full IDEA #21 stack BS+OC failed faster than v137, killed ep3 G=−7.03, 2026-04-17)
+**Recipe**: v132 EXACTLY + `--overlap-consistency-weight 0.5` (so SSM+MTPP+BS+OC, all gradient sources active). Fresh pretrain. Ran ~21:10–22:33 PDT (~83 min, killed ep3).
+
+**Training (Phase 3 only)**:
+- ep1: W=+0.20, G=−4.19 (already concerning, mirrors v137 ep1 −4.23)
+- ep2: W=+0.48, G=−6.29 (plunged 2.10 in one epoch)
+- ep3: W=+1.36, G=**−7.03** (deeper than v137's ep5 −6.62; collapse arriving FASTER)
+
+**Why killed**: Trajectory unambiguous — same critic-dominance pattern as v137/v138 but worse, with W also climbing. Sub-loss (b) stacked on top of BS adds a second boundary-region gradient source on G, which breaks the v132 stability balance just like the lr-d/grad-clip probes did. Killed before ep5 ★.
+
+**Finding — full IDEA #21 (BS + OC stacked) is OVER-CONSTRAINING on alibaba**: v132's narrow-stable operating point cannot absorb a second boundary loss. The chunk-stitching family on alibaba may be EITHER (a) OR (b), not both. v140 tests OC alone as a BS replacement.
 
 ---
 
