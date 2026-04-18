@@ -50,14 +50,23 @@ relevant.
 
 ---
 
-### alibaba_v137 — **v132 with lr-d halved (2e-5 vs 4e-5) — slow critic to extend productive window**
-**Why**: v135/v136 ablations confirm v132 stack is MINIMAL (all of SSM+MTPP+BS load-bearing on alibaba). Next axis: address the specific failure mode shared by v132/v134/v136 = early ★ peak (ep5-10) then W climbs toward 3.0 as critic dominates. Hypothesis: halving critic learning rate extends the productive window without disrupting the recipe's components.
+### alibaba_v138 — **v132 EXACTLY with grad-clip 1.0 (vs 0.5) — final hyperparameter probe**
+**Why**: v137 (v132 with lr-d halved) BACKFIRED catastrophically — halving the critic lr made MMD² explode 4× (ep5 0.03787 vs v134 0.00655). Hypothesis: v132's grad-clip 0.5 may be over-restricting critic's ability to respond to G's supervisor-pretrained starting point. Relaxing grad-clip to 1.0 gives critic more room without changing lr. **If v138 also fails, alibaba frontier 0.05778 stands and focus pivots to tencent refinement.**
 
-**Recipe**: v132 EXACTLY MINUS `--lr-d 4e-5` → `--lr-d 2e-5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2.
+**Recipe**: v132 EXACTLY with `--grad-clip 1.0` (was 0.5). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2. lr-g 8e-5, lr-d 4e-5 (unchanged).
 
-**Expected signal**: If lr-d helps, expect Phase 3 ep5-ep15 to hold ★ close to v134's ep5 (0.05755) with W staying <2.0 through ep15+. If it fails like v128 (stability without quality), ★ will cap around 0.067 (v128 ep5). If MTPP/BS+halved-lr-d destabilizes, G collapse or W-stop.
+**Status** (2026-04-17): launched 19:39 PDT PID 181433. Log `/home/darrell/train_alibaba_v138.log`.
 
-**Status** (2026-04-17): launched 18:27 PDT PID 164331. Log `/home/darrell/train_alibaba_v137.log`.
+---
+
+### alibaba_v137 — CLOSED (lr-d halved BACKFIRED, ep5 ★=0.09607 catastrophic, 2026-04-17)
+**Recipe**: v132 EXACTLY with `--lr-d 2e-5` (vs 4e-5). Fresh pretrain. PID 164331. Ran 18:27–19:39 PDT (~72 min, killed ep5).
+
+**Training**: Phase 3 G deeply negative from ep1 — ep1 G=−4.23, ep4 G=−5.92, **ep5 G=−6.62**. ep5 ★=**0.09607** (MMD²=0.03787 — 4× worse than v134 ep5's 0.00655, recall=0.709, W=0.32).
+
+**Why killed**: ep5 ★ 67% worse than v134 ep5 (0.05755), 66% above ATB 0.05778. MMD²=0.03787 is catastrophic — worst alibaba training start in recent memory. Dynamics show G can't make progress because critic (with halved lr) isn't providing useful gradient — critic is essentially random-guessing, giving G a noisy signal that collapses quality.
+
+**Finding — lr-d is TUNED on alibaba**: Halving critic lr produces a WORSE outcome than the default, not better. The supervisor-pretrained G is strong enough that critic needs its full 4e-5 lr to produce a discriminative signal. Opposite-direction probe (v138 = raised grad-clip) may help; if that also fails, v132 is at alibaba's frontier for all cheap axes.
 
 ---
 
