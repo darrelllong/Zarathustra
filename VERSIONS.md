@@ -19,7 +19,7 @@ moving-bundle reports.
 | Alibaba | **0.04982**       | **v157** final.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00722, β-recall=0.7870, α=n/a → ★=0.04982. **18% improvement over v132's 0.05778.** Round 18 (Gemini) P1 #1 confirmed empirically: best.pt (=epoch_0015.pt) ★=0.05748 is 15.4% worse than frozen-best final.pt. Sweep also exposed ~0.01 ★ variance across reruns purely from fake-sample RNG — fixed by new `--eval-fake-seed`; best.pt/ep15 now match exactly (★=0.05748 both). `final.pt` (saved at Phase-3 end after ep16 W-stop) is the winner — training-time selector missed it entirely. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
-| Tencent | **0.04003**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0020.pt 2026-04-17: MMD²=0.00313, β-recall=0.8155, α=0.6995. **13% improvement over v152's 0.04575.** Same recipe as v152 (different training seed). Train ★=0.04129, frozen ★=0.04003 — train/frozen tight (Δ=−0.00126). v153's ep45 best.pt frozen=0.0685 (much worse) — proves training-time ★ optimum ≠ frozen optimum. |
+| Tencent | **0.04430**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: ep_0020.pt MMD²=0.00290, β-recall=0.7930 → ★=0.04430. Supersedes prior non-deterministic 0.04003 claim (fake-RNG variance). **Still 3.2% better than v152's 0.04575.** `best.pt` (ep45, train-★ peak) frozen ★=0.07223 = **+63% worse** than frozen-best — largest best.pt mis-rank observed; reinforces Round 18 checkpoint-selection critique. Sweep ranking: ep20 (0.0443) < ep50 (0.0512) < ep40 (0.0665) < best (0.0722) < ep30 (0.0946) < ep10 (0.1023). |
 | Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
 | Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
 | Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Claimed ATB 2026-04-17 AM; replaced by v150 same day |
@@ -68,6 +68,17 @@ torch/numpy/random/cuda). After fix, identical weights score identically.
 - epoch_0015.pt / best.pt : ★=0.05748  MMD²=0.00938  β-rec=0.7595
 - epoch_0010.pt : ★=0.05751  MMD²=0.00851  β-rec=0.7550
 - epoch_0005.pt : ★=0.08624  (recall crash)
+
+**Finding 3 (tencent_v153, deterministic sweep seeds 42/42)**:
+- ep_0020.pt : ★=**0.04430**  MMD²=0.00290  β-rec=0.7930  ← **NEW TENCENT ATB**
+- ep_0050.pt : ★=0.05116
+- ep_0040.pt : ★=0.06652
+- best.pt (ep45) : ★=0.07223 — **+63% worse than frozen-best** (largest best.pt mis-rank observed)
+- ep_0030.pt : ★=0.09457
+- ep_0010.pt : ★=0.10225
+The prior non-deterministic claim of 0.04003 was optimistic by ~11%. The
+U-shaped frozen trajectory (ep10→ep20→ep30→ep40→ep50) with ep20 as a sharp
+local minimum makes best.pt's mis-rank particularly dramatic.
 
 `best.pt` is +15.4% worse than frozen-best. The actual frozen-best is
 `final.pt`, saved at Phase-3 end after the ep16 W-stop — a checkpoint no
