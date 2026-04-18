@@ -38,12 +38,32 @@ relevant.
 
 ## Currently Running
 
-### alibaba_v135 — **v132 recipe MINUS boundary-smoothness (Round 16 clean ablation: is BS load-bearing in v132 ATB?)**
-**Why**: v134 reproduced v132's early-peak pattern (ep5 ★=0.05755, then critic dominance ep15-21). v132 recipe IS reproducible but the recipe itself has a narrow usable window (peaks ep5-10). Round 16 demands per-component attribution. BS alone failed (v128). MTPP alone failed (v131). v132 stacks SSM+MTPP+BS and succeeded — but it's unknown which component is truly load-bearing vs residual noise. v135 removes BS to test: if ★ trajectory similar → BS isn't load-bearing (simpler recipe is equivalent); if ★ dies fast → BS is load-bearing.
+### alibaba_v136 — **v132 recipe MINUS MTPP (symmetric ablation: completes component decomposition)**
+**Why**: v135 (v132 − BS) confirmed BS is load-bearing on alibaba (ep5 ★=0.09441, 64% worse than v134 ep5, G=−7.5 critic dominance). v136 is the symmetric probe — remove MTPP instead, test if MTPP is also load-bearing. Completes component matrix:
+- v128: BS alone → failed (0.06703 ep5, no ATB)
+- v131: MTPP alone → failed (frozen 0.09141)
+- v132: SSM+MTPP+BS → ATB 0.05778 (frozen)
+- v135: SSM+MTPP (no BS) → FAILED (BS is load-bearing)
+- **v136: SSM+BS (no MTPP)** → this probe
 
-**Recipe**: v132/v134 EXACTLY MINUS `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5`. SSM state-dim 16 + MTPP timing (0.5/σ_min 0.05) + v124 base (K=4 regimes, var-cond + gmm-8, supervisor 5.0, continuity 1.0, reuse-bce 2.0, stride-cons 1.0, diversity 2.0, feature-matching 1.0). Fresh pretrain. n_critic=2.
+If v136 ALSO fails, alibaba needs ALL of SSM+MTPP+BS (no redundancy). If v136 matches v134 trajectory (ep5 ★ ~0.058), MTPP is dead-weight and we simplify. If v136 beats v134, MTPP was hurting (unlikely given v131's failure wasn't catastrophic).
 
-**Status** (2026-04-17): launched 15:58 PDT PID 119103. Log `/home/darrell/train_alibaba_v135.log`.
+**Recipe**: v132/v134 EXACTLY MINUS `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. SSM state-dim 16 + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2.
+
+**Status** (2026-04-17): launched 17:10 PDT PID 139510. Log `/home/darrell/train_alibaba_v136.log`.
+
+---
+
+### alibaba_v135 — CLOSED (BS confirmed load-bearing on alibaba, killed ep7, 2026-04-17)
+**Recipe**: v132/v134 EXACTLY MINUS boundary-smoothness flags. SSM+MTPP only. Fresh pretrain. PID 119103. Ran 15:58–17:10 PDT (~72 min, killed ep7).
+
+**Training**: ep5 ★=**0.09441** (MMD²=0.02041, recall=0.630, W=1.98, G=−7.54). vs v134 ep5 ★=0.05755 (MMD²=0.00655, recall=0.745, W=0.77, G=−3.55): **64% worse ★, 3× higher MMD², recall 15pp lower, W 2.6× higher, G 2.1× more negative**. ep6/ep7 G stuck at −7.5 (classic critic dominance), W sustained 1.9-2.0.
+
+**Why killed**: ep5 ★ 63% above ATB 0.05778 + G=−7.5 heavy critic dominance + W climbing toward 3.0. No path to recovery that beats ATB. Ablation answered unambiguously.
+
+**Finding — BS is LOAD-BEARING on alibaba v132 ATB**: Removing BS from v132 recipe destabilizes from ep1. BS alone failed (v128) but STACKED with SSM+MTPP it's structural to the ATB. v132 cannot be simplified by removing BS. Next: v136 = v132 − MTPP (symmetric test). If both −BS and −MTPP fail, all three components (SSM, MTPP, BS) are load-bearing, and the only remaining axes are (a) non-component changes (lr-d, cond-drop-prob) or (b) new IDEAS (chunk-stitching #21, cache-desc #18).
+
+**Frozen eval**: NOT RUN. ep5 train-★ already 63% above ATB.
 
 ---
 
