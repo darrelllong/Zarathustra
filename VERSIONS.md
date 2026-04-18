@@ -50,16 +50,27 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
-### alibaba_v156 — **v132 recipe EXACTLY + cache-descriptor monitor (IDEA #18 Phase A diagnostic)**
-**Why**: v140 (OC-replaces-BS) CLOSED hopeless — peaked at ep10 0.0714 (24% behind ATB) then regressed. BS and OC are not interchangeable on alibaba; BS-alone v132 remains the ATB. Per Round 16 R16's recommended next-idea queue, IDEA #18 (cache-descriptor distillation) is next. v156 Phase A = non-differentiable descriptor monitor = near-zero risk diagnostic bet. Dual-purpose: fresh-seed v132 retry (seed variance could hit a new frozen sweet spot per v153 lesson) + desc_mse data to decide IDEA #18 Phase B.
+### alibaba_v157 — **v132 recipe EXACTLY (clean reproduce, no cache-descriptor monitor)**
+**Why**: v156 (v132 + cache-descriptor monitor) FAILED — G stuck deeply negative for 17 straight epochs (never recovered, unlike v155 which went positive by ep10), ★ regressing ep5=0.0664→ep10=0.0638→ep15=0.0761, W hit +3.29 exceeding stop threshold at ep17. v156 best ★=0.0638 (10% behind ATB 0.0578, moving AWAY). Given three consecutive alibaba failures (v139 BS+OC, v140 OC-only, v156 v132+descriptor-monitor), a clean v132 reproduce is needed to rule out lucky-seed hypothesis vs environmental drift vs monitor interference. v157 removes cache-descriptor monitor entirely — cleanest possible v132 replay.
 
-**Recipe**: v132 EXACTLY + `--cache-descriptor-file /home/darrell/traces/characterization/alibaba_descriptors.jsonl`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0). Fresh pretrain. --checkpoint-every 5. 1368 alibaba file descriptor targets loaded (D=8).
+**Recipe**: v132 EXACTLY (no additions). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, mixed-type-recovery). Fresh pretrain. --checkpoint-every 5.
 
 **Strategy**:
-- If v156 training ★ < v132's (trend to <0.05778 frozen) → seed-variance win, new ATB candidate.
-- Regardless: desc_mse trajectory informs IDEA #18 Phase B (differentiable descriptor loss) go/no-go.
+- If v157 training ★ ≤ v132's ~0.06 → confirms v132 recipe reproduces, then test frozen eval vs 0.05778 (seed-variance could hit a new frozen optimum per v153 lesson).
+- If v157 also fails → v132 ATB was a lucky seed; need new idea (#17 retrieval memory or #22 hybrid diffusion) for alibaba.
 
-**Status** (2026-04-18): launched 00:24 PDT as PID 290183. Log `/home/darrell/train_alibaba_v156.log`. Cache-descriptor monitor active (1368 file targets, D=8).
+**Status** (2026-04-18): launched 04:21 PDT as PID 323893. Log `/home/darrell/train_alibaba_v157.log`.
+
+---
+
+### alibaba_v156 — CLOSED (G never recovered positive across 17 Phase 3 epochs; W hit +3.29 stop threshold; ★ regressing, killed ep17, 2026-04-18)
+**Recipe**: v132 EXACTLY + `--cache-descriptor-file /home/darrell/traces/characterization/alibaba_descriptors.jsonl` (cache-descriptor monitor, non-differentiable Phase A).
+
+**Training (Phase 3 only, ep1-17)**: ep1 G=-2.89, ep5 G=-2.81 ★=0.06636, ep10 G=-2.38 ★=**0.06381** (best, 10% behind ATB 0.0578), ep11-17 G stuck -2.26 to -2.91 (never crossed zero). ★ ep15=**0.07614** (+19% regression from best). W: ep15=2.88, ep17=**3.29** (exceeded W-stop 3.0). recall: ep5=0.716→ep10=0.744→ep15=0.665 (crashed). desc_mse trajectory flat (0.0221 ep5 → 0.0083 ep10) while ★ varied 4% — **weak correlation signal for IDEA #18 Phase B**.
+
+**Why killed**: G stuck deeply negative all 17 epochs (catastrophic critic dominance, unlike v155's typical recovery by ep5). ★ regressing from best. W crossed stop threshold. 10% behind ATB and trajectory moving away. Hopeless before 30-stale window.
+
+**Finding — cache-descriptor monitor likely NOT the cause** (non-differentiable, shouldn't affect grads) but v132 recipe shows environmental/seed fragility: 3 consecutive alibaba v132-family attempts (v139, v140, v156) all failed. v132's 0.05778 ATB now under suspicion of being a LUCKY SEED. v157 (clean v132 reproduce, no monitor) tests this directly. Independently: desc_mse nearly constant across 4% ★ variation (both v155 tencent and v156 alibaba) weakens IDEA #18 Phase B justification — the descriptor is not tracking trace-quality differences the joint metric cares about.
 
 ---
 
