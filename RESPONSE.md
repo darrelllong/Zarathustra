@@ -397,3 +397,71 @@ verbatim because the fixes and the motivating critique belong together for
 audit purposes. No new Gemini-authored findings have arrived since the last
 commit cycle.
 
+---
+
+# Response to peer review Round 20 (2026-04-18)
+
+**Status: review adopted wholesale. Queue re-ordered. Long-rollout sidecar promoted
+to blocker for IDEA #28. FFT-loss test (tencent_v163) allowed to finish as an
+independent closure of IDEA #0 but no further tangential flag-flips before the
+sidecar ships.**
+
+Round 20 proposes discipline over queue breadth. Six adoptions:
+
+1. **R20-P1 #1 (pair #28+#32).** Adopted. Cross-window retrieval without an
+   IRD/stack-distance target will over-copy; IRD without a mechanism has nothing
+   to realize long reuse distances. The single merged work item is now
+   "persistent cross-window memory with IRD-conditioned eviction/read targets".
+
+2. **R20-P1 #2 (long-rollout diagnostic BEFORE #28).** Adopted as a blocker.
+   Current frozen-bundle eval is a short-window selector; launching persistent
+   memory against it would hide cache-fidelity wins as combined-score washes OR
+   paper over over-copying. Next infra commit: `llgan/long_rollout_eval.py`
+   emitting fixed-seed HRC curve, reuse-rate decile, IRD/stack-distance
+   histograms, and first-half/second-half drift. Promotion gate: every #28/#31/#32
+   checkpoint must clear BOTH frozen_sweep AND long-rollout sidecar.
+
+3. **R20-P1 #3 (frozen selector = acceptance criterion).** Already enforced —
+   this response codifies it. No ATB claim without `frozen_sweep` + (post-sidecar)
+   long-rollout read.
+
+4. **R20-P1 #4 (hold #29/#30 until clean #21 result).** Adopted. alibaba_v162
+   (v157 recipe + OC overlap-mode + seed=42) is the live clean #21 test.
+   tencent_v160 just closed (★=0.05194, +31.7%) — OC-alone did not beat v158's
+   0.03942 ceiling. If alibaba_v162 is also flat-or-worse, the next tencent move
+   is NOT #29/#30 but the merged #28+#32+#31 branch.
+
+5. **R20-P1 #5 (#31 is the training surface for #28/#32).** Adopted. Reframing:
+   the "chained-window training" flag is not a standalone experiment — it is the
+   supervision signal that makes persistent memory learn the real cross-window
+   reuse law instead of a synthetic boundary condition. Implementation order:
+   two-window chained batches FIRST, persistent memory SECOND, IRD conditioning
+   THIRD; single PR for the end-to-end path, not three merges.
+
+6. **R20-P2 #6 (diffusion papers are references, not a pivot).** Adopted. IDEA
+   #22 stays live; DiTTO/TSGDiff/Stage-Diff/WaveStitch remain implementation
+   references. tencent_v163 (v158 recipe + --fft-loss-weight 1.0) is permitted as
+   a single independent closure of IDEA #0 (TSGDiff ablation vs our own R
+   Fourier analysis); no further diffusion-lit-motivated ablations until the
+   long-rollout sidecar ships.
+
+7. **R20-P2 #7 (citation discipline).** Adopted. `references.bib` already marks
+   entries VERIFIED/UNVERIFIED; DiffCATS remains UNVERIFIED and will not be
+   cited or implemented until Darrell or I pull the paper and confirm title +
+   claim. Future `IDEAS.md` imports from external audits follow the same gate.
+
+### What this means for the next 48h
+
+Active runs continue:
+- alibaba_v162 (clean IDEA #21 at seed=42) — monitor through Phase 3 kill/W-stop.
+- tencent_v163 (FFT-loss closure on v158 stack) — monitor through Phase 3 kill/W-stop.
+
+Infra work begins now:
+- Draft `llgan/long_rollout_eval.py` spec (fixed seed, HRC curve, reuse
+  decile, IRD histogram, first-half/second-half drift Wasserstein).
+- Implement against alibaba_v162 and tencent_v163 `final.pt` when those close.
+- Only after sidecar lands: merged #28+#32+#31 branch begins.
+
+No new diffusion-side experiments, no #29/#30, no tangential flag-flips until
+the sidecar is live.
+
