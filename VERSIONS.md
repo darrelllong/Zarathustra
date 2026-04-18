@@ -50,17 +50,27 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
-### alibaba_v140 — **v132 MINUS BS PLUS overlap-consistency 0.5 (sub-loss (b) as REPLACEMENT for sub-loss (a))**
-**Why**: v139 (v132 + OC stacked on top of BS) failed catastrophically — ep1 G=−4.19, ep2 G=−6.29, ep3 G=−7.03 (worse than v137's ep5 of −6.62). BS + OC stacked is too much gradient pressure on G. Round 17 P2 said "stop stacking" — full IDEA #21 may mean EITHER sub-loss (a) OR sub-loss (b), not both. v140 tests OC as a REPLACEMENT for BS: keeps v132's stack but swaps the boundary regularizer from latent-space to feature-space. v135 already showed v132 minus BS alone fails (G-collapse) — so this also tests whether OC can fill BS's regularizing role.
+### alibaba_v156 — **v132 recipe EXACTLY + cache-descriptor monitor (IDEA #18 Phase A diagnostic)**
+**Why**: v140 (OC-replaces-BS) CLOSED hopeless — peaked at ep10 0.0714 (24% behind ATB) then regressed. BS and OC are not interchangeable on alibaba; BS-alone v132 remains the ATB. Per Round 16 R16's recommended next-idea queue, IDEA #18 (cache-descriptor distillation) is next. v156 Phase A = non-differentiable descriptor monitor = near-zero risk diagnostic bet. Dual-purpose: fresh-seed v132 retry (seed variance could hit a new frozen sweet spot per v153 lesson) + desc_mse data to decide IDEA #18 Phase B.
 
-**Recipe**: v132 EXACTLY MINUS `--boundary-smoothness-*` flags PLUS `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + **OC 0.5/k=2/decay=0.5** (no BS) + v124 base. Fresh pretrain. n_critic=2. grad-clip 0.5. **--checkpoint-every 5** (was 10) per v153 lesson.
+**Recipe**: v132 EXACTLY + `--cache-descriptor-file /home/darrell/traces/characterization/alibaba_descriptors.jsonl`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0). Fresh pretrain. --checkpoint-every 5. 1368 alibaba file descriptor targets loaded (D=8).
 
-**Decision tree**:
-- If v140 ★ ≈ v132 0.05778 → OC and BS are interchangeable boundary regularizers (good — proves chunk-stitching family viable in feature space).
-- If v140 ★ < 0.05778 → OC is BETTER than BS (NEW alibaba ATB candidate).
-- If v140 G-collapses like v135 → OC can't replace BS's regularization role on alibaba; chunk-stitching family on alibaba is BS-only.
+**Strategy**:
+- If v156 training ★ < v132's (trend to <0.05778 frozen) → seed-variance win, new ATB candidate.
+- Regardless: desc_mse trajectory informs IDEA #18 Phase B (differentiable descriptor loss) go/no-go.
 
-**Status** (2026-04-17): first launch ~22:33 PDT HUNG at Phase 2.5 ep1 for 54+ min (Python burned 96% CPU, log mtime stuck, empty checkpoints dir). Killed PID 239026. Initial relaunch attempt seeded with v139's pretrain failed at load — v139 pretrain Recovery shape `fc.{weight,bias}` mismatched v140's `fc_cont.{weight,bias} + fc_binary.{weight,bias}` (v139 omitted `--mixed-type-recovery`, v140 keeps it per v132 recipe). Cleared seed, fresh-relaunched 22:39 PDT as PID 254660. Log `/home/darrell/train_alibaba_v140.log`. Hang root cause unknown — possibly transient NFS issue on /tiamat (v154 on local-disk tencent unaffected). If second attempt hangs again at the same point, pivot to local-copy alibaba dir.
+**Status** (2026-04-18): launched 00:24 PDT as PID 290183. Log `/home/darrell/train_alibaba_v156.log`. Cache-descriptor monitor active (1368 file targets, D=8).
+
+---
+
+### alibaba_v140 — CLOSED (OC-replaces-BS plateaued, ep10 best 0.0714 regressed to ep15 0.0750, killed ep16, 2026-04-18)
+**Recipe**: v132 EXACTLY MINUS `--boundary-smoothness-*` + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. Fresh pretrain. First launch 22:33 PDT HUNG at Phase 2.5 ep1 for 54+ min on /tiamat NFS. Pretrain-reuse attempt failed (v139 pretrain Recovery shape mismatch). Fresh-relaunched 22:39 PDT, passed hang point second try (still slow on NFS: ~40s/epoch pretrain). Phase 3 started ~23:55. Killed 00:24 PDT.
+
+**Training ★ progression**: ep5=0.08943, ep10=**0.07144** (best), ep15=0.07501 (regression, +5% from ep10). MMD² ep5→ep15: 0.0216→0.0162→0.0160 (plateau). Recall ep5→ep15: 0.661→0.724→0.705 (peak at ep10, regressing). W climbed +0.78→+1.84. G stably -2.5 (NOT catastrophic collapse like v135's -7.54 — OC DOES provide some regularization, just insufficient).
+
+**Why killed**: ★ peaked at ep10 and regressing; W climbing into critic-dominance zone (+1.84 ep16); 5 stale from best. To beat ATB 0.05778 in remaining 25 stale-budget epochs, ★ would need ~20% improvement while trajectory is worsening. Race context: kill now rather than wait for 30-stale confirmation.
+
+**Finding — OC provides PARTIAL replacement for BS on alibaba**: v135 (v132 − BS) hit ★=0.0944 G=-7.54 catastrophic. v140 (v132 − BS + OC) hit ★=0.0714 G=-2.5 stable. So OC's feature-space regularization stops the G-collapse, but doesn't hit BS-alone's 0.058 performance. **BS and OC are NOT interchangeable on alibaba; BS is uniquely tuned. Chunk-stitching family on alibaba: CLOSED.** Next alibaba code-level priority: IDEA #18 cache-descriptor distillation (v156 Phase A monitor → Phase B pending signal).
 
 ---
 
