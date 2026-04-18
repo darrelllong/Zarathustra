@@ -112,10 +112,24 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-### alibaba_v161 — v157 recipe + **fixed BS+OC overlap-mode** (Round 19 P1 fix: independent forward pairs), seed-5, 2026-04-18
-**Why**: v160 was confounded — BS=1.0 silently lost its adjacent-window semantics because OC's overlap-mode split forward was reused for BS. Commit `dce95a0` separates BS and OC onto two independent forward pairs (BS always uses B-from-A-final-hidden; OC-overlap uses B-from-h_mid). v161 re-runs v160's intent on clean code. Seed=5 (v160 used seed-4; change to avoid cross-contaminating seed sweep results).
-**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 5`. Fresh pretrain. Launched ~14:45 PDT, PID 581633. Log `/home/darrell/train_alibaba_v161.log`.
-**Status** (2026-04-18): Phase 1 AE pretrain starting. Cost now ~2x per G-step (two G forwards when both BS and OC active). Kill criteria: (a) G collapse below -6 like v139, (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+### alibaba_v162 — v157 recipe + fixed BS+OC overlap-mode + **seed-42** (seed-dependence test for v161's W-spike), 2026-04-18
+**Why**: v161 (same recipe, seed-5) W-spiked ep4–7 and auto-stopped — W went 0.17→0.78→1.57→2.92→3.39→3.75→4.51 (monotone, not a transient spike). Three hypotheses remain after v161's frozen sweep: (A) seed=5 unlucky, (B) OC=0.5 on top of BS=1.0+continuity=1.0 is inherently destabilizing on alibaba, (C) BS bug-fix changed the effective gradient scale because pre-fix BS was borrowing OC's overlap split. v162 uses seed=42 — the seed that produced the current alibaba ATB via v157 — to separate (A) from (B)+(C). If v162 is stable, v161's failure was seed-dependent and we get a clean IDEA #21 reading on alibaba. If v162 also blows up, next step is to drop either OC or BS to isolate which loss is the destabilizer.
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 42`. Fresh pretrain. Launched ~15:59 PDT. Log `/home/darrell/train_alibaba_v162.log`.
+**Status** (2026-04-18): launching. Kill criteria: (a) W≥3.0 for 3 consecutive (auto-stop), (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+
+---
+
+### alibaba_v161 — CLOSED-FAILED (W-spike auto-stop @ ep7; frozen-best final.pt ★=0.09800 = +97% vs ATB 0.04982, 2026-04-18)
+**Why (closed)**: first **unconfounded** test of IDEA #21 (BS + OC overlap-mode on alibaba, post-Round 19 bug fix). Intent was to re-run v160's experimental design on clean code after `dce95a0` split BS and OC onto independent forward pairs.
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 5`. Fresh pretrain. PID 581633.
+**Training (Phase 3)**: ep1 W=+0.17, ep2 W=+0.78, ep3 W=+1.57, ep4 W=+2.92, ep5 W=+3.39 (★=0.08740), ep6 W=+3.75, ep7 W=+4.51 → W-spike guard fired, `final.pt` written at ep7.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| epoch_0005.pt / best.pt | 0.01622 | 0.4660 | 0.12302 |
+| **final.pt** | **0.01010** | **0.5605** | **★=0.09800** (frozen-best) |
+
+**Conclusion**: frozen-best final.pt ★=0.09800 is +97% behind ATB 0.04982. Recipe destabilizes the critic/G balance almost immediately on alibaba under seed=5. `best.pt` (ep5) was +25.5% worse than frozen-best (6th confirmation of best.pt mis-rank). Next: alibaba_v162 re-tries at seed=42 to separate seed-dependence from recipe-dependence.
 
 ---
 
