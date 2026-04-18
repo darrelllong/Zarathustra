@@ -18,7 +18,8 @@ moving-bundle reports.
 |---------|--------------------|---------|----------------------|-------|
 | Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall). `boundary-smoothness` = latent-space sub-loss only from `chunk_stitching.py`; full #21 overlap-consistency chunk stitching is UNTESTED. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
-| Tencent | **0.04575**       | **v152** (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt 2026-04-17: MMD²=0.00195, β-recall=0.7810, α=0.7095. **22% improvement over v150's 0.05875.** Train→frozen delta **−0.00589** (frozen improved over train, EMA underestimated recall). HRC-MAE=0.0607. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
+| Tencent | **0.04003**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0020.pt 2026-04-17: MMD²=0.00313, β-recall=0.8155, α=0.6995. **13% improvement over v152's 0.04575.** Same recipe as v152 (different training seed). Train ★=0.04129, frozen ★=0.04003 — train/frozen tight (Δ=−0.00126). v153's ep45 best.pt frozen=0.0685 (much worse) — proves training-time ★ optimum ≠ frozen optimum. |
+| Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
 | Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
 | Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Claimed ATB 2026-04-17 AM; replaced by v150 same day |
 | Tencent prior | 0.178 avg | v136 (multi-scale+PCF) | was "0.094" | Former ATB; v141 (continuity) 0.186 |
@@ -60,16 +61,32 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
-### tencent_v153 — **v152 EXACTLY (reproducibility probe for new tencent ATB 0.04575)**
-**Why**: v152 frozen eval yielded ★=0.04575, NEW TENCENT ATB — 22% improvement over v150's 0.05875. Before declaring the recipe stable, reproduce with a fresh seed. Parallels v149→v150 ATB confirmation strategy (v149 seed was wide-delta, v150 seed was tight-delta — same recipe, seed-dependent quality).
+### tencent_v154 — **v152 EXACTLY + --overlap-consistency-weight 0.5 (sub-loss (b) ALONE on tencent)**
+**Why**: BS (sub-loss a) was DEAD WEIGHT on tencent (v150 with BS → v152 without BS = 22% better). But sub-loss (b) operates in DECODED-feature space, not latent — different gradient surface. v154 tests whether feature-space chunk-stitching helps tencent in isolation (no BS). If yes, the chunk-stitching family splits cleanly: sub-loss (a) is alibaba-only, sub-loss (b) is universal.
 
-**Recipe**: v152 EXACTLY. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + v146 base (n_regimes=8). NO boundary-smoothness. n_critic=2. Fresh pretrain.
+**Recipe**: v152 EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + **OC 0.5/k=2/decay=0.5** + v146 base (n_regimes=8). NO boundary-smoothness. n_critic=2. Fresh pretrain. **--checkpoint-every 5** (was 10) — v153 showed ep20 was frozen-optimum, not ep45 (training-★ optimum); finer granularity helps locate frozen sweet spot.
 
-**Hypothesis**: If v153 lands within ±0.005 of 0.04575, recipe is seed-robust and ATB is load-bearing. If v153 lands at v150-level (~0.058), v152 was seed-lucky (single-run peak). Expect Phase 3 start ~18:00-18:10 PDT, first ★ ep5 ~18:15-18:25 PDT.
-
-**Status** (2026-04-17 21:10 PDT): launched 17:31 PDT PID 148582. Log `/home/darrell/train_tencent_v153.log`. Training ★ progression: ep10 0.04568 (matched v152 frozen ATB) → ep25 0.04129 → ep35 0.03946 → ep45 **0.03535** (9 stale at ep54). ep50 comb=0.04410 no-★. W 2.0-2.8 healthy. best.pt = ep_0045.pt. Frozen eval queued at kill.
+**Status** (2026-04-17): launched ~21:45 PDT. Log `/home/darrell/train_tencent_v154.log`.
 
 ---
+
+### tencent_v153 — CLOSED — **PRODUCED NEW TENCENT ATB 0.04003** (ep_0020.pt frozen, 2026-04-17)
+**Recipe**: v152 EXACTLY (reproducibility probe). PID 148582. Ran 17:31–21:30 PDT (~4 hr, killed ep59 W=4.48 crossed threshold).
+
+**Training ★ progression**: ep10=0.04568, ep25=0.04129, ep30=0.04285, ep35=0.03946, ep40=0.04032, ep45=**0.03535** (peak), ep50=0.04410, ep55=0.03925.
+
+**Frozen evals across checkpoints**:
+| epoch | MMD² | β-recall | α-prec | ★ frozen |
+|-------|------|----------|--------|----------|
+| 10 | 0.00880 | 0.5635 | 0.7720 | 0.0961 |
+| **20** | **0.00313** | **0.8155** | **0.6995** | **0.0400** ← **NEW ATB** |
+| 30 | 0.00733 | 0.5725 | 0.8485 | 0.0928 |
+| 40 | 0.00375 | 0.7175 | 0.8430 | 0.0603 |
+| 45 (best.pt) | 0.00527 | 0.6840 | 0.7675 | 0.0685 |
+
+**KEY FINDING — training-time ★ optimum ≠ frozen optimum**: v153's training-★ peaked at ep45 (0.03535) but frozen-★ peaked at ep20 (0.04003). Train→frozen delta varies WILDLY by epoch: ep20 delta=−0.00126 (tight), ep45 delta=+0.0331 (huge gap). **best.pt heuristic (max training-★) is unreliable.** Going forward: at kill, frozen-eval ALL checkpoints, not just best.pt.
+
+**Why killed**: ep57 W=3.60 crossed W-stop threshold, ep59 W=4.48 confirmed critic broken away. 14 stale from training-★ ep45. Recipe is seed-sensitive — v152 (seed-1) had ep10 frozen-best 0.04575; v153 (seed-2) had ep20 frozen-best 0.04003. Same recipe, different optima. 13% improvement comes from finer checkpoint search, not new recipe.
 
 ### alibaba_v138 — CLOSED (grad-clip 1.0 BACKFIRED, killed ep3 critic-dominance imminent, 2026-04-17)
 **Recipe**: v132 EXACTLY with `--grad-clip 1.0` (was 0.5). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. PID 181433. Ran 19:32–21:05 PDT.
