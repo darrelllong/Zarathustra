@@ -818,3 +818,309 @@ memory,
 cache behavior,
 state,
 or event time.
+
+---
+
+## Literature refresh (2026-04-18) — structural bets targeting the four open problems
+
+This batch specifically targets four diagnosed failure modes that the config-space search exhausted
+and that the existing architectural queue (#17–#22) does not fully address:
+
+1. **Reuse-rate gap** (~0.5% vs 10%+): pure scalar loss and retrieval memory are in the queue, but
+   nothing in the existing list gives the generator a discrete, tokenized representation of object
+   identity. Ideas #23 and #26 add that.
+2. **Eval variance in recall** (0.398–0.639 per run, documented in log entries 56, 64, 74): the
+   generator ships a *single* point-estimate sample path per prompt. Nothing at inference time
+   calibrates toward high-recall regions of the output distribution. Idea #25 targets this.
+3. **Long-rollout drift** (12-step training window, hidden-state carry unsupervised): the existing
+   chunk-stitching idea #21 supervises window boundaries, but does not address the open-loop vs
+   closed-loop mismatch inside a single generation pass. Idea #27 targets this.
+4. **Corpus-specific recipes don't transfer** (multi-scale helps tencent, hurts alibaba — log
+   entry 88): every recipe so far is a *global* setting. Nothing in the existing list routes
+   examples to specialist subnetworks based on workload regime. Idea #24 targets this.
+
+All five entries below satisfy the "structural mechanism" bar: each changes the hypothesis class or
+the inference procedure, not just a loss coefficient.
+
+### 23. Discrete object tokenization via VQ-VAE codebook (TimeVQVAE-style)
+
+**Core claim:** the reuse-rate gap is partly a *representation* problem, not just a supervision
+problem. The generator currently emits continuous outputs that must be quantized to object IDs via
+stride arithmetic. That path cannot easily express "reuse exactly this recent object" because the
+decoder has no discrete action for it. Tokenizing the trace into discrete codes via a VQ-VAE, then
+learning a prior over code sequences, makes object-level decisions first-class.
+
+**Why this fits the repo specifically:**
+- The reuse gap is the most stubborn defect. Retrieval memory (#17) fixes the addressing side; VQ
+  tokenization fixes the emission side. They are complementary, not competing.
+- Our mixed-type head already admits that different fields need different loss structures.
+  Discrete codes generalize this: the entire trace lives in a discrete latent space.
+- A bidirectional transformer prior on codes provides exactly the "any-order" editing ability that
+  masked diffusion papers have validated — we can re-sample a sub-window of codes conditioned on
+  its neighborhood, which addresses both long-rollout drift and mode-coverage at once.
+
+**Architecture sketch:**
+- Stage 1: train a VQ-VAE on windowed traces (continuous fields + categorical fields combined).
+  Codebook size 512–1024. Commitment loss for code stability.
+- Stage 2: train a bidirectional masked-diffusion / any-order autoregressive prior over the code
+  sequence, conditioned on char-file stats and z_global.
+- Decoding stage 1 deterministically recovers fields from codes; the discrete code sequence carries
+  the generative variability.
+- Optionally couple codes to retrieval memory from #17: a code index can point to a memory slot,
+  collapsing "reuse" into "emit code k = copy from memory slot k".
+
+**Minimal viable experiment:**
+- Start with the alibaba multi-scale+PCF ATB recipe (v111 / v136).
+- Train a small TimeVQVAE (codebook=256, window=12 preserved) on alibaba first.
+- Measure: does the stage-1 reconstruction already beat v98 on HRC-MAE even *without* a learned
+  prior? If yes, the representation is doing useful work. If no, do not proceed to stage 2.
+
+**Success criteria:**
+- Stage-1 reconstruction HRC-MAE within 10% of real-trace replay.
+- Reuse rate in generated traces climbs from ~0.5% toward the real ~10%.
+- Frozen-bundle combined★ improves on v98 (alibaba 0.088) or v136 (tencent 0.094).
+
+**Failure modes / risks:**
+- Codebook collapse — 2025 papers (VAEVQ, CODA) report this is still a live issue; mitigation via
+  entropy regularization or residual VQ is mandatory.
+- The decoder may leak information that the prior then has to re-learn, wasting capacity.
+- Training a bidirectional transformer prior on top of a GAN backbone is a two-stage commitment;
+  cannot easily A/B against v111 on the same compute.
+
+**Primary sources:**
+- Daesoo Lee et al., [Vector Quantized Time Series Generation with a Bidirectional Prior Model (TimeVQVAE)](pubs/TimeVQVAE_AISTATS2023.pdf), AISTATS 2023. [arXiv](https://arxiv.org/abs/2303.04743)
+- Anonymous, [Any-Order GPT as Masked Diffusion Model](pubs/AnyOrderGPT_MaskedDiff_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2506.19935)
+
+---
+
+### 24. Workload-regime mixture-of-experts generator
+
+**Core claim:** the "multi-scale helps tencent, hurts alibaba" result is not a bug; it is evidence
+that the two corpora live in *different regions* of the generator's hypothesis class and a single
+shared set of weights cannot serve both. A mixture-of-experts generator with char-file-driven
+routing lets specialists co-exist, while shared early layers still transfer.
+
+**Why this fits the repo specifically:**
+- Log entry 88 explicitly documents the universal-recipe failure: multi-scale is "universal" only
+  in the sense that it is non-catastrophic everywhere, not in the sense that it is optimal anywhere.
+- The char-file vector is already a clean per-example descriptor. It is the natural MoE router
+  input and is already produced by the preprocessing stack.
+- Regime sampler (#5) validated that *discrete regime identity* is useful signal. MoE generalizes
+  regime routing from "sample k, then condition" to "route to expert k's weights."
+- Time-MoE (ICLR 2025 spotlight) shows MoE is now practical at the scale of forecasting foundation
+  models, so the engineering risk is much lower than it would have been two years ago.
+
+**Architecture sketch:**
+- Shared encoder over `z`, char-file conditioning, and (optional) regime-sampler output.
+- A small gating network maps char-file stats → distribution over E experts (E=4–8).
+- Each expert is an LSTM or multi-scale critic aligned G head with its own weights.
+- Load-balancing auxiliary loss to prevent expert collapse (a well-studied Time-MoE trick).
+- Critic remains shared — the point is specialization of G, not of D.
+- Optional: per-corpus experts as the initial warm start (2 experts pinned to alibaba/tencent),
+  then unpin and let routing adapt.
+
+**Minimal viable experiment:**
+- E=4, top-1 routing, shared LSTM first layer, per-expert second LSTM layer.
+- Train on the union of alibaba + tencent char-file-labeled data. This is the first experiment in
+  the repo's history to train on the *union*, which is itself a useful diagnostic.
+- Evaluate both corpora on their own frozen bundles.
+
+**Success criteria:**
+- Either (a) a single MoE generator matches both ATBs (0.088 alibaba, 0.094 tencent) with one model,
+  which is a capability we have never demonstrated, or (b) routing statistics align with known
+  regime labels, validating that the model learned something semantically coherent.
+- Expert usage distribution is not pathologically skewed (>80% to one expert is a failure).
+- Cross-corpus transfer improves: alibaba checkpoint evaluated on tencent (currently catastrophic)
+  produces *some* reasonable output.
+
+**Failure modes / risks:**
+- Expert collapse under a small effective batch size — tencent alone has small files-per-epoch.
+- Router noise destabilizes WGAN training. The gating network must be warm-started or the W-loss
+  can explode within the first few epochs.
+- MoE adds parameters; must check that gains are not just a capacity effect against a parameter-
+  matched dense baseline.
+
+**Primary sources:**
+- Xiaoming Shi et al., [Time-MoE: Billion-Scale Time Series Foundation Models with Mixture of Experts](pubs/TimeMoE_ICLR2025.pdf), ICLR 2025 Spotlight. [arXiv](https://arxiv.org/abs/2409.16040)
+
+---
+
+### 25. Inference-time energy-based calibration for eval-variance stability
+
+**Core claim:** the dominant unsolved failure (entries 56, 64, 74) is that eval *variance* is
+larger than the gap between competing recipes. This is not a training problem — the training-time
+combined★ is already near-ATB. It is an *inference-time sampling* problem. An energy-based model
+trained on the generator's output distribution can be used at inference time to perform a few
+Langevin steps that pull generated samples toward the real-data energy landscape, without
+retraining G.
+
+**Why this fits the repo specifically:**
+- Lower lr (v94, v123) eliminated the train→eval gap mechanically but cost quality. That experiment
+  proved the gap is reducible, not structural — we just need a reducer that doesn't cost quality.
+- Every seed re-roll (v98–v103) confirmed eval variance is the real bottleneck. Averaging over
+  n_samples is not a fix; it is a measurement adaptation.
+- The existing frozen_sweep evaluation infrastructure already produces per-sample generator output;
+  a calibration hook is a small addition, not a rewrite.
+- EBM-CoT (arXiv 2025) validates that a small EBM head trained on top of a frozen base model can
+  perform Langevin calibration in embedding space to reduce sample-to-sample inconsistency. The
+  original problem there (LLM reasoning variance) is structurally the same as ours (generator
+  recall variance).
+
+**Architecture sketch:**
+- Freeze the best v98 / v136 generator.
+- Train a small EBM `E_φ(x, cond)` on paired (real trace window, cond) with noise contrastive
+  estimation: positives = real, negatives = G-generated.
+- At eval time only: run K Langevin steps on generated latent or output to minimize `E_φ`.
+- Step size / K tuned per corpus; evaluated against the frozen bundle.
+- Does not modify training; strictly a post-hoc inference upgrade.
+
+**Minimal viable experiment:**
+- Train E_φ on v98 (alibaba) only; 3 days of compute max.
+- Evaluate with K ∈ {0, 5, 20, 50} Langevin steps.
+- Gate: does the 5-run eval *variance* (not just mean) decrease?
+
+**Success criteria:**
+- 5-run eval std on recall drops from the documented ~0.12 range (0.398–0.639 observed) to <0.05
+  without loss of mean recall.
+- Mean combined★ improves by >10% on v98 frozen bundle.
+- Calibration effect transfers to tencent v136 without re-training E_φ on tencent (bonus — not
+  required).
+
+**Failure modes / risks:**
+- E_φ training is adversarial: negatives drift as G is fixed, but the EBM may overfit G's failure
+  mode and refuse legitimate diversity. Mitigate with replay buffer.
+- Langevin noise can push samples *off* the data manifold if E_φ is miscalibrated; step size must
+  be conservative.
+- If eval variance comes from char-file ambiguity (which v97 tested), EBM calibration on outputs
+  will not help; the failure is upstream.
+
+**Primary sources:**
+- Xin Tong et al., [Think Consistently, Reason Efficiently: Energy-Based Calibration for Implicit Chain-of-Thought](pubs/EBM_CoT_Calibration_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2511.07124)
+
+---
+
+### 26. Mamba-Hawkes event-time backbone: fuses #19 (SSM) and #20 (MTPP)
+
+**Core claim:** the existing queue has #19 (SSM backbone) and #20 (MTPP) as independent options.
+Mamba Hawkes (2024) demonstrates that these two can be a single module, not two separate swaps.
+This is not a rehash of #19 or #20 — it is a *unified* replacement that avoids the interface
+problem of gluing an SSM backbone to a separately-trained point-process head.
+
+**Why this fits the repo specifically:**
+- The copy-path-only result (v106, gap 7.3%) suggests per-timestep timing-aware supervision helps
+  when it is structural. MTPP makes timing structural.
+- The repo already depends on hidden-state carry across generation windows (generate.py). Mamba's
+  selective state carry is strictly better matched to that pattern than a fresh LSTM handoff.
+- Doing MTPP on top of an LSTM backbone is known to be capacity-limited; doing it on top of a
+  Mamba backbone changes the long-range modeling budget at the same time.
+
+**Architecture sketch:**
+- Generator backbone: Mamba blocks (selective SSM) in place of the LSTM generator core.
+- Event-time head: Hawkes-style intensity conditioned on the Mamba hidden state.
+- Mark heads (size, opcode, reuse, stride): unchanged mixed-type heads, but conditioned on both the
+  Mamba hidden state and the sampled event-time offset.
+- Critic: keep the current multi-scale critic in the first ablation; the Mamba backbone on G alone
+  is the cleanest first test.
+
+**Minimal viable experiment:**
+- Swap only G's LSTM for a 2-layer Mamba block of equal hidden size; keep all heads.
+- No MTPP yet — first verify the backbone swap alone is stable.
+- Second phase: add the Hawkes-style time head.
+- Alibaba only for the first pass; do not touch tencent until #26 is validated on one corpus.
+
+**Success criteria:**
+- Phase 1 (Mamba only): matches v98 ATB with no hidden-state carry tricks, and *long-rollout drift*
+  metric improves (not just short-window eval).
+- Phase 2 (Mamba + Hawkes time): burst realism (inter-arrival autocorr, ts_delta Wasserstein)
+  improves without hurting recall.
+
+**Failure modes / risks:**
+- Mamba + WGAN stability is less well-studied than Mamba + MLE. Critic may find adversarial exploits
+  in the selective-scan gradients.
+- Mamba adds hyperparameters (state dim, d_conv) not in the current grid; tuning cost is real.
+- MTPP integration after a backbone swap doubles the risk surface; keep phases strictly separated.
+
+**Primary sources:**
+- Anningzhe Gao et al., [Mamba Hawkes Process](pubs/MambaHawkes_2024.pdf), arXiv 2024. [arXiv](https://arxiv.org/abs/2407.05302)
+- Plus the #19 SSM and #20 MTPP sources already in pubs/.
+
+---
+
+### 27. Professor-Forcing closed-loop rollout supervision
+
+**Core claim:** the long-rollout drift problem (12-step training vs long-trace inference) has a
+well-known root cause: the generator only ever sees teacher-forced inputs during training, never
+its own rolled-out outputs. The generate.py path does closed-loop rollout, but nothing supervises
+the resulting trajectory distribution. Professor Forcing is the textbook fix: train a small
+auxiliary classifier that cannot tell open-loop from closed-loop hidden-state trajectories.
+
+**Why this fits the repo specifically:**
+- The continuity-loss family (failed on tencent twice, see entries 95 and "continuity loss" in
+  tried-and-validated) was trying to solve this problem with a scalar. Professor Forcing uses a
+  *classifier*, not a scalar, and is architecturally closer to the WGAN machinery already in use.
+- The repo already has two critics in production use (main WGAN critic + multi-scale critic).
+  Adding a third small classifier with a completely different job (open-loop vs closed-loop) is
+  low engineering overhead.
+- Chunk-stitching (#21) supervises window boundaries; Professor Forcing supervises every timestep
+  within a window. They compose: PF fixes the inside of a window, #21 fixes the seams.
+
+**Architecture sketch:**
+- During training, for each real window, run the generator twice:
+  - Once in teacher-forced mode (current training regime).
+  - Once in free-running / closed-loop mode from the same initial state.
+- Train a small MLP classifier D_PF to distinguish the two hidden-state trajectories.
+- Add to G loss: `-λ · log D_PF(closed_loop)` (i.e., G wants the classifier to be fooled).
+- The classifier operates on hidden states, not outputs — cheap, and sidesteps the output-space
+  exposure-bias trap that scheduled sampling falls into.
+- Critically, this does NOT require any new labels, new data, or any change to the critic.
+
+**Minimal viable experiment:**
+- Add PF as a single new flag `--professor-forcing-weight`.
+- Grid: λ ∈ {0.0, 0.1, 0.5} on alibaba v98-recipe base.
+- Measure: training combined★ (expect small loss), frozen-bundle eval mean, AND a new long-rollout
+  drift metric (generate 10× the training window length and measure distribution shift from
+  first decile to last decile).
+
+**Success criteria:**
+- Frozen-bundle eval mean stays within 10% of v98 ATB.
+- Long-rollout drift metric (first-decile-vs-last-decile Wasserstein on any emitted field)
+  improves by at least 25%.
+- If combined★ does *not* regress on short-window eval but *does* improve on long-rollout metrics,
+  this is the clean signal we want.
+
+**Failure modes / risks:**
+- D_PF can become too strong and force the generator into pathological hidden-state geometry that
+  satisfies the classifier but produces bad outputs. This is the original Professor Forcing paper's
+  own caveat. Mitigate with PF weight annealing.
+- The method trains one extra small module per step; compute cost ~15–25%.
+- If the real driver of long-rollout drift is char-file mismatch rather than hidden-state mismatch
+  (possible — v97 hinted at this), PF will have no effect and the experiment will be informative
+  only as a negative result.
+
+**Primary sources:**
+- Anirudh Goyal et al., [Professor Forcing: A New Algorithm for Training Recurrent Networks](pubs/ProfessorForcing_NeurIPS2016.pdf), NeurIPS 2016.
+- Supporting theory on flow-matching-style self-consistency (analogous to PF's closed-loop constraint, one domain over): [Consistency Flow Matching](pubs/ConsistencyFM_ICML2025.pdf), ICML 2025. [arXiv](https://arxiv.org/abs/2407.02398)
+
+---
+
+### Updated recommended build order (2026-04-18)
+
+Before starting the 2026-04-15 queue (#17–#22), the following are cheaper and attack failure modes
+that #17–#22 do not touch:
+
+- **Inference-time EBM calibration (#25)** — cheapest, does not touch training, directly targets
+  the largest documented gap (eval variance). Run first.
+- **Professor Forcing (#27)** — second cheapest, single flag, directly targets the long-rollout
+  drift failure that the continuity-loss experiments failed to fix.
+- **Workload-regime MoE (#24)** — answers the "recipes don't transfer" problem that is itself a
+  ceiling on reviewer claims about universality.
+
+Only after that is the order #17 → #18 → #23 → (#19 or #26) → #21 → #22 worth committing to.
+
+### Honesty note on these five
+
+All five entries above cite papers from adjacent domains (LLM reasoning for #25, masked diffusion
+for #23, point processes for #26, forecasting MoE for #24, RNN training for #27). None of these
+papers target block-level I/O traces. The inference that they apply here is ours, not the authors'.
+Each idea therefore carries *interpretation risk* in addition to *implementation risk*: if it fails,
+part of the failure may be that the mechanism just does not transfer to this problem domain.
