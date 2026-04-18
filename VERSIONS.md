@@ -50,16 +50,16 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ## Currently Running
 
-### alibaba_v157 — **v132 recipe EXACTLY (clean reproduce, no cache-descriptor monitor)**
-**Why**: v156 (v132 + cache-descriptor monitor) FAILED — G stuck deeply negative for 17 straight epochs (never recovered, unlike v155 which went positive by ep10), ★ regressing ep5=0.0664→ep10=0.0638→ep15=0.0761, W hit +3.29 exceeding stop threshold at ep17. v156 best ★=0.0638 (10% behind ATB 0.0578, moving AWAY). Given three consecutive alibaba failures (v139 BS+OC, v140 OC-only, v156 v132+descriptor-monitor), a clean v132 reproduce is needed to rule out lucky-seed hypothesis vs environmental drift vs monitor interference. v157 removes cache-descriptor monitor entirely — cleanest possible v132 replay.
+### alibaba_v157 — CLOSED (v132 reproduce — train ★ improved through ep15 then W-spike stopped ep16; frozen-eval PENDING, 2026-04-18)
+**Recipe**: v132 EXACTLY (no additions). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, mixed-type-recovery). Fresh pretrain. --checkpoint-every 5. Launched 04:21 PDT, PID 323893, W-stopped ~06:39 PDT. 15 Phase-3 epochs completed.
 
-**Recipe**: v132 EXACTLY (no additions). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + continuity 1.0 + v114 base (K=4 regimes, var-cond, gmm-8, diversity 2.0, feature-matching 1.0, supervisor 5.0, mixed-type-recovery). Fresh pretrain. --checkpoint-every 5.
+**Training (Phase 3 only)**: ep1 W=+0.16 G=-1.90, ep5 W=+1.06 G=-2.67 **★=0.07585** (recall=0.690), ep10 W=+2.12 G=-1.77 **★=0.06960** (recall=0.691), ep15 W=+3.81 G=-0.31 **★=0.05445** (recall=0.749) ★ best, ep16 W=+3.35 → W-spike guard: W≥3.0 for 3 consecutive epochs → stop. `best.pt` + `final.pt` + pretrain preserved.
 
-**Strategy**:
-- If v157 training ★ ≤ v132's ~0.06 → confirms v132 recipe reproduces, then test frozen eval vs 0.05778 (seed-variance could hit a new frozen optimum per v153 lesson).
-- If v157 also fails → v132 ATB was a lucky seed; need new idea (#17 retrieval memory or #22 hybrid diffusion) for alibaba.
+**Finding — v132 recipe DOES reproduce train-trajectory (ep15 train ★=0.0545 < v132's 0.058 train, matching strategy "train ≤ 0.06" branch)**. Three prior alibaba-v132-family failures (v139 full-#21, v140 OC-only, v156 v132+descriptor-monitor) were caused by the added loss terms/monitors, NOT seed/environmental drift: clean v132 replay hits the same training neighborhood. W-spike at ep15 is an artefact of v132's narrow-stable regime (same pattern seen in late epochs of v132) — but the best checkpoint landed inside the spike, so frozen eval is needed.
 
-**Status** (2026-04-18): launched 04:21 PDT as PID 323893. Log `/home/darrell/train_alibaba_v157.log`.
+**Frozen-eval (--eval-real-seed 42, in progress)**: launched on `best.pt` as vinge PID 361832. Log `/home/darrell/eval_alibaba_v157_best.log`. Expected: if frozen ★ < 0.05778 → **new alibaba ATB**; if frozen ★ ≥ 0.0578 → v132 ATB was a frozen-bundle-lucky seed, not a recipe advantage → pivot to IDEA #17 (retrieval memory) or #22 (hybrid diffusion) for alibaba.
+
+**Status** (2026-04-18): training W-stopped 06:39 PDT at ep16; frozen-eval launched; alibaba race slot OPEN pending frozen-eval verdict.
 
 ---
 
