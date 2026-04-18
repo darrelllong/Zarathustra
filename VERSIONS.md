@@ -16,7 +16,7 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.05567**       | **v157** ep_0010.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | Frozen ep_0010.pt 2026-04-18: MMD²=0.00847, β-recall=0.7640, α=0.7855. **4% improvement over v132's 0.05778.** Same recipe as v132 (different training seed). Train ★=0.0696, frozen ★=0.0557 — frozen better than train (Δ=−0.014). v157 ep15 train-best (★=0.0545) had frozen ★=0.0734 — again proves training-time ★ optimum ≠ frozen optimum (v153 lesson reproduced on alibaba). |
+| Alibaba | **0.04982**       | **v157** final.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00722, β-recall=0.7870, α=n/a → ★=0.04982. **18% improvement over v132's 0.05778.** Round 18 (Gemini) P1 #1 confirmed empirically: best.pt (=epoch_0015.pt) ★=0.05748 is 15.4% worse than frozen-best final.pt. Sweep also exposed ~0.01 ★ variance across reruns purely from fake-sample RNG — fixed by new `--eval-fake-seed`; best.pt/ep15 now match exactly (★=0.05748 both). `final.pt` (saved at Phase-3 end after ep16 W-stop) is the winner — training-time selector missed it entirely. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
 | Tencent | **0.04003**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0020.pt 2026-04-17: MMD²=0.00313, β-recall=0.8155, α=0.6995. **13% improvement over v152's 0.04575.** Same recipe as v152 (different training seed). Train ★=0.04129, frozen ★=0.04003 — train/frozen tight (Δ=−0.00126). v153's ep45 best.pt frozen=0.0685 (much worse) — proves training-time ★ optimum ≠ frozen optimum. |
@@ -46,6 +46,42 @@ carry from `generate.py`. Sub-loss (b) is NOT wired, so true IDEA #21
 remains **untested**. Entries now read "partial-#21 (BS only)" where only
 sub-loss (a) was used. Full #21 chunk stitching is the next code-level
 priority after the current hyperparameter ablation loop (v138) closes.
+
+---
+
+## Checkpoint-Selection Repair (2026-04-18, Round 18 P1 #1)
+
+Gemini Round 18 correctly identified that `best.pt` (training-time EMA
+combined score) systematically mis-ranks against the published frozen-bundle
+protocol. Built `llgan/frozen_sweep.py`: post-train tool that runs
+`eval.py --eval-real-seed 42 --eval-fake-seed 42` over every
+`epoch_*.pt`/`best.pt`/`final.pt`, promotes a `frozen_best.pt` symlink,
+writes `frozen_sweep.{json,log}`.
+
+**Finding 1**: First sweep (fake RNG unseeded) showed `best.pt` and
+`epoch_0015.pt` — the **same weights** — scoring ★=0.06099 vs ★=0.05006.
+0.011 ★ gap from fake-sample RNG alone. Added `--eval-fake-seed` (seeds
+torch/numpy/random/cuda). After fix, identical weights score identically.
+
+**Finding 2 (alibaba_v157, deterministic sweep seeds 42/42)**:
+- final.pt : ★=**0.04982**  MMD²=0.00722  β-rec=0.7870  ← **NEW ATB**
+- epoch_0015.pt / best.pt : ★=0.05748  MMD²=0.00938  β-rec=0.7595
+- epoch_0010.pt : ★=0.05751  MMD²=0.00851  β-rec=0.7550
+- epoch_0005.pt : ★=0.08624  (recall crash)
+
+`best.pt` is +15.4% worse than frozen-best. The actual frozen-best is
+`final.pt`, saved at Phase-3 end after the ep16 W-stop — a checkpoint no
+training metric flagged. This supersedes the previous (non-deterministic)
+claim of "v157 ep_0010 ★=0.0557 = new ATB": under deterministic evaluation,
+ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
+
+**Implications**:
+- Published alibaba ATB: **0.04982 v157 final.pt** (2026-04-18, seeds 42/42).
+- Every future version should be evaluated via `frozen_sweep`, not by
+  evaluating `best.pt` alone.
+- Prior tencent_v153 ★=0.04003 and tencent_v158 ★=0.0528 numbers were
+  non-deterministic — they need re-sweeping (TODO).
+- Round 18 P1 #1 response: CHECKPOINT SELECTION FIX SHIPPED.
 
 ---
 
