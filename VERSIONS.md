@@ -18,8 +18,9 @@ moving-bundle reports.
 |---------|--------------------|---------|----------------------|-------|
 | Alibaba | **0.05778**       | **v132** (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/#21) | n/a | Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. 12% improvement over v124's 0.0656. Train→frozen delta -0.00164 (frozen better than train, EMA underestimated recall) |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | Former ATB, 5-run 0.06000–0.06962 |
-| Tencent | **0.05875**       | **v150** (v149 recipe reproduced, IDEAS #19/#20/#8/#6/#21) | n/a | Frozen ep_0035 best.pt 2026-04-17: MMD²=0.00305, β-recall=0.7065, α=0.7945. 39% improvement over v149 0.09628. Train→frozen delta +0.00748 (25× tighter than v149's +0.054 — recipe is seed-robust, v150 seed gave much better real-coverage) |
-| Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Previously claimed ATB 2026-04-17 12:00 PDT; replaced by v150 seed same day |
+| Tencent | **0.04575**       | **v152** (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt 2026-04-17: MMD²=0.00195, β-recall=0.7810, α=0.7095. **22% improvement over v150's 0.05875.** Train→frozen delta **−0.00589** (frozen improved over train, EMA underestimated recall). HRC-MAE=0.0607. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
+| Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/#21)      | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. |
+| Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Claimed ATB 2026-04-17 AM; replaced by v150 same day |
 | Tencent prior | 0.178 avg | v136 (multi-scale+PCF) | was "0.094" | Former ATB; v141 (continuity) 0.186 |
 
 **Prior alibaba baseline**: v114 (continuity) frozen 0.176 — ties v98 (0.182) within noise. Surpassed by v124 SSM on 2026-04-16.
@@ -38,6 +39,17 @@ relevant.
 
 ## Currently Running
 
+### tencent_v153 — **v152 EXACTLY (reproducibility probe for new tencent ATB 0.04575)**
+**Why**: v152 frozen eval yielded ★=0.04575, NEW TENCENT ATB — 22% improvement over v150's 0.05875. Before declaring the recipe stable, reproduce with a fresh seed. Parallels v149→v150 ATB confirmation strategy (v149 seed was wide-delta, v150 seed was tight-delta — same recipe, seed-dependent quality).
+
+**Recipe**: v152 EXACTLY. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + v146 base (n_regimes=8). NO boundary-smoothness. n_critic=2. Fresh pretrain.
+
+**Hypothesis**: If v153 lands within ±0.005 of 0.04575, recipe is seed-robust and ATB is load-bearing. If v153 lands at v150-level (~0.058), v152 was seed-lucky (single-run peak). Expect Phase 3 start ~18:00-18:10 PDT, first ★ ep5 ~18:15-18:25 PDT.
+
+**Status** (2026-04-17): launched 17:31 PDT PID 148580 (wrapper; train.py PID in nohup). Log `/home/darrell/train_tencent_v153.log`.
+
+---
+
 ### alibaba_v136 — **v132 recipe MINUS MTPP (symmetric ablation: completes component decomposition)**
 **Why**: v135 (v132 − BS) confirmed BS is load-bearing on alibaba (ep5 ★=0.09441, 64% worse than v134 ep5, G=−7.5 critic dominance). v136 is the symmetric probe — remove MTPP instead, test if MTPP is also load-bearing. Completes component matrix:
 - v128: BS alone → failed (0.06703 ep5, no ATB)
@@ -51,6 +63,27 @@ If v136 ALSO fails, alibaba needs ALL of SSM+MTPP+BS (no redundancy). If v136 ma
 **Recipe**: v132/v134 EXACTLY MINUS `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. SSM state-dim 16 + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2.
 
 **Status** (2026-04-17): launched 17:10 PDT PID 139510. Log `/home/darrell/train_alibaba_v136.log`.
+
+---
+
+### tencent_v152 — CLOSED, **NEW TENCENT ATB 0.04575** (v150 − BS, boundary-smoothness was DEAD WEIGHT, 2026-04-17)
+**Recipe**: v150 EXACTLY MINUS `--boundary-smoothness-*` flags. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + v146 base (n_regimes=8). n_critic=2. Fresh pretrain.
+
+**Training**: ep10 ★=0.05164 BEAT v150 ep10 ★=0.05703 by 9% (MMD² 4.7× tighter, recall tied). Continued through ep21, then W=3.35 crossed threshold. best.pt = ep10 preserved.
+
+**Frozen eval (`--eval-real-seed 42`)**:
+```
+MMD²         : 0.00195
+α-precision  : 0.7095
+β-recall     : 0.7810
+Combined ★   : 0.04575   ← NEW TENCENT ATB (22% better than v150 0.05875)
+HRC-MAE      : 0.0607
+```
+Train→frozen delta **−0.00589** (frozen better than train — EMA underestimated recall; tightest negative delta to date on tencent).
+
+**Finding — BS is DEAD WEIGHT on tencent**: Round 16 critique ("stop stacking") validated. Removing BS from v150 recipe IMPROVES frozen ★ by 22%. This is the OPPOSITE finding from alibaba v135 (BS load-bearing there). The stacking strategy added BS to v150 because it helped alibaba — but on tencent it was actively harmful. **Lesson: component interactions are corpus-specific; single-variable ablations are mandatory before claiming a stack is optimal.**
+
+**Comparison to alibaba v132**: alibaba needs SSM+MTPP+BS (v135 confirmed BS load-bearing). Tencent needs SSM+MTPP+multi-scale+PCF, NO BS. Corpus-specific recipes now distinct. Next alibaba move: v136 (v132-MTPP) in progress. Next tencent move: v153 reproduces v152; if confirmed, ablate each remaining component (PCF, multi-scale, MTPP) to find if any are also dead-weight.
 
 ---
 
