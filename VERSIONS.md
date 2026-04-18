@@ -112,6 +112,13 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
+### alibaba_v160 — v132 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)**, IDEA #21 full (R17 P3 / R18 P2), seed-4, 2026-04-18
+**Why**: RESPONSE.md commitment after v159 closed the v132-seed sweep (range 0.050–0.058, std 0.004). v157's 0.04982 ATB is real but recipe is not reliably sub-0.05 — representation-level change needed. Before 2026-04-18, `--overlap-consistency-weight` reused boundary-smoothness math on two adjacent non-overlapping windows (v139 blew up stacking it; v140 replaced BS with it → 0.0714). New `--overlap-consistency-mode=overlap` (default) splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise → A's last k and B's first k refer to the SAME absolute timesteps. Loss = `overlap_consistency(R(H_A), R(H_B), k=2)`. Drives feature-space noise-invariance in the overlap region — the exact gap between training (each window sampled i.i.d.) and inference (generate.py carries hidden state across window boundaries).
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 12:27 PDT, PID 544183. Log `/home/darrell/train_alibaba_v160.log`.
+**Status** (2026-04-18): Phase 1 AE pretrain starting. Forward-pair cost ~1.5x per G-step (one extra G call to split A; one extra R decode vs legacy sub-loss (b)). Kill criteria: (a) G collapse below -6 like v139, (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+
+---
+
 ### alibaba_v159 — CLOSED-FAILED (v132 recipe seed-3 W-stop @ ep15; frozen-best final.pt ★=0.05715, +15% behind v157 ATB 0.04982, 2026-04-18)
 **Why**: v157 (seed-2) produced 0.04982 frozen. v132 (orig seed) 0.0578. v159 seed-3 tested whether v132-recipe frozen distribution is tight (confirms) or high-variance (reveals true benchmark).
 **Recipe**: v132/v157 EXACTLY + explicit --seed 3. Fresh pretrain.
