@@ -50,19 +50,32 @@ relevant.
 
 ---
 
-### alibaba_v136 — **v132 recipe MINUS MTPP (symmetric ablation: completes component decomposition)**
-**Why**: v135 (v132 − BS) confirmed BS is load-bearing on alibaba (ep5 ★=0.09441, 64% worse than v134 ep5, G=−7.5 critic dominance). v136 is the symmetric probe — remove MTPP instead, test if MTPP is also load-bearing. Completes component matrix:
-- v128: BS alone → failed (0.06703 ep5, no ATB)
-- v131: MTPP alone → failed (frozen 0.09141)
-- v132: SSM+MTPP+BS → ATB 0.05778 (frozen)
-- v135: SSM+MTPP (no BS) → FAILED (BS is load-bearing)
-- **v136: SSM+BS (no MTPP)** → this probe
+### alibaba_v137 — **v132 with lr-d halved (2e-5 vs 4e-5) — slow critic to extend productive window**
+**Why**: v135/v136 ablations confirm v132 stack is MINIMAL (all of SSM+MTPP+BS load-bearing on alibaba). Next axis: address the specific failure mode shared by v132/v134/v136 = early ★ peak (ep5-10) then W climbs toward 3.0 as critic dominates. Hypothesis: halving critic learning rate extends the productive window without disrupting the recipe's components.
 
-If v136 ALSO fails, alibaba needs ALL of SSM+MTPP+BS (no redundancy). If v136 matches v134 trajectory (ep5 ★ ~0.058), MTPP is dead-weight and we simplify. If v136 beats v134, MTPP was hurting (unlikely given v131's failure wasn't catastrophic).
+**Recipe**: v132 EXACTLY MINUS `--lr-d 4e-5` → `--lr-d 2e-5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2.
 
-**Recipe**: v132/v134 EXACTLY MINUS `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. SSM state-dim 16 + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. n_critic=2.
+**Expected signal**: If lr-d helps, expect Phase 3 ep5-ep15 to hold ★ close to v134's ep5 (0.05755) with W staying <2.0 through ep15+. If it fails like v128 (stability without quality), ★ will cap around 0.067 (v128 ep5). If MTPP/BS+halved-lr-d destabilizes, G collapse or W-stop.
 
-**Status** (2026-04-17): launched 17:10 PDT PID 139510. Log `/home/darrell/train_alibaba_v136.log`.
+**Status** (2026-04-17): launched 18:27 PDT PID 164331. Log `/home/darrell/train_alibaba_v137.log`.
+
+---
+
+### alibaba_v136 — CLOSED (MTPP confirmed load-bearing; ep5 best ★=0.07606, 32% above ATB, W climbing, 2026-04-17)
+**Recipe**: v132 EXACTLY MINUS `--mtpp-timing --mtpp-timing-weight 0.5 --mtpp-sigma-min 0.05`. SSM state-dim 16 + BS 1.0/k=2/decay=0.5 + v124 base. Fresh pretrain. PID 139510. Ran 17:10–18:27 PDT (~77 min, killed ep16).
+
+**Training**:
+- ep5 ★=**0.07606** (MMD²=0.02656, recall=0.752, W=1.38, G=+0.73) — the only ★
+- ep10 comb=0.08304 (no ★; MMD² 0.02656→0.01574 HALVED, but recall 0.752→0.663 dropped)
+- ep15 comb=0.07698 (MMD² 0.01128, recall 0.671) — still not a ★, effectively tied with ep5
+- ep16 W=**2.46** climbing toward 3.0
+
+**Why killed**: ep5 ★ already 32% above ATB 0.05778. MMD² halved twice (0.0266→0.0113) but recall regressed to 0.67 and never recovered. W trajectory 0.12→2.46 in 16 ep projects W-stop by ep18-20. Projected frozen with optimistic −0.006 delta (v152-level) → ~0.070, still 21% above ATB. Hopeless. Skipped frozen eval.
+
+**Finding — MTPP is LOAD-BEARING on alibaba, gradually not catastrophically**: Removing MTPP produces a valid early trajectory (ep1-5 healthy G-dynamics), but ★ quality caps 32% above ATB and recall collapses ep10+. Contrasts with v135 (v132 − BS) which failed INSTANTLY (ep1 G=−7.5). So:
+- **BS**: *structural* — presence required from ep1 for stable dynamics
+- **MTPP**: *quality-lifting* — allows recipe to reach the ATB frontier, not required for stability
+- v132 is minimal — cannot simplify. Next axis: hyperparameter tuning (v137 lr-d halved) or new IDEAS.
 
 ---
 
