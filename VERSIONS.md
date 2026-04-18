@@ -78,12 +78,27 @@ priority after the current hyperparameter ablation loop (v138) closes.
 
 ---
 
-### tencent_v154 — **v152 EXACTLY + --overlap-consistency-weight 0.5 (sub-loss (b) ALONE on tencent)**
-**Why**: BS (sub-loss a) was DEAD WEIGHT on tencent (v150 with BS → v152 without BS = 22% better). But sub-loss (b) operates in DECODED-feature space, not latent — different gradient surface. v154 tests whether feature-space chunk-stitching helps tencent in isolation (no BS). If yes, the chunk-stitching family splits cleanly: sub-loss (a) is alibaba-only, sub-loss (b) is universal.
+### tencent_v155 — **v153 recipe (no boundary losses) + cache-descriptor monitor (IDEA #18 Phase A diagnostic)**
+**Why**: v154 confirmed OC ALONE doesn't help tencent (best training ★=0.04764 at ep5, drifted 0.049+, killed ep19 hopeless). Tencent boundary-regularizer family (BS, OC, both) now EXHAUSTED — all dead weight or worse. Pivot to IDEA #18 per Round 16's recommended build order. v155 adds cache-descriptor MONITOR (Phase A, non-differentiable): logs `desc_mse` each ★ epoch. Also functions as a fresh-seed retry of v153 recipe (same recipe produced 0.04003 at ep20 via seed variance alone).
 
-**Recipe**: v152 EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + **OC 0.5/k=2/decay=0.5** + v146 base (n_regimes=8). NO boundary-smoothness. n_critic=2. Fresh pretrain. **--checkpoint-every 5** (was 10) — v153 showed ep20 was frozen-optimum, not ep45 (training-★ optimum); finer granularity helps locate frozen sweet spot.
+**Recipe**: v153/v152 recipe (no BS, no OC) + `--cache-descriptor-file /home/darrell/traces/characterization/tencent_descriptors.jsonl`. SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain. --checkpoint-every 5 per v153 lesson.
 
-**Status** (2026-04-17): launched ~21:45 PDT. Log `/home/darrell/train_tencent_v154.log`.
+**Strategy**:
+- If v155 ★ < 0.04003 → NEW tencent ATB (pure seed luck reproducing v153's win).
+- Regardless of ★: desc_mse trajectory informs IDEA #18 Phase B decision. If desc_mse strongly correlates with ★ across epochs → Phase B (differentiable descriptor distillation) is worth the code cost. If uncorrelated → close #18 cheaply.
+
+**Status** (2026-04-17): launched ~23:32 PDT as PID 273688. Log `/home/darrell/train_tencent_v155.log`. Cache-descriptor monitor active (3234 file targets, D=8 descriptor).
+
+---
+
+### tencent_v154 — CLOSED (OC-alone on tencent hopeless, killed ep19 with ★ trajectory worsening, 2026-04-17)
+**Recipe**: v152 EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-decay 0.5`. SSM + MTPP + multi-scale + PCF + mixed-type-recovery + **OC 0.5/k=2/decay=0.5** (no BS). Fresh pretrain. Ran ~21:45–23:30 PDT (~105 min).
+
+**Training ★ progression**: ep5=0.04764, ep10=0.05048, ep15=0.04907. Best ★ at ep5; 14 epochs stale at kill. ★ trajectory WORSENING from ep5.
+
+**Why killed**: Training ★ stably 0.049 (19-26% behind tencent ATB 0.04003 target). W climbing +0.76→+1.60 (critic dominating but still <3.0 threshold). At current rate, ★ would need a 22% collapse in the 15 epochs remaining before 30-stale kill — no upward momentum visible. Hopeless vs ATB, pivoted without waiting for stale-threshold to autoconfirm.
+
+**Finding — tencent boundary-regularizer family EXHAUSTED**: v150 (with BS) < v152 (no BS) < v153 (no BS, seed-2) = ATB. v154 (with OC, no BS) = worse than v152. All boundary losses on tencent (BS-only, OC-only, BS+OC) underperform the no-boundary recipe. **Closing chunk-stitching family on tencent.** Sub-loss (a) (BS) and sub-loss (b) (OC) are both dead-weight or destructive on tencent. Aligns with R16 P2: stop iterating on chunk-stitching on tencent; pivot to a different representation-changing idea.
 
 ---
 
