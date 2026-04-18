@@ -112,6 +112,13 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
+### tencent_v160 — v158 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)** (IDEA #21 full on tencent stack), seed-4, 2026-04-18
+**Why**: v159 CLOSED confirmed v153-family seed-farming is exhausted (frozen-best 0.07176 vs ATB 0.03942). v158 is near the ceiling of the current architecture at seeds-3/4. Representation-level move: add WaveStitch-style overlap-mode OC as the ONLY boundary-region regularizer on the tencent stack (tencent recipe has no BS — v152 ablation established BS is DEAD WEIGHT on tencent). Tests whether feature-space noise-invariance in the overlap region (trained at paired adjacent windows sharing h_mid) breaks past v158's 0.03942 floor.
+**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 13:16 PDT, PID 563498. Log `/home/darrell/train_tencent_v160.log`.
+**Status** (2026-04-18): Phase 1 AE pretrain starting. Kill criteria: (a) G collapse below -6 (chunk-stitching on tencent has blown G before), (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+
+---
+
 ### alibaba_v160 — v132 recipe + **TRUE WaveStitch-style overlap-mode sub-loss (b)**, IDEA #21 full (R17 P3 / R18 P2), seed-4, 2026-04-18
 **Why**: RESPONSE.md commitment after v159 closed the v132-seed sweep (range 0.050–0.058, std 0.004). v157's 0.04982 ATB is real but recipe is not reliably sub-0.05 — representation-level change needed. Before 2026-04-18, `--overlap-consistency-weight` reused boundary-smoothness math on two adjacent non-overlapping windows (v139 blew up stacking it; v140 replaced BS with it → 0.0714). New `--overlap-consistency-mode=overlap` (default) splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise → A's last k and B's first k refer to the SAME absolute timesteps. Loss = `overlap_consistency(R(H_A), R(H_B), k=2)`. Drives feature-space noise-invariance in the overlap region — the exact gap between training (each window sampled i.i.d.) and inference (generate.py carries hidden state across window boundaries).
 **Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 12:27 PDT, PID 544183. Log `/home/darrell/train_alibaba_v160.log`.
@@ -135,10 +142,22 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
-### tencent_v159 — v153 recipe EXACTLY + --seed 3 (reproducibility arbiter after v158 failed to reproduce v153 ATB)
-**Why**: v158 frozen-best 0.0528 = 32% worse than v153's 0.04003, same recipe, clean replay. Two outcomes: (a) v153 seed-lucky (→ tencent ATB overstated), (b) v158 seed-unlucky (→ tencent ATB holds). v159 seed-3 is the tie-breaker.
-**Recipe**: v153/v152/v158 EXACTLY + explicit --seed 3. Fresh pretrain. K=8, SSM+MTPP+multi-scale+PCF.
-**Status** (2026-04-18): launched ~10:20 PDT as PID 371121. Log `/home/darrell/train_tencent_v159.log`.
+### tencent_v159 — CLOSED-HOPELESS (killed ep42, 7 stale from train-best ep35 ★=0.05619; frozen-best ep_0035.pt ★=0.07176 = +82% behind tencent ATB 0.03942, 2026-04-18)
+**Why (obsoleted)**: launched as v153/v158 seed tie-breaker. Rationale dissolved once v158 deterministic frozen_sweep established final.pt ★=0.03942 as the tencent ATB — the "v158 failed to reproduce v153" narrative was a best.pt mis-rank, not a seed issue. v159 was running on outdated reasoning.
+**Recipe**: v153/v152/v158 EXACTLY + explicit --seed 3. Fresh pretrain. K=8, SSM+MTPP+multi-scale+PCF. Launched ~10:20 PDT PID 371121.
+**Training ★ progression (Phase 3)**: ep5=0.06155, ep10=0.06373, ep15=0.06380, ep20=0.05997, ep25=0.05770, ep30=0.05733, **ep35=0.05619** (train-best), ep40=0.05813 (regressed), ep42 W=+2.45 (climbing toward 3.0). Killed 13:15 PDT at ep42 — trailing v158 by 34% at same epoch (v158 ep40=0.04340), improvement rate slowing (0.5% ep30→ep35), W approaching stop threshold.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0035.pt / best.pt** | **0.00356** | **0.6590** | **★=0.07176** (frozen-best) |
+| epoch_0020.pt | 0.00254 | 0.6210 | 0.07834 |
+| epoch_0010.pt | 0.00253 | 0.6150 | 0.07953 |
+| epoch_0030.pt | 0.00414 | 0.6110 | 0.08194 |
+| epoch_0040.pt | 0.00492 | 0.5880 | 0.08732 |
+| epoch_0005.pt | 0.00468 | 0.5090 | 0.10288 |
+
+**Finding**: v159 frozen-best ★=0.07176 is +82% worse than tencent ATB 0.03942. Recall stuck at 0.58-0.66 all epochs (vs v158 ep100 β-recall ≈ 0.82). **Seed-3 on v153-family recipe is a bad lottery ticket — v158 may be close to the ceiling of this architecture/recipe.** Round 18 P1 #2 Gemini warning vindicated: seed-farming the v153-family is not generating new information. Tencent now moves to representation-level work — v160 launches with the new WaveStitch overlap-mode sub-loss (b).
+**Status**: CLOSED-HOPELESS, frozen_best.pt promoted → epoch_0035.pt.
 
 ---
 
