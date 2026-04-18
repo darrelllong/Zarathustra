@@ -90,29 +90,34 @@
 }
 
 % -------------------------------------------------------------------------
-% External-audit references (UNVERIFIED arXiv IDs — fetch before citing)
+% External-audit references — verification pass 2026-04-18 (Darrell)
 % -------------------------------------------------------------------------
 
-@article{kim2025_storage_diffusion,
-  title     = {Diffusion-Based Framework for Configurable and Cache-Accurate Synthetic Trace Generation},
+@article{kim2025_ditto_storage,
+  title     = {A Diffusion-Based Framework for Configurable and Realistic Multi-Storage Trace Generation},
   author    = {Kim and others},
   journal   = {arXiv preprint},
   year      = {2025},
   eprint    = {2509.01919},
   archivePrefix = {arXiv},
   primaryClass = {cs.LG},
-  note      = {UNVERIFIED: external-audit citation, not yet fetched against arXiv}
+  note      = {VERIFIED 2026-04-18; storage-trace-specific conditional diffusion; treat HRC claim
+               as hypothesis to test in Zarathustra, not quoted fact unless paper's metric table
+               confirms it}
 }
 
-@article{shen2025_tsgdiff,
-  title     = {TSGDiff: Rethinking Synthetic Time Series Generation from a Diffusion Perspective},
-  author    = {Shen and others},
+@article{shen2025_tsgdiff_graph,
+  title     = {Rethinking Synthetic Time Series Generation from a Pure Graph Perspective},
+  author    = {Shen, and Li, and Long},
   journal   = {arXiv preprint},
   year      = {2025},
   eprint    = {2511.12174},
   archivePrefix = {arXiv},
   primaryClass = {cs.LG},
-  note      = {UNVERIFIED: external-audit citation, not yet fetched against arXiv}
+  note      = {VERIFIED 2026-04-18; CORRECTED title — graph-structured diffusion, NOT an
+               adaptive-noise-schedule paper as originally listed by the Grok audit; transfer idea
+               is graph construction from Fourier/temporal dependencies + graph-aware latent
+               diffusion}
 }
 
 @article{masi2025_diffcats,
@@ -120,7 +125,7 @@
   author    = {Masi and others},
   journal   = {Transactions on Machine Learning Research (TMLR)},
   year      = {2025},
-  note      = {UNVERIFIED: external-audit citation}
+  note      = {UNVERIFIED: external-audit citation; still needs arXiv/OpenReview fetch}
 }
 
 @inproceedings{ge2025_t2s,
