@@ -364,3 +364,36 @@ contract). The engineering-debt items are agreed and will be worked after the
 current chunk-stitching experiment closes. No new IDEAS.md entries — Grok's
 review is code-quality, not architectural.
 
+---
+
+# Response to Gemini peer review, Round 2 (2026-04-18)
+
+**Status: all three findings already fixed in prior commits — no live bugs.**
+
+Gemini's Round 2 review (pubs-adjacent file `PEER-REVIEW-GEMINI.md`) flags three
+code-level issues. Inspection against the current tree:
+
+1. **R2-P1 — CFG information leakage through GMM prior.** FIXED in commit
+   `267d23d` ("Fix CFG info leakage: dropout before cond_encoder/regime_sampler/GMM").
+   `llgan/train.py:_make_z_global` applies the CFG dropout mask at line 132–135
+   BEFORE the cond_encoder (137), regime_sampler (144), and GMM prior (149)
+   consume the condition. Lines 128–131 reference "Gemini Round 2 P1" as the
+   motivation for that ordering.
+
+2. **R2-P2 — Biased MMD² estimator.** FIXED in commit `253c860` ("fix two live
+   peer-review bugs: … MMD² diagonal"). `llgan/mmd.py:mmd` (lines 96–103) now
+   uses the Gretton 2012 unbiased U-statistic:
+   `(Kxx.sum() - Kxx.diagonal().sum()) / (n * (n - 1))`. Docstring lines 73–75
+   reference "Gemini R2 P2".
+
+3. **R2-P3 — DMD-GEN zero-division.** FIXED in commit `7530334` ("Fix Gemini R1
+   #5 … + R2 #3 (DMD-GEN zero-division)"). `llgan/mmd.py:_dmd_subspace` line 194
+   uses `np.linalg.pinv(np.diag(S_r))`, which zeroes singular values below
+   numpy's default tolerance. Handles mode-collapse without NaN propagation.
+
+**Why Gemini's review text still describes the bugs**: `PEER-REVIEW-GEMINI.md`
+is an append-only log of historical reviews. The Round 2 findings are recorded
+verbatim because the fixes and the motivating critique belong together for
+audit purposes. No new Gemini-authored findings have arrived since the last
+commit cycle.
+
