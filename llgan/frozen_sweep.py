@@ -85,7 +85,8 @@ def _run_eval(
     ckpt: Path,
     trace_dir: str,
     fmt: str,
-    seed: int,
+    real_seed: int,
+    fake_seed: int,
     n_samples: int,
     eval_script: Path,
     python_exe: str,
@@ -98,7 +99,8 @@ def _run_eval(
         "--trace-dir", trace_dir,
         "--fmt", fmt,
         "--n-samples", str(n_samples),
-        "--eval-real-seed", str(seed),
+        "--eval-real-seed", str(real_seed),
+        "--eval-fake-seed", str(fake_seed),
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     stdout = proc.stdout or ""
@@ -148,6 +150,7 @@ def run_sweep(args) -> int:
                 args.trace_dir,
                 args.fmt,
                 args.eval_real_seed,
+                args.eval_fake_seed,
                 args.n_samples,
                 eval_script,
                 python_exe,
@@ -181,6 +184,7 @@ def run_sweep(args) -> int:
         "trace_dir": args.trace_dir,
         "fmt": args.fmt,
         "eval_real_seed": args.eval_real_seed,
+        "eval_fake_seed": args.eval_fake_seed,
         "n_samples": args.n_samples,
         "frozen_best": winner["checkpoint"],
         "frozen_best_combined": winner["combined"],
@@ -229,6 +233,9 @@ def parse_args():
     p.add_argument("--fmt", default="oracle_general")
     p.add_argument("--eval-real-seed", type=int, default=42,
                    help="Frozen-bundle seed. Default 42 matches the published protocol.")
+    p.add_argument("--eval-fake-seed", type=int, default=42,
+                   help="Fake-sampling seed. Default 42. Required for deterministic "
+                        "cross-checkpoint comparison — see llgan.eval.")
     p.add_argument("--n-samples", type=int, default=2000)
     return p.parse_args()
 

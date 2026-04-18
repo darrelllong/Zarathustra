@@ -567,9 +567,20 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
         print(f"Saved MMD² : {ckpt['mmd']:.5f}")
 
     real_seed = getattr(args, 'eval_real_seed', None) if args else None
+    fake_seed = getattr(args, 'eval_fake_seed', None) if args else None
     bundle_note = f" (frozen bundle seed={real_seed})" if real_seed is not None else ""
+    if fake_seed is not None:
+        bundle_note += f" (fake seed={fake_seed})"
     print(f"\nSampling {n_samples} real and fake windows{bundle_note} …")
     real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples, real_seed=real_seed)
+
+    if fake_seed is not None:
+        import random as _random
+        _random.seed(fake_seed)
+        np.random.seed(fake_seed)
+        torch.manual_seed(fake_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(fake_seed)
 
     cfg  = ckpt["config"]
     timestep  = cfg.timestep
@@ -695,6 +706,12 @@ def parse_args():
                         "behaviour). Use a fixed seed across runs to isolate "
                         "fake-sample variance from benchmark variance. Evals using "
                         "the same seed on the same trace_dir are directly comparable.")
+    p.add_argument("--eval-fake-seed", type=int, default=None,
+                   help="Seed for deterministic fake-sample generation (generator "
+                        "noise, cond pool indices, recovery RNG). Required alongside "
+                        "--eval-real-seed for fully deterministic comparison across "
+                        "checkpoints — without it, ★ varies ~±0.01 across reruns of "
+                        "the same weights purely from fake-sample draw noise.")
     return p.parse_args()
 
 
