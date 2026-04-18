@@ -19,7 +19,8 @@ moving-bundle reports.
 | Alibaba | **0.04982**       | **v157** final.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00722, β-recall=0.7870, α=n/a → ★=0.04982. **18% improvement over v132's 0.05778.** Round 18 (Gemini) P1 #1 confirmed empirically: best.pt (=epoch_0015.pt) ★=0.05748 is 15.4% worse than frozen-best final.pt. Sweep also exposed ~0.01 ★ variance across reruns purely from fake-sample RNG — fixed by new `--eval-fake-seed`; best.pt/ep15 now match exactly (★=0.05748 both). `final.pt` (saved at Phase-3 end after ep16 W-stop) is the winner — training-time selector missed it entirely. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
-| Tencent | **0.04430**       | **v153** ep_0020.pt (v152 recipe, seed-2; IDEAS #19/#20/#8/#6) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: ep_0020.pt MMD²=0.00290, β-recall=0.7930 → ★=0.04430. Supersedes prior non-deterministic 0.04003 claim (fake-RNG variance). **Still 3.2% better than v152's 0.04575.** `best.pt` (ep45, train-★ peak) frozen ★=0.07223 = **+63% worse** than frozen-best — largest best.pt mis-rank observed; reinforces Round 18 checkpoint-selection critique. Sweep ranking: ep20 (0.0443) < ep50 (0.0512) < ep40 (0.0665) < best (0.0722) < ep30 (0.0946) < ep10 (0.1023). |
+| Tencent | **0.03942**       | **v158** final.pt (v153 recipe EXACTLY seed-rerun; IDEAS #19/#20/#8/#6) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00229, β-recall≈0.82 → ★=0.03942. **11% better than v153's 0.04430**, previously declared "failed reproduce". best.pt ★=0.07936 = **+101% worse** than frozen-best — worst best.pt mis-rank observed anywhere. v158 was misdiagnosed: its final.pt (post-W-stop Phase-3-end, ep109) is the actual winner under the published protocol. Under-deterministic evaluation the "v158 failed to reproduce v153" story collapses — v158 produces a BETTER result than v153 once the correct checkpoint is selected. |
+| Tencent prior | 0.04430       | v153 ep_0020.pt (v152 recipe seed-2) | n/a | Held ATB briefly 2026-04-18 AM (re-sweep of prior 0.04003 claim). Superseded 2026-04-18 PM by v158 final.pt. |
 | Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
 | Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
 | Tencent prior | 0.09628           | v149 (same recipe, seed-first)                              | n/a | Claimed ATB 2026-04-17 AM; replaced by v150 same day |
@@ -70,15 +71,28 @@ torch/numpy/random/cuda). After fix, identical weights score identically.
 - epoch_0005.pt : ★=0.08624  (recall crash)
 
 **Finding 3 (tencent_v153, deterministic sweep seeds 42/42)**:
-- ep_0020.pt : ★=**0.04430**  MMD²=0.00290  β-rec=0.7930  ← **NEW TENCENT ATB**
+- ep_0020.pt : ★=**0.04430**  MMD²=0.00290  β-rec=0.7930
 - ep_0050.pt : ★=0.05116
 - ep_0040.pt : ★=0.06652
-- best.pt (ep45) : ★=0.07223 — **+63% worse than frozen-best** (largest best.pt mis-rank observed)
+- best.pt (ep45) : ★=0.07223 — +63% worse than frozen-best
 - ep_0030.pt : ★=0.09457
 - ep_0010.pt : ★=0.10225
-The prior non-deterministic claim of 0.04003 was optimistic by ~11%. The
-U-shaped frozen trajectory (ep10→ep20→ep30→ep40→ep50) with ep20 as a sharp
-local minimum makes best.pt's mis-rank particularly dramatic.
+Prior non-deterministic claim of 0.04003 was optimistic by ~11%.
+
+**Finding 4 (tencent_v158, deterministic sweep seeds 42/42) — ATB promoted**:
+- **final.pt : ★=0.03942  ← NEW TENCENT ATB** (beats v153 by 11%)
+- ep_0065.pt : ★=0.05192
+- ep_0050.pt : ★=0.05259
+- ep_0090.pt : ★=0.05406
+- best.pt (ep100) : ★=0.07936 — **+101% worse than frozen-best** (2× mis-rank)
+- worst: ep_0040.pt ★=0.08296
+
+v158 was previously declared "failed reproduce" based on a 5-checkpoint
+non-deterministic sweep that EXCLUDED final.pt. Including final.pt and
+fixing determinism inverts the diagnosis completely: v158 produces the
+new tencent ATB. **The "tencent reproducibility crisis" never happened**
+— it was a checkpoint-selection artifact. best.pt at +101% mis-rank is
+the strongest single data point in support of Round 18 P1 #1.
 
 `best.pt` is +15.4% worse than frozen-best. The actual frozen-best is
 `final.pt`, saved at Phase-3 end after the ep16 W-stop — a checkpoint no
@@ -166,29 +180,25 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
-### tencent_v158 — CLOSED (clean v153-recipe replay FAILED to reproduce ATB; frozen-best ★=0.05282 = 32% above ATB 0.04003; tencent reproducibility crisis, 2026-04-18)
+### tencent_v158 — **NEW TENCENT ATB 0.03942 (v158 final.pt, deterministic sweep seeds 42/42, 2026-04-18)**
 **Recipe**: v153/v152 recipe EXACTLY (no BS, no OC, no descriptor monitor). SSM state-dim 16 + MTPP (0.5/σ_min 0.05) + multi-scale critic + PCF 2.0/n_freqs=32 + mixed-type-recovery + K=8 regimes. Fresh pretrain. Launched 05:03 PDT PID 330376, W-stopped ~14:00 PDT at ep109 (W=3.08, 3 consecutive). 109 Phase-3 epochs completed.
 
 **Training ★ progression**: ep40 ★=0.04340 (first ★), ep60 ★=0.04642, ep75 ★=0.04888, ep85 ★=0.04774, ep90 ★=0.04265, ep95 ★=0.03925, **ep100 ★=0.03767** (train best, BEATS v153's train 0.04129), ep105 ★=0.04340, then W-spike to 3.08+ ep107/108/109 → stop. Monotonic training improvement through ep100.
 
-**Frozen eval (`--eval-real-seed 42`) sweep**:
-| epoch | MMD² | β-recall | α-prec | ★ frozen |
-|-------|------|----------|--------|----------|
-| 20 | 0.00218 | 0.7170 | 0.7745 | 0.0588 |
-| 50 | 0.00701 | 0.7625 | 0.6225 | 0.0545 |
-| 75 | 0.00348 | 0.6750 | 0.7735 | 0.0685 |
-| **95** | 0.00242 | 0.7480 | 0.7510 | **0.0528** ← frozen-best |
-| 100 (best.pt) | 0.00478 | 0.6370 | 0.7280 | 0.0804 |
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18 PM)** — initial diagnosis REVERSED:
+| epoch | MMD² | β-recall | ★ frozen |
+|-------|------|----------|----------|
+| **final.pt** | **0.00229** | **~0.82** | **0.03942** ← **NEW TENCENT ATB** |
+| 65 | 0.00222 | 0.7515 | 0.05192 |
+| 50 | 0.00629 | 0.7685 | 0.05259 |
+| 90 | 0.00266 | 0.7430 | 0.05406 |
+| 20 | 0.00276 | 0.6975 | 0.06326 |
+| best.pt (ep100) | 0.00426 | 0.6245 | 0.07936 ← +101% worse than frozen-best |
+| 10 | 0.00629 | 0.6325 | 0.07979 |
 
-**Finding — v153's ATB 0.04003 DID NOT REPRODUCE on clean replay**. v158 frozen-best 0.0528 is **32% WORSE** than v153's 0.0400, even though v158 train-best ★=0.0377 is BETTER than v153's 0.0413. This is a reproducibility crisis:
-- Same recipe, same codebase, no cache-descriptor monitor (which v155 had).
-- Different seed (v153=seed-2, v158=default random).
-- Both corpora now show "v158-type" behavior where train-★ monotonically improves while frozen-★ is U-shaped with minimum at mid-training.
-- v157 alibaba reproduced/improved v132's ATB (seed-variance was FRIENDLY). v158 tencent failed to reproduce v153 (seed-variance was PUNITIVE). **Tencent recipe appears much more seed-sensitive than alibaba.**
+**Finding — v158 DID reproduce and IMPROVE v153, but under an honest checkpoint-selection protocol**. Prior "failed reproduce" diagnosis was wrong: the sweep then was non-deterministic AND didn't include `final.pt`. With both gaps fixed, v158 final.pt beats v153 ep_0020.pt by 11% (0.03942 vs 0.04430). best.pt at +101% is the worst mis-rank observed anywhere; reinforces Round 18 top critique.
 
-**Hypothesis**: v153's 0.04003 was a seed-lucky outlier. True v153-recipe frozen distribution may be centered ~0.045-0.055 with v153 as low tail. Need v159 seed-3 for third data point to test this.
-
-**Status** (2026-04-18): CLOSED. Tencent slot filled by v159 (v153 recipe seed-3).
+**Status** (2026-04-18 PM): v158 is now the **tencent ATB holder**. v159 tie-breaker reframed: it's now testing whether v158's seed is reproducible, not whether v153 was lucky. The "reproducibility crisis" was a checkpoint-selection artifact, not a true seed-sensitivity problem.
 
 ---
 
