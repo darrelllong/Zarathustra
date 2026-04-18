@@ -3,9 +3,13 @@ Chunk stitching / boundary-consistency loss (IDEAS.md idea #21).
 
 Status
 ------
-DESIGN+IMPL — standalone loss callable; integration into the joint-GAN
-training step is deferred to a separate commit. Backward compatible:
-when disabled, training is byte-identical to the current recipe.
+WIRED. Sub-loss (a) boundary_latent_smoothness and sub-loss (b)
+feature-space overlap-consistency are both integrated into the joint-GAN
+training step (llgan/train.py). Sub-loss (b) is driven by
+--overlap-consistency-weight and reuses sub-loss (a)'s forward pair,
+applying the decay-weighted boundary MSE on post-Recovery features
+instead of latents. Backward compatible: when both weights are 0,
+training is byte-identical to the prior recipe.
 
 Motivation
 ----------

@@ -1697,23 +1697,48 @@ def train(cfg: Config) -> None:
                     loss_cont = loss_cont_mean + loss_cont_std
                     g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
 
-                # L_boundary_smooth: chunk-stitching latent-space boundary loss
-                # (IDEAS.md #21). Per-step exponential-decay weighted MSE on
-                # the LSTM latent across the train→inference boundary.
-                # Complements continuity_loss_weight (feature-space mean/std).
-                if getattr(cfg, "boundary_smoothness_weight", 0.0) > 0:
+                # L_boundary_smooth: chunk-stitching boundary losses (IDEAS #21).
+                # Two complementary sub-losses on the SAME forward pair:
+                #   (a) boundary_smoothness_weight — latent-space MSE (pre-R).
+                #   (b) overlap_consistency_weight — feature-space MSE (post-R)
+                #       on paired adjacent windows with hidden-state carry.
+                # Both use an exponential-decay weighting so the boundary step
+                # counts most. When either weight > 0, we generate a second
+                # chunk whose LSTM hidden is seeded from chunk A's final hidden
+                # (matching generate.py's rollout semantics).
+                _bs_w = float(getattr(cfg, "boundary_smoothness_weight", 0.0))
+                _oc_w = float(getattr(cfg, "overlap_consistency_weight", 0.0))
+                if _bs_w > 0 or _oc_w > 0:
                     z_gb, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                              file_cond=file_cond_batch, G=G)
                     z_lb1 = G.sample_z_local(B, cfg.timestep, device)
                     z_lb2 = G.sample_z_local(B, cfg.timestep, device)
                     H_b1, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
                     H_b2 = G(z_gb, z_lb2, hidden=h_b_carry)
-                    loss_bs = boundary_latent_smoothness(
-                        H_b1, H_b2,
-                        k=int(getattr(cfg, "boundary_smoothness_k", 2)),
-                        decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
-                    )
-                    g_loss = g_loss + cfg.boundary_smoothness_weight * loss_bs
+                    if _bs_w > 0:
+                        loss_bs = boundary_latent_smoothness(
+                            H_b1, H_b2,
+                            k=int(getattr(cfg, "boundary_smoothness_k", 2)),
+                            decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
+                        )
+                        g_loss = g_loss + _bs_w * loss_bs
+                    if _oc_w > 0:
+                        if latent_ae:
+                            feat_b1 = R(H_b1)
+                            feat_b2 = R(H_b2)
+                        else:
+                            feat_b1 = H_b1
+                            feat_b2 = H_b2
+                        # Reuse the same decay-weighted boundary MSE math but
+                        # on decoded features — this is what eval.py actually
+                        # measures, so it targets the train→inference gap
+                        # directly in output space.
+                        loss_oc = boundary_latent_smoothness(
+                            feat_b1, feat_b2,
+                            k=int(getattr(cfg, "overlap_consistency_k", 2)),
+                            decay=float(getattr(cfg, "overlap_consistency_decay", 0.5)),
+                        )
+                        g_loss = g_loss + _oc_w * loss_oc
 
                 # Feature-space critic in generator loss (dual discriminator).
                 # C_feat operates in decoded feature space — it sees what the
@@ -2366,6 +2391,20 @@ def parse_args() -> Config:
                    help="Exponential weight decay across boundary steps "
                         "(default 0.5; weight on step i = decay**i, so the boundary "
                         "step counts most).")
+    p.add_argument("--overlap-consistency-weight", type=float, default=0.0,
+                   help="Chunk-stitching FEATURE-space boundary consistency loss "
+                        "(IDEAS.md idea #21 sub-loss (b)). Complements "
+                        "--boundary-smoothness-weight: same forward pair (chunk B "
+                        "generated with hidden=chunk A's final hidden), but applies "
+                        "the decay-weighted boundary MSE on DECODED features (post-R) "
+                        "instead of latents. This targets the train→inference gap in "
+                        "the output space that eval.py measures. Default 0.0 = off.")
+    p.add_argument("--overlap-consistency-k", type=int, default=2,
+                   help="Number of boundary steps on each side compared by the "
+                        "feature-space overlap consistency loss (default 2).")
+    p.add_argument("--overlap-consistency-decay", type=float, default=0.5,
+                   help="Exponential weight decay across boundary steps for the "
+                        "feature-space overlap consistency loss (default 0.5).")
     p.add_argument("--hybrid-diffusion-aux", action="store_true",
                    help="IDEAS.md #22 (Stage-1 only): side-train a "
                         "LatentDenoiser on E(real).detach() in the joint-GAN "
@@ -2501,6 +2540,9 @@ def parse_args() -> Config:
     cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
     cfg.boundary_smoothness_k        = args.boundary_smoothness_k
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
+    cfg.overlap_consistency_weight   = args.overlap_consistency_weight
+    cfg.overlap_consistency_k        = args.overlap_consistency_k
+    cfg.overlap_consistency_decay    = args.overlap_consistency_decay
     cfg.ssm_backbone                 = args.ssm_backbone
     cfg.ssm_state_dim                = args.ssm_state_dim
     cfg.mtpp_timing                  = args.mtpp_timing
