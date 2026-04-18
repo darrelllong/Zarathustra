@@ -1222,3 +1222,63 @@ of attack once the current tencent_v160/alibaba_v161 runs complete:
 This ordering is orthogonal to the 2026-04-18 list above (#25, #27, #24, #23). Those five are
 cheaper architectural experiments; #28–#31 are targeted attacks on documented failure modes from
 the frozen-sweep history.
+
+---
+
+### 32. Explicit Inter-Reference-Distance (IRD) footprint modeling
+
+**Gap attacked**: HRC-MAE cliffs and plateaus. Current generators (including this one) match
+first-order frequency skew (Zipf/Pareto) and produce *concave* HRCs. Real storage traces have
+*non-concave* HRCs with cliffs at specific cache sizes, driven by IRD histogram spikes and holes
+that frequency alone cannot reproduce. This is the single gap the 2DIO paper (pubs/2DIO_CacheAccurate_2026.pdf,
+EuroSys 2026, Wang/Khor/Desnoyers) argues most strongly.
+
+**Proposal**:
+- Extend `cache_descriptor.py` with a per-window IRD histogram descriptor (reuse-distance
+  quantiles + spike-detection peaks via SciPy peak-finding on the IRD log-histogram).
+- Conditioning path: append IRD descriptor to `cond_dim` so G sees IRD as input, not just
+  frequency descriptors.
+- Auxiliary loss: MSE (or Wasserstein-1) between real vs. synthetic IRD histograms computed on a
+  rolling window of decoded features, added to joint-GAN step with weight
+  `--ird-loss-weight`.
+- Generation: when the existing reuse gate fires, sample target reuse-distance from the
+  IRD-conditioned distribution rather than the uniform bank lookup.
+
+**Why this is on-target**: IDEA #28 (cross-window retrieval bank) provides the *mechanism* for
+long-range reuse but has no *distributional target* for eviction age. IRD supplies exactly that
+target. #28 and #32 are complementary: #32 tells the model *which* reuse distances to produce,
+#28 provides the memory state to actually produce them.
+
+**Primary source**: 2DIO (Wang et al., EuroSys 2026). The paper's core empirical claim is that
+IRD-informed synthesis reproduces non-concave HRCs and frequency-skew-only synthesis does not.
+
+**Cost**: 4–6h. `cache_descriptor.py` already computes a superset; adding the IRD head is a
+focused extension. Risk: IRD is expensive to compute exactly for very long windows; use a
+Flajolet-Martin-style approximation or sample-based estimate if needed.
+
+---
+
+### Diffusion-paper integration targets (under IDEA #22)
+
+These are concrete integration candidates for IDEA #22 (full hybrid diffusion pivot) surfaced by
+the 2026-04-18 Grok audit. **Listed but not yet verified** — all three arXiv IDs come from an
+external agent and have not been independently checked:
+
+- **arXiv 2509.01919 — Kim et al. (Sep 2025), storage-trace-specific conditional diffusion**.
+  Most directly relevant; claims structured conditioning on device/workload descriptors
+  (analogous to our char-file + cache-descriptor pipeline) and HRC-preserving synthesis.
+  Verification needed before citation.
+- **arXiv 2511.12174 — TSGDiff (Shen et al., Nov 2025), general multivariate TS diffusion with
+  adaptive noise schedules**. Plausible drop-in for `hybrid_diffusion.py` LatentDenoiser.
+  Verification needed.
+- **DiffCATS (Masi et al., TMLR 2025), causally-associated time-series diffusion**. Would require
+  an inferred causal graph over our feature dims (obj_id_reuse → ts, etc.); moderate
+  implementation cost. Verification needed.
+- **WaveStitch (pubs/WaveStitch_2025.pdf, PACMMOD 2025)** — already in our library; is the basis
+  of our overlap-consistency mode.
+- **Stage-Diff (pubs/StageDiff_LongTS_2025.pdf, 2025)** — already in our library; stage-wise
+  long-TS generation model that maps onto our four-phase curriculum.
+
+Action: before acting on any of the unverified arXiv entries, fetch and confirm title/authors.
+If verified, they slot in as implementation references for IDEA #22, not new ideas in their own
+right.

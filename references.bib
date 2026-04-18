@@ -1,0 +1,132 @@
+% References for the Zarathustra LLGAN project.
+% Entries are drawn from pubs/ and external-audit recommendations. Verified
+% citations are marked "VERIFIED"; externally-provided arXiv IDs that have
+% not yet been fetched against the arXiv title are marked "UNVERIFIED".
+
+% -------------------------------------------------------------------------
+% Storage trace synthesis lineage
+% -------------------------------------------------------------------------
+
+@article{wang2026_2dio,
+  title     = {2DIO: Configurable and Cache-Accurate Trace Generation for Storage Benchmarking},
+  author    = {Yirong Wang and Isaac Khor and Peter Desnoyers},
+  journal   = {Proceedings of the 21st European Conference on Computer Systems (EuroSys '26)},
+  year      = {2026},
+  note      = {VERIFIED: pubs/2DIO_CacheAccurate_2026.pdf}
+}
+
+@inproceedings{sabnis2021_tragen,
+  title     = {TRAGEN: A Synthetic Trace Generator for Realistic Cache Simulations},
+  author    = {Anirudh Sabnis and Ramesh K. Sitaraman},
+  booktitle = {Proceedings of the 21st ACM Internet Measurement Conference (IMC '21)},
+  year      = {2021},
+  doi       = {10.1145/3487552.3487845},
+  note      = {VERIFIED: pubs/TRAGEN_IMC2021.pdf}
+}
+
+@inproceedings{sabnis2022_jedi,
+  title     = {JEDI: Model-Driven Trace Generation for Cache Simulations},
+  author    = {Anirudh Sabnis and Ramesh K. Sitaraman},
+  booktitle = {Proceedings of the 22nd ACM Internet Measurement Conference (IMC '22)},
+  year      = {2022},
+  doi       = {10.1145/3517745.3561466},
+  note      = {VERIFIED: pubs/JEDI_IMC2022.pdf}
+}
+
+% -------------------------------------------------------------------------
+% Metrics and evaluation
+% -------------------------------------------------------------------------
+
+@article{haddou2025_dmdgen,
+  title     = {DMD-GEN: A Grassmannian Distance for Temporal Mode Collapse in Time Series Generative Models},
+  author    = {Abba Haddou and others},
+  journal   = {Advances in Neural Information Processing Systems (NeurIPS 2025)},
+  year      = {2025},
+  eprint    = {2412.11292},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {VERIFIED: pubs/DMD-GEN_NeurIPS2025.pdf}
+}
+
+% -------------------------------------------------------------------------
+% Path characteristic function / PCF-GAN family
+% -------------------------------------------------------------------------
+
+@inproceedings{lou2023_pcfgan,
+  title     = {PCF-GAN: Generating Sequential Data via the Characteristic Function of Measures on the Path Space},
+  author    = {Hang Lou and Siran Li and Hao Ni},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS 2023)},
+  year      = {2023},
+  eprint    = {2305.12511},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {VERIFIED: referenced in llgan/pcf_loss.py}
+}
+
+% -------------------------------------------------------------------------
+% Diffusion backbones for long TS / stitching / causality
+% -------------------------------------------------------------------------
+
+@article{shankar2025_wavestitch,
+  title     = {WaveStitch: Flexible and Fast Conditional Time Series Generation with Diffusion Models},
+  author    = {Aditya Shankar and Lydia Y. Chen and Arie van Deursen and Rihan Hai},
+  journal   = {Proceedings of the ACM on Management of Data (PACMMOD)},
+  year      = {2025},
+  eprint    = {2503.06231},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {VERIFIED: pubs/WaveStitch_2025.pdf; motivates llgan/chunk_stitching.py overlap mode}
+}
+
+@article{hou2025_stagediff,
+  title     = {Stage-Diff: Stage-wise Long-Term Time Series Generation Based on Diffusion Models},
+  author    = {Xuan Hou and Shuhan Liu and Zhaohui Peng and Yaohui Chu and Yue Zhang and Yining Wang},
+  journal   = {arXiv preprint},
+  year      = {2025},
+  eprint    = {2508.21330},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {VERIFIED: pubs/StageDiff_LongTS_2025.pdf}
+}
+
+% -------------------------------------------------------------------------
+% External-audit references (UNVERIFIED arXiv IDs — fetch before citing)
+% -------------------------------------------------------------------------
+
+@article{kim2025_storage_diffusion,
+  title     = {Diffusion-Based Framework for Configurable and Cache-Accurate Synthetic Trace Generation},
+  author    = {Kim and others},
+  journal   = {arXiv preprint},
+  year      = {2025},
+  eprint    = {2509.01919},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {UNVERIFIED: external-audit citation, not yet fetched against arXiv}
+}
+
+@article{shen2025_tsgdiff,
+  title     = {TSGDiff: Rethinking Synthetic Time Series Generation from a Diffusion Perspective},
+  author    = {Shen and others},
+  journal   = {arXiv preprint},
+  year      = {2025},
+  eprint    = {2511.12174},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  note      = {UNVERIFIED: external-audit citation, not yet fetched against arXiv}
+}
+
+@article{masi2025_diffcats,
+  title     = {DiffCATS: Causally Associated Time-Series Generation through Diffusion Models},
+  author    = {Masi and others},
+  journal   = {Transactions on Machine Learning Research (TMLR)},
+  year      = {2025},
+  note      = {UNVERIFIED: external-audit citation}
+}
+
+@inproceedings{ge2025_t2s,
+  title     = {T2S: High-Resolution Time Series Generation with Text-to-Series Diffusion Models},
+  author    = {Ge and others},
+  booktitle = {Proceedings of IJCAI 2025},
+  year      = {2025},
+  note      = {UNVERIFIED: external-audit citation}
+}
