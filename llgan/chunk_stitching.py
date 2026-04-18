@@ -6,10 +6,19 @@ Status
 WIRED. Sub-loss (a) boundary_latent_smoothness and sub-loss (b)
 feature-space overlap-consistency are both integrated into the joint-GAN
 training step (llgan/train.py). Sub-loss (b) is driven by
---overlap-consistency-weight and reuses sub-loss (a)'s forward pair,
-applying the decay-weighted boundary MSE on post-Recovery features
-instead of latents. Backward compatible: when both weights are 0,
-training is byte-identical to the prior recipe.
+--overlap-consistency-weight and controlled by
+--overlap-consistency-mode:
+  * mode=overlap (default, 2026-04-18): TRUE WaveStitch-style overlap.
+    Chunk A is split at step T-k to capture h_mid. A's suffix and B's
+    prefix both start from h_mid with INDEPENDENT local noise — so A's
+    last k and B's first k decoded features refer to the same absolute
+    timesteps. loss = overlap_consistency(feat_A, feat_B, k). Drives
+    noise-invariance in the overlap region.
+  * mode=boundary (legacy): reuses sub-loss (a)'s adjacent-window
+    forward pair, applies decay-weighted boundary MSE on decoded
+    features. Kept for provenance of pre-2026-04-18 runs (v140).
+Backward compatible: when both weights are 0, training is byte-identical
+to the prior recipe.
 
 Motivation
 ----------

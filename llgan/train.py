@@ -46,7 +46,7 @@ from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
                      _OPCODE_COLS)
 from model import Generator, Critic, MultiScaleCritic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
-from chunk_stitching import boundary_latent_smoothness
+from chunk_stitching import boundary_latent_smoothness, overlap_consistency
 from timing_head import log_normal_nll
 from hybrid_diffusion import LatentDenoiser, LatentDiffusion
 
@@ -1698,48 +1698,77 @@ def train(cfg: Config) -> None:
                     g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
 
                 # L_boundary_smooth: chunk-stitching boundary losses (IDEAS #21).
-                # Two complementary sub-losses on the SAME forward pair:
+                # Two complementary sub-losses:
                 #   (a) boundary_smoothness_weight — latent-space MSE (pre-R).
-                #   (b) overlap_consistency_weight — feature-space MSE (post-R)
-                #       on paired adjacent windows with hidden-state carry.
-                # Both use an exponential-decay weighting so the boundary step
-                # counts most. When either weight > 0, we generate a second
-                # chunk whose LSTM hidden is seeded from chunk A's final hidden
-                # (matching generate.py's rollout semantics).
+                #       Forward: B starts from A's FINAL hidden (step T). Adjacent-window
+                #       continuity — A ends, B starts-smooth.
+                #   (b) overlap_consistency_weight — feature-space MSE (post-R).
+                #       Controlled by --overlap-consistency-mode:
+                #         boundary (legacy): same forward-pair as (a), decay-weighted
+                #           boundary MSE on decoded features. Adjacent-window semantics.
+                #         overlap (WaveStitch-style, default post-2026-04-18):
+                #           A runs through step T-k capturing h_mid; both A's suffix
+                #           and B's prefix start from h_mid with DIFFERENT local noise,
+                #           so A's last k steps and B's first k steps refer to the
+                #           SAME absolute timesteps. Penalises divergence under noise —
+                #           trains the generator to be noise-robust in the overlap region.
                 _bs_w = float(getattr(cfg, "boundary_smoothness_weight", 0.0))
                 _oc_w = float(getattr(cfg, "overlap_consistency_weight", 0.0))
+                _oc_mode = str(getattr(cfg, "overlap_consistency_mode", "overlap"))
                 if _bs_w > 0 or _oc_w > 0:
                     z_gb, _ = _make_z_global(B, cfg, device, real_features=real_batch,
                                              file_cond=file_cond_batch, G=G)
-                    z_lb1 = G.sample_z_local(B, cfg.timestep, device)
-                    z_lb2 = G.sample_z_local(B, cfg.timestep, device)
-                    H_b1, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
-                    H_b2 = G(z_gb, z_lb2, hidden=h_b_carry)
-                    if _bs_w > 0:
-                        loss_bs = boundary_latent_smoothness(
-                            H_b1, H_b2,
-                            k=int(getattr(cfg, "boundary_smoothness_k", 2)),
-                            decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
-                        )
-                        g_loss = g_loss + _bs_w * loss_bs
-                    if _oc_w > 0 and latent_ae:
-                        # Reuse the same decay-weighted boundary MSE math but
-                        # on decoded features — this is what eval.py actually
-                        # measures, so it targets the train→inference gap
-                        # directly in output space.  NOTE: feature scale
-                        # (post-R, bounded) differs from latent scale
-                        # (unbounded) by roughly an order of magnitude, so
-                        # _oc_w is NOT directly comparable to _bs_w — tune
-                        # independently. Skipped when latent_ae=False (would
-                        # collapse to sub-loss (a) on raw H).
+                    if _oc_w > 0 and _oc_mode == "overlap" and latent_ae:
+                        # TRUE overlap mode: split A's forward at step T-k so A's
+                        # suffix and B's prefix share h_mid (same absolute-time
+                        # semantics). A and B use INDEPENDENT local noise in the
+                        # overlap region → loss drives noise-invariance there.
+                        T = int(cfg.timestep)
+                        k = int(getattr(cfg, "overlap_consistency_k", 2))
+                        k = max(1, min(k, T - 1))
+                        z_lb1 = G.sample_z_local(B, T, device)
+                        z_lb2 = G.sample_z_local(B, T, device)
+                        # A prefix: steps [0..T-k)
+                        H_b1_pre, h_mid = G(z_gb, z_lb1[:, :T - k, :], return_hidden=True)
+                        # A suffix: steps [T-k..T) — starts from h_mid
+                        H_b1_suf = G(z_gb, z_lb1[:, T - k:, :], hidden=h_mid)
+                        H_b1 = torch.cat([H_b1_pre, H_b1_suf], dim=1)
+                        # B full: also starts from h_mid. Its first k steps refer to
+                        # the same absolute timesteps as A's last k steps.
+                        H_b2 = G(z_gb, z_lb2, hidden=h_mid)
+                        if _bs_w > 0:
+                            loss_bs = boundary_latent_smoothness(
+                                H_b1, H_b2,
+                                k=int(getattr(cfg, "boundary_smoothness_k", 2)),
+                                decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
+                            )
+                            g_loss = g_loss + _bs_w * loss_bs
                         feat_b1 = R(H_b1)
                         feat_b2 = R(H_b2)
-                        loss_oc = boundary_latent_smoothness(
-                            feat_b1, feat_b2,
-                            k=int(getattr(cfg, "overlap_consistency_k", 2)),
-                            decay=float(getattr(cfg, "overlap_consistency_decay", 0.5)),
-                        )
+                        loss_oc = overlap_consistency(feat_b1, feat_b2, k_overlap=k)
                         g_loss = g_loss + _oc_w * loss_oc
+                    else:
+                        # Legacy boundary mode: B starts from A's FINAL hidden.
+                        z_lb1 = G.sample_z_local(B, cfg.timestep, device)
+                        z_lb2 = G.sample_z_local(B, cfg.timestep, device)
+                        H_b1, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
+                        H_b2 = G(z_gb, z_lb2, hidden=h_b_carry)
+                        if _bs_w > 0:
+                            loss_bs = boundary_latent_smoothness(
+                                H_b1, H_b2,
+                                k=int(getattr(cfg, "boundary_smoothness_k", 2)),
+                                decay=float(getattr(cfg, "boundary_smoothness_decay", 0.5)),
+                            )
+                            g_loss = g_loss + _bs_w * loss_bs
+                        if _oc_w > 0 and latent_ae:
+                            feat_b1 = R(H_b1)
+                            feat_b2 = R(H_b2)
+                            loss_oc = boundary_latent_smoothness(
+                                feat_b1, feat_b2,
+                                k=int(getattr(cfg, "overlap_consistency_k", 2)),
+                                decay=float(getattr(cfg, "overlap_consistency_decay", 0.5)),
+                            )
+                            g_loss = g_loss + _oc_w * loss_oc
 
                 # Feature-space critic in generator loss (dual discriminator).
                 # C_feat operates in decoded feature space — it sees what the
@@ -2409,7 +2438,19 @@ def parse_args() -> Config:
                         "feature-space overlap consistency loss (default 2).")
     p.add_argument("--overlap-consistency-decay", type=float, default=0.5,
                    help="Exponential weight decay across boundary steps for the "
-                        "feature-space overlap consistency loss (default 0.5).")
+                        "feature-space overlap consistency loss (default 0.5). "
+                        "Used only when --overlap-consistency-mode=boundary.")
+    p.add_argument("--overlap-consistency-mode",
+                   choices=["overlap", "boundary"], default="overlap",
+                   help="Sub-loss (b) semantics: 'overlap' (default, WaveStitch-style) "
+                        "splits chunk A at step T-k, runs both A's suffix and B's "
+                        "prefix from the SAME mid-hidden with INDEPENDENT local noise — "
+                        "A's last k and B's first k refer to the same absolute "
+                        "timesteps; penalises feature-space divergence under noise. "
+                        "'boundary' (legacy pre-2026-04-18) reuses the decay-weighted "
+                        "boundary-smoothness math on decoded features of two adjacent, "
+                        "non-overlapping windows. 'overlap' is the true IDEA #21 "
+                        "sub-loss (b).")
     p.add_argument("--hybrid-diffusion-aux", action="store_true",
                    help="IDEAS.md #22 (Stage-1 only): side-train a "
                         "LatentDenoiser on E(real).detach() in the joint-GAN "
@@ -2548,6 +2589,7 @@ def parse_args() -> Config:
     cfg.overlap_consistency_weight   = args.overlap_consistency_weight
     cfg.overlap_consistency_k        = args.overlap_consistency_k
     cfg.overlap_consistency_decay    = args.overlap_consistency_decay
+    cfg.overlap_consistency_mode     = args.overlap_consistency_mode
     cfg.ssm_backbone                 = args.ssm_backbone
     cfg.ssm_state_dim                = args.ssm_state_dim
     cfg.mtpp_timing                  = args.mtpp_timing
