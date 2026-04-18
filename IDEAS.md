@@ -1261,24 +1261,32 @@ Flajolet-Martin-style approximation or sample-based estimate if needed.
 ### Diffusion-paper integration targets (under IDEA #22)
 
 These are concrete integration candidates for IDEA #22 (full hybrid diffusion pivot) surfaced by
-the 2026-04-18 Grok audit. **Listed but not yet verified** — all three arXiv IDs come from an
-external agent and have not been independently checked:
+the 2026-04-18 Grok audit.
 
-- **arXiv 2509.01919 — Kim et al. (Sep 2025), storage-trace-specific conditional diffusion**.
-  Most directly relevant; claims structured conditioning on device/workload descriptors
-  (analogous to our char-file + cache-descriptor pipeline) and HRC-preserving synthesis.
-  Verification needed before citation.
-- **arXiv 2511.12174 — TSGDiff (Shen et al., Nov 2025), general multivariate TS diffusion with
-  adaptive noise schedules**. Plausible drop-in for `hybrid_diffusion.py` LatentDenoiser.
-  Verification needed.
-- **DiffCATS (Masi et al., TMLR 2025), causally-associated time-series diffusion**. Would require
+Verified 2026-04-18 against arXiv:
+
+- **arXiv 2509.01919 — Kim et al., DiTTO-style storage-trace diffusion**:
+  [A Diffusion-Based Framework for Configurable and Realistic Multi-Storage Trace Generation](https://arxiv.org/abs/2509.01919).
+  This is the most directly relevant #22 reference: it is storage-trace-specific, explicitly
+  conditional/configurable, and reports high-fidelity multi-device trace synthesis. Treat HRC
+  benefits as an inference to test in Zarathustra, not a quoted claim unless the paper's metric
+  table confirms it.
+- **arXiv 2511.12174 — Shen/Li/Long, TSGDiff**:
+  [Rethinking Synthetic Time Series Generation from a Pure Graph Perspective](https://arxiv.org/abs/2511.12174).
+  Correction to the external note: this is a graph-structured diffusion model, not a paper titled
+  "from a diffusion perspective" and not primarily an adaptive-noise-schedule paper. The useful
+  transfer idea is graph construction from Fourier/temporal dependencies plus a graph-aware latent
+  diffusion backbone.
+- **arXiv 2508.21330 — Hou et al., Stage-Diff**:
+  [Stage-wise Long-Term Time Series Generation Based on Diffusion Models](https://arxiv.org/abs/2508.21330).
+  Verified as a stage-wise long-horizon time-series diffusion reference; this maps cleanly onto
+  Zarathustra's coarse-regime / local-supervisor / critic-polish split.
+- **DiffCATS (Masi et al., TMLR 2025), causally-associated time-series diffusion**. Still unverified
+  in this pass. Would require
   an inferred causal graph over our feature dims (obj_id_reuse → ts, etc.); moderate
   implementation cost. Verification needed.
 - **WaveStitch (pubs/WaveStitch_2025.pdf, PACMMOD 2025)** — already in our library; is the basis
   of our overlap-consistency mode.
-- **Stage-Diff (pubs/StageDiff_LongTS_2025.pdf, 2025)** — already in our library; stage-wise
-  long-TS generation model that maps onto our four-phase curriculum.
 
-Action: before acting on any of the unverified arXiv entries, fetch and confirm title/authors.
-If verified, they slot in as implementation references for IDEA #22, not new ideas in their own
-right.
+Action: DiTTO, TSGDiff, Stage-Diff, and WaveStitch slot in as implementation references for IDEA
+#22, not new ideas in their own right. Verify DiffCATS before citing or implementing it.
