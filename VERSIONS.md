@@ -112,10 +112,19 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-### alibaba_v159 — v132 recipe EXACTLY + --seed 3 (seed-sweep firming of v157's new ATB 0.05567)
-**Why**: v157 (seed-2) beat v132's ATB 0.0578 with 0.05567 frozen. v132 (original seed) had 0.0578. Two seeds = two points below 0.0580. v159 seed-3 tests whether v132-recipe frozen distribution is tight (confirms ATB) or has high variance (reveals true benchmark).
+### alibaba_v159 — CLOSED-FAILED (v132 recipe seed-3 W-stop @ ep15; frozen-best final.pt ★=0.05715, +15% behind v157 ATB 0.04982, 2026-04-18)
+**Why**: v157 (seed-2) produced 0.04982 frozen. v132 (orig seed) 0.0578. v159 seed-3 tested whether v132-recipe frozen distribution is tight (confirms) or high-variance (reveals true benchmark).
 **Recipe**: v132/v157 EXACTLY + explicit --seed 3. Fresh pretrain.
-**Status** (2026-04-18): launched ~10:20 PDT as PID 370903. Log `/home/darrell/train_alibaba_v159.log`.
+**Training (Phase 3 only)**: ep5 W=+0.86 G=-0.54 ★=0.08116, ep10 W=+1.20 G=-1.07 ★=**0.06961** (train best), ep15 W=+3.34 G=-3.21 ★=0.07525 (regressed from ep10) → W≥3.0 3-consecutive → stop ep15. final.pt preserved.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| epoch_0005.pt | 0.01444 | 0.6715 | 0.08014 |
+| epoch_0010.pt / best.pt (identical) | 0.00861 | 0.7060 | 0.06741 |
+| **final.pt** | **0.00725** | **0.7505** | **★=0.05715** (frozen-best) |
+
+**Finding — v132-recipe seed distribution is WIDER than hoped**: three alibaba v132-recipe seeds now frozen-measured — seed-orig (v132) 0.0578, seed-2 (v157 final) 0.04982, seed-3 (v159 final) 0.05715. Range 0.050–0.058, std ≈ 0.004. v157's 0.04982 ATB is real but the recipe is NOT reliably sub-0.05; seed-2 was favorable. v159 final.pt does NOT beat v157. best.pt mis-ranked by +18% vs frozen-best — **4th consecutive empirical confirmation** of Round 18 P1 #1 (checkpoint-selection bottleneck). Alibaba race slot OPEN. Next: representation-level change (IDEA #21 real overlap-mode chunk stitching, per RESPONSE.md commitment).
+**Status** (2026-04-18): CLOSED-FAILED. frozen_best.pt promoted → final.pt.
 
 ---
 
