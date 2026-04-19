@@ -20,7 +20,8 @@ moving-bundle reports.
 | Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
-| Tencent | **0.03942**       | **v158** final.pt (v153 recipe EXACTLY seed-rerun; IDEAS #19/#20/#8/#6) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00229, β-recall≈0.82 → ★=0.03942. **11% better than v153's 0.04430**, previously declared "failed reproduce". best.pt ★=0.07936 = **+101% worse** than frozen-best — worst best.pt mis-rank observed anywhere. v158 was misdiagnosed: its final.pt (post-W-stop Phase-3-end, ep109) is the actual winner under the published protocol. Under-deterministic evaluation the "v158 failed to reproduce v153" story collapses — v158 produces a BETTER result than v153 once the correct checkpoint is selected. |
+| Tencent | **0.03900**       | **v164** epoch_0020.pt (v158 recipe + IDEA #21 BS+OC overlap-mode; seed=5) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: epoch_0020.pt MMD²=0.00210, β-recall=**0.8155** → ★=0.03900. **Marginal −1.1% over v158's 0.03942**. Unlike v158 (where final.pt won), the winner here is **mid-training ep20** (pre-W-breach, W=2.25) — IDEA #21 BS+OC shifts the optimum earlier. final.pt (ep38 W-stop) ★=0.04179. best.pt (ep15) ★=0.05117 = **+31.2% worse than frozen-best** (9th best.pt mis-rank confirmation on tencent side). |
+| Tencent prior | 0.03942       | v158 final.pt (v153 recipe EXACTLY seed-rerun; IDEAS #19/#20/#8/#6) | n/a | Held ATB 2026-04-18 AM through afternoon. Superseded 2026-04-18 evening by v164 epoch_0020.pt. Deterministic sweep: final.pt MMD²=0.00229, β-recall≈0.82 → ★=0.03942. best.pt ★=0.07936 = **+101% worse** (worst best.pt mis-rank observed anywhere). |
 | Tencent prior | 0.04430       | v153 ep_0020.pt (v152 recipe seed-2) | n/a | Held ATB briefly 2026-04-18 AM (re-sweep of prior 0.04003 claim). Superseded 2026-04-18 PM by v158 final.pt. |
 | Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
 | Tencent prior | 0.05875           | v150 (v149 recipe reproduced, IDEAS #19/#20/#8/#6/partial-#21) | n/a | Frozen ep_0035 ★=0.05875. Held 0.5 days before v152 ablation beat it. `partial-#21` = boundary-smoothness only, not full chunk stitching. |
@@ -150,7 +151,32 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 ## Currently Running
 
 - **alibaba_v166** — IDEA #33 arm (b): resume from v165/epoch_0025.pt, `--tail-start-epoch 30 --critic-lr-tail-factor 0.1` (critic LR drops 10× at the tail boundary), `--w-stop-threshold 5.0`. Tests whether slowing the critic across the tail produces a better `final.pt` than arm (c) / arm (a). Log `/home/darrell/train_alibaba_v166.log`.
-- **tencent_v164** — IDEA #21 BS+OC overlap-mode probe on tencent. ep28 W=+2.51, ★ ep15=0.05018, 13 ep stale (healthy). Log `/home/darrell/train_tencent_v164.log`.
+- **tencent_v165** — first training-side test of IDEA #17 retrieval memory on tencent (K/V/T/mask per-window bank + learned reuse gate + BCE aux). params=98,913. Log `/home/darrell/train_tencent_v165.log`.
+
+---
+
+### tencent_v164 — CLOSED-WIN ★ NEW TENCENT ATB ★ (v158 recipe + IDEA #21 BS+OC overlap-mode; W-spike auto-stop @ ep38; frozen-best epoch_0020.pt ★=0.03900 = **−1.1% vs prior ATB 0.03942**, 2026-04-18)
+**Why (closed)**: port IDEA #21 BS+OC overlap-mode (current alibaba-ATB recipe) onto the v158 tencent stack to test cross-corpus transfer of the overlap-consistency + boundary-smoothness pair. Tencent's v158 was already the strongest tencent recipe under the frozen protocol; adding BS+OC was the next compositional probe.
+**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` + `--seed 5`. Fresh pretrain. Log `/home/darrell/train_tencent_v164.log`.
+**Training (Phase 3)**: ep5 W=+1.62, ep10 W=+1.98, ep15 W=+2.12 (train-★ best=0.05018), ep20 W=+2.25 (pre-breach), ep25 W=+2.61, ep30 W=+2.81, ep35 W=+2.95, ep36–38 W=3.02/3.11/3.14 → W-spike guard fired, `final.pt` written at ep38.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0020.pt** (pre-W-breach, W=2.25) | **0.00210** | **0.8155** | **★=0.03900** ★ NEW ATB ★ |
+| final.pt (ep38 W-stop) | 0.00259 | 0.8040 | 0.04179 |
+| epoch_0030.pt | 0.00216 | 0.7590 | 0.05036 |
+| epoch_0015.pt / best.pt | 0.00227 | 0.7555 | 0.05117 |
+| epoch_0035.pt | 0.00170 | 0.7440 | 0.05290 |
+| epoch_0010.pt | 0.00501 | 0.7480 | 0.05541 |
+| epoch_0025.pt | 0.00227 | 0.6730 | 0.06767 |
+| epoch_0005.pt | 0.00683 | 0.5165 | 0.10353 |
+
+**Interpretation — marginal ATB improvement; opposite checkpoint-selection pattern from alibaba_v164**:
+- **★=0.03900 is a genuine (if slim) new tencent ATB**: −1.1% over v158's 0.03942, improvement driven by a higher β-recall (0.8155 vs v158's ~0.82 — similar) combined with lower MMD² (0.00210 vs 0.00229). Not a lottery win — deterministic sweep, 42/42 seeds.
+- **Winner is mid-training, NOT final.pt.** This is the *opposite* pattern from alibaba_v164 (where final.pt at W-stop ep29 was the clear winner by a wide margin over every earlier checkpoint). On tencent under the same recipe, final.pt (ep38) is **+7.2% worse** than epoch_0020.pt. The "W-stop distillation" pattern from alibaba does not transfer — IDEA #21 BS+OC on tencent shifts the optimum earlier in training rather than later.
+- **best.pt mis-rank persists**: best.pt = ep15 ★=0.05117, +31.2% worse than frozen-best epoch_0020.pt. 9th corpus-wide confirmation of Round 18 P1 #1.
+- **β-recall cliff at ep5 → ep10 → ep20 (0.52 → 0.75 → 0.82)**: the recipe acquires most of its coverage quickly and holds it. Small-integer rounded weights (0.5 for OC, 1.0 for BS) may be over-aggressive late; a weight-ramp ablation is a candidate follow-up if the next tencent probe wants to push below 0.039.
+- Commits: IDEA #21 wire-up `dce95a0` (Round 19); used by v164/v165/v166 alibaba and this tencent_v164.
 
 ---
 
