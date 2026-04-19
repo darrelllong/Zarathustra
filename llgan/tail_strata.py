@@ -110,7 +110,10 @@ def main() -> int:
     basenames_to_path = {Path(f).name: f for f in trace_files}
     print(f"[tail_strata] trace-dir {args.trace_dir}: {len(trace_files)} files")
 
-    scored: list[tuple[str, float, float, float, float]] = []
+    # Characterizations JSONL can contain multiple entries that resolve to
+    # the same on-disk file (e.g., duplicate basenames across source dirs).
+    # Dedup by resolved path; first-wins.
+    by_path: dict[str, tuple[float, float, float, float]] = {}
     skipped = 0
     with open(args.char_file) as fh:
         for line in fh:
@@ -131,12 +134,14 @@ def main() -> int:
                 resolved = basenames_to_path.get(Path(path).name)
             if resolved is None:
                 continue
+            if resolved in by_path:
+                continue
             score_result = _score(rec.get("profile") or {})
             if score_result is None:
                 skipped += 1
                 continue
-            iat_ratio, stride_ratio, iat_cv, tail_score = score_result
-            scored.append((resolved, iat_ratio, stride_ratio, iat_cv, tail_score))
+            by_path[resolved] = score_result
+    scored = [(p, ir, sr, cv, ts) for p, (ir, sr, cv, ts) in by_path.items()]
 
     if not scored:
         raise SystemExit(
