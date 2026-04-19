@@ -204,7 +204,8 @@ def _resolve_conditioning(cond_dim: int, n_streams: int, *,
 
 def _rollout(ckpt, n_records: int, n_streams: int, device, *,
              char_file: str = "", source_traces=None,
-             random_conditioning: bool = False):
+             random_conditioning: bool = False,
+             retrieval_persist: bool = False):
     """Run a deterministic long-rollout and return (df, conditioning_meta).
 
     df: pandas DataFrame with a stream_id column prepended. Mirrors
@@ -295,10 +296,28 @@ def _rollout(ckpt, n_records: int, n_streams: int, device, *,
         else:
             z_global = torch.randn(n_streams, cfg.noise_dim, device=device)
         hidden = None
+        # IDEA #28: optionally thread the retrieval memory bank state across
+        # window boundaries at eval time. Mirrors generate.py's
+        # --retrieval-persist-across-windows contract.
+        retrieval_enabled = getattr(G, "retrieval", None) is not None
+        persist_retrieval = retrieval_persist and retrieval_enabled
+        retrieval_state = None
 
         for _ in range(windows_per_stream):
             z_local = torch.randn(n_streams, timestep, cfg.noise_dim, device=device)
-            latent, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
+            if persist_retrieval:
+                latent, hidden, retrieval_state = G(
+                    z_global, z_local, hidden=hidden,
+                    return_hidden=True,
+                    retrieval_state=retrieval_state,
+                    return_retrieval_state=True,
+                )
+                retrieval_state = {
+                    k: (v.detach() if torch.is_tensor(v) else v)
+                    for k, v in retrieval_state.items()
+                }
+            else:
+                latent, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
             # SSM backbone returns (state, None); LSTM returns (h, c). Guard the
             # second element so either backbone carries cleanly across windows.
             h0 = hidden[0].detach() if hidden[0] is not None else None
@@ -863,6 +882,11 @@ def _parse_args():
                         "verbatim. If it does not exist, a new manifest is "
                         "written at the end of the run. Empty = do not "
                         "read/write a manifest.")
+    p.add_argument("--retrieval-persist-across-windows", action="store_true",
+                   help="IDEA #28: thread the retrieval-memory bank (K/V/T/mask) "
+                        "across window boundaries during the long rollout, "
+                        "instead of re-initialising each window. No-op if the "
+                        "checkpoint has no retrieval memory.")
     return p.parse_args()
 
 
@@ -898,6 +922,7 @@ def main() -> int:
         char_file=args.char_file,
         source_traces=source_traces,
         random_conditioning=args.random_conditioning,
+        retrieval_persist=args.retrieval_persist_across_windows,
     )
     print(f"[long_rollout_eval] conditioning: {cond_meta.get('source')}")
     t_fake = time.time() - t0
