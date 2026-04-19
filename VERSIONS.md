@@ -211,6 +211,41 @@ _(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 
 | footprint_per_stream | (0%) | +35.2% | +25.4% | — | v162 |
 | **HRC-MAE** | (0) | 0.1694 | **0.1074** | — | **v162 (−36.6%)** |
 
+> **Round 21 caveat (2026-04-18).** The numbers above were produced by the
+> pre-Round-21 version of `long_rollout_eval.py` (before commit `83852d0`) and
+> carry four documented biases:
+> 1. **Random conditioning, not workload-descriptor.** The rollout used
+>    `torch.randn(n, cond_dim)*0.5` instead of sampling from
+>    `trace_characterizations.jsonl`. The v162/v157 fake streams were not
+>    conditioned on the same descriptor distribution as the real baseline, so
+>    the reuse / HRC-MAE deltas mix "generator improvement" with
+>    "conditioning-mismatch artefact".
+> 2. **Positional IRD mislabeled as IRD/stack-distance.** The
+>    `ird_positional_median=1` line is a positional recurrence distance, not
+>    the LRU-governing stack distance. A true reuse-distance (distinct
+>    intervening keys) was not computed in this pass; the cache-footprint
+>    target #32 cares about is still uncharacterised for v162.
+> 3. **Between-stream drift, not temporal drift.** `drift_ts_delta_w1_norm`
+>    was computed on the stream-concatenated pooled series with a half-split
+>    — under `n_streams=4`, the "first half" was mostly streams 0–1 and the
+>    "second half" was mostly streams 2–3. This measures between-stream
+>    heterogeneity, not first-half vs second-half *rollout* drift.
+> 4. **Unmanifested real baseline.** The "real" row came from a shuffled
+>    `_collect_files` walk. If alibaba trace files are added, removed, or
+>    renamed, the same `--seed 42` no longer reproduces these numbers. No
+>    manifest was written alongside the 2026-04-18 JSON.
+>
+> **Interpretation with those caveats.** v162 still plausibly helps the
+> access-level reuse and warmup metrics because those are stream-local and
+> relatively robust to the conditioning source. HRC-MAE and drift_ts_delta
+> should be read as *indicative*, not as a promotion gate. The "−36.6%
+> HRC-MAE" line in particular must be re-computed under the fixed sidecar
+> (char_file sampling + stack-distance + per-stream drift + real-baseline
+> manifest) before being cited as evidence for IDEA #21 effectiveness.
+> v162 is **not** being promoted to ATB on the basis of these numbers (the
+> seed-fragility argument in the next subsection stands on frozen_sweep
+> alone, independent of the long-rollout sidecar).
+
 **Conclusion — IDEA #21 is SEED-FRAGILE LOTTERY, not recipe-destabilizing (in the catastrophic sense).**
 - **W-spike pattern IS recipe-dependent**: both seeds (5 and 42) hit W≥3.0 within 7–9 epochs, same monotone rise. Recipe is **unstable** — `final.pt` is saved whenever W-stop fires, not at a chosen convergence.
 - **Frozen-eval outcome is SEED-DEPENDENT**: seed=5 (v161) ★=0.09800 catastrophic; seed=42 (v162) ★=0.04803 marginal win. **Range 0.048–0.098 on IDENTICAL recipe** — this is a coin flip.
