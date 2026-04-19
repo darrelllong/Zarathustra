@@ -90,6 +90,7 @@ def _run_eval(
     n_samples: int,
     eval_script: Path,
     python_exe: str,
+    file_manifest: str | None = None,
 ) -> tuple[str, dict | None]:
     cmd = [
         python_exe,
@@ -102,6 +103,8 @@ def _run_eval(
         "--eval-real-seed", str(real_seed),
         "--eval-fake-seed", str(fake_seed),
     ]
+    if file_manifest:
+        cmd.extend(["--eval-file-manifest", file_manifest])
     proc = subprocess.run(cmd, capture_output=True, text=True)
     stdout = proc.stdout or ""
     stderr = proc.stderr or ""
@@ -154,6 +157,7 @@ def run_sweep(args) -> int:
                 args.n_samples,
                 eval_script,
                 python_exe,
+                file_manifest=args.eval_file_manifest,
             )
             logf.write(f"\n{'='*72}\n{ckpt}\n{'='*72}\n{stdout}\n")
             logf.flush()
@@ -237,6 +241,12 @@ def parse_args():
                    help="Fake-sampling seed. Default 42. Required for deterministic "
                         "cross-checkpoint comparison — see llgan.eval.")
     p.add_argument("--n-samples", type=int, default=2000)
+    p.add_argument("--eval-file-manifest", default=None,
+                   metavar="PATH",
+                   help="IDEA #34 tail-stratified sweep: pass-through to eval.py "
+                        "--eval-file-manifest. Restricts real-bundle file pool "
+                        "to paths in the manifest. Produce manifests via "
+                        "llgan/tail_strata.py (top-decile tail-heavy vs ordinary).")
     return p.parse_args()
 
 

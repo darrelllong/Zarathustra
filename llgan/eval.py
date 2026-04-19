@@ -515,13 +515,20 @@ def _load_encoder(ckpt, device):
 
 
 def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int,
-                 real_seed: int = None) -> np.ndarray:
+                 real_seed: int = None,
+                 file_manifest: str = None) -> np.ndarray:
     """Sample real windows for evaluation.
 
     When real_seed is provided, file selection and window subsampling are
     deterministic, so the "real bundle" is frozen across runs. This isolates
     fake-sample variance from benchmark variance (Round 15 peer review P1).
     Use the same seed across evals intended to be directly compared.
+
+    When file_manifest is provided (IDEA #34 tail-stratified eval), the file
+    pool is restricted to paths listed in that manifest (one path per line)
+    rather than the full trace_dir. The manifest is intersected with the
+    trace_dir's actual discoverable files so callers can share manifests
+    across machines with different on-disk paths as long as basenames match.
     """
     import random
     sys.path.insert(0, ".")
@@ -532,6 +539,22 @@ def _sample_real(ckpt, trace_dir: str, fmt: str, n_samples: int,
     all_files = _collect_files(trace_dir, fmt)
     if not all_files:
         raise RuntimeError(f"No files found in {trace_dir}")
+
+    if file_manifest:
+        with open(file_manifest) as fh:
+            wanted = {line.strip() for line in fh if line.strip()
+                      and not line.startswith("#")}
+        wanted_basenames = {Path(p).name for p in wanted}
+        filtered = [f for f in all_files
+                    if f in wanted or Path(f).name in wanted_basenames]
+        if not filtered:
+            raise RuntimeError(
+                f"No files in {trace_dir} matched manifest {file_manifest} "
+                f"(wanted {len(wanted)} paths, 0 intersected)"
+            )
+        all_files = filtered
+        print(f"[eval] file-manifest restricted pool to {len(all_files)} files "
+              f"from {file_manifest}")
 
     if real_seed is not None:
         file_rng = random.Random(real_seed)
@@ -568,11 +591,16 @@ def evaluate(checkpoint_path: str, trace_dir: str, fmt: str,
 
     real_seed = getattr(args, 'eval_real_seed', None) if args else None
     fake_seed = getattr(args, 'eval_fake_seed', None) if args else None
+    file_manifest = getattr(args, 'eval_file_manifest', None) if args else None
     bundle_note = f" (frozen bundle seed={real_seed})" if real_seed is not None else ""
     if fake_seed is not None:
         bundle_note += f" (fake seed={fake_seed})"
+    if file_manifest:
+        bundle_note += f" (manifest={Path(file_manifest).name})"
     print(f"\nSampling {n_samples} real and fake windows{bundle_note} …")
-    real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples, real_seed=real_seed)
+    real_flat = _sample_real(ckpt, trace_dir, fmt, n_samples,
+                             real_seed=real_seed,
+                             file_manifest=file_manifest)
 
     if fake_seed is not None:
         import random as _random
@@ -712,6 +740,14 @@ def parse_args():
                         "--eval-real-seed for fully deterministic comparison across "
                         "checkpoints — without it, ★ varies ~±0.01 across reruns of "
                         "the same weights purely from fake-sample draw noise.")
+    p.add_argument("--eval-file-manifest", default=None,
+                   metavar="PATH",
+                   help="IDEA #34: restrict the real-bundle file pool to paths "
+                        "listed in this manifest (one per line; basenames also "
+                        "accepted). Used to build tail-stratified eval bundles "
+                        "(top-decile tail-heavy files vs ordinary files) on top "
+                        "of the existing --eval-real-seed determinism. Tail "
+                        "manifests are produced by llgan/tail_strata.py.")
     return p.parse_args()
 
 
