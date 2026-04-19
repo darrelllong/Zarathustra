@@ -203,8 +203,29 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v168** — v167 recipe EXACTLY + IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0; M=32, key=32, val=32; params=98,913). Fresh pretrain (NOT branched). `--seed 7`. Stacks retrieval on the new ATB recipe to test whether IDEA #17 adds to v167's 0.02915. Log `/home/darrell/train_alibaba_v168.log`.
+- **alibaba_v169** — v167 recipe EXACTLY + `--moment-loss-weight 0.5` (5× default 0.1). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. Tests whether explicit higher-moment pressure (the training-time lever behind IDEA #34's moment audit motivation) adds to v167's 0.02915 where IDEA #17 retrieval memory FAILED (v168 → 0.05131, +76%). Moment loss targets per-feature higher moments directly — the R audit identified M5/M6 on iat_*, abs_stride_*, reuse_ratio as the un-modeled tail regime. Log `/home/darrell/train_alibaba_v169.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v168 — CLOSED-FAILED (v167 recipe + IDEA #17 retrieval memory; W-spike auto-stop @ ep25; frozen-best epoch_0020.pt ★=0.05131 = **+76.0% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: first training-side test of IDEA #17 retrieval memory on alibaba. v165 showed retrieval memory WINS on tencent (−3.8% over v164). v168 tests whether that cross-corpus transfers. It does NOT — adding retrieval memory to v167's near-optimal recipe made alibaba substantially worse, and the W-spike guard fired at ep25 (recall crashed 0.717 → 0.647).
+**Recipe**: v167 EXACTLY + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-reuse-bce-weight 1.0` (params=98,913). Fresh pretrain (NOT branched — branch point belongs to v167-family only). `--seed 7`. Log `/home/darrell/train_alibaba_v168.log`.
+**Training (Phase 3)**: ep5 recall=0.652, ep10 recall=0.697, ep15 recall=0.655, ep20 recall=0.717 (train-best), ep25 W-burst W=3.58/3.56/3.17 → W-spike guard fired; recall crashed to 0.647; train-★=0.09002. `final.pt` saved.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0020.pt** | **0.00721** | **0.7795** | **★=0.05131** (frozen-best, +76.0% vs v167) |
+| final.pt (ep25 W-stop) | 0.01084 | 0.7335 | 0.06414 |
+| epoch_0005.pt (= best.pt) | 0.01216 | 0.6160 | 0.08896 |
+| epoch_0010.pt | 0.01521 | 0.6040 | 0.09441 |
+| epoch_0015.pt | 0.01879 | 0.6015 | 0.09849 |
+
+**Interpretation**:
+- **IDEA #17 retrieval memory does NOT transfer from tencent to alibaba**. v165 tencent +retrieval = −3.8% win; v168 alibaba +retrieval = +76% LOSS. Cross-corpus asymmetry is strong.
+- Unlike v167 (where W-spike final.pt was the ONLY good checkpoint), v168's W-stop recall crash produced a bad final.pt too (frozen ★=0.06414, +20% vs ep20). Retrieval memory made the tail crash worse than the recipe without it.
+- This is the second documented alibaba-only negative for a cross-corpus-useful mechanism (first: multi-scale critic + PCF both positive on tencent, negative on alibaba per `feedback_alibaba_eval_negatives.md`). The alibaba corpus has fewer, larger, more-concentrated reuse patterns; per-window retrieval memory likely over-injects locality at the expense of the diversity alibaba already has.
+- **Next queued**: v169 tests explicit higher-moment pressure via `--moment-loss-weight 0.5` (5× default). Tail-regime motivation from the R audit is orthogonal to retrieval memory's reuse-pattern target. If v169 ≥ 0.02915, next levers are IDEA #27 Professor Forcing (not yet wired) or IDEA #21 weight-bump probes.
 
 ---
 
