@@ -203,8 +203,30 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v175** — v164 recipe EXACTLY + `--seed 7` + patched `chunk_stitching.py` (palindrome-bug fix from peer review Round 27 P1 #4 / Gemini R3 P1 #1: `boundary_latent_smoothness` now uses derivative matching — i-th forward finite difference at A's trailing edge vs B's leading edge — instead of the previous `.flip(dims=[1])` palindrome constraint that forced A[T-1-i]=B[i] and penalized directional trends). v174 (n-critic=1) closed-failed at ep20 frozen ★=0.08573 (see below). v175 backs out the n-critic perturbation so the ONLY delta vs v164 is the BS-loss math — clean A/B on whether the palindrome fix alone unlocks alibaba gains. Same pretrain determinism as v164/v174 (seed=7). Log `/home/darrell/train_alibaba_v175.log`.
-- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Running pre-patch BS (buggy palindrome) — leave as-is; in-memory module loaded at launch. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+- **alibaba_v176** — v164 EXACT recipe + `--seed 7` + patched `chunk_stitching.py` + `--boundary-smoothness-k 1` (position-only, vs v164/v175's k=2). v175 (patched BS k=2) closed-failed at frozen ★=0.07121, **+106% worse than v164's 0.03457 despite identical seed/recipe/pretrain**. Strongly suggests the buggy palindrome constraint at k>=1 was accidentally useful regularization for alibaba, and the mathematically-correct velocity-matching constraint hurts learning. v176 drops to k=1, so only order-0 (position continuity) is enforced; patched and buggy code behave identically at k=1. Tests whether alibaba's BS benefit came from position continuity alone. Same seed=7 pretrain determinism. Log `/home/darrell/train_alibaba_v176.log`.
+- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Running pre-patch BS (buggy palindrome) — leave as-is; in-memory module loaded at launch. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. ep50 hit new train-best ★=0.04456 (−4.9% vs ep35 ★=0.04685); ep54/55 W≥3.0 counter=2, W-stop imminent. If v166 beats v165 ★=0.03752, the two mechanisms add. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v175 — CLOSED-FAILED (v164 EXACT recipe + patched `chunk_stitching.py` [palindrome-bug fix]; W-spike auto-stop @ ep25; frozen-best epoch_0020.pt ★=0.07121 = **+106% worse than v164's 0.03457**, 2026-04-19)
+**Why (closed-failed)**: IDEA #21 palindrome-bug fix test (peer review Round 27 P1 #4 / Gemini R3 P1 #1). v164 used `boundary_latent_smoothness` with `.flip(dims=[1])` which forced A[T-1-i]=B[i] — a palindrome constraint at the boundary that mathematically penalizes directional trends. Patch replaces this with derivative matching: i-th forward finite difference at A's trailing edge vs B's leading edge. v175 tests whether this fix alone unlocks alibaba gains.
+**Result — the fix HURTS**: same seed, same recipe, same pretrain — frozen ★ degrades from v164's 0.03457 to v175's 0.07121 (+106%). Three hypotheses: (H1) the palindrome constraint was accidentally useful regularization for alibaba's window structure — it forced boundary symmetry that happened to stabilize tail learning; (H2) the derivative-matching at k=2 (velocity continuity) actively over-constrains the generator; (H3) the BS benefit of v164 came from position continuity at order 0 only, and k>=1 orders add noise regardless of math. Next candidate v176 tests H3 via BS-k=1 (position-only, no k>=1 orders, patched==buggy behavior).
+**Recipe**: v164 EXACT + `--seed 7` + patched `chunk_stitching.py` (derivative matching instead of palindrome). Fresh pretrain.
+**Training (Phase 3)**: ep5 W=+0.95 (train★=0.09890 ★), ep10 W=+1.53 (train★=0.08163 ★), ep15 W=+2.19 (train★=0.08752 regression), ep20 W=+2.93 (train★=0.07090 ★), ep23 W=+3.17, ep24 W=+3.54, ep25 W=+3.07 → W-spike guard fired (3 consecutive ≥3.0). final.pt saved at ep25. Shorter tail than v164 (ep29 W-stop).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0020.pt** (= best.pt) | **0.00961** | **0.6920** | **★=0.07121** (frozen-best) | **+106% worse** |
+| final.pt (ep25 W-stop) | 0.01543 | 0.6035 | 0.09473 | +174% worse |
+| epoch_0005.pt | 0.02367 | 0.6275 | 0.09817 | +184% worse |
+| epoch_0010.pt | 0.01815 | 0.5755 | 0.10305 | +198% worse |
+| epoch_0015.pt | 0.02318 | 0.4650 | 0.13018 | +277% worse |
+
+**Interpretation**:
+- **Peer review math fix is correct but empirically degrades alibaba**: removing the palindrome bug produces 2× worse frozen ★. The bug was doing real work.
+- **Train-selector tracks frozen on v175**: train★=0.07090 at ep20 ~= frozen★=0.07121. No mis-rank like v164 (frozen ★=0.03457 vs train-selector ep30 train★=0.09-ish). This suggests the model's internal "good" state (what train-selector picks) is the same as the held-out "good" state — normal behavior. v164's dramatic mis-rank is specifically tied to the W-stop tail under the buggy palindrome.
+- **Recall decay at final.pt is stronger in v175**: 0.69 (ep20) → 0.60 (final, ep25). v164's recall typically rebounded at W-stop; v175's doesn't.
+- **Next queued v176**: BS-k=1 (position-only). If v176 recovers v164's 0.03457, the k>=1 derivative constraint is the specific hurt mechanism and going forward BS should be k=1. If v176 still degrades, BS orders >= 1 do nothing useful regardless of math, and the "win" of v164 was multi-factor in a way the palindrome bug was part of.
 
 ---
 
