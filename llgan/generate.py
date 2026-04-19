@@ -71,6 +71,10 @@ def generate(
                   retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
                   retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
                   retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
+                  ssm_backbone=getattr(cfg, "ssm_backbone", False),
+                  ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
+                  mtpp_timing=getattr(cfg, "mtpp_timing", False),
+                  mtpp_sigma_min=getattr(cfg, "mtpp_sigma_min", 0.05),
                   ).to(device)
     # Prefer EMA weights for generation: they are the time-averaged model that
     # has been smoothed over recent training oscillations and consistently
@@ -180,8 +184,13 @@ def generate(
             else:
                 latent, hidden = G(z_global, z_local, hidden=hidden,
                                    return_hidden=True)
-            # Detach hidden to avoid accumulating the full computation graph
-            hidden = (hidden[0].detach(), hidden[1].detach())
+            # Detach hidden to avoid accumulating the full computation graph.
+            # SSM backbone returns (state, None); LSTM returns (h, c). Guard
+            # the second element so either backbone carries cleanly across
+            # windows (mirrors long_rollout_eval._rollout).
+            h0 = hidden[0].detach() if hidden[0] is not None else None
+            h1 = hidden[1].detach() if hidden[1] is not None else None
+            hidden = (h0, h1)
 
             # Decode latents to feature space (latent AE mode only)
             out = R(latent) if R is not None else latent
