@@ -203,8 +203,36 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v173** — v167 recipe EXACTLY + `--seed 13` (third seed, same ep25 branch) + `--checkpoint-every 1` (dense per-epoch capture ep26–ep34, directly addresses Round 26 P1 #1). Second seed test after v172 (seed=11) failed catastrophically at ★=0.08054 (+176% vs v167's 0.02915). If v173 ★≈0.029 → v167 is not universal (v172 was the outlier, need seed basin characterization). If v173 ★≈0.08 → v167 seed=7 was a rare lottery. Log `/home/darrell/train_alibaba_v173.log`.
+- **alibaba_v174** — v164 recipe EXACTLY + `--n-critic 1` (vs v164's `--n-critic 2`). Fresh pretrain. `--seed 7`. Mechanism change (not seed/branch lottery): halves critic update frequency relative to G to delay the W-runaway pattern that W-stops every alibaba tail. Directly tests whether critic slowdown (not threshold adjustment) is the right tail-control lever (peer review Round 25 explicitly called for this branched-critic-slowdown arm). If v174 extends the usable tail past ep34 without recall crash, n_critic=1 is the new baseline. Targets beating v164's ★=0.03457 (the reproducible ATB) — v167's 0.02915 is now known to be a seed-lottery artifact, not a reproducible target. Log `/home/darrell/train_alibaba_v174.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v173 — CLOSED-FAILED (v167 recipe EXACTLY + `--seed 13` + `--checkpoint-every 1`; W-spike auto-stop @ ep28; frozen-best epoch_0026.pt ★=0.04186 = **+43.6% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: third-seed basin characterization for v167. After v172 (seed=11) crashed at ★=0.08054, v173 (seed=13) was the bracket test. Result: different W-trajectory again (W-stopped at ep28, even earlier than v172's ep29); frozen-best is mid-run ep26, not the final checkpoint. Dense per-epoch checkpointing (peer review Round 26 P1 #1 request) successfully captured the pre-W-burst trajectory and confirmed ep26 as the best instead of final.pt.
+**Recipe**: v167 EXACTLY + `--seed 13` + `--checkpoint-every 1` (dense tail capture). Branched from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0`.
+**Training (Phase 3, from ep26 branch-point)**: ep26 W=+3.22 (already past threshold!), ep27 W=+3.68, ep28 W=+4.84 → W-spike guard fired (3 consecutive). Only 3 Phase 3 checkpoints (ep26 saved pre-emptively by --checkpoint-every 1, ep27 saved, final.pt at ep28 W-stop).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v167 |
+|---|---|---|---|---|
+| **epoch_0026.pt** (branch+1) | **0.00556** | **0.8185** | **★=0.04186** (frozen-best) | **+43.6% worse** |
+| epoch_0027.pt | 0.00616 | 0.7620 | 0.05376 | +84.4% worse |
+| final.pt (ep28 W-stop) | 0.00774 | 0.7010 | 0.06754 | +131.7% worse |
+
+**Three-seed basin for v167 recipe (same branch, same W-stop, different seeds)**:
+| seed | W-stop epoch | frozen-best | frozen ★ | vs v167 |
+|---|---|---|---|---|
+| 7 (v167)  | ep34 | final.pt | **0.02915** | baseline (published ATB) |
+| 11 (v172) | ep29 | final.pt | 0.08054 | +176.3% |
+| 13 (v173) | ep28 | ep26 | 0.04186 | +43.6% |
+
+**Interpretation**:
+- **v167 is conclusively a seed-lottery result**, not a mechanism. Three seeds give ★ from 0.029 to 0.081 — a 2.76× range. Only seed=7 reaches an ATB-grade number.
+- **W-stop timing is also seed-sensitive**: ep34 / ep29 / ep28. The 6-epoch spread on W-stop trigger tells us the critic dynamics genuinely differ between seeds at this branch point.
+- **Decreasing ★ trend seeds 11→13 (0.08 → 0.042)** hints at a wide basin: the "good" seeds find usable mid-run checkpoints, the "bad" seeds crash both MMD² and recall. Not enough evidence (N=3) to claim seed search converges; too expensive to grid.
+- **Round 26 P1 #1 fully validated**: dense checkpointing (ep26/27/final) on seed=13 showed the useful state is not at final.pt — it's the first post-branch epoch before the critic catches up. This is the opposite of v167 (seed=7, where ep30→final.pt is the win). The "W=3.0 mechanism claim" is now downgraded from "over-stated" to "incorrect": different seeds have their frozen-best at different epochs relative to W-stop.
+- **Reproducible alibaba ATB is v164's 0.03457** (not v167's 0.02915). v164 fresh-pretrain is now the target to beat for any new mechanism.
+- **Next pivot v174**: new mechanism, not another seed. `--n-critic 1` (vs 2) slows the critic — directly attacks the W-runaway pattern that W-stops every alibaba tail. Peer review Round 25 explicitly called for this branched-critic-slowdown arm.
 
 ---
 
