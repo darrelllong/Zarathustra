@@ -149,6 +149,57 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
+## IDEA #34 — Tail-Stratified Eval Bundle (MVE landed 2026-04-19)
+
+**Scaffolding**: `llgan/tail_strata.py` scores each trace file by a geometric
+mean of `iat_q99/iat_q50`, `abs_stride_q99/abs_stride_q50`, and `iat_std/iat_mean`
+(fields already in `trace_characterizations.jsonl`). Partitions into
+top-decile **tail-heavy** / middle-80% **ordinary**, writes file-list
+manifests. `llgan/eval.py` + `llgan/frozen_sweep.py` gain `--eval-file-manifest`
+pass-through: the real bundle is sampled from within the manifest while
+the existing `--eval-real-seed 42` determinism still holds. Motivated by
+R-ANALYSIS.md §"Generator-Relevant Tail Results" (block-trace families
+have M6 up to 14M on `abs_stride_q50`, 11.7M on `iat_q50`).
+
+Corpora stratified (commits `caaac84` + `d3690d6`):
+- alibaba: 852 files scored → 85 tail-heavy / 682 ordinary (bottom decile dropped)
+- tencent: 3142 files scored → 314 tail-heavy / 2514 ordinary
+
+**First-pass ATB evals on both strata (2026-04-19, seeds 42/42)**:
+
+| Checkpoint | Stratum | MMD² | β-recall | ★ |
+|---|---|---|---|---|
+| v167 alibaba final.pt | full corpus | 0.00705 | 0.8895 | **0.02915** (ATB) |
+| v167 alibaba final.pt | tail-heavy | 0.02426 | 0.9485 | 0.03456 (+18.5%) |
+| v167 alibaba final.pt | ordinary | 0.01460 | 0.9155 | 0.03150 (+8.1%) |
+| v164 tencent ep_0020 | full corpus | 0.00210 | 0.8155 | **0.03900** (ATB) |
+| v164 tencent ep_0020 | tail-heavy | 0.01592 | 0.9130 | 0.03332 (−14.6%) |
+| v164 tencent ep_0020 | ordinary | 0.00396 | 0.8385 | 0.03626 (−7.0%) |
+
+**First-pass interpretation (preliminary, single-checkpoint)**:
+- β-recall on the tail stratum is *higher* than on ordinary for both corpora
+  (0.9485 / 0.9130 vs 0.9155 / 0.8385). Tail files have broader per-file
+  distributions, so the generator's mode coverage trivially accounts for
+  more of the tail's real support.
+- MMD² on the tail stratum is 3.4× (alibaba) and 7.6× (tencent) worse than
+  ordinary. Tail-heaviness shows up as a distributional-shape penalty, not
+  a coverage penalty.
+- The full-corpus ★ is *not* a naive average of stratum ★ — stratum scores
+  use different seed-42 4-file samples drawn from the restricted pool, so
+  MMD² summary-space differs across bundles. Treat each stratum ★ as its
+  own metric, not as a decomposition.
+- **Gate for future checkpoints**: a candidate must either (a) improve
+  tail-★ without regressing ordinary-★, or (b) beat the current ATB by a
+  margin that exceeds the bundle-variance observed here (≈0.005 ★ between
+  full and ordinary bundles of the same checkpoint). Use this as a second
+  signal beyond the single full-corpus ★.
+
+Not running on every checkpoint yet — the stratum sweep adds 2× eval cost.
+Apply to every candidate that beats the full-corpus ATB, plus ATB holders
+on newly-landed code changes.
+
+---
+
 ## Currently Running
 
 - **alibaba_v168** — v167 recipe EXACTLY + IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0; M=32, key=32, val=32; params=98,913). Fresh pretrain (NOT branched). `--seed 7`. Stacks retrieval on the new ATB recipe to test whether IDEA #17 adds to v167's 0.02915. Log `/home/darrell/train_alibaba_v168.log`.
