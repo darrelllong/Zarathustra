@@ -991,3 +991,97 @@ The repo responded to Round 20 in the right direction. [RESPONSE.md](/Users/darr
 ### Short Take
 
 The project did not fall back into local scalar tweaking this time; it built the right kind of infrastructure. The problem is that a gate is only useful if it measures the contract it claims to gate. Right now `long_rollout_eval.py` is a promising diagnostic, but not yet a valid acceptance criterion for persistent memory, chained windows, or IRD-footprint modeling.
+
+---
+
+## Round 22
+
+### v164 Is A Real Win, But The Interpretation Is Running Ahead Of The Evidence
+
+The new commits since Round 21 only changed `VERSIONS.md`, but the claims changed materially:
+`alibaba_v162` closed as a seed-fragile marginal win, `alibaba_v164` became the new Alibaba
+frozen-bundle ATB, and `tencent_v163` closed the FFT-amplification test. The strongest result is
+v164's `0.03457` frozen score. That is important. The weak part is the story being built around
+it.
+
+I added [IDEAS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/IDEAS.md) #33 because the
+interesting new phenomenon is not "raise W-stop threshold"; it is "late-tail generator
+distillation under a critic trajectory that may or may not be failing." That should become an
+explicit control surface, not another raw-threshold bet.
+
+1. `[P1]` The "W-stop distillation mechanism" claim is still underidentified. The ATB table now
+   says the v161/v162/v164 sequence proves a seed-sampled W-stop distillation effect in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L19), and the v164
+   section repeats that interpretation in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L161). But the
+   actual evidence is three seeds of the same unstable recipe: final frozen scores `0.098`,
+   `0.048`, `0.035`, with the best run also being the longest run before the W guard fired. That
+   is compatible with useful late-tail polishing, but it is also compatible with survivorship:
+   seed 7 simply avoided early collapse long enough to reach a good state. The text should say
+   "hypothesis" until there is a control that starts from the same pre-tail checkpoint and varies
+   only critic continuation, critic freeze, or W-stop policy.
+
+2. `[P1]` The queued `--w-stop-threshold 5.0` probe is the wrong first control. The open question
+   in [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L165) asks
+   whether distillation is monotone past W-stop and queues v166 with a higher threshold. That
+   mostly tests whether the run can survive more critic divergence. It does not isolate the
+   mechanism. A cleaner control is: take a checkpoint before v164's W-rise, branch into (a)
+   normal W-stop, (b) critic-frozen or lower-critic-update tail, and (c) higher-threshold tail,
+   then frozen-sweep all tail checkpoints. If only (c) works, the effect may be adversarial
+   pressure. If (b) works too, the repo has evidence for generator/recovery distillation. Without
+   that branch control, v166 risks turning a real discovery into another scalar tweak.
+
+3. `[P1]` The repo is now contradicting itself on whether IDEA #21 is open, closed, or merely
+   unstable. The front-matter clarification still says overlap sub-loss `(b)` is "NOT wired" and
+   true #21 remains untested in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L42), but the ATB
+   table labels v164 as IDEA `#21 BS+OC overlap-mode` in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L19), while the
+   v162 section says "CLOSE IDEA #21" as currently formulated in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L221). The code may
+   now be past the old "not wired" state, but the documentation has not been reconciled. This is
+   not cosmetic: the project uses closure language to decide what to build next. The right status
+   is probably "BS+OC overlap-mode produced one new ATB but remains unstable and not yet
+   mechanistically understood," not "closed" and not "untested."
+
+4. `[P1]` Do not use v164 to bypass the Round 21 long-rollout gate. The v164 section correctly
+   says long-rollout eval is blocked by the sidecar issues in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L166), but the
+   long-rollout section still promotes the current sidecar as a gate for #28/#31/#32 in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L137). Those cannot
+   both stand without qualification. Until conditioning, true reuse-distance/stack-distance, drift
+   splitting, and manifested real baselines are fixed, sidecar numbers can be used as diagnostic
+   hints only. They should not decide promotion or closure for persistent memory, chained windows,
+   or IRD footprint modeling.
+
+5. `[P2]` The tencent_v163 conclusion is much better framed now, but it should still avoid closing
+   the broader spectral question. The version log now correctly calls the run FFT-weight
+   amplification, not off-vs-on Fourier loss, in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L171). Good. But the
+   conclusion in [VERSIONS.md](/Users/darrell/.codex/worktrees/afb2/Zarathustra/VERSIONS.md#L189)
+   still says IDEA #0's "FFT-unnecessary" verdict is reaffirmed at weight `1.0`. That is fine for
+   the naive MSE weight path. It should not be generalized to TSGDiff-style graph/Fourier
+   structure or #22. "20x FFT MSE hurts tencent" is a valid closure. "Spectral structure is
+   unnecessary" would again be too broad.
+
+### What I Would Do Next
+
+1. Reword the v164 interpretation from "mechanism proven" to "W-stop distillation hypothesis."
+
+2. Replace or precede v166's simple `--w-stop-threshold 5.0` launch with a branched tail-control
+   test from the same pre-tail checkpoint: normal, critic-frozen/critic-slowed, and higher-threshold.
+
+3. Reconcile the IDEA #21 status text across the front matter, v162, and v164 sections.
+
+4. Fix the Round 21 long-rollout sidecar issues before using any sidecar output as an acceptance
+   gate.
+
+5. Keep the new #33 idea as the structural follow-up if the tail-control test shows the effect is
+   real.
+
+### Short Take
+
+v164 is the best short-window Alibaba result in the repo and should be treated as real. But the
+project is already turning it into a story before it has the controls for that story. The next
+move should be a mechanism-separating tail experiment, not a bigger W-stop threshold and not
+another closure label.

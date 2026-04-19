@@ -1290,3 +1290,36 @@ Verified 2026-04-18 against arXiv:
 
 Action: DiTTO, TSGDiff, Stage-Diff, and WaveStitch slot in as implementation references for IDEA
 #22, not new ideas in their own right. Verify DiffCATS before citing or implementing it.
+
+---
+
+### 33. Critic-trajectory distillation instead of W-stop gambling
+
+**Gap attacked**: the newest BS+OC overlap-mode runs suggest useful generator states can appear
+late in training while the critic is railing out, but the current mechanism is accidental: save
+`final.pt` when the W-stop guard fires and hope that the tail checkpoint is better than the
+training-selected checkpoint.
+
+**Proposal**: turn the late-tail effect into an explicit control surface instead of a higher
+`--w-stop-threshold` gamble:
+
+- Track a critic-trajectory state (`healthy`, `railing`, `collapsed`) from W-distance slope,
+  recall trend, and critic loss variance.
+- When the critic enters a controlled railing state, branch into a short "distillation tail":
+  freeze or slow the critic, lower discriminator updates, keep generator/recovery/auxiliary
+  losses active, and emit dense frozen-sweep candidates.
+- Add a paired control run where the same checkpoint enters the tail with the critic frozen
+  immediately, so improvements can be attributed to generator polishing rather than adversarial
+  instability.
+- End the tail by frozen-sweep/long-rollout criteria, not by a larger raw W threshold.
+
+**Why this is on-target**: the v161/v162/v164 pattern hints that final checkpoints saved during
+W-stop can be much better than training-best, but tencent_v163 shows the same symptom can also
+mean real recall collapse. A tail controller would separate "critic railing while G improves"
+from "critic railing because the model is dying." It also converts the repeated best.pt
+mis-rank pathology into a deliberate checkpoint-production strategy.
+
+**Cost**: 4-8h for a trainer-side phase controller plus denser tail checkpointing; low model
+architecture risk. The main risk is overfitting to one alibaba seed, so the first test should
+start from an already-saved pre-tail checkpoint and run two or three deterministic tail variants
+before spending full fresh-training budget.
