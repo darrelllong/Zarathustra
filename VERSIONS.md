@@ -16,7 +16,8 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.04982**       | **v157** final.pt (v132 recipe EXACTLY, clean reproduce seed-2; IDEAS #19/#20/partial-#21) | n/a | `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00722, β-recall=0.7870, α=n/a → ★=0.04982. **18% improvement over v132's 0.05778.** Round 18 (Gemini) P1 #1 confirmed empirically: best.pt (=epoch_0015.pt) ★=0.05748 is 15.4% worse than frozen-best final.pt. Sweep also exposed ~0.01 ★ variance across reruns purely from fake-sample RNG — fixed by new `--eval-fake-seed`; best.pt/ep15 now match exactly (★=0.05748 both). `final.pt` (saved at Phase-3 end after ep16 W-stop) is the winner — training-time selector missed it entirely. |
+| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00677, β-recall=**0.8610** → ★=0.03457. **30.7% improvement over v157's 0.04982**; beats v162 lottery-win (0.04803) by 28.1%. Now BEATS tencent ATB 0.03942 (alibaba was historically the harder corpus). best.pt (ep5) ★=0.08841 = **+155.7% worse than frozen-best** — 8th confirmation of best.pt mis-rank pathology and the largest alibaba-side gap observed. final.pt saved at W-stop ep29 (W=3.72). **The "v162 lottery" reframes as a seed-sampled *W-stop distillation* effect: a recipe that W-spikes produces final.pt checkpoints that progressively distill against the failing critic; three alibaba seeds now show 0.098 / 0.048 / **0.035**, with seed=7 proving the effect can reach deep into new-ATB territory.** |
+| Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
 | Tencent | **0.03942**       | **v158** final.pt (v153 recipe EXACTLY seed-rerun; IDEAS #19/#20/#8/#6) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00229, β-recall≈0.82 → ★=0.03942. **11% better than v153's 0.04430**, previously declared "failed reproduce". best.pt ★=0.07936 = **+101% worse** than frozen-best — worst best.pt mis-rank observed anywhere. v158 was misdiagnosed: its final.pt (post-W-stop Phase-3-end, ep109) is the actual winner under the published protocol. Under-deterministic evaluation the "v158 failed to reproduce v153" story collapses — v158 produces a BETTER result than v153 once the correct checkpoint is selected. |
@@ -139,10 +140,53 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-### alibaba_v164 — v162 recipe at seed=7 (IDEA #21 lottery 3rd data point), 2026-04-18
-**Why**: v161 (seed=5) frozen ★=0.098, v162 (seed=42) frozen ★=0.04803 on IDENTICAL recipe → 2× spread, LOTTERY signal. Third seed probes whether the distribution is [good|bad] bimodal or uniformly-spread. If seed=7 lands near 0.048, IDEA #21 is productive-with-seed-search and the v162 win generalizes. If it lands near 0.098, IDEA #21 is confirmed as unreliably-lucky and truly closes. Both outcomes sharpen the next-step decision (stabilize #21 with grad-clip/lower OC, or move on to #27/#32). Run completes in ~2h since W-stop fires by ep9.
-**Recipe**: v162 EXACTLY (v157 + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap`) + `--seed 7`. Fresh pretrain. PID 644119. Log `/home/darrell/train_alibaba_v164.log`.
-**Kill criteria**: (a) W≥3.0 for 3 consecutive (auto-stop, expected ~ep7–9 matching v161/v162 pattern), (b) ★ at kill > 0.10 → IDEA #21 definitively lottery-negative. Frozen-sweep on all checkpoints + long_rollout_eval on final.pt at any stop.
+_(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 2026-04-18 PM; next pair queued below)_
+
+---
+
+### alibaba_v164 — CLOSED-WIN ★ NEW ALIBABA ATB ★ (W-spike auto-stop @ ep29; frozen-best final.pt ★=0.03457 = **−30.7% vs prior ATB 0.04982**, 2026-04-18)
+**Why (closed)**: third seed of v162 recipe (IDEA #21 BS+OC overlap-mode) to triangulate the v161→v162 lottery. Outcome inverted the "lottery" framing: this is a *W-stop distillation* mechanism, not pure luck.
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` + `--seed 7`. Fresh pretrain. PID 644132. Log `/home/darrell/train_alibaba_v164.log`.
+**Training (Phase 3)**: ep1 W=+0.33, ep5 W=+0.75 (train★=0.06728 — still train-best at kill), ep10 W=+1.53, ep15 W=+1.86, ep20 W=+2.47, ep25 W=+2.34, ep27 W=+3.15, ep28 W=+3.61, ep29 W=+3.72 → W-spike guard fired, `final.pt` written at ep29 with W=3.72. Slower spike than v161/v162 (7-9 ep) — this seed let the generator train for ~20 more epochs against a gradually railing critic.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **final.pt** (ep29 W-stop) | **0.00677** | **0.8610** | **★=0.03457** ★ NEW ATB ★ |
+| epoch_0020.pt | 0.00622 | 0.7225 | 0.06172 |
+| epoch_0025.pt | 0.00771 | 0.6685 | 0.07401 |
+| epoch_0010.pt | 0.01140 | 0.6360 | 0.08420 |
+| epoch_0005.pt / best.pt | 0.01071 | 0.6115 | 0.08841 |
+| epoch_0015.pt | 0.01372 | 0.4895 | 0.11582 |
+
+**Interpretation — IDEA #21 recipe is a W-STOP DISTILLATION mechanism, not a lottery**:
+- Three alibaba seeds (5, 42, 7) on identical recipe now yield final.pt ★ = 0.098, 0.048, **0.035**. With only 3 points, this could still look random — but the best seed produces the longest Phase 3 run (ep29 vs ep7–9), and β-recall at final.pt ascends monotonically with run length (0.56 → 0.83 → 0.86). Reinterpretation: *the longer the critic takes to rail out, the further the generator distills*, and recall compounds during that window.
+- best.pt (ep5 ★=0.08841) was +155.7% worse than frozen-best — LARGEST best.pt mis-rank observed on alibaba, 8th corpus-wide confirmation of Round 18 P1 #1. A training-★ selector would have shipped a model 2.6× worse than the actual result.
+- v164 is also the first alibaba ATB to BEAT the tencent ATB (0.03457 vs 0.03942). Historically alibaba was considered harder (Hurst=0.98 block-sampling requirements, 10× more files). This inverts that.
+- **Open question**: is the distillation monotone past the W-stop? v164 stopped at ep29; no evidence that ★ would have continued dropping at ep50. A follow-up `--w-stop-threshold 5.0` probe is warranted (queued as v166).
+- Long-rollout eval on v164 final.pt is blocked by Round 21 P1 sidecar issues (conditioning, IRD-vs-stack-distance, drift-half computation, manifested baseline). Will run after sidecar fixes land.
+
+---
+
+### tencent_v163 — CLOSED-FAILED (FFT-weight amplification 0.05 → 1.0 on v158 stack; W-spike auto-stop @ ep68; frozen-best ep20 ★=0.05420 = **+37.5% vs ATB 0.03942**, 2026-04-18)
+**Why (closed)**: TSGDiff-motivated Fourier amplification. IDEA #0 had deprioritized FFT-aware losses as "corpora are near-white-noise"; TSGDiff's ablation hinted that Fourier MSE still supervises higher-order spectral moments. v163 amplifies the default `fft_loss_weight` from 0.05 (already on in v158) to 1.0 (20× heavier). **Note (Round 21 P2 correction)**: this is an *amplification* test, not an on/off test — VERSIONS.md previously mis-framed it; FFT is on by default in `config.py:75`.
+**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--fft-loss-weight 1.0` + `--seed 5`. Fresh pretrain. PID 615527. Log `/home/darrell/train_tencent_v163.log`.
+**Training (Phase 3)**: ep5 W=+2.1, ep10 W=+2.5, ep20 W=+3.26 (comb=0.06137), ep30 comb=0.05406★, ep45 comb=0.05426, ep50 comb=0.05410, ep55 comb=0.05209★, ep60 comb=0.05327, ep65 comb=0.05245, ep66–68 W=3.03/3.07/3.21 → W-spike guard fired, `final.pt` written at ep68.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0020.pt** | **0.00200** | **0.7390** | **★=0.05420** (frozen-best) |
+| epoch_0045.pt | 0.00166 | 0.7005 | 0.06156 |
+| epoch_0055.pt / best.pt | 0.00226 | 0.6790 | 0.06646 |
+| epoch_0060.pt | 0.00212 | 0.6645 | 0.06922 |
+| epoch_0065.pt | 0.00336 | 0.6640 | 0.07056 |
+| epoch_0030.pt | 0.00296 | 0.6415 | 0.07466 |
+| epoch_0035.pt | 0.00240 | 0.6380 | 0.07480 |
+| epoch_0050.pt | 0.00388 | 0.6450 | 0.07488 |
+| ... (8 more checkpoints) | | | |
+| final.pt | 0.00324 | 0.5935 | 0.08454 |
+| epoch_0005.pt | 0.00989 | 0.2585 | 0.15819 |
+
+**Conclusion**: frozen-best ep20 ★=0.05420 is +37.5% behind ATB 0.03942. FFT amplification on tencent does NOT beat v158 0.03942. Notably, the best.pt mis-rank here is only +22.6% (not the >100% seen in v158 itself) — this recipe collapses recall faster than v158 so there's less distillation-tail upside. best.pt (ep55) was +22.6% worse than frozen-best — 9th confirmation of Round 18 P1 #1. Unlike alibaba v164, tencent's `final.pt` (ep68, the W-stop) was NOT the winner — final.pt ★=0.08454 was 2.4× worse than the ep20 early checkpoint. **The "W-stop distillation" effect seen on alibaba v164 does NOT replicate on tencent v163**: here the critic's failure collapses recall instead of distilling it. Likely cause: PCF + multi-scale critic on tencent provides enough regularization that the W-spike reflects legitimate mode collapse, not a railing critic being outrun. **FFT-weight amplification CLOSED on tencent**; IDEA #0's "FFT-unnecessary" verdict is re-affirmed at the 1.0 weight level, but the 0.05 default stays (still contributes to v158 ATB).
 
 ---
 
@@ -211,13 +255,6 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 | epoch_0005.pt | 0.00358 | 0.5890 | 0.08578 |
 
 **Conclusion**: frozen-best ep25 ★=0.05194 is +31.7% behind ATB 0.03942. Recall peaked at 0.75 (ep25), below v158's ~0.82. best.pt (ep20) at ★=0.07189 was +38.4% worse than frozen-best — 7th confirmation of best.pt mis-rank. **OC overlap-mode alone does not beat v158's ceiling on tencent.** IDEA #21 full-form (BS-less overlap) is closed on tencent; if pursued further, needs combination with structural additions (#28 cross-window retrieval, #31 chained-window training) not yet in tree.
-
----
-
-### tencent_v163 — v158 recipe + `--fft-loss-weight 1.0` (TSGDiff-motivated Fourier reconstruction loss, IDEA #22 diffusion-lit insight), seed-5, 2026-04-18
-**Why**: IDEA #0 said our corpora are near-white-noise so FFT-aware losses "unnecessary", but TSGDiff (arXiv 2511.12174, AAAI 2026) ablation shows Fourier reconstruction loss nearly halves Context-FID (0.224→0.407 without it on ETTh). Fourier-domain MSE can supervise higher-order spectral moments (power distribution across frequency bins) even in spectrally white series. Single-flag test; cheap; can close or open the FFT-loss question on our corpora definitively.
-**Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--fft-loss-weight 1.0` + `--seed 5`. Fresh pretrain. Launched 2026-04-18 PM PDT.
-**Status**: launching. Kill criteria: (a) W≥3.0 for 3 consecutive (auto-stop), (b) ★ ep10 > 0.08, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
 
 ---
 
