@@ -792,6 +792,8 @@ class Generator(nn.Module):
         z_local: torch.Tensor,
         hidden=None,
         return_hidden: bool = False,
+        retrieval_state=None,
+        return_retrieval_state: bool = False,
     ):
         """
         z_global : (batch, noise_dim) — workload code, used to set h_0/c_0.
@@ -801,6 +803,12 @@ class Generator(nn.Module):
                    maintain temporal coherence across window boundaries
                    (used by generate.py for long trace synthesis).
         return_hidden : pass True when generating multi-window traces.
+        retrieval_state : dict from a previous forward() call to persist the
+                   retrieval memory bank across window boundaries (IDEA #28).
+                   If None, memory is re-initialised empty (default, matches
+                   IDEA #17 behaviour). No-op when retrieval memory is off.
+        return_retrieval_state : pass True to receive the updated bank state
+                   alongside the output. Requires retrieval memory enabled.
         """
         if hidden is None:
             B = z_global.size(0)
@@ -828,7 +836,10 @@ class Generator(nn.Module):
         # Side-channel emits p_reuse_seq for trainer's optional BCE aux loss.
         if self.retrieval is not None:
             B, T, H = h.shape
-            state = self.retrieval.init_state(B, h.device, h.dtype)
+            if retrieval_state is None:
+                state = self.retrieval.init_state(B, h.device, h.dtype)
+            else:
+                state = retrieval_state
             p_reuse_steps = []
             h_aug_steps = []
             for t in range(T):
@@ -840,8 +851,10 @@ class Generator(nn.Module):
             self._last_retrieval_aux = {
                 "p_reuse_seq": torch.stack(p_reuse_steps, dim=1),  # (B, T)
             }
+            retrieval_state_out = state
         else:
             self._last_retrieval_aux = None
+            retrieval_state_out = None
 
         # MTPP timing head: produce (μ, σ) for log(IAT) from h.  Stored on
         # the side channel so train.py can compute NLL vs. real IAT.
@@ -852,6 +865,10 @@ class Generator(nn.Module):
             self._last_timing_aux = None
 
         out = self.out_act(self.fc(h))
+        if return_retrieval_state and return_hidden:
+            return out, hidden_out, retrieval_state_out
+        if return_retrieval_state:
+            return out, retrieval_state_out
         if return_hidden:
             return out, hidden_out
         return out

@@ -34,6 +34,7 @@ def generate(
     binarize_opcode: bool = True,
     char_file: str = "",
     source_trace: str = "",
+    retrieval_persist_across_windows: bool = False,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -150,12 +151,35 @@ def generate(
         else:
             z_global = torch.randn(n_streams, cfg.noise_dim, device=device)
         hidden = None   # initialised from z_global on first window
+        # IDEA #28: optionally thread retrieval-memory bank state across window
+        # boundaries. Off by default (matches IDEA #17 per-window re-init).
+        retrieval_enabled = getattr(G, "retrieval", None) is not None
+        persist_retrieval = retrieval_persist_across_windows and retrieval_enabled
+        if retrieval_persist_across_windows and not retrieval_enabled:
+            print("[warn] --retrieval-persist-across-windows set but checkpoint "
+                  "has no retrieval memory; flag ignored.")
+        retrieval_state = None
 
         for _ in range(windows_per_stream):
             z_local = torch.randn(
                 n_streams, timestep, cfg.noise_dim, device=device
             )
-            latent, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
+            if persist_retrieval:
+                latent, hidden, retrieval_state = G(
+                    z_global, z_local, hidden=hidden,
+                    return_hidden=True,
+                    retrieval_state=retrieval_state,
+                    return_retrieval_state=True,
+                )
+                # Detach bank tensors so autograd graph doesn't grow across
+                # windows (consistent with hidden-state handling below).
+                retrieval_state = {
+                    k: (v.detach() if torch.is_tensor(v) else v)
+                    for k, v in retrieval_state.items()
+                }
+            else:
+                latent, hidden = G(z_global, z_local, hidden=hidden,
+                                   return_hidden=True)
             # Detach hidden to avoid accumulating the full computation graph
             hidden = (hidden[0].detach(), hidden[1].detach())
 
@@ -206,6 +230,11 @@ def parse_args():
                    metavar="FILE",
                    help="Trace filename (basename) whose precharacterized stats are used "
                         "as the conditioning vector. Requires --char-file.")
+    p.add_argument("--retrieval-persist-across-windows", action="store_true",
+                   help="IDEA #28: thread the retrieval-memory bank (K/V/T/mask) "
+                        "across window boundaries during generation instead of "
+                        "re-initialising each window. No-op if the checkpoint "
+                        "has no retrieval memory.")
     return p.parse_args()
 
 
@@ -220,4 +249,5 @@ if __name__ == "__main__":
         not args.no_binarize_opcode,
         char_file=args.char_file,
         source_trace=args.source_trace,
+        retrieval_persist_across_windows=args.retrieval_persist_across_windows,
     )
