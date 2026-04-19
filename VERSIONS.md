@@ -217,8 +217,30 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v176** — v164 EXACT recipe + `--seed 7` + patched `chunk_stitching.py` + `--boundary-smoothness-k 1` (position-only, vs v164/v175's k=2). v175 (patched BS k=2) closed-failed at frozen ★=0.07121, **+106% worse than v164's 0.03457 despite identical seed/recipe/pretrain**. Strongly suggests the buggy palindrome constraint at k>=1 was accidentally useful regularization for alibaba, and the mathematically-correct velocity-matching constraint hurts learning. v176 drops to k=1, so only order-0 (position continuity) is enforced; patched and buggy code behave identically at k=1. Tests whether alibaba's BS benefit came from position continuity alone. Same seed=7 pretrain determinism. Log `/home/darrell/train_alibaba_v176.log`.
 - **tencent_v177** — v165 recipe + `--seed 7` (seed basin test, like alibaba v172/v173/v167). Reproduces v165's retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + n-regimes 8 + supervisor 5.0 stack against the CORRECT tencent corpus `/home/darrell/traces/tencent_block_1M`. If v177 converges near v165 ep45 ★=0.03752, confirms 0.03752 is a reproducible mechanism and the seed basin for tencent is narrower than alibaba's {0.029, 0.042, 0.081}. If v177 diverges significantly, forces a tencent seed-lottery retraction analogous to v167's alibaba retraction. Log `/home/darrell/train_tencent_v177.log`.
+- **alibaba slot: OPEN** — v176 closed-failed (BS-k=1 position-only also degrades; +47.6% vs v164). All BS variants under patched code now exhausted. Next candidate should pivot to a structurally different lever (Professor-Forcing, workload-conditioned mechanism router, or v164 seed-basin test).
+
+---
+
+### alibaba_v176 — CLOSED-FAILED (v164 EXACT recipe + patched `chunk_stitching.py` + `--boundary-smoothness-k 1` [position-only]; ran full 200 epochs under W-stop guard; frozen-best final.pt ★=0.05102 = **+47.6% worse than v164's 0.03457**, 2026-04-19)
+**Why (closed-failed)**: IDEA #21 H3 test (from v175 post-mortem): does alibaba's BS benefit come from position continuity at order 0 alone? With k=1, only i=0 (position) is enforced — no k≥1 derivative terms — and patched code behaves identically to the palindrome-buggy code at this setting. If v176 recovers v164's 0.03457, the k≥1 derivative constraint is the specific hurt mechanism of the patch. Result: **H3 disproven**. v176 frozen-best is 0.05102 — better than v175's patched-k=2 0.07121 (+47.6% vs v164 vs +106% for v175), confirming that k≥1 terms hurt more than k=0 alone, but NOT recovering v164. The gap between v176 (patched-k=1) and v164 (buggy-k=2) is what the palindrome bug contributed — and it's not recoverable via patched-BS variants.
+**Recipe**: v164 EXACT + `--seed 7` + patched `chunk_stitching.py` (derivative matching) + `--boundary-smoothness-k 1` (vs v164/v175's k=2). Fresh pretrain.
+**Training (Phase 3)**: ran full 200 epochs without tripping W-stop guard. Phase 3 started around ep20 in epoch_0005.pt sampling. Train-best ~ep20 (best.pt MMD²=0.00818, recall=0.778). No W-spike to report because `frozen_sweep.log` shows clean run to final.pt ep200.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **final.pt** (ep200) | **0.00682** | **0.779** | **★=0.05102** (frozen-best) | **+47.6% worse** |
+| best.pt (ep20) | 0.00818 | 0.778 | 0.05258 | +52.1% worse |
+| epoch_0010.pt | 0.01670 | 0.767 | 0.06330 | +83.1% worse |
+| epoch_0005.pt | 0.02458 | 0.646 | 0.09538 | +176% worse |
+| epoch_0015.pt | 0.02321 | 0.528 | 0.11771 | +240% worse |
+
+**Interpretation**:
+- **H3 partially holds, but not decisively**: patched-BS k=1 (v176, ★=0.051) is clearly better than patched-BS k=2 (v175, ★=0.071), so k≥1 derivative orders DO hurt independently of the palindrome issue. However, v176 still degrades vs v164 (+47.6%), so position-continuity-alone is NOT what made v164 work. Some of v164's ★=0.03457 came from the palindrome-bug's accidental regularization effect at k=2 that's no longer reachable with patched code.
+- **BS family exhausted under patched code**: v175 (patched k=2) +106%, v176 (patched k=1) +47.6%, v174 (n-critic=1 control) +148%, v171 (BS 1.5/OC 0.75) still worse than v164. No BS variant under patched code gets within 40% of v164.
+- **v164's 0.03457 is now partially paper-tiger**: the buggy palindrome code that produced it can be reverted locally and re-run, but going forward, the math-correct version is the repository state. If we cannot reproduce ≤0.04 under patched code with ANY seed, we should consider retracting v164 as a seed-lottery outcome tied to a since-fixed bug.
+- **Train-selector agrees with frozen here**: v176's best.pt (ep20) ★=0.05258 is within 3% of final.pt ★=0.05102. Unlike v164's dramatic mis-rank (+121%), patched-code training behaves well — further evidence that v164's mis-rank was tied to the palindrome bug's interaction with W-stop.
+- **Next moves (decision pending)**: (1) Pivot to IDEA #27 Professor-Forcing or IDEA #35 workload-conditioned mechanism router — structurally different levers that don't relive BS. (2) v164 seed-basin test under patched code (new seed, same flags) — lowest-effort sanity check that the published ATB isn't seed-unique. (3) Revert `chunk_stitching.py` locally on vinge, rerun v164 exact + seed=11 — true reproducibility test.
 
 ---
 
