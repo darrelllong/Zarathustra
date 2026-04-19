@@ -139,7 +139,10 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-*(alibaba slot OPEN — pending next recipe selection from IDEAS.md; tencent_v163 still running, see below)*
+### alibaba_v164 — v162 recipe at seed=7 (IDEA #21 lottery 3rd data point), 2026-04-18
+**Why**: v161 (seed=5) frozen ★=0.098, v162 (seed=42) frozen ★=0.04803 on IDENTICAL recipe → 2× spread, LOTTERY signal. Third seed probes whether the distribution is [good|bad] bimodal or uniformly-spread. If seed=7 lands near 0.048, IDEA #21 is productive-with-seed-search and the v162 win generalizes. If it lands near 0.098, IDEA #21 is confirmed as unreliably-lucky and truly closes. Both outcomes sharpen the next-step decision (stabilize #21 with grad-clip/lower OC, or move on to #27/#32). Run completes in ~2h since W-stop fires by ep9.
+**Recipe**: v162 EXACTLY (v157 + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap`) + `--seed 7`. Fresh pretrain. PID 644119. Log `/home/darrell/train_alibaba_v164.log`.
+**Kill criteria**: (a) W≥3.0 for 3 consecutive (auto-stop, expected ~ep7–9 matching v161/v162 pattern), (b) ★ at kill > 0.10 → IDEA #21 definitively lottery-negative. Frozen-sweep on all checkpoints + long_rollout_eval on final.pt at any stop.
 
 ---
 
