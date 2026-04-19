@@ -203,8 +203,32 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v170** — v167 recipe EXACTLY + `--moment-loss-weight 0.2` (2× default 0.1, backing off v169's 5× that crashed recall). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. v169's MMD² DROPPED (-4.8% from 0.00705 → 0.00671) suggesting moment-loss helps moments, but its 5× weight crashed recall 0.8895 → 0.8520. v170 tests a gentler bump: does 2× preserve recall while keeping the MMD² gain? Log `/home/darrell/train_alibaba_v170.log`.
+- **alibaba_v171** — v167 recipe + `--boundary-smoothness-weight 1.5` (vs 1.0) + `--overlap-consistency-weight 0.75` (vs 0.5). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. Tests IDEA #30-style weight bump on the one mechanism that actually produced v167's win (BS+OC). Moment-loss lever saturated (v169/v170 both fail). Log `/home/darrell/train_alibaba_v171.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v170 — CLOSED-FAILED (v167 recipe + `--moment-loss-weight 0.2` 2× default; W-spike auto-stop @ ep34 replay; frozen-best final.pt ★=0.03173 = **+8.8% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: follow-up to v169 (moment-loss 0.5 crashed recall +24.5%). v170 tests gentler 2× bump to see if moment-loss can help without destroying recall. Result: recall crash softer (0.8895 → 0.8755 vs v169's 0.8520), but still net loss.
+**Recipe**: v167 EXACTLY + `--moment-loss-weight 0.2`. Branched from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`.
+**Training (Phase 3)**: ep26 W=+2.43, ep27 W=+2.75, ep28 W=+4.72, ep29 W=+3.04, ep30 W=+2.21, ep31 W=+2.16, ep32 W=+5.01, ep33 W=+4.70, ep34 W=+3.77 → W-spike guard fired. Final.pt written at ep34. Closer to v167's final W=3.79 than v169's 5.66.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v167 |
+|---|---|---|---|---|
+| **final.pt** (ep34 W-stop) | **0.00683** | **0.8755** | **★=0.03173** | **+8.8% worse** |
+| epoch_0030.pt (= best.pt) | 0.01256 | 0.6630 | 0.07996 | +174.4% worse |
+
+**Monotonic moment-loss dose-response on alibaba (3 data points)**:
+| v# | moment_weight | MMD² | β-recall | ★ | Δ vs v167 |
+|---|---|---|---|---|---|
+| v167 | 0.1 (default) | 0.00705 | 0.8895 | 0.02915 | baseline |
+| v170 | 0.2 | 0.00683 | 0.8755 | 0.03173 | +8.8% |
+| v169 | 0.5 | 0.00671 | 0.8520 | 0.03631 | +24.5% |
+
+**Interpretation**:
+- **Moment-loss dose-response is monotonic**: higher weight → better MMD² but worse recall, monotonically worse combined. The default 0.1 is the local optimum for this weight grid.
+- **MMD² trend is real but small**: −3.1% at 2× to −4.8% at 5×. Recall trend is stronger and dominates combined.
+- **Lever saturated**. Moving on. Next queued v171 = IDEA #30-style weight bump on BS (1.0→1.5) + OC (0.5→0.75) — the one mechanism that actually produced v167's win.
 
 ---
 
