@@ -61,6 +61,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
+# Checkpoints pickled by train.py reference bare module names ("dataset",
+# "model", "train") because train.py runs from the llgan/ directory. Add
+# llgan/ AND its parent to sys.path so torch.load finds both "dataset" and
+# "llgan.dataset". Must happen before any torch.load call.
+_LLGAN_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_LLGAN_DIR.parent))
+sys.path.insert(0, str(_LLGAN_DIR))
+
 
 # ---------------------------------------------------------------------------
 # Deterministic seeding
