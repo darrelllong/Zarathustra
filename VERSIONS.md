@@ -203,8 +203,26 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v172** — v167 recipe EXACTLY + `--seed 11` (different seed, same ep25 branch point). Tests whether v167's 0.02915 is seed-lottery vs branch-point-lockin. Directly responsive to Round 26 P1 #1 peer review (over-closed v167 conclusion). If v172 gives ★≈0.02915±0.005, recipe is robust; if ★>0.035, v167 was a lottery and seed search is the next lever. Log `/home/darrell/train_alibaba_v172.log`.
+- **alibaba_v173** — v167 recipe EXACTLY + `--seed 13` (third seed, same ep25 branch) + `--checkpoint-every 1` (dense per-epoch capture ep26–ep34, directly addresses Round 26 P1 #1). Second seed test after v172 (seed=11) failed catastrophically at ★=0.08054 (+176% vs v167's 0.02915). If v173 ★≈0.029 → v167 is not universal (v172 was the outlier, need seed basin characterization). If v173 ★≈0.08 → v167 seed=7 was a rare lottery. Log `/home/darrell/train_alibaba_v173.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v172 — CLOSED-FAILED (v167 recipe EXACTLY + `--seed 11`; W-spike auto-stop @ ep29; only final.pt captured; frozen-best final.pt ★=0.08054 = **+176.3% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: seed-lottery test for v167. Same recipe, same branch (v165/ep25), same W-stop threshold — only `--seed 7` → `--seed 11`. Directly addresses Round 26 P1 #1 peer review ("W=3.0 mechanism claim is over-closed; could be one-off seed/branch trajectory"). Result: v167's 0.02915 does **NOT** reproduce under seed=11 — seed=11 gives 2.76× worse combined and W-stops 5 epochs earlier (ep29 vs ep34).
+**Recipe**: v167 EXACTLY + `--resume-from /home/darrell/checkpoints/alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 11`.
+**Training (Phase 3, from ep26 branch-point)**: ep26 W=+2.42, ep27 W=+3.21, ep28 W=+3.36, ep29 W=+3.62 → W-spike guard fired **5 epochs earlier than v167/v169/v170/v171** (all W-stopped at ep34). No `epoch_*.pt` saved (W-stop at ep29, before ep30 checkpoint-every fire); only final.pt exists.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v167 |
+|---|---|---|---|---|
+| **final.pt** (ep29 W-stop) | **0.00814** | **0.6380** | **★=0.08054** | **+176.3% worse** |
+
+**Interpretation**:
+- **v167 is seed-sensitive** — `seed=7` gives ★=0.02915, `seed=11` gives ★=0.08054. The 2.76× frozen-★ swing from a single seed flip confirms Round 26 P1 #1: the v167 "mechanism claim" is much weaker than the numerical result suggested. W=3.0 with this branch point *can* produce an ATB, but does not reliably do so.
+- **Critic dynamics differ under seed=11**: W crossed 3.0 at ep27 (vs v167's ep32 / moment/BS perturbations' ep32). The 5-epoch-earlier W-stop suggests a fundamentally different trajectory, not just slightly different weights at the same stopping point.
+- **Recall collapse drives the gap**: β-recall=0.638 vs v167's 0.8895 — a 0.25-absolute coverage drop. MMD² also worse (0.00814 vs 0.00705, +15%). Both dimensions regressed.
+- **Round 26 P1 #1 partially confirmed**: the ★=0.02915 win is not a property of "W=3.0 + v165/ep25 branch" — it's a property of the specific (seed=7, W=3.0, v165/ep25 branch) trajectory. Dense ep31/ep32/ep33 checkpointing (which peer reviewer asked for) would have been uninformative here because v172 didn't reach those epochs; this validates the reviewer's concern from a different angle — different seeds explore different W-trajectories.
+- **Next queued v173**: seed=13 + `--checkpoint-every 1` to capture every Phase 3 epoch (dense tail capture as peer reviewer requested). Second seed outside {7, 11} will characterize the basin. If v173 ★≈0.029, v167 class is ~50% replicable (needs multi-seed reporting). If v173 ★≈0.08, v167 was a rare lottery (seed search becomes primary lever, not mechanism tweaks).
 
 ---
 
