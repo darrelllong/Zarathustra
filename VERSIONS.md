@@ -203,8 +203,26 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v171** — v167 recipe + `--boundary-smoothness-weight 1.5` (vs 1.0) + `--overlap-consistency-weight 0.75` (vs 0.5). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. Tests IDEA #30-style weight bump on the one mechanism that actually produced v167's win (BS+OC). Moment-loss lever saturated (v169/v170 both fail). Log `/home/darrell/train_alibaba_v171.log`.
+- **alibaba_v172** — v167 recipe EXACTLY + `--seed 11` (different seed, same ep25 branch point). Tests whether v167's 0.02915 is seed-lottery vs branch-point-lockin. Directly responsive to Round 26 P1 #1 peer review (over-closed v167 conclusion). If v172 gives ★≈0.02915±0.005, recipe is robust; if ★>0.035, v167 was a lottery and seed search is the next lever. Log `/home/darrell/train_alibaba_v172.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v171 — CLOSED-FAILED (v167 recipe + BS 1.5 / OC 0.75 weight bump; W-spike auto-stop @ ep34; frozen-best final.pt ★=0.03542 = **+21.5% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: IDEA #30-style weight bump on the one mechanism (BS+OC overlap-mode) that actually produced v167's win. Tests whether pushing harder on the winning loss terms extracts more. Result: biggest MMD² gain on alibaba (-8.9%) but recall collapse dominated (0.8895 → 0.8550), net +21.5% worse.
+**Recipe**: v167 EXACTLY + `--boundary-smoothness-weight 1.5` (vs 1.0) + `--overlap-consistency-weight 0.75` (vs 0.5). Branched from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`.
+**Training (Phase 3)**: ep26 W=+2.45, ep27 W=+2.75, ep28 W=+4.72, ep29 W=+3.05, ep30 W=+2.21 (train-★=0.10445 ≈ v169/v170's 0.10401/0.10396), ep31 W=+2.19, ep32 W=+5.13, ep33 W=+4.72, ep34 W=+3.78 → W-spike guard fired. Identical critic dynamics to v167/v169/v170 despite the BS/OC change.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v167 |
+|---|---|---|---|---|
+| **final.pt** (ep34 W-stop) | **0.00642** | **0.8550** | **★=0.03542** | **+21.5% worse** |
+| epoch_0030.pt (= best.pt) | 0.01275 | 0.6555 | 0.08165 | +180.1% worse |
+
+**Interpretation**:
+- **BS/OC bump trades MMD² for recall harder than moment-loss**: biggest MMD² improvement observed on alibaba (-8.9%) but also the biggest recall crash (-3.9% absolute from v167). The two training-time lever families (moment-loss, BS+OC-weight) now both show the same monotonic trade-off shape.
+- **v167 recipe is pareto-optimal on the MMD²-recall frontier** under these single-variable perturbations. Next informative experiment must be orthogonal: either change the branch point (v172+), change the seed (tests lottery), or add a new mechanism (requires code).
+- **Round 26 P1 #1 relevance**: this is the 4th consecutive alibaba run (v168/v169/v170/v171) that replayed the same ep34 W-stop on the same branch point. The ep34 W-stop captures a specific trajectory that each perturbation reshapes only at the final weights, not the critic dynamics. The peer reviewer's caution ("normal W-stop captured the best observed tail checkpoint" rather than "W=3.0 proven") is correct — we don't yet know if another branch point or seed would find something better.
+- **Next queued v172**: v167 recipe EXACTLY + seed=11 (same branch, different seed). Decouples seed from branch-point. If v172 ≈ v167, recipe robust. If v172 ≫ v167, v167 was lottery.
 
 ---
 
