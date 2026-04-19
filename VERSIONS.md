@@ -204,7 +204,7 @@ on newly-landed code changes.
 ## Currently Running
 
 - **alibaba_v168** — v167 recipe EXACTLY + IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0; M=32, key=32, val=32; params=98,913). Fresh pretrain (NOT branched). `--seed 7`. Stacks retrieval on the new ATB recipe to test whether IDEA #17 adds to v167's 0.02915. Log `/home/darrell/train_alibaba_v168.log`.
-- **(tencent slot open — launching v166 = v165 recipe + IDEA #21 BS+OC stacked, testing if retrieval memory and BS+OC combine additively)**
+- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
 
 ---
 
