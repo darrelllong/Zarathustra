@@ -9,7 +9,8 @@ score wash AND a combined-score win does not hide over-copying.
 This tool runs a deterministic long-rollout against a trained checkpoint and
 computes:
 
-  * HRC (LRU hit-ratio curve) on the *stitched* stream, not per-window.
+  * HRC (LRU hit-ratio curve) computed per-stream and averaged (not stitched,
+    since streams are independent after the AD-round-1 offset removal).
   * Overall reuse rate.
   * First-decile vs. last-decile reuse rate (drift indicator).
   * Inter-reference-distance (IRD) histogram.
@@ -378,7 +379,10 @@ def _half_drift(values: np.ndarray) -> tuple:
         mid = len(values) // 2
         w1 = float(wasserstein_distance(values[:mid], values[mid:]))
     scale = float(np.median(np.abs(values))) if len(values) else 1.0
-    return w1, max(scale, 1.0)  # floor to avoid div-by-zero on degenerate data
+    # Pure div-by-zero guard (1e-12). A larger unit-bearing floor (e.g. 1.0)
+    # would silently denormalize small-magnitude corpora; with this guard,
+    # genuinely degenerate data produces an honest blow-up ratio instead.
+    return w1, max(scale, 1e-12)
 
 
 def _metrics_for_stream(df, cache_sizes: np.ndarray, n_ird_bins: int = 32) -> dict:
@@ -624,7 +628,7 @@ def main() -> int:
     _row("drift_obj_size_w1_norm", fake_m["drift_obj_size_w1_normalized"], real_m["drift_obj_size_w1_normalized"])
     _row("footprint_per_stream", fake_m["footprint_mean_per_stream"], real_m["footprint_mean_per_stream"], fmt="{:>14.0f}")
     print("─" * 68)
-    print(f"HRC-MAE (stitched long stream) : {gap_m['hrc_mae']:.4f}" if gap_m['hrc_mae'] else
+    print(f"HRC-MAE (mean across streams) : {gap_m['hrc_mae']:.4f}" if gap_m['hrc_mae'] else
           "HRC-MAE: unavailable")
     print(f"json     → {out_path}")
     print("─" * 68)
