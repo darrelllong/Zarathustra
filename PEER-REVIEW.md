@@ -1296,3 +1296,96 @@ The new data is useful because it says the mechanisms are workload-specific. The
 listen to that. Retrieval should not become a global recipe flag, moment-loss weight should not be
 mistaken for higher-order tail modeling, and the next major move should be conditional architecture
 or tail/checkpoint structure, not another scalar search.
+
+---
+
+## Round 28
+
+### Correct Retractions, But The New Baseline Is Still On Probation
+
+The changes since Round 27 are mostly the right kind of correction: `v167` was retracted as an
+Alibaba ATB after the three-seed basin failed, the boundary-smoothness palindrome bug was patched,
+`v174` closed the blunt `n_critic=1` slowdown arm, and `v175` is now the clean patched-BS rerun
+against the v164 recipe. That is a healthier posture than the previous scalar ladder. The remaining
+risk is that the repo now treats the new cleanup as closure before the patched training surface has
+earned it.
+
+1. `[P1]` The tail-strata section still labels the retracted checkpoint as the Alibaba ATB. The top
+   table correctly demotes `v167` and reinstates `v164` as the reproducible Alibaba baseline in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/VERSIONS.md#L19), but the IDEA
+   #34 table still says `v167 alibaba final.pt` has `0.02915 (ATB)` in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/VERSIONS.md#L173). That is now
+   stale and misleading. It matters because the tail-strata gate is meant to become a promotion
+   surface; if its example table keeps a lottery checkpoint as the reference, future tail claims
+   will compare against the wrong target. Re-run or relabel the Alibaba tail/ordinary rows against
+   `v164`, and keep the `v167` rows only as "retracted seed=7 diagnostic" provenance.
+
+2. `[P1]` The patched boundary loss fixes the math, but it invalidates more interpretation than the
+   current docs fully absorb. The new derivative-matching implementation in
+   [llgan/chunk_stitching.py](/Users/darrell/.codex/worktrees/db7d/Zarathustra/llgan/chunk_stitching.py#L113)
+   is a real repair: it replaces the old flipped-window constraint with position/velocity-style
+   continuity. But the response simultaneously says every BS-family result from v132 through v174
+   is compromised in [RESPONSE.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/RESPONSE.md#L603)
+   and then says recent v162-onward runs used the unaffected overlap path in
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/RESPONSE.md#L640). The second
+   sentence is only true for the OC sub-loss, not for the full BS+OC recipe, because BS was still
+   active and still using the palindrome loss. Until `v175` reports, the honest status is:
+   "v164 remains the reproducible score baseline, but its mechanism evidence for boundary
+   smoothness is tainted." Do not use v164 to conclude that BS+OC works; use it only as the numeric
+   baseline to beat.
+
+3. `[P1]` The retrieval-state patch is still not a valid training counterpart for persistent
+   retrieval. The new BS path threads `retrieval_state` from chunk A to chunk B in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/db7d/Zarathustra/llgan/train.py#L1753), and the
+   overlap path starts both overlap branches from the same prefix state in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/db7d/Zarathustra/llgan/train.py#L1789). That is
+   better than resetting the bank everywhere, but it is still gated behind BS/OC forwards and still
+   only gives roughly two 12-step chunks of exposure. With the default memory size of 32, the
+   response correctly admits the bank still does not saturate in
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/RESPONSE.md#L627). So do not read
+   `tencent_v166` as a clean test of persistent retrieval plus BS/OC. It is a test of short
+   retrieval memory with a limited two-window auxiliary path. The real #28/#31/#32 test still needs
+   chained-window training or a long sequential batch surface where eviction and long reuse-distance
+   behavior are actually trained.
+
+4. `[P2]` The `n_critic=1` failure is useful, but the conclusion should be narrower than "critic
+   slowdown is the wrong lever." `v174` shows that halving critic update frequency in the full
+   recipe produces stable-but-bad learning in [VERSIONS.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/VERSIONS.md#L211).
+   That closes this crude starvation arm. It does not close IDEA #33's broader tail-control idea:
+   dynamic critic regularization, spectral-norm strength, frozen/slow critic only after a diagnosed
+   railing state, or Professor-Forcing-style trajectory supervision remain different mechanisms.
+   The right inference is "do not starve the critic from the start of the run," not "tail control is
+   dead."
+
+5. `[P2]` The current promotion rule for new Alibaba mechanisms is directionally right but too
+   underspecified for seed-lottery prevention. [VERSIONS.md](/Users/darrell/.codex/worktrees/db7d/Zarathustra/VERSIONS.md#L19)
+   now says a new candidate must beat `0.03457` under seed 7 and show reproducibility under at
+   least one other seed. Good. But "at least one other seed" can still let a high-variance recipe
+   through if the loser seed is not run or not reported. For ATB promotion, publish the seed bundle
+   as a bundle: median, best, worst, and whether the worst seed is still competitive with v164.
+   Otherwise the project will recreate the v167 failure with a two-seed version of the same problem.
+
+### What I Would Do Next
+
+1. Fix the IDEA #34 table so `v167` is no longer labeled as the Alibaba ATB; add `v164` tail and
+   ordinary rows if those numbers are available.
+
+2. Let `v175` answer exactly one question: patched BS math versus the v164 numeric baseline. Do not
+   stack any other mechanism onto that branch until it reports.
+
+3. Treat `tencent_v166` as provisional unless it includes long-rollout HRC, stack-distance, reuse
+   access rate, and tail-stratum results. A short-window `★` win alone is not enough.
+
+4. Make the next retrieval-memory implementation step #31-style chained-window training, not
+   another per-window retrieval recipe flag.
+
+5. For Alibaba ATB promotion, require a published seed bundle rather than a single winning seed
+   plus one informal reproducibility note.
+
+### Short Take
+
+The project did the right thing by retracting v167 and patching the boundary-loss math. Now it has
+to live with the consequences: v164 is a numeric baseline, not clean evidence for BS; v175 is the
+first meaningful patched-BS test; and persistent retrieval still needs a training surface where the
+memory can actually fill, evict, and learn long reuse behavior. This is the moment to keep the bar
+high rather than immediately promote the next attractive scalar result.
