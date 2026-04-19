@@ -149,7 +149,32 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-_(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 2026-04-18 PM; next pair queued below)_
+- **alibaba_v166** — IDEA #33 arm (b): resume from v165/epoch_0025.pt, `--tail-start-epoch 30 --critic-lr-tail-factor 0.1` (critic LR drops 10× at the tail boundary), `--w-stop-threshold 5.0`. Tests whether slowing the critic across the tail produces a better `final.pt` than arm (c) / arm (a). Log `/home/darrell/train_alibaba_v166.log`.
+- **tencent_v164** — IDEA #21 BS+OC overlap-mode probe on tencent. ep28 W=+2.51, ★ ep15=0.05018, 13 ep stale (healthy). Log `/home/darrell/train_tencent_v164.log`.
+
+---
+
+### alibaba_v165 — CLOSED-FAILED (IDEA #33 arm (c): W-stop threshold 5.0; W-spike auto-stop @ ep34; frozen-best epoch_0030.pt ★=0.03894 = **+12.6% vs ATB 0.03457**, 2026-04-18)
+**Why (closed)**: IDEA #33 arm (c) — identical recipe to v164 but `--w-stop-threshold 5.0` (instead of 3.0), to test whether a higher-threshold tail would let the critic-generator dynamics find a *better* checkpoint than v164's ep29 final.pt. This isolates the "higher-threshold tail" mechanism from arm (b) (critic-slowdown tail) and arm (a) (normal w-stop 3.0).
+**Recipe**: v164 EXACTLY + `--w-stop-threshold 5.0` + `--seed 7` (same seed as v164 so only the threshold differs). Fresh pretrain. PID 666077. Log `/home/darrell/train_alibaba_v165.log`.
+**Training (Phase 3)**: ep5 W=+0.75 (train★=0.06728 — best, never beaten), ep10 W=+1.53, ep15 W=+1.86 (★=0.07084), ep20 W=+2.47 (★=0.07233), ep25 W=+2.34 (★=0.08702), ep30 W=+3.70 (★=0.07994), ep31 W=+4.45, ep32 W=+5.27, ep33 W=+5.20, ep34 W=+5.19 → W-spike guard fired (3 consecutive above 5.0), `final.pt` written at ep34.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0030.pt** (W=3.70, pre-tail) | **0.00963** | **0.8275** | **★=0.03894** (frozen-best) |
+| final.pt (ep34 W-stop tail) | 0.00963 | 0.8275 | 0.04413 |
+| epoch_0020.pt | 0.00622 | 0.7225 | 0.06172 |
+| epoch_0025.pt | 0.00771 | 0.6685 | 0.07401 |
+| epoch_0010.pt | 0.01140 | 0.6360 | 0.08420 |
+| epoch_0005.pt / best.pt | 0.01071 | 0.6115 | 0.08841 |
+| epoch_0015.pt | 0.01372 | 0.4895 | 0.11582 |
+
+**Interpretation — IDEA #33 arm (c) does NOT beat arm (a) = v164**:
+- v165 frozen-best ep30 ★=0.03894 is **+12.6% worse** than v164 final.pt ★=0.03457 (same recipe, only w-stop-threshold differs). Raising the w-stop threshold did not unlock a better checkpoint than v164's w-stop-3.0 final.pt.
+- v165 `final.pt` (ep34, 4 epochs past the old 3.0 boundary, W=5.19) is itself **worse** than ep30 (pre-tail). The "longer tail under railing critic distills better final.pt" pattern from v164's 3-seed lottery does NOT hold when the critic is simply allowed to diverge further — so the v164 distillation-hypothesis's *mechanism* is not "critic divergence = better G" in isolation.
+- best.pt (ep5) ★=0.08841 = **+127% worse than frozen-best** — 10th confirmation of Round 18 P1 #1 (best.pt mis-rank pathology). ep5 was train-★-best and remained so at kill, but frozen_sweep ranks it 6th of 7.
+- **What v165 tells us about v164**: the v164 seed-7 landing at ★=0.03457 is likely NOT reproducible by simply "train longer" (seed-7 now exists with w-stop 5.0 and produces ★=0.03894). The v164 result depends on the specific critic trajectory that w-stop-3.0 cuts off. v166 (arm b, critic-slowdown tail branched from v165/ep25) is the next identification test: if arm (b) produces a final.pt ≤ v164's 0.03457, the mechanism is "slowing the critic" specifically, not just "stopping training"; if arm (b) also fails, the v164 result is the survivorship lottery that Round 22 reconciliation warned about.
+- Commits: IDEA #33 tail-control lever `2bc7833` (adds `--tail-start-epoch` / `--critic-lr-tail-factor`), used by v166.
 
 ---
 
