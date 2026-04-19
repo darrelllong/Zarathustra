@@ -203,8 +203,27 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v174** — v164 recipe EXACTLY + `--n-critic 1` (vs v164's `--n-critic 2`). Fresh pretrain. `--seed 7`. Mechanism change (not seed/branch lottery): halves critic update frequency relative to G to delay the W-runaway pattern that W-stops every alibaba tail. Directly tests whether critic slowdown (not threshold adjustment) is the right tail-control lever (peer review Round 25 explicitly called for this branched-critic-slowdown arm). If v174 extends the usable tail past ep34 without recall crash, n_critic=1 is the new baseline. Targets beating v164's ★=0.03457 (the reproducible ATB) — v167's 0.02915 is now known to be a seed-lottery artifact, not a reproducible target. Log `/home/darrell/train_alibaba_v174.log`.
-- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+- **alibaba_v175** — v164 recipe EXACTLY + `--seed 7` + patched `chunk_stitching.py` (palindrome-bug fix from peer review Round 27 P1 #4 / Gemini R3 P1 #1: `boundary_latent_smoothness` now uses derivative matching — i-th forward finite difference at A's trailing edge vs B's leading edge — instead of the previous `.flip(dims=[1])` palindrome constraint that forced A[T-1-i]=B[i] and penalized directional trends). v174 (n-critic=1) closed-failed at ep20 frozen ★=0.08573 (see below). v175 backs out the n-critic perturbation so the ONLY delta vs v164 is the BS-loss math — clean A/B on whether the palindrome fix alone unlocks alibaba gains. Same pretrain determinism as v164/v174 (seed=7). Log `/home/darrell/train_alibaba_v175.log`.
+- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Running pre-patch BS (buggy palindrome) — leave as-is; in-memory module loaded at launch. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v174 — CLOSED-FAILED (v164 recipe + `--n-critic 1` slow-critic arm; manual kill @ ep22 after 12 epochs of ★ flat/regressing; frozen-best epoch_0020.pt ★=0.08573 = **+148% worse than v164's 0.03457**, 2026-04-19)
+**Why (closed-failed)**: IDEA #33 branched tail-control experiment — halve critic frequency (n-critic 2→1) to test whether slower critic delays the ep30+ W-runaway that kills every alibaba tail. Result: n-critic=1 did control W (ep20 W=+1.25 vs v164's W=+2.47 at same epoch), BUT the critic-gradient signal was too weak for G to learn useful structure — ★ trajectory was FLAT-TO-RISING: ep5=0.09971, ep10=0.07454 (best), ep15=0.07848, ep20=0.08085. Recall crashed ep15→ep20 (0.752 → 0.670). At this trajectory no realistic path to ★=0.03457. Killed manually at ep22. Lesson: controlling W by starving the critic is counterproductive — the critic needs enough steps to provide useful gradient direction, otherwise G just wanders.
+**Recipe**: v164 EXACTLY + `--n-critic 1` (vs v164's `--n-critic 2`). Fresh pretrain. `--seed 7`. Ran on buggy palindrome BS (pre-patch code).
+**Training (Phase 3)**: ep1 W=+0.07, ep5 W=+0.62 (train★=0.09971), ep10 W=+0.99 (train★=0.07454 ★), ep15 W=+1.11 (train★=0.07848), ep18 W=+2.19 (single spike), ep20 W=+1.25 (train★=0.08085; recall 0.670 — crashed), ep22 W=+0.66 → manual kill.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0020.pt** | **0.01033** | **0.6230** | **★=0.08573** (frozen-best) | **+148% worse** |
+| epoch_0010.pt (= best.pt) | 0.01981 | 0.5785 | 0.10411 | +201% worse |
+| epoch_0015.pt | 0.02384 | 0.4920 | 0.12544 | +263% worse |
+| epoch_0005.pt | 0.03267 | 0.3460 | 0.16347 | +373% worse |
+
+**Interpretation**:
+- **n-critic=1 produces stable-but-bad**: unlike v164 where frozen ★ mis-ranks train-selector's pick by 121%, v174's frozen (ep20 0.0857) ~= its train-selector's pick (ep20 train★=0.0809). A weak critic produces a poor model that the weak critic itself can't distinguish from worse models — no training/frozen drift because no learning signal.
+- **Hypothesis refuted**: tail-control via critic slowdown is the wrong lever. Better levers are (a) fix the BS-loss math (v175 tests this), (b) regularize the critic (spectral-norm strength sweep), (c) Professor Forcing-style trajectory matching.
+- **Next queued**: v175 backs out the n-critic=1 perturbation so only the patched BS differs from v164. This is the identification experiment for whether the palindrome fix unlocks alibaba gains.
 
 ---
 
