@@ -150,8 +150,34 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-- **alibaba_v166** — IDEA #33 arm (b): resume from v165/epoch_0025.pt, `--tail-start-epoch 30 --critic-lr-tail-factor 0.1` (critic LR drops 10× at the tail boundary), `--w-stop-threshold 5.0`. Tests whether slowing the critic across the tail produces a better `final.pt` than arm (c) / arm (a). Log `/home/darrell/train_alibaba_v166.log`.
-- **tencent_v165** — first training-side test of IDEA #17 retrieval memory on tencent (K/V/T/mask per-window bank + learned reuse gate + BCE aux). params=98,913. Log `/home/darrell/train_tencent_v165.log`.
+- **alibaba_v167** — IDEA #33 arm (a): resume from v165/epoch_0025.pt, `--w-stop-threshold 3.0` (default), no tail-control. Completes the three-arm identification test by pairing the *same branch point* with the *normal* w-stop policy that v164 used via fresh-pretrain lottery. If v167 beats v166 (★=0.04038) and v165 (★=0.03894), the "distillation" effect v164 showed is from critic-clipping at 3.0 specifically, not the longer tail. If v167 is worse than both, the v164 result needed the specific seed-trajectory of a fresh pretrain, not the shared branch-point. Log `/home/darrell/train_alibaba_v167.log`.
+- **tencent_v165** — first training-side test of IDEA #17 retrieval memory on tencent (K/V/T/mask per-window bank + learned reuse gate + BCE aux). params=98,913. Entered Phase 3 @ 02:08. Log `/home/darrell/train_tencent_v165.log`.
+
+---
+
+### alibaba_v166 — CLOSED-FAILED (IDEA #33 arm (b): critic-slowdown tail, `--critic-lr-tail-factor 0.1` at ep30; killed at ep75 on 30-ep-stale-from-train-★; frozen-best epoch_0065.pt ★=0.04038 = **+16.8% vs ATB 0.03457**, 2026-04-19)
+**Why (closed)**: IDEA #33 arm (b) — branched from v165/epoch_0025.pt (same pre-tail checkpoint as v165 arm (c)) but tail-policy = `--tail-start-epoch 30 --critic-lr-tail-factor 0.1` (critic LR drops 10× at ep30). Tests whether *slowing* the critic across the tail gives the generator room to distill, separately from merely *raising* the w-stop threshold (arm c = v165). Killed at ep75 when train-★ had been stale at ep45 (0.06791) for 30 epochs — critic-slowdown prevented any w-stop fire but also prevented further ★ improvement.
+**Recipe**: v165 EXACTLY + `--tail-start-epoch 30 --critic-lr-tail-factor 0.1` (replacing v165's `--w-stop-threshold 5.0` alone). `--seed 7`. Resume from `alibaba_v165/epoch_0025.pt` (pre-tail branch-point). Log `/home/darrell/train_alibaba_v166.log`. IDEA #33 tail-control lever wired in commit `2bc7833`.
+**Training (Phase 3)**: Resumed @ ep26. ep30 W=+2.22 train-★=0.10414 (tail-control ACTIVATED here — log shows `[IDEA #33] tail-control: scaled all critic LRs by 0.1 at epoch 30`). ep35 train-★=0.10321, ep40 train-★=0.10233, ep45 train-★=**0.06791** (big jump — MMD² 0.01093→0.00671, β-recall 0.543→0.694). ep50–75: train-★ oscillates 0.077–0.105, never beats ep45. W trajectory post-tail 1.97–4.98, stays under 5.0 threshold (no w-stop fire). Killed at ep75 (30 ep stale).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0065.pt** | **0.01108** | **0.8535** | **★=0.04038** (frozen-best) |
+| epoch_0040.pt | 0.00557 | 0.8255 | 0.04047 |
+| epoch_0060.pt | 0.00606 | 0.8165 | 0.04276 |
+| epoch_0045.pt / best.pt | 0.01730 | 0.8495 | 0.04740 |
+| epoch_0070.pt | 0.00570 | 0.7855 | 0.04860 |
+| epoch_0075.pt | 0.00614 | 0.7290 | 0.06034 |
+| epoch_0035.pt | 0.00947 | 0.7300 | 0.06347 |
+| epoch_0050.pt | 0.00742 | 0.7125 | 0.06492 |
+| epoch_0030.pt | 0.01243 | 0.6905 | 0.07433 |
+| epoch_0055.pt | 0.01570 | 0.6225 | 0.09120 |
+
+**Interpretation — critic-slowdown loses to higher-threshold; both lose to normal w-stop (fresh pretrain)**:
+- v166 frozen-best ★=0.04038 is **+3.7% worse than v165 arm (c) ★=0.03894** (both branched from v165/ep25 with identical recipe; only tail-policy differs). Forcing the critic slower did NOT produce a better distilled generator than simply letting the critic diverge further under a raised threshold.
+- v166 frozen-best ★=0.04038 is **+16.8% worse than v164 ATB ★=0.03457** (v164 = fresh pretrain + normal w-stop 3.0 + seed 7). The fresh-pretrain 3.0-stop run dominates both branched tail variants. This suggests the v164 "distillation" may be at least partly tied to the *specific critic trajectory a fresh pretrain produces before ep25*, not the tail policy alone.
+- best.pt (ep45) ★=0.04740 vs frozen-best (ep65) ★=0.04038 — **+17.4% mis-rank** (11th confirmation). Notable: ep45 had higher β-recall (0.8495) but WORSE MMD² (0.01730); ep65 has lower β-recall (0.8535 — actually similar) AND better MMD² (0.01108) — so ep65's win is mostly MMD² quality.
+- **Still-missing arm**: v167 (now running) is the proper arm (a) control — same branch point, normal 3.0 w-stop. Only after v167 completes can the three-arm table be read.
 
 ---
 
