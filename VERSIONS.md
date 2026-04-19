@@ -16,7 +16,7 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00677, β-recall=**0.8610** → ★=0.03457. **30.7% improvement over v157's 0.04982**; beats v162 lottery-win (0.04803) by 28.1%. Now BEATS tencent ATB 0.03942 (alibaba was historically the harder corpus). best.pt (ep5) ★=0.08841 = **+155.7% worse than frozen-best** — 8th confirmation of best.pt mis-rank pathology and the largest alibaba-side gap observed. final.pt saved at W-stop ep29 (W=3.72). **The "v162 lottery" reframes as a seed-sampled *W-stop distillation* effect: a recipe that W-spikes produces final.pt checkpoints that progressively distill against the failing critic; three alibaba seeds now show 0.098 / 0.048 / **0.035**, with seed=7 proving the effect can reach deep into new-ATB territory.** |
+| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode — unstable recipe, tail-checkpoint win) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00677, β-recall=**0.8610** → ★=0.03457. **30.7% improvement over v157's 0.04982**; beats v162 lottery-win (0.04803) by 28.1%. Now BEATS tencent ATB 0.03942 (alibaba was historically the harder corpus). best.pt (ep5) ★=0.08841 = **+155.7% worse than frozen-best** — 8th confirmation of best.pt mis-rank pathology and the largest alibaba-side gap observed. final.pt saved at W-stop ep29 (W=3.72). **Three alibaba seeds on this recipe now show 0.098 / 0.048 / 0.035 with final.pt saved at W-stop epochs 7 / 9 / 29. That pattern is consistent with a *W-stop distillation hypothesis* (longer tail under a railing critic yields better final.pt) but it is also consistent with survivorship — 3 seeds is too few to identify the mechanism. A branched tail-control test (IDEA #33) is needed before the distillation framing can be treated as mechanism rather than hypothesis.** |
 | Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
@@ -39,15 +39,24 @@ All new experiments eval with `--eval-real-seed 42`. Old numbers kept
 in-line for historical provenance but marked "moving-bundle" where
 relevant.
 
-**Labeling clarification (Round 17 peer review, 2026-04-17)**: Prior
+**Labeling clarification (Round 17 peer review, 2026-04-17; revised 2026-04-18 per Round 22)**: Prior
 entries tagged `--boundary-smoothness-*` as IDEA #21. That was inaccurate.
 `boundary-smoothness` implements only the latent-space sub-loss (a) from
 `chunk_stitching.py`; the full IDEA #21 also requires (b) feature-space
 overlap-consistency training on paired adjacent windows with hidden-state
-carry from `generate.py`. Sub-loss (b) is NOT wired, so true IDEA #21
-remains **untested**. Entries now read "partial-#21 (BS only)" where only
-sub-loss (a) was used. Full #21 chunk stitching is the next code-level
-priority after the current hyperparameter ablation loop (v138) closes.
+carry from `generate.py`.
+
+**Current status (2026-04-18, post-Round 22 reconciliation)**: sub-loss (b)
+IS wired as of the Round 19 code cleanup (`dce95a0`). v161/v162/v164 all
+run BS+OC overlap-mode (both sub-losses active). The recipe has produced
+the current alibaba ATB (v164 final.pt ★=0.03457) but is **unstable**:
+the critic W-distance climbs past the 3.0 W-stop guard within 7–29 epochs
+on every tried seed, and `final.pt` (whatever W-stop catches) is the
+only reliably usable checkpoint. Status is **"wired, producing ATBs, but
+recipe-unstable and mechanistically not yet understood"** — not "NOT wired"
+(that was the Round 17 state) and not "closed" (still unstable). Partial-#21
+(BS only, no OC overlap-mode) in v132/v150 runs remains an earlier-lineage
+label for runs from before sub-loss (b) landed; those are not re-opened.
 
 ---
 
@@ -145,7 +154,7 @@ _(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 
 ---
 
 ### alibaba_v164 — CLOSED-WIN ★ NEW ALIBABA ATB ★ (W-spike auto-stop @ ep29; frozen-best final.pt ★=0.03457 = **−30.7% vs prior ATB 0.04982**, 2026-04-18)
-**Why (closed)**: third seed of v162 recipe (IDEA #21 BS+OC overlap-mode) to triangulate the v161→v162 lottery. Outcome inverted the "lottery" framing: this is a *W-stop distillation* mechanism, not pure luck.
+**Why (closed)**: third seed of v162 recipe (IDEA #21 BS+OC overlap-mode) to triangulate the v161→v162 lottery. Outcome is consistent with a *W-stop distillation hypothesis* (longer pre-W-stop tail → better final.pt) but 3 seeds are not enough to rule out survivorship; the branched tail-control test (IDEA #33) is the identification experiment.
 **Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5` + `--seed 7`. Fresh pretrain. PID 644132. Log `/home/darrell/train_alibaba_v164.log`.
 **Training (Phase 3)**: ep1 W=+0.33, ep5 W=+0.75 (train★=0.06728 — still train-best at kill), ep10 W=+1.53, ep15 W=+1.86, ep20 W=+2.47, ep25 W=+2.34, ep27 W=+3.15, ep28 W=+3.61, ep29 W=+3.72 → W-spike guard fired, `final.pt` written at ep29 with W=3.72. Slower spike than v161/v162 (7-9 ep) — this seed let the generator train for ~20 more epochs against a gradually railing critic.
 **Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
@@ -158,12 +167,12 @@ _(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 
 | epoch_0005.pt / best.pt | 0.01071 | 0.6115 | 0.08841 |
 | epoch_0015.pt | 0.01372 | 0.4895 | 0.11582 |
 
-**Interpretation — IDEA #21 recipe is a W-STOP DISTILLATION mechanism, not a lottery**:
-- Three alibaba seeds (5, 42, 7) on identical recipe now yield final.pt ★ = 0.098, 0.048, **0.035**. With only 3 points, this could still look random — but the best seed produces the longest Phase 3 run (ep29 vs ep7–9), and β-recall at final.pt ascends monotonically with run length (0.56 → 0.83 → 0.86). Reinterpretation: *the longer the critic takes to rail out, the further the generator distills*, and recall compounds during that window.
+**Interpretation — W-STOP DISTILLATION HYPOTHESIS, not yet identified as mechanism (Round 22 reconciliation)**:
+- Three alibaba seeds (5, 42, 7) on identical recipe now yield final.pt ★ = 0.098, 0.048, **0.035**, with W-stop epochs 7 / 9 / 29 and final.pt β-recall 0.56 / 0.83 / 0.86. The pattern *looks like* "longer pre-W-stop tail → better final.pt". But with only 3 points, the alternative explanation — seed 7 happened to avoid early collapse long enough to land in a good generator state — is not ruled out. Calling this a "mechanism" is an overclaim until the tail-control test isolates the W-stop-distillation effect from run-length / survivorship.
 - best.pt (ep5 ★=0.08841) was +155.7% worse than frozen-best — LARGEST best.pt mis-rank observed on alibaba, 8th corpus-wide confirmation of Round 18 P1 #1. A training-★ selector would have shipped a model 2.6× worse than the actual result.
 - v164 is also the first alibaba ATB to BEAT the tencent ATB (0.03457 vs 0.03942). Historically alibaba was considered harder (Hurst=0.98 block-sampling requirements, 10× more files). This inverts that.
-- **Open question**: is the distillation monotone past the W-stop? v164 stopped at ep29; no evidence that ★ would have continued dropping at ep50. A follow-up `--w-stop-threshold 5.0` probe is warranted (queued as v166).
-- Long-rollout eval on v164 final.pt is blocked by Round 21 P1 sidecar issues (conditioning, IRD-vs-stack-distance, drift-half computation, manifested baseline). Will run after sidecar fixes land.
+- **Open identification question — and why v165 `--w-stop-threshold 5.0` is not the clean control (Round 22 P1 #2)**: raising the W-stop threshold only tests whether the run can survive further critic divergence. It does not separate *generator distillation under railing critic* from *generator improvement independent of critic state*. The correct first control (IDEA #33, queued as the real follow-up) branches from the **same pre-tail checkpoint** into (a) normal W-stop, (b) critic-frozen / critic-slowed tail, and (c) higher-threshold tail, then frozen-sweeps all three. If (b) and (c) both beat (a) the effect is generator distillation; if only (c) beats (a) the effect is adversarial pressure. v165 is left running for its raw data (it is not useless — it provides a third data point on the W-stop-distillation pattern) but is **not** the identification experiment and its result should not close the hypothesis either way.
+- Long-rollout eval on v164 final.pt is **now unblocked** by the Round 21 sidecar fix (commit `83852d0`: char_file sampling + stack-distance + per-stream drift + real-baseline manifest). To be run against v164 final.pt under the fixed sidecar before citing any long-rollout numbers for v164.
 
 ---
 
@@ -253,7 +262,7 @@ _(no active training — alibaba_v164 and tencent_v163 both W-stopped and swept 
 - **Do NOT promote v162 to alibaba ATB**: same recipe at seed=5 scored 2× worse. Declaring 0.04803 as the new ATB would be cherry-picking the lucky seed. v157 (★=0.04982, seed=2) stays the alibaba ATB.
 - **best.pt ep5 was 3× worse than frozen-best (final.pt ep9)**: 7th confirmation of Round 18 P1 #1 best.pt mis-rank pathology.
 
-**CLOSE IDEA #21 (BS+OC overlap-mode on alibaba)** as currently formulated: the recipe's W-instability means `final.pt` content is RNG-gated and cannot be reliably shipped. Future re-entry for #21 on alibaba requires a stabilizer (e.g., lower OC weight <0.5, higher `--grad-clip`, or drop BS) to turn the W-spike into a gradual climb — without stabilization the recipe is a lottery.
+**IDEA #21 STATUS (revised 2026-04-18 per Round 22)**: BS+OC overlap-mode on alibaba is **wired, productive, but unstable**. It has produced the current alibaba ATB (v164 final.pt) AND a catastrophic failure (v161) AND a marginal win (v162) on three seeds of the same recipe — this is not "closed". The original "CLOSE IDEA #21" framing in this section was premature; later commits (v164) showed the recipe could reach deep new-ATB territory on the right seed. The correct status is: **IDEA #21 remains open; the recipe produces ATBs but only via `final.pt` captured at W-stop, and identifying whether this is distillation or survivorship (IDEA #33 tail-control test) is the next step**. A stabilizer variant (lower OC weight, higher grad-clip, or BS drop) is still a valid future direction but is no longer the sole path forward — the tail-control experiment is a more targeted identification.
 
 ---
 
