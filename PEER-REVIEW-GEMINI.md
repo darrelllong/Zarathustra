@@ -35,3 +35,23 @@ After reviewing the newest inference features and core metrics, here is the next
 2. `[P2]` **Mathematically Biased MMD² Estimator**: The `mmd` function in `llgan/mmd.py` computes `_rbf_kernel(...).mean()`. This naturally includes the diagonal matrices where distance is 0 and the kernel evaluates to exactly `1.0`. While perfectly functional as a comparative distance proxy, claiming it as an "Unbiased" estimator (as noted in the docstring) is mathematically incorrect and introduces a systematic scaling bias of `1/N`. A mathematically pure unbiased estimator must explicitly subtract the trace (diagonal elements) before calculating the mean, otherwise the metric is artificially inflated for small evaluation samples.
 
 3. `[P2]` **Zero-division instability in DMD-GEN**: The `_dmd_subspace` function in `llgan/mmd.py` calculates `A_tilde` using `np.diag(1.0 / S_r)` directly on the raw singular values. For synthetic trace sequences that suffer from mode-collapse (producing constant, unchanging feature values over 12 timesteps), the singular values `S_r` will aggressively approach absolute zero. Instead of catching this cleanly, `1.0 / S_r` floats explode to infinity, completely destroying the calculation and periodically throwing silent `NaNs`. Because early generator training naturally includes frequent mode-collapse, the DMD metric needs to use a pseudo-inverse like `np.linalg.pinv(np.diag(S_r))` or enforce a strict `S_r > tol` threshold cut-off to remain numerically robust across all epochs.
+
+## Round 3
+
+1. `[P1]` **Mathematical Bug: `boundary_latent_smoothness` Forces a Palindrome**
+**Location:** `llgan/chunk_stitching.py`
+**Issue:** The chunk stitching logic intended to enforce continuity across adjacent generated windows contains a severe mathematical flaw. It computes the MSE between the trailing steps of chunk A and the leading steps of chunk B, but it reverses chunk A using `.flip(dims=[1])`. 
+- **Effect:** This compares `A[T-1]` to `B[0]` and `A[T-2]` to `B[1]`. For a continuous sequence, enforcing `A[T-2] == B[1]` penalizes any directional trend and forces the generated time-series to have zero velocity at the boundary, turning the time-series into a local palindrome. This destroys directional temporal dynamics and explains why continuity losses fail to improve long-horizon realism.
+- **Fix:** Remove the `.flip(dims=[1])` and adjust the comparison so it correctly compares equivalent overlapped points, or compute a forward derivative difference `(B[1]-B[0]) - (A[T-1]-A[T-2])` to penalize sharp velocity shifts without halting the trajectory.
+
+2. `[P1]` Train/Eval Mismatch: Retrieval Memory is Never Saturated During Training
+**Location:** `llgan/train.py` and `llgan/retrieval_memory.py`
+**Issue:** The newly added `RetrievalMemory` is designed to be persistent across very long sequences during evaluation (up to 100,000 steps). However, during training in `train.py`, `retrieval_state` is completely omitted from the recurrent thread. 
+- **Effect:** The generator only trains on isolated `T=12` step windows with a fresh memory each time. Since the default memory capacity is `mem_size=32`, the memory never actually fills up during training. The critical logic for memory eviction (`evict_score`) and attending over a saturated memory space never receives any supervision. 
+- **Fix:** `train.py` must maintain and thread `retrieval_state` across sequential training chunks, just as it does with `h_carry` for the RNN/SSM backbone. Without this, persistent retrieval is completely out-of-distribution during long rollouts.
+
+3. `[P2]` **Legacy `boundary` Mode for Overlap Consistency Invokes the Palindrome Bug**
+**Location:** `llgan/train.py` (around line 1784)
+**Issue:** When using the legacy `--overlap-consistency-mode boundary`, the `train.py` script mistakenly invokes `boundary_latent_smoothness` to compute feature-space MSE.
+- **Effect:** This applies the exact same palindrome-forcing zero-velocity boundary conditions to the feature space (`feat_c1`, `feat_c2`). The WaveStitch-style `overlap` mode (the new default) correctly uses the time-aligned `overlap_consistency` and is unaffected.
+- **Fix:** If the legacy boundary mode is to be preserved for provenance, write a dedicated continuous feature MSE loss rather than reusing `boundary_latent_smoothness`'s flipped logic.
