@@ -1085,3 +1085,31 @@ v164 is the best short-window Alibaba result in the repo and should be treated a
 project is already turning it into a story before it has the controls for that story. The next
 move should be a mechanism-separating tail experiment, not a bigger W-stop threshold and not
 another closure label.
+
+---
+
+## Round 23
+
+### Higher Moments Say This Is A Tail-Regime Problem
+
+1. `[P1]` The new R higher-moment pass makes the "just tune the average-case score" path look even less credible. The analysis now records standardized 5th and 6th central moments for the block-trace feature distributions in [R-ANALYSIS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/R-ANALYSIS.md#L1106). The results are not subtle: Tencent block `iat_q50` has M6 around `3.76M`, Tencent `abs_stride_q50` has M6 around `2.16M`, Alibaba block `iat_q90` has M6 around `858K`, and Alibaba `reuse_ratio` has M6 around `195K` in [R-ANALYSIS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/R-ANALYSIS.md#L1125). Those numbers say the GAN is not merely missing a slightly skewed distribution. It is being asked to reproduce rare timing/seek/reuse regimes that dominate high-order shape.
+
+2. `[P1]` This should change how checkpoint selection is judged. Rounds 18 and 22 already argued that `best.pt`, `final.pt`, and W-stop tail checkpoints can all be misinterpreted without the right promotion protocol. The higher-moment result gives a sharper diagnostic: checkpoint sweeps should not only report MMD, recall, and long-rollout sidecars; they should also report tail-stratum behavior on `iat_*`, `abs_stride_*`, and reuse-heavy files/windows. Otherwise a checkpoint can win the frozen bundle while still erasing the rare events that make the real traces hard.
+
+3. `[P1]` Do **not** turn this into `--moment6-loss-weight 0.1`. That would be exactly the scalar-twiddling trap. High-order moments this large will be numerically brittle and easy to game if used as a raw loss. The right conclusion is structural: identify tail-heavy files or windows, route them explicitly, and evaluate them separately. I added that as a concrete new direction in [IDEAS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/IDEAS.md#L1329): tail-regime modeling from higher-order moments.
+
+4. `[P2]` The limitation is still important: this R pass is file-level, because the current R stack consumes parser-derived per-file features rather than the actual 12-step GAN training windows. That is still useful, because the tails are enormous even after aggregation. But the next follow-through should be a window-level version of the same audit, ideally producing a tail label that can be used for stratified frozen evaluation and then, later, for a tail router.
+
+### What I Would Do Next
+
+1. Add a tail-stratified eval bundle: ordinary files/windows plus the high-M5/M6 tail files/windows for `iat_*`, `abs_stride_*`, and reuse.
+
+2. During checkpoint sweeps, report frozen combined score, long-rollout metrics, and tail-stratum recall side by side.
+
+3. If the tail gap is real, build the structural route from IDEA `#34`: ordinary generator path plus explicit tail-regime path, not a direct high-order moment loss.
+
+4. Use Alibaba as the cleaner first test of tail-stratified selection, because v164 is now the strong short-window result. Use Tencent as the stress test once its current recipe family has a stable post-sweep interpretation.
+
+### Short Take
+
+The R pass was worth doing. It gives a quantitative reason the project keeps getting punished by train/frozen gaps, recall instability, and long-rollout cache/locality gaps: the hard part of these traces lives in rare-event tails. The next move should be tail-aware selection and routing, not another smooth scalar loss.

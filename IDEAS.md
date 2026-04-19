@@ -1323,3 +1323,32 @@ mis-rank pathology into a deliberate checkpoint-production strategy.
 architecture risk. The main risk is overfitting to one alibaba seed, so the first test should
 start from an already-saved pre-tail checkpoint and run two or three deterministic tail variants
 before spending full fresh-training budget.
+
+---
+
+### 34. Tail-regime modeling from higher-order moments
+
+**Core claim:** the 2026-04-18 R higher-moment pass shows that the block-trace families have enormous
+standardized 5th and 6th moments on `iat_*`, `abs_stride_*`, and `reuse_ratio` surfaces. That is a
+rare-event regime problem, not something likely to be solved by another smooth scalar loss.
+
+**Why this fits the repo specifically:**
+- Tencent `iat_q50` has M6 around 3.76M and `abs_stride_q50` has M6 around 2.16M in the R pass.
+- Alibaba `iat_q90` has M6 around 858K and `reuse_ratio` has M6 around 195K.
+- These are precisely the surfaces where the generator keeps showing train/frozen and recall instability.
+
+**Architecture sketch:**
+- Add a tail-regime classifier or router that explicitly separates ordinary windows from rare timing/seek/reuse windows.
+- Route tail windows through a specialized generator head, mixture component, or sampled rare-event template.
+- Use higher-order moments as diagnostics and checkpoint triage, not as a raw high-order loss term.
+
+**Minimal viable experiment:**
+- Label files or windows as tail-heavy using the R moment audit.
+- Train or evaluate with a tail-stratified frozen bundle.
+- Require candidate checkpoints to preserve ordinary combined score while improving tail-stratum recall.
+
+**Failure modes / risks:**
+- Directly optimizing M5/M6 would be numerically brittle and easy to game.
+- File-level moments may not map perfectly to 12-step training windows; a window-level follow-up is still needed.
+
+**Why it is still worth it:** the moment pass gives a quantitative reason that smooth average-case tuning keeps disappointing. The tails are too extreme to treat as noise.
