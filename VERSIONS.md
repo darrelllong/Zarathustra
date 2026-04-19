@@ -139,10 +139,39 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-### alibaba_v162 — v157 recipe + fixed BS+OC overlap-mode + **seed-42** (seed-dependence test for v161's W-spike), 2026-04-18
-**Why**: v161 (same recipe, seed-5) W-spiked ep4–7 and auto-stopped — W went 0.17→0.78→1.57→2.92→3.39→3.75→4.51 (monotone, not a transient spike). Three hypotheses remain after v161's frozen sweep: (A) seed=5 unlucky, (B) OC=0.5 on top of BS=1.0+continuity=1.0 is inherently destabilizing on alibaba, (C) BS bug-fix changed the effective gradient scale because pre-fix BS was borrowing OC's overlap split. v162 uses seed=42 — the seed that produced the current alibaba ATB via v157 — to separate (A) from (B)+(C). If v162 is stable, v161's failure was seed-dependent and we get a clean IDEA #21 reading on alibaba. If v162 also blows up, next step is to drop either OC or BS to isolate which loss is the destabilizer.
-**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 42`. Fresh pretrain. Launched ~15:59 PDT. Log `/home/darrell/train_alibaba_v162.log`.
-**Status** (2026-04-18): Phase 3 ep5. W trajectory 0.22→1.07→1.85→2.50→2.51 (rose fast early, now stabilized at 2.5, under 3.0 stop). First ★ at ep5: MMD²=0.04487, recall=0.670, **comb=0.11087★** (+122% vs ATB 0.04982). Not killable — v158 ep5 had similar early ★ and still hit 0.0394 frozen; early-★ mis-rank precedent holds. Kill criteria: (a) W≥3.0 for 3 consecutive (auto-stop), (b) still ★>0.08 at ep20, (c) 30 epochs stale from train-best. Frozen-sweep at any stop.
+*(alibaba slot OPEN — pending next recipe selection from IDEAS.md; tencent_v163 still running, see below)*
+
+---
+
+### alibaba_v162 — CLOSED-LOTTERY (W-spike auto-stop @ ep9; frozen ★=0.04803 vs baseline 0.04982 = marginal −3.6% — seed-fragile, long-rollout better than v157 baseline, 2026-04-18)
+**Why (closed)**: second test of IDEA #21 (BS + OC overlap-mode on alibaba, clean post-Round 19 code). Same recipe as v161 but `--seed 42` (the seed that produced the alibaba ATB via v157) to separate seed-dependence from recipe-dependence in v161's W-spike.
+**Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 42`. Fresh pretrain. Log `/home/darrell/train_alibaba_v162.log`.
+**Training (Phase 3)**: ep1 W=+0.22, ep2 W=+1.07, ep3 W=+1.85, ep4 W=+2.50, ep5 W=+2.51 (★=0.11087), ep6 W=+2.65, ep7 W=+3.01, ep8 W=+3.71, ep9 W=+3.04 → W-spike guard fired, `final.pt` written at ep9. **W-pattern matches v161 (monotone rise >3.0 within 9 epochs) → W-spike IS recipe-dependent, not seed-dependent.**
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| epoch_0005.pt / best.pt | 0.03613 | 0.4805 | 0.14003 |
+| **final.pt** (ep9 W-stop) | **0.01343** | **0.8270** | **★=0.04803** (frozen-best) |
+
+**Long-rollout sidecar (`long_rollout_eval.py`, N=100K records × 4 streams, seed=42, 2026-04-18)** — v162 final.pt vs v157 baseline final.pt on real alibaba:
+| metric | real | v157 baseline | v162 | v162 gap vs real | winner |
+|---|---|---|---|---|---|
+| reuse_access_rate | 0.2691 | 0.0121 | 0.0835 | −69.0% | v162 (3–7× closer to real) |
+| reuse_decile_local_first | 0.2815 | 0.0192 | 0.0765 | −72.8% | v162 |
+| reuse_decile_local_last | 0.3102 | 0.0250 | 0.1931 | −37.7% | v162 |
+| ird_positional_median | 218 | 1 | 1 | −99.5% | tie (both broken) |
+| drift_ts_delta_w1_norm | 0.1443 | 0.0208 | 0.0468 | −67.6% | v162 |
+| footprint_per_stream | (0%) | +35.2% | +25.4% | — | v162 |
+| **HRC-MAE** | (0) | 0.1694 | **0.1074** | — | **v162 (−36.6%)** |
+
+**Conclusion — IDEA #21 is SEED-FRAGILE LOTTERY, not recipe-destabilizing (in the catastrophic sense).**
+- **W-spike pattern IS recipe-dependent**: both seeds (5 and 42) hit W≥3.0 within 7–9 epochs, same monotone rise. Recipe is **unstable** — `final.pt` is saved whenever W-stop fires, not at a chosen convergence.
+- **Frozen-eval outcome is SEED-DEPENDENT**: seed=5 (v161) ★=0.09800 catastrophic; seed=42 (v162) ★=0.04803 marginal win. **Range 0.048–0.098 on IDENTICAL recipe** — this is a coin flip.
+- **Long-rollout favors v162 on every non-IRD metric** vs v157 baseline, including the headline HRC-MAE (−37%). IRD_positional_median=1 is a universal alibaba-family pathology (baseline has it too), not v162-specific.
+- **Do NOT promote v162 to alibaba ATB**: same recipe at seed=5 scored 2× worse. Declaring 0.04803 as the new ATB would be cherry-picking the lucky seed. v157 (★=0.04982, seed=2) stays the alibaba ATB.
+- **best.pt ep5 was 3× worse than frozen-best (final.pt ep9)**: 7th confirmation of Round 18 P1 #1 best.pt mis-rank pathology.
+
+**CLOSE IDEA #21 (BS+OC overlap-mode on alibaba)** as currently formulated: the recipe's W-instability means `final.pt` content is RNG-gated and cannot be reliably shipped. Future re-entry for #21 on alibaba requires a stabilizer (e.g., lower OC weight <0.5, higher `--grad-clip`, or drop BS) to turn the W-spike into a gradual climb — without stabilization the recipe is a lottery.
 
 ---
 
