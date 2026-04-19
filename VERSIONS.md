@@ -218,7 +218,7 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v177** — v165 recipe + `--seed 7` (seed basin test, like alibaba v172/v173/v167). Reproduces v165's retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + n-regimes 8 + supervisor 5.0 stack against the CORRECT tencent corpus `/home/darrell/traces/tencent_block_1M`. If v177 converges near v165 ep45 ★=0.03752, confirms 0.03752 is a reproducible mechanism and the seed basin for tencent is narrower than alibaba's {0.029, 0.042, 0.081}. If v177 diverges significantly, forces a tencent seed-lottery retraction analogous to v167's alibaba retraction. Log `/home/darrell/train_tencent_v177.log`.
-- **alibaba slot: OPEN** — v176 closed-failed (BS-k=1 position-only also degrades; +47.6% vs v164). All BS variants under patched code now exhausted. Next candidate should pivot to a structurally different lever (Professor-Forcing, workload-conditioned mechanism router, or v164 seed-basin test).
+- **alibaba_v178** — v164 EXACT recipe + `--seed 11` (patched `chunk_stitching.py`, BS k=2 + OC overlap k=2). Seed-basin test for v164 under patched code, analogous to v172/v173 for v167. v175 (same recipe, seed=7) gave frozen ★=0.07121 (+106%); v176 (same recipe seed=7 BS-k=1) gave 0.05102 (+47.6%). If v178 ≤ 0.04, v164's 0.03457 is reproducible mechanism across seeds under patched code. If v178 lands in [0.05, 0.08], v164's ★=0.03457 is tied to the palindrome-bug interaction at seed=7 specifically — forcing a v164 retraction (or a note that v164's ATB requires the buggy BS code). Log `/home/darrell/train_alibaba_v178.log`.
 
 ---
 
