@@ -119,6 +119,10 @@ def _rollout(ckpt, n_records: int, n_streams: int, device, *,
                   retrieval_decay=getattr(cfg, "retrieval_decay", 0.85),
                   retrieval_tau_write=getattr(cfg, "retrieval_tau_write", 0.5),
                   retrieval_n_warmup=getattr(cfg, "retrieval_n_warmup", 4),
+                  ssm_backbone=getattr(cfg, "ssm_backbone", False),
+                  ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
+                  mtpp_timing=getattr(cfg, "mtpp_timing", False),
+                  mtpp_sigma_min=getattr(cfg, "mtpp_sigma_min", 0.05),
                   ).to(device)
     g_weights = ckpt.get("G_ema", ckpt["G"])
     G.load_state_dict({k: v.to(device) for k, v in g_weights.items()})
