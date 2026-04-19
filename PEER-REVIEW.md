@@ -1163,3 +1163,37 @@ The commits since Round 24 are a healthy mix: the Round 21 long-rollout sidecar 
 ### Short Take
 
 The repo made the long-rollout sidecar much more credible, and the new v164/v165 results are useful. But the highest-risk gap has shifted to generation parity: the command that actually emits traces is behind the evaluator, and the evaluator does not yet exercise the new persistent-memory state it is supposed to gate. Fix that before spending more compute on #28/#31/#32 conclusions.
+
+---
+
+## Round 26
+
+### The New Tail Gate Is Useful, But Do Not Let It Become Another Blurry Scalar
+
+The commits since Round 25 mostly do the right things. `generate.py` now instantiates SSM/MTPP checkpoints and guards SSM hidden state, `long_rollout_eval.py` can carry persistent retrieval state, and IDEA #34 has a first MVE in `tail_strata.py` plus `--eval-file-manifest` pass-through. That is good infrastructure work. The main problem is interpretation: the repo is already using new scalar summaries to close mechanisms more strongly than the measurements justify.
+
+1. `[P1]` The v167 conclusion is over-closed. [VERSIONS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/VERSIONS.md#L221) says the three-arm IDEA #33 test is closed and that the mechanism is "critic-clipping at W=3.0 specifically." The result is real — v167's `0.02915` is a strong new Alibaba ATB — but the mechanism claim is stronger than the evidence. W-stop is mostly a checkpoint-capture policy, not a different training objective. In v167, [VERSIONS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/VERSIONS.md#L213) says only `epoch_0030.pt`, `best.pt`, and `final.pt` were swept, and [VERSIONS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/VERSIONS.md#L216) shows the entire win appears between ep30 (`0.07433`) and final ep34 (`0.02915`). Without dense ep31/ep32/ep33 checkpoints, the repo does not know whether the useful state appeared before W crossed 3.0, exactly at the guard, or as a one-off seed/branch trajectory. Reframe the conclusion as "normal W-stop captured the best observed tail checkpoint" and run dense tail checkpointing before calling W=3.0 the load-bearing mechanism.
+
+2. `[P1]` Tail-`★` is not a safe gate by itself. The new IDEA #34 section correctly notices that tail recall is higher while tail MMD is much worse in [VERSIONS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/VERSIONS.md#L188), but the proposed gate still talks about improving tail-`★` in [VERSIONS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/VERSIONS.md#L196). That can reward the wrong thing. Tencent tail-heavy `★` looks better than full corpus even though tail MMD is 7.6x ordinary, because the broader tail bundle makes beta-recall easier. For tail evaluation, publish separate promotion rules: tail MMD or distributional-shape gap must improve, ordinary score must not regress, and recall must be interpreted as support breadth within a deliberately broad stratum rather than as proof that rare events were modeled.
+
+3. `[P2]` `eval.py --baseline` ignores the new manifest restriction. The main checkpoint path passes `file_manifest` into `_sample_real()` in [llgan/eval.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/eval.py#L601), but the baseline branch still calls `_sample_real(b_ckpt, trace_dir, fmt, n_samples)` with no `real_seed` and no `file_manifest` in [llgan/eval.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/eval.py#L695). So `eval.py --checkpoint X --baseline Y --eval-file-manifest tail_heavy.txt` compares X on the tail stratum against Y on a fresh full-corpus random bundle. That makes baseline deltas invalid exactly where the new tool is supposed to support tail-stratum comparisons. Thread `real_seed`, `fake_seed`, `cond_noise_scale`, and `file_manifest` through the baseline path or disable `--baseline` when a manifest is supplied.
+
+4. `[P2]` The current tail-strata MVE does not actually include reuse-heavy tail scoring. IDEA #34 was motivated by `iat_*`, `abs_stride_*`, and `reuse_ratio` high moments in [IDEAS.md](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/IDEAS.md#L1332), but [llgan/tail_strata.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/tail_strata.py#L13) scores only `iat_q99/q50`, `abs_stride_q99/q50`, and `iat_std/iat_mean`. That is a reasonable first timing/stride panel, but it is not yet the reuse-heavy panel that #34 promised and that the HRC failures need. Add reuse-ratio or stack-distance-derived tail labels before using this as evidence that the model handles locality tails.
+
+5. `[P2]` The long-rollout sidecar now has the persistent retrieval flag, but the JSON does not record whether it was used. `_rollout()` accepts `retrieval_persist` and mirrors `generate.py` in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/long_rollout_eval.py#L205), and the CLI exposes `--retrieval-persist-across-windows` in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/long_rollout_eval.py#L885). But the output `result` only records checkpoint, conditioning, manifest, fake/real metrics, and gaps in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/c3c9/Zarathustra/llgan/long_rollout_eval.py#L959). Future JSONs will not be self-describing on the key #28 contract. Add `retrieval_persist_requested`, `retrieval_persist_enabled`, and the relevant retrieval config values to the result before using sidecar JSONs for promotion or closure.
+
+### What I Would Do Next
+
+1. Keep v167 as the Alibaba ATB, but downgrade the mechanism language from "W=3.0 proven" to "normal W-stop captured the best observed tail checkpoint."
+
+2. Add dense checkpointing around the W-stop tail and sweep ep31/ep32/ep33-equivalent artifacts before closing IDEA #33 mechanistically.
+
+3. Make tail-stratum promotion a multi-metric gate: tail MMD/shape, ordinary non-regression, and recall reported separately.
+
+4. Patch `eval.py --baseline` so manifest-restricted comparisons use the same real bundle policy on both sides.
+
+5. Extend `tail_strata.py` with a reuse-heavy stratum and record persistent-retrieval settings in long-rollout JSON.
+
+### Short Take
+
+This was a productive infra turn, not a retreat into scalar tweaking. But the project is at risk of repeating an old mistake in a new form: building a better measurement surface, then immediately over-reading a single composite score. Tail-aware evaluation and W-stop tail control are the right directions. They need sharper contracts before they should close mechanisms.
