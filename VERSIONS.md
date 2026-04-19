@@ -110,6 +110,33 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ---
 
+## Long-Rollout Sidecar — Landed 2026-04-18 (Round 20 P1 #2)
+
+**What**: `llgan/long_rollout_eval.py` — deterministic long-rollout diagnostic. Per-stream HRC curve + IRD (positional) histogram + local-reuse-rate deciles + normalized half-to-half Wasserstein-1 drift. Written per Round 20 peer review: "every #28/#31/#32 checkpoint must clear BOTH `frozen_sweep` AND this sidecar."
+
+**CLI**: `python -m llgan.long_rollout_eval --checkpoint PATH --trace-dir DIR --fmt FMT [--n-records 100000 --n-streams 4 --seed 42]`
+
+**AD rounds 1 & 2 both closed.** Round 1 caught 3 THEATER + 3 PARTIAL (10M stream-offset inflating footprint, asymmetric real baseline, positional-IRD mislabeled as stack-distance, cold-start reuse-drift confound, scale-dependent W1, cuDNN nondeterminism). Round 2 confirmed all six fixes HOLD and flagged 2 cosmetic issues ("stitched long stream" label inconsistent with per-stream-mean implementation; scale floor unit-bearing) — both fixed in commit 07d7d9d.
+
+**Tencent v158 final.pt baseline** (seed=42, 10K records × 2 streams):
+| metric | fake | real | gap |
+|---|---|---|---|
+| reuse_access_rate | 0.2482 | 0.6045 | -59% |
+| reuse_object_rate | 0.2340 | 0.2127 | +10% |
+| reuse_decile_local_drift | 0.0390 | 0.0660 | -41% |
+| ird_positional_median | 1 | 100 | -99% |
+| ird_positional_p90 | 1 | 370 | -99.7% |
+| drift_ts_delta_w1_norm | 0.013 | 0.130 | -90% |
+| drift_obj_size_w1_norm | 0.121 | 0.510 | -76% |
+| footprint_per_stream | 3759 | 1978 | +90% |
+| **HRC-MAE** (mean across streams) | | | **0.2435** |
+
+**Interpretation**: frozen ★=0.03942 hid a large long-horizon failure. Diagnostic signals — roughly equal object-reuse rate (~22% of ids are reused in both fake and real) BUT halved access-reuse rate (0.25 vs 0.60) AND positional-IRD median of 1 — indicate the generator produces adjacent-duplicate-dominated short bursts: mean accesses-per-reused-id ≈ 2.4 (fake) vs ≈ 8.2 (real). Fake also generates ~2× more unique ids per stream (smaller locality). This is the exact failure mode that IDEAS #28/#31/#32 (cross-window retrieval, chained-window training, IRD footprint targets) aim to fix.
+
+**Promotion gate**: sidecar acts as long-horizon filter for #28/#31/#32 candidates. A winning checkpoint must show HRC-MAE drop AND ird_positional_median increase toward real AND reuse_access_rate rise toward 0.60 (tencent) — short-window ★ alone is insufficient.
+
+---
+
 ## Currently Running
 
 ### alibaba_v162 — v157 recipe + fixed BS+OC overlap-mode + **seed-42** (seed-dependence test for v161's W-spike), 2026-04-18
