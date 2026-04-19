@@ -170,7 +170,11 @@ def _rollout(ckpt, n_records: int, n_streams: int, device, *,
         for _ in range(windows_per_stream):
             z_local = torch.randn(n_streams, timestep, cfg.noise_dim, device=device)
             latent, hidden = G(z_global, z_local, hidden=hidden, return_hidden=True)
-            hidden = (hidden[0].detach(), hidden[1].detach())
+            # SSM backbone returns (state, None); LSTM returns (h, c). Guard the
+            # second element so either backbone carries cleanly across windows.
+            h0 = hidden[0].detach() if hidden[0] is not None else None
+            h1 = hidden[1].detach() if hidden[1] is not None else None
+            hidden = (h0, h1)
             out = R(latent) if R is not None else latent
             if opcode_col >= 0:
                 out[:, :, opcode_col] = (out[:, :, opcode_col] >= 0).float() * 2 - 1
