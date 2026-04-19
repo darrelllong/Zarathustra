@@ -204,9 +204,12 @@ def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
     same columns the preprocessor would produce after inverse_transform.
     """
     import pandas as pd
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from llgan.train import _collect_files
-    from llgan.dataset import load_trace
+    from llgan.dataset import _READERS
+
+    reader = _READERS.get(fmt)
+    if reader is None:
+        raise RuntimeError(f"Unknown trace format '{fmt}'")
 
     all_files = sorted(_collect_files(trace_dir, fmt))
     if not all_files:
@@ -215,11 +218,12 @@ def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
     pool = all_files[:]
     rng.shuffle(pool)
 
-    dfs, have = [], 0
+    dfs, have, errors = [], 0, []
     for path in pool:
         try:
-            df = load_trace(path, fmt)
-        except Exception:
+            df = reader(str(path), n_records)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{Path(path).name}: {e}")
             continue
         if df is None or len(df) == 0:
             continue
@@ -227,6 +231,9 @@ def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
         have += len(df)
         if have >= n_records:
             break
+    if not dfs and errors:
+        raise RuntimeError(
+            f"No real records from {trace_dir}; first errors: {errors[:3]}")
     if not dfs:
         raise RuntimeError(f"Could not load any real trace records from {trace_dir}")
     df_all = pd.concat(dfs, ignore_index=True).head(n_records)
