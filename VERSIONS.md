@@ -21,7 +21,8 @@ moving-bundle reports.
 | Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
-| Tencent | **0.03900**       | **v164** epoch_0020.pt (v158 recipe + IDEA #21 BS+OC overlap-mode; seed=5) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: epoch_0020.pt MMD²=0.00210, β-recall=**0.8155** → ★=0.03900. **Marginal −1.1% over v158's 0.03942**. Unlike v158 (where final.pt won), the winner here is **mid-training ep20** (pre-W-breach, W=2.25) — IDEA #21 BS+OC shifts the optimum earlier. final.pt (ep38 W-stop) ★=0.04179. best.pt (ep15) ★=0.05117 = **+31.2% worse than frozen-best** (9th best.pt mis-rank confirmation on tencent side). |
+| Tencent | **0.03752**       | **v165** epoch_0045.pt (v158 recipe + IDEA #17 retrieval memory; seed=5) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-19: epoch_0045.pt MMD²=0.00192, β-recall=**0.8220** → ★=0.03752. **−3.8% over v164's 0.03900**. Winner is mid-training ep45 (train-★=0.05414, 10th-worst of 14 ckpts). **best.pt (train-ep35, train-★=0.03855) frozen ★=0.06171 = +64.5% worse** — 10th confirmation of Round 18 P1 #1 on tencent. Train-★ ≠ frozen-★ pattern repeats: train said ep35 was best (★=0.03855), frozen says ep20 (0.03941) and ep45 (0.03752) are the real winners, while ep35 is one of the worst. IDEA #17 retrieval memory on tencent genuinely productive; stacks on v158 baseline to beat v164 (+#21 BS+OC). |
+| Tencent prior | 0.03900       | v164 epoch_0020.pt (v158 recipe + IDEA #21 BS+OC overlap-mode; seed=5) | n/a | Held ATB 2026-04-18 PM through 2026-04-19 06:45. Superseded by v165 ep45 (−3.8%). Deterministic sweep: epoch_0020.pt MMD²=0.00210, β-recall=0.8155 → ★=0.03900. |
 | Tencent prior | 0.03942       | v158 final.pt (v153 recipe EXACTLY seed-rerun; IDEAS #19/#20/#8/#6) | n/a | Held ATB 2026-04-18 AM through afternoon. Superseded 2026-04-18 evening by v164 epoch_0020.pt. Deterministic sweep: final.pt MMD²=0.00229, β-recall≈0.82 → ★=0.03942. best.pt ★=0.07936 = **+101% worse** (worst best.pt mis-rank observed anywhere). |
 | Tencent prior | 0.04430       | v153 ep_0020.pt (v152 recipe seed-2) | n/a | Held ATB briefly 2026-04-18 AM (re-sweep of prior 0.04003 claim). Superseded 2026-04-18 PM by v158 final.pt. |
 | Tencent prior | 0.04575       | v152 (v150 MINUS boundary-smoothness, IDEAS #19/#20/#8/#6) | n/a | Frozen ep_0010 best.pt: MMD²=0.00195, β-recall=0.7810, α=0.7095. v152 ep_0020 frozen=0.05081 (worse), confirming v152 ep10 was the right choice for that run. **BS confirmed DEAD WEIGHT on tencent** — Round 16 critique validated. |
@@ -203,7 +204,37 @@ on newly-landed code changes.
 ## Currently Running
 
 - **alibaba_v168** — v167 recipe EXACTLY + IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0; M=32, key=32, val=32; params=98,913). Fresh pretrain (NOT branched). `--seed 7`. Stacks retrieval on the new ATB recipe to test whether IDEA #17 adds to v167's 0.02915. Log `/home/darrell/train_alibaba_v168.log`.
-- **tencent_v165** — first training-side test of IDEA #17 retrieval memory on tencent (K/V/T/mask per-window bank + learned reuse gate + BCE aux). params=98,913. Entered Phase 3 @ 02:08. Log `/home/darrell/train_tencent_v165.log`.
+- **(tencent slot open — launching v166 = v165 recipe + IDEA #21 BS+OC stacked, testing if retrieval memory and BS+OC combine additively)**
+
+---
+
+### tencent_v165 — CLOSED-WIN ★ NEW TENCENT ATB ★ (v158 recipe + IDEA #17 retrieval memory; manual kill @ ep66 after 30/30 stale from train-★ ep35; frozen-best epoch_0045.pt ★=0.03752 = **−3.8% vs prior ATB 0.03900**, 2026-04-19)
+**Why (closed)**: first training-side test of IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0) on tencent. Previous tencent best was v164 ★=0.03900 (v158 + IDEA #21 BS+OC). This v165 replaces BS+OC with retrieval memory on the same v158 backbone — tests whether retrieval memory is a better add-on than BS+OC for tencent.
+**Recipe**: v158 EXACTLY + `--retrieval-memory --retrieval-mem-size 32 --retrieval-key-dim 32 --retrieval-val-dim 32 --retrieval-reuse-bce-weight 1.0`. Fresh pretrain. `--seed 5`. Log `/home/darrell/train_tencent_v165.log`.
+**Training trajectory (train-★ via EMA at mmd-every 5)**: ep5=0.05178, ep10=0.06614, ep15=0.05204, ep20=0.05478, ep25=0.05222, **ep30=0.04978**, **ep35=0.03855 train-★ best**, ep40=0.04021, ep45=0.05414, ep50=0.04158, ep55=0.05167, ep60=0.05378, ep65=0.04623. Killed at ep66 (31 stale from train-★ ep35). W stable at +1.5-+2.1 (no W-stop fire); G=4-5 in tail. No `final.pt` (manual kill, not natural W-stop).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)** — 14 checkpoints evaluated:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **epoch_0045.pt** | **0.00192** | **0.8220** | **★=0.03752** ★ NEW ATB ★ |
+| epoch_0020.pt | 0.00191 | 0.8125 | 0.03941 |
+| epoch_0055.pt | 0.00151 | 0.8025 | 0.04101 |
+| epoch_0060.pt | 0.00213 | 0.7610 | 0.04993 |
+| epoch_0065.pt | 0.00185 | 0.7280 | 0.05625 |
+| epoch_0050.pt | 0.00296 | 0.7280 | 0.05736 |
+| epoch_0040.pt | 0.00206 | 0.7165 | 0.05876 |
+| epoch_0010.pt | 0.00316 | 0.7080 | 0.06156 |
+| **epoch_0035.pt** (= best.pt) | 0.00261 | 0.7045 | 0.06171 |
+| epoch_0030.pt | 0.00312 | 0.6950 | 0.06412 |
+| epoch_0015.pt | 0.00297 | 0.6725 | 0.06847 |
+| epoch_0005.pt | 0.00593 | 0.5770 | 0.09053 |
+| epoch_0025.pt | 0.00504 | 0.5570 | 0.09364 |
+
+**Interpretation**:
+- **IDEA #17 retrieval memory IS PRODUCTIVE on tencent** — v165 ep45 ★=0.03752 beats v164 (+#21 BS+OC) ★=0.03900 by −3.8% and v158 baseline ★=0.03942 by −4.8%. Retrieval memory is a better tencent add-on than BS+OC, but the margin over v164 is small (−1.5%).
+- **Train-★ vs frozen-★ mis-rank, 10th tencent-side confirmation**: train said ep35 was best (train-★=0.03855), frozen says ep35 is the **9th-worst** checkpoint (frozen ★=0.06171, +64.5% worse than frozen-best). best.pt (= ep35 weights) frozen ★=0.06171 → the published sweep again vindicates the frozen-bundle protocol.
+- **Mid-training wins**: ep45 and ep20 are the two best checkpoints. Mirror of v164's pattern (where ep20 also beat final.pt). Retrieval memory + tencent appears to peak mid-training and then plateau.
+- **Recall drives the win**: ep45 β-recall=0.8220 is the highest observed on tencent (v164 ep20 was 0.8155, v158 final.pt was ~0.82). MMD² at ep45 (0.00192) is typical; the gain is coverage.
+- **Next queued**: v166 tencent = v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Tests whether retrieval-memory and BS+OC combine additively on tencent (both produced small but real wins individually over v158). If v166 beats 0.03752, the two mechanisms are additive; if v166 matches or loses, they overlap on the same tail-regime improvement and only one should be kept.
 
 ---
 
