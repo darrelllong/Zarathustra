@@ -1355,3 +1355,36 @@ rare-event regime problem, not something likely to be solved by another smooth s
 - File-level moments may not map perfectly to 12-step training windows; a window-level follow-up is still needed.
 
 **Why it is still worth it:** the moment pass gives a quantitative reason that smooth average-case tuning keeps disappointing. The tails are too extreme to treat as noise.
+
+---
+
+### 35. Workload-conditioned mechanism router
+
+**Gap attacked:** the same mechanism is now clearly helpful on one corpus and harmful on another.
+Retrieval memory produced a small Tencent ATB, but the analogous Alibaba stack collapsed badly.
+Multi-scale/PCF showed a similar cross-corpus split earlier. Treating retrieval, BS/OC, PCF, and
+tail heads as globally-on recipe switches is too blunt for traces whose locality and burst regimes
+differ by workload family.
+
+**Proposal:** make the generator conditionally route between mechanism experts rather than
+hard-enable each module for a full run:
+- Use existing file descriptors plus new tail/reuse-stratum labels to predict soft gates for
+  retrieval memory, BS/OC boundary pressure, PCF/multi-scale paths, and any tail-regime expert.
+- Add a small sparsity/entropy regularizer so the router chooses a few mechanisms per workload
+  instead of averaging every mechanism into every trace.
+- During eval, report mechanism-gate histograms per corpus and per tail stratum so wins can be
+  attributed to "Tencent uses retrieval" or "Alibaba suppresses retrieval" instead of another
+  recipe-level binary flag.
+
+**Minimal viable experiment:**
+- Freeze the current v167/v165 backbones and train only a lightweight conditioning router over two
+  experts: retrieval-on vs retrieval-off, or BS/OC-on vs BS/OC-off.
+- Evaluate on full, ordinary, tail-heavy, and long-rollout panels. A useful router should reproduce
+  Tencent's retrieval benefit while avoiding Alibaba's retrieval collapse.
+
+**Why this is on-target:** the latest results say the project is not looking for one universal
+scalar setting. It needs workload-aware composition: the architecture should learn when a mechanism
+matches the trace regime instead of forcing the researcher to choose one global recipe per corpus.
+
+**Risk:** a router can hide failures if it simply memorizes corpus IDs. Start with descriptor-only
+inputs, hold out files/families, and require gate histograms to make mechanistic sense.

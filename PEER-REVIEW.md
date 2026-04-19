@@ -1197,3 +1197,102 @@ The commits since Round 25 mostly do the right things. `generate.py` now instant
 ### Short Take
 
 This was a productive infra turn, not a retreat into scalar tweaking. But the project is at risk of repeating an old mistake in a new form: building a better measurement surface, then immediately over-reading a single composite score. Tail-aware evaluation and W-stop tail control are the right directions. They need sharper contracts before they should close mechanisms.
+
+---
+
+## Round 27
+
+### The New Results Are Useful, But The Queue Is Sliding Back Into Scalar Tweaks
+
+The repo changed again while this review was being pushed: `VERSIONS.md` now includes the v171
+failure and v172 launch, and `PEER-REVIEW-GEMINI.md` Round 3 adds a relevant code-level critique
+of the boundary loss. The material picture is still the same, just sharper: `tencent_v165`
+promotes retrieval memory to a new Tencent ATB, `alibaba_v168` shows the same retrieval mechanism
+is disastrous on Alibaba, `alibaba_v169` / `alibaba_v170` close a small moment-loss weight sweep,
+and `alibaba_v171` confirms that simply turning up BS/OC also trades MMD for recall. Those are
+real data points. The concern is what the project is doing with them.
+
+I added [IDEAS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/IDEAS.md) #35 because the
+retrieval split is no longer a minor ablation artifact. It is evidence that this project needs
+workload-conditioned mechanism composition, not more global recipe switches.
+
+1. `[P1]` The moment-loss experiments are being mapped onto IDEA #34 too strongly. The v169
+   section calls `--moment-loss-weight 0.5` "explicit higher-moment pressure" motivated by M5/M6
+   tail evidence in [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L235),
+   and v170 then treats the `0.1 -> 0.2 -> 0.5` sweep as a saturated moment-loss dose response in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L221). But the actual
+   loss in [llgan/train.py](/Users/darrell/.codex/worktrees/d43d/Zarathustra/llgan/train.py#L1447)
+   matches mean, std, slope, and third standardized moment only; the default config description is
+   even narrower, "per-feature mean+std matching," in
+   [llgan/config.py](/Users/darrell/.codex/worktrees/d43d/Zarathustra/llgan/config.py#L72). So v169
+   and v170 are good evidence that increasing the existing low-order auxiliary moment weight trades
+   small MMD gains for recall loss. They are not evidence that IDEA #34's M5/M6 tail-regime
+   diagnosis has been directly tested, and they should not close or weaken the structural #34 path.
+
+2. `[P1]` The BS/OC scalar ladder has now failed the same way the moment-loss ladder failed.
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L211) reports
+   `alibaba_v171` as `+21.5%` worse than v167 after raising boundary smoothness from `1.0` to
+   `1.5` and overlap consistency from `0.5` to `0.75`. The interpretation in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L221) is the right
+   read: biggest MMD gain, biggest recall crash. This confirms the Round 27 concern rather than
+   resolving it. Stop the Alibaba scalar ladder unless a future scalar probe is backed by a new
+   mechanism-specific diagnosis; the next serious Alibaba slot should be dense tail checkpointing /
+   mechanism attribution, a tail-stratified structural route, or the workload-conditioned router
+   from IDEA #35.
+
+3. `[P1]` The Tencent retrieval win should not be generalized as "retrieval memory works" without a
+   workload gate. [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L274)
+   shows `tencent_v165` is a real but small ATB: `0.03752`, only `-3.8%` over v164. Meanwhile
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L253) shows
+   `alibaba_v168` with the analogous retrieval addition is `+76%` worse than v167. That asymmetry
+   is too large to treat as ordinary noise. The repo should use it as a design signal: retrieval
+   needs workload- or descriptor-conditioned gating, and `tencent_v166` should be judged with
+   long-rollout reuse/HRC metrics, not only short-window `★`, before declaring retrieval+BS/OC
+   additive.
+
+4. `[P1]` Gemini Round 3's boundary-loss bug should be treated as a blocker for more BS-family
+   interpretation. [llgan/chunk_stitching.py](/Users/darrell/.codex/worktrees/d43d/Zarathustra/llgan/chunk_stitching.py#L136)
+   reverses the tail of chunk A before comparing it with the head of chunk B. For `k>1`, that does
+   not merely smooth the boundary; it compares earlier pre-boundary points to later post-boundary
+   points and can suppress directional dynamics at the join. The legacy feature-space boundary mode
+   also reuses this function in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/d43d/Zarathustra/llgan/train.py#L1776). The
+   default WaveStitch-style `overlap` path is less directly exposed, but the broader lesson matters:
+   do not interpret BS/OC weight failures as clean evidence about overlap consistency until the
+   boundary loss semantics are corrected or isolated. Patch the loss, then rerun only if the
+   corrected mechanism still has a real reason to exist.
+
+5. `[P2]` The v167 mechanism language remains overconfident after the new failures. The top ATB
+   table still says "W-stop at 3.0 is the load-bearing policy" in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L19). But v169 and
+   v170 replay the same branch and W-stop endpoint while changing only the auxiliary moment weight;
+   v171 does the same with BS/OC weights. Their final checkpoints are worse despite similar W-stop
+   timing in [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L214) and
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/d43d/Zarathustra/VERSIONS.md#L231). That makes the
+   Round 26 caution stronger, not weaker: W=3.0 is a useful capture boundary for this branch, but
+   the generator state inside that boundary is sensitive to auxiliary pressures. Do not call the
+   threshold itself the mechanism.
+
+### What I Would Do Next
+
+1. Reword v169/v170 as "low-order moment auxiliary weight sweep failed," not "higher-moment tail
+   pressure saturated."
+
+2. Treat v171 as the end of the current Alibaba scalar ladder. It failed in the same MMD-for-recall
+   pattern as the moment-loss sweep.
+
+3. Patch or isolate the flipped boundary-smoothness semantics before drawing any more conclusions
+   from BS-family losses.
+
+4. Make the next Alibaba effort structural: dense ep31/ep32/ep33 checkpointing around the W-stop
+   tail, a reuse-inclusive tail-stratum route, or IDEA #35 workload-conditioned mechanism gating.
+
+5. For `tencent_v166`, require long-rollout HRC/reuse and tail-stratum reporting before concluding
+   retrieval and BS/OC are additive. A `★` win alone would only show a short-window gain.
+
+### Short Take
+
+The new data is useful because it says the mechanisms are workload-specific. The project should
+listen to that. Retrieval should not become a global recipe flag, moment-loss weight should not be
+mistaken for higher-order tail modeling, and the next major move should be conditional architecture
+or tail/checkpoint structure, not another scalar search.
