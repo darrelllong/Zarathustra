@@ -1113,3 +1113,21 @@ another closure label.
 ### Short Take
 
 The R pass was worth doing. It gives a quantitative reason the project keeps getting punished by train/frozen gaps, recall instability, and long-rollout cache/locality gaps: the hard part of these traces lives in rare-event tails. The next move should be tail-aware selection and routing, not another smooth scalar loss.
+
+---
+
+## Round 24
+
+### Full-Corpus Higher Moments, Not A Cherry-Picked Slice
+
+1. `[P1]` The first higher-moment write-up was too compact and made the analysis look narrower than it was. The pass actually consumed the full `/tiamat` model-aware feature table, not a hand sample, and now [R-ANALYSIS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/R-ANALYSIS.md#L1152) records the full-corpus leaderboard outputs. The run produced 560 finite higher-moment rows across 22 logical families with enough observations for 6th moments, plus 307 generator-surface rows. That matters because the tail-regime conclusion is stronger, not weaker, when widened beyond the current Alibaba/Tencent training pair.
+
+2. `[P1]` The full-corpus leaderboard shows the most extreme generator-surface tails are actually even larger than Round 23 reported. `s3-cache-datasets__tencentBlock` has `abs_stride_q50` M6 around `14.0M` and `iat_q50` M6 around `11.7M`, both above the already-large `2020_tencentBlock` values in [R-ANALYSIS.md](/Users/darrell/.codex/worktrees/2458/Zarathustra/R-ANALYSIS.md#L1167). Alibaba-family rows also repeat the same pattern across both `s3-cache-datasets__alibaba` and `s3-cache-datasets__2020_alibabaBlock`, with `iat_q90` M6 around `899K` and `859K`. This is not one weird corpus shard. It is a broad high-tail signature in the request-trace surface.
+
+3. `[P1]` The modeling implication is sharper now: a tail-aware benchmark should be built from the whole trace inventory, not only from the active race corpora. If the project trains on Alibaba/Tencent but only evaluates tails from those two views, it can miss the stronger tail regimes already present in the broader trace library. The right next artifact is a full-corpus tail manifest: top files/windows by high-order `iat_*`, `abs_stride_*`, and reuse surfaces, stratified by family, with enough examples from each large family to prevent overfitting to one benchmark pair.
+
+4. `[P2]` This still should not become a raw high-order moment loss. The full-corpus result makes a scalar M6 loss even more dangerous, because the most extreme rows would dominate gradients. The correct use is selection and routing: build a tail-stratified eval panel, then use structural mechanisms such as IDEA `#34` to handle tail regimes explicitly.
+
+### Short Take
+
+The broader run strengthens the conclusion: Zarathustra has a lot of traces, and the tail problem is visible across that larger inventory. Do not compress that into a couple of showcase rows. Build a full-corpus tail manifest and make future checkpoint promotion prove it can preserve the rare regimes, not just the average frozen score.

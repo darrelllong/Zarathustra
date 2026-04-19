@@ -1336,6 +1336,9 @@ rare-event regime problem, not something likely to be solved by another smooth s
 - Tencent `iat_q50` has M6 around 3.76M and `abs_stride_q50` has M6 around 2.16M in the R pass.
 - Alibaba `iat_q90` has M6 around 858K and `reuse_ratio` has M6 around 195K.
 - These are precisely the surfaces where the generator keeps showing train/frozen and recall instability.
+- The full-corpus leaderboard is even more extreme: the LCS-style `s3-cache-datasets__tencentBlock`
+  family has `abs_stride_q50` M6 around 14.0M and `iat_q50` M6 around 11.7M, so the tail-regime
+  issue is not an artifact of cherry-picking the current training pair.
 
 **Architecture sketch:**
 - Add a tail-regime classifier or router that explicitly separates ordinary windows from rare timing/seek/reuse windows.
