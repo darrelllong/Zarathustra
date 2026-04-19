@@ -218,7 +218,7 @@ on newly-landed code changes.
 ## Currently Running
 
 - **alibaba_v176** — v164 EXACT recipe + `--seed 7` + patched `chunk_stitching.py` + `--boundary-smoothness-k 1` (position-only, vs v164/v175's k=2). v175 (patched BS k=2) closed-failed at frozen ★=0.07121, **+106% worse than v164's 0.03457 despite identical seed/recipe/pretrain**. Strongly suggests the buggy palindrome constraint at k>=1 was accidentally useful regularization for alibaba, and the mathematically-correct velocity-matching constraint hurts learning. v176 drops to k=1, so only order-0 (position continuity) is enforced; patched and buggy code behave identically at k=1. Tests whether alibaba's BS benefit came from position continuity alone. Same seed=7 pretrain determinism. Log `/home/darrell/train_alibaba_v176.log`.
-- **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Running pre-patch BS (buggy palindrome) — leave as-is; in-memory module loaded at launch. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. ep50 hit new train-best ★=0.04456 (−4.9% vs ep35 ★=0.04685); ep54/55 W≥3.0 counter=2, W-stop imminent. If v166 beats v165 ★=0.03752, the two mechanisms add. Log `/home/darrell/train_tencent_v166.log`.
+- **tencent_v177** — v165 recipe + `--seed 7` (seed basin test, like alibaba v172/v173/v167). Reproduces v165's retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + n-regimes 8 + supervisor 5.0 stack against the CORRECT tencent corpus `/home/darrell/traces/tencent_block_1M`. If v177 converges near v165 ep45 ★=0.03752, confirms 0.03752 is a reproducible mechanism and the seed basin for tencent is narrower than alibaba's {0.029, 0.042, 0.081}. If v177 diverges significantly, forces a tencent seed-lottery retraction analogous to v167's alibaba retraction. Log `/home/darrell/train_tencent_v177.log`.
 
 ---
 
@@ -241,6 +241,29 @@ on newly-landed code changes.
 - **Train-selector tracks frozen on v175**: train★=0.07090 at ep20 ~= frozen★=0.07121. No mis-rank like v164 (frozen ★=0.03457 vs train-selector ep30 train★=0.09-ish). This suggests the model's internal "good" state (what train-selector picks) is the same as the held-out "good" state — normal behavior. v164's dramatic mis-rank is specifically tied to the W-stop tail under the buggy palindrome.
 - **Recall decay at final.pt is stronger in v175**: 0.69 (ep20) → 0.60 (final, ep25). v164's recall typically rebounded at W-stop; v175's doesn't.
 - **Next queued v176**: BS-k=1 (position-only). If v176 recovers v164's 0.03457, the k>=1 derivative constraint is the specific hurt mechanism and going forward BS should be k=1. If v176 still degrades, BS orders >= 1 do nothing useful regardless of math, and the "win" of v164 was multi-factor in a way the palindrome bug was part of.
+
+---
+
+### tencent_v166 — CLOSED-FAILED (v165 recipe + IDEA #21 BS+OC overlap-mode stacked; W-spike auto-stop @ ep55; frozen-best final.pt ★=0.04802 = **+27.9% worse than v165's 0.03752**, 2026-04-19)
+**Why (closed-failed)**: IDEA #21 BS+OC stacked on top of v165's retrieval-memory recipe (the tencent ATB holder). Hypothesis: two complementary mechanisms (retrieval locality + boundary continuity) add. Result: they DON'T — BS+OC on tencent mirrors the alibaba negative result (v160, v171, v174, v175, v176 all negative or within noise). BS+OC is a net negative on both corpora when stacked with other adversarial/retrieval mechanisms. Ran on buggy palindrome BS (pre-patch code, palindrome-fix commit 5effe2b landed after launch — in-memory module unchanged).
+**Recipe**: v165 recipe + `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --boundary-smoothness-decay 0.5 --overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap`. Same `--seed 5`. Same retrieval-memory (defaults), K=8 regimes, multi-scale critic, PCF 2.0, mixed-type-recovery.
+**Training (Phase 3)**: ep5 train★=0.05283, ep10 train★=0.06380, ep15 train★=0.05648, ep20 train★=0.04982, ep25 train★=0.05909 (W=+3.77 SPIKE), ep30 train★=0.05822, ep35 train★=0.04685 ★, ep40 train★=0.04758, ep45 train★=0.05580, ep50 train★=0.04456 (new train-best, recall 0.794), ep53-55 W≥3.0 → W-spike guard fired. Final.pt saved at ep55.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v165 ep45 |
+|---|---|---|---|---|
+| **final.pt** (ep55 W-stop) | **0.00162** | **0.7680** | **★=0.04802** (frozen-best) | **+27.9% worse** |
+| epoch_0020.pt | 0.00182 | 0.7350 | 0.05482 | +46.1% worse |
+| epoch_0045.pt | 0.00214 | 0.7185 | 0.05844 | +55.8% worse |
+| epoch_0010.pt | 0.00513 | 0.7105 | 0.06303 | +68.0% worse |
+| best.pt (train-ep35) | 0.00416 | 0.6255 | 0.07906 | +110.7% worse |
+
+**Interpretation**:
+- **BS+OC negative on tencent too**: v165 → v166 goes from ★=0.03752 → ★=0.04802 (+28%). Now confirmed on BOTH corpora: BS+OC stacked on top of a well-tuned recipe is a consistent negative. The v164 tencent ★=0.03900 result (also BS+OC-over-v158) was already only 1.4% better than v158's ★=0.03942 — that small improvement has not held under a fresh basin (v165 without BS+OC gave 4.8% over v164).
+- **Train-★ mis-ranks by +111% on v166**: train said best.pt (ep35 train★=0.04685) was the winner; frozen says final.pt (ep55 post-W-stop) is the winner. 11th tencent-side train/frozen mis-rank observation.
+- **v165 ATB reconfirmed** in this sweep — I ran a parallel re-sweep on v165 with the corrected tencent path and recovered the canonical ep_0045.pt ★=0.03752, β-recall 0.8220, MMD² 0.00192.
+- **Protocol bug I caught**: my initial v166 frozen_sweep ran against `/tiamat/zarathustra/traces/tencent`, which contains `Cloud_Disk_dataset` — an unrelated corpus. Both v165 and v166 produced β-recall=0.0 everywhere under the wrong path. The CORRECT tencent path is `/home/darrell/traces/tencent_block_1M` (3234 files, used by all tencent training). Cataloging here as a reminder: always verify `--trace-dir` against the TRAIN log's "Trace dir:" banner before sweeping.
+- **Gemini Round 3 P1 #2 prediction vindicated but diagnosis refined**: R3 P1 #2 hypothesized the retrieval-memory+training/eval mismatch would break long rollout. The frozen_sweep (short-window) doesn't show this — v166 checkpoints all have β-recall 0.62–0.77 (not collapsed). The long-rollout sidecar would be where that mismatch shows up; that's still worth checking on v165 final.pt and v166 final.pt if bandwidth permits.
+- **Next queued v177**: v165 recipe EXACT + `--seed 7`. Seed-basin test. If reproduces ★≤0.040, v165's 0.03752 is a mechanism, not lottery. If diverges, forces a tencent retraction analogous to alibaba's v167 retraction. **Don't stack any new losses on top until seed reproducibility is established** — the BS+OC, moment-loss, retrieval-stack misadventures all teach the same lesson.
 
 ---
 
