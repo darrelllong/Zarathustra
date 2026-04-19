@@ -330,8 +330,12 @@ def _half_drift(values: np.ndarray) -> float:
 
 def _metrics_for_stream(df, cache_sizes: np.ndarray, n_ird_bins: int = 32) -> dict:
     obj_ids = _obj_ids_with_stream_offset(df)
-    footprint = int(np.unique(obj_ids).size)
-    reuse_rate_overall = float((np.bincount(obj_ids - obj_ids.min()) > 1).sum()) / max(footprint, 1)
+    # np.unique(return_counts=True) is O(N log N) memory-safe; np.bincount
+    # would allocate O(id_range), which blows up when the fake generator
+    # emits obj_ids spanning 1e14.
+    unique_ids, id_counts = np.unique(obj_ids, return_counts=True)
+    footprint = int(unique_ids.size)
+    reuse_rate_overall = float((id_counts > 1).sum()) / max(footprint, 1)
     # Overall reuse-access-rate (fraction of accesses that are reuses):
     seen: set = set()
     reuse_hits = 0
