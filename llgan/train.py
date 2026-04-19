@@ -1742,11 +1742,27 @@ def train(cfg: Config) -> None:
                     # BS (sub-loss a) ALWAYS uses adjacent-window semantics:
                     # B starts from A's FINAL hidden. This holds regardless of
                     # OC mode so BS's meaning is stable across recipes.
+                    # When retrieval-memory is active, also thread retrieval_state
+                    # A→B so the bank's read/eviction logic sees cross-window
+                    # supervision (Gemini Round 3 P1 #2, 2026-04-19).
                     if _bs_w > 0:
                         z_lb1 = G.sample_z_local(B, cfg.timestep, device)
                         z_lb2 = G.sample_z_local(B, cfg.timestep, device)
-                        H_b1_adj, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
-                        H_b2_adj = G(z_gb, z_lb2, hidden=h_b_carry)
+                        _rm = bool(getattr(cfg, "retrieval_memory", False))
+                        if _rm:
+                            H_b1_adj, h_b_carry, r_b_carry = G(
+                                z_gb, z_lb1,
+                                return_hidden=True,
+                                return_retrieval_state=True,
+                            )
+                            H_b2_adj = G(
+                                z_gb, z_lb2,
+                                hidden=h_b_carry,
+                                retrieval_state=r_b_carry,
+                            )
+                        else:
+                            H_b1_adj, h_b_carry = G(z_gb, z_lb1, return_hidden=True)
+                            H_b2_adj = G(z_gb, z_lb2, hidden=h_b_carry)
                         loss_bs = boundary_latent_smoothness(
                             H_b1_adj, H_b2_adj,
                             k=int(getattr(cfg, "boundary_smoothness_k", 2)),
@@ -1759,16 +1775,35 @@ def train(cfg: Config) -> None:
                             # TRUE overlap mode: split A at T-k so A's suffix and
                             # B's prefix both start from h_mid with INDEPENDENT
                             # local noise → loss drives noise-invariance over the
-                            # SAME absolute timesteps.
+                            # SAME absolute timesteps. When retrieval-memory is
+                            # active, thread the bank state from the prefix so
+                            # both suffix-A and prefix-B share A's memory reads
+                            # (Gemini Round 3 P1 #2, 2026-04-19).
                             T = int(cfg.timestep)
                             k = int(getattr(cfg, "overlap_consistency_k", 2))
                             k = max(1, min(k, T - 1))
                             z_lc1 = G.sample_z_local(B, T, device)
                             z_lc2 = G.sample_z_local(B, T, device)
-                            H_c1_pre, h_mid = G(z_gb, z_lc1[:, :T - k, :], return_hidden=True)
-                            H_c1_suf = G(z_gb, z_lc1[:, T - k:, :], hidden=h_mid)
+                            _rm = bool(getattr(cfg, "retrieval_memory", False))
+                            if _rm:
+                                H_c1_pre, h_mid, r_mid = G(
+                                    z_gb, z_lc1[:, :T - k, :],
+                                    return_hidden=True,
+                                    return_retrieval_state=True,
+                                )
+                                H_c1_suf = G(
+                                    z_gb, z_lc1[:, T - k:, :],
+                                    hidden=h_mid, retrieval_state=r_mid,
+                                )
+                                H_c2 = G(
+                                    z_gb, z_lc2,
+                                    hidden=h_mid, retrieval_state=r_mid,
+                                )
+                            else:
+                                H_c1_pre, h_mid = G(z_gb, z_lc1[:, :T - k, :], return_hidden=True)
+                                H_c1_suf = G(z_gb, z_lc1[:, T - k:, :], hidden=h_mid)
+                                H_c2 = G(z_gb, z_lc2, hidden=h_mid)
                             H_c1 = torch.cat([H_c1_pre, H_c1_suf], dim=1)
-                            H_c2 = G(z_gb, z_lc2, hidden=h_mid)
                             feat_c1 = R(H_c1)
                             feat_c2 = R(H_c2)
                             loss_oc = overlap_consistency(feat_c1, feat_c2, k_overlap=k)

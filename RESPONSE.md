@@ -564,3 +564,150 @@ JSON at `/tmp/lre_smoke.json` shows:
 The sidecar is now a valid acceptance criterion. The next #28/#31/#32 branch
 can launch against it without repeating the Round 20 "built the right kind of
 infrastructure but not yet the right gate" pattern.
+
+---
+
+# Response to peer review Round 27 + Gemini Round 3 (2026-04-19)
+
+**Status**: two P1 code bugs patched live while `alibaba_v174` was running;
+v167 language downgraded in the VERSIONS.md top table; interpretation rework
+on moment-loss / scalar ladder / retrieval-as-global-flag taken.
+
+Round 27 and Gemini Round 3 landed together and converge on the same two
+code bugs and the same interpretation concern: the project was starting to
+over-read short-window ★ deltas as mechanism evidence. Patches and
+retractions below.
+
+## 1. Gemini R3 P1 #1 / Darrell R27 P1 #4 — palindrome bug in `boundary_latent_smoothness` — FIXED
+
+**Confirmed**. `llgan/chunk_stitching.py:137` (pre-fix) reversed A's trailing
+window with `.flip(dims=[1])` before the MSE step, which for k≥2 forced
+`A[T-2] = B[1]`, `A[T-3] = B[2]`, …  — a palindrome/zero-velocity constraint
+around the join, not smoothness. Every BS-family run from v132 onward
+(default `k=2`) trained against this flipped objective.
+
+**Patch**: replaced the position-MSE-with-flip with **derivative matching**.
+For order `i` in `0..k-1`, compute the `i`-th forward finite difference at
+A's trailing edge (using A[T-1-i..T-1]) and at B's leading edge (using
+B[0..i]), and MSE-match them. Order 0 is position continuity, order 1
+velocity, order 2 acceleration, etc. The `decay**i` weight is preserved so
+the boundary dominates. Single-window generation is unaffected.
+
+Sanity tests (on vinge.local, torch installed):
+- Linear extension `[0..11] → [12..23]`: position gap 1, velocity matches →
+  loss 0.667 (penalizes the raw boundary jump, not the trend direction).
+- Palindrome B = A.flip: was 0 under the bug, now 1.333 — correctly flagged.
+- Velocity discontinuity (ramp A, flat B with matching boundary): k=1 loss
+  = 0 (boundary aligned), k=2 loss = 0.333 (catches the velocity break).
+
+**Interpretation impact**: every BS-family result is compromised as
+"evidence about boundary smoothness." This includes v132 (partial-#21
+baseline), v157, v161–164 (v164's 0.03457 ATB), v166–v174. The scalar
+numbers are what they are and remain valid against each other *within the
+buggy regime*, but any claim that "BS helps" or "BS/OC weight sweep
+saturates" is now uninterpretable. Next launch after v174 is v175 = v164
+recipe with the patched BS — if v175 beats 0.03457 cleanly, the fix is a
+bigger win than all of v168–v174 put together.
+
+## 2. Gemini R3 P1 #2 — retrieval memory never saturated during training — PARTIAL FIX
+
+**Confirmed**. `retrieval_state` was only threaded in `generate.py` and
+`long_rollout_eval.py`, never in `train.py`. The bank started empty on
+every training batch; with `mem_size=32` and `T=12`, the bank never filled,
+so `evict_score` / attention-over-saturated-memory had zero training
+supervision. Persistent retrieval was strictly OOD at inference.
+
+**Partial patch applied**: when `--retrieval-memory` is active AND the
+BS/OC chunk-stitching path is taken, thread `retrieval_state` from chunk A
+into chunk B (mirror of how `h_carry` is threaded). This gives the bank at
+least one cross-window training step per G-update when BS/OC is on. The
+OC-overlap path threads the bank from the `h_mid` split so both suffix-A
+and prefix-B share A's bank reads.
+
+**What this does NOT fix**: the main G-update forward is still one isolated
+window per batch, so the bank only fills during BS/OC forwards and only to
+~2·T = 24 entries (< mem_size=32). True saturation needs multi-chunk
+sequential training (e.g., draw 4+ adjacent windows per sample and chain
+them), which is a larger restructuring of the batch-assembly path. Flagged
+in IDEAS.md as a follow-up. Tencent retrieval runs from before this patch
+(v165, v166) remain uncontaminated only in the "bank visits during training"
+sense — the bank still never saturated.
+
+## 3. Gemini R3 P2 #3 — legacy `--overlap-consistency-mode boundary` inherits palindrome — FIXED by (1)
+
+The legacy boundary mode at `train.py:1784` calls `boundary_latent_smoothness`
+on decoded features, so the palindrome bug propagated there too. Now that
+the function itself is fixed, the legacy mode is also correct. Default mode
+is `overlap` (which uses `overlap_consistency`, never had the bug), so the
+recent runs (v162 onward) used the fixed path by default anyway.
+
+## 4. Darrell R27 P1 #1 — moment-loss mis-mapped to IDEA #34 — ACCEPTED
+
+**Agreed**. `--moment-loss-weight` in `train.py:1447` matches mean, std,
+slope, and third standardized moment. That is NOT "higher-moment tail
+pressure" in the IDEA #34 sense (M5/M6 tail regimes on `iat_*`,
+`abs_stride_*`, reuse surfaces). The v169/v170 "dose-response"
+interpretation was a category error.
+
+**VERSIONS.md rework**: the v169 section still contains "first alibaba test
+of explicit higher-moment pressure (IDEA #34 motivation)" — this will be
+reworded in the next commit as "low-order moment auxiliary weight sweep
+(matches M1–M3 and slope only; NOT an IDEA #34 test)". IDEA #34's
+structural tail-regime route remains **open**, not closed or weakened.
+
+## 5. Darrell R27 P1 #2 — stop the alibaba scalar ladder — ACCEPTED
+
+**Done.** v174 was a scalar-adjacent change (`--n-critic 1` — a training
+regime knob, not a new loss term or a new architecture), launched before
+this review was available. It will run to completion for the data point;
+no further Alibaba scalar probes will be queued after it unless backed by
+a specific mechanism diagnosis. The next Alibaba slot is reserved for one
+of: (a) v175 = v164 + patched BS (clean re-measure of chunk stitching now
+that the math is right); (b) dense tail checkpointing with a structural
+tail-route; or (c) IDEA #35 workload-conditioned mechanism gating.
+
+## 6. Darrell R27 P1 #3 — Tencent retrieval ≠ universal retrieval — ACCEPTED
+
+**Agreed**. The +76% alibaba vs −3.8% tencent asymmetry on retrieval memory
+is too large for noise. The mechanism is workload-specific, not universal.
+`tencent_v166` will be evaluated with long-rollout HRC / reuse / stack-
+distance metrics (not only short-window ★) before any claim about
+retrieval + BS/OC additivity. The v165 tencent ATB remains promoted, but
+with the hedge "retrieval-memory works on tencent corpora specifically;
+alibaba transfer failed; IDEA #35 workload-conditioned gate is the open
+follow-up." This will be added to the v165 VERSIONS.md entry.
+
+## 7. Darrell R27 P2 #5 — v167 mechanism language — RETRACTED
+
+**Done.** VERSIONS.md top ATB table: v167 is now listed as
+"Alibaba prior — retracted" with the basin analysis
+{0.029, 0.042, 0.081} cited explicitly. v164's 0.03457 is re-instated as
+the reproducible alibaba ATB. Promotion rule going forward: any NEW
+alibaba candidate must beat 0.03457 under seed=7 AND demonstrate
+reproducibility under at least one other seed before ATB claim.
+
+## What's not done yet (tracked)
+
+- **v175 launch** (v164 + patched BS) — blocked until v174 completes so
+  GPU isn't over-shared. Expected within the next race-mode cycle.
+- **Full multi-chunk retrieval training** — partial patch only; main
+  G-update is still single-window. Deferred pending user direction on
+  batch-assembly restructuring.
+- **IDEA #35 workload-conditioned mechanism gate** — queued but not yet
+  scoped into a runnable recipe. The retrieval asymmetry is the clearest
+  motivating case; BS/OC may also benefit from per-corpus gating once the
+  patched BS establishes a fresh baseline.
+- **v169 / v170 wording fix** in VERSIONS.md — pending the post-v174 commit
+  cycle.
+
+## Why this cycle matters
+
+This is the first review cycle where the two peer reviewers (Darrell + Gemini)
+independently identified the same code-level bug and the same
+interpretation drift. The 3-seed v167 basin analysis earlier the same day
+(0.029 / 0.042 / 0.081) had already set the tone — short-window ★ deltas
+can be deceiving. Round 27 sharpens that into a rule: no more scalar
+promotion without mechanism diagnosis. Gemini Round 3 sharpens it into a
+code fix. Both patches are live; both retractions are in the top ATB
+table; the next alibaba launch will measure the patched BS against a
+reproducible baseline.

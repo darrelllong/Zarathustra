@@ -110,42 +110,71 @@ def boundary_latent_smoothness(
     decay: float = 0.5,
 ) -> torch.Tensor:
     """
-    MSE between trailing-k steps of latent_A and leading-k steps of latent_B.
+    Derivative-matching continuity loss at the boundary between two latent chunks.
+
+    For order i in 0..k-1, compute the i-th forward finite difference at A's
+    trailing edge and at B's leading edge, and MSE-match them. Order 0 is
+    position continuity (A[T-1] ↔ B[0]); order 1 is velocity continuity
+    ((A[T-1]-A[T-2]) ↔ (B[1]-B[0])); order 2 is acceleration continuity; etc.
+    decay**i weights higher-order (farther-from-boundary) terms less, so the
+    boundary position dominates.
 
     Parameters
     ----------
     latent_A : (B, T, D)  generator output for the first chunk
     latent_B : (B, T, D)  generator output for the second chunk, generated
                           with hidden = final hidden of chunk A
-    k : number of boundary steps on each side to compare
-    decay : weight on step i is decay**i, so step closest to boundary
-            counts most (i=0)
+    k : how many orders of continuity to enforce (i = 0..k-1)
+    decay : weight on order i is decay**i, so position (i=0) counts most
 
     Returns
     -------
     scalar loss
+
+    Note
+    ----
+    An earlier version reversed A's trailing window with ``.flip(dims=[1])``
+    and compared positions A[T-1-i] against B[i]. For i≥1 that forced
+    A[T-1-i] = B[i] — a palindrome constraint around the boundary — which
+    penalizes directional trends rather than smoothing them (peer review
+    Round 27 P1 #4 / Gemini Round 3 P1 #1, 2026-04-19). Replaced here with
+    the derivative-matching formulation above.
     """
     if latent_A.dim() != 3 or latent_B.dim() != 3:
         raise ValueError("expected (B, T, D) tensors for both chunks")
     if latent_A.size(0) != latent_B.size(0) or latent_A.size(2) != latent_B.size(2):
         raise ValueError("chunks must share batch and feature dims")
 
-    T = latent_A.size(1)
-    k_eff = min(k, T)
+    T_A = latent_A.size(1)
+    T_B = latent_B.size(1)
+    k_eff = min(k, T_A, T_B)
+    if k_eff <= 0:
+        return latent_A.new_zeros(())
 
-    # Last k of A, first k of B — order so that index 0 in each = boundary step.
-    a_tail = latent_A[:, T - k_eff:, :].flip(dims=[1])    # (B, k, D)
-    b_head = latent_B[:, :k_eff, :]                       # (B, k, D)
-
-    weights = torch.tensor(
-        [decay ** i for i in range(k_eff)],
-        device=latent_A.device,
-        dtype=latent_A.dtype,
-    ).view(1, k_eff, 1)
-
-    sq = (a_tail - b_head) ** 2                           # (B, k, D)
-    weighted = sq * weights
-    return weighted.mean()
+    import math
+    loss = latent_A.new_zeros(())
+    total_w = 0.0
+    for i in range(k_eff):
+        # i-th forward finite difference: Δ^i x[n] = Σ_j C(i,j)·(-1)^(i-j)·x[n+j]
+        # Evaluated at n = T-1-i on A (uses A[T-1-i..T-1], i+1 points)
+        # and at n = 0 on B (uses B[0..i], i+1 points).
+        if i == 0:
+            d_a = latent_A[:, T_A - 1 : T_A, :]
+            d_b = latent_B[:, 0:1, :]
+        else:
+            coeffs = torch.tensor(
+                [((-1) ** (i - j)) * math.comb(i, j) for j in range(i + 1)],
+                device=latent_A.device,
+                dtype=latent_A.dtype,
+            ).view(1, i + 1, 1)
+            a_pts = latent_A[:, T_A - 1 - i : T_A, :]     # (B, i+1, D)
+            b_pts = latent_B[:, : i + 1, :]               # (B, i+1, D)
+            d_a = (a_pts * coeffs).sum(dim=1, keepdim=True)
+            d_b = (b_pts * coeffs).sum(dim=1, keepdim=True)
+        w = decay ** i
+        loss = loss + w * ((d_a - d_b) ** 2).mean()
+        total_w += w
+    return loss / max(total_w, 1e-9)
 
 
 def overlap_consistency(
