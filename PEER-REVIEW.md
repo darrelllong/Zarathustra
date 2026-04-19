@@ -1131,3 +1131,35 @@ The R pass was worth doing. It gives a quantitative reason the project keeps get
 ### Short Take
 
 The broader run strengthens the conclusion: Zarathustra has a lot of traces, and the tail problem is visible across that larger inventory. Do not compress that into a couple of showcase rows. Build a full-corpus tail manifest and make future checkpoint promotion prove it can preserve the rare regimes, not just the average frozen score.
+
+---
+
+## Round 25
+
+### The New Gate Is Better, But Generation Parity Is Still Broken
+
+The commits since Round 24 are a healthy mix: the Round 21 long-rollout sidecar fixes landed, IDEA #21 produced a small Tencent ATB in `tencent_v164`, the higher-threshold W-stop arm failed cleanly in `alibaba_v165`, and the repo added the first generation-side hook for persistent retrieval memory. That is real forward motion. The main problem is that the newest command surfaces still do not all run the same model contract.
+
+1. `[P1]` `generate.py` still cannot be trusted on the current frontier checkpoints. The constructor in [llgan/generate.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/generate.py#L58) threads `film_cond`, GMM, regimes, retrieval, and GP prior, but it does **not** pass `ssm_backbone`, `ssm_state_dim`, `mtpp_timing`, or `mtpp_sigma_min`. The fixed long-rollout sidecar does pass those same flags in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/long_rollout_eval.py#L228), which is the right contrast. Since the live ATB families in [VERSIONS.md](/Users/darrell/.codex/worktrees/104d/Zarathustra/VERSIONS.md#L7) are SSM/MTPP recipes, `generate.py` will either fail strict `load_state_dict()` for those checkpoints or instantiate the wrong architecture. Even after adding those args, [llgan/generate.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/generate.py#L184) blindly detaches `hidden[1]`; SSM returns `(state, None)`, so multi-window generation will crash on the second window unless it uses the guard already present in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/long_rollout_eval.py#L302). This is now the highest-priority code bug because the repo just added `--retrieval-persist-across-windows` to the generation path, but that path is not viable for the models the project actually cares about.
+
+2. `[P1]` The long-rollout sidecar still does not evaluate the new persistent-retrieval generation contract. IDEA #28 Phase A added `retrieval_state` carry in [llgan/model.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/model.py#L789) and exposed `--retrieval-persist-across-windows` in [llgan/generate.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/generate.py#L167), but `_rollout()` in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/long_rollout_eval.py#L299) still calls `G(..., return_hidden=True)` without passing or returning `retrieval_state`. That means the promoted gate for #28/#31/#32 will reset retrieval memory every window even when the actual generation command can persist it. If the next memory run improves only under persistent generation, the sidecar will falsely reject it; if the per-window behavior looks okay, the sidecar still has not tested the new long-horizon mechanism. Add a sidecar flag mirroring `generate.py`, carry `retrieval_state` through `_rollout()`, and record the setting in the JSON before using the sidecar to accept or close any persistent-memory work.
+
+3. `[P2]` The sidecar conditioning repair is a major improvement, but the default `char_file_random_sample` mode is still not a per-source matched benchmark. `_resolve_conditioning()` samples arbitrary characterization vectors from the pool in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/long_rollout_eval.py#L175), while `_sample_real_stream()` may replay a completely different real-file manifest in [llgan/long_rollout_eval.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/long_rollout_eval.py#L329). That is acceptable for a corpus-level smoke test, but it should not be described as source-conditioned parity. For serious HRC/stack-distance comparisons, either derive `--source-traces` from the real manifest or run a panel where each fake stream is conditioned on the same source trace used for the corresponding real stream.
+
+4. `[P2]` The new tail-control LR scaling is useful, but it is not restart-idempotent. `_tail_lr_applied` is initialized to `False` on every process start in [llgan/train.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/train.py#L1166), and the multiplier is applied whenever `epoch >= tail_start_epoch` in [llgan/train.py](/Users/darrell/.codex/worktrees/104d/Zarathustra/llgan/train.py#L1180). If a tail run is resumed from a checkpoint at or beyond the tail boundary with the same flags, the critic LR will be multiplied again. That can silently turn the intended `0.1x` critic-slowdown arm into `0.01x`, changing the interpretation of IDEA #33. Store a tail-applied marker in the checkpoint, or set critic LRs to an absolute base-LR-times-factor value rather than multiplying the current optimizer value.
+
+5. `[P2]` The v165/v164 result pair is being interpreted with the right amount of skepticism now. [VERSIONS.md](/Users/darrell/.codex/worktrees/104d/Zarathustra/VERSIONS.md#L130) correctly says `alibaba_v165` did not prove "longer critic divergence helps"; it made the higher-threshold arm worse than v164. That supports Round 22's warning. The right next read is still the branched critic-slowdown arm from a shared pre-tail checkpoint, but only if the restart-idempotence issue above is controlled.
+
+### What I Would Do Next
+
+1. Patch `generate.py` to instantiate SSM/MTPP generators exactly like `long_rollout_eval.py`, and guard SSM hidden-state detaching.
+
+2. Add persistent-retrieval carry to `long_rollout_eval.py` so the sidecar can evaluate the same contract exposed by `generate.py`.
+
+3. Make source-conditioned sidecars manifest-matched, not merely char-pool sampled, before citing per-workload long-rollout conclusions.
+
+4. Make tail-control LR scaling idempotent before treating `v166` or any resumed IDEA #33 arm as clean evidence.
+
+### Short Take
+
+The repo made the long-rollout sidecar much more credible, and the new v164/v165 results are useful. But the highest-risk gap has shifted to generation parity: the command that actually emits traces is behind the evaluator, and the evaluator does not yet exercise the new persistent-memory state it is supposed to gate. Fix that before spending more compute on #28/#31/#32 conclusions.
