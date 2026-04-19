@@ -80,6 +80,10 @@ def _seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+        # cuDNN autotune and non-deterministic kernels would violate the
+        # "strictly reproducible across runs" promise in the docstring.
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 
 # ---------------------------------------------------------------------------
@@ -197,12 +201,13 @@ def _rollout(ckpt, n_records: int, n_streams: int, device, *,
 # Real-trace sampler — deterministic, matches rollout scale.
 # ---------------------------------------------------------------------------
 
-def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
+def _sample_real_stream(trace_dir: str, fmt: str, n_records: int, n_streams: int,
                         seed: int) -> "pandas.DataFrame":
-    """Concatenate consecutive real files until we have at least n_records,
-    deterministic under (seed, trace_dir, fmt). Returns DataFrame with the
-    same columns the preprocessor would produce after inverse_transform.
-    """
+    """Sample n_streams independent real trace streams, deterministic under
+    (seed, trace_dir, fmt, n_streams). Each stream draws from a disjoint
+    slice of the shuffled file pool so the fake vs real comparison is
+    apples-to-apples: both fake and real have N independent streams of
+    records_per_stream records each, tagged stream_id 0..N-1."""
     import pandas as pd
     from llgan.train import _collect_files
     from llgan.dataset import _READERS
@@ -214,30 +219,39 @@ def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
     all_files = sorted(_collect_files(trace_dir, fmt))
     if not all_files:
         raise RuntimeError(f"No files found in {trace_dir}")
+
+    records_per_stream = math.ceil(n_records / n_streams)
     rng = random.Random(seed)
     pool = all_files[:]
     rng.shuffle(pool)
 
-    dfs, have, errors = [], 0, []
-    for path in pool:
-        try:
-            df = reader(str(path), n_records)
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"{Path(path).name}: {e}")
+    per_stream_dfs: list = []
+    errors: list[str] = []
+    file_idx = 0
+    for s in range(n_streams):
+        acc, have = [], 0
+        while have < records_per_stream and file_idx < len(pool):
+            path = pool[file_idx]
+            file_idx += 1
+            try:
+                df = reader(str(path), records_per_stream)
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{Path(path).name}: {e}")
+                continue
+            if df is None or len(df) == 0:
+                continue
+            acc.append(df)
+            have += len(df)
+        if not acc:
             continue
-        if df is None or len(df) == 0:
-            continue
-        dfs.append(df)
-        have += len(df)
-        if have >= n_records:
-            break
-    if not dfs and errors:
+        df_s = pd.concat(acc, ignore_index=True).head(records_per_stream)
+        df_s.insert(0, "stream_id", s)
+        per_stream_dfs.append(df_s)
+
+    if not per_stream_dfs:
         raise RuntimeError(
             f"No real records from {trace_dir}; first errors: {errors[:3]}")
-    if not dfs:
-        raise RuntimeError(f"Could not load any real trace records from {trace_dir}")
-    df_all = pd.concat(dfs, ignore_index=True).head(n_records)
-    df_all.insert(0, "stream_id", 0)
+    df_all = pd.concat(per_stream_dfs, ignore_index=True).head(n_records)
     return df_all
 
 
@@ -245,20 +259,25 @@ def _sample_real_stream(trace_dir: str, fmt: str, n_records: int,
 # Metrics
 # ---------------------------------------------------------------------------
 
-def _obj_ids_with_stream_offset(df) -> np.ndarray:
-    """Convert a stream_id-tagged DataFrame to a flat obj_id sequence with
-    cross-stream collision prevention (offset each stream by 10M)."""
+def _per_stream_obj_ids(df) -> list:
+    """Return a list of per-stream obj_id numpy arrays in stream_id order.
+    NO cross-stream offset — metrics are computed per-stream and aggregated
+    by the caller. Cross-stream id collisions (e.g. two streams emitting
+    the same id) are then correctly NOT counted as reuse, because each
+    stream is measured independently."""
     if 'obj_id' not in df.columns:
         raise RuntimeError("DataFrame missing 'obj_id' column — long-rollout eval needs it.")
     out = []
-    for s, g in df.groupby('stream_id', sort=True):
-        out.append(g['obj_id'].astype(np.int64).values + int(s) * 10_000_000)
-    return np.concatenate(out)
+    for _s, g in df.groupby('stream_id', sort=True):
+        out.append(g['obj_id'].astype(np.int64).values)
+    return out
 
 
-def _hrc(obj_ids: np.ndarray, cache_sizes: np.ndarray) -> np.ndarray:
-    """LRU HRC on a stitched stream at the given cache sizes."""
+def _hrc_single(obj_ids: np.ndarray, cache_sizes: np.ndarray) -> np.ndarray:
+    """LRU HRC on a single stream at the given cache sizes."""
     hrcs = np.zeros(len(cache_sizes), dtype=np.float64)
+    if len(obj_ids) == 0:
+        return hrcs
     for j, cs in enumerate(cache_sizes):
         cache: "OrderedDict[int, bool]" = OrderedDict()
         hits = 0
@@ -275,10 +294,13 @@ def _hrc(obj_ids: np.ndarray, cache_sizes: np.ndarray) -> np.ndarray:
     return hrcs
 
 
-def _ird(obj_ids: np.ndarray) -> np.ndarray:
-    """Inter-reference distance (in accesses): for each position i where the
-    object was seen before, distance to its previous occurrence. Returns a
-    1-D array of IRD values (length = number of reuses)."""
+def _ird_positional(obj_ids: np.ndarray) -> np.ndarray:
+    """POSITIONAL inter-reference distance: for each position i where the
+    object was seen before, the number of accesses between it and its
+    previous occurrence (i.e., i - last_i). NOT stack distance / distinct-
+    intervening IRD (which would require a SortedList of O(N log N) cost
+    and is not implemented here). Caller should read the output as
+    "positional IRD", not classical reuse-distance IRD."""
     last = {}
     dists = []
     for i, oid in enumerate(obj_ids):
@@ -291,11 +313,12 @@ def _ird(obj_ids: np.ndarray) -> np.ndarray:
     return np.asarray(dists, dtype=np.int64)
 
 
-def _reuse_rate_deciles(obj_ids: np.ndarray, n_bins: int = 10) -> np.ndarray:
-    """Split the stream into n_bins consecutive chunks and return the reuse
-    rate in each chunk (reuse = "object seen at least once earlier in the
-    WHOLE stream", so the deciles reflect how often late-stream accesses land
-    on objects already established earlier)."""
+def _reuse_rate_deciles_cumulative(obj_ids: np.ndarray, n_bins: int = 10) -> np.ndarray:
+    """Cumulative reuse rate per decile: access is reuse if the obj_id has
+    been seen anywhere earlier in the stream. This is the classic coupon-
+    collector / warmup curve — useful as a sanity check that both fake and
+    real exhibit the same shape, NOT as a drift indicator (which AD
+    correctly flagged: the curve is monotone by construction)."""
     N = len(obj_ids)
     if N == 0:
         return np.zeros(n_bins, dtype=np.float64)
@@ -312,115 +335,173 @@ def _reuse_rate_deciles(obj_ids: np.ndarray, n_bins: int = 10) -> np.ndarray:
                      for k in range(n_bins)], dtype=np.float64)
 
 
-def _half_drift(values: np.ndarray) -> float:
-    """Wasserstein-1 between the first and second half of a 1-D sample."""
+def _reuse_rate_deciles_local(obj_ids: np.ndarray, n_bins: int = 10) -> np.ndarray:
+    """LOCAL reuse rate per decile: within each decile, fraction of accesses
+    whose obj_id also appears elsewhere *within the same decile*. Isolates
+    'is the generator's local locality stable across the stream' from
+    cold-start warmup — this is the drift indicator the Round 20 reviewer
+    actually cares about."""
+    N = len(obj_ids)
+    if N == 0:
+        return np.zeros(n_bins, dtype=np.float64)
+    edges = np.linspace(0, N, n_bins + 1, dtype=np.int64)
+    out = np.zeros(n_bins, dtype=np.float64)
+    for k in range(n_bins):
+        chunk = obj_ids[edges[k]:edges[k+1]]
+        if len(chunk) == 0:
+            continue
+        _uniq, counts = np.unique(chunk, return_counts=True)
+        reused_ids = _uniq[counts > 1]
+        # fraction of accesses landing on a locally-reused id
+        hits = np.isin(chunk, reused_ids).sum()
+        out[k] = hits / len(chunk)
+    return out
+
+
+def _half_drift(values: np.ndarray) -> tuple:
+    """Wasserstein-1 between the first and second half of a 1-D sample,
+    plus a scale constant (median absolute value) for unit-free comparison.
+
+    Returns (w1, scale) where w1/scale is dimensionless and roughly
+    comparable across corpora with very different value magnitudes. Caller
+    divides: fake_w1 / max(scale, eps) vs real_w1 / max(scale, eps)."""
     if len(values) < 2:
-        return 0.0
+        return 0.0, 1.0
     try:
         from scipy.stats import wasserstein_distance
     except Exception:
-        # Fallback: MAE of sorted quantiles (cheap approximation).
         mid = len(values) // 2
         a = np.sort(values[:mid])
         b = np.sort(values[mid:mid + len(a)])
-        return float(np.abs(a - b).mean())
-    mid = len(values) // 2
-    return float(wasserstein_distance(values[:mid], values[mid:]))
+        w1 = float(np.abs(a - b).mean())
+    else:
+        mid = len(values) // 2
+        w1 = float(wasserstein_distance(values[:mid], values[mid:]))
+    scale = float(np.median(np.abs(values))) if len(values) else 1.0
+    return w1, max(scale, 1.0)  # floor to avoid div-by-zero on degenerate data
 
 
 def _metrics_for_stream(df, cache_sizes: np.ndarray, n_ird_bins: int = 32) -> dict:
-    obj_ids = _obj_ids_with_stream_offset(df)
-    # np.unique(return_counts=True) is O(N log N) memory-safe; np.bincount
-    # would allocate O(id_range), which blows up when the fake generator
-    # emits obj_ids spanning 1e14.
-    unique_ids, id_counts = np.unique(obj_ids, return_counts=True)
-    footprint = int(unique_ids.size)
-    reuse_rate_overall = float((id_counts > 1).sum()) / max(footprint, 1)
-    # Overall reuse-access-rate (fraction of accesses that are reuses):
-    seen: set = set()
-    reuse_hits = 0
-    for oid in obj_ids:
-        key = int(oid)
-        if key in seen:
-            reuse_hits += 1
-        else:
-            seen.add(key)
-    reuse_access_rate = reuse_hits / len(obj_ids) if len(obj_ids) else 0.0
+    """Compute metrics PER-STREAM and aggregate across streams. HRC is
+    averaged across streams, IRD is pooled, reuse rates are averaged,
+    footprint is averaged (so the 'per-stream working-set size' is
+    comparable between fake and real regardless of n_streams)."""
+    per_stream = _per_stream_obj_ids(df)
+    if not per_stream:
+        raise RuntimeError("empty DataFrame passed to _metrics_for_stream")
 
-    ird = _ird(obj_ids)
+    footprints = []
+    reuse_access_rates = []
+    reuse_object_rates = []
+    deciles_cumulative = []
+    deciles_local = []
+    ird_pooled: list = []
+    hrcs = []
+
+    for obj_ids in per_stream:
+        if len(obj_ids) == 0:
+            continue
+        unique_ids, id_counts = np.unique(obj_ids, return_counts=True)
+        footprints.append(int(unique_ids.size))
+        reuse_object_rates.append(float((id_counts > 1).sum()) / max(unique_ids.size, 1))
+        # reuse_access_rate: total_reuses / total_accesses (computed from counts
+        # without a second pass: accesses on reused ids minus one "first" access
+        # per reused id = total reuses).
+        total_acc = int(id_counts.sum())
+        total_first_accesses = int(unique_ids.size)
+        reuse_access_rates.append((total_acc - total_first_accesses) / total_acc)
+
+        deciles_cumulative.append(_reuse_rate_deciles_cumulative(obj_ids, n_bins=10))
+        deciles_local.append(_reuse_rate_deciles_local(obj_ids, n_bins=10))
+        ird_pooled.append(_ird_positional(obj_ids))
+        hrcs.append(_hrc_single(obj_ids, cache_sizes))
+
+    ird = np.concatenate(ird_pooled) if ird_pooled else np.zeros(0, dtype=np.int64)
     if len(ird) > 0:
-        # Log-spaced bins from 1 to max IRD.
         max_ird = int(ird.max())
         bin_edges = np.unique(np.geomspace(1, max(max_ird, 2), n_ird_bins + 1).astype(np.int64))
         hist, _ = np.histogram(ird, bins=bin_edges)
         hist = hist.astype(np.float64) / max(hist.sum(), 1)
         ird_hist = hist.tolist()
         ird_bin_edges = bin_edges.tolist()
-        ird_median = int(np.median(ird))
-        ird_p90 = int(np.percentile(ird, 90))
+        ird_positional_median = int(np.median(ird))
+        ird_positional_p90 = int(np.percentile(ird, 90))
     else:
-        ird_hist, ird_bin_edges, ird_median, ird_p90 = [], [], 0, 0
+        ird_hist, ird_bin_edges, ird_positional_median, ird_positional_p90 = [], [], 0, 0
 
-    hrc = _hrc(obj_ids, cache_sizes)
+    hrc_avg = np.mean(hrcs, axis=0) if hrcs else np.zeros(len(cache_sizes))
 
-    # Half-to-half Wasserstein on ts_delta and obj_size.
-    drift_ts = 0.0
-    drift_size = 0.0
+    # Half-to-half W1 on PER-STREAM concatenated values — first pass at each
+    # stream's values is stationary, so stream concatenation is fine for drift.
+    # Scale-normalize by pooled median to make the ratio dimensionless.
+    ts_deltas, sizes = [], []
     if 'ts' in df.columns:
-        ts_sorted = df.sort_values(['stream_id']).groupby('stream_id')['ts']
-        ts_deltas = []
-        for _, s in ts_sorted:
-            d = np.diff(s.astype(np.float64).values)
-            ts_deltas.append(d)
-        ts_delta = np.concatenate(ts_deltas) if ts_deltas else np.zeros(0)
-        drift_ts = _half_drift(ts_delta)
+        for _s, g in df.groupby('stream_id', sort=True):
+            d = np.diff(g['ts'].astype(np.float64).values)
+            if len(d): ts_deltas.append(d)
     if 'obj_size' in df.columns:
-        drift_size = _half_drift(df['obj_size'].astype(np.float64).values)
+        sizes = df['obj_size'].astype(np.float64).values
+    ts_delta_arr = np.concatenate(ts_deltas) if ts_deltas else np.zeros(0)
+    drift_ts, scale_ts = _half_drift(ts_delta_arr)
+    drift_size, scale_size = _half_drift(np.asarray(sizes) if len(sizes) else np.zeros(0))
 
-    reuse_deciles = _reuse_rate_deciles(obj_ids, n_bins=10)
-
+    total_records = int(sum(len(x) for x in per_stream))
     return {
-        "n_records": int(len(obj_ids)),
-        "footprint": footprint,
-        "reuse_access_rate": reuse_access_rate,
-        "reuse_object_rate": reuse_rate_overall,
-        "reuse_decile_first": float(reuse_deciles[0]),
-        "reuse_decile_last": float(reuse_deciles[-1]),
-        "reuse_decile_drift": float(reuse_deciles[-1] - reuse_deciles[0]),
-        "reuse_deciles": reuse_deciles.tolist(),
-        "ird_median": ird_median,
-        "ird_p90": ird_p90,
-        "ird_histogram": ird_hist,
-        "ird_bin_edges": ird_bin_edges,
-        "hrc": hrc.tolist(),
+        "n_records": total_records,
+        "n_streams": len(per_stream),
+        "footprint_mean_per_stream": float(np.mean(footprints)) if footprints else 0.0,
+        "footprints_per_stream": footprints,
+        "reuse_access_rate": float(np.mean(reuse_access_rates)) if reuse_access_rates else 0.0,
+        "reuse_object_rate": float(np.mean(reuse_object_rates)) if reuse_object_rates else 0.0,
+        "reuse_decile_cumulative_first": float(np.mean([d[0] for d in deciles_cumulative])) if deciles_cumulative else 0.0,
+        "reuse_decile_cumulative_last": float(np.mean([d[-1] for d in deciles_cumulative])) if deciles_cumulative else 0.0,
+        "reuse_decile_local_first": float(np.mean([d[0] for d in deciles_local])) if deciles_local else 0.0,
+        "reuse_decile_local_last": float(np.mean([d[-1] for d in deciles_local])) if deciles_local else 0.0,
+        "reuse_decile_local_drift": float(np.mean([d[-1] - d[0] for d in deciles_local])) if deciles_local else 0.0,
+        "reuse_deciles_cumulative": [float(x) for x in np.mean(deciles_cumulative, axis=0)] if deciles_cumulative else [],
+        "reuse_deciles_local": [float(x) for x in np.mean(deciles_local, axis=0)] if deciles_local else [],
+        "ird_positional_median": ird_positional_median,
+        "ird_positional_p90": ird_positional_p90,
+        "ird_positional_histogram": ird_hist,
+        "ird_positional_bin_edges": ird_bin_edges,
+        "hrc": hrc_avg.tolist(),
         "cache_sizes": cache_sizes.tolist(),
         "drift_ts_delta_w1": drift_ts,
+        "drift_ts_delta_w1_normalized": drift_ts / scale_ts,
         "drift_obj_size_w1": drift_size,
+        "drift_obj_size_w1_normalized": drift_size / scale_size,
     }
 
 
 def _gap(fake: dict, real: dict) -> dict:
-    """Compute fake-vs-real gaps for a small set of headline metrics."""
+    """Compute fake-vs-real gaps for a small set of headline metrics.
+    Drift ratios use the scale-normalized Wasserstein-1 so they are
+    dimensionless and comparable across corpora with different value
+    magnitudes."""
     hrc_fake = np.asarray(fake.get("hrc", []))
     hrc_real = np.asarray(real.get("hrc", []))
     n = min(len(hrc_fake), len(hrc_real))
     hrc_mae = float(np.abs(hrc_fake[:n] - hrc_real[:n]).mean()) if n else None
 
+    def _ratio(f, r):
+        return (f / r) if (r is not None and r > 0) else None
+
     return {
         "hrc_mae": hrc_mae,
         "reuse_access_rate_delta": fake["reuse_access_rate"] - real["reuse_access_rate"],
-        "reuse_decile_drift_fake_minus_real":
-            fake["reuse_decile_drift"] - real["reuse_decile_drift"],
+        "reuse_object_rate_delta": fake["reuse_object_rate"] - real["reuse_object_rate"],
+        "reuse_decile_local_drift_fake_minus_real":
+            fake["reuse_decile_local_drift"] - real["reuse_decile_local_drift"],
         "drift_ts_delta_w1_ratio":
-            (fake["drift_ts_delta_w1"] / real["drift_ts_delta_w1"])
-            if real["drift_ts_delta_w1"] > 0 else None,
+            _ratio(fake["drift_ts_delta_w1_normalized"], real["drift_ts_delta_w1_normalized"]),
         "drift_obj_size_w1_ratio":
-            (fake["drift_obj_size_w1"] / real["drift_obj_size_w1"])
-            if real["drift_obj_size_w1"] > 0 else None,
-        "ird_median_ratio":
-            fake["ird_median"] / real["ird_median"] if real["ird_median"] else None,
-        "ird_p90_ratio":
-            fake["ird_p90"] / real["ird_p90"] if real["ird_p90"] else None,
+            _ratio(fake["drift_obj_size_w1_normalized"], real["drift_obj_size_w1_normalized"]),
+        "ird_positional_median_ratio":
+            _ratio(fake["ird_positional_median"], real["ird_positional_median"]),
+        "ird_positional_p90_ratio":
+            _ratio(fake["ird_positional_p90"], real["ird_positional_p90"]),
+        "footprint_ratio":
+            _ratio(fake["footprint_mean_per_stream"], real["footprint_mean_per_stream"]),
     }
 
 
@@ -475,12 +556,15 @@ def main() -> int:
     t_fake = time.time() - t0
 
     print(f"[long_rollout_eval] sampling real trace baseline …")
-    real_df = _sample_real_stream(args.trace_dir, args.fmt, args.n_records, args.seed)
+    real_df = _sample_real_stream(args.trace_dir, args.fmt, args.n_records,
+                                  args.n_streams, args.seed)
     t_real = time.time() - t0 - t_fake
 
-    # Determine cache sizes from the real footprint.
-    real_oids = _obj_ids_with_stream_offset(real_df)
-    real_footprint = int(np.unique(real_oids).size)
+    # Determine cache sizes from the mean per-stream real footprint (so cache
+    # scales make sense for an N-stream comparison rather than N× the mean).
+    real_per_stream = _per_stream_obj_ids(real_df)
+    real_footprint = int(np.mean([np.unique(s).size for s in real_per_stream])) \
+        if real_per_stream else 0
     if args.cache_sizes:
         cache_sizes = np.array([int(s.strip()) for s in args.cache_sizes.split(",") if s.strip()],
                                dtype=np.int64)
@@ -530,14 +614,15 @@ def main() -> int:
         r_txt = fmt.format(r_val) if isinstance(r_val, (int, float)) else f"{r_val:>14}"
         print(f"{name:<32}{f_txt}{r_txt}  {gap_txt}")
     _row("reuse_access_rate", fake_m["reuse_access_rate"], real_m["reuse_access_rate"])
-    _row("reuse_decile_first", fake_m["reuse_decile_first"], real_m["reuse_decile_first"])
-    _row("reuse_decile_last", fake_m["reuse_decile_last"], real_m["reuse_decile_last"])
-    _row("reuse_decile_drift", fake_m["reuse_decile_drift"], real_m["reuse_decile_drift"])
-    _row("ird_median", fake_m["ird_median"], real_m["ird_median"], fmt="{:>14.0f}")
-    _row("ird_p90", fake_m["ird_p90"], real_m["ird_p90"], fmt="{:>14.0f}")
-    _row("drift_ts_delta_w1", fake_m["drift_ts_delta_w1"], real_m["drift_ts_delta_w1"])
-    _row("drift_obj_size_w1", fake_m["drift_obj_size_w1"], real_m["drift_obj_size_w1"])
-    _row("footprint", fake_m["footprint"], real_m["footprint"], fmt="{:>14.0f}")
+    _row("reuse_object_rate", fake_m["reuse_object_rate"], real_m["reuse_object_rate"])
+    _row("reuse_decile_local_first", fake_m["reuse_decile_local_first"], real_m["reuse_decile_local_first"])
+    _row("reuse_decile_local_last", fake_m["reuse_decile_local_last"], real_m["reuse_decile_local_last"])
+    _row("reuse_decile_local_drift", fake_m["reuse_decile_local_drift"], real_m["reuse_decile_local_drift"])
+    _row("ird_positional_median", fake_m["ird_positional_median"], real_m["ird_positional_median"], fmt="{:>14.0f}")
+    _row("ird_positional_p90", fake_m["ird_positional_p90"], real_m["ird_positional_p90"], fmt="{:>14.0f}")
+    _row("drift_ts_delta_w1_norm", fake_m["drift_ts_delta_w1_normalized"], real_m["drift_ts_delta_w1_normalized"])
+    _row("drift_obj_size_w1_norm", fake_m["drift_obj_size_w1_normalized"], real_m["drift_obj_size_w1_normalized"])
+    _row("footprint_per_stream", fake_m["footprint_mean_per_stream"], real_m["footprint_mean_per_stream"], fmt="{:>14.0f}")
     print("─" * 68)
     print(f"HRC-MAE (stitched long stream) : {gap_m['hrc_mae']:.4f}" if gap_m['hrc_mae'] else
           "HRC-MAE: unavailable")
