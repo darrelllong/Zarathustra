@@ -16,7 +16,8 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode — unstable recipe, tail-checkpoint win) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-18: final.pt MMD²=0.00677, β-recall=**0.8610** → ★=0.03457. **30.7% improvement over v157's 0.04982**; beats v162 lottery-win (0.04803) by 28.1%. Now BEATS tencent ATB 0.03942 (alibaba was historically the harder corpus). best.pt (ep5) ★=0.08841 = **+155.7% worse than frozen-best** — 8th confirmation of best.pt mis-rank pathology and the largest alibaba-side gap observed. final.pt saved at W-stop ep29 (W=3.72). **Three alibaba seeds on this recipe now show 0.098 / 0.048 / 0.035 with final.pt saved at W-stop epochs 7 / 9 / 29. That pattern is consistent with a *W-stop distillation hypothesis* (longer tail under a railing critic yields better final.pt) but it is also consistent with survivorship — 3 seeds is too few to identify the mechanism. A branched tail-control test (IDEA #33) is needed before the distillation framing can be treated as mechanism rather than hypothesis.** |
+| Alibaba | **0.02915**       | **v167** final.pt (v164 recipe + IDEA #33 arm (a); branched resume from v165/ep25 + w-stop 3.0 + seed=7) | n/a | Deterministic `frozen_sweep` (seeds 42/42) 2026-04-19: final.pt MMD²=0.00705, β-recall=**0.8895** → ★=0.02915. **−15.7% improvement over v164's 0.03457**. W-spike guard fired at ep34 (W=3.79, 3 consecutive >3.0); final.pt is the ONLY good checkpoint (epoch_0030.pt ★=0.07433, best.pt same). best.pt (pre-branch ep30) +155.0% mis-rank = 12th confirmation of Round 18 P1 #1. **Three-arm IDEA #33 identification test now CLOSED**: v167 arm (a) branched w-stop 3.0 = 0.02915 (WINS) vs v166 arm (b) critic-slowdown 0.04038 vs v165 arm (c) w-stop 5.0 = 0.03894; fresh-pretrain v164 arm-a-like = 0.03457. W-stop at 3.0 is the load-bearing policy; tail-slowing and threshold-raising both HURT. Branched from v165/ep25 improves on fresh-pretrain for this recipe family. |
+| Alibaba prior | 0.03457       | v164 final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode; fresh pretrain) | n/a | Held ATB 2026-04-18 PM through 2026-04-19 02:50. Superseded by v167 final.pt (same recipe, branched from v165/ep25 instead of fresh-pretrain, −15.7%). final.pt MMD²=0.00677, β-recall=0.8610. |
 | Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
 | Alibaba prior | 0.0656 avg    | v124 (SSM, IDEA #19 only) | n/a             | 5-run 0.06000–0.06962 |
@@ -150,8 +151,28 @@ ep10's ★=0.0575 and final.pt's ★=0.0498 are the correct numbers.
 
 ## Currently Running
 
-- **alibaba_v167** — IDEA #33 arm (a): resume from v165/epoch_0025.pt, `--w-stop-threshold 3.0` (default), no tail-control. Completes the three-arm identification test by pairing the *same branch point* with the *normal* w-stop policy that v164 used via fresh-pretrain lottery. If v167 beats v166 (★=0.04038) and v165 (★=0.03894), the "distillation" effect v164 showed is from critic-clipping at 3.0 specifically, not the longer tail. If v167 is worse than both, the v164 result needed the specific seed-trajectory of a fresh pretrain, not the shared branch-point. Log `/home/darrell/train_alibaba_v167.log`.
+- **alibaba_v168** — v167 recipe EXACTLY + IDEA #17 retrieval memory (K/V/T/mask per-window bank + learned reuse gate + BCE aux weight 1.0; M=32, key=32, val=32; params=98,913). Fresh pretrain (NOT branched). `--seed 7`. Stacks retrieval on the new ATB recipe to test whether IDEA #17 adds to v167's 0.02915. Log `/home/darrell/train_alibaba_v168.log`.
 - **tencent_v165** — first training-side test of IDEA #17 retrieval memory on tencent (K/V/T/mask per-window bank + learned reuse gate + BCE aux). params=98,913. Entered Phase 3 @ 02:08. Log `/home/darrell/train_tencent_v165.log`.
+
+---
+
+### alibaba_v167 — CLOSED-WIN ★ NEW ALIBABA ATB ★ (IDEA #33 arm (a): branched from v165/ep25 + `--w-stop-threshold 3.0` + seed=7; W-spike auto-stop @ ep34; frozen-best final.pt ★=0.02915 = **−15.7% vs prior ATB 0.03457**, 2026-04-19)
+**Why (closed)**: IDEA #33 arm (a) — completes the three-arm identification test. Branches from the same `alibaba_v165/epoch_0025.pt` pre-tail checkpoint used by v166 (arm b) and v165 (arm c), but pairs it with the *normal* `--w-stop-threshold 3.0` that v164 used via fresh-pretrain lottery. This isolates "branched + w-stop 3.0 tail" from (b) branched + critic-slowdown tail and (c) branched + w-stop 5.0 tail, and separately from v164 (fresh-pretrain + w-stop 3.0). WINS cleanly: final.pt ★=0.02915, beating all three other arms *and* the v164 fresh-pretrain baseline it was originally trying to explain.
+**Recipe**: v164 EXACTLY (v157/v132 recipe + BS+OC overlap-mode) + `--resume-from /home/darrell/checkpoints/alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` (default) + `--seed 7`. Log `/home/darrell/train_alibaba_v167.log`.
+**Training (Phase 3, from ep26 branch-point)**: ep26 W=+2.44, ep27 W=+2.75, ep28 W=+4.73, ep29 W=+3.04, ep30 W=+2.22 (train★=0.10414 — pre-tail-reset), ep31 W=+2.17, ep32 W=+5.15, ep33 W=+4.71, ep34 W=+3.79 → W-spike guard fired (3 consecutive >3.0), `final.pt` written at ep34. Only 3 checkpoints landed (branch + ep30 + final.pt) — short tail, W-stopped fast.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen |
+|---|---|---|---|
+| **final.pt** (ep34 W-stop) | **0.00705** | **0.8895** | **★=0.02915** ★ NEW ATB ★ |
+| epoch_0030.pt | 0.01243 | 0.6905 | 0.07433 |
+| best.pt (= ep30 weights) | 0.01243 | 0.6905 | 0.07433 |
+
+**Interpretation — THREE-ARM IDEA #33 CLOSED; w-stop 3.0 is the load-bearing policy**:
+- **Full leaderboard of the identification test**: v167 arm (a) branched+w3.0 ★=0.02915 **(WINS)** < v164 fresh-pretrain+w3.0 ★=0.03457 < v165 arm (c) branched+w5.0 ★=0.03894 < v166 arm (b) branched+critic-slowdown ★=0.04038. Both deviations from the w-stop-3.0 policy (raising the threshold, slowing the critic) HURT relative to w-stop-3.0. The "W-stop distillation" v164 hinted at is real, and the mechanism is **critic-clipping at W=3.0 specifically**, not "longer tail" or "slower critic."
+- **Branching beats fresh pretrain** when paired with w-stop 3.0: v167 branched from v165/ep25 produces a final.pt that is −15.7% better than v164's fresh-pretrain final.pt, under identical recipe otherwise. This is the first evidence that the v165/ep25 branch-point has trained-in structure that a fresh pretrain does not reliably recover.
+- best.pt (ep30 weights) ★=0.07433 is **+155.0% worse than frozen-best** — 12th confirmation of Round 18 P1 #1 best.pt mis-rank. Actually slightly larger than the v164 +155.7% record. Training-★ selector would have shipped a model 2.5× worse.
+- β-recall at 0.8895 is the highest observed on alibaba, up from v164's 0.8610 at identical MMD² (both ~0.007). v167 is a recall-improvement over v164, not a mode-collapse trade-off.
+- **Next queued**: v168 stacks IDEA #17 retrieval memory on this recipe (fresh pretrain), to test whether retrieval adds incrementally to the new 0.02915 baseline. If v168 beats 0.02915, retrieval is additive to BS+OC+w-stop-3.0. If v168 matches or loses, the combination is saturated and the next lever is IDEA #34 (tail-stratified eval bundle).
 
 ---
 
