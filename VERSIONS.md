@@ -168,14 +168,28 @@ Corpora stratified (commits `caaac84` + `d3690d6`):
 
 **First-pass ATB evals on both strata (2026-04-19, seeds 42/42)**:
 
+NOTE: v167 alibaba rows below are retracted provenance (v167 was later
+demoted after a 3-seed basin showed the 0.02915 result was seed-lottery,
+not reproducible). The reproducible alibaba baseline is v164 final.pt
+★=0.03457. The v164 tencent row is the prior tencent baseline (0.03900);
+current tencent ATB is v165 ep_0045.pt ★=0.03752. Tail-stratum numbers
+for v164 alibaba and v165 tencent have NOT yet been run — re-stratify on
+those before using tail-★ as a promotion gate (peer review Round 28 P1 #1).
+
 | Checkpoint | Stratum | MMD² | β-recall | ★ |
 |---|---|---|---|---|
-| v167 alibaba final.pt | full corpus | 0.00705 | 0.8895 | **0.02915** (ATB) |
-| v167 alibaba final.pt | tail-heavy | 0.02426 | 0.9485 | 0.03456 (+18.5%) |
-| v167 alibaba final.pt | ordinary | 0.01460 | 0.9155 | 0.03150 (+8.1%) |
-| v164 tencent ep_0020 | full corpus | 0.00210 | 0.8155 | **0.03900** (ATB) |
-| v164 tencent ep_0020 | tail-heavy | 0.01592 | 0.9130 | 0.03332 (−14.6%) |
-| v164 tencent ep_0020 | ordinary | 0.00396 | 0.8385 | 0.03626 (−7.0%) |
+| v167 alibaba final.pt *(RETRACTED — seed-lottery)* | full corpus | 0.00705 | 0.8895 | 0.02915 |
+| v167 alibaba final.pt *(RETRACTED)* | tail-heavy | 0.02426 | 0.9485 | 0.03456 |
+| v167 alibaba final.pt *(RETRACTED)* | ordinary | 0.01460 | 0.9155 | 0.03150 |
+| v164 alibaba final.pt *(current ATB)* | full corpus | — | — | **0.03457** (reproducible) |
+| v164 alibaba final.pt | tail-heavy | *not yet run* | | |
+| v164 alibaba final.pt | ordinary | *not yet run* | | |
+| v165 tencent ep_0045.pt *(current tencent ATB)* | full corpus | — | — | **0.03752** |
+| v165 tencent ep_0045.pt | tail-heavy | *not yet run* | | |
+| v165 tencent ep_0045.pt | ordinary | *not yet run* | | |
+| v164 tencent ep_0020 *(prior tencent baseline, superseded by v165)* | full corpus | 0.00210 | 0.8155 | 0.03900 |
+| v164 tencent ep_0020 | tail-heavy | 0.01592 | 0.9130 | 0.03332 |
+| v164 tencent ep_0020 | ordinary | 0.00396 | 0.8385 | 0.03626 |
 
 **First-pass interpretation (preliminary, single-checkpoint)**:
 - β-recall on the tail stratum is *higher* than on ordinary for both corpora
