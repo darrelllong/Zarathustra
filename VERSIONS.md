@@ -203,8 +203,26 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v169** — v167 recipe EXACTLY + `--moment-loss-weight 0.5` (5× default 0.1). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. Tests whether explicit higher-moment pressure (the training-time lever behind IDEA #34's moment audit motivation) adds to v167's 0.02915 where IDEA #17 retrieval memory FAILED (v168 → 0.05131, +76%). Moment loss targets per-feature higher moments directly — the R audit identified M5/M6 on iat_*, abs_stride_*, reuse_ratio as the un-modeled tail regime. Log `/home/darrell/train_alibaba_v169.log`.
+- **alibaba_v170** — v167 recipe EXACTLY + `--moment-loss-weight 0.2` (2× default 0.1, backing off v169's 5× that crashed recall). Branched resume from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. v169's MMD² DROPPED (-4.8% from 0.00705 → 0.00671) suggesting moment-loss helps moments, but its 5× weight crashed recall 0.8895 → 0.8520. v170 tests a gentler bump: does 2× preserve recall while keeping the MMD² gain? Log `/home/darrell/train_alibaba_v170.log`.
 - **tencent_v166** — v165 recipe + IDEA #21 BS+OC overlap-mode stacked. Same `--seed 5`. Tests whether retrieval-memory (v165 win on tencent) + BS+OC (v164 win on tencent) combine additively. If v166 beats v165 ★=0.03752, the two mechanisms add. If v166 matches/regresses, they overlap the same tail-regime improvement. Log `/home/darrell/train_tencent_v166.log`.
+
+---
+
+### alibaba_v169 — CLOSED-FAILED (v167 recipe + `--moment-loss-weight 0.5` 5× default; W-spike auto-stop @ ep34 replay of v167; frozen-best final.pt ★=0.03631 = **+24.5% worse than v167's 0.02915**, 2026-04-19)
+**Why (closed-failed)**: first alibaba test of explicit higher-moment pressure (IDEA #34 motivation: R audit shows M5/M6 tails on iat_*, abs_stride_*, reuse_ratio are un-modeled). v168 retrieval failure drove picking an orthogonal lever. Result: moment-loss 0.5 replayed v167's W-burst trajectory EXACTLY (ep32 W=5.56, ep33 W=5.96, ep34 W=5.66 → guard fires), but final.pt lost recall (-4.2% absolute) while gaining MMD² (-4.8%) — net +24.5% worse combined.
+**Recipe**: v167 EXACTLY + `--moment-loss-weight 0.5` (vs default 0.1). Branched from `alibaba_v165/epoch_0025.pt` + `--w-stop-threshold 3.0` + `--seed 7`. Same branch, same seed as v167 = controlled single-variable test.
+**Training (Phase 3, from ep26 branch-point)**: ep26 W=+2.44, ep27 W=+2.77, ep28 W=+4.74, ep29 W=+3.08, ep30 W=+2.23 (train-★=0.10401), ep31 W=+2.19, ep32 W=+5.56, ep33 W=+5.96, ep34 W=+5.66 → W-spike guard fired (3 consecutive >3.0). Final.pt written at ep34. W-burst pattern IDENTICAL to v167 (ep32 W=5.15, ep33 W=4.71, ep34 W=3.79).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v167 |
+|---|---|---|---|---|
+| **final.pt** (ep34 W-stop) | **0.00671** | **0.8520** | **★=0.03631** | **+24.5% worse** |
+| epoch_0030.pt (= best.pt) | 0.01268 | 0.6615 | 0.08038 | +175.8% worse |
+
+**Interpretation**:
+- **Moment-loss 0.5 trades MMD² for recall**: MMD² improved by 4.8% (0.00705 → 0.00671), but β-recall dropped 4.2% absolute (0.8895 → 0.8520). Net combined worse.
+- **The MMD² direction is real signal**: gentler moment pressure may capture the benefit without crashing recall. Next queued v170 tests moment-loss 0.2 (2× default).
+- **W-burst replay confirms branch-point determinism**: same branch + same seed + near-identical W trajectory → moment-loss at this weight does NOT alter the critic dynamics, only the final weights. Both runs W-stopped at ep34.
+- **best.pt (ep30 pre-W-burst) is still the 12th documented training/frozen mis-rank**: frozen ★=0.08038 vs final.pt 0.03631 = +121.4% worse.
 
 ---
 
