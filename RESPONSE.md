@@ -465,3 +465,102 @@ Infra work begins now:
 No new diffusion-side experiments, no #29/#30, no tangential flag-flips until
 the sidecar is live.
 
+---
+
+# Response to peer review Round 21 (2026-04-18)
+
+**Status: all four P1 sidecar issues fixed in commit `83852d0` ("long_rollout_eval:
+fix Round 21 P1 sidecar issues"); the P2 framing correction on tencent_v163 was
+already applied in the v163 post-mortem before this response.**
+
+Round 21 correctly read the Round 20 adoption as direction-right-but-gate-wrong.
+The sidecar needed four concrete fixes before it could stand as an acceptance
+criterion for #28/#31/#32. All four are now in.
+
+1. **R21-P1 #1 (conditioning source).** Fixed. `_rollout()` no longer draws
+   `torch.randn(n, cond_dim) * 0.5`. Added `_resolve_conditioning()` with four
+   explicit modes: `unconditional` (cond_dim == 0), `source_traces` (per-stream
+   names looked up in `--char-file`), `char_file_random_sample` (uniform draw
+   from the characterization pool, seed-deterministic), and
+   `random_torch_randn_0.5` (only reachable via explicit
+   `--random-conditioning`). Conditional checkpoints **raise** without either
+   `--char-file` or `--random-conditioning` — the sidecar refuses to silently
+   measure a different contract from frozen eval. The actual source used is
+   recorded as `result["conditioning"]["source"]` in the output JSON so every
+   sidecar JSON is self-describing.
+
+2. **R21-P1 #2 (true reuse-distance).** Fixed. Added `_stack_distances()` —
+   exact O(N log N) Fenwick-tree implementation that returns the number of
+   *distinct* intervening keys for every reuse. Result JSON now carries both
+   `stack_distance_{median,p90,histogram,bin_edges}` and the existing
+   `ird_positional_*` fields, so positional-IRD remains available as a cadence
+   proxy but does not stand in for the cache-footprint target #32 needs. Unit
+   tests on `AA`, `ABA`, `ABCDA`, `ABCABCA`, `ABACB` (0, 1, 3, 2-2-2-2, 1-2)
+   pass against hand-calculated ground truth.
+
+3. **R21-P1 #3 (per-stream drift).** Fixed. `_metrics_for_stream()` now
+   computes half-to-half W1 on `ts_delta` and `obj_size` *per stream*, then
+   averages the normalized values across streams. The raw pooled
+   concatenation that measured between-stream heterogeneity is gone. The
+   result JSON carries `drift_*_per_stream` (list) and
+   `drift_*_per_stream_mean` (scalar) so both the distribution and the
+   summary number are auditable.
+
+4. **R21-P1 #4 (real-baseline manifest).** Fixed. `_sample_real_stream()`
+   accepts `--real-manifest PATH`; if the file exists, it **replays** the
+   exact `(path, records_taken)` entries and fails fast if any referenced
+   file is missing or short-reads, otherwise it writes the manifest after
+   sampling. A replay-determinism smoke test (alibaba_v157 / seed=42 /
+   2000 records / 2 streams) confirmed identical real-side metrics across
+   two runs once the manifest was written.
+
+5. **R21-P2 #5 (FFT framing).** Already adopted. The `tencent_v163`
+   post-mortem in `VERSIONS.md` (commit `90bd638`) reframed the result as
+   "FFT-weight amplification at 20× (0.05 → 1.0)" rather than off-vs-on
+   spectral loss. Round 22 re-checked this and agreed the framing was
+   correct; it only asked that the conclusion not be generalized beyond the
+   naive-MSE weight path to TSGDiff-style Fourier/graph structure. The v163
+   section has been scoped accordingly.
+
+### End-to-end verification
+
+Ran the fixed sidecar against `/home/darrell/checkpoints/alibaba_v157/final.pt`
+(the current alibaba frozen-bundle baseline) with `--char-file`,
+`--real-manifest`, `--n-records 2000`, `--n-streams 2`, `--seed 42`. Output
+JSON at `/tmp/lre_smoke.json` shows:
+- `conditioning.source == "char_file_random_sample"` with 2 pool keys recorded.
+- `stack_distance_{median,p90}` populated (fake 0/0 vs real 254/444 — expected
+  divergence since v157 does not have persistent cross-window memory).
+- `drift_ts_delta_w1_per_stream` list has 2 entries, mean exposed separately.
+- `real_manifest.streams` recorded exact files and per-file record counts;
+  second run replaying from that manifest produced identical real-side
+  metrics.
+- Refusal-without-flags verified: running the same command without
+  `--char-file` and without `--random-conditioning` raises with a clear
+  message, as intended.
+
+### What this unblocks
+
+- **IDEA #28 (cross-window retrieval bank)** can now be gated on sidecar
+  stack-distance recovery, not on positional-IRD which would have been
+  satisfied by Zipf frequency matching alone.
+- **IDEA #31 (chained-window training)** can be gated on
+  `drift_*_per_stream_mean` instead of the pooled version that conflated
+  between-stream heterogeneity.
+- **IDEA #32 (IRD footprint modeling)** now has the correct evaluation
+  target (`stack_distance_histogram`), not a proxy.
+- The **real-baseline manifest** makes every future sidecar comparison
+  reproducible against the same trace files, closing the moving-benchmark
+  problem Round 21 flagged.
+
+### What remains open
+
+- Round 22 P1 items (v164 interpretation overreach, v165 wrong-control,
+  IDEA #21 status reconciliation, long-rollout-gate-vs-v164 tension) are
+  tracked separately — the sidecar fix alone does not address them.
+- Round 23 / Round 24 (higher-moment tail-regime, full-corpus leaderboard,
+  IDEAS.md #34) are independent follow-ups.
+
+The sidecar is now a valid acceptance criterion. The next #28/#31/#32 branch
+can launch against it without repeating the Round 20 "built the right kind of
+infrastructure but not yet the right gate" pattern.
