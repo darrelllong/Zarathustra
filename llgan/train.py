@@ -1159,6 +1159,14 @@ def train(cfg: Config) -> None:
     # -----------------------------------------------------------------------
     # Epoch loop
     # -----------------------------------------------------------------------
+    # IDEA #33 tail-control: if configured, scale all critic optimiser LRs
+    # by --critic-lr-tail-factor once epoch >= --tail-start-epoch. Captured
+    # as a single-shot idempotent flag; does nothing if factor==1.0 or the
+    # start epoch was not set.
+    _tail_lr_applied = False
+    _tail_start_epoch = int(getattr(cfg, "tail_start_epoch", -1))
+    _tail_lr_factor = float(getattr(cfg, "critic_lr_tail_factor", 1.0))
+
     for epoch in range(start_epoch, cfg.epochs):
         G.train(); C.train()
         if latent_ae:
@@ -1168,6 +1176,19 @@ def train(cfg: Config) -> None:
         # Anneal Gumbel temperature for regime sampler (idea #5).
         if getattr(G, "regime_sampler", None) is not None:
             G.regime_sampler.anneal(epoch / max(cfg.epochs - 1, 1))
+        # IDEA #33 tail-control lever — apply LR scaling at the tail boundary.
+        if (not _tail_lr_applied
+                and _tail_start_epoch >= 0
+                and _tail_lr_factor != 1.0
+                and epoch >= _tail_start_epoch):
+            for _opt_Ci in opt_C_all:
+                for pg in _opt_Ci.param_groups:
+                    pg["lr"] = pg["lr"] * _tail_lr_factor
+            print(f"[IDEA #33] tail-control: scaled all critic LRs by "
+                  f"{_tail_lr_factor} at epoch {epoch} "
+                  f"(tail_start_epoch={_tail_start_epoch}).",
+                  flush=True)
+            _tail_lr_applied = True
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
@@ -2340,6 +2361,15 @@ def parse_args() -> Config:
                         "for 3 consecutive epochs (0=off). Prevents the conditioning collapse "
                         "seen in v33/v36 (W→10 at ep178-179, well after EMA best was saved). "
                         "Recommended: 3.0. Good runs rarely exceed 2.0.")
+    p.add_argument("--tail-start-epoch",     type=int, default=-1,
+                   help="IDEA #33 tail-control: epoch at which to apply "
+                        "--critic-lr-tail-factor. Use with --resume-from <pre-tail-ckpt> "
+                        "and a matching --tail-start-epoch to branch training into a "
+                        "critic-slowdown tail variant. -1 = disabled.")
+    p.add_argument("--critic-lr-tail-factor", type=float, default=1.0,
+                   help="IDEA #33 tail-control: multiplier applied to all critic "
+                        "optimiser LRs once epoch >= --tail-start-epoch. 0.0 freezes "
+                        "the critic entirely; 0.1 slows it 10×; 1.0 (default) is a no-op.")
     p.add_argument("--multi-scale-critic",   action="store_true", default=False,
                    help="Multi-resolution critic (IDEAS.md idea #8, HiFi-GAN style): "
                         "3 independent LSTM critics at T, T//2, T//4 temporal scales. "
@@ -2563,6 +2593,8 @@ def parse_args() -> Config:
     cfg.n_regimes               = args.n_regimes
     cfg.num_lstm_layers         = args.num_lstm_layers
     cfg.w_stop_threshold        = args.w_stop_threshold
+    cfg.tail_start_epoch        = args.tail_start_epoch
+    cfg.critic_lr_tail_factor   = args.critic_lr_tail_factor
     cfg.multi_scale_critic      = args.multi_scale_critic
     cfg.mixed_type_recovery     = args.mixed_type_recovery
     cfg.gp_prior                = args.gp_prior
