@@ -217,8 +217,34 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **alibaba_v182** — v164 EXACT recipe with **patched BS at weight 0.5, k=1** (`--boundary-smoothness-weight 0.5 --boundary-smoothness-k 1`) + OC 0.5 + `--seed 7`. **Lower-BS-weight test**: v176 was patched BS 1.0 k=1 (★=0.051); v182 halves the BS gradient. If v182 ≤ 0.04, the patched-BS penalty was *too strong* at 1.0 — lower weight recovers toward v164. If v182 ≈ v176's 0.051, weight is not the limiting factor. If v182 ≥ 0.07 (or collapses), reducing BS weight below 1.0 pushes toward v179/v181's mode-collapse regime (since BS=0 both collapsed). Log `/home/darrell/train_alibaba_v182.log`. PID 925729.
-- **tencent_v183** — v165 EXACT recipe **minus** `--pcf-loss-weight` + `--seed 5` (same seed as v165). **PCF-loss ablation**, follow-up to v180 closing retrieval-memory as load-bearing. Keeps retrieval-memory, multi-scale-critic, mixed-type-recovery, 8 regimes, supervisor 5.0. Tests whether v165's PCF loss (pair-count-function second-order moment) contributed to ★=0.03752 or was passenger atop the retrieval + multi-scale stack. If v183 ≤ 0.04, PCF was passenger; v165 win distributes to retrieval + multi-scale. If v183 ≥ 0.05, PCF is second load-bearing term after retrieval-memory. Log `/home/darrell/train_tencent_v183.log`. PID 940636.
+- **tencent_v183** — v165 EXACT recipe **minus** `--pcf-loss-weight` + `--seed 5` (same seed as v165). **PCF-loss ablation**, follow-up to v180 closing retrieval-memory as load-bearing. Keeps retrieval-memory, multi-scale-critic, mixed-type-recovery, 8 regimes, supervisor 5.0. Tests whether v165's PCF loss contributed to ★=0.03752 or was passenger. Log `/home/darrell/train_tencent_v183.log`. PID 940636.
+- **alibaba_v184** — v176 EXACT recipe (patched BS 1.0 k=1 + OC 0.5 + seed=7) **plus** `--retrieval-memory` (IDEA #17). **Retrieval-memory on alibaba**: never tested there; confirmed load-bearing on tencent (v180 ablation → 3.17× frozen-★ degradation). v176 is our best patched alibaba (★=0.051); v184 adds retrieval-memory on top. If v184 ≤ 0.04, retrieval-memory transfers cross-corpus and can push patched alibaba below v164's legacy-bug 0.03457. If v184 ≈ 0.05, retrieval-memory doesn't help (passenger on alibaba, unlike tencent). If v184 ≥ 0.07, adding retrieval-memory destabilizes the v176 recipe. Log `/home/darrell/train_alibaba_v184.log`. PID 962748.
+
+---
+
+### alibaba_v182 — CLOSED-FAILED (v164 EXACT recipe + patched BS **0.5** k=1 + OC 0.5 + `--seed 7` + patched code; trajectory-kill @ ep25 after 15 epochs stale from ep10 best and ep25 regressed to 0.184 with recall dropping 0.350→0.274; frozen-best epoch_0020.pt ★=0.21740 = **+528.9% worse than v164's 0.03457**, β-recall 0.004-0.053 across all 6 checkpoints = deep mode collapse, 2026-04-19)
+**Why (closed-failed)**: **BS=0.5 sub-weight test** — fills the gap between v176's BS=1.0 (★=0.051) and v179's BS=0 (★=0.207). Tests whether BS weight has a soft slope or sharp cliff between 1.0 and 0. **Result: sharp cliff**. BS=0.5 collapses identically to BS=0 — frozen-★=0.21740 sits between v179 (0.207) and v181 (0.226) in the collapse band. There is no "middle ground" for BS weight on patched alibaba: the v164/v176 behavior requires BS≥1.0, and anything below collapses the run.
+**Recipe**: v164 EXACT + `--seed 7` + patched `chunk_stitching.py`, with `--boundary-smoothness-weight 0.5 --boundary-smoothness-k 1` + `--overlap-consistency-weight 0.5 --overlap-consistency-mode overlap --overlap-consistency-k 2`. Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=0.18181 (rec 0.284), ep10 train★=0.16164 ★ **best** (rec 0.335), ep15 train★=0.16547 (rec 0.350), ep20 train★=0.16239 (rec 0.310), ep25 train★=0.18377 (rec 0.274) — collapsing, manual kill at ep25. W tame (+0.25 → +0.57, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0020.pt** | **0.02790** | **0.0525** | **★=0.21740** (frozen-best) | **+528.9% worse** |
+| epoch_0015.pt | 0.03420 | 0.0495 | 0.22430 | +549% worse |
+| epoch_0025.pt | 0.02931 | 0.0150 | 0.22631 | +555% worse |
+| epoch_0010.pt (= best.pt) | 0.03268 | 0.0040 | 0.23188 | +571% worse |
+| epoch_0005.pt | 0.03850 | 0.0075 | 0.23700 | +586% worse |
+
+**Interpretation**:
+- **BS-weight cliff on patched alibaba is sharp** — BS=0.5 collapses identically to BS=0. There is no smooth gradient between 1.0 (works) and 0 (collapses): the run either stays above a BS floor or falls into mode collapse.
+- **Four-point BS/OC surface now complete for alibaba seed=7 + patched code**:
+  - BS=1.0 OC=0.5: ★=0.051-0.071 (v176, v175) — works
+  - BS=0.5 OC=0.5: ★=0.217 (v182) — collapses
+  - BS=0 OC=0: ★=0.207 (v179) — collapses
+  - BS=0 OC=0.5: ★=0.226 (v181) — collapses (OC-only actively harmful)
+- **Train-selector mis-rank 15th confirmation**: best.pt = ep10 (β-rec 0.004) vs frozen-best ep20 (β-rec 0.053). Train-selector picked a checkpoint with 13× less mode coverage.
+- **β-recall 0.004-0.053 = deepest mode collapse in this sweep**: ep10 has β-rec 0.004 = 0.4% of target coverage.
+- **Next queued v184**: v176 recipe (BS=1.0) + `--retrieval-memory` — cross-corpus transfer test. Retrieval-memory confirmed load-bearing on tencent; testing whether it also helps on alibaba atop the working BS=1.0 baseline.
 
 ---
 
