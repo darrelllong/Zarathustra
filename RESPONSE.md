@@ -958,20 +958,19 @@ now reads "2026-04-18 capture" (the actual frozen-sweep date).
 
 ---
 
-## Current state (2026-04-20)
+## Current state (2026-04-20, updated)
 
 **Running on vinge:**
-- `tencent_v187` (−multi-scale-critic, seed=5): ep ~54, best train-★ 0.08677 @ ep50, W≈2.2 < 3.0
-- `tencent_v188` (−mixed-type-recovery, seed=5): ep ~40, best train-★ 0.09878 @ ep35, W≈1.9 < 3.0
+- `tencent_v187` (−multi-scale-critic, seed=5): ep 63+, best train-★ 0.08677 @ ep50, W≈1.8–2.1 < 3.0
+- `tencent_v188` (−mixed-type-recovery, seed=5): ep 48+, best train-★ 0.09525 @ ep40, W≈1.8–2.2 < 3.0
+- `alibaba_v189` (IDEA #36 boundary critic, K=4, weight=0.5, seed=7): ep 4+, W building 0.25→0.73; first MMD at ep5
 
-Both are 2–3× above the v165 numeric target so far, suggesting multi-scale-critic
-and mixed-type-recovery may also be load-bearing inside seed=5. They have not
-W-stopped; need to run to natural completion or W-stop before frozen eval.
+v187 and v188 are 2–3× above v165's 0.03752 target so far (seed=5 ablations).
+Need to W-stop or run to completion before frozen eval can close the component matrix.
 
-**Alibaba is idle.** After v184's failure (retrieval negative) and v186's collapse
-(patched BS fragile), the alibaba slot is held for a structural move:
-IDEA #36 (learned boundary prior), IDEA #31 (chained-window training), or
-IDEA #35 (workload-conditioned router). No further scalar probes.
+v189 is the first structural Alibaba experiment: no BS/OC scalars, WGAN-SN
+boundary critic replaces hand-written penalty.  Phase 3 from v176 pretrain.
+First MMD signal pending (ep5, ~2026-04-20 17:00 local).
 
 **Long-rollout sidecar for v165/v177/v180/v183** — still deferred; required before
 mechanism claims about retrieval or PCF.
