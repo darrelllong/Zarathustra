@@ -218,7 +218,30 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v180** — v165 EXACT recipe **minus** `--retrieval-memory` + `--seed 5` (same seed as v165). **Retrieval-memory ablation**, parallel to v179's BS ablation on alibaba. Tests whether IDEA #17 retrieval memory contributed to v165's ★=0.03752 or was passenger. If v180 ≤ 0.04, retrieval-memory was passenger (or negative!) and v165's win comes from multi-scale + PCF + mixed-type + 8 regimes alone. If v180 ≥ 0.05, retrieval-memory is the load-bearing component and v165's ATB is tied to that mechanism. Log `/home/darrell/train_tencent_v180.log`. PID 889665.
-- **alibaba_v181** — v164 EXACT recipe with **BS disabled, OC retained** (`--boundary-smoothness-weight 0.0 --overlap-consistency-weight 0.5 --overlap-consistency-mode overlap --overlap-consistency-k 2`) + `--seed 7` (patched code). **OC-only ablation** — follow-up to v179's BS+OC=0 catastrophe (★=0.20719, β-rec=0.076 mode collapse). Tests whether OC alone carries the anti-mode-collapse signal, or whether BS is strictly required on alibaba. If v181 ≤ 0.06, OC alone is sufficient (and patched-BS k=2 vs k=1 was hurting). If v181 ≈ v179's 0.20, the BS+OC *pair* is required (OC alone is not enough). Narrows the R29-preserved surfaces for BS family. Log `/home/darrell/train_alibaba_v181.log`. PID 908516.
+- **alibaba_v182** — v164 EXACT recipe with **patched BS at weight 0.5, k=1** (`--boundary-smoothness-weight 0.5 --boundary-smoothness-k 1`) + OC 0.5 + `--seed 7`. **Lower-BS-weight test**: v176 was patched BS 1.0 k=1 (★=0.051); v182 halves the BS gradient. If v182 ≤ 0.04, the patched-BS penalty was *too strong* at 1.0 — lower weight recovers toward v164. If v182 ≈ v176's 0.051, weight is not the limiting factor. If v182 ≥ 0.07 (or collapses), reducing BS weight below 1.0 pushes toward v179/v181's mode-collapse regime (since BS=0 both collapsed). Log `/home/darrell/train_alibaba_v182.log`. PID 925729.
+
+---
+
+### alibaba_v181 — CLOSED-FAILED (v164 EXACT recipe, BS disabled, OC retained at 0.5 + `--seed 7` + patched code; manual kill @ ep19 after trajectory tracked v179's mode-collapse pattern precisely [ep5 0.194 → ep10 0.151 → ep15 0.153 regressing]; frozen-best epoch_0015.pt ★=0.22589 = **+553.6% worse than v164's 0.03457**, β-recall 0.003-0.030 across all 4 checkpoints = near-total mode collapse, 2026-04-19)
+**Why (closed-failed)**: **OC-only ablation** — follow-up to v179 (BS=0 OC=0 → ★=0.207). Tests whether overlap-consistency alone carries the anti-mode-collapse signal. **Result: OC-only is strictly WORSE than BS+OC both off**. v181's ★=0.226 is the worst alibaba run on record (beats v179's 0.207 and v178's 0.207). Hypothesis: OC's gradient actively destabilizes training when BS isn't there to anchor boundary semantics. The BS+OC pair must be kept together — removing BS alone turns OC into a net negative.
+**Recipe**: v164 EXACT + `--seed 7` + patched `chunk_stitching.py`, with `--boundary-smoothness-weight 0.0` + `--overlap-consistency-weight 0.5 --overlap-consistency-mode overlap --overlap-consistency-k 2`. Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=0.19438 (rec 0.236), ep10 train★=0.15149 ★ **best** (rec 0.377), ep15 train★=0.15292 (rec 0.397) — regressing, matching v179's trajectory exactly (v179 ep5 0.166 → ep10 0.149 → ep15 0.156). Killed at ep19 after 9 epochs stale and clear v179-tracking pattern. W tame (+0.26 to +0.62, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0015.pt** | **0.03189** | **0.0300** | **★=0.22589** (frozen-best) | **+553.6% worse** |
+| epoch_0010.pt (= best.pt) | 0.03042 | 0.0095 | 0.22852 | +561% worse |
+| epoch_0005.pt | 0.03894 | 0.0035 | 0.23824 | +589% worse |
+
+**Interpretation**:
+- **OC alone is actively harmful**: ★=0.226 for BS=0 OC=0.5 is 9% worse than ★=0.207 for BS=0 OC=0. Removing only BS (keeping OC) is strictly worse than removing both. OC's gradient needs BS as an anchor.
+- **β-recall 0.003-0.030**: the deepest mode collapse observed to date. ep5 checkpoint has β-recall=0.0035 = 0.35% of the target's mode coverage.
+- **Train-selector mis-rank**: best.pt = ep10 (β-rec 0.009) vs frozen-best ep15 (β-rec 0.030). Train-selector picked a checkpoint with 3× less coverage than the actual best. 14th confirmation of the pattern.
+- **Three-point BS/OC surface for alibaba at seed=7 + patched code**:
+  - BS=1.0 OC=0.5: ★=0.051-0.071 (v176, v175)
+  - BS=0 OC=0: ★=0.207 (v179)
+  - BS=0 OC=0.5: ★=0.226 (v181) — worst
+  - Next queued v182: BS=0.5 OC=0.5 — fills the gap between 0 and 1.0. Tests whether lower BS weight recovers any performance, or whether the BS contribution has a sharp cliff between 0 and 1.0.
 
 ---
 
