@@ -16,7 +16,7 @@ moving-bundle reports.
 
 | Corpus  | Best frozen-bundle | Version | Moving-bundle claim | Notes |
 |---------|--------------------|---------|----------------------|-------|
-| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode; fresh pretrain; **BUGGY PALINDROME BS CODE**) | n/a | **Legacy buggy-BS numeric baseline** — not a current-code reproducible ATB (peer review Round 29 P1 #1). Produced under the since-fixed `chunk_stitching.py` palindrome bug that forced `A[T-1-i]=B[i]` at the boundary. Under patched code, v164's recipe has produced a basin of {seed=7 k=2: 0.07121, seed=7 k=1: 0.05102, seed=11 k=2: **0.20662** mode-collapse}. v178 (seed=11 patched) gave β-recall=0.06 — catastrophic. The ★=0.03457 number remains the numeric threshold to beat, but it is **not reproducible under current code** and downstream BS+OC mechanism claims attached to v164 are tainted. v175/v176/v178 post-mortems detail the collapse. All NEW mechanism candidates must beat **0.03457** under at least one seed under PATCHED code — that is the real race target. Deterministic `frozen_sweep` of v164 (seeds 42/42): final.pt MMD²=0.00677, β-recall=0.8610 → ★=0.03457 (under buggy code, May-2026 capture). |
+| Alibaba | **0.03457**       | **v164** final.pt (v162 recipe EXACTLY seed=7; IDEAS #19/#20/#21 BS+OC overlap-mode; fresh pretrain; **BUGGY PALINDROME BS CODE**) | n/a | **Legacy buggy-BS numeric baseline** — not a current-code reproducible ATB (peer review Round 29 P1 #1). Produced under the since-fixed `chunk_stitching.py` palindrome bug that forced `A[T-1-i]=B[i]` at the boundary. Under patched code, v164's recipe has produced a basin of {seed=7 k=2: 0.07121, seed=7 k=1: 0.05102, seed=11 k=2: **0.20662** mode-collapse}. v178 (seed=11 patched) gave β-recall=0.06 — catastrophic. The ★=0.03457 number remains the numeric threshold to beat, but it is **not reproducible under current code** and downstream BS+OC mechanism claims attached to v164 are tainted. v175/v176/v178 post-mortems detail the collapse. All NEW mechanism candidates must beat **0.03457** under at least one seed under PATCHED code — that is the real race target. Deterministic `frozen_sweep` of v164 (seeds 42/42, 2026-04-18 capture): final.pt MMD²=0.00677, β-recall=0.8610 → ★=0.03457 (under buggy code). |
 | Alibaba prior — retracted | 0.02915 | v167 final.pt (seed=7 on v165/ep25 branch + w-stop 3.0) | n/a | **Retracted 2026-04-19 11:00.** Originally promoted 2026-04-19 04:00 after v164→v167 sweep. Round 26 P1 #1 peer review flagged the mechanism claim as over-stated; v172 (seed=11) and v173 (seed=13) experiments characterized the seed basin at {0.029, 0.042, 0.081}, confirming v167 was a lottery. The ★=0.02915 number is real under that specific seed, but not reproducible, and downstream mechanism claims ("W-stop at 3.0 is load-bearing", "branched beats fresh-pretrain") were artifacts of the single-seed trajectory. See v172/v173 post-mortems for basin analysis. |
 | Alibaba prior | 0.04982       | v157 final.pt (v132 recipe seed-2; IDEAS #19/#20/partial-#21) | n/a | Held ATB 2026-04-18 day. Frozen ★=0.04982, MMD²=0.00722, β-recall=0.7870. Superseded 2026-04-18 PM by v164 final.pt. |
 | Alibaba prior | 0.05778       | v132 (SSM+MTPP+boundary-smoothness, IDEAS #19/#20/partial-#21) | n/a | Former ATB. Frozen ep_0010.pt 2026-04-17: MMD²=0.00848, β-recall=0.7535. Superseded by v157 same-recipe seed-2. |
@@ -51,8 +51,8 @@ carry from `generate.py`.
 
 **Current status (2026-04-18, post-Round 22 reconciliation)**: sub-loss (b)
 IS wired as of the Round 19 code cleanup (`dce95a0`). v161/v162/v164 all
-run BS+OC overlap-mode (both sub-losses active). The recipe has produced
-the current alibaba ATB (v164 final.pt ★=0.03457) but is **unstable**:
+run BS+OC overlap-mode (both sub-losses active). The recipe produced
+the seed-locked numeric target (v164 final.pt ★=0.03457 under buggy-BS code, seed=7 only) but is **unstable**:
 the critic W-distance climbs past the 3.0 W-stop guard within 7–29 epochs
 on every tried seed, and `final.pt` (whatever W-stop catches) is the
 only reliably usable checkpoint. Status is **"wired, producing ATBs, but
@@ -170,9 +170,9 @@ Corpora stratified (commits `caaac84` + `d3690d6`):
 
 NOTE: v167 alibaba rows below are retracted provenance (v167 was later
 demoted after a 3-seed basin showed the 0.02915 result was seed-lottery,
-not reproducible). The reproducible alibaba baseline is v164 final.pt
-★=0.03457. The v164 tencent row is the prior tencent baseline (0.03900);
-current tencent ATB is v165 ep_0045.pt ★=0.03752. Tail-stratum numbers
+not reproducible). The alibaba numeric target is v164 final.pt
+★=0.03457 (seed-locked to seed=7 under buggy-BS code). The v164 tencent row is the prior tencent baseline (0.03900);
+tencent numeric target is v165 ep_0045.pt ★=0.03752 (seed-locked to seed=5). Tail-stratum numbers
 for v164 alibaba and v165 tencent have NOT yet been run — re-stratify on
 those before using tail-★ as a promotion gate (peer review Round 28 P1 #1).
 
@@ -181,10 +181,10 @@ those before using tail-★ as a promotion gate (peer review Round 28 P1 #1).
 | v167 alibaba final.pt *(RETRACTED — seed-lottery)* | full corpus | 0.00705 | 0.8895 | 0.02915 |
 | v167 alibaba final.pt *(RETRACTED)* | tail-heavy | 0.02426 | 0.9485 | 0.03456 |
 | v167 alibaba final.pt *(RETRACTED)* | ordinary | 0.01460 | 0.9155 | 0.03150 |
-| v164 alibaba final.pt *(current ATB)* | full corpus | — | — | **0.03457** (reproducible) |
+| v164 alibaba final.pt *(seed-locked numeric target, buggy-BS baseline)* | full corpus | — | — | **0.03457** (seed=7 only, buggy code) |
 | v164 alibaba final.pt | tail-heavy | *not yet run* | | |
 | v164 alibaba final.pt | ordinary | *not yet run* | | |
-| v165 tencent ep_0045.pt *(current tencent ATB)* | full corpus | — | — | **0.03752** |
+| v165 tencent ep_0045.pt *(seed-locked numeric target, seed=5 only)* | full corpus | — | — | **0.03752** (seed=5; seed=3→0.143, seed=7→0.088) |
 | v165 tencent ep_0045.pt | tail-heavy | *not yet run* | | |
 | v165 tencent ep_0045.pt | ordinary | *not yet run* | | |
 | v164 tencent ep_0020 *(prior tencent baseline, superseded by v165)* | full corpus | 0.00210 | 0.8155 | 0.03900 |
@@ -203,11 +203,16 @@ those before using tail-★ as a promotion gate (peer review Round 28 P1 #1).
   use different seed-42 4-file samples drawn from the restricted pool, so
   MMD² summary-space differs across bundles. Treat each stratum ★ as its
   own metric, not as a decomposition.
-- **Gate for future checkpoints**: a candidate must either (a) improve
-  tail-★ without regressing ordinary-★, or (b) beat the current ATB by a
-  margin that exceeds the bundle-variance observed here (≈0.005 ★ between
-  full and ordinary bundles of the same checkpoint). Use this as a second
-  signal beyond the single full-corpus ★.
+- **Gate for future checkpoints (revised per Round 32 P2 #4)**: a
+  candidate must (a) improve **tail MMD²** (or another direct shape-distance
+  metric) without regressing ordinary-★, AND (b) beat the full-corpus
+  numeric target by a margin that exceeds the bundle-variance observed
+  here (≈0.005 ★ between full and ordinary bundles of the same checkpoint).
+  **Tail β-recall is reported separately, not rolled into tail-★ for
+  promotion** — since β-recall on the tail stratum is trivially higher
+  than ordinary (broader per-file distributions), letting it compensate
+  for worse tail shape would reopen the exact scoring loophole the
+  diagnostic was created to close.
 
 Not running on every checkpoint yet — the stratum sweep adds 2× eval cost.
 Apply to every candidate that beats the full-corpus ATB, plus ATB holders
@@ -320,7 +325,7 @@ v165's ★=0.03752 is a **single-seed lottery win at seed=5**, not a reproducibl
 **Interpretation**:
 - **PCF-loss is load-bearing on tencent** (frozen-★ 0.037 → 0.192 without it = 5.11× degrade). Parallel to v180's retrieval-memory result (0.037 → 0.119 = 3.17× degrade). v165 is a **two-pillar recipe**: both components carry weight, neither is passenger.
 - **Round 30 P1 #1 implication tightens**: v165's ★=0.03752 depends on the full stack (retrieval + PCF + multi-scale-critic + mixed-type-recovery + seed=5). None of these can be removed without collapse. Whether any *single* swap preserves 0.037 is now highly constrained.
-- **MMD² is low but β-recall is catastrophic**: best checkpoint's MMD² 0.01232 is actually *better* than v165's checkpoint MMD², but β-recall 0.1030 is far below v165's 0.82 — the PCF-ablated generator produces samples that are *distributionally close in low-moment sense* but fail reuse/locality recall. This matches PCF's theoretical role (pair correlations = long-range reuse structure).
+- **MMD² is low but β-recall is catastrophic**: best checkpoint's MMD² 0.01232 is actually *better* than v165's checkpoint MMD², but β-recall 0.1030 is far below v165's 0.82 — the PCF-ablated generator produces samples that are *distributionally close in low-moment sense* but fail reuse/locality recall. The safe conclusion (Round 32 P1 #2): **PCF is a load-bearing short-window distributional regularizer inside seed=5**; whether it specifically recovers long-range reuse structure (as pair-correlation theory would suggest) requires HRC-MAE / stack-distance / reuse-access sidecar panels on the v165/v177/v180/v183 quartet — not yet run.
 - **16th train-selector mis-rank confirmation**: best.pt = ep30 (β-rec 0.094) vs frozen-best ep35 (β-rec 0.103). The gap is tiny here (Δ★ = +0.00002 = +0.0%) — a rare near-miss compared to the 13× β-rec mis-rank in v182. The frozen-bundle protocol still earns its keep.
 - **Next queued v185**: v165 EXACT + seed=3 (seed-basin test addressing Round 30 P1 #1 demotion of v165 to "best observed seed-5 numeric baseline").
 
