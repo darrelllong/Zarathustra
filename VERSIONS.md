@@ -217,8 +217,38 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **tencent_v180** — v165 EXACT recipe **minus** `--retrieval-memory` + `--seed 5` (same seed as v165). **Retrieval-memory ablation**, parallel to v179's BS ablation on alibaba. Tests whether IDEA #17 retrieval memory contributed to v165's ★=0.03752 or was passenger. If v180 ≤ 0.04, retrieval-memory was passenger (or negative!) and v165's win comes from multi-scale + PCF + mixed-type + 8 regimes alone. If v180 ≥ 0.05, retrieval-memory is the load-bearing component and v165's ATB is tied to that mechanism. Log `/home/darrell/train_tencent_v180.log`. PID 889665.
 - **alibaba_v182** — v164 EXACT recipe with **patched BS at weight 0.5, k=1** (`--boundary-smoothness-weight 0.5 --boundary-smoothness-k 1`) + OC 0.5 + `--seed 7`. **Lower-BS-weight test**: v176 was patched BS 1.0 k=1 (★=0.051); v182 halves the BS gradient. If v182 ≤ 0.04, the patched-BS penalty was *too strong* at 1.0 — lower weight recovers toward v164. If v182 ≈ v176's 0.051, weight is not the limiting factor. If v182 ≥ 0.07 (or collapses), reducing BS weight below 1.0 pushes toward v179/v181's mode-collapse regime (since BS=0 both collapsed). Log `/home/darrell/train_alibaba_v182.log`. PID 925729.
+- **tencent_v183** — v165 EXACT recipe **minus** `--pcf-loss-weight` + `--seed 5` (same seed as v165). **PCF-loss ablation**, follow-up to v180 closing retrieval-memory as load-bearing. Keeps retrieval-memory, multi-scale-critic, mixed-type-recovery, 8 regimes, supervisor 5.0. Tests whether v165's PCF loss (pair-count-function second-order moment) contributed to ★=0.03752 or was passenger atop the retrieval + multi-scale stack. If v183 ≤ 0.04, PCF was passenger; v165 win distributes to retrieval + multi-scale. If v183 ≥ 0.05, PCF is second load-bearing term after retrieval-memory. Log `/home/darrell/train_tencent_v183.log`. PID 940636.
+
+---
+
+### tencent_v180 — CLOSED-FAILED (v165 EXACT recipe − `--retrieval-memory` + `--seed 5`; stale-kill @ ep65 after 30 epochs from train-★ best at ep35; frozen-best epoch_0065.pt ★=0.11882 = **+216.7% worse than v165's 0.03752**, 2026-04-19)
+**Why (closed-failed)**: **Retrieval-memory ablation** on tencent, parallel to v179's BS ablation on alibaba. Tests whether IDEA #17 retrieval memory contributed to v165's ★=0.03752 ATB or was passenger atop the v158 stack. **Result: retrieval-memory is load-bearing on tencent** — disabling it pushes frozen-★ from 0.03752 (v165) to 0.11882 (v180), a 3.17× degradation. IDEA #17 contributes meaningfully to tencent performance; it was not a passenger.
+**Recipe**: v165 EXACT (multi-scale-critic + PCF + mixed-type-recovery + 8 regimes + supervisor 5.0 + var-cond 0.01 + gmm 8 + seed=5) with `--retrieval-memory` flag removed. Fresh pretrain.
+**Training (Phase 3)**: train-★ best=0.06635 at ep35 (1.77× from v165's 0.03752). Post ep35: regressed through ep40-65 in 0.066-0.072 range, never beating ep35. 30-epoch-stale auto-kill at ep65. W tame throughout.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v165 |
+|---|---|---|---|---|
+| **epoch_0065.pt** | **0.01132** | **0.4625** | **★=0.11882** (frozen-best) | **+216.7% worse** |
+| epoch_0055.pt | 0.00400 | 0.3725 | 0.12950 | +245% worse |
+| epoch_0060.pt | 0.00480 | 0.3660 | 0.13160 | +251% worse |
+| epoch_0045.pt | 0.00579 | 0.3305 | 0.13969 | +272% worse |
+| epoch_0035.pt (= best.pt) | 0.00508 | 0.2910 | 0.14688 | +291% worse |
+| epoch_0050.pt | 0.00972 | 0.3055 | 0.14862 | +296% worse |
+| epoch_0040.pt | 0.01050 | 0.2795 | 0.15460 | +312% worse |
+| epoch_0030.pt | 0.00654 | 0.2480 | 0.15694 | +318% worse |
+| epoch_0025.pt | 0.00843 | 0.2355 | 0.16133 | +330% worse |
+| epoch_0015.pt | 0.00697 | 0.2035 | 0.16627 | +343% worse |
+| epoch_0020.pt | 0.00537 | 0.1625 | 0.17287 | +361% worse |
+| epoch_0010.pt | 0.00626 | 0.0950 | 0.18726 | +399% worse |
+| epoch_0005.pt | 0.01452 | 0.0540 | 0.20372 | +443% worse |
+
+**Interpretation**:
+- **Retrieval-memory is load-bearing on tencent**: 3.17× frozen-★ degradation when removed. This is one of the cleanest single-component ablations on record.
+- **Train/frozen mis-rank yet again**: best.pt = ep35 (★=0.14688) vs frozen-best ep65 (★=0.11882, +23.6% better). 12th confirmation on tencent. Training-time EMA selector was actively regressing the frozen benchmark — v180 was still improving on frozen-★ at ep65 when the 30-epoch-stale policy cut it. Policy correctly closed a failing run, but the train-★ selector chose the wrong moment.
+- **Premature-kill concern vs race policy**: even if v180 had been allowed to run longer and reached frozen-★ ~0.09-0.10, it would still be >2× worse than v165's 0.03752 — closing was correct.
+- **β-recall trajectory**: 0.054 → 0.463 over 65 epochs — model was learning coverage late without retrieval memory, but too slowly.
+- **Next queued v183**: v165 EXACT − PCF + seed=5 — **PCF ablation**. With retrieval-memory confirmed load-bearing, remaining question is whether PCF loss is second load-bearing term or passenger.
 
 ---
 
