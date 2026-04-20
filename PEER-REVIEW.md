@@ -1474,3 +1474,33 @@ The new changes since Round 29 are only in [VERSIONS.md](/Users/darrell/.codex/w
 ### Short Take
 
 The new evidence is valuable because it identifies load-bearing ingredients inside fragile basins. It does not yet identify robust mechanisms. Tencent `v165` now belongs in the same category as Alibaba `v164`: a numeric target produced by a specific seed and recipe, not a reproducible architectural answer. The project should stop spending mainline compute on hand-written BS scalar variants and start proving whether retrieval, PCF, and boundary structure survive seed changes and long-rollout cache metrics.
+
+---
+
+## Round 31
+
+### v182 Should End The BS Scalar Ladder; v184 Is A Retest, Not A New Frontier
+
+The only new repo changes since Round 30 are in [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md): the Tencent top row now correctly demotes `v165` to a seed-5 numeric baseline, `alibaba_v182` closed the lower-weight patched-BS probe with catastrophic collapse, and `alibaba_v184` launched retrieval memory on top of the best patched Alibaba point. The demotion is good. The new risk is that the docs are starting to reinterpret old retrieval evidence and use v182's failure to justify another local stack rather than the structural pivot the last several rounds called for.
+
+1. `[P1]` The v184 launch rationale is factually stale about Alibaba retrieval. [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md#L221) says "Retrieval-memory on alibaba: never tested there," but the same history file records `alibaba_v168` as a closed-failed retrieval-memory test on Alibaba, `+76.0%` worse than v167 in [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md#L569), and earlier Alibaba retrieval runs `v120`/`v121`/`v127` are also documented in [RESPONSE.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/RESPONSE.md#L21). This matters because v184 is not a first test of IDEA #17 on Alibaba. It is a retest of retrieval on a specific patched-BS `v176` basin after several Alibaba-negative retrieval results. Frame it that way, or the project will keep re-opening old mechanisms by forgetting their provenance.
+
+2. `[P1]` v182 closes the deterministic BS coefficient search more strongly than the current "sharp cliff" language admits. [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md#L225) reports `BS=0.5, k=1, OC=0.5` at `★=0.21740`, essentially the same collapse band as `BS=0` and `OC-only`. Combined with `v175` and `v176`, this is not an invitation to search for a magic BS floor; it says patched hand-written BS has two bad regimes: below 1.0 it collapses, and at 1.0 it avoids total collapse but still misses the legacy target by `+47.6%` or worse. The next Alibaba boundary work should be #36 learned boundary prior or #31 chained-window training, not another coefficient/k/order probe.
+
+3. `[P1]` Calling `BS=1.0, OC=0.5` "works" is too permissive and will mis-steer the next decisions. The four-point table in [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md#L240) labels `v176`/`v175` as "works" because they avoid the `0.20+` collapse band. But [VERSIONS.md](/Users/darrell/.codex/worktrees/ec6e/Zarathustra/VERSIONS.md#L391) already says `v176` still degrades by `+47.6%` versus v164 and does not recover the published numeric target. Use sharper language: `BS=1.0` is the least-bad patched scalar setting observed under seed 7, not a working mechanism. Otherwise v184's baseline will look healthier than it is.
+
+4. `[P2]` v184 is a reasonable small retest only if its acceptance bar is predeclared. Retrieval was load-bearing inside Tencent seed 5, but `v177` showed that the full Tencent recipe does not survive seed 7, and `v168` showed retrieval hurt Alibaba on the previous branch. So a v184 short-window win should not promote retrieval or reopen IDEA #17 globally. If v184 wins, immediately require a second seed, tail-strata rows, and long-rollout HRC/reuse panels; if it loses or collapses, stop testing retrieval as a global recipe flag on Alibaba and move to #35's workload-conditioned router if retrieval remains interesting.
+
+### What I Would Do Next
+
+1. Fix the v184 wording from "never tested on Alibaba" to "retest on the patched-v176 basin despite earlier Alibaba-negative retrieval results."
+
+2. Mark v182 as the end of the deterministic BS scalar ladder. Keep v184 only as an already-launched cross-corpus retrieval retest, not as a new scalar-search branch.
+
+3. Replace "BS=1.0 works" with "BS=1.0 avoids total collapse under seed 7 but remains far from the legacy numeric target."
+
+4. If v184 is not a clear win with a second seed and long-rollout/tail evidence, pivot the mainline compute to #36 learned boundary prior, #31 chained-window training, or #35 workload-conditioned routing.
+
+### Short Take
+
+The repo correctly applied Round 30's Tencent demotion, but the new v184 framing is slipping back into stale-mechanism optimism. Alibaba retrieval has been tested before and has mostly failed; patched BS scalar variants have now been mapped enough to stop. Treat v184 as a narrow retest on a fragile basin, then move to a structural boundary or workload-routing idea instead of stacking more local switches.
