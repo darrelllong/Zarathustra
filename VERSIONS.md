@@ -222,7 +222,9 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **tencent_v187** — v165 EXACT recipe **minus** `--multi-scale-critic` + `--seed 5` (same seed as v165). **Multi-scale-critic ablation** — 3rd component test on tencent after v180 (retrieval-memory, 3.17× degrade) and v183 (PCF-loss, 5.11× degrade). Keeps retrieval-memory + mixed-type-recovery + PCF-loss 2.0 + 8 regimes. Tests whether IDEA #8 multi-scale critic is load-bearing or passenger on tencent. **Alibaba slot held pending Round 31 P1 #2 structural pivot**: next alibaba = IDEA #36 (learned boundary prior) / #31 (chained-window) / #35 (workload-conditioned router); these need code work before launching. Log `/home/darrell/train_tencent_v187.log`. PID 1029832.
+- **tencent_v187** — v165 EXACT recipe **minus** `--multi-scale-critic` + `--seed 5` (same seed as v165). **Multi-scale-critic ablation** — 3rd component test on tencent after v180 (retrieval-memory, 3.17× degrade) and v183 (PCF-loss, 5.11× degrade). Keeps retrieval-memory + mixed-type-recovery + PCF-loss 2.0 + 8 regimes. Tests whether IDEA #8 multi-scale critic is load-bearing or passenger on tencent. Log `/home/darrell/train_tencent_v187.log`. PID 1029832.
+- **tencent_v188** — v165 EXACT recipe **minus** `--mixed-type-recovery` + `--seed 5`. **Mixed-type Recovery ablation** — 4th and final tencent component ablation, completes the audit matrix. Keeps retrieval-memory + multi-scale-critic + PCF-loss 2.0 + 8 regimes. Tests whether IDEA #7 binary Recovery heads are load-bearing on tencent. Log `/home/darrell/train_tencent_v188.log`. PID 1046763.
+- **Alibaba slot held pending Round 31 P1 #2 / Round 32 structural pivot**: next alibaba = IDEA #36 (learned boundary prior) / #31 (chained-window) / #35 (workload-conditioned router); these need code work (4-6h dev each) before launching.
 
 ---
 
