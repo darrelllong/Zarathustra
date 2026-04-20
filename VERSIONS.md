@@ -217,8 +217,33 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **tencent_v177** — v165 recipe + `--seed 7` (seed basin test, like alibaba v172/v173/v167). Reproduces v165's retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + n-regimes 8 + supervisor 5.0 stack against the CORRECT tencent corpus `/home/darrell/traces/tencent_block_1M`. If v177 converges near v165 ep45 ★=0.03752, confirms 0.03752 is a reproducible mechanism and the seed basin for tencent is narrower than alibaba's {0.029, 0.042, 0.081}. If v177 diverges significantly, forces a tencent seed-lottery retraction analogous to v167's alibaba retraction. Log `/home/darrell/train_tencent_v177.log`.
+- **tencent_v180** — v165 EXACT recipe **minus** `--retrieval-memory` + `--seed 5` (same seed as v165). **Retrieval-memory ablation**, parallel to v179's BS ablation on alibaba. Tests whether IDEA #17 retrieval memory contributed to v165's ★=0.03752 or was passenger. If v180 ≤ 0.04, retrieval-memory was passenger (or negative!) and v165's win comes from multi-scale + PCF + mixed-type + 8 regimes alone. If v180 ≥ 0.05, retrieval-memory is the load-bearing component and v165's ATB is tied to that mechanism. Log `/home/darrell/train_tencent_v180.log`. PID 889665.
 - **alibaba_v179** — v164 EXACT recipe **minus** `--boundary-smoothness-weight` and `--overlap-consistency-weight` (both 0, i.e. BS+OC entirely disabled) + `--seed 7` (patched code). **BS/OC ablation** — tests whether BS was contributing to v164's ★=0.03457 at all, or if v164's win came from the rest of the recipe (4 regimes, supervisor 5.0, diversity 2.0, feature-matching 1.0, mixed-type-recovery, var-cond 0.01, gmm 8, ema 0.999). If v179 ≤ 0.04, BS was passenger (or negative!) in v164 and the ATB is robust. If v179 ≥ 0.06, BS contributed and v164's ATB is tied to buggy-BS (given patched-BS v175/v176 all worse). Log `/home/darrell/train_alibaba_v179.log`. PID 877646.
+
+---
+
+### tencent_v177 — CLOSED-FAILED (v165 recipe + `--seed 7`; stale-kill @ ep40 after 30 epochs with no new ★; frozen-best epoch_0035.pt ★=0.16819 = **+348.3% worse than v165's 0.03752**, β-recall 0.08-0.19 across all checkpoints = mode collapse, 2026-04-19)
+**Why (closed-failed)**: seed-basin test for v165 under the correct tencent corpus `/home/darrell/traces/tencent_block_1M`. Direct parallel to v178 for v164 — tests whether v165's ★=0.03752 reproduces across seeds. Result: **v165 is seed-locked at seed=5, exactly like v164 is seed-locked at seed=7**. All 9 frozen checkpoints show β-recall between 0.06 and 0.19 — near-total mode collapse. Two published ATBs are now both confirmed seed-lottery outcomes.
+**Recipe**: v165 EXACT (retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + 8 regimes + supervisor 5.0 + var-cond 0.01 + gmm 8) + `--seed 7`.
+**Training (Phase 3)**: ep5 train★=0.12035 (rec 0.453), ep10 train★=0.09885 ★ **best**, ep15 no ★, ep20 train★=0.10357, ep30 train★=0.10261, ep40 train★=0.10652 → **30 epochs stale from best** → auto-kill. W trajectory tame (+0.29 → +1.42, no W-stop risk).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19, correct tencent_block_1M path)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v165 |
+|---|---|---|---|---|
+| **epoch_0035.pt** | **0.00619** | **0.1900** | **★=0.16819** (frozen-best) | **+348.3% worse** |
+| epoch_0040.pt | 0.00877 | 0.1475 | 0.17927 | +377% worse |
+| epoch_0030.pt | 0.00643 | 0.1275 | 0.18093 | +382% worse |
+| epoch_0015.pt | 0.00674 | 0.0905 | 0.18864 | +403% worse |
+| epoch_0010.pt (= best.pt) | 0.00707 | 0.0870 | 0.18967 | +405% worse |
+| epoch_0025.pt | 0.00636 | 0.0830 | 0.18976 | +406% worse |
+| epoch_0005.pt | 0.01120 | 0.1005 | 0.19110 | +409% worse |
+| epoch_0020.pt | 0.00674 | 0.0570 | 0.19534 | +421% worse |
+
+**Interpretation**:
+- **v165 tencent ATB is seed-locked at seed=5**, by the same criterion applied to v164 (alibaba) and v167 (alibaba). Three of the last four "published" ATBs (v164, v165, v167) are now confirmed seed-lottery — 1-2 seed basin tests each showed catastrophic divergence (β-recall collapse, +100-500% ★).
+- **MMD² is deceptively good** (0.006-0.011) while β-recall is in free-fall (0.06-0.19). The model is producing distributionally-tight outputs but failing to cover the target's tail modes. Same pattern as v178 alibaba (MMD² 0.02, β-rec 0.06). Frozen-★ correctly penalizes the coverage collapse; train-★ did not notice.
+- **Train-selector mis-rank on tencent continues**: best.pt (train-selector pick = ep10) is 13% worse than frozen-best (ep35). 12th confirmation of the training/frozen mis-rank pattern on tencent.
+- **Per-seed catastrophe is consistent with the R29 diagnosis**: v164 under seed=11 patched → mode collapse (β-rec 0.06); v165 under seed=7 → mode collapse (β-rec 0.08-0.19). The recipes we've promoted work on exactly one seed each.
+- **Next queued v180**: v165 recipe − retrieval-memory + seed=5 (back to v165's winning seed, ablate the newest mechanism to isolate its contribution). Parallel to v179's BS ablation on alibaba. Tests whether retrieval-memory is load-bearing for v165's ★=0.03752 or was passenger on top of v158's recipe.
 
 ---
 
