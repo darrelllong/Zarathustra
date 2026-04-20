@@ -217,8 +217,59 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **tencent_v183** — v165 EXACT recipe **minus** `--pcf-loss-weight` + `--seed 5` (same seed as v165). **PCF-loss ablation**, follow-up to v180 closing retrieval-memory as load-bearing. Keeps retrieval-memory, multi-scale-critic, mixed-type-recovery, 8 regimes, supervisor 5.0. Tests whether v165's PCF loss contributed to ★=0.03752 or was passenger. Log `/home/darrell/train_tencent_v183.log`. PID 940636.
-- **alibaba_v184** — v176 EXACT recipe (patched BS 1.0 k=1 + OC 0.5 + seed=7) **plus** `--retrieval-memory` (IDEA #17). **Retrieval-memory on alibaba**: never tested there; confirmed load-bearing on tencent (v180 ablation → 3.17× frozen-★ degradation). v176 is our best patched alibaba (★=0.051); v184 adds retrieval-memory on top. If v184 ≤ 0.04, retrieval-memory transfers cross-corpus and can push patched alibaba below v164's legacy-bug 0.03457. If v184 ≈ 0.05, retrieval-memory doesn't help (passenger on alibaba, unlike tencent). If v184 ≥ 0.07, adding retrieval-memory destabilizes the v176 recipe. Log `/home/darrell/train_alibaba_v184.log`. PID 962748.
+- **tencent_v185** — v165 EXACT recipe + `--seed 3` (seed-basin test parallel to v177's seed=7 which collapsed). Full stack: retrieval-memory + multi-scale-critic + mixed-type-recovery + PCF-loss 2.0 + 8 regimes + supervisor 5.0. Tests whether v165's ★=0.03752 is reproducible at a *different* seed (addressing Round 30 P1 #1: v165 demoted to "best observed seed-5 numeric baseline — not yet a reproducible Tencent mechanism"). If v185 ≤ 0.05, seed-invariant → recipe is robust. If v185 ≥ 0.08 (like v177 at 0.088), v165 is seed-locked. Log `/home/darrell/train_tencent_v185.log`. PID 984426.
+- **alibaba_v186** — v176 EXACT recipe (patched BS 1.0 k=1 + OC 0.5) + `--seed 11`. **Seed-basin test on v176** (not a BS scalar probe — addresses Round 30 P2 #5 seed-bundle concern). v176 is our best patched alibaba at seed=7 (★=0.051). If v186 ≤ 0.06, v176 recipe is seed-robust and we can claim a reproducible patched alibaba mechanism. If v186 collapses (like v177 did on tencent+seed=7, which yielded ★=0.088), v176 is seed-locked at seed=7 and the 0.051 is a seed-lottery win rather than a structural recipe. Log `/home/darrell/train_alibaba_v186.log`. PID 1009584.
+
+---
+
+### alibaba_v184 — CLOSED-FAILED (v176 EXACT recipe + `--retrieval-memory` + `--seed 7`; stale-kill @ ep100 after **95 epochs** stale from ep5 train-★ best (0.14855) with trajectory drifting in 0.16-0.19 band and β-recall collapsing 0.402→0.283; frozen-best epoch_0070.pt ★=0.18417 = **+261% worse than v176's 0.051 and +432% worse than v164's 0.03457**, 2026-04-19)
+**Why (closed-failed)**: **Retrieval-memory cross-corpus transfer test**. v180 established retrieval-memory is load-bearing on tencent (3.17× degrade when removed). v184 tests whether it also *helps* alibaba when added atop our best patched alibaba recipe (v176, ★=0.051). **Result: retrieval-memory actively destabilizes alibaba**. Adding it to v176 causes 95 epochs of stagnation (no train-★ improvement from ep5 to ep100) and frozen-★ regresses to 0.184 = 3.6× worse than v176 without it. Retrieval-memory is **tencent-specific**, not a universal IDEA. Combined with v183 (PCF-loss ablation, load-bearing on tencent) and v182/v181/v179 (BS-weight cliff on alibaba), this further cements: **v164-family and v165-family mechanisms are corpus-specific**, not interchangeable recipes.
+**Recipe**: v176 EXACT (BS=1.0 k=1 position-only + OC=0.5 overlap-mode k=2 + seed=7 + multi-scale-critic + mixed-type-recovery + PCF 2.0 + 4 regimes + supervisor 5.0) + `--retrieval-memory` (M=32, key/val dim 32, decay 0.85, warmup 4, 98,913 params). Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=**0.14855** ★ **best** (rec 0.402), ep10-15 no new ★, then 95-epoch drift: ep25 train★=0.07440 reported but NOT a new best (no ★ marker — suggests metric-logging ambiguity; confirmed via sweep: ep25 frozen-★=0.20805, β-rec 0.083 = deep collapse), ep80 ★=0.16362 (rec 0.368), ep85-90 regressing, ep95 ★=0.16447 (rec 0.310), ep100 ★=0.18605 (rec 0.283) — manual stale-kill. W tame throughout (+0.2-+1.5 range, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19, 21 checkpoints)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v176 |
+|---|---|---|---|---|
+| **epoch_0070.pt** | **0.02177** | **0.1880** | **★=0.18417** (frozen-best) | **+261% worse** |
+| epoch_0060.pt | 0.02668 | 0.1935 | 0.18798 | +268% worse |
+| epoch_0020.pt | 0.02078 | 0.1480 | 0.19118 | +275% worse |
+| epoch_0055.pt | 0.02025 | 0.1310 | 0.19405 | +280% worse |
+| epoch_0080.pt | 0.03305 | 0.1855 | 0.19595 | +284% worse |
+| ... | | | | |
+| epoch_0005.pt (= best.pt) | 0.03209 | 0.0235 | 0.22739 | +346% worse |
+| epoch_0010.pt | 0.03745 | 0.0170 | 0.23405 | +359% worse |
+
+**Interpretation**:
+- **Retrieval-memory does NOT transfer cross-corpus**: load-bearing on tencent (v165 with it, v180 without it → 3.17× degrade) but actively harmful on alibaba (v176 without it = 0.051, v184 with it = 0.184 = 3.6× worse). Universality claim for IDEA #17 is rejected.
+- **Mechanism hypothesis**: alibaba's locality signal is dominated by local-chunk patterns (BS=1.0 cliff, mid-file bursts, short-range reuse) — a cross-window retrieval bank injects long-range memory that *disrupts* alibaba's local structure but *matches* tencent's long-range reuse profile. This matches the 2DIO/IRD framing: different workloads need different distributional targets.
+- **17th train-selector mis-rank confirmation** (significant one): best.pt = ep5 (β-rec 0.0235) vs frozen-best ep70 (β-rec 0.188). Training-time selector mis-ranked by +23.5% — best.pt β-rec is 8× lower than frozen-best. Dense checkpointing + frozen-sweep protocol continues to earn its keep.
+- **Slow-drift failure mode**: v184 didn't collapse sharply (no W spike, no loss divergence). It drifted for 95 epochs with β-recall slowly degrading from ep70's 0.188 → ep90's 0.043 → ep100's 0.024. Retrieval-memory didn't cause instability; it caused the generator to converge to a low-MMD/low-recall flat region. Classic "mode-matching without mode-coverage" failure.
+- **Next queued v186**: v176 EXACT + seed=11 — direct seed-basin test on v176 (no new components). Addresses Round 30 P2 #5 seed-bundle concern: is v176's 0.051 reproducible across seeds, or seed-locked like v165 on tencent?
+
+---
+
+### tencent_v183 — CLOSED-FAILED (v165 EXACT recipe **minus** `--pcf-loss-weight` + `--seed 5` = PCF-loss ablation; stale-kill @ ep48 after 18 epochs from train-★ best at ep30, with ep35-45 trajectory regressing and β-recall dropping 0.358→0.268; frozen-best epoch_0035.pt ★=0.19172 = **+411.0% worse than v165's 0.03752**, 2026-04-19)
+**Why (closed-failed)**: **PCF-loss ablation** on tencent, parallel to v180's retrieval-memory ablation. Tests whether IDEA #29-class PCF loss contributed to v165's ★=0.03752 ATB or was passenger atop the v158 stack. **Result: PCF-loss is load-bearing on tencent** — disabling it pushes frozen-★ from 0.03752 (v165) to 0.19172 (v183), a 5.11× degradation. Together with v180 (retrieval-memory ablation → 3.17× degrade), this confirms the v165 recipe is a stack of load-bearing components: both retrieval-memory AND PCF-loss contribute meaningfully, and v165's ★=0.03752 is not attributable to a single mechanism.
+**Recipe**: v165 EXACT − `--pcf-loss-weight 2.0` + `--seed 5`. Keeps retrieval-memory, multi-scale-critic, mixed-type-recovery, 8 regimes, supervisor 5.0, diversity 2.0, feature-matching 1.0. Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=0.15822 (rec 0.253), ep10 train★=0.15221 (rec 0.286), ep15 train★=0.15067 (rec 0.321), ep20 train★=0.14755 (rec 0.336), ep25 train★=0.14203 (rec 0.348), ep30 train★=**0.13946** ★ **best** (rec 0.358), ep35 train★=0.14712 (rec 0.328), ep40 train★=0.14685 (rec 0.316), ep45 train★=0.15783 (rec 0.268) — regressing, manual stale-kill at ep48. W tame throughout.
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v165 |
+|---|---|---|---|---|
+| **epoch_0035.pt** | **0.01232** | **0.1030** | **★=0.19172** (frozen-best) | **+411.0% worse** |
+| epoch_0030.pt (= best.pt) | 0.01054 | 0.0940 | 0.19174 | +411.1% worse |
+| epoch_0020.pt | 0.01180 | 0.0665 | 0.19850 | +429.1% worse |
+| epoch_0045.pt | 0.01247 | 0.0575 | 0.20097 | +435.7% worse |
+| epoch_0040.pt | 0.01134 | 0.0435 | 0.20264 | +440.1% worse |
+| epoch_0015.pt | 0.01168 | 0.0380 | 0.20408 | +443.9% worse |
+| epoch_0005.pt | 0.01993 | 0.0515 | 0.20963 | +458.7% worse |
+| epoch_0025.pt | 0.01357 | 0.0135 | 0.21087 | +462.0% worse |
+| epoch_0010.pt | 0.02338 | 0.0140 | 0.22058 | +487.9% worse |
+
+**Interpretation**:
+- **PCF-loss is load-bearing on tencent** (frozen-★ 0.037 → 0.192 without it = 5.11× degrade). Parallel to v180's retrieval-memory result (0.037 → 0.119 = 3.17× degrade). v165 is a **two-pillar recipe**: both components carry weight, neither is passenger.
+- **Round 30 P1 #1 implication tightens**: v165's ★=0.03752 depends on the full stack (retrieval + PCF + multi-scale-critic + mixed-type-recovery + seed=5). None of these can be removed without collapse. Whether any *single* swap preserves 0.037 is now highly constrained.
+- **MMD² is low but β-recall is catastrophic**: best checkpoint's MMD² 0.01232 is actually *better* than v165's checkpoint MMD², but β-recall 0.1030 is far below v165's 0.82 — the PCF-ablated generator produces samples that are *distributionally close in low-moment sense* but fail reuse/locality recall. This matches PCF's theoretical role (pair correlations = long-range reuse structure).
+- **16th train-selector mis-rank confirmation**: best.pt = ep30 (β-rec 0.094) vs frozen-best ep35 (β-rec 0.103). The gap is tiny here (Δ★ = +0.00002 = +0.0%) — a rare near-miss compared to the 13× β-rec mis-rank in v182. The frozen-bundle protocol still earns its keep.
+- **Next queued v185**: v165 EXACT + seed=3 (seed-basin test addressing Round 30 P1 #1 demotion of v165 to "best observed seed-5 numeric baseline").
 
 ---
 
