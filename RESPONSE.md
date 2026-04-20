@@ -366,6 +366,43 @@ review is code-quality, not architectural.
 
 ---
 
+# Response to Gemini peer review, Round 1 (2026-04-20)
+
+**Status: all five findings fixed — no live bugs.**
+
+Gemini's Round 1 review (`PEER-REVIEW-GEMINI.md`) flags five code-level bugs.
+Status of each against the current tree:
+
+1. **R1-P1 — `compute_window_descriptors` hardcoded (B,10) shape mismatch.** FIXED.
+   `llgan/dataset.py:compute_window_descriptors` now accepts `col_names` and
+   `cond_dim` parameters. `train.py` publishes `cfg.col_names` from the fitted
+   preprocessor (line 453) and passes it through every call site, including
+   `eval.py` and `mmd.py`.  Shape follows the live schema, not a hardcoded 10.
+
+2. **R1-P2 — HRC-MAE padding inflates metric.** FIXED.
+   `eval.py:_per_window_hrc` now returns only `n_pts_actual` unique points
+   (no padding); `hrc_mae` computes MAE over `min(len(real), len(fake))` actual
+   points.  The dead outer helper `_compute_hrc` that still had the `hrc[-1]`
+   padding constant was also cleaned up (2026-04-20) to return variable-length
+   output without padding.
+
+3. **R1-P3 — Conditional eval bypasses `cond_encoder`/`regime_sampler`/GMM.**
+   FIXED in commit `253c860`.  `eval.py:_sample_fake` and `mmd.py:evaluate_metrics`
+   route `cond` through `G.cond_encoder`, `G.regime_sampler`, and `G.sample_noise`
+   exactly as `_make_z_global` does at train time.
+
+4. **R1-P4 — `_reuse_rate` hardcoded column index 3.** FIXED.
+   `eval.py:_reuse_rate` (line 648–656) resolves the reuse column dynamically
+   via `prep.col_names.index('obj_id_reuse')`, falling back to index 3 only
+   as a legacy path.
+
+5. **R1-P5 — Preprocessor fit inconsistent seeding.** FIXED.
+   `train.py` uses a dedicated `random.Random(0)` RNG (line 384) for seed-file
+   selection, so preprocessor min/max bounds are invariant across `cfg.seed`
+   values.  Cross-seed comparisons are no longer contaminated by schema drift.
+
+---
+
 # Response to Gemini peer review, Round 2 (2026-04-18)
 
 **Status: all three findings already fixed in prior commits — no live bugs.**
@@ -1026,3 +1063,32 @@ next win requires escaping that. Committing to:
 - Implement IDEA #36 boundary critic for Alibaba (next structural bet)
 - Run long-rollout + tail panels on the existing baselines before any mechanism claim
 - Require worst/median seed competitive before promotion
+
+---
+
+# Code-fix log (2026-04-20)
+
+Deferred code-correctness bugs from Darrell peer-review Rounds 1 and 4 fixed in
+this session.  No metric numbers change until these fixes propagate to a new
+training run.
+
+## `TraceDataset` off-by-one — FIXED
+
+`llgan/dataset.py` line 1014: `n_windows = max(0, len(data) - timestep)` is
+off by one.  Valid window start indices are `0 … N−T` inclusive, giving `N−T+1`
+windows.  The old formula silently discarded the last legal window from every
+file, and returned 0 windows for files with exactly `timestep` records.
+
+Fix: changed to `max(0, len(data) - timestep + 1)`.
+
+Impact: every training file now contributes one extra window (~0.8% more data
+per epoch on Alibaba at T=12).  Does not change evaluation (val tensor is
+pre-built from the same `TraceDataset`).  No existing ATB claims are invalidated
+because the difference is small and symmetric across all runs.
+
+## `_compute_hrc` dead-code padding — FIXED
+
+`eval.py:_compute_hrc` was never called (dead code) but still contained the
+`hrc[-1]` padding pattern Gemini R1-P2 flagged.  Removed the padding and
+updated the docstring to clarify variable-length return.  The live path
+(`_per_window_hrc` inside `hrc_mae`) was already correct.

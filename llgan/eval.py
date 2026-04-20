@@ -187,18 +187,15 @@ def _compute_hrc(obj_ids: np.ndarray, footprint: int,
                  n_points: int = 20) -> np.ndarray:
     """Compute LRU hit ratio curve at n_points cache sizes from 1% to 100% of footprint.
 
-    Returns: (n_points,) array of hit ratios.
+    Returns: variable-length array (only unique cache sizes; caller must not
+    assume exactly n_points elements).
     """
     if footprint <= 0:
-        return np.zeros(n_points)
+        return np.zeros(0)
     sizes = np.unique(np.linspace(
         max(1, footprint // 100), footprint, n_points
     ).astype(int))
-    hrc = np.array([_lru_hit_ratio(obj_ids, int(s)) for s in sizes])
-    # Pad to n_points if fewer unique sizes
-    if len(hrc) < n_points:
-        hrc = np.pad(hrc, (0, n_points - len(hrc)), constant_values=hrc[-1])
-    return hrc[:n_points]
+    return np.array([_lru_hit_ratio(obj_ids, int(s)) for s in sizes])
 
 
 def _seqs_to_obj_ids(seqs: np.ndarray, prep=None) -> np.ndarray:

@@ -1011,7 +1011,7 @@ class TraceDataset(Dataset):
     ):
         self.data = torch.from_numpy(data)
         self.timestep = timestep
-        self.n_windows = max(0, len(data) - timestep)
+        self.n_windows = max(0, len(data) - timestep + 1)
         # file_cond: (cond_dim,) float32 tensor, same for every window in this
         # file.  None = fall back to window-level compute_window_descriptors().
         self.file_cond = file_cond
