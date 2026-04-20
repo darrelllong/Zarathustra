@@ -1388,3 +1388,38 @@ matches the trace regime instead of forcing the researcher to choose one global 
 
 **Risk:** a router can hide failures if it simply memorizes corpus IDs. Start with descriptor-only
 inputs, hold out files/families, and require gate histograms to make mechanistic sense.
+
+---
+
+### 36. Learned boundary prior instead of deterministic BS/OC penalties
+
+**Gap attacked:** the patched boundary-smoothness experiments show that the old palindrome bug was
+not merely harmless noise. The mathematically-correct derivative penalty made alibaba much worse,
+while the buggy k=2 constraint produced the current numeric baseline. That means the project should
+stop treating boundary continuity as a hand-written scalar penalty and learn what a realistic join
+looks like from trace data.
+
+**Proposal:**
+- Build a small boundary critic or contrastive head that sees `(left_window_tail, right_window_head)`
+  pairs and distinguishes true adjacent joins from generated joins and shuffled non-adjacent joins.
+- Train the generator to fool that boundary critic across generated adjacent windows, but do not
+  prescribe position equality, velocity equality, or reflection symmetry directly.
+- Include negative controls: true adjacent pairs, shuffled same-file pairs, shuffled cross-file pairs,
+  buggy-palindrome generated joins, and derivative-smoothed generated joins.
+- Report boundary-prior scores alongside frozen `★`, tail strata, and long-rollout HRC/stack-distance
+  so the model cannot improve a local join metric while damaging global workload structure.
+
+**Why this is on-target:** v175/v176 imply the useful signal was not "smoothness" in the simple
+finite-difference sense. It may be a workload-specific boundary manifold: bursts, repeated IDs,
+idle gaps, and local symmetry patterns that a scalar MSE cannot encode. A learned prior can preserve
+that empirical manifold without hard-coding the accidental palindrome.
+
+**Minimal viable experiment:**
+- Freeze the current generator recipe and train only the boundary critic on real adjacent vs shuffled
+  joins to confirm it can separate realistic boundaries.
+- Add its adversarial/contrastive loss to a short alibaba run from the v164 recipe with patched BS
+  disabled or near-zero.
+- Promote only if it beats the current-code patched baseline and does not regress long-rollout reuse.
+
+**Risk:** this can become another critic that overfits short windows. Keep it local to the boundary,
+hold out files, and require long-rollout metrics before treating it as an IDEA #21 successor.

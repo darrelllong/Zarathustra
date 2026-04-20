@@ -1389,3 +1389,52 @@ to live with the consequences: v164 is a numeric baseline, not clean evidence fo
 first meaningful patched-BS test; and persistent retrieval still needs a training surface where the
 memory can actually fill, evict, and learn long reuse behavior. This is the moment to keep the bar
 high rather than immediately promote the next attractive scalar result.
+
+---
+
+## Round 29
+
+### The Boundary Bug Is Now A Baseline Problem, Not Just A Mechanism Problem
+
+The only code/doc surface changed since Round 28 is `VERSIONS.md`, but the new run outcomes are
+substantive. `alibaba_v175` tested the v164 recipe after the palindrome fix and collapsed to
+`★=0.07121`; `alibaba_v176` then tried patched position-only BS and still landed at `★=0.05102`;
+`tencent_v166` closed BS+OC stacking as negative on Tencent; and the currently running jobs are now
+seed-basin tests for v165 and v164. That is the right evidentiary neighborhood. The risk is that
+the docs still preserve too much of the old "v164 is the reproducible ATB" posture while the newest
+evidence says v164 is probably a legacy-code baseline.
+
+I added [IDEAS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/IDEAS.md) #36 because the
+boundary result should not lead to another BS scalar ladder. If the accidental palindrome helped,
+the next structural move is a learned boundary prior or boundary critic that learns realistic joins
+from adjacent trace windows, not a hand-written smoothness penalty with a different coefficient.
+
+1. `[P1]` The top ATB table still overstates v164 as a reproducible current baseline. [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L19) still calls v164 the "Reproducible alibaba ATB" and "stable baseline to beat." But the two new same-seed patched-code reruns in [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L247) and [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L225) are exactly the counterevidence: v175, v164 exact with the corrected k=2 BS math, is `+106%` worse; v176, patched k=1, is still `+47.6%` worse. That does not merely weaken the BS mechanism story. It means the published alibaba ATB was produced by a since-fixed objective. Until an unpatched seed-basin rerun or a patched-code run gets near `0.03457`, label v164 as "legacy buggy-BS numeric baseline" rather than "reproducible ATB under current code."
+
+2. `[P1]` The v178 launch cannot prove the claim it is assigned to prove. [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L221) says if patched-code seed 11 reaches `≤0.04`, then "v164's 0.03457 is reproducible mechanism across seeds under patched code." That inference is invalid because seed 7 under patched code already failed badly in v175. A seed-11 win would show a different patched seed can work; it would not make v164 reproducible across seeds, and it would not rescue the seed-7 legacy result as a current-code mechanism. The cleaner experiment is two-arm: rerun seed 11 under the old palindrome code and under patched code, with the same pretrain/seed accounting. That separates "seed basin" from "objective changed."
+
+3. `[P1]` "BS family exhausted under patched code" is too broad for the evidence and risks closing IDEA #21 the wrong way again. [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L240) cites v175 and v176, but those test only the v164 recipe with patched BS k=2 and k=1 under seed 7. They do not test lower BS weight, OC-only, BS-disabled plus OC, a learned boundary prior, or chained-window training. The right conclusion is narrower and stronger: hand-written BS penalties in the v164 recipe are not the path forward. Do not close chunk stitching; close this deterministic BS-loss family and move to #31 or #36.
+
+4. `[P2]` The tencent_v166 post-mortem correctly rejects BS+OC stacking, but it still leans on short-window `★` before the retrieval contract is checked. [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L269) shows v166 is worse than v165, and [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L287) correctly says long-rollout is still worth checking. Make that mandatory for v165/v177 promotion. Retrieval's only plausible value is long reuse/HRC recovery; a `★=0.03752` short-window win without HRC/stack-distance improvement would be another local metric win, not a structural solution.
+
+5. `[P2]` The tail-stratum table has been relabeled correctly, but the gate still uses composite tail-`★` too prominently. [VERSIONS.md](/Users/darrell/.codex/worktrees/8b14/Zarathustra/VERSIONS.md#L206) still allows a candidate to pass by improving tail-`★` without regressing ordinary-`★`. Round 26's concern remains: tail recall can be easier on broad tail bundles while MMD shape gets much worse. Promotion should require tail MMD/shape improvement explicitly, with recall reported separately. Composite tail-`★` is acceptable as a summary, not as the gate.
+
+### What I Would Do Next
+
+1. Rewrite the top Alibaba row as a legacy-code numeric baseline: useful for comparison, not a current-code reproducible ATB.
+
+2. Let v178 finish, but interpret it only as a patched-code seed-11 data point. If it wins, run the old-palindrome seed-11 arm before drawing mechanism conclusions.
+
+3. Stop the hand-written BS ladder. Use either #31 chained-window training or the new #36 learned boundary prior if the project wants to keep pursuing cross-window structure.
+
+4. Run long-rollout HRC, stack-distance, reuse-access, and tail-strata panels for v165 and v177 before promoting Tencent retrieval as more than a short-window `★` improvement.
+
+5. Change the tail gate to require tail MMD/shape improvement, not just composite tail-`★`.
+
+### Short Take
+
+This was a useful correction cycle. The project found that the bug fix was mathematically right but
+empirically damaging, and it did not hide that result. Now the documentation needs to absorb the
+full consequence: v164 is not a clean current-code ATB, deterministic BS is probably a dead end,
+and the next serious boundary move should be learned or sequence-trained rather than another local
+smoothness scalar.
