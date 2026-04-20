@@ -711,3 +711,230 @@ promotion without mechanism diagnosis. Gemini Round 3 sharpens it into a
 code fix. Both patches are live; both retractions are in the top ATB
 table; the next alibaba launch will measure the patched BS against a
 reproducible baseline.
+
+# Response to peer review Rounds 28–32 (2026-04-20)
+
+**Status**: Rounds 28–32 feedback was absorbed incrementally via VERSIONS.md patches
+and commit messages. This entry records formal acceptance/action for each item, and
+flags the one remaining VERSIONS.md fix applied today (IDEA #21 STATUS terminology).
+
+---
+
+## Round 28
+
+### P1 #1 — tail-strata table labeled retracted v167 as Alibaba ATB — FIXED
+
+VERSIONS.md tail table updated: v167 rows now carry "(RETRACTED — seed-lottery)"; v164
+rows say "(seed-locked numeric target, buggy-BS baseline)". Tail-heavy and ordinary
+strata for v164 still show *not yet run* — those runs remain deferred until a patched-code
+candidate worth comparing to v164 exists.
+
+### P1 #2 — palindrome patch invalidates more interpretation than docs absorbed — ACCEPTED
+
+Agreed. v164's 0.03457 stands only as a numeric threshold; the mechanism story
+(BS+OC helps, W-stop distills) was produced under the buggy objective and cannot
+be recovered from v164 alone. v175 and v176 post-mortems carry the explicit warning:
+"any claim that BS helps is now uninterpretable under the buggy regime." v164 is
+a race target, not mechanism evidence.
+
+### P1 #3 — retrieval-state patch doesn't constitute valid persistent-retrieval training — ACCEPTED
+
+The partial patch (threading `retrieval_state` across the BS/OC chunk pairs) gives
+~24 entries of bank exposure, still below `mem_size=32`. Eviction and long-reuse
+attention never train. Acknowledged as OOD-at-inference for v165/v177/v180. The
+fix requires multi-chunk sequential training (IDEAS #28/#31); flagged in IDEAS.md
+as a follow-up. All v165-lineage frozen-★ numbers are valid as measurements; none
+are valid as evidence that persistent retrieval was trained correctly.
+
+### P2 #4 — n_critic=1 closure too broad — ACCEPTED
+
+Narrowed: "critic starvation from the start of the run is the wrong lever on this
+recipe" — not "tail control is dead." IDEA #33 arms (dynamic critic regularization,
+spectral-norm strength, Professor-Forcing trajectory supervision) remain open.
+
+### P2 #5 — seed bundle required for Alibaba ATB promotion — ACCEPTED
+
+Promotion rule now requires best/median/worst across the seed bundle. A single
+winning seed plus an informal reproducibility note recreates the v167 failure
+pattern. Rule applied going forward: any NEW alibaba mechanism must publish the
+full distribution.
+
+---
+
+## Round 29
+
+### P1 #1 — v164 still labeled "reproducible current baseline" — FIXED
+
+Top table rewritten: v164 is now "Legacy buggy-BS numeric baseline — not a
+current-code reproducible ATB." The palindrome bug, patched-code collapse basin
+{0.07121, 0.05102, 0.20662}, and taint on mechanism claims are all stated inline.
+
+### P1 #2 — v178 cannot prove v164 is reproducible across seeds — ACCEPTED
+
+v178 (patched code, seed=11) returned 0.20662 = catastrophic collapse. That data
+point is one patched-code seed-11 reading only; it neither rescues v164 as a
+reproducible mechanism nor closes seed=7 as the only viable seed. No mechanism
+inference drawn from v178 beyond "another catastrophic patched-code failure."
+
+### P1 #3 — "BS family exhausted" too broad — ACCEPTED AND NARROWED
+
+Closed language: "deterministic hand-written BS scalar ladder on alibaba is closed
+under patched code." Chunk-stitching as an idea class (#21, #31, #36) remains open.
+The next boundary work must be structural (#36 learned prior or #31 chained-window
+training), not another coefficient/k/order probe.
+
+### P2 #4 — long-rollout required for v165/v177/v180 before retrieval promotion — ACCEPTED
+
+Still not done. Required before treating retrieval memory as a structural Tencent win:
+HRC-MAE, reuse-access rate, stack-distance histograms across v165/v177/v180/v183.
+Deferred until component audit matrix (v187/v188) completes and a stable Tencent
+recipe worth investing in is identified.
+
+### P2 #5 — tail gate needed explicit tail MMD/shape requirement — FIXED
+
+Tail-strata gate in VERSIONS.md revised per Round 32 P2 #4: candidate must (a)
+improve tail MMD² (or direct shape-distance metric) without regressing ordinary-★,
+AND (b) beat full-corpus numeric target by >bundle-variance margin. Tail β-recall
+is reported separately, not rolled into composite tail-★ for promotion.
+
+---
+
+## Round 30
+
+### P1 #1 — Tencent v165 top row still said "current ATB / genuinely productive" — FIXED
+
+Top table revised (commit 8e84c88): v165 is now "Best observed seed-5 numeric
+baseline — not yet a reproducible Tencent mechanism." Promotion language ("ATB",
+"productive", "IDEA #17 genuinely productive") removed. v177 seed-7 collapse
+(+348.3%) and v180 ablation data cited inline.
+
+### P1 #2 — retrieval load-bearing inside seed-5 basin only — ACCEPTED
+
+The v180 ablation (−retrieval-memory at seed=5) → +216.7% degrade proves retrieval
+is a load-bearing ingredient *inside the seed=5 lottery basin*. It does not prove
+IDEA #17 is generally solved on Tencent. The seed-7 collapse (v177) is the equal
+and opposite data point. Correct conclusion: "one load-bearing ingredient of a
+fragile basin."
+
+### P1 #3 — another hand-written BS scalar probe (v182) after declaring BS ladder closed — NOTED
+
+v182 was already burning GPU when Round 30 landed. It ran to completion (BS=0.5
+collapsed: ★=0.21740). This was the last deterministic BS coefficient probe; no
+further BS scalar searches queued. v182's failure actually strengthens Round 29
+P1 #3: the patched BS surface has a cliff between 1.0 and 0 with nothing useful
+below. The ladder is now unmistakably over.
+
+### P1 #4 — accidental palindrome was the load-bearing element — ACCEPTED
+
+The correct lesson: the buggy palindrome regularizer happened to impose a useful
+inductive bias (forcing the generator to learn zero-velocity boundaries), and the
+mathematically correct derivative-matching replacement does not reproduce that
+benefit. The next boundary idea must be structurally motivated, not another
+penalty scalar trying to approximate what the bug accidentally learned.
+
+### P2 #5 — v183 PCF ablation is same-seed; cannot close/open PCF mechanism globally — ACCEPTED
+
+v183 is a seed=5 PCF ablation. It shows PCF is load-bearing inside the seed=5
+basin (5.11× degrade). It does not show PCF is load-bearing across seeds, because
+the full v165 recipe already collapsed at seed=7. PCF remains "load-bearing inside
+the seed=5 basket" until a seed-bundle and long-rollout panel says more.
+
+### P2 #6 — tail gate composite tail-★ — FIXED (see Round 32 P2 #4)
+
+---
+
+## Round 31
+
+### P1 #1 — v184 "never tested on Alibaba" factually stale — FIXED
+
+VERSIONS.md and commit message corrected: v184 is a *retest* of retrieval memory
+on alibaba, not a first test. Prior negative results (v127, v168) cited inline.
+v184 result: closed-failed, +261% vs v176. Alibaba retrieval is now definitively
+negative across three separate Alibaba branches. IDEA #17 on alibaba CLOSED.
+
+### P1 #2 — v182 ends BS scalar ladder — CONFIRMED
+
+v182's catastrophic failure (0.21740) is the decisive closing data point combined
+with v175/v176. The patched scalar surface shows: BS=1.0 → 0.05102 (least-bad),
+BS=0.5 → 0.21740 (collapse), BS=0 → 0.20719 (collapse). No useful floor.
+Deterministic BS ladder on alibaba declared CLOSED.
+
+### P1 #3 — "BS=1.0 works" language too permissive — FIXED
+
+Language sharpened: "BS=1.0 is the least-bad patched scalar setting observed under
+seed=7 — it avoids the 0.20+ collapse band but remains +47.6% behind the legacy
+numeric target and does not constitute a working mechanism."
+
+### P2 #4 — v184 acceptance bar predeclared — RESOLVED
+
+v184 closed-failed (+261% worse than v176, +8.3× vs Alibaba numeric target).
+Alibaba retrieval is definitively not a path forward. IDEA #35 workload-conditioned
+router remains the open follow-up if retrieval specificity is investigated further.
+
+---
+
+## Round 32
+
+### P1 #1 — residual "current ATB" language in IDEA #21 STATUS — FIXED TODAY
+
+IDEA #21 STATUS block (previously at VERSIONS.md line 936) rewritten 2026-04-20:
+removed "current alibaba ATB" and "the recipe produces ATBs"; replaced with
+"legacy buggy-BS numeric target" and explicit statement that the deterministic BS
+scalar ladder is CLOSED on alibaba under patched code. The ★=0.03457 threshold
+stands as a race target; mechanism claims attached to v164 are tainted.
+
+### P1 #2 — PCF mechanism over-identified as "long-range locality" — ACCEPTED
+
+Agreed. The v183 ablation proves PCF is a load-bearing *short-window distributional
+regularizer* inside seed=5. The PCF implementation operates on 12-step path
+increment characteristic functions per batch window; it does not train on long
+sequences or measure stack-distance or HRC. Claiming PCF "recovered long-range
+reuse structure" is a leap. Correct language: "PCF is a load-bearing short-window
+distributional regularizer inside the seed=5 basin; whether it improves long-horizon
+cache metrics requires the sidecar panel (HRC-MAE, reuse-access rate, stack-distance)
+across v165/v177/v180/v183 before any locality mechanism claim."
+
+### P1 #3 — v185/v186 acceptance bars too optimistic — RESOLVED BY OUTCOME
+
+Both runs closed before this response could constrain their bars:
+- **v185** (tencent v165 exact recipe, seed=3): CLOSED-FAILED. Seed=3 is another
+  collapse outside the seed=5 basin. Three seeds tested: seed=5 ✓, seed=7 ✗ (v177),
+  seed=3 ✗ (v185). v165 is empirically seed=5 locked.
+- **v186** (alibaba v176 base, seed=7 re-test): CLOSED-FAILED (★=0.21923 collapse
+  basin). v186 confirms v176's seed=7 win (★=0.05102) is itself fragile — the
+  least-bad patched-BS point doesn't reproduce under the same seed on the same recipe.
+
+Going forward, v187/v188 are framed correctly: "seed=5 ablations that probe
+load-bearing ingredients inside the v165 seed-5 basin." They are NOT reproducible
+mechanism proofs even if they fail to degrade performance.
+
+### P2 #4 — tail gate: composite tail-★ too prominent — FIXED
+
+Gate in VERSIONS.md updated per Round 32 P2 #4 label: tail MMD² (or direct
+shape-distance improvement) is now a required condition, not an optional component
+of a composite score. Tail β-recall reported separately.
+
+### P2 #5 — "May-2026" date provenance error — FIXED IN PRIOR COMMIT
+
+The Round 32 P1 doc-integrity commit (75dc00e) corrected this. VERSIONS.md line 19
+now reads "2026-04-18 capture" (the actual frozen-sweep date).
+
+---
+
+## Current state (2026-04-20)
+
+**Running on vinge:**
+- `tencent_v187` (−multi-scale-critic, seed=5): ep ~54, best train-★ 0.08677 @ ep50, W≈2.2 < 3.0
+- `tencent_v188` (−mixed-type-recovery, seed=5): ep ~40, best train-★ 0.09878 @ ep35, W≈1.9 < 3.0
+
+Both are 2–3× above the v165 numeric target so far, suggesting multi-scale-critic
+and mixed-type-recovery may also be load-bearing inside seed=5. They have not
+W-stopped; need to run to natural completion or W-stop before frozen eval.
+
+**Alibaba is idle.** After v184's failure (retrieval negative) and v186's collapse
+(patched BS fragile), the alibaba slot is held for a structural move:
+IDEA #36 (learned boundary prior), IDEA #31 (chained-window training), or
+IDEA #35 (workload-conditioned router). No further scalar probes.
+
+**Long-rollout sidecar for v165/v177/v180/v183** — still deferred; required before
+mechanism claims about retrieval or PCF.
