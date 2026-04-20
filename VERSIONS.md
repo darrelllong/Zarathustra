@@ -218,7 +218,31 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v180** — v165 EXACT recipe **minus** `--retrieval-memory` + `--seed 5` (same seed as v165). **Retrieval-memory ablation**, parallel to v179's BS ablation on alibaba. Tests whether IDEA #17 retrieval memory contributed to v165's ★=0.03752 or was passenger. If v180 ≤ 0.04, retrieval-memory was passenger (or negative!) and v165's win comes from multi-scale + PCF + mixed-type + 8 regimes alone. If v180 ≥ 0.05, retrieval-memory is the load-bearing component and v165's ATB is tied to that mechanism. Log `/home/darrell/train_tencent_v180.log`. PID 889665.
-- **alibaba_v179** — v164 EXACT recipe **minus** `--boundary-smoothness-weight` and `--overlap-consistency-weight` (both 0, i.e. BS+OC entirely disabled) + `--seed 7` (patched code). **BS/OC ablation** — tests whether BS was contributing to v164's ★=0.03457 at all, or if v164's win came from the rest of the recipe (4 regimes, supervisor 5.0, diversity 2.0, feature-matching 1.0, mixed-type-recovery, var-cond 0.01, gmm 8, ema 0.999). If v179 ≤ 0.04, BS was passenger (or negative!) in v164 and the ATB is robust. If v179 ≥ 0.06, BS contributed and v164's ATB is tied to buggy-BS (given patched-BS v175/v176 all worse). Log `/home/darrell/train_alibaba_v179.log`. PID 877646.
+- **alibaba_v181** — v164 EXACT recipe with **BS disabled, OC retained** (`--boundary-smoothness-weight 0.0 --overlap-consistency-weight 0.5 --overlap-consistency-mode overlap --overlap-consistency-k 2`) + `--seed 7` (patched code). **OC-only ablation** — follow-up to v179's BS+OC=0 catastrophe (★=0.20719, β-rec=0.076 mode collapse). Tests whether OC alone carries the anti-mode-collapse signal, or whether BS is strictly required on alibaba. If v181 ≤ 0.06, OC alone is sufficient (and patched-BS k=2 vs k=1 was hurting). If v181 ≈ v179's 0.20, the BS+OC *pair* is required (OC alone is not enough). Narrows the R29-preserved surfaces for BS family. Log `/home/darrell/train_alibaba_v181.log`. PID 908516.
+
+---
+
+### alibaba_v179 — CLOSED-FAILED (v164 EXACT recipe − BS − OC + `--seed 7` + patched code; stale-kill @ ep36 after 26 epochs with no new best train-★ from ep10's 0.14866; frozen-best epoch_0030.pt ★=0.20719 = **+499.4% worse than v164's 0.03457**, β-recall 0.011-0.076 across all 8 checkpoints = mode collapse, 2026-04-19)
+**Why (closed-failed)**: **BS+OC full ablation** — tests whether v164's 0.03457 ATB depended on the boundary-smoothness / overlap-consistency losses at all. Result: **disabling both produces catastrophic mode collapse on seed=7** (β-recall max 0.076 across 8 checkpoints, worst 0.011). Narrowly tied with v178 (0.20662) as the worst alibaba run on record. The BS family *is* load-bearing on alibaba — without BS or OC, v164's recipe cannot maintain mode coverage. This settles the "was BS a passenger?" question: no. Combined with v175 (patched k=2: 0.07), v176 (patched k=1: 0.05), v178 (buggy + seed=11: 0.21): **v164's 0.03457 requires the specific combination of buggy-palindrome BS, seed=7, k=2**; any deviation from those three ingredients degrades by 48-500%.
+**Recipe**: v164 EXACT + `--seed 7` + patched `chunk_stitching.py`, with `--boundary-smoothness-weight 0.0` and `--overlap-consistency-weight 0.0` (no flags passed, so both defaults at 0). Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=0.16571 (rec 0.312), ep10 train★=0.14866 ★ **best** (rec 0.383), ep15 train★=0.15570, ep20 train★=0.15885, ep25 train★=0.16637, ep30 train★=0.15838, ep35 train★=0.16761 → ep10 best never beaten across 25 subsequent epochs → manual kill at ep36 (stale 26 epochs, trajectory flat, 4× gap to target). W tame (+0.27 → +0.66, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0030.pt** | **0.02229** | **0.0755** | **★=0.20719** (frozen-best) | **+499.4% worse** |
+| epoch_0035.pt | 0.02128 | 0.0580 | 0.20968 | +507% worse |
+| epoch_0020.pt | 0.02557 | 0.0765 | 0.21027 | +508% worse |
+| epoch_0025.pt | 0.02902 | 0.0365 | 0.22172 | +542% worse |
+| epoch_0005.pt | 0.02865 | 0.0140 | 0.22585 | +553% worse |
+| epoch_0010.pt (= best.pt) | 0.03053 | 0.0125 | 0.22803 | +560% worse |
+| epoch_0015.pt | 0.03466 | 0.0110 | 0.23246 | +573% worse |
+
+**Interpretation**:
+- **BS family is load-bearing on alibaba**: removing BS+OC entirely pushes the run into near-total mode collapse. The v164 recipe's anti-mode-collapse signal comes from BS (and possibly from OC).
+- **Tightening the v164 conclusion per R29 P1 #3**: v164's ATB requires the specific {buggy-palindrome BS, seed=7, k=2} triad. Any single substitution (patched BS, different seed, different k, no BS) degrades 48-500%. The BS family is load-bearing but only its buggy form reaches 0.03.
+- **Train-selector mis-rank yet again**: best.pt = ep10 ★=0.22803 vs frozen-best ep30 ★=0.20719 (+10.1% worse). 13th confirmation of the pattern on alibaba.
+- **β-recall 0.011 at ep10/ep15** — tighter mode collapse than v178 (0.0605 at frozen-best). The model converged on 1-2% of the target's mode coverage.
+- **Next queued v181**: v164 EXACT − BS (keep OC) + seed=7 — **OC-only ablation** to disambiguate which of BS or OC was carrying the anti-collapse signal. If v181 recovers to ~0.06, OC alone is sufficient. If v181 ≈ 0.20, the BS+OC pair is required.
 
 ---
 
