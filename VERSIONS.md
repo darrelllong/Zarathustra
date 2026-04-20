@@ -218,7 +218,27 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v185** — v165 EXACT recipe + `--seed 3` (seed-basin test parallel to v177's seed=7 which collapsed). Full stack: retrieval-memory + multi-scale-critic + mixed-type-recovery + PCF-loss 2.0 + 8 regimes + supervisor 5.0. Tests whether v165's ★=0.03752 is reproducible at a *different* seed (addressing Round 30 P1 #1: v165 demoted to "best observed seed-5 numeric baseline — not yet a reproducible Tencent mechanism"). If v185 ≤ 0.05, seed-invariant → recipe is robust. If v185 ≥ 0.08 (like v177 at 0.088), v165 is seed-locked. Log `/home/darrell/train_tencent_v185.log`. PID 984426.
-- **alibaba_v186** — v176 EXACT recipe (patched BS 1.0 k=1 + OC 0.5) + `--seed 11`. **Seed-basin test on v176** (not a BS scalar probe — addresses Round 30 P2 #5 seed-bundle concern). v176 is the least-bad patched alibaba at seed=7 (★=0.051, still +47.6% vs v164). If v186 ≤ 0.06, v176 recipe is seed-robust and we have a reproducible patched alibaba mechanism. If v186 collapses (like v177 did on tencent+seed=7 → ★=0.088), v176 is seed-locked at seed=7 and the 0.051 is a seed-lottery win rather than a structural recipe. **Last v176-basin run** — per Round 31 P1 #2 and P1 #3, patched BS scalar search is closed; regardless of v186's outcome, the next alibaba launch will be **IDEA #36 (learned boundary prior) / #31 (chained-window) / #35 (workload-conditioned router)**, not more coefficient probes. Log `/home/darrell/train_alibaba_v186.log`. PID 1009584.
+- **tencent_v187** — v165 EXACT recipe **minus** `--multi-scale-critic` + `--seed 5` (same seed as v165). **Multi-scale-critic ablation** — 3rd component test on tencent after v180 (retrieval-memory, 3.17× degrade) and v183 (PCF-loss, 5.11× degrade). Keeps retrieval-memory + mixed-type-recovery + PCF-loss 2.0 + 8 regimes. Tests whether IDEA #8 multi-scale critic is load-bearing or passenger on tencent. **Alibaba slot held pending Round 31 P1 #2 structural pivot**: next alibaba = IDEA #36 (learned boundary prior) / #31 (chained-window) / #35 (workload-conditioned router); these need code work before launching. Log `/home/darrell/train_tencent_v187.log`. PID 1029832.
+
+---
+
+### alibaba_v186 — CLOSED-FAILED (v176 EXACT recipe + `--seed 11` = seed-basin test; trajectory-kill @ ep18 after 8 epochs stale from ep10 train-★ best with recall stuck at 0.32-0.36 vs v176 seed=7's 0.67-0.71; frozen-best epoch_0010.pt ★=0.21923 = **+534% worse than v164's 0.03457 and +330% worse than v176 seed=7's 0.051**, 2026-04-20)
+**Why (closed-failed)**: **Seed-basin test on v176** (addresses Round 30 P2 #5 and Round 31 P1 #2 "stop scalar probing, but confirm whether v176 is structural vs seed-lottery"). v176 is the least-bad patched alibaba at seed=7 (★=0.051). **Result: v176 is seed-locked at seed=7**. Changing seed from 7 → 11 reproduces the alibaba collapse basin (frozen-★ 0.219 = essentially identical to v179's 0.207, v182's 0.217, v181's 0.226). The v176 recipe is not a seed-robust mechanism — it is a single-seed lottery win. Closes the v176-basin era.
+**Recipe**: v176 EXACT (patched BS 1.0 k=1 position-only + OC=0.5 overlap-mode k=2 + multi-scale-critic + mixed-type-recovery + PCF 2.0 + 4 regimes + supervisor 5.0) + `--seed 11`. Fresh pretrain.
+**Training (Phase 3)**: ep5 train★=0.17897 (rec 0.318), ep10 train★=**0.15901** ★ **best** (rec 0.358), ep15 train★=0.17179 (rec 0.349) — no recovery, manual trajectory-kill at ep18. W tame (+0.7 → +1.26, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-20)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v176 seed=7 |
+|---|---|---|---|---|
+| **epoch_0010.pt** (= best.pt) | **0.02443** | **0.0260** | **★=0.21923** (frozen-best) | **+330% worse** |
+| epoch_0015.pt | 0.03033 | 0.0335 | 0.22363 | +338% worse |
+| epoch_0005.pt | 0.03357 | 0.0185 | 0.22987 | +351% worse |
+
+**Interpretation**:
+- **v176 is seed-locked at seed=7** — seed=11 reproduces the alibaba collapse basin (★ ≈ 0.21-0.23, β-rec < 0.05). The 0.051 observed at seed=7 is not a reproducible mechanism; it is a single-point seed-lottery win on the patched BS recipe.
+- **Alibaba collapse basin is a well-defined attractor** across many perturbations: v179 (BS=0/OC=0) 0.207, v181 (BS=0/OC=0.5) 0.226, v182 (BS=0.5/OC=0.5) 0.217, v184 (v176+retrieval/seed=7) 0.184, v186 (v176/seed=11) 0.219. Train-★ 0.15-0.18 with β-rec 0.03-0.18 = consistent signature.
+- **Round 31 P1 #2 validated**: the deterministic BS scalar search is closed; v186 demonstrates that even moving to a different seed on the one BS setting that "worked" reproduces the collapse basin. The next alibaba work must be structural (#36 learned boundary prior, #31 chained-window, #35 workload-conditioned router), not another coefficient/k/seed probe.
+- **No train-selector mis-rank this time**: best.pt = ep10 = frozen-best (★ = 0.21923 exactly). When a run is deep in the collapse basin, all checkpoints cluster close and there's no selection to get wrong.
+- **Next launched v187**: v165 EXACT − multi-scale-critic (3rd tencent component ablation). Alibaba slot held pending structural-mechanism implementation per Round 31.
 
 ---
 
