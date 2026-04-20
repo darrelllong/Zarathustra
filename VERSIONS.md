@@ -218,7 +218,31 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v177** — v165 recipe + `--seed 7` (seed basin test, like alibaba v172/v173/v167). Reproduces v165's retrieval-memory + multi-scale-critic + PCF 2.0 + mixed-type-recovery + n-regimes 8 + supervisor 5.0 stack against the CORRECT tencent corpus `/home/darrell/traces/tencent_block_1M`. If v177 converges near v165 ep45 ★=0.03752, confirms 0.03752 is a reproducible mechanism and the seed basin for tencent is narrower than alibaba's {0.029, 0.042, 0.081}. If v177 diverges significantly, forces a tencent seed-lottery retraction analogous to v167's alibaba retraction. Log `/home/darrell/train_tencent_v177.log`.
-- **alibaba_v178** — v164 EXACT recipe + `--seed 11` (patched `chunk_stitching.py`, BS k=2 + OC overlap k=2). Seed-basin test for v164 under patched code, analogous to v172/v173 for v167. v175 (same recipe, seed=7) gave frozen ★=0.07121 (+106%); v176 (same recipe seed=7 BS-k=1) gave 0.05102 (+47.6%). If v178 ≤ 0.04, v164's 0.03457 is reproducible mechanism across seeds under patched code. If v178 lands in [0.05, 0.08], v164's ★=0.03457 is tied to the palindrome-bug interaction at seed=7 specifically — forcing a v164 retraction (or a note that v164's ATB requires the buggy BS code). Log `/home/darrell/train_alibaba_v178.log`.
+- **alibaba_v179** — v164 EXACT recipe **minus** `--boundary-smoothness-weight` and `--overlap-consistency-weight` (both 0, i.e. BS+OC entirely disabled) + `--seed 7` (patched code). **BS/OC ablation** — tests whether BS was contributing to v164's ★=0.03457 at all, or if v164's win came from the rest of the recipe (4 regimes, supervisor 5.0, diversity 2.0, feature-matching 1.0, mixed-type-recovery, var-cond 0.01, gmm 8, ema 0.999). If v179 ≤ 0.04, BS was passenger (or negative!) in v164 and the ATB is robust. If v179 ≥ 0.06, BS contributed and v164's ATB is tied to buggy-BS (given patched-BS v175/v176 all worse). Log `/home/darrell/train_alibaba_v179.log`. PID 877646.
+
+---
+
+### alibaba_v178 — CLOSED-FAILED (v164 EXACT recipe + `--seed 11` + patched `chunk_stitching.py`; manual kill @ ep34 after ep30 ★ stagnating at train★=0.150 = 2× worse than v164's ep30; frozen-best epoch_0035.pt ★=0.20662 = **+497.8% worse than v164's 0.03457**, β-recall=0.06, 2026-04-19)
+**Why (closed-failed)**: seed-basin test for v164, direct analogue of v172/v173 for v167. Tests whether v164's ★=0.03457 reproduces across seeds under patched-BS code. Result: seed=11 fell into **near-total mode collapse** (frozen β-recall=0.06 — about 6% of target workload coverage). +497.8% degradation dwarfs v175 (seed=7 patched BS k=2 +106%) and v176 (seed=7 patched BS k=1 +48%). v178 is the worst alibaba run on record.
+**Recipe**: v164 EXACT + `--seed 11` + patched `chunk_stitching.py`. `--boundary-smoothness-weight 1.0 --boundary-smoothness-k 2 --overlap-consistency-weight 0.5 --overlap-consistency-mode overlap`.
+**Training (Phase 3)**: ep5 train★=0.20310 (rec 0.194), ep10 train★=0.18558 (rec 0.245) ★, ep15 no ★, ep20 train★=0.15747 (rec 0.336) ★, ep25 no ★, ep30 train★=0.14993 (rec 0.372) ★ **best**, ep34 train★ flat ~0.15. W tame (+0.35 → +0.66, no spikes). Killed manually at ep34 (trajectory hopeless: +4× gap to ATB, compression rate slowing).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-19)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v164 |
+|---|---|---|---|---|
+| **epoch_0035.pt** (= best.pt) | **0.01872** | **0.0605** | **★=0.20662** (frozen-best) | **+497.8% worse** |
+| epoch_0030.pt | 0.02248 | 0.0540 | 0.21168 | +512% worse |
+| epoch_0025.pt | 0.02300 | 0.0410 | 0.21480 | +521% worse |
+| epoch_0020.pt | 0.02483 | 0.0220 | 0.22043 | +538% worse |
+| epoch_0010.pt | 0.03063 | 0.0275 | 0.22513 | +551% worse |
+| epoch_0015.pt | 0.03937 | 0.0705 | 0.22527 | +552% worse |
+| epoch_0005.pt | 0.03982 | 0.0085 | 0.23812 | +589% worse |
+
+**Interpretation**:
+- **v164 is seed-locked at seed=7**: this is the strongest evidence yet that v164's ★=0.03457 does not generalize to other seeds under patched code. The catastrophic mode collapse (β-recall 0.06) at seed=11 suggests v164's recipe + seed=11 + patched BS is not a viable combination. Three patched-code points for v164 recipe: seed=7 k=2 → 0.071, seed=7 k=1 → 0.051, seed=11 k=2 → **0.207**. A basin with this much variance is not a "reproducible baseline"; it is a lottery whose winning ticket happens to involve buggy code.
+- **v164 retraction-class problem**: by the same criterion applied to v167 (three-seed basin showing seed-lottery), v164 is at minimum a two-seed lottery under patched code. Under buggy code, only seed=7 has ever been run.
+- **Train-selector agreed with frozen here** (best.pt = epoch_0035.pt, same ★). No mis-rank — because the recipe failed so badly that everything was equally bad. When nothing works, train- and frozen-selectors trivially agree.
+- **β-recall trajectory is the signal**: 0.194 (ep5) → 0.245 (ep10) → 0.336 (ep20) → 0.372 (ep30). Recall was slowly improving but from a deeply collapsed baseline. Would not have reached reasonable levels even if training continued. Kill was correct.
+- **Next queued v179**: v164 EXACT − BS/OC + seed=7 (BS/OC ablation). Tests whether v164's win depended on BS at all. If v179 ≤ 0.04, BS was passenger and v164's core is reproducible; if v179 ≥ 0.06, BS was essential to the (seed=7, buggy BS) combination.
 
 ---
 
