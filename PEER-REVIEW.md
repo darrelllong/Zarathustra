@@ -1536,3 +1536,39 @@ The new changes since Round 31 are again confined to [VERSIONS.md](/Users/darrel
 ### Short Take
 
 This round is useful because it narrows the map: PCF and retrieval are both load-bearing inside Tencent seed 5, retrieval is now convincingly negative on Alibaba, and patched BS scalars are done. The repo should now stop trying to rescue those facts into universal mechanisms. The next evidence needs to be seed-bundled and long-rollout-aware, and the next Alibaba bet needs to be structural.
+
+---
+
+## Round 33
+
+### Seed-Lottery Is Now The Main Result, Not A Side Caveat
+
+The only code/doc surface changed since Round 32 is [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md), but the new evidence is important. `tencent_v185` confirms the `v165` recipe is seed-locked, `alibaba_v186` confirms the least-bad patched Alibaba recipe is also seed-locked, and the docs correctly move the Alibaba slot toward structural work. The remaining risk is that the project now spends the next cycle explaining a lucky seed-5 basin instead of escaping it.
+
+1. `[P1]` The Tencent component ablations are now within-basin forensics, not mechanism validation. `v185` gives a three-seed basin for the full `v165` recipe: seed 5 scores `0.03752`, seed 7 scores `0.088`, and seed 3 scores `0.14326` in [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L231). That means the `v180`, `v183`, `v187`, and `v188` ablations are all answering a narrower question: which parts are load-bearing inside the seed-5 lottery basin. They should be reported as useful forensics, but they should not drive the next mainline recipe unless a reproduced seed bundle or long-rollout panel shows the same mechanism outside seed 5. Let `v187` and `v188` finish if they are already running, then stop the seed-5 autopsy and move to a recipe designed for robustness.
+
+2. `[P1]` "Seed averaging" is the wrong escape hatch if it means smoothing over unstable generators after the fact. The `v185` interpretation says the project can escape the seed-lottery regime through "explicit seed-averaging in reporting" in [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L260). Reporting mean/median/worst is necessary, but it does not solve the modeling problem. A three-seed distribution of `{0.03752, 0.088, 0.14326}` still describes a fragile recipe, even if the average is published honestly. The stronger bar should be: promote only when the worst or at least the median seed is competitive with the current numeric target, and use seed bundles to choose structural mechanisms rather than to launder a single lucky checkpoint.
+
+3. `[P1]` The #21 status text still says "producing ATBs" after the repo has demoted both baseline claims. [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L52) correctly says v164 is a seed-locked numeric target under buggy BS code, but [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L58) still labels the status as `"wired, producing ATBs"`. That phrase is now stale. The honest status is closer to: "wired, can produce seed-locked numeric targets, but current-code patched recipes collapse or seed-lock and the mechanism remains unvalidated." This matters because #21 is still a strategic branch; stale ATB language will keep pulling the team back toward deterministic BS/OC tuning.
+
+4. `[P1]` The Alibaba evidence now fully closes the patched-BS scalar basin, not just one coefficient ladder. `v186` shows the least-bad patched point `v176` moves from `0.051` at seed 7 to `0.21923` at seed 11 in [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L265), and the collapse basin now includes `v179`, `v181`, `v182`, `v184`, and `v186` in [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L276). The docs say the next Alibaba work must be #36/#31/#35, which is correct. Do not add another "confirming" seed, weight, or BS/OC decomposition. Pick one structural implementation and build it.
+
+5. `[P2]` The current "Alibaba slot held" line is directionally right but still too passive for race mode. [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L227) says the next Alibaba option is #36 learned boundary prior, #31 chained-window training, or #35 workload-conditioned router, each needing 4-6h of code. That is a decision point, not a queue. My recommendation is to start with #36 because the strongest new Alibaba evidence is boundary-specific: the old palindrome objective produced the numeric target, patched deterministic BS collapses, and retrieval transfer is repeatedly negative. #31 can follow if #36 gives a useful boundary score but fails long rollout; #35 becomes more compelling once there are at least two viable mechanisms to route between.
+
+6. `[P2]` Tail and long-rollout gates are still missing exactly where they are now most needed. The tail-strata table admits that v164 Alibaba and v165 Tencent target rows have not been run in [VERSIONS.md](/Users/darrell/.codex/worktrees/0496/Zarathustra/VERSIONS.md#L184), and Round 32 already required long-rollout panels for the Tencent quartet. After `v185`, those diagnostics should not wait for a new short-window winner. Run them on the numeric targets and the failed seeds too: `v165`, `v177`, `v185`, `v180`, `v183` for Tencent; `v164`, `v176`, `v186`, `v184` for Alibaba if artifacts exist. The important question is no longer just "which checkpoint has low ★"; it is whether the lucky seeds are lucky on the same cache/tail laws the project actually cares about.
+
+### What I Would Do Next
+
+1. Finish `v187` and `v188` only as seed-5 component forensics, then stop same-seed ablations unless they feed a reproduced structural branch.
+
+2. Rewrite the #21 status phrase from "producing ATBs" to seed-locked numeric-target language.
+
+3. Treat seed bundles as promotion gates with best/median/worst, not as averaged scoreboards that can hide collapse seeds.
+
+4. Start the Alibaba structural implementation with #36 learned boundary prior; use #31 chained windows as the next sequence-training step if #36 shows local boundary signal.
+
+5. Run tail-strata and long-rollout panels on both the lucky baselines and their failed seed counterparts before claiming any mechanism is solving locality, cache footprint, or tails.
+
+### Short Take
+
+The project has now done enough seed-basin work to answer the main question: the current numeric targets are not reproducible mechanisms. That is not a small caveat; it is the central state of the repo. The next win will not come from more scalar cleanup around v164 or more same-seed dissection around v165. It needs a structural move that survives at least a tiny seed bundle and improves the long-rollout or tail behavior the short-window score keeps hiding.
