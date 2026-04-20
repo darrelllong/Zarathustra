@@ -217,8 +217,41 @@ on newly-landed code changes.
 
 ## Currently Running
 
-- **tencent_v185** — v165 EXACT recipe + `--seed 3` (seed-basin test parallel to v177's seed=7 which collapsed). Full stack: retrieval-memory + multi-scale-critic + mixed-type-recovery + PCF-loss 2.0 + 8 regimes + supervisor 5.0. Tests whether v165's ★=0.03752 is reproducible at a *different* seed (addressing Round 30 P1 #1: v165 demoted to "best observed seed-5 numeric baseline — not yet a reproducible Tencent mechanism"). If v185 ≤ 0.05, seed-invariant → recipe is robust. If v185 ≥ 0.08 (like v177 at 0.088), v165 is seed-locked. Log `/home/darrell/train_tencent_v185.log`. PID 984426.
 - **tencent_v187** — v165 EXACT recipe **minus** `--multi-scale-critic` + `--seed 5` (same seed as v165). **Multi-scale-critic ablation** — 3rd component test on tencent after v180 (retrieval-memory, 3.17× degrade) and v183 (PCF-loss, 5.11× degrade). Keeps retrieval-memory + mixed-type-recovery + PCF-loss 2.0 + 8 regimes. Tests whether IDEA #8 multi-scale critic is load-bearing or passenger on tencent. **Alibaba slot held pending Round 31 P1 #2 structural pivot**: next alibaba = IDEA #36 (learned boundary prior) / #31 (chained-window) / #35 (workload-conditioned router); these need code work before launching. Log `/home/darrell/train_tencent_v187.log`. PID 1029832.
+
+---
+
+### tencent_v185 — CLOSED-FAILED (v165 EXACT recipe + `--seed 3` = seed-basin test; stale-kill @ ep109 after 29 epochs from train-★ best at ep80 with trajectory regressing to 0.082-0.08; frozen-best epoch_0045.pt ★=0.14326 = **+282% worse than v165's 0.03752** and **+63% worse than v177 seed=7's 0.088**, 2026-04-20)
+**Why (closed-failed)**: **Seed-basin test on v165** (addresses Round 30 P1 #1 demotion of v165 to "best observed seed-5 numeric baseline — not yet a reproducible Tencent mechanism"). **Result: v165 is seed-locked at seed=5**. Changing seed from 5 → 3 produces frozen-★ 0.143 (3.8× worse than v165's 0.037); changing seed from 5 → 7 (v177) produced 0.088 (2.3× worse). Three seeds now sample the v165 recipe:
+- **seed=3 (v185)**: ★=0.14326 (this run)
+- **seed=5 (v165)**: ★=0.03752 (original)
+- **seed=7 (v177)**: ★=0.088 (closed-failed Round 28)
+
+v165's ★=0.03752 is a **single-seed lottery win at seed=5**, not a reproducible structural mechanism. The tencent and alibaba "best" baselines (v165 seed=5 = 0.037; v164 seed=7 = 0.034 legacy buggy-BS) are both seed-locked to specific seeds on specific code branches.
+**Recipe**: v165 EXACT (retrieval-memory + multi-scale-critic + mixed-type-recovery + PCF-loss 2.0 + 8 regimes + supervisor 5.0 + diversity 2.0 + feature-matching 1.0) + `--seed 3`. Fresh pretrain.
+**Training (Phase 3)**: Monotonic improvement through ep80 — ep5 ★=0.11016 (rec 0.481) → ep40 ★=0.08199 (rec 0.630) → ep60 ★=0.07492 (rec 0.647) → ep75 ★=0.07482 (rec 0.659) → ep80 train★=**0.06771** ★ **best** (rec 0.681, MMD² 0.00391). Then regression: ep85 0.076, ep90 0.082, ep95 0.079, ep100-109 holding 0.08 band. Stale-kill at ep109 (29 epochs from ep80 best). W tame throughout (+1.3-1.8, no spikes).
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-20, 22 checkpoints)**:
+| checkpoint | MMD² | β-recall | ★ frozen | vs v165 |
+|---|---|---|---|---|
+| **epoch_0045.pt** | **0.00856** | **0.3265** | **★=0.14326** (frozen-best) | **+282% worse** |
+| epoch_0065.pt | 0.00484 | 0.2960 | 0.14564 | +288% worse |
+| epoch_0105.pt | 0.00399 | 0.2915 | 0.14569 | +288% worse |
+| epoch_0090.pt | 0.00389 | 0.2865 | 0.14659 | +291% worse |
+| epoch_0070.pt | 0.00660 | 0.2990 | 0.14680 | +291% worse |
+| epoch_0060.pt | 0.00631 | 0.2940 | 0.14751 | +293% worse |
+| epoch_0080.pt (= best.pt) | 0.00464 | 0.2610 | 0.15244 | +306% worse |
+| epoch_0025.pt | 0.01859 | 0.3295 | 0.15269 | +307% worse |
+| ... | | | | |
+| epoch_0005.pt | 0.00661 | 0.0940 | 0.18781 | +401% worse |
+
+**Interpretation**:
+- **v165 is seed-locked at seed=5** (3-seed confirmation: 5 → 0.037, 3 → 0.143, 7 → 0.088). All 3 seeds share the same 200-epoch stack + 8 regimes + retrieval-memory + PCF-loss; only the seed differs. The ★ varies by 3.8× across seeds. v165's win is not a mechanism — it's a sampling event.
+- **Best β-recall 0.327** vs v165's 0.82 — the seed=3 basin has far less mode coverage. MMD² is comparable (0.00856 vs v165's ~0.004), but the β-recall gap is what drives frozen-★ 4× higher.
+- **18th train-selector mis-rank confirmation**: best.pt = ep80 (β-rec 0.261) vs frozen-best ep45 (β-rec 0.3265). +6.4% miss. Dense checkpointing + frozen-sweep continues to save 6-20% ★ routinely.
+- **Earlier checkpoints (ep25, ep45) beat later ones** — similar to v166's pattern on tencent where ep20 beat final.pt. Tencent frozen-optimal checkpoint is **mid-training, not late**. This was also the v153 lesson.
+- **Round 30 P1 #1 fully validated**: v165's top-table position as "best observed seed-5 numeric baseline — not yet a reproducible Tencent mechanism" is now empirically justified. Any future claim of a reproducible tencent ATB must come from a recipe that reproduces across at least 2 seeds.
+- **Implication for v187 and forward ablations**: v180/v183/v187 are **seed=5 ablations**, i.e., they probe which components of the v165-seed-5-basin stack are load-bearing inside that specific seed-lottery basin. They are informative about the seed=5 mechanism but do not by themselves establish a reproducible mechanism. To escape the seed-lottery regime, we need either (a) a new mechanism that works at ≥2 seeds or (b) explicit seed-averaging in reporting.
+- **Next queued v188** (pending v187 completion): v165 EXACT − `--mixed-type-recovery` + seed=5 — 4th component ablation on tencent. Completes the ablation grid over v165's major components before pivoting to structural ideas.
 
 ---
 
