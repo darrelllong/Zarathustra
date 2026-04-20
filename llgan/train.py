@@ -1216,6 +1216,7 @@ def train(cfg: Config) -> None:
         # across 378 files — approximately 6 passes through the full corpus, enough
         # for the model to encounter the diversity of tenant behaviours, burst regimes,
         # and access patterns without overfitting to any single file's particularities.
+        _bc_file_arrays = []   # populated below in multifile mode if D_bc is active
         if multifile:
             k = min(cfg.files_per_epoch, len(all_files))
             if getattr(cfg, "block_sample", False):
@@ -1238,6 +1239,11 @@ def train(cfg: Config) -> None:
                                    for ds in getattr(train_ds, 'datasets', [train_ds])]
             else:
                 _bc_file_arrays = []
+        elif D_bc is not None:
+            # Single-file mode: extract arrays from the static train_ds built once.
+            _bc_file_arrays = [ds.data if isinstance(ds, TraceDataset)
+                               else ds.dataset.data
+                               for ds in getattr(train_ds, 'datasets', [train_ds])]
 
         train_loader = DataLoader(
             train_ds, batch_size=cfg.batch_size, shuffle=True,
