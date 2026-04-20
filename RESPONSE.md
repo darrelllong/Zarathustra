@@ -938,3 +938,91 @@ IDEA #35 (workload-conditioned router). No further scalar probes.
 
 **Long-rollout sidecar for v165/v177/v180/v183** — still deferred; required before
 mechanism claims about retrieval or PCF.
+
+---
+
+# Response to peer review Round 33 (2026-04-20)
+
+**Status**: Round 33 arrived while the Mac was down. Responding same session. P1 #3
+(IDEA #21 "producing ATBs" language) was already fixed in this session's VERSIONS.md
+edit (IDEA #21 STATUS fully rewritten 2026-04-20). Remaining items accepted below.
+
+## P1 #1 — component ablations are within-basin forensics, not mechanism validation — ACCEPTED
+
+Agreed. v187 (−multi-scale-critic, seed=5) and v188 (−mixed-type-recovery, seed=5)
+are useful to understand which components hold the seed=5 basin together. Neither
+can establish a reproducible mechanism because v177 (seed=7), v185 (seed=3) already
+confirmed the full recipe collapses outside seed=5. Both are running; they will
+complete to natural W-stop or early kill. After their frozen evals, the seed-5
+autopsy is DONE. No further same-seed ablations will be launched.
+
+Next step: a recipe designed for robustness, not another seed=5 component probe.
+
+## P1 #2 — "seed averaging" doesn't escape seed-lottery — ACCEPTED
+
+Agreed. Reporting mean/median/worst is necessary for honesty, but a three-seed
+distribution of {0.03752, 0.088, 0.143} still describes a fragile recipe regardless
+of how clearly the distribution is published. Promotion bar going forward:
+
+> **A mechanism is promotable only when the worst seed (or at minimum the median)
+> is competitive with the current numeric target, AND the winning seed's
+> long-rollout / tail evidence supports the mechanism claim.**
+
+Seed averaging to report distributions ≠ seed averaging to launder a fragile recipe.
+
+## P1 #3 — IDEA #21 status still says "producing ATBs" — ALREADY FIXED
+
+IDEA #21 STATUS block was rewritten 2026-04-20 in this session. The block now reads:
+"IDEA #21 deterministic hand-written BS scalar ladder is CLOSED on alibaba under
+patched code." The phrase "producing ATBs" is gone; replaced with "legacy buggy-BS
+numeric target." No further action needed.
+
+## P1 #4 — Alibaba patched-BS basin fully closed; pick one structural implementation — ACCEPTED
+
+Accepted. v179, v181, v182, v184, v186 complete the collapse map. There is nothing
+left to measure on the patched hand-written BS/OC surface. The next Alibaba run will
+be structural. Choosing **IDEA #36 (learned boundary prior)** as the first structural
+bet because:
+- The strongest Alibaba evidence is boundary-specific: the buggy palindrome objective
+  accidentally encoded a useful boundary manifold that derivative-smoothing did not
+- Retrieval transfer is definitively negative on Alibaba (three branches)
+- #36 directly addresses the mechanism gap without assuming transferability from Tencent
+
+IDEA #31 (chained-window training) is the follow-on if #36 shows boundary signal
+but fails long rollout. IDEA #35 (workload-conditioned router) becomes relevant once
+there are at least two mechanisms to route between.
+
+## P2 #5 — "Alibaba slot held" is too passive; start #36 — ACCEPTED
+
+The Alibaba GPU slot is free now. Plan:
+1. Implement the boundary critic module: small MLP that sees
+   `(left_window_tail, right_window_head)` pairs and separates true adjacent joins
+   from generated and shuffled controls.
+2. Train boundary critic standalone on real Alibaba adjacent pairs to confirm signal.
+3. Add its contrastive loss to an Alibaba run (v176 recipe base, patched BS zeroed)
+   as alibaba_v189.
+
+## P2 #6 — tail-strata and long-rollout panels missing where most needed — ACCEPTED
+
+Still deferred, but this is now the highest-priority diagnostic debt. With the
+forensic picture of the seed-5 basin complete after v187/v188, the right next
+investment is:
+
+1. **Long-rollout panels for Tencent quartet** (v165/v177/v185/v180/v183):
+   HRC-MAE, reuse-access rate, stack-distance histograms. Compares lucky seed vs
+   failed seeds on the cache metrics the project actually cares about.
+2. **Long-rollout panels for Alibaba** (v164/v176/v186):
+   Same panel. Checks whether the seed=7 win was real on long-range structure or
+   just short-window distributional luck.
+3. Tail-strata runs (v164 tail-heavy/ordinary, v165 tail-heavy/ordinary) — blocked
+   only by not having run them; no code work required.
+
+## Summary
+
+Round 33's core message is correct: the current repo state is "two seed-locked
+numeric targets, both with failed seed basins and no mechanism validation." The
+next win requires escaping that. Committing to:
+- Finish v187/v188 as seed-5 forensics, then stop same-seed ablations
+- Implement IDEA #36 boundary critic for Alibaba (next structural bet)
+- Run long-rollout + tail panels on the existing baselines before any mechanism claim
+- Require worst/median seed competitive before promotion
