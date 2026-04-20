@@ -1438,3 +1438,39 @@ empirically damaging, and it did not hide that result. Now the documentation nee
 full consequence: v164 is not a clean current-code ATB, deterministic BS is probably a dead end,
 and the next serious boundary move should be learned or sequence-trained rather than another local
 smoothness scalar.
+
+---
+
+## Round 30
+
+### New Evidence: The ATBs Are Numeric Baselines, Not Mechanisms Yet
+
+The new changes since Round 29 are only in [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md), but they materially change the strategic read. `v177` says Tencent `v165` is seed-locked, `v180` says retrieval memory is load-bearing inside that same seed-5 basin, and `v179`/`v181` say Alibaba's patched-code BS/OC surface collapses when the old boundary losses are removed or separated. Those are useful ablations. The main risk is that the repo is again turning single-basin ablations into global mechanism claims.
+
+1. `[P1]` The Tencent top row now needs the same demotion language Alibaba got. [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L24) still presents `v165` as the current Tencent ATB and says IDEA #17 retrieval memory is "genuinely productive." But the new seed-basin test at [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L302) reports `v177` at `0.16819`, `+348.3%` worse than `v165`, with beta-recall stuck between `0.06` and `0.19`. The interpretation even says `v165` is seed-locked at seed 5 in [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L318). That should be reflected in the top table: `v165` is the best observed Tencent numeric baseline, not a reproducible Tencent mechanism. Otherwise the repo will repeat the `v167` and `v164` promotion mistake on the other corpus.
+
+2. `[P1]` `v180` proves retrieval is load-bearing only within the winning seed-5 recipe, not that IDEA #17 is generally solved. The ablation is clean and valuable: removing `--retrieval-memory` at seed 5 worsens frozen star from `0.03752` to `0.11882` in [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L225). But that result must be read together with the seed-7 collapse above. The correct conclusion is "retrieval is one load-bearing ingredient of the seed-5 basin," not "retrieval memory works on Tencent" in the broad sense. Before promoting retrieval as structural progress, run the long-rollout HRC / stack-distance / reuse-access panel for `v165`, `v177`, and `v180`. If retrieval is real, it should move the long-horizon cache metrics, not just preserve short-window beta-recall under one seed.
+
+3. `[P1]` The project says to close the hand-written BS scalar ladder, then launches another hand-written BS scalar. [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L366) correctly says hand-written BS penalties in the v164 recipe are not the path forward. But [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L220) has `alibaba_v182` running exactly a lower-weight patched-BS scalar test. Given `v175`, `v176`, `v179`, and `v181`, this is not a high-upside architectural bet; it is one more local search on a surface that already showed catastrophic recall cliffs. Let `v182` finish if it is already burning GPU, but do not queue another BS coefficient/k/order probe after it. The next boundary move should be #36 learned boundary prior or #31 chained-window training.
+
+4. `[P1]` The Alibaba BS/OC ablations show dependence on the old boundary regularization, but not a usable current-code recipe. [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L278) shows BS+OC disabled gives `0.20719`; [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L255) shows OC-only is even worse at `0.22589`. That is strong evidence that the old v164 basin depended on the boundary-loss family. It is not evidence that the patched BS/OC family is worth optimizing: the best current-code patched point is still `v176` at `0.05102`, `+47.6%` worse than the buggy numeric target in [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L351). The right lesson is narrower and harsher: the accidental palindrome regularizer was load-bearing, and the mathematically intentional replacements have not recovered its benefit.
+
+5. `[P2]` `v183` is a reasonable PCF ablation, but it should not become another same-seed closure. [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L221) frames `v183` as deciding whether PCF was a passenger or a second load-bearing term. That is fine inside seed 5. It is not enough for a mechanism verdict, because the full `v165` recipe already failed under seed 7. If `v183` fails, PCF may be load-bearing in the seed-5 recipe. If it wins, PCF may be a passenger in the seed-5 recipe. Neither outcome tells us whether the retrieval+multi-scale+regime stack is reproducible without a second seed bundle and long-rollout panel.
+
+6. `[P2]` The tail gate is still using the wrong summary as an acceptance rule. [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L194) correctly notes that tail beta-recall can be higher while tail MMD is much worse, but [VERSIONS.md](/Users/darrell/.codex/worktrees/492d/Zarathustra/VERSIONS.md#L206) still allows a candidate to pass by improving composite tail-star without explicitly requiring tail MMD/shape improvement. This is the same scoring trap as the short-window ATB table: a composite can hide the failure mode that the new diagnostic was built to expose. Make tail MMD/shape improvement a required condition, with recall reported separately.
+
+### What I Would Do Next
+
+1. Relabel Tencent `v165` as "best observed seed-5 numeric baseline" until at least one more seed lands near it.
+
+2. Run long-rollout HRC, stack-distance, reuse-access, and tail-strata panels for `v165`, `v177`, and `v180` before treating retrieval as a structural win.
+
+3. Let `v182` finish, but make it the last deterministic BS scalar probe unless it produces a genuinely surprising current-code result.
+
+4. Move the next Alibaba boundary effort to #36 learned boundary prior or #31 chained-window training.
+
+5. Interpret `v183` only as a same-seed PCF ablation; require seed-bundle confirmation before promoting or closing the mechanism.
+
+### Short Take
+
+The new evidence is valuable because it identifies load-bearing ingredients inside fragile basins. It does not yet identify robust mechanisms. Tencent `v165` now belongs in the same category as Alibaba `v164`: a numeric target produced by a specific seed and recipe, not a reproducible architectural answer. The project should stop spending mainline compute on hand-written BS scalar variants and start proving whether retrieval, PCF, and boundary structure survive seed changes and long-rollout cache metrics.
