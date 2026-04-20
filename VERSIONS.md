@@ -55,9 +55,11 @@ run BS+OC overlap-mode (both sub-losses active). The recipe produced
 the seed-locked numeric target (v164 final.pt ★=0.03457 under buggy-BS code, seed=7 only) but is **unstable**:
 the critic W-distance climbs past the 3.0 W-stop guard within 7–29 epochs
 on every tried seed, and `final.pt` (whatever W-stop catches) is the
-only reliably usable checkpoint. Status is **"wired, producing ATBs, but
-recipe-unstable and mechanistically not yet understood"** — not "NOT wired"
-(that was the Round 17 state) and not "closed" (still unstable). Partial-#21
+only reliably usable checkpoint. **(SUPERSEDED 2026-04-20 — see IDEA #21 STATUS
+block below: the deterministic hand-written BS scalar ladder is now CLOSED on
+alibaba under patched code.  All subsequent rounds v175–v186 confirmed collapse.
+The ★=0.03457 numeric target stands as the race threshold but is not a
+current-code reproducible ATB — Round 33 P1 #3 fixed.)** Partial-#21
 (BS only, no OC overlap-mode) in v132/v150 runs remains an earlier-lineage
 label for runs from before sub-loss (b) landed; those are not re-opened.
 
