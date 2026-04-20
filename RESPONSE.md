@@ -1066,6 +1066,41 @@ next win requires escaping that. Committing to:
 
 ---
 
+# AD review of boundary_critic.py / train.py wiring (2026-04-20)
+
+Adversarial reviewer ran against the IDEA #36 implementation.  7 findings.
+
+**P0 #1 — `_bc_file_arrays` NameError in single-file mode.** CONCEDED + FIXED.
+In the epoch loop, `_bc_file_arrays` was only assigned inside `if multifile:`.
+Fixed: added `_bc_file_arrays = []` default before the `if multifile:` block,
+plus a `elif D_bc is not None:` branch for single-file mode.  Commit `3fff930`.
+
+**P0 #2 — R's GRU hidden-state reset poisons fake boundary.** PUSHED BACK.
+AD argues that `R(_H_B)` (cold start) produces a different decode than R with
+warm state, creating an artifact the critic will learn.  Rebuttal: Recovery is
+pretrained with zero initial hidden state on independent windows — cold-start
+decode is the intended and trained behavior.  Both at train time and here, every
+window is decoded from scratch.  The comparison (real raw features vs R-decoded
+latent) is the same asymmetry the main critic has always lived with; LLGAN's
+training objective (E+R ≈ identity on real data) makes them comparable.  Not
+a correctness bug.
+
+**P1 #1 — Real boundary alignment is arbitrary / asymmetric with fake semantics.**
+PUSHED BACK.  Sampling real boundaries at positions b = i·T is reasonable because
+the time series is approximately stationary across window boundaries; no position
+is special.  The fake joins are also T-step aligned (end of rollout A, start of
+rollout B).  The alignment matches semantics.
+
+**P1 #2 — Real pair not file-matched to fake rollout z_global.** ACKNOWLEDGED
+as a training-efficiency issue but not a correctness bug.  The critic learns
+general feature-space boundary realism, not per-file statistics.  Not critical
+at this stage.
+
+**P2 — scaler_C.update() called multiple times per n_critic iteration.**
+Pre-exists the boundary critic; not a regression introduced here.  Out of scope.
+
+---
+
 # Code-fix log (2026-04-20)
 
 Deferred code-correctness bugs from Darrell peer-review Rounds 1 and 4 fixed in
