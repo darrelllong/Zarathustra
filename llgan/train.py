@@ -47,6 +47,7 @@ from dataset import (load_trace, TracePreprocessor, TraceDataset, _READERS,
 from model import Generator, Critic, MultiScaleCritic, Encoder, Recovery, Supervisor, LatentDiscriminator
 from mmd import evaluate_mmd, evaluate_metrics
 from chunk_stitching import boundary_latent_smoothness, overlap_consistency
+from boundary_critic import BoundaryCritic, sample_real_boundaries
 from timing_head import log_normal_nll
 from hybrid_diffusion import LatentDenoiser, LatentDiffusion
 
@@ -609,6 +610,19 @@ def train(cfg: Config) -> None:
         print(f"[dual-critic] Feature-space critic enabled (weight={_feat_cw:.2f})")
     else:
         C_feat = opt_C_feat = None
+
+    # Boundary critic (IDEA #36): learned boundary prior instead of hand-written
+    # BS/OC scalars.  Operates on decoded-feature space (post-R), K steps on each
+    # side of the window boundary.  Trained WGAN-SN style alongside the main D.
+    _bc_w = float(getattr(cfg, "boundary_critic_weight", 0.0))
+    _bc_k = int(getattr(cfg, "boundary_critic_k", 4))
+    _bc_hidden = int(getattr(cfg, "boundary_critic_hidden", 128))
+    if _bc_w > 0 and R is not None:
+        D_bc = BoundaryCritic(prep.num_cols, k=_bc_k, hidden=_bc_hidden).to(device)
+        opt_D_bc = torch.optim.Adam(D_bc.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
+        print(f"[boundary-critic] Enabled (weight={_bc_w:.2f}, K={_bc_k}, hidden={_bc_hidden})")
+    else:
+        D_bc = opt_D_bc = None
 
     # torch.compile: fuses CUDA kernels for ~20-40% speedup on NVIDIA hardware.
     # Skipped on MPS/CPU (no benefit) and when create_graph gradients are needed
@@ -1216,6 +1230,14 @@ def train(cfg: Config) -> None:
             if train_ds is None or len(train_ds) == 0:
                 print(f"Epoch {epoch+1}: no data loaded, skipping.")
                 continue
+            # Extract per-file raw arrays for boundary-critic real-pair sampling.
+            # ConcatDataset wraps a list of TraceDatasets; each .data is (N_i, F).
+            if D_bc is not None:
+                _bc_file_arrays = [ds.data if isinstance(ds, TraceDataset)
+                                   else ds.dataset.data
+                                   for ds in getattr(train_ds, 'datasets', [train_ds])]
+            else:
+                _bc_file_arrays = []
 
         train_loader = DataLoader(
             train_ds, batch_size=cfg.batch_size, shuffle=True,
@@ -1352,6 +1374,35 @@ def train(cfg: Config) -> None:
                         scaler_C.unscale_(opt_C_feat)
                         nn.utils.clip_grad_norm_(C_feat.parameters(), cfg.grad_clip)
                     scaler_C.step(opt_C_feat)
+                    scaler_C.update()
+
+                # --- Boundary critic step (IDEA #36) ---
+                if D_bc is not None and R is not None and _bc_file_arrays:
+                    opt_D_bc.zero_grad()
+                    with torch.amp.autocast(device.type, enabled=use_amp):
+                        # Real boundary pairs from this epoch's files
+                        _bc_tail_r, _bc_head_r = sample_real_boundaries(
+                            _bc_file_arrays, B, _bc_k, cfg.timestep, device)
+                        # Fake boundary pairs: G adjacent windows via h_carry
+                        with torch.no_grad():
+                            _z_gb_bc, _ = _make_z_global(B, cfg, device,
+                                                         real_features=real_batch,
+                                                         file_cond=file_cond_batch, G=G)
+                            _z_la = G.sample_z_local(B, cfg.timestep, device)
+                            _z_lb = G.sample_z_local(B, cfg.timestep, device)
+                            _H_A, _h_carry_bc = G(_z_gb_bc, _z_la, return_hidden=True)
+                            _H_B = G(_z_gb_bc, _z_lb, hidden=_h_carry_bc)
+                            _feat_A = R(_H_A).detach()
+                            _feat_B = R(_H_B).detach()
+                        _bc_tail_f = _feat_A[:, -_bc_k:, :]
+                        _bc_head_f = _feat_B[:, :_bc_k, :]
+                        bc_loss = (D_bc(_bc_tail_f, _bc_head_f) -
+                                   D_bc(_bc_tail_r.float(), _bc_head_r.float())).mean()
+                    scaler_C.scale(bc_loss).backward()
+                    if cfg.grad_clip > 0:
+                        scaler_C.unscale_(opt_D_bc)
+                        nn.utils.clip_grad_norm_(D_bc.parameters(), cfg.grad_clip)
+                    scaler_C.step(opt_D_bc)
                     scaler_C.update()
 
             # --- PCF adversarial step (frequency maximization) ---
@@ -1841,6 +1892,22 @@ def train(cfg: Config) -> None:
                     loss_pcf = pcf_loss_fn(real_batch.detach(), fake_decoded)
                     g_loss = g_loss + cfg.pcf_loss_weight * loss_pcf
                     pcf_losses.append(loss_pcf.item())
+
+                # Boundary critic adversarial loss (IDEA #36).
+                # G generates an adjacent window pair and tries to fool D_bc on the join.
+                if D_bc is not None and R is not None and _bc_w > 0:
+                    _z_gb_g, _ = _make_z_global(B, cfg, device, real_features=real_batch,
+                                                file_cond=file_cond_batch, G=G)
+                    _z_la_g = G.sample_z_local(B, cfg.timestep, device)
+                    _z_lb_g = G.sample_z_local(B, cfg.timestep, device)
+                    _H_Ag, _h_carry_g = G(_z_gb_g, _z_la_g, return_hidden=True)
+                    _H_Bg = G(_z_gb_g, _z_lb_g, hidden=_h_carry_g)
+                    _feat_Ag = R(_H_Ag)
+                    _feat_Bg = R(_H_Bg)
+                    _bc_tail_g = _feat_Ag[:, -_bc_k:, :]
+                    _bc_head_g = _feat_Bg[:, :_bc_k, :]
+                    loss_bc = -D_bc(_bc_tail_g, _bc_head_g).mean()
+                    g_loss = g_loss + _bc_w * loss_bc
 
                 # Variational conditioning KL loss (IDEAS.md #3): regularise the
                 # cond encoder toward N(0,I).  kl_loss=0 when var_cond is off.
@@ -2513,6 +2580,17 @@ def parse_args() -> Config:
                         "boundary-smoothness math on decoded features of two adjacent, "
                         "non-overlapping windows. 'overlap' is the true IDEA #21 "
                         "sub-loss (b).")
+    p.add_argument("--boundary-critic-weight", type=float, default=0.0,
+                   help="IDEAS.md #36: learned boundary critic weight on G loss. "
+                        "Trains a small MLP discriminator to distinguish real adjacent "
+                        "window joins from generated ones; G is penalised for unrealistic "
+                        "cross-window transitions. Requires latent_ae (R decoder). "
+                        "Default 0.0 = off. Suggested starting value: 0.5.")
+    p.add_argument("--boundary-critic-k", type=int, default=4,
+                   help="Context steps K on each side of the boundary fed to the "
+                        "boundary critic (default 4). Critic input is (2K*feat_dim,).")
+    p.add_argument("--boundary-critic-hidden", type=int, default=128,
+                   help="Hidden size of the boundary critic MLP (default 128).")
     p.add_argument("--hybrid-diffusion-aux", action="store_true",
                    help="IDEAS.md #22 (Stage-1 only): side-train a "
                         "LatentDenoiser on E(real).detach() in the joint-GAN "
@@ -2647,6 +2725,9 @@ def parse_args() -> Config:
     cfg.retrieval_reuse_bce_weight   = args.retrieval_reuse_bce_weight
     cfg.cache_descriptor_file        = args.cache_descriptor_file
     cfg.cache_descriptor_monitor_samples = args.cache_descriptor_monitor_samples
+    cfg.boundary_critic_weight       = args.boundary_critic_weight
+    cfg.boundary_critic_k            = args.boundary_critic_k
+    cfg.boundary_critic_hidden       = args.boundary_critic_hidden
     cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
     cfg.boundary_smoothness_k        = args.boundary_smoothness_k
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
