@@ -1793,3 +1793,101 @@ that the current implementation changes the confound rather than eliminating it:
 fresh encoder-window joins, fake boundaries are carried generator joins. Fix that carry mismatch
 before concluding anything about IDEA #36, and do not let a higher W-stop threshold turn instability
 into a claimed architectural breakthrough.
+
+---
+
+## Round 37
+
+### Do Not Retreat From Confound Removal Back To Seed-5 Decoded BC
+
+The new commits since Round 36 mostly add the v193 frozen verdict, the Round 36 response, and the
+v194 launch/update in [VERSIONS.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/VERSIONS.md)
+and [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md). The empirical
+result is useful: latent-H boundary criticism as currently implemented is not competitive. The
+strategic risk is that the project is now using that failure to slide back to decoded-mode bc as if
+its old domain confound were solved. It is not.
+
+1. `[P1]` v194's decoded-mode premise reopens the raw-vs-decoded confound that Round 35 already
+   flagged. [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md#L1466) says
+   decoded-mode bc has both real and fake in the same decoded feature space, but the current code
+   still samples real positives directly from raw normalized trace arrays in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1418) while fake
+   boundaries are `R(G(...))` decoded in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1420) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1423). The
+   generator-side loss uses the same decoded fake path in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1937) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1941). So if
+   v194 wins, it will show that decoded bc can produce a better short-window frozen score in seed 5;
+   it will not prove that `D_bc` learned boundary realism rather than raw-vs-Recovery texture. I
+   added IDEA #44 for a domain-matched decoded boundary critic: reconstruct real positives with
+   `R(E(real))` or add a three-way decoded diagnostic before treating `bc_gap` as mechanism evidence.
+
+2. `[P1]` Closing IDEA #42 as "latent space too low-dimensional" is overidentified. v193 is a real
+   negative result: [VERSIONS.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/VERSIONS.md#L302)
+   through [VERSIONS.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/VERSIONS.md#L327) show
+   frozen-best `0.11060`, beta-recall peaking at `0.4775`, and no late phase transition. But the
+   implementation still compares reset-encoded real heads with carried generator heads, as shown in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1410) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/train.py#L1416). That
+   means v192/v193 close the current latent-H implementation, not the whole idea of latent or
+   representation-matched boundary criticism. The response's "dim=24 is simply too low-dimensional"
+   explanation in [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md#L1456)
+   through [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md#L1460) is a
+   plausible hypothesis, not an identified cause. Do not use it to bury IDEA #43 or IDEA #44.
+
+3. `[P1]` v194 is not a clean mechanism test because it deliberately returns to the seed-5 basin.
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/VERSIONS.md#L238) says v194 uses
+   seed 5, a seed-5 pretrain from v193, and a raised W-stop threshold. The same page also says the
+   Tencent seed-5 component audit is within-basin forensics, not mechanism validation, in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/VERSIONS.md#L237). Apply that same
+   standard here. If v194 beats v191, call it "decoded bc works better inside seed 5 with a relaxed
+   kill guard" until a second seed or domain-matched critic reproduces the effect. Also fix the
+   text that says "same seed as ATB holder v165" for an Alibaba run; the nearby comparisons use
+   `v176` as the Alibaba `0.051` target, while `v165` has been the Tencent seed-5 numeric target.
+
+4. `[P2]` The long-rollout/tail gate is still too conditional. [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md#L1515)
+   through [RESPONSE.md](/Users/darrell/.codex/worktrees/966b/Zarathustra/RESPONSE.md#L1520) delays HRC,
+   reuse-access, stack-distance, and tail rows unless v194 reaches `<=0.060`. That keeps the project
+   trapped in short-window score triage. Boundary criticism exists specifically to improve generated
+   joins and long-horizon behavior; the diagnostic panel is informative even for v191/v193 failures
+   because it can tell whether bc is improving boundary/cache laws while losing beta-recall, or
+   merely changing the short-window sample cloud. Run at least one compact panel for `v176`, `v191`,
+   `v193`, and any swept `v194` checkpoint.
+
+5. `[P2]` The boundary-critic documentation still overstates what is being sampled. The module doc
+   says real pairs are centered on a "true file boundary" in
+   [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/boundary_critic.py#L11)
+   through [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/boundary_critic.py#L14),
+   but `sample_real_boundaries()` actually samples every `T` records within each file in
+   [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/boundary_critic.py#L121)
+   through [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/966b/Zarathustra/llgan/boundary_critic.py#L124).
+   That is a real adjacent-window boundary, not a file boundary. The distinction matters because the
+   critic is being used to reason about whole-trace continuity; stale wording makes the method sound
+   closer to trace-level stitching than it is.
+
+### What I Would Do Next
+
+1. Let v194 run, but pre-register its interpretation as seed-5 decoded-bc evidence, not mechanism
+   closure.
+
+2. Implement IDEA #44 before more boundary scalar/schedule probes: decoded real positives should be
+   `R(E(real))`, or the diagnostic should explicitly score raw-real, reconstructed-real,
+   shuffled-reconstructed-real, and fake joins.
+
+3. Keep IDEA #43 alive as a latent/transition-contract fix. v193 closes the current latent-H
+   implementation, not every representation-matched critic.
+
+4. Run a compact long-rollout/tail panel on v176, v191, v193, and swept v194. Do not gate all
+   long-horizon evidence on the short-window `<=0.060` threshold.
+
+5. Correct the v194 docs: `v165` is not the Alibaba ATB reference, and "decoded-mode" does not mean
+   real and fake are both decoded.
+
+### Short Take
+
+The v193 result is a useful negative result, but the right lesson is not "return to decoded bc and
+trust it." The right lesson is narrower: the first latent-H implementation failed, EMA remains a bad
+selector, and the next boundary critic must preserve decoded-feature gradient strength while
+removing the raw-vs-decoded shortcut. IDEA #44 is the cleanest next structural move; more W-stop,
+weight, or seed-5 chasing should be treated as secondary.

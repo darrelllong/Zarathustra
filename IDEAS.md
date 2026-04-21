@@ -1605,3 +1605,23 @@ Options:
 **Minimal viable experiment**: add a `--boundary-critic-real-carry` mode that builds real positives from adjacent windows plus `S(E(A))`-conditioned transition features, and compare against current `--boundary-critic-latent` on the same seed/pretrain. Acceptance requires frozen sweep improvement plus a diagnostic showing the critic cannot separate positives by "head starts at timestep 0 of a fresh encoder window" alone.
 
 **Why this is structural**: the project keeps finding that boundary scores are easy to fool by domain artifacts. A matched carried-state critic would make the adversary operate on the same train/generate contract the model must satisfy at long rollout time.
+
+---
+
+### 44. Domain-matched decoded boundary critic
+
+**Gap attacked**: decoded-mode boundary criticism is currently the most promising IDEA #36 branch, but it still trains `D_bc` on raw normalized real boundaries versus `R(G(...))` decoded fake boundaries. That means the critic can still learn feature-manifold / Recovery-texture artifacts instead of temporal boundary realism. The latent-H branch removed that raw-vs-decoded shortcut but introduced its own reset/carry and low-dimensional-gradient problems. The next structural move should keep decoded-feature gradients while matching the real and fake domains.
+
+**Proposal**: build a decoded-domain boundary critic where both real and fake joins pass through the same decode surface before `D_bc` sees them.
+
+Options:
+
+1. **Reconstructed-real positives**: for real adjacent windows, encode and decode with `R(E(real))`, then feed the reconstructed tail/head to `D_bc`. Fake remains `R(G(...))`. This tests whether decoded-mode bc works after the raw-vs-decoded shortcut is removed.
+2. **Three-way decoded diagnostic**: train or at least evaluate scores for consecutive `R(E(real))`, shuffled `R(E(real))`, and `R(G)` joins. A useful boundary critic should rank consecutive reconstructed-real above shuffled reconstructed-real and both above generated joins.
+3. **Dual-head critic**: share a trunk over decoded features but expose separate logits for domain authenticity and temporal adjacency. The generator should receive only the temporal-adjacency pressure, not a gradient that encourages matching decoder artifacts.
+
+**Minimal viable experiment**: add `--boundary-critic-real-reconstruct` so the real side in decoded mode is sampled as full windows, transformed through `E` and `R`, then sliced at the boundary. Compare against v191/v194 on the same seed/pretrain, and log `D_bc(raw-real)`, `D_bc(recon-real)`, `D_bc(shuffled-recon-real)`, and `D_bc(fake)`.
+
+**Acceptance bar**: a win only counts if the reconstructed-real diagnostic still separates consecutive from shuffled joins and frozen sweep improves without worsening long-rollout HRC / reuse-access / stack-distance. If the score disappears when real is reconstructed, decoded bc was mostly exploiting the raw-vs-decoded artifact.
+
+**Why this is structural**: it preserves the decoded-feature gradient that latent-H seems to lack while removing the confound that makes current `bc_gap` hard to interpret. This is a better next boundary bet than more `bc_weight`, W-stop, or warm-up tuning.
