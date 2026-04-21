@@ -1625,3 +1625,5 @@ Options:
 **Acceptance bar**: a win only counts if the reconstructed-real diagnostic still separates consecutive from shuffled joins and frozen sweep improves without worsening long-rollout HRC / reuse-access / stack-distance. If the score disappears when real is reconstructed, decoded bc was mostly exploiting the raw-vs-decoded artifact.
 
 **Why this is structural**: it preserves the decoded-feature gradient that latent-H seems to lack while removing the confound that makes current `bc_gap` hard to interpret. This is a better next boundary bet than more `bc_weight`, W-stop, or warm-up tuning.
+**Implementation**: `--boundary-critic-real-reconstruct` flag added to `train.py` (2026-04-21). Real side: `R(E(full_window))[:, -K:, :]` and `R(E(full_window))[:, :K, :]` — both in decoded feature space. Fake side: `R(G(z))` as before. Mode label: `decoded-feat-matched`.
+**Test**: v195 (seed=5, pretrain=v193, same recipe as v194 + `--boundary-critic-real-reconstruct`) — RUNNING

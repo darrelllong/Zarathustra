@@ -618,11 +618,17 @@ def train(cfg: Config) -> None:
     _bc_k = int(getattr(cfg, "boundary_critic_k", 4))
     _bc_hidden = int(getattr(cfg, "boundary_critic_hidden", 128))
     _bc_latent = bool(getattr(cfg, "boundary_critic_latent", False))
+    _bc_real_reconstruct = bool(getattr(cfg, "boundary_critic_real_reconstruct", False))
     if _bc_w > 0 and R is not None:
         _bc_feat_dim = cfg.latent_dim if (_bc_latent and latent_ae) else prep.num_cols
         D_bc = BoundaryCritic(_bc_feat_dim, k=_bc_k, hidden=_bc_hidden).to(device)
         opt_D_bc = torch.optim.Adam(D_bc.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
-        _bc_mode = "latent-H" if (_bc_latent and latent_ae) else "decoded-feat"
+        if _bc_latent and latent_ae:
+            _bc_mode = "latent-H"
+        elif _bc_real_reconstruct:
+            _bc_mode = "decoded-feat-matched"  # IDEA #44: R(E(real)) vs R(G)
+        else:
+            _bc_mode = "decoded-feat"
         print(f"[boundary-critic] Enabled (weight={_bc_w:.2f}, K={_bc_k}, hidden={_bc_hidden}, mode={_bc_mode})")
     else:
         D_bc = opt_D_bc = None
@@ -1414,6 +1420,20 @@ def train(cfg: Config) -> None:
                                 _bc_head_r = E(_raw_B.float())[:, :_bc_k, :].detach()
                                 _bc_tail_f = _H_A[:, -_bc_k:, :].detach()
                                 _bc_head_f = _H_B[:, :_bc_k, :].detach()
+                            elif _bc_real_reconstruct:
+                                # IDEA #44: domain-matched decoded bc.
+                                # Real positives are R(E(real)) so both sides pass
+                                # through the same decode surface, removing the
+                                # raw-vs-decoded shortcut that exists in plain decoded-feat.
+                                _raw_A, _raw_B = sample_real_boundaries(
+                                    _bc_file_arrays, B, _bc_k, cfg.timestep, device,
+                                    full_window=True)
+                                _bc_tail_r = R(E(_raw_A.float()))[:, -_bc_k:, :].detach()
+                                _bc_head_r = R(E(_raw_B.float()))[:, :_bc_k, :].detach()
+                                _feat_A = R(_H_A).detach()
+                                _feat_B = R(_H_B).detach()
+                                _bc_tail_f = _feat_A[:, -_bc_k:, :]
+                                _bc_head_f = _feat_B[:, :_bc_k, :]
                             else:
                                 _bc_tail_r, _bc_head_r = sample_real_boundaries(
                                     _bc_file_arrays, B, _bc_k, cfg.timestep, device)
@@ -2642,6 +2662,11 @@ def parse_args() -> Config:
                    help="IDEA #42: operate D_bc in latent space (E(real) vs G latents) "
                         "instead of decoded feature space, removing the raw-vs-decoded "
                         "manifold confound. Requires --latent-dim > 0.")
+    p.add_argument("--boundary-critic-real-reconstruct", action="store_true",
+                   help="IDEA #44: domain-matched decoded bc — real positives are R(E(real)) "
+                        "so both real and fake pass through the same decode surface. Removes "
+                        "the raw-vs-decoded shortcut in plain decoded-feat mode. "
+                        "Requires --latent-dim > 0.")
     p.add_argument("--hybrid-diffusion-aux", action="store_true",
                    help="IDEAS.md #22 (Stage-1 only): side-train a "
                         "LatentDenoiser on E(real).detach() in the joint-GAN "
@@ -2779,7 +2804,8 @@ def parse_args() -> Config:
     cfg.boundary_critic_weight       = args.boundary_critic_weight
     cfg.boundary_critic_k            = args.boundary_critic_k
     cfg.boundary_critic_hidden       = args.boundary_critic_hidden
-    cfg.boundary_critic_latent       = args.boundary_critic_latent
+    cfg.boundary_critic_latent            = args.boundary_critic_latent
+    cfg.boundary_critic_real_reconstruct  = args.boundary_critic_real_reconstruct
     cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
     cfg.boundary_smoothness_k        = args.boundary_smoothness_k
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay
