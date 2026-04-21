@@ -235,8 +235,8 @@ on newly-landed code changes.
 | PCF-loss (IDEA #26) | v183 | ~0.1921 | **~5.11×** |
 
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
-- **alibaba_v193** — **PLANNED** (after v192). IDEA #36 bc_weight=0.1, seed=5. Third seed for mechanism robustness; if v191 (seed=11) and v192 (seed=3 or seed=7) both avoid collapse at bc=0.1, seed=5 completes the 3-seed bundle required for mechanism claim.
-- **alibaba_v192** — **RUNNING** (PID 3260378, launched 2026-04-21). **IDEA #36 + IDEA #42**: bc_weight=0.1 + `--boundary-critic-latent`, seed=7. Confirmed startup: `mode=latent-H`. Pretrain: v189 `pretrain_complete.pt` (seed=7). **ep5: recall=0.699, ★=0.075; ep10: recall=0.726, ★=0.078; ep15: recall=0.797, ★=0.063; ep20: recall=0.784, ★=0.056 (train-best); ep25: recall=0.733, ★=0.071 (NO collapse — v191 collapsed here at 0.605); ep30: recall=0.898, ★=0.02454 (new EMA best! W=2.82 rising).** Latent-H bc avoids ep20-25 collapse catastrophically better than decoded mode. bc_gap stable 0.29-0.39. Watching ep35 — W approaching 3.0 threshold. Log `/home/darrell/train_alibaba_v192.log`.
+- **alibaba_v193** — **PLANNED** (next). **IDEA #36 + IDEA #42 (latent-H) + `--w-stop-threshold 5.0`**, seed=5 or seed=11. Rationale: v192 showed latent-H bc avoids decoded-mode ep25 collapse (ep25 recall=0.733 vs v191's 0.605), but W-stopped at ep35 (only 8 checkpoints). v191's frozen-best was ep75 (17 checkpoints). Hypothesis: v192 recipe needs longer training — raise w-stop-threshold to 5.0 to allow late-epoch frozen recovery. Pretrain: reuse v189 `pretrain_complete.pt` (seed=7 pretrain, slight seed mismatch acceptable). If v193 reaches ep70+ without W-stop, frozen sweep should reveal whether latent-H bc's late-epoch frozen quality matches or beats v191's ★=0.067.
+- **alibaba_v192** — **CLOSED** (W-stopped ep35, 2026-04-21). **IDEA #36 + IDEA #42**: bc_weight=0.1 + `--boundary-critic-latent`, seed=7. mode=latent-H. Pretrain: v189 `pretrain_complete.pt` (seed=7). **Frozen sweep complete (seeds 42/42, 8 checkpoints ep5–ep35 + best.pt + final.pt)**: frozen-best **epoch_0030.pt ★=0.10389** (MMD²=0.01329, β-rec=0.547). 24th mis-rank: best.pt EMA ★=0.024 → frozen ★=0.104 (+334% worse). Training trajectory: ep5 recall=0.699 → ep25 0.733 (NO decoded-mode collapse) → ep30 0.898 EMA peak → W-stop ep35 (W=3.25, 3.34, 3.07). Gap to ATB: ★=0.104 vs v176 ★=0.051 = **104% worse**; worse than v191 (★=0.067). **W-stop confound**: v192 had only ep5–ep35 checkpoints; v191's frozen-best was ep75. Latent-H bc may need longer training but W instability kills the run early. v193 should raise w-stop-threshold. Log `/home/darrell/train_alibaba_v192.log`.
 - **alibaba_v191** — **CLOSED** (killed ep83, 63 epochs stale from ep20 train-best, 2026-04-20). IDEA #36 bc_weight=0.1, k=4, n-regimes 4, seed=11. **Frozen sweep complete (seeds 42/42, 17 checkpoints ep5–ep80 + best.pt)**: frozen-best **epoch_0075.pt ★=0.06749** (MMD²=0.00929, β-rec=0.709). 23rd train-selector mis-rank: best.pt=epoch_0020.pt EMA ★=0.05529 → frozen ★=0.17753 (+163.0% worse). **Key finding**: EMA "collapse" at ep70-80 (EMA recall=0.383-0.440) masked genuine frozen-eval recovery (frozen ep75 β-recall=0.709, ep80 β-recall=0.789). Killed too early by EMA heuristics. Gap to ATB: ★=0.067 vs v176 ★=0.051 = **32% worse**. bc=0.1 beats bc=0.5 runs (v189 ★=0.076, v190 ★=0.083). Pretrain: reused v190 pretrain_complete.pt. Log `/home/darrell/train_alibaba_v191.log`.
 - **alibaba_v190** — **CLOSED-FAILED** (killed ep70, 40 epochs stale from train-best, 2026-04-20). IDEA #36 bc_weight=0.5, seed=3. **Frozen sweep (seeds 42/42, ep5–ep65 + best.pt, 14 checkpoints)**: frozen-best **epoch_0065.pt ★=0.08291** (MMD²=0.01731, β-rec=0.672). best.pt=epoch_0030.pt ★=0.12440 (22nd mis-rank: +50% worse than frozen-best). Training trajectory: ep30 train-best (recall=0.773, ★=0.053); recall collapse ep40–50 (0.663→0.514); partial recovery ep55–65 (0.574→0.672). bc_gap 0.065–0.122 throughout. ep70 saved (EMA recall=0.541, not swept). Gap to ATB: ★=0.083 vs v176 ★=0.051 = **63% worse**. bc_weight=0.5 confirmed too large: recall oscillates but never recovers to ep30 peak. Key finding: frozen-best is ep65 (not ep30), meaning frozen and train metrics disagree on optimal stopping by 35 epochs. Log `/home/darrell/train_alibaba_v190.log`.
 
@@ -258,6 +258,33 @@ All four components are load-bearing inside seed=5; removing any one causes 3–
 - **21st train-selector mis-rank**: best.pt EMA train-★=0.034 → frozen ★=0.089 (+16.5% worse than final.pt). EMA recall 0.853 → frozen recall 0.628 for the SAME ep60 checkpoint. **EMA train metrics are a poor proxy for frozen evaluation on this architecture.**
 - **IDEA #36 proof of concept**: frozen β-recall 0.62–0.69 across all checkpoints, all above the 0.26 collapse floor. Boundary critic successfully prevents Alibaba collapse under patched code for the first time.
 - **Gap to target**: frozen ★=0.076 vs v176 ★=0.051 = **49% worse**. Boundary critic raises recall floor but introduces MMD² overhead. v191 should tune bc_weight or combine with PCF-loss to improve frozen MMD².
+
+---
+
+### alibaba_v192 — CLOSED (W-stopped ep35; frozen-best ep30 ★=0.10389; 24th mis-rank EMA ★=0.024→frozen ★=0.104, 2026-04-21)
+
+**Why**: IDEA #36 + IDEA #42 (Learned Boundary Prior + Latent-H D_bc), seed=7, bc_weight=0.1. Addresses Round 35 P1 #2 raw-vs-decoded confound. D_bc now scores E(real)[:, -K:, :] latents vs G-hidden[:, -K:, :] — same latent space, no decoder artifact confound. Confirmed startup: `[boundary-critic] Enabled (weight=0.10, K=4, hidden=128, mode=latent-H)`.
+
+**Training**: Early trajectory better than decoded-mode (ep25 recall=0.733 vs v191's collapse to 0.605 at ep25). ep30 EMA peak: recall=0.898, ★=0.02454 (best EMA ever on alibaba). W-stopped ep35 (W>3.0 for 3 consecutive epochs: ep33=3.25, ep34=3.34, ep35=3.07). Train-best is ep30.
+
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-21, 8 checkpoints ep5–ep35 + best.pt + final.pt)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **epoch_0030.pt** (frozen-best) = best.pt | **0.10389** | 0.01329 | 0.547 |
+| epoch_0025.pt | 0.10889 | 0.01199 | 0.516 |
+| final.pt (ep35) | 0.13924 | 0.01654 | 0.387 |
+| epoch_0010.pt | 0.14545 | 0.01655 | 0.356 |
+| epoch_0015.pt | 0.14573 | 0.01933 | 0.368 |
+| epoch_0020.pt | 0.14950 | 0.01370 | 0.321 |
+| epoch_0005.pt | 0.17619 | 0.01869 | 0.213 |
+
+- **24th train-selector mis-rank**: best.pt EMA ★=0.02454 → frozen ★=0.10389 (+334% worse). Latent-H bc produces the most severe EMA inflation seen yet.
+- **NOT competitive**: frozen ★=0.104 vs v191 ★=0.067 vs v176 ATB ★=0.051. Worse than decoded-mode v191.
+- **W-stop confound**: v192 had only 7 epoch checkpoints (ep5–ep35). v191's frozen-best was ep75 (of 17 checkpoints ep5–ep83). The latent-H bc training dynamic may need longer epochs to produce frozen recovery, but W instability terminates the run at ep35.
+- **Early training advantage**: ep25 recall=0.733 vs v191 ep25 recall=0.605 — latent-H bc clearly prevents the decoded-mode ep20-25 collapse pattern. The problem is W instability cuts the run short before late-epoch frozen recovery can occur.
+- **Large negative G-loss**: ep11-35 G-loss consistently −2.5 to −3.5, much larger than decoded mode (ep20-35 G ≈ 0.0-0.8). G easily fools both C and latent D_bc → C must work harder → W spikes.
+- **Key question for v193**: if w-stop-threshold raised to 5.0, would v192 recipe produce late-epoch frozen recovery (like v191 ep75) and become competitive?
 
 ---
 

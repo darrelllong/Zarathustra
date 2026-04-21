@@ -1338,17 +1338,18 @@ question (does D_bc score reconstructed-real lower than raw-real, indicating R a
 rather than boundary realism?) is still pending — requires the R(E(real)) reconstructed-real
 control run.
 
-## seed bundle status
+## seed bundle status (2026-04-21 update)
 
-| seed | bc_weight | frozen ★ | outcome |
-|---|---|---|---|
-| 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
-| 3 (v190) | 0.5 | **0.083** | Frozen-best ep65 (★=0.08291, β-rec=0.672); CLOSED-FAILED |
-| 11 (v191) | 0.1 | **0.067** | Frozen-best ep75 ★=0.06749 (β-rec=0.709); killed ep83; **best bc result** |
+| seed | mode | bc_weight | frozen ★ | epochs | outcome |
+|---|---|---|---|---|---|
+| 7 (v189) | decoded | 0.5 | 0.076 | ep61 W-stop | avoids collapse; not competitive |
+| 3 (v190) | decoded | 0.5 | **0.083** | ep70 kill | Frozen-best ep65; CLOSED-FAILED |
+| 11 (v191) | decoded | 0.1 | **0.067** | ep83 kill | Frozen-best ep75 ★=0.067; best decoded-bc |
+| 7 (v192) | **latent-H** | 0.1 | 0.104 | ep35 W-stop | IDEA #42; avoids ep25 collapse; W-stop too early |
 
-Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
-recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
-and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_weight=0.1.
+v192 (IDEA #42 latent-H bc): EMA breakthrough (ep30 recall=0.898, ★=0.024) but frozen ★=0.104 (+334% EMA inflation). Key finding: **latent-H bc avoids decoded-mode ep25 collapse** (v192 ep25 recall=0.733 vs v191's 0.605), but **W-stop at ep35 cuts off late-epoch frozen recovery**. v191's frozen-best was ep75 — v192 only ran to ep35. v193 test: raise w-stop-threshold to 5.0 to allow longer training.
+
+**Critical lesson (24th mis-rank)**: Latent-H bc produces more severe EMA inflation than decoded mode. EMA ★=0.024 vs frozen ★=0.104 = 4.3× inflation (vs 3.2× for decoded-mode v191). EMA recall during bc training is NOT a reliable signal in either mode — only frozen sweep gives the true number.
 
 **v191 full trajectory (2026-04-20, completed ep80)**:
 
