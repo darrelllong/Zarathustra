@@ -1199,13 +1199,14 @@ audit matrix is done:
 | Component | Ablation | Frozen ★ | Degradation |
 |---|---|---|---|
 | Retrieval-memory (IDEA #17) | v180 | 0.11882 | 3.17× |
-| Multi-scale-critic (IDEA #8) | v187 | 0.16532 | 4.4× |
-| PCF-loss (IDEA #26) | v183 | ~0.192 | ~5.1× |
-| Mixed-type-recovery (IDEA #7) | v188 | TBD | TBD |
+| Multi-scale-critic (IDEA #8) | v187 | 0.16532 | 4.41× |
+| PCF-loss (IDEA #26) | v183 | ~0.1921 | ~5.11× |
+| Mixed-type-recovery (IDEA #7) | v188 | 0.18177 | 4.85× |
 
-The audit will close after v188. No further same-seed tencent ablations. The seed-5
-basin forensics have produced a map of load-bearing components; they have not produced
-a transferable mechanism.
+**Audit COMPLETE** (v188 frozen sweep done 2026-04-20). All four components are
+load-bearing inside seed=5; removing any one causes 3.17–5.11× degradation. The
+seed-5 basin forensics have produced a map of load-bearing components; they have not
+produced a transferable mechanism.
 
 ## Summary
 
