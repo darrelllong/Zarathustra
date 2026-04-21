@@ -1896,3 +1896,72 @@ two-column format — `bc_real` already reports the recon score.
 
 v195 was relaunched with the corrected diagnostic code. The ep36 read
 from the pre-fix run is discarded.
+
+---
+
+## Long-Rollout Panel: v176 / v191 / v193 / v194 ep85
+
+*First actual run — promised in Rounds 35, 37, 38. Gate on ≤0.060 removed per Round 38 P2 #5.*
+
+Command: `python -m llgan.long_rollout_eval --n-records 50000 --n-streams 8 --seed 42 --char-file <char_file>` applied to each `frozen_best.pt`. Run 2026-04-21.
+
+### Panel summary
+
+| Metric | v176 (ATB ★=0.051) | v191 (bc ★=0.067) | v193 (latent-H ★=0.111) | v194 ep85 (bc ★=0.054) | Real |
+|--------|---|---|---|---|---|
+| reuse_access_rate | 0.046 | **0.193** | 0.007 | 0.006 | 0.265 |
+| reuse_object_rate | 0.044 | **0.071** | 0.007 | 0.006 | 0.111 |
+| reuse_decile_local_last | 0.093 | **0.260** | 0.016 | 0.018 | 0.273 |
+| reuse_decile_drift | 0.048 | +0.083 excess | 0.005 | 0.008 | 0.068 |
+| HRC-MAE | 0.1059 | **0.1027** | 0.1298 | 0.1305 | — |
+| footprint over | +29.7% | **+9.7%** | +35.1% | +35.2% | — |
+| IRD median | 1 | 1 | 1 | 1 | **194** |
+| stack_distance median | 0 | 0 | 0 | 0 | **174** |
+
+### Findings
+
+**1. Decoded-feat bc (v191) beats the short-window ATB (v176) on every long-rollout metric.**
+Reuse access rate 0.193 vs 0.046 (+320%). HRC-MAE 0.1027 vs 0.1059 (3% better). Footprint
+overshoot 9.7% vs 29.7%. The bc mechanism is working — boundary criticism at the decoded
+feature level substantially improves long-horizon reuse, even though v191's frozen ★=0.067 is
+32% worse than v176's ★=0.051.
+
+**2. v193 (latent-H bc) and v194 (decoded-feat bc, seed=5) are catastrophic on reuse.**
+Both show reuse_access_rate ~0.006-0.007 (97-98% below real). This is ~27× worse than v191
+on reuse. The latent-H mode destroys reuse; the seed-5 basin also loses reuse. The v194
+"near-miss" on short-window ★=0.054 hides complete long-rollout degradation.
+
+**3. IRD median = 1 is a universal floor across all four models.**
+No generated trace has temporal locality beyond the immediate window. Real IRD median = 194
+(an access is typically 194 positions away from its last occurrence). All fakes have IRD = 1
+(every access is a new object or an immediate repeat). Stack distance = 0 for all fakes
+(no object persists long enough to build non-trivial stack distance). This is a structural
+failure: the LRU HRC can never match real because there is no object locality to exploit.
+
+**4. v191 reuse_decile_drift is +121% above real (fake 0.151, real 0.068).**
+The boundary critic is concentrating reuse in the late decile (last=0.260 vs real's 0.273)
+while under-generating early reuse (first=0.109 vs real's 0.205). This shows bc is improving
+total reuse but unevenly — late-epoch reuse is nearly calibrated while early-epoch reuse
+is still weak.
+
+### What this means for v195
+
+v195 (IDEA #44, decoded-feat-matched bc) must match or improve on v191's reuse_access_rate
+(0.193) to be a genuine improvement over decoded-feat bc. If v195 reuse_access_rate falls
+below v191's 0.193 or near v193/v194's 0.006-0.007, the matched-domain modification hurt
+long-rollout behavior. The bc_diag(raw, shuf) diagnostic will now have a second verification
+layer: not just whether D_bc learned adjacency, but whether that adjacency signal translated
+to long-rollout reuse.
+
+**The primary open structural problem is IRD = 1 across all models.** Boundary criticism
+improves window-join reuse but cannot fix the within-window locality failure. The LSTM
+generator produces independent object draws each timestep with no persistent object revisit
+mechanism. Fixing IRD = 1 requires either: (a) an explicit object-reuse probability model
+(the z_global conditioning on obj_id statistics is insufficient), or (b) a long-rollout
+adversarial signal directly on IRD distribution (IDEA in progress).
+
+### Files
+- `/home/darrell/longroll_v176.json`
+- `/home/darrell/longroll_v191.json`
+- `/home/darrell/longroll_v193.json`
+- `/home/darrell/longroll_v194.json`
