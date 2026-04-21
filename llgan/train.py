@@ -833,6 +833,9 @@ def train(cfg: Config) -> None:
             S.load_state_dict(ckpt["S"], strict=False)
         if LD is not None and "LD" in ckpt:
             LD.load_state_dict(ckpt["LD"])
+        if D_bc is not None and "D_bc" in ckpt:
+            D_bc.load_state_dict(ckpt["D_bc"])
+            opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
@@ -1207,6 +1210,7 @@ def train(cfg: Config) -> None:
         c_losses, g_losses, w_dists = [], [], []
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
         pcf_losses = []   # PCF loss tracking
+        bc_real_scores, bc_fake_scores = [], []   # boundary critic logging (P1#2)
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1402,8 +1406,11 @@ def train(cfg: Config) -> None:
                             _feat_B = R(_H_B).detach()
                         _bc_tail_f = _feat_A[:, -_bc_k:, :]
                         _bc_head_f = _feat_B[:, :_bc_k, :]
-                        bc_loss = (D_bc(_bc_tail_f, _bc_head_f) -
-                                   D_bc(_bc_tail_r.float(), _bc_head_r.float())).mean()
+                        _bc_score_r = D_bc(_bc_tail_r.float(), _bc_head_r.float()).mean()
+                        _bc_score_f = D_bc(_bc_tail_f, _bc_head_f).mean()
+                        bc_loss = _bc_score_f - _bc_score_r
+                        bc_real_scores.append(_bc_score_r.detach().item())
+                        bc_fake_scores.append(_bc_score_f.detach().item())
                     scaler_C.scale(bc_loss).backward()
                     if cfg.grad_clip > 0:
                         scaler_C.unscale_(opt_D_bc)
@@ -2027,6 +2034,10 @@ def train(cfg: Config) -> None:
         if pcf_losses:
             pcf_m = sum(pcf_losses) / len(pcf_losses)
             log += f"  pcf={pcf_m:.4f}"
+        if bc_real_scores:
+            bc_r = sum(bc_real_scores) / len(bc_real_scores)
+            bc_f = sum(bc_fake_scores) / len(bc_fake_scores)
+            log += f"  bc_real={bc_r:+.3f}  bc_fake={bc_f:+.3f}  bc_gap={bc_r - bc_f:.3f}"
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             # Evaluate using the EMA model, not the live G.
@@ -2068,6 +2079,9 @@ def train(cfg: Config) -> None:
                                       "S": S.state_dict()})
                 if LD is not None:
                     ckpt_data["LD"] = LD.state_dict()
+                if D_bc is not None:
+                    ckpt_data["D_bc"] = D_bc.state_dict()
+                    ckpt_data["opt_D_bc"] = opt_D_bc.state_dict()
                 if C_extra:
                     ckpt_data["C_extra"] = [_Ci.state_dict() for _Ci in C_extra]
                     ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
@@ -2187,6 +2201,9 @@ def train(cfg: Config) -> None:
                                   "S": S.state_dict()})
             if LD is not None:
                 ckpt_data["LD"] = LD.state_dict()
+            if D_bc is not None:
+                ckpt_data["D_bc"] = D_bc.state_dict()
+                ckpt_data["opt_D_bc"] = opt_D_bc.state_dict()
             if C_extra:
                 ckpt_data["C_extra"] = [_Ci.state_dict() for _Ci in C_extra]
                 ckpt_data["opt_C_extra"] = [_oi.state_dict() for _oi in opt_C_extra]
@@ -2217,6 +2234,9 @@ def train(cfg: Config) -> None:
                            "S": S.state_dict()})
     if LD is not None:
         final_data["LD"] = LD.state_dict()
+    if D_bc is not None:
+        final_data["D_bc"] = D_bc.state_dict()
+        final_data["opt_D_bc"] = opt_D_bc.state_dict()
     torch.save(final_data, final_path)
     print(f"Training complete → {final_path}")
 
