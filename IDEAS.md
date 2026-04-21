@@ -1705,3 +1705,41 @@ The IRD signal may conflict with the bc boundary signal if both are active simul
 improves reuse_access_rate vs v191 (0.193), a combined bc+IRD run would be the next step.
 If IDEA #44 does not improve reuse, the bc mechanism alone may be saturated and IRD adversary
 is the next structural lever.
+
+---
+
+### 46. Second-seed validation for decoded-feat bc (seed=7, the v176 basin)
+
+**Gap attacked**: Every decoded-feat bc result to date uses seed=5 (v191 used seed=11, v194
+used seed=5). Round 38 P1 #2 explicitly flagged this: "If v194 beats v191, call it 'decoded
+bc works better inside seed 5 with a relaxed kill guard' until a second seed or domain-matched
+critic reproduces the effect." The long-rollout panel (2026-04-21) reinforced this: v194
+(seed=5 bc) has catastrophic long-rollout reuse (reuse_access=0.006), while the v176 seed=7
+basin has better long-rollout reuse (0.046) without bc. If decoded-feat bc applied to seed=7
+gives both short-window ★ ≤ 0.051 AND reuse_access ≥ 0.193, that is mechanism validation.
+
+**Proposal**: Run decoded-feat bc (IDEA #36, standard decoded-feat mode, NOT IDEA #44
+domain-matched) on seed=7 using v189's `pretrain_complete.pt`.
+- seed=7, pretrain=v189, bc=0.1, k=4, w-stop=5.0, decoded-feat mode
+- Same recipe as v194 except: seed=7 (not 5), decoded-feat (not real-reconstruct)
+- Goal: reproduce v191's long-rollout reuse improvement (0.193) while reaching ★ ≤ 0.054
+
+**Why this specific combination**: v191 (seed=11) found reuse_access=0.193 but ★=0.067. v194
+(seed=5) found ★=0.054 but reuse_access=0.006. The seed=7 basin (v176) has the best
+short-window ★ without bc. Adding bc to seed=7 may combine the two strengths: v176's
+basin structure (low MMD²) plus bc's reuse-repair effect.
+
+**Acceptance bar**: mechanism validation requires BOTH:
+1. Frozen sweep ★ ≤ 0.054 (matches or beats v194's bc-ATB) under seeds 42/42
+2. Long-rollout reuse_access ≥ 0.10 (at least halfway toward v191's 0.193)
+
+**Cost**: zero code change — hyperparameter switch only.
+**Risk**: seed=7 basin may collapse under bc pressure (v192 W-stopped at ep35 on seed=7 +
+latent-H bc). The decoded-feat mode is gentler than latent-H (v191 ran to ep83 on seed=11
+without W-stop), so collapse risk is lower. w-stop=5.0 provides additional guard.
+**Expected outcome**: If seed=7 + bc = v176-level ★ + v191-level reuse → mechanism validated.
+If seed=7 + bc collapses or shows v193/v194-style reuse degradation → bc improvement is
+seed-basin-specific, not a general mechanism.
+
+**Test**: v196 (seed=7, pretrain=v189, bc=0.1, decoded-feat, w-stop=5.0) — planned after
+v194 ep160 kill frees GPU capacity.
