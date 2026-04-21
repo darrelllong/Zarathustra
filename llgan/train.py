@@ -1476,11 +1476,14 @@ def train(cfg: Config) -> None:
                                     _bc_raw_real_score = D_bc(
                                         _raw_A[:, -_bc_k:, :].float(),
                                         _raw_B[:, :_bc_k, :].float()).mean().item()
-                                    _shuf_A = torch.randperm(B, device=device)
-                                    _shuf_B = (_shuf_A + 1 + torch.randint(B - 1, (1,), device=device).item()) % B
-                                    _bc_shuf_real_score = D_bc(
-                                        _recon_A[_shuf_A, -_bc_k:, :].float(),
-                                        _recon_B[_shuf_B, :_bc_k, :].float()).mean().item()
+                                    if B >= 2:
+                                        _shuf_A = torch.randperm(B, device=device)
+                                        _shuf_B = (_shuf_A + 1 + torch.randint(B - 1, (1,), device=device).item()) % B
+                                        _bc_shuf_real_score = D_bc(
+                                            _recon_A[_shuf_A, -_bc_k:, :].float(),
+                                            _recon_B[_shuf_B, :_bc_k, :].float()).mean().item()
+                                    else:
+                                        _bc_shuf_real_score = float('nan')
                                 D_bc.train()
                                 bc_raw_real_scores.append(_bc_raw_real_score)
                                 bc_shuf_real_scores.append(_bc_shuf_real_score)
