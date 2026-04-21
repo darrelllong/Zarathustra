@@ -1200,6 +1200,10 @@ def train(cfg: Config) -> None:
     _tail_lr_applied = False
     _tail_start_epoch = int(getattr(cfg, "tail_start_epoch", -1))
     _tail_lr_factor = float(getattr(cfg, "critic_lr_tail_factor", 1.0))
+    # IDEA #45: chained-window ACF EMA — updated each D-step from real_batch.
+    # Tracks real obj_id_reuse ACF at lags 1..acf_chain_n_lags using a slow EMA
+    # (decay=0.995) so the target is smoothed over many batches.
+    _real_acf_ema: "torch.Tensor | None" = None
 
     for epoch in range(start_epoch, cfg.epochs):
         G.train(); C.train()
@@ -1281,6 +1285,27 @@ def train(cfg: Config) -> None:
             else:
                 real_batch, file_cond_batch = batch.to(device), None
             B = real_batch.size(0)
+
+            # IDEA #45: update real obj_id_reuse ACF EMA from this batch.
+            if getattr(cfg, 'acf_chain_weight', 0.0) > 0:
+                with torch.no_grad():
+                    _n_lags = int(getattr(cfg, 'acf_chain_n_lags', 10))
+                    _reuse_r = real_batch[:, :, obj_id_col]
+                    _mean_r = _reuse_r.mean(dim=1, keepdim=True)
+                    _cent_r = _reuse_r - _mean_r
+                    _var_r = _cent_r.var(dim=1).clamp(min=1e-8)
+                    _batch_acf_list = []
+                    for _lag in range(1, _n_lags + 1):
+                        if cfg.timestep > _lag:
+                            _acf_k = (_cent_r[:, _lag:] * _cent_r[:, :-_lag]).mean(dim=1) / _var_r
+                        else:
+                            _acf_k = torch.zeros(B, device=device)
+                        _batch_acf_list.append(_acf_k.mean())
+                    _batch_acf = torch.stack(_batch_acf_list)
+                    if _real_acf_ema is None:
+                        _real_acf_ema = _batch_acf.clone()
+                    else:
+                        _real_acf_ema = 0.995 * _real_acf_ema + 0.005 * _batch_acf
 
             # In latent AE mode the critic operates on latent sequences.
             # Encode real features once per batch; reuse across critic steps.
@@ -1845,6 +1870,47 @@ def train(cfg: Config) -> None:
                     loss_cont_std  = (tail.std(dim=1)  - head.std(dim=1)).pow(2).mean()
                     loss_cont = loss_cont_mean + loss_cont_std
                     g_loss = g_loss + cfg.continuity_loss_weight * loss_cont
+
+                # L_acf_chain: IDEA #45 — chained-window ACF matching on obj_id_reuse.
+                # Generate acf_chain_windows windows by carrying LSTM hidden state
+                # (same as inference), concatenate into a long sequence (T_long =
+                # T * acf_chain_windows), compute ACF at lags 1..n_lags on the
+                # obj_id_reuse column, and penalise MSE against the real EMA ACF.
+                # Real ACF(lag=1) ≈ −0.325 (strongly negative — short runs, alternating).
+                # Fake IRD=1 floor produces long same-object runs → ACF(lag=1) >> −0.325.
+                # This loss directly attacks the IRD=1 structural failure.
+                if (getattr(cfg, 'acf_chain_weight', 0.0) > 0
+                        and latent_ae and _real_acf_ema is not None):
+                    _n_windows = int(getattr(cfg, 'acf_chain_windows', 4))
+                    _n_lags_g = int(getattr(cfg, 'acf_chain_n_lags', 10))
+                    _z_gc_acf, _ = _make_z_global(B, cfg, device,
+                                                  real_features=real_batch,
+                                                  file_cond=file_cond_batch, G=G)
+                    _h_carry_acf = None
+                    _acf_chunks = []
+                    for _wi in range(_n_windows):
+                        _z_lc_acf = G.sample_z_local(B, cfg.timestep, device)
+                        if _h_carry_acf is None:
+                            _H_c, _h_carry_acf = G(_z_gc_acf, _z_lc_acf,
+                                                    return_hidden=True)
+                        else:
+                            _H_c, _h_carry_acf = G(_z_gc_acf, _z_lc_acf,
+                                                    hidden=_h_carry_acf,
+                                                    return_hidden=True)
+                        _acf_chunks.append(_H_c)
+                    _H_long = torch.cat(_acf_chunks, dim=1)
+                    _feat_long = R(_H_long)
+                    _reuse_long = _feat_long[:, :, obj_id_col]
+                    _mean_long = _reuse_long.mean(dim=1, keepdim=True)
+                    _cent_long = _reuse_long - _mean_long
+                    _var_long = _cent_long.var(dim=1).clamp(min=1e-8)
+                    _acf_fake_list = []
+                    for _lag in range(1, _n_lags_g + 1):
+                        _acf_k = (_cent_long[:, _lag:] * _cent_long[:, :-_lag]).mean(dim=1) / _var_long
+                        _acf_fake_list.append(_acf_k.mean())
+                    _acf_fake_long = torch.stack(_acf_fake_list)
+                    loss_acf_chain = nn.functional.mse_loss(_acf_fake_long, _real_acf_ema)
+                    g_loss = g_loss + cfg.acf_chain_weight * loss_acf_chain
 
                 # L_boundary_smooth: chunk-stitching boundary losses (IDEAS #21).
                 # Two complementary sub-losses:
@@ -2739,6 +2805,21 @@ def parse_args() -> Config:
                    help="SSM state vector size N per channel (default 16). "
                         "Larger N captures more long-range structure but costs "
                         "linearly more compute.")
+    p.add_argument("--acf-chain-weight", type=float, default=0.0,
+                   help="IDEA #45: chained-window ACF matching loss weight on "
+                        "the obj_id_reuse column. Generates acf_chain_windows "
+                        "windows by carrying LSTM hidden state (as inference "
+                        "does), computes ACF at lags 1..acf_chain_n_lags on the "
+                        "concatenated long sequence, and penalises MSE against "
+                        "the EMA real ACF. Targets the IRD=1 floor: real ACF "
+                        "lag-1 ≈ −0.325 (short runs) vs fake which produces "
+                        "long runs (ACF near 0 or positive). Default 0.0 = off.")
+    p.add_argument("--acf-chain-windows", type=int, default=4,
+                   help="Number of windows chained per ACF-chain forward pass "
+                        "(default 4; effective T_long = timestep × windows).")
+    p.add_argument("--acf-chain-n-lags", type=int, default=10,
+                   help="Number of ACF lags to match in the chained-window ACF "
+                        "loss (default 10; lags 1..n_lags).")
     args = p.parse_args()
 
     cfg = Config()
@@ -2857,6 +2938,9 @@ def parse_args() -> Config:
     cfg.hybrid_diffusion_aux         = args.hybrid_diffusion_aux
     cfg.hybrid_diffusion_steps       = args.hybrid_diffusion_steps
     cfg.hybrid_channels              = args.hybrid_channels
+    cfg.acf_chain_weight             = args.acf_chain_weight
+    cfg.acf_chain_windows            = args.acf_chain_windows
+    cfg.acf_chain_n_lags             = args.acf_chain_n_lags
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
