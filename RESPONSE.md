@@ -1263,7 +1263,7 @@ control run.
 |---|---|---|---|
 | 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
 | 3 (v190) | 0.5 | **0.083** | Frozen-best ep65 (★=0.08291, β-rec=0.672); CLOSED-FAILED |
-| 11 (v191) | 0.1 | TBD | Running (PID 2932768); ep20 EMA ★=0.05529 (recall=0.786) — within 0.004 of ATB |
+| 11 (v191) | 0.1 | TBD | Running; ep20 EMA ★=0.05529 (recall=0.786, train-best); ep25 recall=0.605 (dip) |
 
 Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
 recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
@@ -1277,10 +1277,11 @@ and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_we
 | 10 | 0.02202 | 0.712 | 0.07972 | 0.268 |
 | 15 | 0.00896 | 0.737 | 0.06166 | 0.250 |
 | **20** | **0.01249** | **0.786** | **0.05529 ★ (train-best)** | 0.199 |
+| 25 | 0.01697 | 0.605 | 0.09607 | 0.239 |
 
-EMA recall accelerating (0.655→0.712→0.737→0.786), no collapse. Ep20 EMA ★=0.05529 is within 0.004
-of ATB (★=0.051). bc_gap stable 0.177–0.338 throughout — D_bc discriminating without dominating G.
-If EMA ★ continues improving to ep25-30, frozen ★ could reach ATB territory.
+Recall peaked ep20 (0.786) then fell to 0.605 at ep25 — unexpected. bc_gap ep24=0.164 (lowest seen),
+ep25=0.239. Dip follows a low-bc_gap period; could be oscillation. Watching ep30: if recall recovers
+to ≥0.70, this is training noise; if ≤0.60, early collapse at bc=0.1. Train-best locked at ep20.
 
 **v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
 ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
