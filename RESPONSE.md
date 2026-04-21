@@ -1347,13 +1347,13 @@ control run.
 | 11 (v191) | decoded | 0.1 | **0.067** | ep83 kill | Frozen-best ep75 ★=0.067; best decoded-bc |
 | 7 (v192) | **latent-H** | 0.1 | 0.104 | ep35 W-stop | IDEA #42; avoids ep25 collapse; W-stop too early |
 | 5 (v193) | **latent-H** | 0.1 | 0.111 | ep97 kill | w-stop=5.0; no phase transition; β-rec ceiling 0.48 |
-| 5 (v194) | **decoded** | 0.1 | running | running | w-stop=5.0; tests v191-style at seed=5 with longer training |
+| 5 (v194) | **decoded** | 0.1 | **0.054** | ep85 (critic collapse ep88) | w-stop=5.0; seed=5 ATB basin; **new bc ATB** |
 
 v192 (IDEA #42 latent-H bc): EMA breakthrough (ep30 recall=0.898, ★=0.024) but frozen ★=0.104 (+334% EMA inflation). Key finding: **latent-H bc avoids decoded-mode ep25 collapse** (v192 ep25 recall=0.733 vs v191's 0.605), but **W-stop at ep35 cuts off late-epoch frozen recovery**.
 
-v193 (IDEA #42 latent-H bc, w-stop=5.0, seed=5): Ran to ep97 with W≤2.1 (exceptional stability). Frozen sweep complete (20 checkpoints). **Frozen-best ep75 ★=0.111, β-rec=0.478. No phase transition in ep80-ep95.** β-recall peaked ep75 and degraded ep80=0.466 → ep85=0.412 → ep95=0.333. **IDEA #42 verdict**: Latent-H bc β-recall ceiling is ~0.48, fundamentally lower than decoded-mode (v191 ep75 β-recall=0.709). The lower-dimensional latent space limits how hard D_bc can push G on spatial pattern generation. Decoded-mode bc is superior.
+v193 (IDEA #42 latent-H bc, w-stop=5.0, seed=5): Ran to ep97 with W≤2.1 (exceptional stability). Frozen sweep complete (20 checkpoints). **Frozen-best ep75 ★=0.111, β-rec=0.478. No phase transition in ep80-ep95.** IDEA #42 verdict: Latent-H bc β-recall ceiling ~0.48; decoded-mode bc is superior.
 
-v194 (IDEA #36 decoded-bc, seed=5, w-stop=5.0): **RUNNING**. Tests whether decoded-mode bc at seed=5 with w-stop=5.0 can produce late-epoch frozen recovery past v191's ep83 kill. v191 had EMA β-recall=0.789 at ep80 (still improving) when killed. If v194 survives to ep100+, it may improve on v191's ★=0.067.
+v194 (IDEA #36 decoded-bc, seed=5, w-stop=5.0): **CLOSED (critic collapse ep88, frozen-best ep85 ★=0.05445).** β-recall trajectory: 0.449(ep30)→0.499→0.501→0.543→0.688→0.752→**0.773(ep85)**. Phase transition at ep75 (β-recall 0.543→0.688). Training continued to ep85 producing new bc ATB. WGAN critic collapsed at ep88 (W: 2.41→0.02) — ep90 frozen ★=0.172 (catastrophic). W partially recovered by ep95-97 (W=1.05-1.49) but G-loss +5-7; ep85 confirmed as peak. **Result**: frozen ep85 ★=0.05445 (β-recall=0.773, MMD²=0.009) — beats v191 ★=0.067 by 19%. **Gap to ATB: 6.8%** (★=0.054 vs v176 ★=0.051). Monitoring for post-collapse recovery through ep115 per bc rule.
 
 **Critical lesson (24th mis-rank)**: Latent-H bc produces more severe EMA inflation than decoded mode. EMA ★=0.024 vs frozen ★=0.104 = 4.3× inflation (vs 3.2× for decoded-mode v191). EMA recall during bc training is NOT a reliable signal in either mode — only frozen sweep gives the true number.
 
