@@ -1215,3 +1215,66 @@ v189 is not in the Alibaba collapse basin, not that IDEA #36 is working. The two
 code fixes (bc logging + D_bc checkpoint) are in. The three remaining items (domain
 gap control, long-rollout gates, seed bundle) are accepted as the real v189 acceptance
 bar and will be addressed as the run matures.
+
+---
+
+# Response to peer review Round 35 (pre-draft, 2026-04-20)
+
+_Round 35 has not yet arrived. This pre-draft documents the v189/v190 post-mortem and v191 rationale so the response is ready when the review lands._
+
+## bc_weight=0.5 recall collapse diagnosis
+
+v190 (seed=3, bc_weight=0.5) reached its train-best at ep30 (EMA ★=0.053, recall=0.773), then
+collapsed: ep40 recall=0.663, ep45 recall=0.522. The collapse pattern is diagnostic.
+
+**Root cause**: at peak recall (ep30), bc_fake scores ≈ −0.75. The bc loss contribution to
+G-loss = bc_weight × (−D_bc(fake_tail, fake_head).mean()) ≈ 0.5 × 0.75 = 0.375. The WGAN
+component of G-loss at ep30 is G=0.64 (total), so WGAN alone ≈ 0.26. **bc is contributing ~60%
+of G-loss**, not a supplemental signal. The generator learns to optimize boundary realism by
+reducing output diversity — a mode-restriction shortcut. Recall falls as the generator covers
+fewer modes in exchange for cleaner window joins.
+
+bc_gap (bc_real − bc_fake) remained positive and stable (0.042–0.107) throughout the collapse:
+D_bc is still discriminating, but the generator is responding by restricting modes rather than
+by making transitions more realistic.
+
+**v191 response**: reduce bc_weight to 0.1 (5× reduction), seed=11.
+- bc contribution at peak = 0.1 × 0.75 = 0.075 (≈22% of G-loss vs 60%)
+- seed=11 was the collapse-seed for v186 (no bc, frozen ★=0.219); tests minimum bc weight to
+  prevent collapse
+- If bc_weight=0.1 prevents collapse AND avoids the recall-restriction shortcut, frozen ★
+  should improve over v189 (0.076) and potentially over v176 (0.051)
+
+## bc_gap: confirming boundary discrimination
+
+Across v189 (ep1–61) and v190 (ep1–45), bc_gap was consistently positive:
+- v189: peaked at 0.31 (ep1), stabilised 0.054–0.129 (ep15–45)
+- v190: peaked at 0.31 (ep5), stabilised 0.042–0.107 (ep25–45)
+
+D_bc is discriminating real boundaries from generated ones throughout training.
+This addresses the Round 34 P1 #1 bc_gap diagnostic requirement. The outstanding domain gap
+question (does D_bc score reconstructed-real lower than raw-real, indicating R artifact detection
+rather than boundary realism?) is still pending — requires the R(E(real)) reconstructed-real
+control run.
+
+## seed bundle status
+
+| seed | bc_weight | frozen ★ | outcome |
+|---|---|---|---|
+| 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
+| 3 (v190) | 0.5 | TBD | Train-best ep30 0.053; recall collapse; frozen TBD |
+| 11 (v191) | 0.1 | TBD | Queued; bc_weight reduced to avoid recall collapse |
+
+Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
+recall collapse after peak. v191 is the first test with tuned bc_weight.
+
+## v189 acceptance bar (Round 34 P1 #3) — status
+
+1. ✅ Frozen sweep complete (★=0.076)
+2. ✅ bc_gap trajectory showing D_bc discriminating (confirmed, see above)
+3. ❌ Long-rollout HRC / reuse-access / stack-distance panel — deferred
+4. ❌ Tail-heavy vs ordinary MMD shape rows — deferred
+5. ✅ Second seed: v190 seed=3 running (seed bundle in progress)
+
+Items 3 and 4 remain gated on v191's frozen sweep results (no point in long-rollout panels
+if bc_weight=0.1 changes the mechanism significantly).
