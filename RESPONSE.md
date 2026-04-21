@@ -1648,3 +1648,169 @@ decoded-mode bc — it was merely hidden. v194 is within-basin forensics that pr
 guard was premature in v191, not that `D_bc` learned boundary realism. IDEA #44 is the cleanest
 next structural move: keep decoded-feature gradients while reconstructing real positives through
 `R(E(real))` so both sides of the critic train in the same feature domain.
+
+---
+
+# Retrospective Response to Peer Review Rounds 19 and 22–26
+
+**Date**: 2026-04-21
+**Context**: These rounds were noted as "tracked separately" in the Round 27 response but were
+never formally closed. This response covers each in retrospect against the current repo state.
+
+---
+
+## Round 19 — Sweep Repair Worked; WaveStitch Has A Hidden Semantics Bug
+
+### P1 #1–#2 — Overlap-mode silently changes BS semantics — SUBSEQUENTLY RESOLVED
+
+The BS+OC overlap-mode confound was real at the time. It was never cleanly isolated: the scalar
+ladder on BS+OC ran through alibaba_v160–v171 and produced diminishing returns. Rounds 26–27
+confirmed the BS/OC weight ladder was not productive (v171: +21.5% vs v167; palindrome bug from
+Gemini R3 further undermined interpretation). The project has since abandoned the BS+OC path in
+favor of the learned boundary critic (IDEA #36), which does not share this semantics confusion.
+The WaveStitch overlap mode remains in the codebase but is not part of any live recipe.
+
+### P1 #3 — Checkpoint-selection repair — INSTITUTIONALIZED
+
+`frozen_sweep.py` with dual seeds (--eval-real-seed 42 --eval-fake-seed 42) is now the mandatory
+promotion protocol. Round 18 P1 #1 started this; it is now the 27th-confirmed mis-rank invariant.
+
+### P1 #4 — Old closures should be treated as lower-confidence — ADOPTED
+
+All pre-frozen-sweep closure decisions (including v157, v158 "failed reproduce" reversals) are
+treated as lower-confidence historical evidence. This is now standard practice.
+
+---
+
+## Round 22 — v164 Is A Real Win, But The Interpretation Is Running Ahead
+
+### P1 #1 — "W-stop distillation mechanism" = hypothesis — CONFIRMED AS HYPOTHESIS, THEN RETRACTED
+
+v164's 0.035 was treated as a mechanism win at the time. v167 (branched from v164, w-stop=3.0)
+pushed to 0.029, which temporarily looked like strong confirmation. However, Round 26 showed the
+mechanism was overidentified: the full dense sweep was never run. v167 was then retracted (April
+2026) after Round 26 peer review flagged it as a single-branch seed lottery. The new Alibaba ATB
+is v176 (★=0.051), a clean fresh-pretrain run with diversity=5.0.
+
+### P1 #2 — Wrong first control for v165 — ACCEPTED, EXPERIMENT NOT RUN
+
+The Round 22 recommendation (branch from pre-tail checkpoint, vary critic continuation) was not
+implemented. Instead, the project moved to fresh seeds (v172/v173 basin characterization) which
+confirmed the seed-lottery nature more efficiently. IDEA #33 remains open as a structural follow-up
+if the mechanism resurfaces with better controls.
+
+### P1 #3 — IDEA #21 status reconciliation — RESOLVED BY ABANDONMENT
+
+The BS+OC overlap-mode path was effectively closed by the v171 failure (+21.5% worse) and the
+Gemini R3 palindrome bug. IDEA #21 is now treated as "closed for current architecture" — the
+WaveStitch overlap path did not produce a reproducible mechanism. The boundary critic (IDEA #36)
+is the active boundary-realism branch.
+
+### P1 #4 — Do not use v164 to bypass Round 21 long-rollout gate — ADOPTED
+
+Long-rollout and tail-strata panels remain as acceptance criteria. The sidecar fixes from Round 21
+were all shipped (conditioning via char_file, real-baseline manifest, per-stream drift, true
+stack-distance). The gate is now valid for bc experiments but has not been run for v176/v191/v194
+yet — this is the open item from Round 37 P2 #4.
+
+### P2 #5 — tencent_v163 conclusion scope — ADOPTED
+
+v163 was reframed as "FFT-weight amplification (20×)" not "spectral is unnecessary." This stands.
+
+---
+
+## Round 23 — Higher Moments Say This Is A Tail-Regime Problem
+
+### P1 #1–#3 — Higher moments → tail-regime diagnosis — ACCEPTED, PARTIAL IMPLEMENTATION
+
+The R analysis confirming extreme M5/M6 moments for iat_*, abs_stride_*, reuse_ratio was accepted.
+IDEA #34 (tail-regime modeling) was added and tail_strata.py was implemented as the first MVE.
+The raw-M6-loss path was explicitly rejected (numerically brittle, easy to game). The structural
+route — tail-stratified eval + explicit routing — is the right direction but remains under-
+utilized: frozen sweeps do not yet report tail-strata rows alongside combined score.
+
+### P1 #4 — Window-level vs file-level tail audit — OPEN
+
+The R analysis was file-level. A window-level tail audit has not been done. Still open.
+
+---
+
+## Round 24 — Full-Corpus Higher Moments, Not A Cherry-Picked Slice
+
+### P1 #1–#3 — Full-corpus tail manifest with all 22 families — ACKNOWLEDGED, NOT BUILT
+
+The full-corpus tail manifest (top files/windows by iat_*, abs_stride_*, reuse across all trace
+families, not only Alibaba/Tencent) has not been built. Acknowledged as the right long-term target.
+Current focus on bc mechanism work makes this secondary, but the race goal requires it before any
+paper-level claim about generalization.
+
+---
+
+## Round 25 — The New Gate Is Better, But Generation Parity Is Still Broken
+
+### P1 #1 — generate.py SSM/MTPP parity — FIXED
+
+`generate.py` was patched to instantiate SSM/MTPP checkpoints matching `long_rollout_eval.py` and
+to guard SSM hidden-state detachment. This was shipped before the Round 26 response.
+
+### P1 #2 — Persistent retrieval in long_rollout_eval — FIXED
+
+`_rollout()` now carries `retrieval_state` and mirrors `generate.py`'s persistent-retrieval
+contract. The JSON records `retrieval_persist_requested` and `retrieval_persist_enabled`.
+
+### P2 #3 — Source-conditioned sidecar not manifest-matched — PARTIALLY FIXED
+
+`--char-file` conditioned generation is now available and `--real-manifest` provides manifest
+determinism. True per-source-trace matched panels have not been run. Acknowledged as open.
+
+### P2 #4 — Tail-control LR not restart-idempotent — ACKNOWLEDGED, NOT FIXED
+
+IDEA #33 tail-control arms were superseded by the bc path before this was fixed. If IDEA #33 is
+revisited, the LR-idempotence issue (re-multiplying lr on resume) must be addressed first by
+storing a `tail_applied` flag in the checkpoint.
+
+---
+
+## Round 26 — The New Tail Gate Is Useful, But Do Not Let It Become A Blurry Scalar
+
+### P1 #1 — v167 conclusion over-closed — RETRACTED
+
+v167 (★=0.029, original Alibaba ATB holder) was retracted 2026-04-19 per Round 26 and
+subsequent basin analysis (v172/v173). The "W=3.0 mechanism" language was removed. The current
+Alibaba ATB is v176 ★=0.051, a clean independent run.
+
+### P1 #2 — Tail-★ not a safe standalone gate — ADOPTED
+
+Tail-stratum promotion now requires separate tail-MMD/shape, ordinary non-regression, and recall
+reported separately rather than a composite tail-★. This is the policy going forward.
+
+### P2 #3 — eval.py --baseline ignores manifest restriction — OPEN BUG
+
+The `--baseline` branch in eval.py was not patched to thread `real_seed`, `fake_seed`, and
+`file_manifest`. This remains an open code bug. When comparing checkpoints on a tail manifest,
+the baseline branch samples from full-corpus, making the delta invalid. Low priority while the
+race focus is on bc, but must be fixed before any tail-strata promotion claim is used.
+
+### P2 #4 — tail_strata.py missing reuse-heavy stratum — PARTIAL
+
+`tail_strata.py` scores iat_q99/q50 and abs_stride_q99/q50 but not reuse-ratio or stack-distance-
+derived tail labels. The reuse-heavy stratum (the actual HRC/cache-fidelity target from IDEA #34)
+has not been implemented. Still open.
+
+### P2 #5 — Long-rollout JSON missing retrieval settings — FIXED
+
+`retrieval_persist_requested` and `retrieval_persist_enabled` were added to the JSON before Round
+27 shipped.
+
+---
+
+## Summary Table
+
+| Round | P1 items status | Key open items |
+|-------|----------------|----------------|
+| 19 | Resolved: BS/OC confound bypassed; frozen_sweep canonical | None live |
+| 22 | v167 retracted; v164 re-labeled hypothesis; IDEA #21 closed | IDEA #33 still open structurally |
+| 23 | Tail-regime diagnosis accepted; tail_strata.py built | Window-level tail audit, reuse-heavy stratum |
+| 24 | Full-corpus tail leaderboard acknowledged | Full-corpus tail manifest not built |
+| 25 | generate.py + long_rollout_eval parity fixed | Per-source-trace manifest panel; LR idempotence |
+| 26 | v167 retracted; tail-★ gate policy adopted | eval.py --baseline manifest bug; reuse-heavy stratum |
