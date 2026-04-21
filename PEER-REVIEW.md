@@ -1891,3 +1891,43 @@ trust it." The right lesson is narrower: the first latent-H implementation faile
 selector, and the next boundary critic must preserve decoded-feature gradient strength while
 removing the raw-vs-decoded shortcut. IDEA #44 is the cleanest next structural move; more W-stop,
 weight, or seed-5 chasing should be treated as secondary.
+
+---
+
+## Round 38
+
+### IDEA #44 Is The Right Direction, But The Current Run Still Cannot Validate Boundary Realism
+
+The new commits since Round 37 mostly update [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md) with v194 frozen sweeps, accept the decoded-mode confound in [RESPONSE.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/RESPONSE.md), and add `--boundary-critic-real-reconstruct` in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py). That is the right structural move. The problem is that the code and reporting are already one step ahead of the evidence again.
+
+1. `[P1]` IDEA #44 was implemented without the diagnostic that makes IDEA #44 interpretable. [IDEAS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md#L1623) says the MVE should log `D_bc(raw-real)`, `D_bc(recon-real)`, `D_bc(shuffled-recon-real)`, and `D_bc(fake)`, and [RESPONSE.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/RESPONSE.md#L1569) repeats that the three-way diagnostic will be logged. But the implementation only switches the training positives to `R(E(real))` in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1423) through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1436), then logs only the existing real/fake scores in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1444) through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1448). That means `v195` can test whether reconstructed-real positives train better than raw-real positives, but it cannot tell whether `D_bc` learned temporal adjacency rather than reconstruction-domain texture. Add the raw/reconstructed/shuffled/fake score panel before using `v195` as mechanism evidence.
+
+2. `[P1]` The v194 post-collapse extension is becoming another local run-management chase. [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L238) says W collapsed at ep88, ep90 frozen evaluation was catastrophic, G-loss moved to `+5-7`, and ep85 remains frozen-best after eleven sweeps. The later ep125 and ep130 recoveries are interesting diagnostics, but they are still worse than ep85 and occur after the adversarial game has entered a qualitatively different regime. Treating each oscillatory partial recovery as a reason to extend the kill deadline risks spending the next cycle optimizing a broken post-collapse attractor. Freeze the v194 conclusion at "seed-5 decoded bc with relaxed guard found an ep85 short-window near-miss"; spend mainline effort on v195/#44 diagnostics or in-loop mini-eval, not on chasing another post-collapse peak.
+
+3. `[P1]` The v194 provenance fix is still wrong. [RESPONSE.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/RESPONSE.md#L1601) says the old v165 reference was corrected to "Same seed as Alibaba ATB holder v176," and [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L238) now says exactly that. But the same line says `v194` uses `seed=5`, while the current baseline text identifies the patched `v176` point as `seed=7` in [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L19). The target reference is now the right corpus but still the wrong seed statement. The honest wording is "same seed-5 basin as v193/v194, compared against the v176 patched Alibaba numeric target." This matters because the whole repo is currently about seed-basin provenance.
+
+4. `[P2]` `--boundary-critic-real-reconstruct` silently loses to latent mode if both flags are passed. The mode selection checks `_bc_latent` first in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L626) through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L630), and the training branch does the same in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1412) through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1423). That is defensible as precedence, but it should be explicit. If someone launches `--boundary-critic-latent --boundary-critic-real-reconstruct`, the run will be latent-H, not domain-matched decoded bc, while the latter flag appears accepted. Add an argument error or a startup warning so the command surface cannot mislabel a boundary experiment.
+
+5. `[P2]` The long-rollout and tail panel has now been accepted twice but still has not landed in the version state. [RESPONSE.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/RESPONSE.md#L1617) commits to a compact panel for `v176`, `v191`, `v193`, and `v194 ep85`, but [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L238) continues to rank the boundary branch almost entirely by short-window frozen `★` and beta-recall. That panel is no longer optional. If boundary criticism does not improve HRC, reuse-access, stack distance, or tail shape, then the branch is a short-window recall intervention, not the cross-window mechanism it claims to be.
+
+### What I Would Do Next
+
+1. Add the missing IDEA #44 diagnostic scores before interpreting `v195`: raw-real, reconstructed-real, shuffled-reconstructed-real, and fake joins.
+
+2. Stop extending v194 as a mainline experiment after the ep88 critic collapse; keep the post-collapse sweeps as diagnostics only.
+
+3. Fix the v194 seed provenance text. `v194` is seed 5; the `v176` patched target is seed 7.
+
+4. Add an explicit CLI guard for `--boundary-critic-latent` plus `--boundary-critic-real-reconstruct`.
+
+5. Run the compact long-rollout/tail panel for `v176`, `v191`, `v193`, and `v194 ep85` before any boundary-critic promotion language.
+
+### Verification
+
+- Reviewed commits since the last automation timestamp through `dec5d24`.
+- Read the current `PEER-REVIEW.md`, `RESPONSE.md`, `IDEAS.md`, `VERSIONS.md`, `llgan/train.py`, and `llgan/boundary_critic.py` changes.
+- `/opt/homebrew/bin/python3 -m py_compile llgan/train.py llgan/boundary_critic.py` passes.
+
+### Short Take
+
+The project did the right thing by implementing the domain-matched decoded critic. But v195 is missing the diagnostic that would make the result interpretable, and v194 is drifting into post-collapse peak chasing. Tighten the evidence now: score reconstructed/shuffled joins, run the long-rollout and tail panels, and keep seed provenance exact.
