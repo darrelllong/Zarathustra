@@ -1423,3 +1423,45 @@ that empirical manifold without hard-coding the accidental palindrome.
 
 **Risk:** this can become another critic that overfits short windows. Keep it local to the boundary,
 hold out files, and require long-rollout metrics before treating it as an IDEA #21 successor.
+
+---
+
+### 37. Recall-gated boundary critic weight (extends #36)
+
+**Gap attacked**: IDEA #36 at bc_weight=0.5 shows that the learned boundary critic can dominate
+the G-loss and cause recall collapse after the training peak. v190 (seed=3) reached EMA recall=0.773
+at ep30 (★=0.053), then decayed to 0.508-0.574 through ep60 because the bc term contributed ~60%
+of G-loss at peak D_bc discrimination. The bc mechanism prevents Alibaba collapse but simultaneously
+restricts mode diversity as a shortcut to better boundary scores.
+
+**Proposal**: gate the effective bc_weight on the current training-EMA recall:
+
+```python
+# In G-step, just before adding bc loss:
+_recall_ema = current_ema_recall   # tracked per epoch
+_effective_bc_w = _bc_w * min(1.0, _recall_ema / cfg.bc_recall_floor)
+```
+
+where `bc_recall_floor` (default 0.60) is the minimum acceptable recall before bc weight
+is reduced. When recall > floor, bc runs at full weight. When recall < floor, bc_weight
+scales down proportionally. This prevents the generator from sacrificing recall to optimize
+bc, because reduced recall automatically reduces bc pressure.
+
+**Alternatively**: use a recall-modulated discriminator step count. Only run D_bc updates
+when the training recall > floor. When recall drops, D_bc freezes and the generator can
+recover mode diversity without bc pressure.
+
+**Why this is on-target**: the v189/v190 experiment established that bc_weight=0.5 is
+too high (60% of G-loss) and bc_weight=0.1 (v191) is the next test. But the optimal weight
+may be dynamic — early in training (recall still building) bc should be weak; late in training
+(recall high) bc can be stronger. A fixed low weight may not prevent collapse at bad seeds
+(weight too small to overcome the collapse attractor), while a fixed high weight causes the
+recall-restriction shortcut. The recall-gated weight automatically adapts to training state.
+
+**Minimal viable experiment:**
+- Run the v191 recipe (bc_weight=0.1) and observe whether collapse is prevented at seed=11.
+- If seed=11 still collapses at bc=0.1, try recall-gated weight with floor=0.60 and max_weight=0.5.
+- If seed=11 doesn't collapse at bc=0.1 but recall is still worse than v176, increase the floor.
+
+**Cost**: 1-2h code change; adds `bc_recall_floor` flag and recall-tracking in training loop.
+**Risk**: recall tracking lags by 1 epoch; if recall swings sharply the gate may lag. Use EMA.
