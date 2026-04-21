@@ -1432,3 +1432,109 @@ A D_bc that separates all three would unambiguously demonstrate temporal join le
 Cost: significant code change (D_bc loss rewrite); deferred until bc=0.1 frozen sweep.
 
 The current bc_gap signal (positive and stable) remains the best available bc diagnostic.
+
+---
+
+# Response to peer review Round 36 (2026-04-21)
+
+Round 36 is the strongest critique yet on the latent-bc branch, and the experimental results now
+available (v193 closed, v194 running) largely validate the reviewer's predictions. Most P1 points
+are accepted on empirical grounds, not on faith.
+
+## P1 #1 — Latent-H carry-semantics confound (real=fresh-encoder, fake=carried-generator) — ACCEPTED
+
+The reviewer correctly identified that IDEA #42's latent-H mode introduced a new shortcut in place
+of the old raw-vs-decoded one: D_bc can learn "fresh encoder head vs carried generator head" rather
+than boundary realism. This point is accepted.
+
+It is now also empirically settled: v193 ran latent-H bc to ep97 (W≤2.1, no W-stop confound),
+covering 20 checkpoints with a full frozen sweep. The frozen-best was ep75 ★=0.11060 with
+β-recall=0.4775. β-recall peaked at ep75 and **degraded** in ep80-ep95 (0.466 → 0.412 → 0.333).
+There was no phase transition. The β-recall ceiling for latent-H bc is approximately 0.48,
+structurally lower than decoded-mode bc (v191 ep75 β-recall=0.709).
+
+This cannot be explained only by the carry-semantics confound — if D_bc were simply learning
+"fresh vs carried," the generator would find ways to exploit this shortcut and the frozen ★ would
+still improve. The complete failure to approach v191's β-recall suggests the latent space (dim=24)
+is simply too low-dimensional for D_bc to provide sufficient gradient pressure on G's spatial
+pattern generation, regardless of the carry-semantics issue.
+
+**IDEA #42 is closed**: latent-H bc is structurally inferior to decoded-mode bc for this
+architecture and trace family. The carry-semantics confound (IDEA #43) remains theoretically
+valid but is academic given latent-H's empirical verdict.
+
+**Current action**: v194 is running decoded-mode bc (IDEA #36, no latent flag), seed=5 (same
+seed as ATB holder v165, ★=0.051), w-stop-threshold=5.0. Decoded-mode bc does not have the
+carry-semantics confound since both real and fake are in the same decoded feature space.
+
+## P1 #2 — v192 should be read as a failed probe, not validation blocked by W-stop — ACCEPTED
+
+Agreed. The Round 35 response was too optimistic about the "W-stop confound" framing. v193
+directly tested the hypothesis "latent-H bc needs more epochs," and the answer is no: with 97
+epochs and W≤2.1 throughout, frozen ★=0.111 is worse than decoded-mode v191's ★=0.067. v192 was
+a failed first probe, not a near-miss blocked by an early kill. The mechanism difference between
+latent-H and decoded-mode is real and decisive.
+
+EMA inflation on latent-H bc was indeed the strongest warning signal: v192 EMA ★=0.024 →
+frozen ★=0.104 (+334%). That is not a calibration issue — it is evidence the model was exploiting
+the confound the reviewer identified (or an adjacent artifact) to produce low EMA loss without
+learning the frozen-bundle-relevant distribution.
+
+## P1 #3 — w-stop-threshold=5.0 as weakened safety guard, not clean architectural win — ACCEPTED
+
+The reviewer's caution was correct. v193 operated with w-stop=5.0, and W stayed ≤2.1 throughout
+(the guard was never engaged), yet v193 still failed. The threshold increase was not the difference
+between success and failure. What it proved: latent-H bc does not cause W instability when
+training is otherwise stable (seed=5 favorable basin), but also doesn't produce competitive frozen
+results even with that stability.
+
+For v194 (decoded-mode bc, seed=5, w-stop=5.0): the raised threshold is there to prevent v191-
+style early kill at ep83 while the model may still be recovering in frozen-eval space. v191 had
+EMA β-recall=0.789 at ep80 (still improving) when killed. If v194's W stays ≤2.1 as v193's did,
+the w-stop change is moot but safe. If W approaches 5.0, we will report it explicitly as
+"weakened-guard evidence" as the reviewer requires.
+
+## P2 #4 — Checkpoint selection: EMA has failed 25 times; IDEA #38 should be prioritized — ACCEPTED IN PRINCIPLE
+
+The track record: 25 consecutive training-selector mis-ranks. EMA is a launch diagnostic and
+nothing more for bc runs. Accepted. IDEA #38 (deterministic mini-eval or dense frozen sweeps in
+the training loop) is the right structural fix.
+
+Current mitigation: we run a full frozen sweep (seeds 42/42, all epoch checkpoints) after every
+run closes. This is expensive (1-2 hours per sweep for ~20 checkpoints) but catches the mis-ranks
+reliably. For v194, we will run an interim frozen sweep around ep75-80 when EMA starts showing
+collapse signals, rather than waiting for the run to close.
+
+We do not have time to implement IDEA #38 in-loop before the competitive deadline. What we can
+do: checkpoint-every-5 + frozen sweep is the current protocol. If v194 shows the same ep75 frozen
+peak as v191, we will not kill it on EMA grounds — we will sweep immediately and decide on frozen
+evidence.
+
+## P2 #5 — Long-rollout and tail gates still deferred — NOTED
+
+Long-rollout HRC / reuse-access / stack-distance and tail-strata panels remain deferred. The
+acceptance bar from Round 34 P1 #3 requires these, and they are not gated on anything except
+finding a competitive frozen checkpoint that is worth the panel investment.
+
+Current trigger: if v194 frozen ★ is competitive (≤0.060, approaching v176 ATB ★=0.051), we will
+run long-rollout and tail panels before claiming any advance. We will not defer indefinitely.
+
+## Summary of actions taken
+
+| item | status |
+|---|---|
+| IDEA #42 (latent-H bc) | **CLOSED** — empirically inferior, v192+v193 verdict |
+| v193 | CLOSED ep97; frozen-best ★=0.111; β-recall ceiling confirmed 0.48 |
+| v194 | **RUNNING** — decoded-mode bc, seed=5 (ATB seed), w-stop=5.0 |
+| IDEA #43 (matched carry-state bc) | Recorded; deferred — latent-H bc itself closed |
+| IDEA #38 (in-loop mini-eval) | Accepted in principle; interim frozen sweeps as proxy |
+| Long-rollout panels | Deferred; triggered if v194 frozen ★ ≤ 0.060 |
+| w-stop raising | Will flag as "weakened-guard" if W approaches 5.0 in v194 |
+
+## Short take
+
+The reviewer's predictions were accurate: latent-H bc failed exactly as the carry-semantics
+confound analysis predicted, the W-stop raise was not a clean fix, and EMA remains unreliable.
+v193's full frozen sweep closes the latent-H branch definitively. v194 returns to decoded-mode bc
+at seed=5 — the ATB seed — with the only change being higher w-stop to prevent the ep83 early
+kill that may have cut v191 short while β-recall was still improving.
