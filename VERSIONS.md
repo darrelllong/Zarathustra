@@ -225,7 +225,17 @@ on newly-landed code changes.
 ## Currently Running
 
 - **tencent_v187** — **CLOSED (frozen sweep complete, 2026-04-20)**. v165 EXACT −`--multi-scale-critic` + seed=5. **Frozen-best: epoch_0055.pt ★=0.16532** (β-recall=0.198, MMD²=0.005). Ablation result: **removing multi-scale-critic = +340% degradation** (0.165 vs v165's 0.038) = **4.4× worse**. 19th train-selector mis-rank: train picked ep50 (★=0.087 train), frozen found ep55 (★=0.165 frozen). Component audit: multi-scale-critic is the 2nd most load-bearing seed-5 component after PCF-loss (5.1×). Seed-5 audit matrix so far: −retrieval-memory 3.17×, −multi-scale-critic **4.4×**, −PCF-loss **5.1×**, −mixed-type-recovery TBD (v188).
-- **tencent_v188** — **KILLED ep70 (2026-04-20); frozen sweep running**. v165 EXACT −`--mixed-type-recovery` + seed=5. Trajectory: ep5 ★=0.168, ep20 ★=0.109, **ep40 ★=0.095 (train-best)**, ep65 ★=0.112, ep70 ★=0.114 (stale). Frozen sweep pending — result will complete the seed-5 audit matrix.
+- **tencent_v188** — **CLOSED (frozen sweep complete, 2026-04-20)**. v165 EXACT −`--mixed-type-recovery` + seed=5. **Frozen-best: epoch_0060.pt ★=0.18177** (β-recall=0.129, MMD²=0.008). Ablation result: **removing mixed-type-recovery = +384% degradation** (0.182 vs v165's 0.038) = **4.85× worse**. 20th train-selector mis-rank: train picked ep40 (frozen 0.190), frozen found ep60 (0.182). **Seed-5 component audit COMPLETE**:
+
+| Component | v | Frozen ★ | Degradation |
+|---|---|---|---|
+| Retrieval-memory (IDEA #17) | v180 | 0.11882 | **3.17×** |
+| Multi-scale-critic (IDEA #8) | v187 | 0.16532 | **4.41×** |
+| Mixed-type-recovery (IDEA #7) | v188 | 0.18177 | **4.85×** |
+| PCF-loss (IDEA #26) | v183 | ~0.1921 | **~5.11×** |
+
+All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
+- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test**. Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). Pretrain_complete.pt copied from v189 (= v176 pretrain). Launched 2026-04-20 18:06. Seed bundle for IDEA #36: v189 seed=7 (running), v190 seed=3 (just launched). Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
 - **alibaba_v189** — **IDEA #36 (Learned Boundary Prior)** on Alibaba. v176 pretrain reused (seed=7, phases 1–2 skipped); Phase 3 uses fresh LSTM G with `BoundaryCritic` WGAN-SN MLP (K=4, hidden=128, weight=0.5). All hand-written BS/OC scalars removed (weight=0). PCF and multi-scale-critic also dropped (per Round 33 / Round 32 guidance: drop those for Alibaba). `--n-regimes 4` (not 8 — 4 regimes are Alibaba-optimal per v46). Seed=7 to match v176 pretrain. First structural Alibaba run targeting boundary continuity without the palindrome bias. **ep5: ★=0.071**; **ep10: ★=0.082**; **ep15: ★=0.073**; **ep20: ★=0.099** (recall noisy 0.58–0.73, MMD² improving); **ep30: MMD²=0.00594, recall=0.757, ★=0.05444 ← NEW TRAIN BEST** (recall at 0.757 = strongest Alibaba recall since v164 buggy-code era; MMD² 0.00594 is competitive; still ep30/200). Boundary critic appears to be learning useful signal — bc_gap and long-rollout evidence needed before mechanism claim. Log `/home/darrell/train_alibaba_v189.log`. PID 2137428.
 
 ---
