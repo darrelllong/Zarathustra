@@ -1534,3 +1534,56 @@ bc_fm_loss = F.mse_loss(_phi_fake.mean(0), _phi_real.mean(0).detach())
 **Cost**: ~30 lines in train.py; requires splitting D_bc.net into feature extractor + final linear. The `BoundaryCritic.net` is a simple Sequential, so extracting `net[:-1]` is trivial.
 **Risk**: feature-matching competes with adversarial signal; too large a weight can overwhelm D_bc's training objective. Start small (0.05–0.1). Requires D_bc weights to be frozen during fm extraction (detach phi_real).
 **Expected outcome**: if bc fm-loss reduces boundary MMD² without collapsing recall, it might provide the MMD² reduction needed to close the gap to v176 (★=0.051 with MMD²=0.007).
+
+---
+
+### 41. Adaptive n-critic schedule for boundary critic warm-up
+
+**Gap attacked**: the boundary critic (D_bc) needs to be well-trained before its adversarial loss provides useful gradient to G. In the first 10-15 epochs, D_bc may be too weak to discriminate (low bc_gap), so its contribution to G-loss is mostly noise. Later, once D_bc is expert-level, its gradient becomes more reliable. A fixed `n-critic-bc=1` (one D_bc update per G step throughout) may under-train D_bc early and over-train late.
+
+v191 bc_gap pattern (ep1-20): 0.300 → 0.253 → 0.526 → 0.344 → 0.338 → 0.207 → 0.187 → 0.201 → 0.230 → 0.268 → 0.194 → 0.182 → 0.174 → 0.203 → 0.250 → 0.177 → 0.261 → 0.209 → 0.231 → 0.199.
+bc_gap is oscillating 0.174–0.526 with no clear trend. The bc signal is noisy relative to its guidance value.
+
+**Proposal**: use a warm-up schedule for D_bc: run `n_critic_bc = 3` updates per G-step for the first N epochs (while bc_gap < target), then switch to `n_critic_bc = 1`. This pre-trains D_bc to expert level faster, then stabilizes it.
+
+```python
+# Adaptive D_bc training frequency
+_n_critic_bc = 3 if (epoch <= cfg.bc_warmup_epochs and bc_gap_ema < 0.30) else 1
+for _ in range(_n_critic_bc):
+    # ... D_bc training step ...
+```
+
+**Alternative**: Warm-up D_bc with standalone real/fake pairs for the first 5 epochs (no G updates during this phase), similar to how WGAN-GP warms up the critic before joint training.
+
+**Cost**: ~15 lines in train.py; adds `--bc-warmup-epochs N` flag (default 10) and bc_gap EMA tracker.
+**Risk**: over-training D_bc early can create a too-strong adversary that overwhelms G-loss early; cap at n_critic_bc=3, not higher.
+**Expected outcome**: bc_gap stabilizes faster → G gets cleaner boundary gradient earlier → possibly faster recall improvement and lower MMD² oscillation. Test as v195 (same bc=0.1 recipe + bc_warmup_epochs=10).
+
+---
+
+### 42. Boundary critic on latent space instead of decoded feature space
+
+**Gap attacked**: the current D_bc takes (tail_K_steps, head_K_steps) from the Recovery-decoded output (R(H_A), R(H_B)). Round 34 P1 #1 flagged this: D_bc may learn to detect Recovery decoder artifacts (the unique texture of the R network) rather than genuine boundary transition quality. If bc_gap is high because D_bc detects R-texture mismatch (real=raw vs fake=decoded), the bc loss misleads G to mimic R's artifacts at boundaries, not to produce realistic joins.
+
+**Proposal**: feed D_bc the hidden state tail/head instead of the decoded feature tail/head:
+
+```python
+# Instead of:
+tail_r = R(H_A[:, -K:, :])  # decoded real tail
+head_r = R(H_B[:, :K, :])   # decoded real head
+tail_f = R(H_Af[:, -K:, :]) # decoded fake tail
+head_f = R(H_Bf[:, :K, :])  # decoded fake head
+
+# Use latent directly:
+tail_r = H_A[:, -K:, :].detach()  # hidden state tail (raw encoder output)
+head_r = H_B[:, :K, :].detach()   # hidden state head
+# ... no decode step
+```
+
+Since both real and fake paths go through the same Supervisor/Recovery pipeline at the hidden-state level, the R-texture artifact distinction disappears — D_bc must discriminate temporal latent structure, not decoder texture.
+
+**Why this is on-target**: if D_bc learns to discriminate H-space boundary transitions (not feature-space), then the bc gradient to G is "your latent dynamics at boundaries look wrong," which is structurally meaningful and immune to the decoded-artifact confound. Long-rollout boundary quality depends on latent dynamics anyway (the LSTM states), so aligning bc to latent space is mechanistically cleaner.
+
+**Cost**: ~20 lines in train.py; requires tracking H_A / H_B (LSTM hidden states from the Supervisor forward passes). These are already available in the training loop as `h_carry` but may need separate accumulation for K-step windows.
+**Risk**: latent space has different dimensionality from decoded space (hidden_size=256 vs n_features=5); D_bc hidden=128 may need tuning. Also, H_A from real and H_A from fake are from different models (Supervisor vs Generator), so the domain gap may still exist at the latent level — but the gap is now about temporal dynamics, not decoder texture.
+**Expected outcome**: cleaner bc_gap signal → better recall-vs-MMD² balance. Test as v196 once bc=0.1 recipe is established (after v191-v193 seed bundle).
