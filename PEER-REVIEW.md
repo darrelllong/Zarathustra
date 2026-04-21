@@ -1665,3 +1665,45 @@ scalar search. But the measurement bar has to rise with it. A learned boundary c
 architectural win if it learns boundary realism rather than decoder artifacts, survives checkpoint
 resume semantics, and improves the long-rollout/tail surfaces that motivated the pivot in the first
 place.
+
+---
+
+## Round 35
+
+### Boundary Critic Is Still Promising, But The Current Evidence Is Not Clean Yet
+
+The new changes since Round 34 are mostly response/version/idea updates plus a small
+`llgan/train.py` fix for boundary-critic logging and checkpoint save/restore. That is a good
+direction: the repo is no longer pretending the hand-written BS scalar ladder is the main answer,
+and `v191` is a serious low-weight learned-boundary probe. The main risk is that the project is
+starting to convert early EMA health and raw `bc_gap` into mechanism confidence before the diagnostic
+surface can actually distinguish temporal joins from decoder/domain artifacts.
+
+1. `[P1]` The `v191` "within 0.004 of ATB" language compares the wrong surfaces. [VERSIONS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/VERSIONS.md#L240) and [RESPONSE.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/RESPONSE.md#L1266) compare `v191` ep20 EMA `★=0.05529` to the frozen `v176` `★=0.051` target. But the same page documents that this architecture has severe EMA-vs-frozen reversals: `v189` best.pt had EMA train-`★=0.034` but frozen `★=0.08869` in [VERSIONS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/VERSIONS.md#L257), and `v190` ep30 had train `★=0.053` but frozen `★=0.12440` while ep65 was the frozen winner in [VERSIONS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/VERSIONS.md#L281). So `v191` is a healthy trajectory, not an ATB-near result yet. Do not launch `v194`/`v195` style follow-on knobs from the ep20 EMA story; wait for dense checkpoints plus frozen sweep.
+
+2. `[P1]` `bc_gap` still does not prove the boundary critic learned boundary realism. The real side of `D_bc` is raw normalized trace windows from `sample_real_boundaries()` in [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/ab19/Zarathustra/llgan/boundary_critic.py#L84), while the fake side is `R(G(...))` decoded output in [llgan/train.py](/Users/darrell/.codex/worktrees/ab19/Zarathustra/llgan/train.py#L1397) through [llgan/train.py](/Users/darrell/.codex/worktrees/ab19/Zarathustra/llgan/train.py#L1411). Positive `bc_gap` therefore still mixes temporal-join discrimination with raw-vs-decoded feature-manifold discrimination. [RESPONSE.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/RESPONSE.md#L1310) now correctly rejects the shuffled-real control, but that makes the conclusion stricter, not looser: the current `bc_gap` is only "the critic separates its two training domains." Before treating #36 as validated, implement the three-way or reconstructed-real control and report whether consecutive-real beats shuffled-real after the raw/decoded confound is removed.
+
+3. `[P2]` The boundary-critic checkpoint fix missed `--reset-optimizer` semantics. The resume loader restores `opt_D_bc` unconditionally when the checkpoint contains it in [llgan/train.py](/Users/darrell/.codex/worktrees/ab19/Zarathustra/llgan/train.py#L836), before the later `cfg.reset_optimizer` branch decides to keep `opt_G`/`opt_C` fresh. That means a hot-start with `--reset-optimizer` resets the main optimizers but keeps stale Adam moments and learning-rate state for the boundary critic. For exactly the current workflow, where `bc_weight` and seed are being changed around `v189`/`v190`/`v191`, that can silently make the auxiliary adversary the only optimizer that did not reset. Gate `opt_D_bc.load_state_dict()` behind `not cfg.reset_optimizer`, or explicitly rebuild it when resetting.
+
+4. `[P2]` The new idea queue is starting to slide back toward local scalar/schedule tuning before the structural diagnostic is closed. [IDEAS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/IDEAS.md#L1493) proposes `diversity-loss-weight` 2→5, and [IDEAS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/IDEAS.md#L1540) proposes `n_critic_bc` warm-up. Those may be useful rescue knobs, but they are not the main architectural bet. The bolder idea in the new batch is [IDEAS.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/IDEAS.md#L1564): move boundary criticism out of decoded feature space or otherwise remove the raw-vs-decoded confound. Prioritize that diagnostic/representation fix over more weight and schedule probes; otherwise #36 risks becoming the same scalar-ladder trap as BS/OC.
+
+5. `[P2]` The v189 acceptance bar is being weakened by deferral. [RESPONSE.md](/Users/darrell/.codex/worktrees/ab19/Zarathustra/RESPONSE.md#L1295) marks frozen sweep and `bc_gap` complete, but defers long-rollout HRC/reuse/stack-distance and tail-heavy rows until after `v191`. That is understandable for GPU cost, but it means the repo still has no evidence that the learned boundary prior improves the long-horizon or tail surfaces it was created to address. At minimum, run those panels for the best `v191` frozen checkpoint before any mechanism language, and include `v189`/`v190` as negative controls if artifacts are available.
+
+### What I Would Do Next
+
+1. Freeze the `v191` interpretation until frozen sweep reports. Treat ep20 EMA as a launch-health signal only.
+
+2. Fix `--reset-optimizer` so `opt_D_bc` resets with the rest of the optimizers.
+
+3. Build the raw/decoded-confound diagnostic next: reconstructed-real or three-way consecutive-real / shuffled-real / decoded-fake, not another `bc_weight` or `n_critic_bc` tweak.
+
+4. If `v191` frozen is competitive, immediately run long-rollout and tail-strata panels before promoting #36.
+
+5. If `v191` frozen is not competitive, move toward the latent-space or reconstructed-real boundary critic path rather than stacking diversity-weight and warm-up schedules on a still-confounded signal.
+
+### Short Take
+
+The learned boundary critic remains the right kind of bet, and the lower-weight `v191` run is worth
+letting finish. But the repo should be more severe about evidence: EMA near-misses are not frozen
+near-misses, raw `bc_gap` is not boundary-realism proof, and the next high-leverage work is removing
+the domain confound rather than tuning another handful of local scalars around it.
