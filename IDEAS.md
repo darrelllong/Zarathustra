@@ -1561,7 +1561,7 @@ for _ in range(_n_critic_bc):
 
 ---
 
-### 42. Boundary critic on latent space instead of decoded feature space
+### 42. Boundary critic on latent space instead of decoded feature space — **IMPLEMENTED (2026-04-20, commit 71ba3f9)**
 
 **Gap attacked**: the current D_bc takes (tail_K_steps, head_K_steps) from the Recovery-decoded output (R(H_A), R(H_B)). Round 34 P1 #1 flagged this: D_bc may learn to detect Recovery decoder artifacts (the unique texture of the R network) rather than genuine boundary transition quality. If bc_gap is high because D_bc detects R-texture mismatch (real=raw vs fake=decoded), the bc loss misleads G to mimic R's artifacts at boundaries, not to produce realistic joins.
 
@@ -1584,6 +1584,6 @@ Since both real and fake paths go through the same Supervisor/Recovery pipeline 
 
 **Why this is on-target**: if D_bc learns to discriminate H-space boundary transitions (not feature-space), then the bc gradient to G is "your latent dynamics at boundaries look wrong," which is structurally meaningful and immune to the decoded-artifact confound. Long-rollout boundary quality depends on latent dynamics anyway (the LSTM states), so aligning bc to latent space is mechanistically cleaner.
 
-**Cost**: ~20 lines in train.py; requires tracking H_A / H_B (LSTM hidden states from the Supervisor forward passes). These are already available in the training loop as `h_carry` but may need separate accumulation for K-step windows.
-**Risk**: latent space has different dimensionality from decoded space (hidden_size=256 vs n_features=5); D_bc hidden=128 may need tuning. Also, H_A from real and H_A from fake are from different models (Supervisor vs Generator), so the domain gap may still exist at the latent level — but the gap is now about temporal dynamics, not decoder texture.
-**Expected outcome**: cleaner bc_gap signal → better recall-vs-MMD² balance. Test as v196 once bc=0.1 recipe is established (after v191-v193 seed bundle).
+**Implementation**: `--boundary-critic-latent` flag in train.py. Real side: `E(full_window)[:, -K:, :]` (encoder latent, B×K×latent_dim). Fake side: `G(z)[:, -K:, :]` (generator latent output). D_bc input_dim = 2×K×latent_dim = 192 (vs 40 in decoded mode). `sample_real_boundaries(full_window=True)` returns T-step windows for encoding; boundary range correctly set per mode.
+**AD findings (2026-04-20)**: E is co-optimized by opt_ER during Phase 3 (not frozen). The D_bc real anchor tracks E's current latent embedding space — both real and fake are in the jointly-optimized latent space. In non-avatar mode (no BN), running stats are not affected. The "raw-vs-decoded" confound is removed; replaced by "E-encoded-real vs G-generated-latent" comparison in co-evolving latent space.
+**Test**: v192 (bc=0.1, seed=7, latent mode) — next run after v191 frozen sweep.
