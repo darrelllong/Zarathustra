@@ -2050,3 +2050,88 @@ Zarathustra is not stuck. It is circling a local boundary proxy after accumulati
 that the real gap is continuation plus cache-law generation. The shortest path forward is not a
 heroic new scalar. It is: freeze boundary evidence, trust the long-rollout sidecar, train the model
 to continue real prefixes, and make object reuse distance an explicit generated process.
+
+---
+
+## Round 40
+
+### The New Diagnostics Are Doing Their Job; Do Not Ignore Them
+
+The changes since the last automation run add the missing IDEA #44 boundary diagnostics, run the
+long-rollout panel that previous rounds kept asking for, add IDEAS #45-#49, and update the v194-v196
+state in [VERSIONS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/VERSIONS.md). This is real
+progress. The important point is also uncomfortable: the new diagnostics are already saying that the
+boundary-critic branch is not learning the boundary signal it claims to learn.
+
+1. `[P1]` v196's promotion bar omits IDEA #44's own diagnostic acceptance criterion. [VERSIONS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/VERSIONS.md#L239)
+   says `v196` validates IDEA #44 if frozen `★ <= 0.054` and long-rollout `reuse_access >= 0.10`.
+   That is not sufficient. IDEA #44's acceptance bar in [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1625)
+   requires the reconstructed-real diagnostic to separate consecutive joins from shuffled joins,
+   and the live `v195` evidence in [VERSIONS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/VERSIONS.md#L240)
+   says `shuf >= raw` or `shuf ~= recon` through ep60. If `v196` wins on short-window score or
+   reuse while `bc_diag` still cannot rank adjacent reconstructed-real above shuffled reconstructed-real,
+   the result is useful but it is not validation of a temporal boundary critic. Call it a decoded
+   real-vs-fake auxiliary or seed-basin regularizer until the adjacency diagnostic clears.
+
+2. `[P1]` IDEA #45 points the proposed IRD loss at the wrong object. [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1643)
+   through [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1653) correctly diagnose
+   that binary `obj_id_reuse` marginals do not determine recurrence spacing, but the minimal plan in
+   [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1695) says to compute IRD with
+   `np.unique` on the `obj_id_reuse` column. That cannot produce inter-reference distance or stack
+   distance. It can only measure autocorrelation of a binary reuse flag. True IRD/stack distance is a
+   function of the emitted object identity stream, including which object was reused and how many
+   distinct objects intervened. This is exactly why IDEA #48 is the stronger path: make object reuse
+   a stateful output process first, then train or repair against stack-distance buckets. A binary
+   reuse-ACF loss can be a cheap auxiliary, but it should not be sold as the IRD fix.
+
+3. `[P1]` The current v195 result should end the matched-domain boundary branch unless the ep75/ep80
+   sweep reverses both diagnostics. The run has now shown frozen `★=0.095` at ep60, worse ep65/ep70,
+   no adjacency separation through ep60, and a mini-collapse around ep66-69 in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/VERSIONS.md#L240). Continuing to
+   watch it until the predeclared ep80 sweep is fine, but do not let this become another v194-style
+   post-collapse rescue arc. If ep75/ep80 does not recover frozen score and make `bc_real > bc_shuf`
+   by a meaningful margin, close IDEA #44 as "domain matching removed the shortcut but did not make
+   D_bc learn temporal adjacency" and move the architecture slot to IDEA #47 or #48.
+
+4. `[P2]` The IDEA #44 diagnostic has a small command-surface footgun. In [llgan/train.py](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/llgan/train.py#L1454)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/llgan/train.py#L1455), the
+   deranged shuffled control calls `torch.randint(B - 1, ...)`. Normal runs use large batches and
+   `drop_last=True`, so this probably will not affect the current race, but the CLI permits
+   `--batch-size 1`. In that configuration the diagnostic crashes with an empty randint range. Add
+   a guard (`B >= 2`) or skip the shuffled diagnostic for singleton batches.
+
+5. `[P2]` The long-rollout interpretation should be tightened. [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1682)
+   through [IDEAS.md](/Users/darrell/.codex/worktrees/7ea2/Zarathustra/IDEAS.md#L1686) says IRD=1 means
+   fake traces behave as infinite working sets where every LRU cache always misses. That overstates
+   the metric. The observed failure is worse and more specific: low reuse-access plus positional
+   IRD=1 and stack-distance=0 means the few reuses are mostly immediate repeats, while most objects
+   never participate in realistic longer-gap reuse. Do not describe it as "every cache misses"; describe
+   it as "the object process lacks the long-gap reuse law that shapes real HRCs."
+
+### What I Would Do Next
+
+1. Amend the v196 acceptance bar: frozen `★`, long-rollout reuse, and `bc_real > bc_shuf` are all
+   required before calling IDEA #44 validated.
+
+2. Treat IDEA #45 Option B as a reuse-ACF auxiliary unless it is rewritten around actual generated
+   object IDs or stack-distance buckets.
+
+3. Stop v195 after the ep75/ep80 decision point if frozen score and adjacency separation do not both
+   recover. Do not spend another cycle extending a boundary branch that its own diagnostic rejects.
+
+4. Move the next implementation slot to IDEA #47 continuation training or IDEA #48 stateful
+   stack-distance decoding. Those are architectural bets; another boundary scalar is not.
+
+### Verification
+
+- Reviewed commits since the last automation timestamp through `b23d956`.
+- Read the current review/response chain, `VERSIONS.md`, `IDEAS.md`, `llgan/train.py`, and
+  `llgan/long_rollout_eval.py`.
+- This pass changes review text only; no code tests were needed.
+
+### Short Take
+
+The project did the right thing by adding diagnostics, but the answer so far is negative: matched
+decoded boundary criticism is separating real/fake texture, not adjacent/non-adjacent joins. The
+next real progress is not to keep nursing that family. It is to train continuation directly and make
+object reuse distance an explicit generated state.
