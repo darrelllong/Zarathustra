@@ -1465,3 +1465,25 @@ recall-restriction shortcut. The recall-gated weight automatically adapts to tra
 
 **Cost**: 1-2h code change; adds `bc_recall_floor` flag and recall-tracking in training loop.
 **Risk**: recall tracking lags by 1 epoch; if recall swings sharply the gate may lag. Use EMA.
+
+---
+
+### 38. Per-epoch deterministic mini-eval to close the EMA-vs-frozen gap
+
+**Gap attacked**: The 22nd training-selector mis-rank (v190) reveals a systematic flaw in the kill criterion: train-★ was stale from ep30, but the frozen-★ improved for 35 more epochs (ep30→ep65). The EMA recall overestimated the ep30 checkpoint by 52% (EMA: 0.773 vs frozen: 0.509). Our 30-epoch-stale kill policy cuts runs at the peak of an EMA artifact, not at the true peak. We killed v190 at ep70 with 40 epochs of potential improvement remaining.
+
+**Root cause**: The EMA metric uses training-distribution MMD samples (non-deterministic, seed varies per epoch). The frozen eval uses seeds 42/42 on a fixed held-out set. The EMA is noisier and biased toward the training distribution. The divergence is largest when the model is rapidly adapting (ep20–40).
+
+**Proposal**: Add an optional per-epoch deterministic mini-eval using a small fixed set:
+```
+--mini-eval-every N        # run mini-eval every N epochs (default 0 = disabled)
+--mini-eval-samples M      # MMD samples for mini-eval (default 500, vs 2000 for EMA)
+--mini-eval-seed S         # deterministic seed (default 42)
+```
+Mini-eval takes ~20–30s/epoch at 500 samples. Its ★ would be logged as `eval_★` alongside `comb=` in the epoch line. Kill criterion: 30 epochs stale from `eval_★` best (not EMA `comb=`).
+
+**Alternative (cheaper)**: Track a 50-epoch rolling frozen sweep within the training loop — run one mini frozen eval every 10 epochs, keep a running best. If mini-eval ★ hasn't improved in 40 epochs, kill.
+
+**Cost**: 2-3h code change; all frozen_sweep infrastructure already exists in `mmd.py` / `eval.py`; just needs deterministic seed param and a second eval path in the epoch loop.
+**Risk**: doubling up eval creates GPU contention with critic updates if parallelized naively. Run sequentially. Mini-eval with 500 samples is slightly noisier than 2000-sample frozen (±0.005 expected variance).
+**Impact**: if mini-eval ★ tracks frozen ★ closely, we can kill/save based on real signal. Expected: would have extended v190 kill to ep65+ and saved the frozen-best checkpoint earlier.
