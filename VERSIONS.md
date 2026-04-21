@@ -237,8 +237,8 @@ on newly-landed code changes.
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
 - **alibaba_v193** — **PLANNED** (after v192). IDEA #36 bc_weight=0.1, seed=5. Third seed for mechanism robustness; if v191 (seed=11) and v192 (seed=3 or seed=7) both avoid collapse at bc=0.1, seed=5 completes the 3-seed bundle required for mechanism claim.
 - **alibaba_v192** — **PLANNED** (after v191). IDEA #36 bc_weight=0.1, seed=7. Tests if lower bc_weight at v176's "good" seed (seed=7) produces better frozen ★ than v176's 0.051. Design: same recipe as v191 but seed=7. If bc_weight=0.1 improves over v176 at its own seed → bc is a structural improvement, not just collapse-prevention.
-- **alibaba_v191** — **QUEUED** (launch after v190 frozen sweep). IDEA #36 bc_weight=0.1 (reduced from 0.5), k=4, n-regimes 4, seed=11. Rationale: bc_weight=0.5 contributes ~60% of G-loss at peak recall (ep30), causing recall collapse ep30→ep45. At bc_weight=0.1, bc is ~22% of G-loss — supplemental signal rather than dominant gradient. seed=11 was the collapse-seed for v186 (no bc, ★=0.219); tests minimum bc weight to prevent collapse. If v191 avoids collapse AND has lower MMD² than v189/v190, could beat v176's ★=0.051. Pretrain: reuse v190 pretrain_complete.pt. Log `/home/darrell/train_alibaba_v191.log`.
-- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test** (running, will auto-stop ~ep90). Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). bc_gap positive ep1-45 (0.31→0.042–0.107 stabilizing). **ep30: EMA MMD²=0.00734 recall=0.773 ★=0.053 (train-best)**; **ep40: recall=0.663 ★=0.082**; **ep45: recall=0.522 ★=0.118**; **ep50: recall=0.514 ★=0.114**; **ep55: recall=0.574 ★=0.103 (bounce)**; **ep60: recall=0.508 ★=0.112, W=1.77**. bc_weight=0.5 causes oscillating recall 0.51-0.58 post-ep30. W elevated (1.42-1.80) but stable below 3.0. Train-best 30 epochs stale; auto-stop at ep90. Frozen sweep candidates: ep30.pt, ep35.pt. Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
+- **alibaba_v191** — **RUNNING** (PID 2932768, launched 2026-04-20). IDEA #36 bc_weight=0.1 (reduced from 0.5), k=4, n-regimes 4, seed=11. Rationale: bc_weight=0.5 contributes ~60% of G-loss at peak recall (ep30), causing recall collapse ep30→ep45. At bc_weight=0.1, bc is ~22% of G-loss — supplemental signal rather than dominant gradient. seed=11 was the collapse-seed for v186 (no bc, ★=0.219); tests minimum bc weight to prevent collapse. If v191 avoids collapse AND has lower MMD² than v189/v190, could beat v176's ★=0.051. Pretrain: reused v190 pretrain_complete.pt. Log `/home/darrell/train_alibaba_v191.log`.
+- **alibaba_v190** — **CLOSED-FAILED** (killed ep70, 40 epochs stale from train-best, 2026-04-20). IDEA #36 bc_weight=0.5, seed=3. **Frozen sweep (seeds 42/42, ep5–ep65 + best.pt, 14 checkpoints)**: frozen-best **epoch_0065.pt ★=0.08291** (MMD²=0.01731, β-rec=0.672). best.pt=epoch_0030.pt ★=0.12440 (22nd mis-rank: +50% worse than frozen-best). Training trajectory: ep30 train-best (recall=0.773, ★=0.053); recall collapse ep40–50 (0.663→0.514); partial recovery ep55–65 (0.574→0.672). bc_gap 0.065–0.122 throughout. ep70 saved (EMA recall=0.541, not swept). Gap to ATB: ★=0.083 vs v176 ★=0.051 = **63% worse**. bc_weight=0.5 confirmed too large: recall oscillates but never recovers to ep30 peak. Key finding: frozen-best is ep65 (not ep30), meaning frozen and train metrics disagree on optimal stopping by 35 epochs. Log `/home/darrell/train_alibaba_v190.log`.
 
 ### alibaba_v189 — CLOSED (W-stopped ep61, frozen sweep complete, 2026-04-20)
 
@@ -258,6 +258,30 @@ All four components are load-bearing inside seed=5; removing any one causes 3–
 - **21st train-selector mis-rank**: best.pt EMA train-★=0.034 → frozen ★=0.089 (+16.5% worse than final.pt). EMA recall 0.853 → frozen recall 0.628 for the SAME ep60 checkpoint. **EMA train metrics are a poor proxy for frozen evaluation on this architecture.**
 - **IDEA #36 proof of concept**: frozen β-recall 0.62–0.69 across all checkpoints, all above the 0.26 collapse floor. Boundary critic successfully prevents Alibaba collapse under patched code for the first time.
 - **Gap to target**: frozen ★=0.076 vs v176 ★=0.051 = **49% worse**. Boundary critic raises recall floor but introduces MMD² overhead. v191 should tune bc_weight or combine with PCF-loss to improve frozen MMD².
+
+---
+
+### alibaba_v190 — CLOSED-FAILED (bc_weight=0.5 recall collapse; frozen-best ep65 ★=0.08291, killed ep70, 2026-04-20)
+
+**Why**: IDEA #36 (Learned Boundary Prior), seed=3, boundary-critic-weight=0.5, k=4, n-regimes=4. Reproducibility test of v189 at a different seed. Killed at ep70 (40 epochs stale from ep30 train-best).
+
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-20, 14 checkpoints ep5–ep65 + best.pt)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **epoch_0065.pt** (frozen-best) | **0.08291** | 0.01731 | 0.672 |
+| epoch_0060.pt | 0.08556 | 0.01736 | 0.659 |
+| epoch_0015.pt | 0.09073 | 0.01093 | 0.601 |
+| epoch_0040.pt | 0.09747 | 0.01387 | 0.582 |
+| epoch_0020.pt | 0.10325 | 0.02155 | 0.592 |
+| epoch_0030.pt = best.pt | 0.12440 | 0.02620 | 0.509 |
+| epoch_0035.pt | 0.13255 | 0.02185 | 0.447 |
+| epoch_0005.pt | 0.18163 | 0.02843 | 0.234 |
+
+- **22nd train-selector mis-rank**: best.pt (ep30 train-best) ★=0.12440 vs frozen-best ep65 ★=0.08291 = **+50% worse**. Training continued improving in frozen eval for 35 epochs after train-★ staled.
+- **Recall collapse trajectory**: ep30 recall=0.773 (peak) → ep35–50 collapse (0.509–0.583 oscillating) → ep60–65 partial recovery (0.659, 0.672). bc_weight=0.5 dominant gradient (≈60% G-loss at ep30) causes mode restriction but model partly recovers if allowed to run.
+- **Not competitive**: frozen ★=0.083 vs v176 ATB ★=0.051 = **63% worse**. bc_weight=0.5 does NOT produce a competitive result.
+- **Key finding**: frozen-best is ep65 not ep30 — frozen and train metrics disagree by 35 epochs. Early-kill based on train-★ staleness would have cut a better checkpoint.
 
 ---
 
