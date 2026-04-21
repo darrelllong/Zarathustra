@@ -1262,11 +1262,16 @@ control run.
 | seed | bc_weight | frozen ★ | outcome |
 |---|---|---|---|
 | 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
-| 3 (v190) | 0.5 | TBD | Train-best ep30 0.053; recall collapse; frozen TBD |
-| 11 (v191) | 0.1 | TBD | Queued; bc_weight reduced to avoid recall collapse |
+| 3 (v190) | 0.5 | **0.083** | Frozen-best ep65 (★=0.08291, β-rec=0.672); CLOSED-FAILED |
+| 11 (v191) | 0.1 | TBD | Running (PID 2932768); bc_weight reduced 5× to avoid recall collapse |
 
 Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
-recall collapse after peak. v191 is the first test with tuned bc_weight.
+recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
+and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_weight=0.1.
+
+**v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
+ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
+mode-recovery. But neither ep30 peak nor ep65 recovery is competitive with ATB ★=0.051.
 
 ## v189 acceptance bar (Round 34 P1 #3) — status
 
@@ -1274,7 +1279,7 @@ recall collapse after peak. v191 is the first test with tuned bc_weight.
 2. ✅ bc_gap trajectory showing D_bc discriminating (confirmed, see above)
 3. ❌ Long-rollout HRC / reuse-access / stack-distance panel — deferred
 4. ❌ Tail-heavy vs ordinary MMD shape rows — deferred
-5. ✅ Second seed: v190 seed=3 running (seed bundle in progress)
+5. ✅ Second seed: v190 seed=3 CLOSED. Frozen ★=0.083. v191 (seed=11, bc_weight=0.1) running.
 
 Items 3 and 4 remain gated on v191's frozen sweep results (no point in long-rollout panels
 if bc_weight=0.1 changes the mechanism significantly).
