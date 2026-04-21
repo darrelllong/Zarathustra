@@ -1346,8 +1346,14 @@ control run.
 | 3 (v190) | decoded | 0.5 | **0.083** | ep70 kill | Frozen-best ep65; CLOSED-FAILED |
 | 11 (v191) | decoded | 0.1 | **0.067** | ep83 kill | Frozen-best ep75 ★=0.067; best decoded-bc |
 | 7 (v192) | **latent-H** | 0.1 | 0.104 | ep35 W-stop | IDEA #42; avoids ep25 collapse; W-stop too early |
+| 5 (v193) | **latent-H** | 0.1 | 0.111 | ep97 kill | w-stop=5.0; no phase transition; β-rec ceiling 0.48 |
+| 5 (v194) | **decoded** | 0.1 | running | running | w-stop=5.0; tests v191-style at seed=5 with longer training |
 
-v192 (IDEA #42 latent-H bc): EMA breakthrough (ep30 recall=0.898, ★=0.024) but frozen ★=0.104 (+334% EMA inflation). Key finding: **latent-H bc avoids decoded-mode ep25 collapse** (v192 ep25 recall=0.733 vs v191's 0.605), but **W-stop at ep35 cuts off late-epoch frozen recovery**. v191's frozen-best was ep75 — v192 only ran to ep35. v193 test: raise w-stop-threshold to 5.0 to allow longer training.
+v192 (IDEA #42 latent-H bc): EMA breakthrough (ep30 recall=0.898, ★=0.024) but frozen ★=0.104 (+334% EMA inflation). Key finding: **latent-H bc avoids decoded-mode ep25 collapse** (v192 ep25 recall=0.733 vs v191's 0.605), but **W-stop at ep35 cuts off late-epoch frozen recovery**.
+
+v193 (IDEA #42 latent-H bc, w-stop=5.0, seed=5): Ran to ep97 with W≤2.1 (exceptional stability). Frozen sweep complete (20 checkpoints). **Frozen-best ep75 ★=0.111, β-rec=0.478. No phase transition in ep80-ep95.** β-recall peaked ep75 and degraded ep80=0.466 → ep85=0.412 → ep95=0.333. **IDEA #42 verdict**: Latent-H bc β-recall ceiling is ~0.48, fundamentally lower than decoded-mode (v191 ep75 β-recall=0.709). The lower-dimensional latent space limits how hard D_bc can push G on spatial pattern generation. Decoded-mode bc is superior.
+
+v194 (IDEA #36 decoded-bc, seed=5, w-stop=5.0): **RUNNING**. Tests whether decoded-mode bc at seed=5 with w-stop=5.0 can produce late-epoch frozen recovery past v191's ep83 kill. v191 had EMA β-recall=0.789 at ep80 (still improving) when killed. If v194 survives to ep100+, it may improve on v191's ★=0.067.
 
 **Critical lesson (24th mis-rank)**: Latent-H bc produces more severe EMA inflation than decoded mode. EMA ★=0.024 vs frozen ★=0.104 = 4.3× inflation (vs 3.2× for decoded-mode v191). EMA recall during bc training is NOT a reliable signal in either mode — only frozen sweep gives the true number.
 

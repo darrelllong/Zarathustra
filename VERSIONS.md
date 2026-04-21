@@ -235,7 +235,8 @@ on newly-landed code changes.
 | PCF-loss (IDEA #26) | v183 | ~0.1921 | **~5.11×** |
 
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
-- **alibaba_v193** — **RUNNING** (PID 3266300, launched 2026-04-21). **IDEA #36 + IDEA #42 (latent-H) + `--w-stop-threshold 5.0`**, seed=5. EMA trajectory: ep60 recall=0.816, ★=0.04507 (EMA best); ep65 0.723; ep70 0.756; ep75 0.774, ★=0.056. W ≤ 1.5 throughout (exceptional stability). **Interim frozen sweep ep5–ep75 (16 ckpts)**: frozen-best **ep75 ★=0.11060** (MMD²=0.00610, β-rec=0.4775). Trend improving: ep40 ★=0.125 → ep75 ★=0.111. **Key finding**: latent-H bc achieves very low MMD² (0.006) but lower β-recall (0.478) vs decoded-mode v191 ep75 (β-rec=0.709). β-recall term dominates ★. Watching ep100+ for β-recall phase-transition (v191 had sudden jump ep55→ep70 0.46→0.72). Log `/home/darrell/train_alibaba_v193.log`.
+- **alibaba_v194** — **RUNNING** (launched 2026-04-21). **IDEA #36 decoded-mode bc + `--w-stop-threshold 5.0`**, seed=5. Decoded-feat mode (NOT latent-H). Pretrain: v193 `pretrain_complete.pt` (seed=5). Hypothesis: decoded-mode bc (v191 approach) with higher w-stop-threshold allows late-epoch frozen recovery past ep83 kill point. Log `/home/darrell/train_alibaba_v194.log`.
+- **alibaba_v193** — **CLOSED** (killed ep97, frozen-best ep75, 2026-04-21). **IDEA #36 + IDEA #42 (latent-H) + `--w-stop-threshold 5.0`**, seed=5. **Frozen sweep complete (seeds 42/42, 20 checkpoints ep5–ep95 + best.pt)**: frozen-best **epoch_0075.pt ★=0.11060** (MMD²=0.00610, β-rec=0.4775). 25th mis-rank: best.pt ★=0.14275 → frozen-best ★=0.11060 (+29.1% worse). No phase transition in ep80-ep95: β-recall peaked ep75 (0.4775) and declined ep85=0.4115, ep90=0.4175, ep95=0.3325. Conclusion: latent-H bc does NOT achieve decoded-mode's high β-recall. β-recall ceiling = ~0.48 vs decoded-mode v191 ep75 = 0.709. Gap to ATB: ★=0.111 vs v176 ★=0.051 = **117% worse**; worse than v191 (★=0.067). Log `/home/darrell/train_alibaba_v193.log`.
 - **alibaba_v192** — **CLOSED** (W-stopped ep35, 2026-04-21). **IDEA #36 + IDEA #42**: bc_weight=0.1 + `--boundary-critic-latent`, seed=7. mode=latent-H. Pretrain: v189 `pretrain_complete.pt` (seed=7). **Frozen sweep complete (seeds 42/42, 8 checkpoints ep5–ep35 + best.pt + final.pt)**: frozen-best **epoch_0030.pt ★=0.10389** (MMD²=0.01329, β-rec=0.547). 24th mis-rank: best.pt EMA ★=0.024 → frozen ★=0.104 (+334% worse). Training trajectory: ep5 recall=0.699 → ep25 0.733 (NO decoded-mode collapse) → ep30 0.898 EMA peak → W-stop ep35 (W=3.25, 3.34, 3.07). Gap to ATB: ★=0.104 vs v176 ★=0.051 = **104% worse**; worse than v191 (★=0.067). **W-stop confound**: v192 had only ep5–ep35 checkpoints; v191's frozen-best was ep75. Latent-H bc may need longer training but W instability kills the run early. v193 should raise w-stop-threshold. Log `/home/darrell/train_alibaba_v192.log`.
 - **alibaba_v191** — **CLOSED** (killed ep83, 63 epochs stale from ep20 train-best, 2026-04-20). IDEA #36 bc_weight=0.1, k=4, n-regimes 4, seed=11. **Frozen sweep complete (seeds 42/42, 17 checkpoints ep5–ep80 + best.pt)**: frozen-best **epoch_0075.pt ★=0.06749** (MMD²=0.00929, β-rec=0.709). 23rd train-selector mis-rank: best.pt=epoch_0020.pt EMA ★=0.05529 → frozen ★=0.17753 (+163.0% worse). **Key finding**: EMA "collapse" at ep70-80 (EMA recall=0.383-0.440) masked genuine frozen-eval recovery (frozen ep75 β-recall=0.709, ep80 β-recall=0.789). Killed too early by EMA heuristics. Gap to ATB: ★=0.067 vs v176 ★=0.051 = **32% worse**. bc=0.1 beats bc=0.5 runs (v189 ★=0.076, v190 ★=0.083). Pretrain: reused v190 pretrain_complete.pt. Log `/home/darrell/train_alibaba_v191.log`.
 - **alibaba_v190** — **CLOSED-FAILED** (killed ep70, 40 epochs stale from train-best, 2026-04-20). IDEA #36 bc_weight=0.5, seed=3. **Frozen sweep (seeds 42/42, ep5–ep65 + best.pt, 14 checkpoints)**: frozen-best **epoch_0065.pt ★=0.08291** (MMD²=0.01731, β-rec=0.672). best.pt=epoch_0030.pt ★=0.12440 (22nd mis-rank: +50% worse than frozen-best). Training trajectory: ep30 train-best (recall=0.773, ★=0.053); recall collapse ep40–50 (0.663→0.514); partial recovery ep55–65 (0.574→0.672). bc_gap 0.065–0.122 throughout. ep70 saved (EMA recall=0.541, not swept). Gap to ATB: ★=0.083 vs v176 ★=0.051 = **63% worse**. bc_weight=0.5 confirmed too large: recall oscillates but never recovers to ep30 peak. Key finding: frozen-best is ep65 (not ep30), meaning frozen and train metrics disagree on optimal stopping by 35 epochs. Log `/home/darrell/train_alibaba_v190.log`.
@@ -284,7 +285,46 @@ All four components are load-bearing inside seed=5; removing any one causes 3–
 - **W-stop confound**: v192 had only 7 epoch checkpoints (ep5–ep35). v191's frozen-best was ep75 (of 17 checkpoints ep5–ep83). The latent-H bc training dynamic may need longer epochs to produce frozen recovery, but W instability terminates the run at ep35.
 - **Early training advantage**: ep25 recall=0.733 vs v191 ep25 recall=0.605 — latent-H bc clearly prevents the decoded-mode ep20-25 collapse pattern. The problem is W instability cuts the run short before late-epoch frozen recovery can occur.
 - **Large negative G-loss**: ep11-35 G-loss consistently −2.5 to −3.5, much larger than decoded mode (ep20-35 G ≈ 0.0-0.8). G easily fools both C and latent D_bc → C must work harder → W spikes.
-- **Key question for v193**: if w-stop-threshold raised to 5.0, would v192 recipe produce late-epoch frozen recovery (like v191 ep75) and become competitive?
+- **Key question for v193**: if w-stop-threshold raised to 5.0, would v192 recipe produce late-epoch frozen recovery (like v191 ep75) and become competitive? **ANSWERED (v193): NO.** Latent-H β-recall ceiling is ~0.48; no phase transition; decoded-mode bc is superior.
+
+---
+
+### alibaba_v193 — CLOSED (latent-H bc + w-stop=5.0; frozen-best ep75 ★=0.11060; no phase transition in ep80–ep95; killed ep97, 2026-04-21)
+
+**Why**: IDEA #36 + IDEA #42 (latent-H D_bc), seed=5, bc_weight=0.1. Raised w-stop-threshold from 3.0→5.0 to allow latent-H bc to run longer than v192 (W-stopped ep35). Hypothesis: if latent-H bc gets longer training, it may achieve late-epoch frozen recovery like v191 ep75.
+
+**Training**: W ≤ 2.1 throughout (exceptional stability vs v192 W>3.0 at ep33). EMA recalls oscillate 0.711-0.816 ep50-ep95. No decoded-mode collapse (ep20-25 recall stays 0.734-0.910 vs v191's 0.605-0.740). G-loss oscillates both positive and negative. bc_gap 0.28-0.43 stable.
+
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-21, 20 checkpoints ep5–ep95 + best.pt)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **epoch_0075.pt** (frozen-best) | **0.11060** | 0.00610 | 0.4775 |
+| epoch_0065.pt | 0.11501 | 0.00591 | 0.4545 |
+| epoch_0080.pt | 0.11536 | 0.00856 | 0.4660 |
+| epoch_0070.pt | 0.12262 | 0.00682 | 0.4210 |
+| epoch_0090.pt | 0.12481 | 0.00831 | 0.4175 |
+| epoch_0040.pt | 0.12528 | 0.00828 | 0.4150 |
+| epoch_0055.pt | 0.12608 | 0.00708 | 0.4050 |
+| epoch_0085.pt | 0.12691 | 0.00921 | 0.4115 |
+| epoch_0045.pt | 0.12846 | 0.01056 | 0.4105 |
+| epoch_0050.pt | 0.13624 | 0.00924 | 0.3650 |
+| epoch_0025.pt | 0.13903 | 0.01263 | 0.3680 |
+| epoch_0035.pt | 0.14064 | 0.01064 | 0.3500 |
+| epoch_0095.pt | 0.14201 | 0.00851 | 0.3325 |
+| epoch_0030.pt | 0.14247 | 0.01317 | 0.3535 |
+| epoch_0060.pt | 0.14275 | 0.00885 | 0.3305 |
+| best.pt (=ep60) | 0.14275 | 0.00885 | 0.3305 |
+| epoch_0020.pt | 0.14931 | 0.01251 | 0.3160 |
+| epoch_0015.pt | 0.17151 | 0.01171 | 0.2010 |
+| epoch_0005.pt | 0.17310 | 0.01630 | 0.2160 |
+| epoch_0010.pt | 0.18289 | 0.02179 | 0.1945 |
+
+- **No phase transition**: β-recall peaked ep75 (0.4775) and degraded ep80=0.466, ep85=0.412, ep90=0.418, ep95=0.333. Unlike v191's ep55→ep70 jump (0.46→0.72), latent-H bc shows no late-epoch recovery.
+- **β-recall ceiling ~0.48**: Latent-H D_bc is systematically unable to achieve the high β-recall of decoded-mode D_bc (v191 ep75 β-recall=0.709). The latent space is lower-dimensional than the decoded feature space; the critic gradient may not push G hard enough on spatial pattern generation.
+- **25th train-selector mis-rank**: best.pt ★=0.14275 → frozen-best ★=0.11060 (+29.1% worse).
+- **NOT competitive**: ★=0.111 vs v176 ATB ★=0.051 = 117% worse; worse than decoded-mode v191 ★=0.067.
+- **IDEA #42 verdict**: Latent-H bc prevents W instability and early training collapse, but β-recall ceiling is too low for competitive performance. Decoded-mode bc (IDEA #36) is superior for this architecture.
 
 ---
 
