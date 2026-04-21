@@ -833,7 +833,7 @@ def train(cfg: Config) -> None:
             S.load_state_dict(ckpt["S"], strict=False)
         if LD is not None and "LD" in ckpt:
             LD.load_state_dict(ckpt["LD"])
-        if D_bc is not None and "D_bc" in ckpt:
+        if D_bc is not None and "D_bc" in ckpt and "opt_D_bc" in ckpt:
             D_bc.load_state_dict(ckpt["D_bc"])
             opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
         # Restore preprocessor from checkpoint so normalization stays consistent
@@ -2038,6 +2038,8 @@ def train(cfg: Config) -> None:
             bc_r = sum(bc_real_scores) / len(bc_real_scores)
             bc_f = sum(bc_fake_scores) / len(bc_fake_scores)
             log += f"  bc_real={bc_r:+.3f}  bc_fake={bc_f:+.3f}  bc_gap={bc_r - bc_f:.3f}"
+        elif D_bc is not None:
+            log += "  bc=disabled(no_arrays)"
 
         if val_tensor is not None and (epoch + 1) % cfg.mmd_every == 0:
             # Evaluate using the EMA model, not the live G.
