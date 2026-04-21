@@ -1269,8 +1269,16 @@ Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weigh
 recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
 and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_weight=0.1.
 
-**v191 early trajectory (ep1–7, 2026-04-20)**: bc_gap=0.300→0.526→0.187 (positive and gradually
-declining as G fools D_bc). EMA recall=0.655 at ep5 — no collapse at bc_weight=0.1.
+**v191 early trajectory (ep1–18, 2026-04-20)**:
+
+| ep | EMA MMD² | recall | EMA ★ | bc_gap |
+|---|---|---|---|---|
+| 5 | 0.01565 | 0.655 | 0.08465 ★ | 0.338 |
+| 10 | 0.02202 | 0.712 | 0.07972 ★ | 0.268 |
+| **15** | **0.00896** | **0.737** | **0.06166 ★** | 0.250 |
+
+EMA recall improving throughout (no collapse at bc_weight=0.1). Ep15 shows dramatic improvement:
+MMD² dropped 60% from ep10→ep15, recall continues climbing. bc_gap stable 0.174–0.338 throughout.
 
 **v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
 ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
