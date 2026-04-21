@@ -1587,3 +1587,21 @@ Since both real and fake paths go through the same Supervisor/Recovery pipeline 
 **Implementation**: `--boundary-critic-latent` flag in train.py. Real side: `E(full_window)[:, -K:, :]` (encoder latent, B×K×latent_dim). Fake side: `G(z)[:, -K:, :]` (generator latent output). D_bc input_dim = 2×K×latent_dim = 192 (vs 40 in decoded mode). `sample_real_boundaries(full_window=True)` returns T-step windows for encoding; boundary range correctly set per mode.
 **AD findings (2026-04-20)**: E is co-optimized by opt_ER during Phase 3 (not frozen). The D_bc real anchor tracks E's current latent embedding space — both real and fake are in the jointly-optimized latent space. In non-avatar mode (no BN), running stats are not affected. The "raw-vs-decoded" confound is removed; replaced by "E-encoded-real vs G-generated-latent" comparison in co-evolving latent space.
 **Test**: v192 (bc=0.1, seed=7, latent mode) — **RUNNING** (PID 3260378, launched 2026-04-21). **ep30: recall=0.898, ★=0.02454** (best EMA ★ ever seen on alibaba). Trajectory: ep5 recall=0.699 → ep15 0.797 → ep20 0.784 → ep25 0.733 (NO collapse unlike v191 ep25=0.605) → ep30 **0.898 leap**. Latent-H bc clearly avoids decoded-mode collapse pattern. bc_gap stable 0.29-0.39. W=2.82 at ep30 (approaching threshold). IDEA #42 validated in early trajectory.
+
+---
+
+### 43. Matched carried-state boundary critic for real and fake joins
+
+**Gap attacked**: IDEA #42 removes the raw-feature-vs-decoded-feature shortcut, but the current latent-H implementation still compares two different boundary semantics. The real side uses `E(window_A)` and `E(window_B)` as two independently reset GRU encodings, while the fake side uses `G(window_A)` and `G(window_B | hidden_A)` with carried LSTM state. A latent boundary critic can therefore learn an encoder-reset / start-of-window signature rather than the quality of a carried adjacent transition.
+
+**Proposal**: train the boundary critic on matched transition representations where both real and fake heads are produced under the same carry contract.
+
+Options:
+
+1. **Supervisor-carried real positive**: encode the real first window, carry a learned state through `S` or a small transition adapter, and compare the predicted/carried real head against the actual encoded next-window head before feeding the join to `D_bc`. The critic then judges transition residuals, not raw reset latents.
+2. **Reset-matched fake negative**: if using independent `E(A)`/`E(B)` positives, also make the fake side independent-reset style for the critic and keep the carried fake path only for generator-side rollout diagnostics.
+3. **Transition-delta critic**: feed `tail`, `head`, and `head - transition(tail)` features, so the discriminator is forced to score boundary dynamics relative to a matched real transition model rather than absolute latent-domain artifacts.
+
+**Minimal viable experiment**: add a `--boundary-critic-real-carry` mode that builds real positives from adjacent windows plus `S(E(A))`-conditioned transition features, and compare against current `--boundary-critic-latent` on the same seed/pretrain. Acceptance requires frozen sweep improvement plus a diagnostic showing the critic cannot separate positives by "head starts at timestep 0 of a fresh encoder window" alone.
+
+**Why this is structural**: the project keeps finding that boundary scores are easy to fool by domain artifacts. A matched carried-state critic would make the adversary operate on the same train/generate contract the model must satisfy at long rollout time.

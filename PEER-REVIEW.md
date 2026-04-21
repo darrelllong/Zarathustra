@@ -1707,3 +1707,89 @@ The learned boundary critic remains the right kind of bet, and the lower-weight 
 letting finish. But the repo should be more severe about evidence: EMA near-misses are not frozen
 near-misses, raw `bc_gap` is not boundary-realism proof, and the next high-leverage work is removing
 the domain confound rather than tuning another handful of local scalars around it.
+
+---
+
+## Round 36
+
+### Latent Boundary Critic Removed One Confound And Added Another
+
+The new changes since Round 35 are substantial enough to review: `v191` closed with a late frozen
+recovery, `v192` implemented IDEA #42 latent-H boundary criticism, `v193` raised the W-stop threshold
+to let latent-H run longer, and `IDEAS.md` now records the latent-boundary branch. The direction is
+still better than the old deterministic BS ladder, but the current interpretation is too generous.
+The latent critic is not yet clean evidence about boundary realism.
+
+1. `[P1]` The latent-H boundary critic compares reset-encoded real heads to carried-state fake heads.
+   In latent mode, the real positive pair is built as `E(_raw_A)[:, -K:, :]` and
+   `E(_raw_B)[:, :K, :]` in [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1410)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1414).
+   `_raw_B` is encoded by the GRU from a fresh zero state. The fake negative head, however, is
+   `G(..., hidden=_h_carry_bc)` from the carried generator state at
+   [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1404)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1416), and the
+   generator-side loss uses the same carried fake contract in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1931) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/7834/Zarathustra/llgan/train.py#L1941). That removes the
+   raw-vs-decoded artifact from Round 35, but it introduces a new shortcut: `D_bc` can learn
+   "fresh encoder head versus carried generator head" rather than realistic adjacent-window
+   dynamics. This directly weakens the claim in [IDEAS.md](/Users/darrell/.codex/worktrees/7834/Zarathustra/IDEAS.md#L1587)
+   that both sides now share the same pipeline. I added IDEA #43 to make the next boundary critic
+   match the carry semantics on real and fake joins.
+
+2. `[P1]` v192 should be read as a failed first latent-H probe, not as validation blocked only by
+   W-stop. [VERSIONS.md](/Users/darrell/.codex/worktrees/7834/Zarathustra/VERSIONS.md#L263) reports frozen-best
+   `★=0.10389`, worse than decoded `v191` at `0.06749` and far behind the patched `v176` target
+   near `0.051`. The ep30 EMA `★=0.02454` was a 4.3x inflation relative to frozen, which is the
+   strongest warning yet that EMA recall is not an acceptance signal for boundary-critic runs.
+   It is fair to say latent-H avoided the ep25 decoded-mode recall dip; it is not fair to say the
+   mechanism is validated. The first full result says "cleaner early trajectory, worse frozen
+   model, severe W instability."
+
+3. `[P1]` Raising `--w-stop-threshold` to 5.0 in `v193` is a risky interpretation of the v192 failure.
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/7834/Zarathustra/VERSIONS.md#L236) frames the new run as a
+   test of whether latent-H merely needed more epochs, but [VERSIONS.md](/Users/darrell/.codex/worktrees/7834/Zarathustra/VERSIONS.md#L283)
+   also says v192 had large negative G-loss and W spikes because the generator was easily fooling
+   both critics. A W-stop is not just an arbitrary patience knob; it is the repo's current guardrail
+   against critic/game instability. If v193 improves only because the run is allowed to continue
+   through W in the 3-5 band, the result must be labeled as "weakened safety guard" evidence, not
+   a clean architectural win. The cleaner next experiment is matched-state latent criticism or a
+   lower-LR / better-regularized latent D_bc, not simply a higher W ceiling.
+
+4. `[P2]` v191's real lesson is checkpoint-selection infrastructure, not boundary-mechanism success.
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/7834/Zarathustra/VERSIONS.md#L295) reports that `epoch_0075.pt`
+   was frozen-best despite EMA labeling the run collapsed, while `best.pt` was `+163%` worse. That is
+   the strongest current justification for IDEA #38: deterministic mini-eval or dense frozen sweeps
+   need to become part of the training loop before more boundary variants are ranked. Without that,
+   every new `bc_weight`, latent/decoded, and W-stop branch is being steered by a proxy that has now
+   failed at least 24 times.
+
+5. `[P2]` The long-rollout and tail gates are still being deferred even though they are now the only
+   way to tell whether boundary work matters. `v191` has the best decoded-bc frozen score so far,
+   and `v192` is the first latent-bc result, but neither has HRC / reuse-access / stack-distance or
+   tail-heavy shape rows. If boundary criticism is supposed to improve cross-window generation, the
+   next evidence after frozen sweep should be long-rollout boundary/cache behavior, not another
+   short-window score chase.
+
+### What I Would Do Next
+
+1. Treat `v193` as a diagnostic run only. If it wins, report clearly that the W-stop guard was relaxed
+   and require a second seed before promotion language.
+
+2. Implement IDEA #43: a matched carried-state boundary critic so real and fake positives/negatives
+   share the same reset/carry semantics.
+
+3. Prioritize IDEA #38 mini-eval or dense deterministic sweeps before launching more boundary knobs.
+
+4. Run long-rollout and tail panels for `v176`, `v191`, `v192`, and any competitive `v193` checkpoint.
+
+5. Stop using EMA recall or `bc_gap` as mechanism evidence. They are launch diagnostics only until
+   the critic is proven not to be exploiting representation-domain shortcuts.
+
+### Short Take
+
+The project made the right kind of move by trying latent-space boundary criticism. The problem is
+that the current implementation changes the confound rather than eliminating it: real boundaries are
+fresh encoder-window joins, fake boundaries are carried generator joins. Fix that carry mismatch
+before concluding anything about IDEA #36, and do not let a higher W-stop threshold turn instability
+into a claimed architectural breakthrough.
