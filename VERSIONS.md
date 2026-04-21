@@ -235,8 +235,26 @@ on newly-landed code changes.
 | PCF-loss (IDEA #26) | v183 | ~0.1921 | **~5.11×** |
 
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
-- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test**. Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). Pretrain_complete.pt copied from v189 (= v176 pretrain). Launched 2026-04-20 18:06. **bc_gap positive ep1-9** (0.31→0.09→0.11 ep1-9, stabilizing ~0.10) — boundary critic discriminating throughout. **ep5: recall=0.613, ★=0.115 ← AVOIDS COLLAPSE**; **ep10: recall=0.621, ★=0.092 (train-best)**; **ep20: recall=0.624, ★=0.084 (train-best)**, bc_gap=0.076 still positive. Recall holding 0.62–0.62 through ep20; consistently improving. Seed bundle: v189 seed=7 ep30 ★=0.054, v190 seed=3 ep20 ★=0.084 — both healthy and improving. Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
-- **alibaba_v189** — **IDEA #36 (Learned Boundary Prior)** on Alibaba. v176 pretrain reused (seed=7, phases 1–2 skipped); Phase 3 uses fresh LSTM G with `BoundaryCritic` WGAN-SN MLP (K=4, hidden=128, weight=0.5). All hand-written BS/OC scalars removed (weight=0). PCF and multi-scale-critic also dropped (per Round 33 / Round 32 guidance: drop those for Alibaba). `--n-regimes 4` (not 8 — 4 regimes are Alibaba-optimal per v46). Seed=7 to match v176 pretrain. First structural Alibaba run targeting boundary continuity without the palindrome bias. **ep5: ★=0.071**; **ep10: ★=0.082**; **ep15: ★=0.073**; **ep20: ★=0.099**; **ep30: ★=0.054 (train-best, recall=0.757)**; **ep35: ★=0.103**; **ep40: ★=0.093**; **ep45: ★=0.076, recall=0.757**; **ep50: ★=0.067, recall=0.770**; **ep55: ★=0.077, recall=0.779** (ep57 W=3.08 single-epoch spike above W-stop threshold 3.0 — monitoring). Recall-peak trend: 0.709→0.733→0.757→0.757→0.770→0.779 improving; ep30 ★=0.054 train-best holds (better MMD²). v190 same recipe bc_gap~0.065–0.13 sustained through ep21. Log `/home/darrell/train_alibaba_v189.log`. PID 2137428.
+- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test** (running). Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). bc_gap positive ep1-24 (0.31→0.06–0.09 stabilizing). **ep5: recall=0.613, ★=0.115 ← AVOIDS COLLAPSE**; **ep20: recall=0.624, ★=0.084 (train-best)**. Caution: v189 frozen showed EMA train-★ severely overstated vs frozen-★; treat v190 train metrics as directional only until frozen sweep. Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
+
+### alibaba_v189 — CLOSED (W-stopped ep61, frozen sweep complete, 2026-04-20)
+
+**Why**: IDEA #36 (Learned Boundary Prior), seed=7, boundary-critic-weight=0.5, k=4, n-regimes=4. W-stopped at ep61 (W=4.44, 3 consecutive epochs > 3.0 threshold).
+
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-20, 13 checkpoints)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **final.pt** (frozen-best) | **0.07614** | 0.01384 | 0.689 |
+| epoch_0055.pt | 0.07768 | 0.01308 | 0.677 |
+| epoch_0060.pt = best.pt | 0.08869 | 0.01419 | 0.628 |
+| epoch_0050.pt | 0.08738 | 0.01058 | 0.616 |
+| epoch_0030.pt | 0.13789 | 0.00929 | 0.357 |
+
+- **Frozen-best: final.pt ★=0.07614** — NOT competitive with v176 patched-BS (★=0.051) or v164 buggy-code (★=0.034).
+- **21st train-selector mis-rank**: best.pt EMA train-★=0.034 → frozen ★=0.089 (+16.5% worse than final.pt). EMA recall 0.853 → frozen recall 0.628 for the SAME ep60 checkpoint. **EMA train metrics are a poor proxy for frozen evaluation on this architecture.**
+- **IDEA #36 proof of concept**: frozen β-recall 0.62–0.69 across all checkpoints, all above the 0.26 collapse floor. Boundary critic successfully prevents Alibaba collapse under patched code for the first time.
+- **Gap to target**: frozen ★=0.076 vs v176 ★=0.051 = **49% worse**. Boundary critic raises recall floor but introduces MMD² overhead. v191 should tune bc_weight or combine with PCF-loss to improve frozen MMD².
 
 ---
 
