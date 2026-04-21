@@ -1487,3 +1487,26 @@ Mini-eval takes ~20–30s/epoch at 500 samples. Its ★ would be logged as `eval
 **Cost**: 2-3h code change; all frozen_sweep infrastructure already exists in `mmd.py` / `eval.py`; just needs deterministic seed param and a second eval path in the epoch loop.
 **Risk**: doubling up eval creates GPU contention with critic updates if parallelized naively. Run sequentially. Mini-eval with 500 samples is slightly noisier than 2000-sample frozen (±0.005 expected variance).
 **Impact**: if mini-eval ★ tracks frozen ★ closely, we can kill/save based on real signal. Expected: would have extended v190 kill to ep65+ and saved the frozen-best checkpoint earlier.
+
+---
+
+### 39. Diversity-pressure boost to offset bc MMD² overhead (extends #36)
+
+**Gap attacked**: IDEA #36 (boundary critic) prevents Alibaba collapse but introduces MMD² overhead. v189 (bc=0.5) frozen MMD²=0.014 vs ATB v176 MMD²=0.007 — 2× worse. Root cause: bc encourages the generator to optimize boundary realism by restricting output modes (diversity decreases → MMD² increases). Even at bc=0.1, the bc signal may create mild mode-restriction pressure that prevents the generator from covering the full feature distribution.
+
+**Proposal**: increase `--diversity-loss-weight` from 2.0 to 4.0–6.0 for bc runs. The diversity loss (which encourages G to produce varied outputs across the batch) directly counters the mode-restriction shortcut. Higher diversity pressure means the generator cannot collapse modes as a shortcut to better boundary scores.
+
+```
+# v191 baseline:       --diversity-loss-weight 2.0 --boundary-critic-weight 0.1
+# v194 proposed:       --diversity-loss-weight 5.0 --boundary-critic-weight 0.1
+```
+
+**Why this is on-target**: the bc's mode-restriction shortcut (generator reduces diversity to optimize boundary scores) is exactly what the diversity loss opposes. Currently diversity-loss=2.0 was tuned for runs without bc. Adding bc creates a new attractor (restricted-diversity boundary-smooth outputs) that diversity=2.0 may not be strong enough to resist. Increasing diversity pressure to 5.0 directly counters this attractor.
+
+**Alternative**: use a dedicated MMD-loss component (like IDEA #9's direct MMD minimization) as an auxiliary term when bc is active. This directly penalizes MMD² increase.
+
+**Minimal viable experiment**: once v191 (bc=0.1, diversity=2.0) frozen sweep completes, launch v194 with bc=0.1, diversity=5.0, same seed=11. If frozen MMD² drops from v191 to v194 while recall stays ≥0.68, the diversity-pressure fix is real.
+
+**Cost**: zero code change — only hyperparameter modification.
+**Risk**: too much diversity pressure may cause training instability or override the bc signal entirely. Start at 4.0; if unstable, back off to 3.0.
+**Expected outcome**: if v191 frozen MMD²≈0.012 and diversity=5.0 brings it to ≈0.007, ★≈0.007+0.2×0.25=0.057 — within 12% of ATB ★=0.051.
