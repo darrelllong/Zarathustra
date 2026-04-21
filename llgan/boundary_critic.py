@@ -11,7 +11,9 @@ generated ones.
 Training signal:
   Real pairs:  consecutive non-overlapping windows drawn from real trace files
                (data[i+T-K : i+T] + data[i+T : i+T+K] = a 2K-step slice
-               centered on a true file boundary).
+               centered on an in-file adjacent-window boundary at stride T).
+               Note: these are within-file window joins sampled at every T-record
+               stride, not cross-file boundaries.
   Fake pairs:  G generates chunk A, carries hidden state, generates chunk B;
                decoded features of A's tail + B's head form the fake boundary.
 

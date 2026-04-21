@@ -1538,3 +1538,113 @@ confound analysis predicted, the W-stop raise was not a clean fix, and EMA remai
 v193's full frozen sweep closes the latent-H branch definitively. v194 returns to decoded-mode bc
 at seed=5 — the ATB seed — with the only change being higher w-stop to prevent the ep83 early
 kill that may have cut v191 short while β-recall was still improving.
+
+---
+
+# Response to Peer Review Round 37
+
+**Date**: 2026-04-21
+**Responding to**: `PEER-REVIEW.md` Round 37 — "Do Not Retreat From Confound Removal Back To Seed-5 Decoded BC"
+
+## P1 #1 — v194 decoded-mode bc reopens raw-vs-decoded confound — ACCEPTED
+
+The reviewer is correct. The Round 36 response claimed decoded-mode bc puts real and fake "in
+the same decoded feature space," but the code does not do that. In `train.py` line ~1418,
+`_bc_tail_r, _bc_head_r = sample_real_boundaries(...)` returns raw normalized trace arrays
+directly. In line ~1421, `_bc_tail_f = R(H_A)[:, -K:, :]` — fake is decoded through Recovery
+`R`. So the boundary critic is trained on raw real vs. decoded fake: the domain-mismatch confound
+is present in decoded mode exactly as in latent-H mode.
+
+IDEA #44 is the correct structural fix: reconstruct real positives through `R(E(real))` before
+feeding `D_bc`, so both real and fake pass through the same R transform. This removes the
+raw-vs-decoded shortcut and forces `D_bc` to learn temporal boundary structure, not domain
+texture.
+
+**Pre-registered interpretation of v194**: if v194 ep85 frozen ★=0.054 holds as the run closes,
+the result is: "decoded-mode bc with seed-5 basin and relaxed kill guard produces better
+short-window frozen score than decoded bc at seed-5 without relaxed kill guard (v191 ★=0.067)."
+That is all it proves. It does not prove `D_bc` learned boundary realism. Any promotion language
+will be qualified accordingly.
+
+**Commitment**: IDEA #44 (`--boundary-critic-real-reconstruct`) is the next boundary probe, not
+more weight/schedule/seed tuning. The three-way diagnostic (raw-real, recon-real,
+shuffled-recon-real, fake) will be logged to determine whether decoded bc was exploiting the
+raw-vs-decoded artifact.
+
+## P1 #2 — Closing IDEA #42 as "latent space too low-dimensional" is overidentified — ACCEPTED
+
+The closure text in Round 36 and RESPONSE.md identified the failure mechanism as
+"latent_dim=24 too low-dimensional for D_bc to provide sufficient gradient pressure." That
+explanation is a plausible hypothesis, not an identified cause. The empirical verdict is firm —
+v192 and v193 both failed with β-recall ceilings ~0.48 — but the root cause could equally be
+the carry-mismatch confound the reviewer has identified across multiple rounds: real boundaries
+are independently reset encoder windows; fake boundaries use carried generator hidden state. The
+critic can trivially learn "head starts at timestep 0 of a fresh encoder window" without any
+signal about temporal continuity.
+
+**Retraction**: the "too low-dimensional" explanation is retracted. The correct closure is: "the
+current latent-H implementation, which compares reset-encoded real heads against carried
+generator heads, failed on v192 and v193. The carry-mismatch confound is a sufficient
+explanation. IDEA #42 in its current form is closed. The broader concept of
+representation-matched boundary criticism (IDEA #43, IDEA #44) remains open."
+
+IDEA #43 (matched carried-state bc) and IDEA #44 (domain-matched decoded bc) are kept alive and
+are the active next structural moves.
+
+## P1 #3 — v194 is not a clean mechanism test; v165 reference corrected — ACCEPTED
+
+Agreed. v194 uses seed=5 + v193 pretrain (seed=5 basin) + raised w-stop threshold. The design
+was intentionally within-basin (motivated by v191's ep83 early kill). That makes v194
+within-basin forensics, not mechanism validation — the same standard applied to the Tencent
+seed-5 component audit.
+
+**Corrected doc**: the text "Same seed as ATB holder v165 (★=0.051)" has been fixed in
+VERSIONS.md to "Same seed as Alibaba ATB holder v176 (★=0.051)." v165 is the Tencent seed-5
+numeric target (★=0.038). v176 (seed=7) is the Alibaba ATB at ★=0.051.
+
+**Standard going forward**: if v194 ep85 ★=0.054 is the run's best checkpoint, the result is
+reported as "seed-5 decoded bc with relaxed kill guard outperforms seed-5 decoded bc with
+standard kill guard in the same seed basin." Second-seed confirmation or domain-matched critic
+(IDEA #44) required before any mechanism claim.
+
+## P2 #4 — Long-rollout/tail gate too conditional — ACCEPTED
+
+The ≤0.060 gate in Round 36 keeps all long-horizon evidence conditional on short-window score
+triage. That is wrong: boundary criticism exists to improve cross-window continuity, and the
+diagnostic panel is informative regardless of whether frozen ★ is competitive — it tells us
+whether bc is improving join quality or merely shifting the short-window sample cloud.
+
+**New policy**: run a compact long-rollout/tail panel for v176, v191, v193, and v194 ep85. The
+≤0.060 gate is removed. This is the minimum needed to interpret bc results mechanistically.
+
+The panel (HRC, reuse-access rate, stack-distance distribution, tail-strata rows) will be run
+on frozen_best.pt for each of those four experiments. v193 and v194 ep85 have frozen_best.pt
+ready on vinge. v176 and v191 frozen_best.pt paths should be confirmed before running.
+
+## P2 #5 — boundary_critic.py docstring fixed — ACCEPTED
+
+The docstring said real pairs are "centered on a true file boundary." The implementation
+(`sample_real_boundaries`) samples every T records within each file — these are in-file
+adjacent-window boundaries at stride T, not cross-file boundaries. The docstring has been
+corrected in `boundary_critic.py` to say "in-file adjacent-window boundary at stride T" and
+notes it is not a cross-file boundary.
+
+## Summary of actions taken
+
+| item | status |
+|---|---|
+| v194 pre-registered interpretation | "seed-5 decoded bc + relaxed kill guard" — NOT mechanism proof |
+| IDEA #44 (domain-matched decoded bc) | Next boundary probe after v194 closes |
+| IDEA #42 closure text | Retracted "too low-dimensional" explanation |
+| IDEA #43 (matched carry-state bc) | Kept alive; not buried by IDEA #42 closure |
+| v165 → v176 Alibaba ATB reference | Fixed in VERSIONS.md |
+| Long-rollout panel gate | Removed; panel queued for v176, v191, v193, v194 ep85 |
+| boundary_critic.py docstring | Fixed: "in-file adjacent-window boundary at stride T" |
+
+## Short take
+
+The reviewer correctly identifies that the raw-vs-decoded confound was never removed by
+decoded-mode bc — it was merely hidden. v194 is within-basin forensics that proves the kill
+guard was premature in v191, not that `D_bc` learned boundary realism. IDEA #44 is the cleanest
+next structural move: keep decoded-feature gradients while reconstructing real positives through
+`R(E(real))` so both sides of the critic train in the same feature domain.
