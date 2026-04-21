@@ -1292,3 +1292,23 @@ frozen sweep) will test bc=0.1 + diversity=5.0 at seed=11.
 
 Items 3 and 4 remain gated on v191's frozen sweep results (no point in long-rollout panels
 if bc_weight=0.1 changes the mechanism significantly).
+
+---
+
+## AD note: shuffled-real diagnostic not implementable without retraining D_bc (2026-04-20)
+
+Attempted to add a shuffled-real control to bc logging (Round 34 P1 #1 partial address).
+AD identified a P0 flaw: D_bc was trained with raw-real as positive and R(G(z))-decoded as
+negative. Shuffled-real pairs are still raw features — D_bc's "real" class — so they score
+similar to consecutive-real by construction. `bc_shuf_gap ≈ 0` would be the expected outcome
+even if D_bc learned perfect temporal structure; the test cannot distinguish the two cases.
+
+**Correct approach** (requires retraining): train a 3-way D_bc with:
+- consecutive-real (positive)
+- shuffled-real (negative class 1: correct features, wrong temporal join)
+- decoded-fake (negative class 2: correct temporal structure, wrong feature manifold)
+
+A D_bc that separates all three would unambiguously demonstrate temporal join learning.
+Cost: significant code change (D_bc loss rewrite); deferred until bc=0.1 frozen sweep.
+
+The current bc_gap signal (positive and stable) remains the best available bc diagnostic.
