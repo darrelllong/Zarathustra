@@ -1510,3 +1510,27 @@ Mini-eval takes ~20–30s/epoch at 500 samples. Its ★ would be logged as `eval
 **Cost**: zero code change — only hyperparameter modification.
 **Risk**: too much diversity pressure may cause training instability or override the bc signal entirely. Start at 4.0; if unstable, back off to 3.0.
 **Expected outcome**: if v191 frozen MMD²≈0.012 and diversity=5.0 brings it to ≈0.007, ★≈0.007+0.2×0.25=0.057 — within 12% of ATB ★=0.051.
+
+---
+
+### 40. Feature-matching loss between real and fake boundary transitions (extends #36)
+
+**Gap attacked**: the boundary critic (IDEA #36) provides only a binary adversarial signal (real vs fake boundary). This gives the generator a gradient direction but no direct magnitude information about HOW the boundary features differ. Feature-matching provides a direct MMD-like alignment signal at the boundary.
+
+**Proposal**: during the G-step (not D_bc step), extract the penultimate-layer activations of D_bc on both real and fake pairs, and add an L2 feature-matching loss:
+
+```python
+# Extract D_bc penultimate features (not output)
+_phi_real = D_bc.net[:-1](torch.cat([tail_r.reshape(B,-1), head_r.reshape(B,-1)], 1))
+_phi_fake = D_bc.net[:-1](torch.cat([tail_f.reshape(B,-1), head_f.reshape(B,-1)], 1))
+bc_fm_loss = F.mse_loss(_phi_fake.mean(0), _phi_real.mean(0).detach())
+# Add: G_loss += bc_fm_weight * bc_fm_loss
+```
+
+**Why this is on-target**: adversarial signal tells G "your boundary looks wrong" but doesn't specify how to fix it. Feature-matching tells G "your mean boundary statistics need to shift in this direction." This is the same principle as `--feature-matching-weight` for the main critic, adapted to the boundary critic.
+
+**Alternative flag**: `--boundary-critic-fm-weight FLOAT` (default 0.0 = disabled). Start at 0.1.
+
+**Cost**: ~30 lines in train.py; requires splitting D_bc.net into feature extractor + final linear. The `BoundaryCritic.net` is a simple Sequential, so extracting `net[:-1]` is trivial.
+**Risk**: feature-matching competes with adversarial signal; too large a weight can overwhelm D_bc's training objective. Start small (0.05–0.1). Requires D_bc weights to be frozen during fm extraction (detach phi_real).
+**Expected outcome**: if bc fm-loss reduces boundary MMD² without collapsing recall, it might provide the MMD² reduction needed to close the gap to v176 (★=0.051 with MMD²=0.007).
