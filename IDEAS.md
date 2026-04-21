@@ -1627,3 +1627,81 @@ Options:
 **Why this is structural**: it preserves the decoded-feature gradient that latent-H seems to lack while removing the confound that makes current `bc_gap` hard to interpret. This is a better next boundary bet than more `bc_weight`, W-stop, or warm-up tuning.
 **Implementation**: `--boundary-critic-real-reconstruct` flag added to `train.py` (2026-04-21). Real side: `R(E(full_window))[:, -K:, :]` and `R(E(full_window))[:, :K, :]` — both in decoded feature space. Fake side: `R(G(z))` as before. Mode label: `decoded-feat-matched`.
 **Test**: v195 (seed=5, pretrain=v193, same recipe as v194 + `--boundary-critic-real-reconstruct`) — RUNNING
+
+---
+
+### 45. Long-rollout IRD adversary — fix the universal IRD=1 structural floor
+
+**Gap attacked**: The first long-rollout panel (2026-04-21, v176/v191/v193/v194) reveals a
+universal structural failure: IRD (inter-reference distance) median = 1 across all four
+models, vs real's IRD median = 194. Stack distance = 0 for all models vs real's 174. This
+means no generated trace has temporal object-locality beyond the immediate timestep. The
+boundary critic (IDEA #36/44) can improve window-join reuse, but it cannot fix within-window
+and cross-window object reuse patterns because it only sees the K-step boundary slice, not
+the full object-ID recurrence structure.
+
+The LSTM generator produces effectively independent object-ID draws each timestep (via the
+`obj_id_reuse` column, which encodes whether the ID recurs). The conditioning on
+trace-level `obj_id_stride` and `obj_id_reuse` statistics is insufficient: the model
+can reproduce the *fraction* of reuse steps (which enters ★ via β-recall) without
+preserving the *temporal gap distribution* (IRD) between reuse events.
+
+**Root cause**: `obj_id_reuse` is a binary per-timestep indicator (1 if this access revisits
+a recent object, 0 if new). The LSTM can learn the marginal P(reuse=1) without learning the
+conditional P(reuse_t | prev_reuse_t-k, obj_id_t-k) — the autocorrelation structure of
+reuse events. A short-window MMD metric captures P(reuse) in a 12-step window but not the
+recurrence spacing distribution across 50,000 records.
+
+**Proposal**: Add a dedicated IRD discriminator or direct IRD loss to force the generator
+to match the inter-reference distance distribution.
+
+**Option A — IRD histogram adversary (GAN signal)**:
+Add a small discriminator D_ird that operates on IRD histograms computed over a long
+(T_long = 512-1024 step) fake vs real window. The discriminator compares binned IRD
+distributions (log-spaced bins from 1 to T_long). This gives G a gradient toward matching
+the shape of the IRD histogram.
+
+```
+# In G-step, with a 512-step rollout:
+real_ird_hist = compute_ird_histogram(real_long_window, bins=32)  # fixed bins
+fake_ird_hist = compute_ird_histogram(fake_long_window, bins=32)
+ird_loss = wasserstein_1d(fake_ird_hist, real_ird_hist.detach())
+G_loss += ird_loss_weight * ird_loss
+```
+
+**Option B — direct IRD alignment loss (no discriminator)**:
+Compute Wasserstein-1 distance between fake and real IRD histograms and use it directly
+as a G-training loss. No D_ird parameters to train; IRD loss is purely supervised.
+Cheaper to implement; trades adversarial sharpness for stability.
+
+**Option C — reuse autocorrelation matching**:
+Instead of IRD histogram, match the autocorrelation function of the `obj_id_reuse` column
+over long windows. If fake and real have the same ACF(obj_id_reuse), the temporal gap
+structure is reproduced. `ACF_loss = MSE(ACF_fake, ACF_real_ema)` over lag 1-50.
+
+**Why this matters for the race**: IRD=1 means all fake traces behave as infinite working
+sets — every LRU cache always misses because objects never repeat within the simulation
+window. This makes every fake trace identical from the caching perspective, regardless of
+short-window ★. The real traces have IRD median=194, which means a cache of size ~200 objects
+covers median reuse. A fake trace with IRD=194 would have 5-10× lower HRC-MAE than any
+current model.
+
+**Minimal viable experiment**: add `--ird-loss-weight 0.5` flag and Option B (direct
+Wasserstein IRD loss). Compute IRD on 256-step fake windows (vs current 12-step training
+window). This requires 256/12 ≈ 22 chained generation steps per batch, which is expensive
+(~20× current window cost). To keep compute tractable, use 1 long window per batch of 32
+normal windows, treating it as a regularizer.
+
+**Cost**: ~2-3h code change. IRD computation: `np.unique` + histogram on `obj_id_reuse`
+column. Chaining: extend the existing hidden-state carry logic (already present for
+block-sample mode) to 256+ steps. Wasserstein-1d: already present in `llgan/mmd.py` or
+use `scipy.stats.wasserstein_distance`.
+
+**Risk**: Long-window chaining is significantly more expensive and may introduce gradient
+instability (256 BPTT steps). Start with 64 steps + gradient clipping before scaling.
+The IRD signal may conflict with the bc boundary signal if both are active simultaneously.
+
+**Dependency**: run v195 (IDEA #44) first to establish the IDEA #44 baseline. If IDEA #44
+improves reuse_access_rate vs v191 (0.193), a combined bc+IRD run would be the next step.
+If IDEA #44 does not improve reuse, the bc mechanism alone may be saturated and IRD adversary
+is the next structural lever.
