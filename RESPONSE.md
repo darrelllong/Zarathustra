@@ -1126,3 +1126,91 @@ because the difference is small and symmetric across all runs.
 `hrc[-1]` padding pattern Gemini R1-P2 flagged.  Removed the padding and
 updated the docstring to clarify variable-length return.  The live path
 (`_per_window_hrc` inside `hrc_mae`) was already correct.
+
+---
+
+# Response to peer review Round 34 (2026-04-20)
+
+Round 34 is the right kind of critique: structural, actionable, and specific about
+what v189's healthy recall does and doesn't prove. Two code issues fixed immediately;
+two accepted with caveats; one already closing naturally.
+
+## P1 #2 — no boundary critic logging, "stable" is unverifiable — FIXED
+
+Agreed. "Boundary critic not destabilizing the generator" is not the same as
+"boundary critic learning boundary realism." Fixed in this session (commit `140d77e`):
+
+- `bc_real_scores / bc_fake_scores` accumulators added to the epoch loop
+- Real and fake scores captured separately before `bc_loss.backward()`
+- Epoch log now emits `bc_real=+X.XXX  bc_fake=+X.XXX  bc_gap=X.XXX`
+
+bc_gap = bc_real − bc_fake is the boundary critic's discriminative margin. A growing
+bc_gap at constant or improving recall would be the first sign that D_bc is learning
+boundary structure rather than just noise. v189 is too early to claim either way;
+future epoch reports will include this data.
+
+## P2 #4 — D_bc / opt_D_bc absent from checkpoint save/restore — FIXED
+
+Agreed. Resume would silently restart the boundary adversary from scratch while keeping
+the generator state, changing the training dynamics mid-run. Fixed in same commit:
+
+- `D_bc` and `opt_D_bc` added to best.pt, epoch_NNNN.pt, and final.pt saves
+- Resume loader now restores D_bc / opt_D_bc if present in the checkpoint
+- Condition is `if D_bc is not None` everywhere — non-boundary-critic runs unaffected
+
+v189 is not yet at a resumed-checkpoint boundary, so no training continuity was lost.
+Future boundary-critic runs are correctly resumable.
+
+## P1 #1 — D_bc may solve decoded-vs-raw artifact detection, not boundary realism — ACCEPTED
+
+This is a legitimate concern. Real pairs are raw normalized `TraceDataset.data`; fake
+pairs go through `R(_H_A)` / `R(_H_B)` — the same Recovery decoder the main critic
+has always lived with, but for IDEA #36 the concern is sharper: a learned boundary
+prior is only meaningful if D_bc is distinguishing temporal join plausibility, not
+Recovery-network texture artifacts.
+
+The bc_gap logging now in place will expose whether D_bc is learning anything at all.
+The proper diagnostic — real-raw vs real-reconstructed vs fake-reconstructed — requires
+a dedicated R(E(real)) control run. This is deferred until v189 completes frozen sweep
+and shows a useful bc_gap signal. If bc_gap stays near zero throughout training, the
+critic is not discriminating; if bc_gap grows but recall doesn't follow, the domain
+gap hypothesis is confirmed. Either outcome shapes the v190 design.
+
+## P1 #3 — v189 needs frozen sweep + boundary diagnostics + long-rollout gates — ACCEPTED
+
+Agreed. v189's ep5–ep20 trajectory is a launch health check (not collapsed, not
+diverged). The actual IDEA #36 acceptance bar is:
+
+1. Frozen sweep over all saved checkpoints
+2. bc_gap trajectory showing D_bc is actually discriminating
+3. Long-rollout HRC / reuse-access / stack-distance panel
+4. Tail-heavy vs ordinary MMD shape rows
+5. At least one additional seed (v190 seed=3 queued after GPU clears)
+
+"Recall healthy" means we are not in the Alibaba collapse basin. It does not mean
+the boundary mechanism is working.
+
+## P2 #5 — v187/v188 are closure, not roadmap — ACCEPTED
+
+v187 is now closed: frozen ★=0.16532 (+340% worse, multi-scale-critic 4.4× load-bearing).
+v188 running; kill at ep70 (~20 min). Once v188 frozen sweep completes, the seed-5
+audit matrix is done:
+
+| Component | Ablation | Frozen ★ | Degradation |
+|---|---|---|---|
+| Retrieval-memory (IDEA #17) | v180 | 0.11882 | 3.17× |
+| Multi-scale-critic (IDEA #8) | v187 | 0.16532 | 4.4× |
+| PCF-loss (IDEA #26) | v183 | ~0.192 | ~5.1× |
+| Mixed-type-recovery (IDEA #7) | v188 | TBD | TBD |
+
+The audit will close after v188. No further same-seed tencent ablations. The seed-5
+basin forensics have produced a map of load-bearing components; they have not produced
+a transferable mechanism.
+
+## Summary
+
+Round 34's core correction is right: a healthy recall at ep5–ep20 is evidence that
+v189 is not in the Alibaba collapse basin, not that IDEA #36 is working. The two
+code fixes (bc logging + D_bc checkpoint) are in. The three remaining items (domain
+gap control, long-rollout gates, seed bundle) are accepted as the real v189 acceptance
+bar and will be addressed as the run matures.
