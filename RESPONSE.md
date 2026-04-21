@@ -1965,3 +1965,146 @@ adversarial signal directly on IRD distribution (IDEA in progress).
 - `/home/darrell/longroll_v191.json`
 - `/home/darrell/longroll_v193.json`
 - `/home/darrell/longroll_v194.json`
+
+---
+
+## Response to Round 39
+
+### P1 #1 — Long-rollout panel is the immediate evidence needed — DONE
+
+The long-rollout panel is complete and reported above (v176/v191/v193/v194 ep85,
+run 2026-04-21). The evidence is in: v195 ep110 long-rollout also complete with
+CATASTROPHIC result (reuse_access=0.0081, HRC-MAE=0.1287). Summary conclusion:
+
+- v191 decoded-bc is the only bc variant with good long-rollout reuse (0.193)
+- ALL decoded-feat-matched variants (v193, v194, v195) are catastrophic (0.006-0.008)
+- IRD=1 floor is universal and structural across all four models and all seeds
+
+The long-rollout sidecar has now rendered its verdict. The bc branch is a recall
+stabilizer, not a locality escape route, as predicted.
+
+### P1 #2 — Real-prefix continuation training (IDEA #47) is next — ACCEPTED
+
+Accepted as architecture slot 1 after the current experiment closes. One cheap
+parallel test is being run first: v197 adds the chained-window ACF loss on
+obj_id_reuse (IDEA #45, T_long=48 across 4 chained windows). This requires zero
+architecture change, reuses v195's pretrain, and runs at the same compute cost.
+If it fails to move long-rollout reuse, architecture slot 1 goes to IDEA #47
+immediately.
+
+IDEA #47 (real-prefix continuation) is the right structural lever: training
+explicitly on the task the model performs at inference (continue a real prefix)
+closes the train/inference gap that boundary criticism only partially addresses.
+Will implement as a fine-tune from an existing checkpoint with E/R frozen for
+the first pass.
+
+### P1 #3 — Locality needs an explicit output mechanism (IDEA #48) — ACCEPTED
+
+Accepted as architecture slot 2. Starting as a post-Recovery repair experiment:
+maintain a synthetic LRU stack during generation, predict new-object vs reuse,
+and sample stack-distance buckets when reuse fires. If this moves HRC/stack-distance,
+promote it into the model as a trained head. The reviewer is right that indirect
+neural locality emergence has been failing for 15+ experiments; the object process
+needs to be explicitly modeled.
+
+### P1 #4 — Window-level bridge (IDEA #49) — ACCEPTED, LOWER PRIORITY
+
+Accepted. Window atlas will be built after the continuation experiment (IDEA #47)
+provides signal. Routing by window type makes most sense once there are at least
+two mechanisms to route between.
+
+### P1 #5 — Execution order, not larger queue — ACCEPTED
+
+Current execution order:
+1. v195 runs to ep200 (34 epochs left, ~85 min). Final frozen sweep to confirm
+   or deny ep110 as the peak. Then CLOSE the bc branch.
+2. v197 launches (IDEA #45 ACF chain, zero architecture change, cheap test).
+3. If v197 fails long-rollout: implement IDEA #47 continuation training.
+4. If v197 passes long-rollout: IDEA #48 as architecture slot 2.
+5. IDEA #49 window atlas after continuation architecture is stable.
+
+No more boundary-critic variants. The bc branch closes after v195+v197.
+
+### P2 #6 — Keep v195, don't let it decide project direction — ACCEPTED
+
+v195 will run to completion as promised (ep200). Its frozen ★=0.042 (ep110) is
+the best clean-code result and a useful calibration point. But the project direction
+is not contingent on v195 — the long-rollout failure is already confirmed. v195
+closes the bc-decoded track; it does not extend it.
+
+---
+
+## Response to Round 40
+
+### P1 #1 — v196 promotion bar incomplete; requires bc_diag adjacency criterion — ACCEPTED
+
+Accepted. v196 promotion bar amended to three conditions:
+1. Frozen ★ ≤ 0.054 (prior bar)
+2. Long-rollout reuse_access_rate ≥ 0.10 (prior bar)
+3. **bc_diag: bc_real > bc_shuf by ≥ 0.05 in the second half of training**
+   (adjacency criterion — D_bc must separate adjacent from shuffled, not just
+   real from fake)
+
+If v196 satisfies conditions 1+2 but fails condition 3, the correct label is
+"decoded real-vs-fake auxiliary / seed-basin regularizer", not "validated temporal
+boundary critic." This is a meaningful distinction for the paper.
+
+Note: v196 is currently paused at ep20 (killed to free GPU for v195's critical
+window). Will restart after v195 completes.
+
+### P1 #2 — IDEA #45 points at wrong object; binary ACF ≠ IRD — ACCEPTED WITH NUANCE
+
+Accepted that binary obj_id_reuse ACF is not inter-reference distance. The reviewer
+is technically correct: true IRD requires the emitted object identity stream and
+counts distinct intervening objects. Binary reuse flag ACF measures run-length
+structure of reuse events, not the gap distribution.
+
+v197 (chained-window ACF on obj_id_reuse) is implemented and will be launched as a
+cheap auxiliary test, explicitly NOT claimed as an IRD fix. Real ACF(lag=1) = −0.325
+(strong negative — alternating reuse pattern) vs fake ACF(lag=1) ≈ 0 or positive
+(long runs of same-object or absent-reuse runs). This is a real signal mismatch even
+if it's not IRD directly. If v197 fails to move long-rollout reuse, the IDEA #45
+ACF auxiliary is confirmed as insufficient and the slot moves to IDEA #47/#48.
+
+If IDEA #48 (stateful LRU stack) is implemented, it will produce an actual object
+identity stream that can be used to compute real IRD, making IDEA #45 Option A
+(direct Wasserstein loss on IRD histograms) tractable. Until then, the ACF auxiliary
+is the best available proxy at zero architecture cost.
+
+### P1 #3 — v195 should close the matched-domain bc branch — ACCEPTED
+
+v195 is at ep166 (34 epochs to go). The verdict is already in from ep110's
+long-rollout (reuse_access=0.0081, CATASTROPHIC). The branch is closed regardless
+of ep200 outcome. The final frozen sweep at ep200 will confirm whether ep110 remains
+the peak or if there's a late recovery, but neither outcome changes the bc-decoded
+conclusion: good short-window ★, catastrophic locality.
+
+bc_diag shows shuf ≥ raw through ep165 — D_bc has not learned temporal adjacency
+at any point in training. This is the second closure criterion (per Round 40 P1 #1
+amendment). Both conditions are satisfied: (1) long-rollout catastrophic, (2) no
+adjacency signal. The matched-domain boundary branch is closed.
+
+### P2 #4 — torch.randint(B-1) crashes when B=1 — FIXED
+
+Fixed. Added `if B >= 2:` guard around the derangement computation; emits
+`nan` for the shuffled diagnostic on singleton batches. Committed 4a7a003
+and pulled to vinge. This path cannot be triggered with the current training
+command (`drop_last=True` + batch_size=64 + 239 files) but the CLI permits
+`--batch-size 1` so the guard is correct.
+
+### P2 #5 — Long-rollout interpretation overstates the failure — ACCEPTED
+
+Accepted. Correcting the language in the IRD=1 floor description:
+
+**Old** (incorrect): "every LRU cache always misses"
+
+**Correct**: "the object process lacks the long-gap reuse law that shapes real HRCs.
+The few reuses that occur are mostly immediate repeats (stack-distance ≈ 0), while
+most objects never participate in realistic longer-gap reuse. A cache working set
+this narrow cannot reproduce the real HRC curve, which requires objects to persist
+in the working set long enough to be re-accessed after many intervening distinct
+objects."
+
+This is a more precise characterization: the failure is in the reuse gap
+distribution (IRD histogram concentrated at 1, not the ~194-median real distribution),
+not a claim about absolute cache hit rates.
