@@ -1269,9 +1269,18 @@ Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weigh
 recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
 and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_weight=0.1.
 
+**v191 early trajectory (ep1–7, 2026-04-20)**: bc_gap=0.300→0.526→0.187 (positive and gradually
+declining as G fools D_bc). EMA recall=0.655 at ep5 — no collapse at bc_weight=0.1.
+
 **v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
 ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
 mode-recovery. But neither ep30 peak nor ep65 recovery is competitive with ATB ★=0.051.
+
+**MMD² gap analysis (IDEA #39)**: v176 ATB achieves MMD²=0.007 with β-recall=0.779, ★=0.051.
+v189 bc=0.5 achieved frozen MMD²=0.014 — 2× worse. Root cause: bc's mode-restriction shortcut
+increases MMD² by narrowing the G distribution. Fix queued as IDEA #39: boost diversity-loss-weight
+from 2.0→5.0 for bc runs to directly counter the mode-restriction attractor. v194 (after v191
+frozen sweep) will test bc=0.1 + diversity=5.0 at seed=11.
 
 ## v189 acceptance bar (Round 34 P1 #3) — status
 
