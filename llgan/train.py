@@ -617,12 +617,16 @@ def train(cfg: Config) -> None:
     _bc_w = float(getattr(cfg, "boundary_critic_weight", 0.0))
     _bc_k = int(getattr(cfg, "boundary_critic_k", 4))
     _bc_hidden = int(getattr(cfg, "boundary_critic_hidden", 128))
+    _bc_latent = bool(getattr(cfg, "boundary_critic_latent", False))
     if _bc_w > 0 and R is not None:
-        D_bc = BoundaryCritic(prep.num_cols, k=_bc_k, hidden=_bc_hidden).to(device)
+        _bc_feat_dim = cfg.latent_dim if (_bc_latent and latent_ae) else prep.num_cols
+        D_bc = BoundaryCritic(_bc_feat_dim, k=_bc_k, hidden=_bc_hidden).to(device)
         opt_D_bc = torch.optim.Adam(D_bc.parameters(), lr=cfg.lr_d, betas=(0.5, 0.9))
-        print(f"[boundary-critic] Enabled (weight={_bc_w:.2f}, K={_bc_k}, hidden={_bc_hidden})")
+        _bc_mode = "latent-H" if (_bc_latent and latent_ae) else "decoded-feat"
+        print(f"[boundary-critic] Enabled (weight={_bc_w:.2f}, K={_bc_k}, hidden={_bc_hidden}, mode={_bc_mode})")
     else:
         D_bc = opt_D_bc = None
+        _bc_latent = False
 
     # torch.compile: fuses CUDA kernels for ~20-40% speedup on NVIDIA hardware.
     # Skipped on MPS/CPU (no benefit) and when create_graph gradients are needed
@@ -1387,14 +1391,10 @@ def train(cfg: Config) -> None:
                     scaler_C.step(opt_C_feat)
                     scaler_C.update()
 
-                # --- Boundary critic step (IDEA #36) ---
+                # --- Boundary critic step (IDEA #36 / #42) ---
                 if D_bc is not None and R is not None and _bc_file_arrays:
                     opt_D_bc.zero_grad()
                     with torch.amp.autocast(device.type, enabled=use_amp):
-                        # Real boundary pairs from this epoch's files
-                        _bc_tail_r, _bc_head_r = sample_real_boundaries(
-                            _bc_file_arrays, B, _bc_k, cfg.timestep, device)
-                        # Fake boundary pairs: G adjacent windows via h_carry
                         with torch.no_grad():
                             _z_gb_bc, _ = _make_z_global(B, cfg, device,
                                                          real_features=real_batch,
@@ -1403,12 +1403,26 @@ def train(cfg: Config) -> None:
                             _z_lb = G.sample_z_local(B, cfg.timestep, device)
                             _H_A, _h_carry_bc = G(_z_gb_bc, _z_la, return_hidden=True)
                             _H_B = G(_z_gb_bc, _z_lb, hidden=_h_carry_bc)
-                            _feat_A = R(_H_A).detach()
-                            _feat_B = R(_H_B).detach()
-                        _bc_tail_f = _feat_A[:, -_bc_k:, :]
-                        _bc_head_f = _feat_B[:, :_bc_k, :]
+                            if _bc_latent:
+                                # IDEA #42: latent-space D_bc — compare E(real) vs G latents.
+                                # Both sides are in latent_dim space; removes raw-vs-decoded
+                                # feature-manifold confound from Round 35 P1 #2.
+                                _raw_A, _raw_B = sample_real_boundaries(
+                                    _bc_file_arrays, B, _bc_k, cfg.timestep, device,
+                                    full_window=True)
+                                _bc_tail_r = E(_raw_A.float())[:, -_bc_k:, :].detach()
+                                _bc_head_r = E(_raw_B.float())[:, :_bc_k, :].detach()
+                                _bc_tail_f = _H_A[:, -_bc_k:, :].detach()
+                                _bc_head_f = _H_B[:, :_bc_k, :].detach()
+                            else:
+                                _bc_tail_r, _bc_head_r = sample_real_boundaries(
+                                    _bc_file_arrays, B, _bc_k, cfg.timestep, device)
+                                _feat_A = R(_H_A).detach()
+                                _feat_B = R(_H_B).detach()
+                                _bc_tail_f = _feat_A[:, -_bc_k:, :]
+                                _bc_head_f = _feat_B[:, :_bc_k, :]
                         _bc_score_r = D_bc(_bc_tail_r.float(), _bc_head_r.float()).mean()
-                        _bc_score_f = D_bc(_bc_tail_f, _bc_head_f).mean()
+                        _bc_score_f = D_bc(_bc_tail_f.float(), _bc_head_f.float()).mean()
                         bc_loss = _bc_score_f - _bc_score_r
                         bc_real_scores.append(_bc_score_r.detach().item())
                         bc_fake_scores.append(_bc_score_f.detach().item())
@@ -1907,7 +1921,7 @@ def train(cfg: Config) -> None:
                     g_loss = g_loss + cfg.pcf_loss_weight * loss_pcf
                     pcf_losses.append(loss_pcf.item())
 
-                # Boundary critic adversarial loss (IDEA #36).
+                # Boundary critic adversarial loss (IDEA #36 / #42).
                 # G generates an adjacent window pair and tries to fool D_bc on the join.
                 if D_bc is not None and R is not None and _bc_w > 0:
                     _z_gb_g, _ = _make_z_global(B, cfg, device, real_features=real_batch,
@@ -1916,10 +1930,14 @@ def train(cfg: Config) -> None:
                     _z_lb_g = G.sample_z_local(B, cfg.timestep, device)
                     _H_Ag, _h_carry_g = G(_z_gb_g, _z_la_g, return_hidden=True)
                     _H_Bg = G(_z_gb_g, _z_lb_g, hidden=_h_carry_g)
-                    _feat_Ag = R(_H_Ag)
-                    _feat_Bg = R(_H_Bg)
-                    _bc_tail_g = _feat_Ag[:, -_bc_k:, :]
-                    _bc_head_g = _feat_Bg[:, :_bc_k, :]
+                    if _bc_latent:
+                        _bc_tail_g = _H_Ag[:, -_bc_k:, :]
+                        _bc_head_g = _H_Bg[:, :_bc_k, :]
+                    else:
+                        _feat_Ag = R(_H_Ag)
+                        _feat_Bg = R(_H_Bg)
+                        _bc_tail_g = _feat_Ag[:, -_bc_k:, :]
+                        _bc_head_g = _feat_Bg[:, :_bc_k, :]
                     loss_bc = -D_bc(_bc_tail_g, _bc_head_g).mean()
                     g_loss = g_loss + _bc_w * loss_bc
 
@@ -2620,6 +2638,10 @@ def parse_args() -> Config:
                         "boundary critic (default 4). Critic input is (2K*feat_dim,).")
     p.add_argument("--boundary-critic-hidden", type=int, default=128,
                    help="Hidden size of the boundary critic MLP (default 128).")
+    p.add_argument("--boundary-critic-latent", action="store_true",
+                   help="IDEA #42: operate D_bc in latent space (E(real) vs G latents) "
+                        "instead of decoded feature space, removing the raw-vs-decoded "
+                        "manifold confound. Requires --latent-dim > 0.")
     p.add_argument("--hybrid-diffusion-aux", action="store_true",
                    help="IDEAS.md #22 (Stage-1 only): side-train a "
                         "LatentDenoiser on E(real).detach() in the joint-GAN "
@@ -2757,6 +2779,7 @@ def parse_args() -> Config:
     cfg.boundary_critic_weight       = args.boundary_critic_weight
     cfg.boundary_critic_k            = args.boundary_critic_k
     cfg.boundary_critic_hidden       = args.boundary_critic_hidden
+    cfg.boundary_critic_latent       = args.boundary_critic_latent
     cfg.boundary_smoothness_weight   = args.boundary_smoothness_weight
     cfg.boundary_smoothness_k        = args.boundary_smoothness_k
     cfg.boundary_smoothness_decay    = args.boundary_smoothness_decay

@@ -87,6 +87,7 @@ def sample_real_boundaries(
     k: int,
     T: int,
     device: torch.device,
+    full_window: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
     Sample n real boundary pairs from a list of per-file tensors.
@@ -104,34 +105,39 @@ def sample_real_boundaries(
     k               : context steps on each side (K)
     T               : window length (so boundaries are at multiples of T)
     device          : target device
+    full_window     : if True, return full T-step windows (B, T, F) suitable
+                      for encoding with E; if False (default), return K-step
+                      boundary slices (B, K, F).
 
     Returns
     -------
-    tail : (n, K, F)  last K steps before each boundary
-    head : (n, K, F)  first K steps after each boundary
+    tail : (n, T or K, F)  window A (full) or last K steps before boundary
+    head : (n, T or K, F)  window B (full) or first K steps after boundary
     """
-    tails, heads = [], []
-
     # Collect all valid boundary positions across all files.
+    # full_window=True needs T steps on both sides; False only needs K steps.
+    _min_after = T if full_window else k
     valid: List[Tuple[Tensor, int]] = []
     for arr in per_file_arrays:
         N = arr.size(0)
-        # Valid boundary positions: b = T, 2T, 3T, … such that b+k <= N and b-k >= 0
-        for b in range(T, N - k + 1, T):
-            if b >= k:
-                valid.append((arr, b))
+        for b in range(T, N - _min_after + 1, T):
+            valid.append((arr, b))
 
     if not valid:
-        # Fallback: return zeros if no valid boundaries (shouldn't happen in practice)
         F = per_file_arrays[0].size(1)
-        z = torch.zeros(n, k, F, device=device)
+        z = torch.zeros(n, _min_after, F, device=device)
         return z, z
 
     chosen = random.choices(valid, k=n)
+    tails, heads = [], []
     for arr, b in chosen:
-        tails.append(arr[b - k : b])      # (K, F)
-        heads.append(arr[b : b + k])      # (K, F)
+        if full_window:
+            tails.append(arr[b - T : b])      # (T, F)
+            heads.append(arr[b : b + T])      # (T, F)
+        else:
+            tails.append(arr[b - k : b])      # (K, F)
+            heads.append(arr[b : b + k])      # (K, F)
 
-    tail = torch.stack(tails, dim=0).to(device)  # (n, K, F)
-    head = torch.stack(heads, dim=0).to(device)  # (n, K, F)
+    tail = torch.stack(tails, dim=0).to(device)
+    head = torch.stack(heads, dim=0).to(device)
     return tail, head
