@@ -1931,3 +1931,122 @@ The new commits since Round 37 mostly update [VERSIONS.md](/Users/darrell/.codex
 ### Short Take
 
 The project did the right thing by implementing the domain-matched decoded critic. But v195 is missing the diagnostic that would make the result interpretable, and v194 is drifting into post-collapse peak chasing. Tighten the evidence now: score reconstructed/shuffled joins, run the long-rollout and tail panels, and keep seed provenance exact.
+
+---
+
+## Round 39
+
+### The Project Is Not Stuck; The Search Loop Is Too Local
+
+This is a broader pause-review, not just a new-commit audit. I read the current review chain,
+response thread, version history, action list, R notes, and the current training/evaluation code. My
+read is that the project is not out of ideas. It is out of patience with the same local proxy loop.
+The next move should not be another boundary-critic weight, W-stop, or seed-basin rescue. It should
+change what the model is trained to continue and how object locality is emitted.
+
+I added three structural ideas to [IDEAS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md):
+`#47` real-prefix continuation training, `#48` stateful stack-distance object decoding, and `#49`
+window-level regime atlas/router supervision.
+
+1. `[P1]` Boundary criticism has become the main loop, but it is only a local join proxy. The current
+   v194/v195 section in [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L238)
+   and [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L239) is still
+   dominated by short-window frozen `★`, beta-recall, W oscillations, and boundary-critic mode. That
+   is useful, but it is not the core failure surface. The long-rollout sidecar already showed that a
+   strong short-window checkpoint can hide a severe cache/locality miss: Tencent `v158` had
+   `reuse_access_rate` `0.2482` vs real `0.6045`, positional IRD median `1` vs real `100`, footprint
+   `+90%`, and HRC-MAE `0.2435` in [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L136)
+   through [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md#L149).
+   So the immediate next evidence should be the promised long-rollout/tail panel, not one more
+   decoded-boundary variant. If v194/v195 do not move HRC, reuse-access, and stack distance, the
+   boundary branch is a recall stabilizer, not the escape route.
+
+2. `[P1]` The most direct next architecture is real-prefix continuation training, not another
+   boundary adversary. Generation explicitly carries hidden state across windows in
+   [llgan/generate.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/generate.py#L139) through
+   [llgan/generate.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/generate.py#L193), but
+   the Phase 3 loop still trains on shuffled local windows in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1263) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1292). The boundary
+   critic creates generated adjacent pairs in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1405)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1411), but it
+   still asks only whether a generic generated join resembles a real join. IDEA
+   [#47](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md#L1749) changes the question to:
+   given a real prefix window from this file/regime, can the model continue the next window? That is
+   a better match to long trace generation than any boundary-only discriminator.
+
+3. `[P1]` Locality needs an output mechanism, not just hidden memory pressure. The repo has retrieval
+   memory, reuse BCE, cache descriptors, and stack-distance diagnostics, but the generated object
+   stream is still expected to emerge indirectly through neural latent output and Recovery. That is
+   why the long-rollout sidecar can show good short-window `★` with bad cache behavior. IDEA
+   [#48](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md#L1796) is the bolder move: maintain an
+   explicit synthetic LRU stack, predict new-object vs reuse, and sample stack-distance buckets when
+   reuse fires. This can start as a post-Recovery repair experiment before becoming a trained head.
+   It is not "less pure"; it is more aligned with the actual system being modeled. Storage traces
+   care about reuse distance because caches care about reuse distance.
+
+4. `[P1]` The project still lacks the window-level bridge it has been asking for since the R work.
+   [ACTION-LIST.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/ACTION-LIST.md#L48) through
+   [ACTION-LIST.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/ACTION-LIST.md#L58) explicitly says
+   within-file window analysis remains pending because file-level summaries do not fully describe
+   window-level generation difficulty. The current conditioning path loads file-level
+   characterizations in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L396)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L408), then
+   builds a validation file-level conditioning pool in [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1158)
+   through [llgan/train.py](/Users/darrell/.codex/worktrees/90fb/Zarathustra/llgan/train.py#L1185). That is
+   better than random descriptors, but it cannot tell a router which windows are burst starts,
+   reuse-heavy islands, long-stack reuses, or tail events. IDEA
+   [#49](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md#L1842) makes the missing bridge
+   concrete: build a window atlas, supervise regime/router labels, and then gate mechanisms by
+   window type instead of corpus-wide flags.
+
+5. `[P1]` The next few days need an execution order, not a larger queue. My recommendation:
+   first freeze boundary-branch evidence; second implement the missing diagnostics; third run one
+   continuation experiment; fourth test the stack-distance decoder as a cheap challenger. In order:
+   run the compact long-rollout/tail panel for `v176`, `v191`, `v193`, `v194 ep85`, and `v195` if it
+   produces any plausible frozen checkpoint; add IDEA #44's missing raw/reconstructed/shuffled/fake
+   boundary score diagnostics; implement IDEA #38 mini-eval if another long run is planned; then
+   spend the next real architecture slot on IDEA #47. If that sounds severe, good. The project has
+   earned a little severity.
+
+6. `[P2]` Keep v195, but do not let it decide whether the project is stuck. v195 is an important
+   cleanup of the raw-vs-decoded confound, but by construction it is still inside the boundary-critic
+   family. If v195 wins on short-window `★`, require the long-rollout/tail panel and the
+   reconstructed/shuffled boundary diagnostic before promotion. If it loses, that should not send the
+   project back to v194 post-collapse sweeps. It should send the project forward to continuation
+   training and explicit object-process decoding.
+
+### Concrete Forward Plan
+
+1. **Evidence freeze, today**: stop treating v194 post-collapse sweeps as mainline. Run or schedule the
+   compact long-rollout/tail panel that has already been accepted.
+
+2. **Diagnostic patch, next**: implement IDEA #44's missing boundary score panel and a CLI guard for
+   incompatible boundary flags.
+
+3. **Architecture slot 1**: implement IDEA #47 as a small continuation fine-tune from an existing
+   checkpoint, with `E/R` frozen for the first pass.
+
+4. **Architecture slot 2**: implement IDEA #48 first as a post-generation object-stream repair layer.
+   If it moves HRC/stack-distance, promote it into the model.
+
+5. **Analysis slot**: build IDEA #49's window atlas on a fixed Tencent/Alibaba manifest and use it to
+   route mechanisms only after held-out window labels make sense.
+
+### Verification
+
+- Reviewed current [PEER-REVIEW.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/PEER-REVIEW.md),
+  [RESPONSE.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/RESPONSE.md),
+  [VERSIONS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/VERSIONS.md),
+  [IDEAS.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/IDEAS.md),
+  [ACTION-LIST.md](/Users/darrell/.codex/worktrees/90fb/Zarathustra/ACTION-LIST.md), R notes, and the
+  core `llgan` training/generation/evaluation modules.
+- Added IDEAS #47, #48, and #49.
+- This pass changed review/planning docs only; no code tests were needed.
+
+### Short Take
+
+Zarathustra is not stuck. It is circling a local boundary proxy after accumulating enough evidence
+that the real gap is continuation plus cache-law generation. The shortest path forward is not a
+heroic new scalar. It is: freeze boundary evidence, trust the long-rollout sidecar, train the model
+to continue real prefixes, and make object reuse distance an explicit generated process.
