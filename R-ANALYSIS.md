@@ -1103,6 +1103,76 @@ This layer writes:
 
 It also appends `## Model-Aware Guidance` to each family report under [characterizations/families](/Users/darrell/Zarathustra/characterizations/families).
 
+## Higher-Order Moment Pass
+
+On 2026-04-18, R was run on `vinge.local` against the `/tiamat` model-aware feature table:
+
+- input: `/tiamat/zarathustra/r-output/model_aware_20260416_0929/results/all_features.csv`
+- output: `/tiamat/zarathustra/r-output/higher_moments_20260418_1058/`
+
+This pass computed standardized central moments through order 6 for every numeric feature within each logical family. For feature \( j \), finite values \( x_1,\dots,x_m \), mean \( \overline{x} \), and sample standard deviation \( s \), the additional moment of order \( r \in \{5,6\} \) is:
+
+$$
+\mu_r^{\ast}(j) =
+\begin{cases}
+\dfrac{1}{m} \sum_{i=1}^{m} \left(\dfrac{x_i - \overline{x}}{s}\right)^r, & m \ge r \text{ and } s > 0 \\
+\mathrm{NA}, & \text{otherwise}
+\end{cases}
+$$
+
+Kurtosis in this pass was also recorded as the raw standardized 4th central moment for comparability with orders 5 and 6.
+
+### Generator-Relevant Tail Results
+
+The block-trace families show extreme positive 5th and 6th moments on inter-arrival and stride surfaces. These are not small corrections to skew/kurtosis; they indicate rare-event tail structure that a mean/variance-driven or ordinary moment-matching recipe can easily miss.
+
+| Family | Metric | n | Skew / M3 | Kurtosis / M4 | M5 | M6 |
+|---|---|---:|---:|---:|---:|---:|
+| s3-cache-datasets__2020_alibabaBlock | iat_q90 | 1000 | 29.607 | 905.362 | 27861.885 | 858620.510 |
+| s3-cache-datasets__2020_alibabaBlock | iat_mean | 1000 | 28.975 | 877.655 | 26793.475 | 819243.700 |
+| s3-cache-datasets__2020_alibabaBlock | iat_std | 1000 | 24.889 | 695.715 | 19904.685 | 572523.020 |
+| s3-cache-datasets__2020_alibabaBlock | reuse_ratio | 1000 | 18.294 | 389.935 | 8634.077 | 194914.630 |
+| s3-cache-datasets__2020_tencentBlock | iat_q50 | 4993 | 37.930 | 1659.769 | 77661.370 | 3756862.900 |
+| s3-cache-datasets__2020_tencentBlock | iat_mean | 4993 | 34.486 | 1453.885 | 65836.701 | 3081617.000 |
+| s3-cache-datasets__2020_tencentBlock | abs_stride_q50 | 4993 | 27.581 | 1082.962 | 47391.454 | 2156810.200 |
+| s3-cache-datasets__2020_tencentBlock | abs_stride_q90 | 4993 | 19.428 | 578.088 | 18906.740 | 636516.900 |
+
+### Modeling Implications
+
+- Higher-order tail shape is concentrated in `iat_*`, `abs_stride_*`, and `reuse_ratio`, not uniformly across every feature.
+- Tencent has especially extreme 6th moments in median IAT and median absolute stride, which supports treating rare timing/seek regimes as a structural modeling problem rather than as one more scalar-loss weight.
+- Alibaba also has massive IAT and reuse tails, but its current recipe reproduces better than Tencent. That suggests the next Alibaba work should not be generic seed churn; it should test whether the chosen checkpoint captures the rare-event tail metrics.
+- A direct high-order-moment loss would probably be numerically brittle. The safer interpretation is diagnostic and architectural: use these moments to identify tail-regime families and then model those regimes explicitly.
+
+### Full-Corpus Leaderboard
+
+The pass was not a sample of a few traces. It consumed the full `all_features.csv` table from the model-aware run and produced:
+
+- 560 finite higher-moment rows
+- 22 logical families with enough finite observations for standardized 6th moments
+- 307 generator-surface rows across `iat_*`, `abs_stride_*`, `reuse_ratio`, object-size, object-popularity, and write-ratio features
+
+The full output files are:
+
+- `/tiamat/zarathustra/r-output/higher_moments_20260418_1058/family_higher_moments.csv`
+- `/tiamat/zarathustra/r-output/higher_moments_20260418_1058/family_max_m6_leaderboard.csv`
+- `/tiamat/zarathustra/r-output/higher_moments_20260418_1058/all_family_generator_surface_higher_moments.csv`
+
+Top generator-surface M6 rows across all sufficient-size families:
+
+| Family | Metric | n | Skew / M3 | Kurtosis / M4 | M5 | M6 |
+|---|---|---:|---:|---:|---:|---:|
+| s3-cache-datasets__tencentBlock | abs_stride_q50 | 4991 | 56.516 | 3470.502 | 219447.201 | 14013411.300 |
+| s3-cache-datasets__tencentBlock | iat_q50 | 4991 | 54.115 | 3156.205 | 190405.700 | 11666434.600 |
+| s3-cache-datasets__2020_tencentBlock | iat_q50 | 4993 | 37.930 | 1659.769 | 77661.370 | 3756862.900 |
+| s3-cache-datasets__2020_tencentBlock | iat_mean | 4993 | 34.486 | 1453.885 | 65836.701 | 3081617.000 |
+| s3-cache-datasets__2020_tencentBlock | abs_stride_q50 | 4993 | 27.581 | 1082.962 | 47391.454 | 2156810.200 |
+| s3-cache-datasets__alibaba | iat_q90 | 1000 | 30.167 | 932.595 | 28947.120 | 899161.400 |
+| s3-cache-datasets__alibaba | iat_mean | 1000 | 29.913 | 922.413 | 28559.050 | 884769.500 |
+| s3-cache-datasets__2020_alibabaBlock | iat_q90 | 1000 | 29.607 | 905.362 | 27861.885 | 858620.510 |
+| alibaba__alibaba | iat_q90 | 999 | 29.592 | 904.453 | 27819.963 | 856898.980 |
+| s3-cache-datasets__2020_alibabaBlock | iat_mean | 1000 | 28.975 | 877.655 | 26793.475 | 819243.700 |
+
 ## Resource Policy On `vinge.local`
 
 During remote execution:
