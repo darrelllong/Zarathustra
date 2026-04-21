@@ -833,9 +833,10 @@ def train(cfg: Config) -> None:
             S.load_state_dict(ckpt["S"], strict=False)
         if LD is not None and "LD" in ckpt:
             LD.load_state_dict(ckpt["LD"])
-        if D_bc is not None and "D_bc" in ckpt and "opt_D_bc" in ckpt:
+        if D_bc is not None and "D_bc" in ckpt:
             D_bc.load_state_dict(ckpt["D_bc"])
-            opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
+            if "opt_D_bc" in ckpt and not cfg.reset_optimizer:
+                opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
         # Restore preprocessor from checkpoint so normalization stays consistent
         if "prep" in ckpt:
             prep = ckpt["prep"]
@@ -935,7 +936,7 @@ def train(cfg: Config) -> None:
             val_tensor = pc["val_tensor"].to(device)
         if LD is not None and "LD" in pc:
             LD.load_state_dict(pc["LD"])
-            if "opt_LD" in pc:
+            if "opt_LD" in pc and not cfg.reset_optimizer:
                 opt_LD.load_state_dict(pc["opt_LD"])
         pretrain_done = True
         print("  Pretrain checkpoint loaded.")

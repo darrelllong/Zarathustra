@@ -1218,9 +1218,90 @@ bar and will be addressed as the run matures.
 
 ---
 
-# Response to peer review Round 35 (pre-draft, 2026-04-20)
+# Response to peer review Round 35 (2026-04-20)
 
-_Round 35 has not yet arrived. This pre-draft documents the v189/v190 post-mortem and v191 rationale so the response is ready when the review lands._
+Round 35's framing is exactly right: the boundary critic is the right structural bet, but the
+evidence bar has not been met yet. Two code fixes applied immediately; three accepted.
+
+## P1 #1 — "within 0.004 of ATB" language compares EMA to frozen — RETRACTED
+
+The language was wrong. v191 ep20 EMA ★=0.05529 versus frozen v176 ★=0.051 is an apples-to-oranges
+comparison given the documented EMA-vs-frozen reversals on this architecture: v189 EMA ★=0.034 →
+frozen ★=0.089 (+162%); v190 EMA ep30 ★=0.053 → ep30 frozen ★=0.124 (+134%).
+
+Retraction is now moot: v191 ep30 confirms collapse, not proximity:
+- ep20: EMA recall=0.786, ★=0.05529 (train-best)
+- ep25: EMA recall=0.605, ★=0.09607
+- ep30: EMA recall=0.537, ★=0.11990 — W rising 0.504→0.918
+
+The trajectory matches v190's collapse pattern. Run is live under patience=60 from ep20; may show
+late-epoch recovery (v190's frozen-best was ep65). "Within 0.004 of ATB" language removed from
+VERSIONS.md and RESPONSE.md. v191 ep20 is a launch-health signal, not an ATB-near result.
+
+## P1 #2 — bc_gap mixes temporal discrimination with raw-vs-decoded artifact — ACCEPTED
+
+Agreed. bc_gap = D_bc(raw_real) − D_bc(R(G(z))) is non-zero even if D_bc learned only to distinguish
+Recovery-decoded texture from raw features, not temporal join quality. The shuffled-real control
+was attempted and rejected by AD (raw-shuffled still on the raw-real manifold). The correct
+diagnostic — consecutive-raw vs shuffled-raw vs reconstructed-real R(E(real)) vs decoded-fake —
+requires retraining D_bc with a 3-way or 4-way classification objective.
+
+Conceding: bc_gap as currently reported is only evidence that "D_bc separates its two training
+domains." It is NOT evidence that D_bc learned temporal boundary structure. IDEA #42 (latent-space
+D_bc) is now the top-priority next structural step for #36: moving both real and fake inputs to
+hidden-state space removes the raw-vs-decoded confound entirely, since H_real and H_fake both pass
+through the same Supervisor/Recovery pipeline.
+
+**Next action**: implement IDEA #42 (latent H-space D_bc) as v196+ after the bc=0.1 seed bundle
+closes (v191/v192/v193). This is ranked above IDEA #39 (diversity boost) and IDEA #41 (n_critic
+warmup) per Round 35 P2 #4.
+
+## P2 #3 — opt_D_bc not gated by --reset-optimizer — FIXED (commit this session)
+
+Confirmed the bug: lines 836-838 restored opt_D_bc unconditionally before the reset_optimizer
+branch at line 848. A hot-start with `--reset-optimizer` would reset opt_G and opt_C but keep
+stale Adam moments in opt_D_bc — exactly the pattern used when launching v191 (different bc_weight
+from v189's seed).
+
+Fixed in this session:
+
+```python
+# Before:
+if D_bc is not None and "D_bc" in ckpt and "opt_D_bc" in ckpt:
+    D_bc.load_state_dict(ckpt["D_bc"])
+    opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
+
+# After:
+if D_bc is not None and "D_bc" in ckpt:
+    D_bc.load_state_dict(ckpt["D_bc"])
+    if "opt_D_bc" in ckpt and not cfg.reset_optimizer:
+        opt_D_bc.load_state_dict(ckpt["opt_D_bc"])
+```
+
+Note: D_bc weights now load even without opt_D_bc in the checkpoint (e.g., old checkpoints pre-Round-34 fix). This is the correct semantics — D_bc weights are valuable even when opt_D_bc state is absent or being reset.
+
+The same pattern was present for opt_LD (latent discriminator, `--avatar` mode); fixed in the same
+commit for consistency. opt_LD is never active in current runs (`--avatar` not used), so this was
+a latent bug, not an active one.
+
+## P2 #4 — scalar/schedule ideas ahead of structural diagnostic fix — ACCEPTED
+
+Agreed. IDEAS #39 (diversity boost) and #41 (n_critic warmup) are rescue knobs that assume bc_gap
+is a valid signal. Round 35 P1 #2 shows it isn't yet proven. IDEA #42 (latent-space D_bc) removes
+the raw-vs-decoded confound structurally. Reprioritizing:
+
+1. **IDEA #42 (latent-space D_bc)** — first priority after seed bundle closes
+2. **IDEA #40 (boundary feature-matching)** — second priority (still in decoded space, but direct alignment rather than adversarial)
+3. **IDEAS #39/#41 (diversity boost, n_critic warmup)** — deferred until #42 establishes a clean bc_gap signal
+
+## P2 #5 — long-rollout HRC/reuse/stack-distance panels still deferred — ACCEPTED with plan
+
+v189 and v190 are the negative controls (bc=0.5, not competitive). Long-rollout panels are most
+informative after v191 frozen sweep establishes whether bc=0.1 is competitive at all. If v191 frozen
+is not competitive, the panels add little signal. If v191 frozen beats v176, then long-rollout
+panels on v191 + v189 + v176 as control are the top priority before any mechanism claim.
+
+Running long-rollout for ALL bc runs before mechanism claim is accepted.
 
 ## bc_weight=0.5 recall collapse diagnosis
 
@@ -1263,7 +1344,7 @@ control run.
 |---|---|---|---|
 | 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
 | 3 (v190) | 0.5 | **0.083** | Frozen-best ep65 (★=0.08291, β-rec=0.672); CLOSED-FAILED |
-| 11 (v191) | 0.1 | TBD | Running; ep20 EMA ★=0.05529 (recall=0.786, train-best); ep25 recall=0.605 (dip) |
+| 11 (v191) | 0.1 | TBD | Running; ep20 train-best ★=0.05529; ep30 recall=0.537 (collapse confirmed); patience→ep80 |
 
 Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
 recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
@@ -1278,10 +1359,11 @@ and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_we
 | 15 | 0.00896 | 0.737 | 0.06166 | 0.250 |
 | **20** | **0.01249** | **0.786** | **0.05529 ★ (train-best)** | 0.199 |
 | 25 | 0.01697 | 0.605 | 0.09607 | 0.239 |
+| 30 | 0.02730 | 0.537 | 0.11990 | 0.266 |
 
-Recall peaked ep20 (0.786) then fell to 0.605 at ep25 — unexpected. bc_gap ep24=0.164 (lowest seen),
-ep25=0.239. Dip follows a low-bc_gap period; could be oscillation. Watching ep30: if recall recovers
-to ≥0.70, this is training noise; if ≤0.60, early collapse at bc=0.1. Train-best locked at ep20.
+Recall collapsed: 0.786→0.605→0.537 (ep20→ep25→ep30). W rising 0.504→0.639→0.918. Confirmed
+collapse at bc=0.1, not oscillation. Run continues under patience=60 from ep20 (auto-stop ep80).
+May show late recovery like v190 (frozen-best at ep65 after collapse). Train-best locked at ep20.
 
 **v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
 ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
