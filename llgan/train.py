@@ -619,6 +619,12 @@ def train(cfg: Config) -> None:
     _bc_hidden = int(getattr(cfg, "boundary_critic_hidden", 128))
     _bc_latent = bool(getattr(cfg, "boundary_critic_latent", False))
     _bc_real_reconstruct = bool(getattr(cfg, "boundary_critic_real_reconstruct", False))
+    if _bc_latent and _bc_real_reconstruct:
+        raise ValueError(
+            "--boundary-critic-latent and --boundary-critic-real-reconstruct are mutually "
+            "exclusive: latent-H mode uses E(x) features; decoded-feat-matched mode uses "
+            "R(E(x)) features. Pass only one."
+        )
     if _bc_w > 0 and R is not None:
         _bc_feat_dim = cfg.latent_dim if (_bc_latent and latent_ae) else prep.num_cols
         D_bc = BoundaryCritic(_bc_feat_dim, k=_bc_k, hidden=_bc_hidden).to(device)
@@ -1222,6 +1228,7 @@ def train(cfg: Config) -> None:
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
         pcf_losses = []   # PCF loss tracking
         bc_real_scores, bc_fake_scores = [], []   # boundary critic logging (P1#2)
+        bc_raw_real_scores, bc_recon_real_scores, bc_shuf_real_scores = [], [], []  # IDEA #44 diagnostics
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1428,8 +1435,23 @@ def train(cfg: Config) -> None:
                                 _raw_A, _raw_B = sample_real_boundaries(
                                     _bc_file_arrays, B, _bc_k, cfg.timestep, device,
                                     full_window=True)
-                                _bc_tail_r = R(E(_raw_A.float()))[:, -_bc_k:, :].detach()
-                                _bc_head_r = R(E(_raw_B.float()))[:, :_bc_k, :].detach()
+                                _recon_A = R(E(_raw_A.float())).detach()
+                                _recon_B = R(E(_raw_B.float())).detach()
+                                _bc_tail_r = _recon_A[:, -_bc_k:, :]
+                                _bc_head_r = _recon_B[:, :_bc_k, :]
+                                # Diagnostics: raw-real, recon-real, shuffled-recon-real
+                                _bc_raw_real_score = D_bc(
+                                    _raw_A[:, -_bc_k:, :].float(),
+                                    _raw_B[:, :_bc_k, :].float()).mean().detach().item()
+                                _bc_recon_real_score = D_bc(
+                                    _bc_tail_r.float(), _bc_head_r.float()).mean().detach().item()
+                                _shuf_idx = torch.randperm(B, device=device)
+                                _bc_shuf_real_score = D_bc(
+                                    _recon_A[_shuf_idx, -_bc_k:, :].float(),
+                                    _recon_B[:, :_bc_k, :].float()).mean().detach().item()
+                                bc_raw_real_scores.append(_bc_raw_real_score)
+                                bc_recon_real_scores.append(_bc_recon_real_score)
+                                bc_shuf_real_scores.append(_bc_shuf_real_score)
                                 _feat_A = R(_H_A).detach()
                                 _feat_B = R(_H_B).detach()
                                 _bc_tail_f = _feat_A[:, -_bc_k:, :]
@@ -2077,6 +2099,11 @@ def train(cfg: Config) -> None:
             bc_r = sum(bc_real_scores) / len(bc_real_scores)
             bc_f = sum(bc_fake_scores) / len(bc_fake_scores)
             log += f"  bc_real={bc_r:+.3f}  bc_fake={bc_f:+.3f}  bc_gap={bc_r - bc_f:.3f}"
+            if bc_raw_real_scores:
+                bc_raw = sum(bc_raw_real_scores) / len(bc_raw_real_scores)
+                bc_rec = sum(bc_recon_real_scores) / len(bc_recon_real_scores)
+                bc_shf = sum(bc_shuf_real_scores) / len(bc_shuf_real_scores)
+                log += f"  bc_diag(raw={bc_raw:+.3f},recon={bc_rec:+.3f},shuf={bc_shf:+.3f})"
         elif D_bc is not None:
             log += "  bc=disabled(no_arrays)"
 

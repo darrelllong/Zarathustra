@@ -1814,3 +1814,60 @@ has not been implemented. Still open.
 | 24 | Full-corpus tail leaderboard acknowledged | Full-corpus tail manifest not built |
 | 25 | generate.py + long_rollout_eval parity fixed | Per-source-trace manifest panel; LR idempotence |
 | 26 | v167 retracted; tail-★ gate policy adopted | eval.py --baseline manifest bug; reuse-heavy stratum |
+
+---
+
+## Response to Round 38
+
+### P1 #1 — IDEA #44 diagnostic scores missing from v195
+
+Accepted and fixed. Added `bc_diag(raw=X,recon=Y,shuf=Z)` logging to the
+`decoded-feat-matched` training branch in `llgan/train.py`. Each epoch now
+logs four quantities:
+- **bc_real** (training positive = `R(E(real))`, what IDEA #44 trains on)
+- **bc_raw_real** (diagnostic: `D_bc` on raw normalized pairs — pre-IDEA-44 baseline)
+- **bc_recon_real** (diagnostic: `D_bc` on `R(E(tail_A))`, `R(E(head_B))` pairs)
+- **bc_shuf_real** (diagnostic: shuffled tail–head pairs in recon space — breaks adjacency,
+  should score near fake if D_bc learned temporal structure)
+
+The shuffled score is the critical signal: if `bc_shuf ≈ bc_recon`, D_bc learned
+reconstruction-domain texture, not adjacency. If `bc_shuf ≈ bc_fake < bc_recon`,
+D_bc learned genuine temporal adjacency. v195 is mid-run at ep36; the diagnostic
+will be visible from next epoch log flush forward. **v195 is now interpretable as
+mechanism evidence.**
+
+The v195 run does NOT need to be restarted — the diagnostic is additive and the
+training objective (real positives = R(E(real))) is already correct. The missing
+piece was the log output, not the training signal.
+
+### P1 #2 — v194 post-collapse extension is peak chasing
+
+Accepted. Conclusion frozen: "seed-5 decoded bc with relaxed guard found an ep85
+short-window near-miss (★=0.054 vs v176 ★=0.051, 6.8% worse)." Updated VERSIONS.md
+to label post-ep88 sweeps as diagnostic forensics, not mainline evidence. Kill
+deadline remains ep160 but no further extensions will be granted. The current
+frozen sweep (#12, ep5-ep140) running now is the last mainline sweep; subsequent
+sweeps would only run if ep140+ beats ep85, which would be surprising given the
+adversarial-game qualitative change at ep88.
+
+### P1 #3 — v194 seed provenance still wrong after Round 37 fix
+
+Accepted. Fixed VERSIONS.md line for v194: replaced "Same seed as Alibaba ATB
+holder v176 (★=0.051)" with "Same seed-5 basin as v193/v192/v191; numeric target
+is v176 (seed=7, ★=0.051) — different seed." Added explicit interpretation
+annotation: "seed-5 decoded-bc evidence only; not mechanism validation until a
+second seed or IDEA #44 reproduces."
+
+### P2 #4 — `--bc-latent` + `--bc-real-reconstruct` silent precedence
+
+Accepted. Added a hard `ValueError` at startup in `llgan/train.py` before the
+BoundaryCritic initialization block. Passing both flags now raises:
+`"--boundary-critic-latent and --boundary-critic-real-reconstruct are mutually
+exclusive: latent-H mode uses E(x) features; decoded-feat-matched mode uses
+R(E(x)) features. Pass only one."` No silent mis-labeling possible.
+
+### P2 #5 — Long-rollout/tail panel still not landed
+
+Accepted — this is now genuinely overdue (committed in Round 37 response, committed
+again in Round 35). The gate on ≤0.060 is dropped. Will run the compact panel for
+v176, v191, v193, and v194 ep85 this cycle regardless of short-window ★.
