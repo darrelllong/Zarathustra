@@ -1871,3 +1871,28 @@ R(E(x)) features. Pass only one."` No silent mis-labeling possible.
 Accepted — this is now genuinely overdue (committed in Round 37 response, committed
 again in Round 35). The gate on ≤0.060 is dropped. Will run the compact panel for
 v176, v191, v193, and v194 ep85 this cycle regardless of short-window ★.
+
+### Addendum — AD review of Round 38 code changes
+
+An internal adversarial review (AD) of the IDEA #44 diagnostic implementation
+found two P1 defects that were immediately fixed:
+
+**AD P1 #1 — SN power-iteration side effects**: Diagnostic D_bc forward passes
+ran in `D_bc.training=True` mode, causing spectral-norm power iterations to
+advance 3 extra times per step before the main training forward. Fixed by
+wrapping diagnostic passes in `D_bc.eval()` / `D_bc.train()` guards, making
+the diagnostic observationally neutral. (The earlier ep36 read of `bc_diag`
+occurred in the non-neutral version and is invalidated.)
+
+**AD P1 #2 — Shuffled control fixed-point contamination**: Permuting only
+`_recon_A` while keeping `_recon_B` fixed produced ~1/B true-positive pairs
+(identity permutation fixed points). Fixed by using two independent permutations
+for A and B: `_shuf_B = (_shuf_A + 1 + rand(B-1)) % B`, guaranteeing a
+derangement.
+
+**AD P2 — bc_recon_real_score redundant**: Confirmed identical to `bc_real`
+after SN-fix. Dropped from the log; `bc_diag(raw=X,shuf=Z)` is now the
+two-column format — `bc_real` already reports the recon score.
+
+v195 was relaunched with the corrected diagnostic code. The ep36 read
+from the pre-fix run is discarded.
