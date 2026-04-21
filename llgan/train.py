@@ -1228,7 +1228,7 @@ def train(cfg: Config) -> None:
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
         pcf_losses = []   # PCF loss tracking
         bc_real_scores, bc_fake_scores = [], []   # boundary critic logging (P1#2)
-        bc_raw_real_scores, bc_recon_real_scores, bc_shuf_real_scores = [], [], []  # IDEA #44 diagnostics
+        bc_raw_real_scores, bc_shuf_real_scores = [], []  # IDEA #44 diagnostics (raw vs shuffled)
 
         # In multi-file mode: resample a fresh random subset of files each epoch.
         # This is the key mechanism behind multi-corpus generalisation: rather than
@@ -1439,18 +1439,25 @@ def train(cfg: Config) -> None:
                                 _recon_B = R(E(_raw_B.float())).detach()
                                 _bc_tail_r = _recon_A[:, -_bc_k:, :]
                                 _bc_head_r = _recon_B[:, :_bc_k, :]
-                                # Diagnostics: raw-real, recon-real, shuffled-recon-real
-                                _bc_raw_real_score = D_bc(
-                                    _raw_A[:, -_bc_k:, :].float(),
-                                    _raw_B[:, :_bc_k, :].float()).mean().detach().item()
-                                _bc_recon_real_score = D_bc(
-                                    _bc_tail_r.float(), _bc_head_r.float()).mean().detach().item()
-                                _shuf_idx = torch.randperm(B, device=device)
-                                _bc_shuf_real_score = D_bc(
-                                    _recon_A[_shuf_idx, -_bc_k:, :].float(),
-                                    _recon_B[:, :_bc_k, :].float()).mean().detach().item()
+                                # Diagnostics: raw-real and shuffled-recon-real.
+                                # Run under D_bc.eval() to suppress spectral-norm
+                                # power-iteration side effects — diagnostic forwards
+                                # must not perturb D_bc's Lipschitz estimate.
+                                # Shuffled control uses two independent permutations
+                                # so every (A_i, B_j) pair is mismatched (no fixed
+                                # points from identity permutation).
+                                D_bc.eval()
+                                with torch.no_grad():
+                                    _bc_raw_real_score = D_bc(
+                                        _raw_A[:, -_bc_k:, :].float(),
+                                        _raw_B[:, :_bc_k, :].float()).mean().item()
+                                    _shuf_A = torch.randperm(B, device=device)
+                                    _shuf_B = (_shuf_A + 1 + torch.randint(B - 1, (1,), device=device).item()) % B
+                                    _bc_shuf_real_score = D_bc(
+                                        _recon_A[_shuf_A, -_bc_k:, :].float(),
+                                        _recon_B[_shuf_B, :_bc_k, :].float()).mean().item()
+                                D_bc.train()
                                 bc_raw_real_scores.append(_bc_raw_real_score)
-                                bc_recon_real_scores.append(_bc_recon_real_score)
                                 bc_shuf_real_scores.append(_bc_shuf_real_score)
                                 _feat_A = R(_H_A).detach()
                                 _feat_B = R(_H_B).detach()
@@ -2101,9 +2108,11 @@ def train(cfg: Config) -> None:
             log += f"  bc_real={bc_r:+.3f}  bc_fake={bc_f:+.3f}  bc_gap={bc_r - bc_f:.3f}"
             if bc_raw_real_scores:
                 bc_raw = sum(bc_raw_real_scores) / len(bc_raw_real_scores)
-                bc_rec = sum(bc_recon_real_scores) / len(bc_recon_real_scores)
                 bc_shf = sum(bc_shuf_real_scores) / len(bc_shuf_real_scores)
-                log += f"  bc_diag(raw={bc_raw:+.3f},recon={bc_rec:+.3f},shuf={bc_shf:+.3f})"
+                # bc_real already logs the recon score; diag adds raw and shuffled control.
+                # If shuf < recon (= bc_real): D_bc learned temporal adjacency.
+                # If shuf ≈ recon: D_bc learned reconstruction-domain texture only.
+                log += f"  bc_diag(raw={bc_raw:+.3f},shuf={bc_shf:+.3f})"
         elif D_bc is not None:
             log += "  bc=disabled(no_arrays)"
 
