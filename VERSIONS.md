@@ -236,8 +236,8 @@ on newly-landed code changes.
 
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
 - **alibaba_v193** — **PLANNED** (after v192). IDEA #36 bc_weight=0.1, seed=5. Third seed for mechanism robustness; if v191 (seed=11) and v192 (seed=3 or seed=7) both avoid collapse at bc=0.1, seed=5 completes the 3-seed bundle required for mechanism claim.
-- **alibaba_v192** — **PLANNED** (launch after v191 frozen sweep). **IDEA #36 + IDEA #42**: bc_weight=0.1 + `--boundary-critic-latent`, seed=7. Design rationale: bc=0.1 still collapses (v191 ep20→ep40 recall 0.786→0.498), same pattern as bc=0.5 (v190). Root cause per Round 35: D_bc may be discriminating raw-vs-decoded manifolds rather than temporal boundary realism. IDEA #42 (latent-space D_bc: E(real) vs G latents) removes this confound. seed=7 = v176's winning seed. If latent-mode D_bc avoids collapse AND improves recall, it validates IDEA #42 as structural fix. Pretrain: reuse v189 `pretrain_complete.pt` (seed=7). Add `--boundary-critic-latent` flag. Log `/home/darrell/train_alibaba_v192.log`.
-- **alibaba_v191** — **RUNNING** (PID 2932768, launched 2026-04-20). IDEA #36 bc_weight=0.1 (reduced from 0.5), k=4, n-regimes 4, seed=11. Rationale: bc_weight=0.5 contributes ~60% of G-loss at peak recall (ep30), causing recall collapse ep30→ep45. At bc_weight=0.1, bc is ~22% of G-loss — supplemental signal rather than dominant gradient. seed=11 was the collapse-seed for v186 (no bc, ★=0.219); tests minimum bc weight to prevent collapse. If v191 avoids collapse AND has lower MMD² than v189/v190, could beat v176's ★=0.051. Pretrain: reused v190 pretrain_complete.pt. **ep20: recall=0.786, ★=0.05529 (train-best); ep25-50: collapse (0.605→0.394); ep55: recall=0.720, ★=0.06603 (RECOVERY); ep60: recall=0.520, ★=0.11373 (re-collapse). Oscillating behavior: collapse→recovery→re-collapse. ep55 checkpoint may be frozen-best. Watching for second recovery ep65+. W stable ~1.2-1.3. Auto-stop ep80 (~35 min).** Log `/home/darrell/train_alibaba_v191.log`.
+- **alibaba_v192** — **RUNNING** (PID 3260378, launched 2026-04-20). **IDEA #36 + IDEA #42**: bc_weight=0.1 + `--boundary-critic-latent`, seed=7. Design rationale: v191 frozen-best ★=0.067 (ep75) with bc=0.1 is closest bc result yet but still 32% from ATB. Root cause per Round 35: D_bc discriminates raw-vs-decoded manifolds (not temporal boundary realism). IDEA #42 (latent-H mode: E(real) latents vs G hidden state) removes raw-vs-decoded confound. seed=7 = v176's winning seed. If latent-mode D_bc produces a cleaner bc_gap signal AND avoids collapse, validates IDEA #42 as structural fix. Confirmed startup: `mode=latent-H`. Pretrain: v189 `pretrain_complete.pt` (seed=7). Log `/home/darrell/train_alibaba_v192.log`.
+- **alibaba_v191** — **CLOSED** (killed ep83, 63 epochs stale from ep20 train-best, 2026-04-20). IDEA #36 bc_weight=0.1, k=4, n-regimes 4, seed=11. **Frozen sweep complete (seeds 42/42, 17 checkpoints ep5–ep80 + best.pt)**: frozen-best **epoch_0075.pt ★=0.06749** (MMD²=0.00929, β-rec=0.709). 23rd train-selector mis-rank: best.pt=epoch_0020.pt EMA ★=0.05529 → frozen ★=0.17753 (+163.0% worse). **Key finding**: EMA "collapse" at ep70-80 (EMA recall=0.383-0.440) masked genuine frozen-eval recovery (frozen ep75 β-recall=0.709, ep80 β-recall=0.789). Killed too early by EMA heuristics. Gap to ATB: ★=0.067 vs v176 ★=0.051 = **32% worse**. bc=0.1 beats bc=0.5 runs (v189 ★=0.076, v190 ★=0.083). Pretrain: reused v190 pretrain_complete.pt. Log `/home/darrell/train_alibaba_v191.log`.
 - **alibaba_v190** — **CLOSED-FAILED** (killed ep70, 40 epochs stale from train-best, 2026-04-20). IDEA #36 bc_weight=0.5, seed=3. **Frozen sweep (seeds 42/42, ep5–ep65 + best.pt, 14 checkpoints)**: frozen-best **epoch_0065.pt ★=0.08291** (MMD²=0.01731, β-rec=0.672). best.pt=epoch_0030.pt ★=0.12440 (22nd mis-rank: +50% worse than frozen-best). Training trajectory: ep30 train-best (recall=0.773, ★=0.053); recall collapse ep40–50 (0.663→0.514); partial recovery ep55–65 (0.574→0.672). bc_gap 0.065–0.122 throughout. ep70 saved (EMA recall=0.541, not swept). Gap to ATB: ★=0.083 vs v176 ★=0.051 = **63% worse**. bc_weight=0.5 confirmed too large: recall oscillates but never recovers to ep30 peak. Key finding: frozen-best is ep65 (not ep30), meaning frozen and train metrics disagree on optimal stopping by 35 epochs. Log `/home/darrell/train_alibaba_v190.log`.
 
 ### alibaba_v189 — CLOSED (W-stopped ep61, frozen sweep complete, 2026-04-20)
@@ -258,6 +258,35 @@ All four components are load-bearing inside seed=5; removing any one causes 3–
 - **21st train-selector mis-rank**: best.pt EMA train-★=0.034 → frozen ★=0.089 (+16.5% worse than final.pt). EMA recall 0.853 → frozen recall 0.628 for the SAME ep60 checkpoint. **EMA train metrics are a poor proxy for frozen evaluation on this architecture.**
 - **IDEA #36 proof of concept**: frozen β-recall 0.62–0.69 across all checkpoints, all above the 0.26 collapse floor. Boundary critic successfully prevents Alibaba collapse under patched code for the first time.
 - **Gap to target**: frozen ★=0.076 vs v176 ★=0.051 = **49% worse**. Boundary critic raises recall floor but introduces MMD² overhead. v191 should tune bc_weight or combine with PCF-loss to improve frozen MMD².
+
+---
+
+### alibaba_v191 — CLOSED (bc_weight=0.1 frozen-best ep75 ★=0.06749; killed ep83 by EMA-collapse heuristic, 2026-04-20)
+
+**Why**: IDEA #36 (Learned Boundary Prior), seed=11, boundary-critic-weight=0.1, k=4, n-regimes=4. Reduced bc from 0.5 (v189/v190) to test supplemental-vs-dominant gradient regime. seed=11 = v186 collapse-seed (no bc, ★=0.219); tests minimum bc weight to prevent collapse.
+
+**Training**: ep20 train-best (EMA ★=0.05529, recall=0.786); apparent collapse ep25-50 (recall→0.394); EMA recovery spike ep55 (recall=0.720); re-collapse ep60-83 per EMA (recall 0.383-0.440, W rising 1.9-2.9). Killed ep83 (63 epochs stale per EMA heuristic). Missed: model was frozen-recovering through ep75-80 despite EMA showing collapse.
+
+**Deterministic `frozen_sweep` (seeds 42/42, 2026-04-20, 17 checkpoints ep5–ep80 + best.pt)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **epoch_0075.pt** (frozen-best) | **0.06749** | 0.00929 | 0.709 |
+| epoch_0080.pt | 0.06897 | 0.02677 | 0.789 |
+| epoch_0060.pt | 0.10348 | 0.02248 | 0.595 |
+| epoch_0040.pt | 0.11286 | 0.01586 | 0.515 |
+| epoch_0065.pt | 0.12104 | 0.05494 | 0.670 |
+| epoch_0055.pt | 0.12285 | 0.01455 | 0.459 |
+| epoch_0070.pt | 0.12302 | 0.06702 | 0.720 |
+| epoch_0050.pt | 0.12472 | 0.06332 | 0.693 |
+| epoch_0030.pt | 0.13490 | 0.04030 | 0.527 |
+| epoch_0020.pt = best.pt | 0.17753 | 0.02373 | 0.231 |
+
+- **23rd train-selector mis-rank**: best.pt (ep20 EMA-best ★=0.05529) → frozen ★=0.17753 (+163.0% worse). Frozen-best ep75 is the optimal checkpoint despite EMA showing it in deep "collapse" (EMA recall=0.383).
+- **EMA-collapse was misleading**: EMA metrics showed recall=0.383-0.440 at ep70-80 (apparent sustained collapse). Frozen eval shows ep75 β-recall=0.709 and ep80 β-recall=0.789 — the model was recovering late. EMA recall is a poor proxy for frozen β-recall on bc runs.
+- **bc=0.1 beats bc=0.5**: v191 ★=0.067 < v190 ★=0.083 < v189 ★=0.076. Reduced bc_weight produces better frozen performance on alibaba.
+- **Gap to ATB**: ★=0.067 vs v176 ★=0.051 = **32% worse**. Closest bc result yet, but still not competitive.
+- **Implication for v192+**: Should NOT kill bc runs based on EMA stale heuristics. Let them run longer (≥ep100+) and rely on frozen sweep. EMA recall during bc training appears to systematically underestimate late-epoch frozen quality.
 
 ---
 

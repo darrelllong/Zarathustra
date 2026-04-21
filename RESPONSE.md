@@ -1344,26 +1344,46 @@ control run.
 |---|---|---|---|
 | 7 (v189) | 0.5 | 0.076 | W-stopped ep61; avoids collapse; not competitive |
 | 3 (v190) | 0.5 | **0.083** | Frozen-best ep65 (★=0.08291, β-rec=0.672); CLOSED-FAILED |
-| 11 (v191) | 0.1 | TBD | Running; ep20 train-best ★=0.05529; ep30 recall=0.537 (collapse confirmed); patience→ep80 |
+| 11 (v191) | 0.1 | **0.067** | Frozen-best ep75 ★=0.06749 (β-rec=0.709); killed ep83; **best bc result** |
 
 Three seeds attempted. v189/v190 confirm IDEA #36 prevents collapse but bc_weight=0.5 causes
 recall collapse after peak. v190 frozen-best is ep65 (not ep30 train-best): 22nd mis-rank, frozen
 and train metrics disagree by 35 epochs. v191 is the first test with tuned bc_weight=0.1.
 
-**v191 trajectory (ep1–20, 2026-04-20)**:
+**v191 full trajectory (2026-04-20, completed ep80)**:
 
-| ep | EMA MMD² | recall | EMA ★ | bc_gap |
+| ep | EMA MMD² | recall | EMA ★ | notes |
 |---|---|---|---|---|
-| 5 | 0.01565 | 0.655 | 0.08465 | 0.338 |
-| 10 | 0.02202 | 0.712 | 0.07972 | 0.268 |
-| 15 | 0.00896 | 0.737 | 0.06166 | 0.250 |
-| **20** | **0.01249** | **0.786** | **0.05529 ★ (train-best)** | 0.199 |
-| 25 | 0.01697 | 0.605 | 0.09607 | 0.239 |
-| 30 | 0.02730 | 0.537 | 0.11990 | 0.266 |
+| 5 | 0.01565 | 0.655 | 0.08465 | healthy launch |
+| 10 | 0.02202 | 0.712 | 0.07972 | |
+| 15 | 0.00896 | 0.737 | 0.06166 | |
+| **20** | **0.01249** | **0.786** | **0.05529 ★ (train-best)** | peak |
+| 25 | 0.01697 | 0.605 | 0.09607 | collapse onset |
+| 30 | 0.02730 | 0.537 | 0.11990 | W=0.918 |
+| 35 | 0.02219 | 0.553 | 0.11149 | |
+| 40 | 0.01739 | 0.498 | 0.11779 | W=1.088 |
+| 45 | 0.02252 | 0.425 | 0.13752 | W=1.326, epoch_t=97s |
+| 50 | 0.03163 | 0.394 | 0.15283 | |
+| **55** | **0.01003** | **0.720** | **0.06603** | **RECOVERY — likely frozen-best** |
+| 60 | 0.01773 | 0.520 | 0.11373 | re-collapse |
+| 65 | 0.02990 | 0.401 | 0.14980 | no 2nd recovery |
+| 70 | 0.03567 | 0.430 | 0.14967 | W=1.399, W rising 2.0-2.9 ep71+ |
+| **75** | **0.01808** | **0.383** | **0.14148** | EMA says "collapse" — **FROZEN-BEST** (see below) |
+| 80 | 0.02185 | 0.440 | 0.13395 | W=2.998 (near w-stop); killed ep83 |
 
-Recall collapsed: 0.786→0.605→0.537 (ep20→ep25→ep30). W rising 0.504→0.639→0.918. Confirmed
-collapse at bc=0.1, not oscillation. Run continues under patience=60 from ep20 (auto-stop ep80).
-May show late recovery like v190 (frozen-best at ep65 after collapse). Train-best locked at ep20.
+**EMA collapsed at ep75-80 but frozen shows recovery**: EMA recall=0.383-0.440 appeared as sustained collapse; run was killed ep83 (63 epochs stale from EMA heuristic). Frozen sweep revealed frozen-best is **epoch_0075.pt ★=0.06749** (β-recall=0.709), not ep55 as predicted. The model was recovering in frozen-eval space even as EMA suggested collapse.
+
+**v191 frozen sweep (seeds 42/42, 17 checkpoints, 2026-04-20)**:
+
+| checkpoint | frozen ★ | MMD² | β-recall |
+|---|---|---|---|
+| **epoch_0075.pt** | **0.06749** | 0.00929 | 0.709 |
+| epoch_0080.pt | 0.06897 | 0.02677 | 0.789 |
+| epoch_0060.pt | 0.10348 | 0.02248 | 0.595 |
+| epoch_0040.pt | 0.11286 | 0.01586 | 0.515 |
+| epoch_0070.pt | 0.12302 | 0.06702 | 0.720 |
+| epoch_0055.pt | 0.12285 | 0.01455 | 0.459 |
+| epoch_0020.pt = best.pt | 0.17753 | 0.02373 | 0.231 |
 
 **v190 additional finding**: recall partially recovered ep60-65 (0.659, 0.672) despite collapse
 ep35-50. bc_weight=0.5 does not permanently damage the generator; it oscillates into periodic
