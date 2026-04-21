@@ -1572,3 +1572,96 @@ The only code/doc surface changed since Round 32 is [VERSIONS.md](/Users/darrell
 ### Short Take
 
 The project has now done enough seed-basin work to answer the main question: the current numeric targets are not reproducible mechanisms. That is not a small caveat; it is the central state of the repo. The next win will not come from more scalar cleanup around v164 or more same-seed dissection around v165. It needs a structural move that survives at least a tiny seed bundle and improves the long-rollout or tail behavior the short-window score keeps hiding.
+
+---
+
+## Round 34
+
+### Boundary Critic Is The Right Pivot, But The Evidence Is Still Too Easy To Fool
+
+The changes since Round 33 finally move in the direction the review has been asking for:
+`llgan/boundary_critic.py` exists, `alibaba_v189` is running IDEA #36 instead of another
+hand-written BS scalar, and the old `TraceDataset` off-by-one plus dead HRC padding bug were fixed
+in [llgan/dataset.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/dataset.py#L1014)
+and [llgan/eval.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/eval.py#L186). That is
+real progress. The main correction is that v189's early "healthy basin" should be treated as a
+smoke test, not as evidence that the learned boundary mechanism is working.
+
+1. `[P1]` The boundary critic can win by detecting decoded-vs-raw artifacts instead of boundary
+   realism. Real pairs are sampled directly from normalized `TraceDataset.data` in
+   [llgan/boundary_critic.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/boundary_critic.py#L130),
+   while fake pairs are generated in latent space and decoded through `R` in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L1399) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L1402). That is
+   the same broad domain gap the main GAN lives with, but for IDEA #36 it is especially dangerous:
+   the new critic is supposed to learn the boundary manifold, not Recovery-network texture. Add a
+   control where real boundaries are passed through `R(E(real))` before `D_bc`, or train a three-way
+   diagnostic with real-raw, real-reconstructed, and fake-reconstructed joins. Until `D_bc` cannot
+   separate raw real from reconstructed real, v189 is not clean evidence about learned boundary
+   structure.
+
+2. `[P1]` The current logging does not measure the boundary critic, so the v189 status overstates
+   what is known. `VERSIONS.md` says the boundary critic is "stable" at
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/b727/Zarathustra/VERSIONS.md#L229), but the training
+   log's `W=` field is still the main critic's Wasserstein distance, not the boundary critic's
+   real/fake separation. The boundary-critic update computes `bc_loss` in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L1405), but it is
+   not accumulated into epoch logs, not checkpointed into history, and not reported against a
+   real-reconstruction control. Add `bc_real`, `bc_fake`, `bc_gap`, and `bc_recon_gap` logging before
+   interpreting ep5/ep10/ep15 as learned-boundary progress. Right now "recall is healthy" only says
+   v189 did not immediately collapse.
+
+3. `[P1]` v189 still needs the exact frozen/sidecar gates the repo keeps deferring. The early
+   trajectory in [VERSIONS.md](/Users/darrell/.codex/worktrees/b727/Zarathustra/VERSIONS.md#L229)
+   is an EMA short-window signal: ep5 `★=0.07102`, ep10 `0.08187`, ep15 `0.07316`. That is useful
+   only as a launch health check. IDEA #36 claims boundary continuity, so acceptance should require:
+   frozen sweep over saved checkpoints; a boundary-join diagnostic comparing real, generated, and
+   shuffled joins; long-rollout HRC / reuse-access / stack-distance; and tail-heavy/ordinary MMD
+   shape rows. If v189 improves short-window recall but leaves long-rollout locality unchanged, it
+   is another local proxy win.
+
+4. `[P2]` Boundary-critic checkpoints are not resumable as implemented. `D_bc` and `opt_D_bc` are
+   created in [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L621)
+   but are absent from the resume loader in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L809) and from
+   best/epoch/final checkpoint payloads at
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L2051),
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L2172), and
+   [llgan/train.py](/Users/darrell/.codex/worktrees/b727/Zarathustra/llgan/train.py#L2206). Frozen
+   eval does not need `D_bc`, so published checkpoint scores are not broken. But any resumed v189
+   training silently restarts the auxiliary adversary while keeping the generator/critic state,
+   changing the training game mid-run. Save and restore `D_bc` plus `opt_D_bc`, or explicitly forbid
+   resuming boundary-critic runs.
+
+5. `[P2]` The Tencent component audit is now only useful as closure, not as the next roadmap. The
+   `v187` and `v188` trajectories in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/b727/Zarathustra/VERSIONS.md#L227) and
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/b727/Zarathustra/VERSIONS.md#L228) are both far
+   above the seed-5 numeric target while still being same-seed ablations. Let them produce their
+   frozen results, then stop. They can say multi-scale critic and mixed-type recovery are
+   load-bearing inside the seed-5 basin; they cannot rescue the recipe from the seed-bundle failure
+   already shown by v177 and v185.
+
+### What I Would Do Next
+
+1. Add boundary-critic instrumentation: raw-real score, reconstructed-real score, fake score,
+   shuffled-real score, and gradient norm.
+
+2. Change the real side of the `D_bc` training experiment, or at least add an ablation, so the critic
+   cannot solve the task by spotting `R` reconstruction artifacts.
+
+3. Save and restore `D_bc` / `opt_D_bc` for boundary-critic runs before relying on resumed training.
+
+4. Let v189 reach frozen sweep, but require boundary diagnostics and long-rollout/tail panels before
+   calling IDEA #36 successful.
+
+5. Close the v187/v188 seed-5 audit after frozen evals and redirect Tencent effort toward a robust
+   recipe or chained-window/persistent-memory training, not more same-basin autopsy.
+
+### Short Take
+
+This is the best kind of new work the repo has done recently: it is structural rather than another
+scalar search. But the measurement bar has to rise with it. A learned boundary critic is only an
+architectural win if it learns boundary realism rather than decoder artifacts, survives checkpoint
+resume semantics, and improves the long-rollout/tail surfaces that motivated the pivot in the first
+place.
