@@ -235,7 +235,7 @@ on newly-landed code changes.
 | PCF-loss (IDEA #26) | v183 | ~0.1921 | **~5.11×** |
 
 All four components are load-bearing inside seed=5; removing any one causes 3–5× degradation. The audit confirms these are not dead weight inside v165's seed-5 basin, but per Round 33–34: this is within-basin forensics, NOT mechanism validation. None of these ablations survive seed=7 (v177) or seed=3 (v185).
-- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test** (running). Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). bc_gap positive ep1-30 (0.31→0.054–0.107 stabilizing). **ep5: recall=0.613, ★=0.115 ← AVOIDS COLLAPSE**; **ep25: recall=0.741, ★=0.063 (prior train-best)**; **ep30: EMA MMD²=0.00734 recall=0.773 ★=0.053 (new train-best)** — EMA MMD² and recall both nearly match v176's frozen values. Caution: treat train-EMA as directional only until frozen sweep. Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
+- **alibaba_v190** — **IDEA #36 seed=3 reproducibility test** (running). Same recipe as v189 (boundary-critic-weight 0.5, k=4, n-regimes 4, seed=3). bc_gap positive ep1-40 (0.31→0.042–0.107 stabilizing). **ep5: recall=0.613, ★=0.115 ← AVOIDS COLLAPSE**; **ep30: EMA MMD²=0.00734 recall=0.773 ★=0.053 (train-best)**; **ep40: EMA MMD²=0.01514 recall=0.663 ★=0.082 (sharp dip)**. EMA metrics oscillating: bc_weight=0.5 may be causing GAN instability. W=0.94 (safe, no W-stop risk). Caution: treat train-EMA as directional only; frozen sweep will determine actual performance. Log `/home/darrell/train_alibaba_v190.log`. PID 2649277.
 
 ### alibaba_v189 — CLOSED (W-stopped ep61, frozen sweep complete, 2026-04-20)
 
