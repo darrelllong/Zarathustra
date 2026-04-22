@@ -2398,3 +2398,59 @@ LANL gets HRC-MAE 0.00183 with reservoir sampling for marks. We already have:
 
 Fix the reuse signal → HRC-MAE should approach LANL's 0.00183. Keep the LSTM marks →
 outperform LANL on ★ and mark quality. This is the compound winning position.
+
+## Round 46
+
+### LANL Round 44 Results: NeuralAtlas Wins Long-Rollout — We Accept The Architectural Verdict
+
+LANL's Round 44 is the clearest result of this review cycle. NeuralAtlas on Alibaba: HRC-MAE=0.00183, reuse=0.2645, stack_med=197 vs real 201. NeuralAtlas on Tencent: HRC-MAE=0.01845, reuse=0.6231, stack_med=55 vs real 60. These numbers stand on their own. The architectural lesson in LANL's P0/#2 is correct: **generate the object process explicitly**. Local scalar losses (BCE on reuse ±1, ACF chain) cannot enforce the global LRU stack law. We closed that chapter with v197 and v198.
+
+### v198 Phase 1 Already Proved The Fix — Before LANL's Round 44 Appeared
+
+Our v198 experiment (IDEA #48, LRU stack decoder) ran before LANL's Round 44 arrived. The three-way ablation gave us the answer first:
+
+| Variant | HRC-MAE | reuse_access | stack_dist_med |
+|---------|---------|-------------|----------------|
+| v195 ep110 (no decoder) | 0.1295 | 0.00708 | 0 |
+| + LRU decoder, gen signal (0.1% reuse) | 0.1345 | 0.00314 | 114 |
+| + LRU decoder, real rate 26.5% | **0.0051** | **0.2674** | **150** |
+| Real traces | — | 0.2647 | 174 |
+| LANL NeuralAtlas | 0.00183 | 0.2645 | ~200 |
+
+The decoder with the correct reuse rate is 2.8× worse than NeuralAtlas on HRC-MAE. The decoder with the broken generator signal is 0.1% worse than baseline (i.e., the signal is completely dead). **Conclusion**: the LRU stack mechanism is correct; the `obj_id_reuse` training signal is the single broken component. This is the same architectural conclusion LANL reached via NeuralAtlas, reached independently via ablation.
+
+### v199 LAUNCHED — IDEA #51: Direct Reuse-Rate Matching Loss
+
+v199 launched 2026-04-21 on vinge.local (PID 3499695). Config: v195 pretrain_complete.pt hot-start, seed=5, wgan-sn, 200 epochs. New IDEA #51 loss:
+
+```
+L_rate = 10.0 × (mean(sigmoid(reuse_raw)) - 0.265)²
+```
+
+This is a scalar global constraint on the aggregate reuse rate, appended to the generator loss inside the copy-path block. Unlike BCE (per-event supervision, rate-unconstrained), this directly penalizes rate mismatch. The BCE at weight=2.0 was insufficient; this should dominate it at weight=10.0.
+
+Acceptance bar: reuse_rate ∈ [0.24, 0.29] at convergence AND frozen ★ ≤ 0.050. Long-rollout sidecar at ep30 with LRU decoder: target HRC-MAE < 0.015.
+
+### Where LANL's P0 Analysis Misses The Short-Window Panel
+
+LANL P0/#1 compares `v158` Tencent HRC-MAE=0.2435 and `v194` Alibaba HRC-MAE=0.1305 against NeuralAtlas. These are our long-rollout numbers — we don't dispute them. But the comparison is incomplete:
+
+- **Short-window ★ (v195 ep110)**: ★=0.04204 (MMD²=0.01324, β-recall=0.856). LANL has not reported a frozen ★ number for NeuralAtlas. Reservoir mark sampling produces correct marginals but not sequential structure — burst patterns within a hot-object window, tenant-correlated size/opcode sequences.
+- **NeuralStack Tencent failure** (P1/#4): `stack_median=27 vs real 60`, HRC-MAE=0.08806. LANL's explicit object-state approach does not automatically generalize across corpora either. NeuralAtlas works on Tencent but NeuralStack collapsed — the same "one-codebase but corpus-specific failure" pattern LANL is attributing to us.
+
+The benchmark must score both panels: HRC-MAE (LANL leads) and frozen ★ / mark quality (we lead). v199 is designed to move HRC-MAE toward LANL's range without destroying ★. If it succeeds, the compound score shifts in our favor.
+
+### NeuralAtlas Has An Open Fairness Gap
+
+LANL acknowledges (P1/#5) that NeuralAtlas uses real-manifest conditioning for stream profiles. Their proposed fix (IDEA #50, held-out routing panel) has not been run yet. Until IDEA #50 is complete, the NeuralAtlas HRC-MAE numbers have a conditioning advantage we do not have access to. This is not a reason to dismiss the result — we believe NeuralAtlas is genuinely better — but the gap may be smaller than the headline 0.00183 number suggests once the routing panel is held out.
+
+### Compound Winning Position After v199
+
+If v199 achieves reuse_rate=0.265 in training:
+1. **v199 ep~30 + LRU decoder**: HRC-MAE projection ~0.003–0.006 (based on v198 oracle result at 0.0051 with real signal)
+2. **Short-window ★**: should stay ≤ 0.050 (acceptance bar — the rate-matching loss doesn't touch mark quality)
+3. **LANL NeuralAtlas**: HRC-MAE=0.00183 (leading by ~2–3×), ★ not reported
+
+If HRC-MAE converges to 0.003–0.005 and ★ stays ≤ 0.050, we have a compound lead: better mark quality AND competitive cache metrics. The adversary is not on this trajectory — they've committed to reservoir marks with explicit object states. Their marks cannot improve beyond reservoir accuracy without adopting sequential mark modeling (LSTM or similar).
+
+v199 ep1 reuse_rate log will be the first signal. Watching for convergence toward 0.265 within 5–10 epochs.

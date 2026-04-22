@@ -1777,25 +1777,26 @@ def train(cfg: Config) -> None:
                     g_loss = g_loss + cfg.reuse_bce_weight * loss_reuse_bce
                     cp_bce_losses.append(loss_reuse_bce.item())
 
-                    # IDEA #51: global reuse-rate matching loss.
-                    # BCE alone can't enforce aggregate reuse rate — G produces 0.1%
-                    # reuse despite 26.5% real (v198 diagnostic). A scalar constraint
-                    # on mean(sigmoid(reuse)) directly fixes this without per-event targets.
-                    _rrw = getattr(cfg, 'reuse_rate_loss_weight', 0.0)
-                    _fake_reuse_prob = (obj_fake_reuse_cp + 1.0) / 2.0  # [-1,1]→[0,1]
-                    _fake_rate = _fake_reuse_prob.mean()
-                    reuse_rate_samples.append(_fake_rate.item())
-                    if _rrw > 0.0:
-                        _r_target = getattr(cfg, 'reuse_rate_target', 0.265)
-                        loss_reuse_rate = (_fake_rate - _r_target) ** 2
-                        g_loss = g_loss + _rrw * loss_reuse_rate
-
                     # Stride-reuse consistency: penalise |stride| where real says reuse.
                     stride_fake = fake_decoded[:, :, stride_col]
                     reuse_mask = (obj_real_reuse_cp > 0).float()  # 1 where reuse
                     loss_stride_cons = (stride_fake.abs() * reuse_mask).mean()
                     g_loss = g_loss + cfg.stride_consistency_weight * loss_stride_cons
                     cp_stride_losses.append(loss_stride_cons.item())
+
+                # IDEA #51: global reuse-rate matching loss (standalone — no --copy-path needed).
+                # BCE alone can't enforce aggregate reuse rate — G produces 0.1% reuse despite
+                # 26.5% real (v198 diagnostic). Scalar constraint on mean(sigmoid(reuse)) fixes
+                # the rate globally. Active whenever obj_id_col is valid and weight > 0.
+                _rrw = getattr(cfg, 'reuse_rate_loss_weight', 0.0)
+                if _rrw > 0.0 and obj_id_col >= 0:
+                    _fake_reuse_raw = fake_decoded[:, :, obj_id_col]   # (B, T) in [-1, 1]
+                    _fake_reuse_prob = (_fake_reuse_raw + 1.0) / 2.0   # → [0, 1]
+                    _fake_rate = _fake_reuse_prob.mean()
+                    reuse_rate_samples.append(_fake_rate.item())
+                    _r_target = getattr(cfg, 'reuse_rate_target', 0.265)
+                    loss_reuse_rate = (_fake_rate - _r_target) ** 2
+                    g_loss = g_loss + _rrw * loss_reuse_rate
 
                 # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
                 # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
