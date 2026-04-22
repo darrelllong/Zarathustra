@@ -2952,3 +2952,63 @@ LANL has not posted a new peer review. They are 21+ commits behind (last reviewe
 
 Next expected LANL action: new PEER-REVIEW.md round responding to our v199-v204 work and the mark quality analysis. They may also launch an extended mark head training (50-100 epochs) to improve past the reservoir baseline.
 
+
+## Round 54
+
+### v204 Post-Mortem: Frozen Sweep Reveals Coverage Catastrophe
+
+The EMA optimism was real and devastating. v204's EMA★=0.057 at ep60 looked like an ATB in progress. The frozen sweep told the truth:
+
+| Checkpoint | Frozen ★ | β-recall |
+|------------|---------|---------|
+| ep10 | 0.211 | 0.038 |
+| ep40 | 0.194 | 0.102 |
+| ep60 | 0.189 | 0.128 |
+| ep80 | **0.178** | **0.184** |
+
+v195 ep110 frozen ★=0.042, β-recall=0.856. The gap is 4.2× on ★, 4.6× on β-recall. v204 is not close to the ATB.
+
+**Root cause (revised)**: The EMA metric evaluates on windows drawn from training files. With oscillating reuse_rate (0.01-0.20), the model occasionally produces windows that match the training distribution well. But the frozen eval uses the held-out 4-file bundle (seed=42). Those files have genuine reuse events at 26.5% and real reuse event feature distributions (shorter IATs, characteristic sizes). v204's reuse oscillation means it almost never generates correct reuse events, so β-recall on the held-out bundle is catastrophically low.
+
+The competition between WGAN gradient and BCE gradient through the shared LSTM hidden state `h` is the mechanism:
+- WGAN: `C(H_fake)` → `H_fake = fc(h)` → `h` → LSTM. WGAN pushes LSTM toward patterns where the critic score improves — since 73.5% of real events are non-reuse, WGAN trains LSTM to generate non-reuse distributions.
+- BCE (v201-v204): `BCE(reuse_head(h), real_binary)` → `h` → LSTM. BCE pushes LSTM the other direction — toward hidden states that predict reuse correctly.
+- WGAN wins because it has more gradient signal on LSTM params (larger parameter set, more critic steps per G step) than BCE.
+
+### IDEA #57 Implemented and Verified: Gradient-Stop BCE
+
+`G.reuse_head(G._last_h_for_reuse.detach())` in train.py replaces the grad-attached logit computation. Verified on vinge:
+- **LSTM grad norm from BCE: 0.000000** — confirmed zero
+- **reuse_head.weight grad norm: 0.979** — confirmed nonzero
+
+The mathematical guarantee: with `h.detach()`, BCE gradient flows:
+- `loss_bce` → `logit = reuse_head(h_detached)` → `reuse_head.weight` ONLY
+- No path from `loss_bce` → `h` → LSTM
+
+BCE alone determines the equilibrium reuse_rate. At the BCE optimum with pos_weight = n_neg/n_pos ≈ 2.75:
+- The optimal logit = log(n_pos/n_neg * 1) ≈ log(0.265/0.735) ≈ -1.02
+- sigmoid(-1.02) ≈ 0.265 = target reuse rate
+
+This is a clean convergence guarantee for the reuse_head: it will converge to 26.5% reuse at the BCE optimum, independent of what WGAN does to the LSTM.
+
+### v205 Launched
+
+PID=3604298 on vinge.local. Config: seed=5, `--gumbel-reuse --gumbel-reuse-weight 1.0` (weight back to 1.0 since the gradient competition is now eliminated — BCE at weight=1.0 with clean gradient path is sufficient). Fresh pretrain underway.
+
+**Acceptance bar**: reuse_rate ∈ [0.20, 0.30] by ep5 AND stable (not oscillating, σ < 0.05) by ep10. Frozen ★ ≤ 0.050 and β-recall ≥ 0.700 by ep50.
+
+**Expected behavior at ep1**: reuse_head initialized with small random weights → sigmoid ≈ 0.50 → reuse_rate ≈ 0.50. With only BCE training (no LSTM competition), the logit should converge monotonically toward −1.02 → reuse_rate → 0.265 over ~5-10 epochs. No oscillation.
+
+### LANL: Temperature Sweep Also Failed
+
+LANL ran a temperature sweep (temp=1.0/0.5/0.25/0.05) on their ep20 neural mark head:
+- temp=1.0: mark_score=0.044
+- temp=0.5: mark_score=0.155 (3.5× worse)
+- temp=0.25: mark_score=0.165
+- temp=0.05: mark_score=0.165
+
+Lower temperatures sharpen the output distribution — which makes things worse because the learned distribution is already wrong. The model learned a mode that is near but not at the correct mark distribution. Sharpening it puts more mass on the wrong mode.
+
+LANL is stuck: their neural mark head at 20 epochs is worse than reservoir baseline (0.044 vs 0.00479), and temperature scaling provides no improvement. Next expected LANL step: either train longer (50-100 epochs) or abandon the autoregressive mark approach in favor of the reservoir.
+
+**Race status**: LLNL has a theoretically sound fix for reuse in v205. If v205 achieves reuse_rate≈0.265, we can run the long-rollout panel and expect HRC-MAE to drop from 0.1287 toward LANL's 0.00301. The ★ metric advantage (LLNL best 0.042 vs LANL unmeasured) remains the one dimension where LLNL is clearly ahead.
