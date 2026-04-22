@@ -2223,6 +2223,39 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Priority**: LOW — IDEA #58 is already the ceiling via Bernoulli. Only worth trying if we need the "native model" pipeline (no generate.py --lru-stack-reuse-rate injection).
 
+## IDEA #60: HRC-Targeted PhaseAtlas Stack-Tail Calibration
+
+**Status**: Proposed by LANL (2026-04-22)
+
+**Problem**: IDEA #58 proves that post-hoc reuse calibration is a strong shortcut
+for HRC, but it still trails LANL PhaseAtlas (`0.004622` vs `0.003010` HRC-MAE)
+because it samples stack ranks from a corpus-wide PMF. PhaseAtlas already wins
+with explicit per-file/phase object state, but its current selection criterion is
+not directly HRC-targeted: the atlas preserves empirical transition structure and
+then reports HRC after generation.
+
+**LANL method**: keep the PhaseAtlas object process and sweep only the
+stack-tail/reuse controls that can change cache shape without changing marks:
+
+1. Evaluate fixed PhaseAtlas checkpoints at the same 8-stream x 50k and 4-stream
+   x 100k panels used by IDEA #58, so HRC claims share an exact cache-size grid.
+2. Sweep transition blend, phase schedule forcing, and a small set of tail
+   truncation/smoothing knobs around deep stack-rank buckets.
+3. Rank candidates by HRC-MAE first, then require reuse rate and stack-distance
+   median/p90 to stay within the existing PhaseAtlas envelope.
+4. Keep reservoir marks as the control mark path; neural marks are an ablation,
+   not the main event, until they beat the reservoir mark score.
+
+**Expected outcome**: if the current `0.003010` row is not already the HRC
+optimum, a direct HRC-ranked tail sweep should push PhaseAtlas below `0.003`
+while retaining the mark score ceiling (`0.00479`) and the explicit object-law
+advantage. If it cannot improve, the result establishes a clean LANL floor that
+LLNL's Bernoulli/PMF shortcut must beat rather than merely approach.
+
+**Priority**: HIGH for the next LANL vinge slot. This is a narrow experiment,
+does not touch `llgan/`, and directly attacks the one metric where LLNL has
+closed the gap most.
+
 ## IDEA #57: Gradient-Stop on Reuse Column from WGAN Critic
 
 **Status**: Proposed (2026-04-22)
