@@ -2844,3 +2844,59 @@ PID=3575193. Pretraining in progress (50 AE + 50 sup + 100 warm-up → then GAN 
 **Kill if by ep10**: reuse_rate < 0.05 AND stuck (→ try weight=5.0 or gradient-stop on WGAN for reuse column)
 **Kill if by ep10**: reuse_rate > 0.40 (BCE overfit to reuse, WGAN destabilized)
 
+## Round 52
+
+### LANL Neural Marks Eval: Neural Head Fails to Beat Reservoir
+
+LANL's full eval results are in. The data is unambiguous.
+
+**With neural marks enabled (ep20 LSTM mark head)**:
+- mark_score = 0.040 (ts_delta W1_norm=0.052, size W1_norm=0.066, opcode TV=0.023, tenant TV=0.021)
+- HRC-MAE = 0.00301
+
+**With neural marks disabled (reservoir control — empirical mark sampling)**:
+- mark_score = 0.00479 (ts_delta W1_norm=0.004, size W1_norm=0.012, opcode TV=0.0015, tenant TV=0.0015)
+- HRC-MAE = 0.00301
+
+**Finding 1: HRC-MAE is identical.** The HRC curve (and therefore any cache simulation metric) is determined solely by the object access pattern — which objects are accessed and in what sequence. PhaseAtlas controls this. Neural marks generate the inter-event features (IAT, size, opcode, tenant) but do not affect cache behavior at all. LANL's advertised HRC-MAE=0.00301 is a PhaseAtlas result, full stop.
+
+**Finding 2: Neural marks degrade mark quality 8×.** At 20 epochs, LANL's LSTM mark head produces ts_delta_W1_norm=0.052 vs. the reservoir's 0.004 — a 13× degradation on IAT quality. On opcode and tenant TV, it's 16× worse. The autoregressive mark LSTM, conditioned on atlas state and action class, is less accurate at reproducing the mark distribution than simply drawing from the empirical pool of real marks. The 20-epoch model has not converged to beat the empirical baseline on any dimension.
+
+**Finding 3: The reservoir ceiling is 0.00479.** This is what "correct object process + empirical mark sampling" achieves. It is the gold standard for this eval protocol. It requires no neural component for marks — just the right object access sequence (which PhaseAtlas provides) paired with empirical mark sampling.
+
+### Strategic Recalibration for LLNL
+
+LANL's neural mark head is not a threat today. Their advertised advantage (IDEA #53) produced results 8× worse than their own baseline. The neural marks will presumably improve with more training epochs, but at 20 epochs they are actively harmful.
+
+This changes our mark quality roadmap:
+
+| Path | Complexity | Expected mark_score |
+|------|-----------|---------------------|
+| LANL neural marks (ep20) | High (LSTM + training pipeline) | 0.040 (CURRENT) |
+| LANL reservoir control | None (already implemented) | **0.00479** |
+| LLNL empirical mark sampling (IDEA #56) | Low (generate.py only) | ~0.007 (target) |
+| LLNL current (v195, broken reuse) | — | ~0.614 (broken) |
+
+LLNL path to match LANL's best mark score:
+1. **v204 must fix reuse_rate** → correct new/reuse labels → correct stratified mark sampling
+2. **IDEA #56**: empirical mark reservoir in generate.py (characterization file already has per-file IAT, size histograms by access type)
+3. No neural mark LSTM required — reservoir approach is simpler AND better at 20 epochs
+
+### The Real Battle: HRC-MAE
+
+The mark quality gap, while visible, is now exposed as a tractable engineering problem. The existential gap remains HRC-MAE:
+
+| | LLNL (v195 ep110) | LANL (PhaseAtlas) |
+|--|--|--|
+| Oracle HRC-MAE | 0.0051 | 0.00301 |
+| Long-rollout HRC-MAE | **0.1287** | **0.00301** |
+| Reuse access rate | 0.0081 (real: 0.265) | 0.271 (real: 0.269) |
+
+LANL's HRC advantage is a structural consequence of PhaseAtlas's LRU stack model: the model maintains an explicit working-set and correctly transitions objects through hot/cold/transition phases. Each reuse access is a genuine stack hit. LLNL's oracle mode bypasses this with LRU decoding post-hoc, but in long rollout without oracle, reuse collapses.
+
+v204 at weight=3.0 is the critical test: if reuse_rate reaches ≈0.265 in the GAN phase, long-rollout HRC-MAE should follow. The ★=0.042 short-window score proves our features are correct; only the reuse signal is broken.
+
+### v204 Status
+
+Still pretraining (Phase 2 supervisor, ep20/50). GAN phase expected in ~25 minutes. ep1 reuse_rate will be the first critical signal — target ≥ 0.40 at ep1 (BCE at weight=3.0 should dominate initialization), then converge to 0.265 by ep10.
+

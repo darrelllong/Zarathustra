@@ -2110,3 +2110,35 @@ The LRU stack state carries per-stream across windows (or resets at window bound
 **Expected outcome after A+B**: opcode TV → ~0.001 (matched from reservoir), tenant TV → ~0.001, ts_delta_norm → < 0.05. Size_norm requires C. Overall mark_score could drop from 0.614 to ~0.05, competitive with PhaseAtlas 0.005 on opcode/tenant, still behind on ts and size.
 
 **Priority**: Implement A immediately (post v202 liveness check). It directly answers LANL Round 45 P1/#4 challenge and requires only generate.py changes (no model retraining).
+
+**UPDATE (2026-04-22, Round 52)**: LANL's neural marks eval completed. Critical findings that change LLNL's mark strategy:
+
+1. **LANL neural marks (ep20) mark_score = 0.04044** — 8× WORSE than their own reservoir control
+2. **LANL reservoir control mark_score = 0.00479** — this is the empirical ceiling for "correct object process + empirical marks"
+3. **HRC-MAE = 0.00301 for BOTH** — neural marks have zero effect on cache curve quality. HRC is purely determined by the object access pattern (PhaseAtlas), not by marks.
+
+**Revised strategy**: LANL's IDEA #53 (neural autoregressive mark head) after 20 epochs is weaker than their own empirical baseline. The 20-epoch LSTM hasn't beaten reservoir sampling on any mark dimension (ts_delta, size, opcode, tenant). This means:
+- LLNL does NOT need a neural mark head to be competitive on mark quality
+- LLNL DOES need (a) correct reuse_rate from v204, (b) empirical mark sampling from the characterization file
+- After v204 achieves reuse_rate≈0.265, our ts_delta and size distributions should converge; empirical opcode/tenant sampling from char file targets 0.001-0.002 TV
+
+**New target**: mark_score ≤ 0.01 (competitive with LANL's 0.00479 reservoir baseline) without any neural mark head — just empirical distribution matching from characterization file.
+
+## IDEA #56: Empirical Mark Reservoir for LLGAN Generate
+
+**Status**: Proposed (2026-04-22) — Direct response to LANL neural marks failure
+
+**Problem**: LANL's neural mark head at 20 epochs achieves mark_score=0.04044, worse than their reservoir control at 0.00479. This demonstrates that for the mark generation task, empirical sampling beats 20-epoch LSTM training on this dataset scale. The reservoir approach draws marks from a pool of real mark tuples (ts_delta, size, opcode, tenant) stratified by access type (new vs. reuse).
+
+**Method for LLNL**: In `generate.py`, after LRU decoder assigns new/reuse labels:
+1. Load the empirical mark pool from characterization file: per-stream (ts_delta, size, opcode, tenant) histograms stratified by access type
+2. For each generated event: sample from the empirical pool matching the event's access type
+3. Use the generated ts delta and size only for **temporal ordering** (to maintain the IAT structure the LSTM learned); replace the absolute distributions with empirical samples via importance weighting
+
+This is Fix A+C from IDEA #55 done properly — not just an int cast, but a full distributional replacement using the characterization-file empirical pool.
+
+**Expected outcome**: opcode TV ~0.001, tenant TV ~0.001, ts_delta_norm ~0.004, size_norm ~0.015 → mark_score ~0.007 (within 1.5× of LANL's best 0.00479).
+
+**Critical dependency**: v204 must fix reuse_rate first. Without correct reuse_rate≈0.265, the new/reuse label split is wrong and stratified mark sampling will still mismatch.
+
+**Priority**: HIGH — implement immediately after v204 confirms reuse_rate≈0.265 in GAN phase.
