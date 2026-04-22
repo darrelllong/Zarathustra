@@ -1679,10 +1679,12 @@ Instead of IRD histogram, match the autocorrelation function of the `obj_id_reus
 over long windows. If fake and real have the same ACF(obj_id_reuse), the temporal gap
 structure is reproduced. `ACF_loss = MSE(ACF_fake, ACF_real_ema)` over lag 1-50.
 
-**Why this matters for the race**: IRD=1 means all fake traces behave as infinite working
-sets — every LRU cache always misses because objects never repeat within the simulation
-window. This makes every fake trace identical from the caching perspective, regardless of
-short-window ★. The real traces have IRD median=194, which means a cache of size ~200 objects
+**Why this matters for the race**: IRD=1 means the object process lacks the long-gap reuse
+law that shapes real HRCs. The few reuses that occur are mostly immediate repeats
+(stack-distance ≈ 0), while most objects never participate in realistic longer-gap reuse.
+A cache working set this narrow cannot reproduce the real HRC curve, which requires objects
+to persist in the working set long enough to be re-accessed after many intervening distinct
+objects. The real traces have IRD median=194, which means a cache of size ~200 objects
 covers median reuse. A fake trace with IRD=194 would have 5-10× lower HRC-MAE than any
 current model.
 
