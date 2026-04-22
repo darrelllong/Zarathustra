@@ -76,6 +76,8 @@ class NeuralAtlasModel:
         temperature: float = 1.0,
         transition_blend: float = 0.75,
         force_phase_schedule: bool = False,
+        stack_rank_scale: float = 1.0,
+        stack_rank_max: int | None = None,
         mark_temperature: float | None = None,
         mark_numeric_noise: float = 0.05,
         mark_numeric_blend: float = 1.0,
@@ -94,6 +96,7 @@ class NeuralAtlasModel:
         rng = np.random.default_rng(seed)
         conds = self._resolve_conds(conds, n_streams, rng)
         transition_blend = float(np.clip(transition_blend, 0.0, 1.0))
+        stack_rank_scale = max(float(stack_rank_scale), 0.0)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_categorical_source not in {"neural", "reservoir"}:
             raise ValueError("mark_categorical_source must be 'neural' or 'reservoir'")
@@ -144,7 +147,12 @@ class NeuralAtlasModel:
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
                 if wants_reuse and stack:
-                    rank = min(max(int(ev.stack_distance), 0), len(stack) - 1)
+                    rank = _calibrated_stack_rank(
+                        ev.stack_distance,
+                        stack_rank_scale=stack_rank_scale,
+                        stack_rank_max=stack_rank_max,
+                        stack_len=len(stack),
+                    )
                     obj_id = stack[rank]
                     del stack[rank]
                     stack.insert(0, obj_id)
@@ -564,6 +572,19 @@ def _phase_bins(n_rows: int, n_phase_bins: int) -> np.ndarray:
 
 def _state_with_phase(state: int, phase: int, base_span: int) -> int:
     return int(phase) * int(base_span) + (int(state) % int(base_span))
+
+
+def _calibrated_stack_rank(
+    raw_rank: int,
+    *,
+    stack_rank_scale: float,
+    stack_rank_max: int | None,
+    stack_len: int,
+) -> int:
+    rank = int(round(max(int(raw_rank), 0) * stack_rank_scale))
+    if stack_rank_max is not None and stack_rank_max >= 0:
+        rank = min(rank, int(stack_rank_max))
+    return min(max(rank, 0), int(stack_len) - 1)
 
 
 def _normalize_counts(counts: Dict[int, int]) -> Tuple[np.ndarray, np.ndarray]:

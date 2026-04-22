@@ -33,6 +33,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--transition-blends", default="0.0,0.25,0.5,0.75,1.0")
     p.add_argument("--phase-modes", default="natural,forced",
                    help="Comma-separated phase modes: natural, forced.")
+    p.add_argument("--stack-rank-scales", default="1.0",
+                   help="Comma-separated multipliers for sampled reuse stack ranks.")
+    p.add_argument("--stack-rank-maxes", default="-1",
+                   help="Comma-separated max stack ranks; -1 disables capping.")
     p.add_argument("--disable-neural-marks", action="store_true",
                    help="Force reservoir marks when the checkpoint has a mark head.")
     p.add_argument("--skip-existing", action="store_true",
@@ -55,26 +59,42 @@ def main() -> int:
                 for blend in _split_float(args.transition_blends):
                     for phase_mode in _split_str(args.phase_modes):
                         force_phase = _parse_phase_mode(phase_mode)
-                        output = out_dir / _label(
-                            args.prefix,
-                            n_streams=n_streams,
-                            n_records=n_records,
-                            seed=seed,
-                            temp=temp,
-                            blend=blend,
-                            force_phase=force_phase,
-                        )
-                        _run_eval(
-                            args,
-                            output,
-                            n_streams=n_streams,
-                            n_records=n_records,
-                            seed=seed,
-                            temp=temp,
-                            blend=blend,
-                            force_phase=force_phase,
-                        )
-                        rows.append(_summarize(output, n_streams, n_records, seed, temp, blend, force_phase))
+                        for rank_scale in _split_float(args.stack_rank_scales):
+                            for rank_max in _split_int(args.stack_rank_maxes):
+                                output = out_dir / _label(
+                                    args.prefix,
+                                    n_streams=n_streams,
+                                    n_records=n_records,
+                                    seed=seed,
+                                    temp=temp,
+                                    blend=blend,
+                                    force_phase=force_phase,
+                                    rank_scale=rank_scale,
+                                    rank_max=rank_max,
+                                )
+                                _run_eval(
+                                    args,
+                                    output,
+                                    n_streams=n_streams,
+                                    n_records=n_records,
+                                    seed=seed,
+                                    temp=temp,
+                                    blend=blend,
+                                    force_phase=force_phase,
+                                    rank_scale=rank_scale,
+                                    rank_max=rank_max,
+                                )
+                                rows.append(_summarize(
+                                    output,
+                                    n_streams,
+                                    n_records,
+                                    seed,
+                                    temp,
+                                    blend,
+                                    force_phase,
+                                    rank_scale,
+                                    rank_max,
+                                ))
 
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
@@ -95,6 +115,8 @@ def _run_eval(
     temp: float,
     blend: float,
     force_phase: bool,
+    rank_scale: float,
+    rank_max: int,
 ) -> None:
     if args.skip_existing and output.exists():
         print(f"[altgan.sweep_phaseatlas_hrc] reusing {output}", flush=True)
@@ -108,6 +130,8 @@ def _run_eval(
         "--cond-dim", str(args.cond_dim),
         "--condition-from-real-manifest",
         "--transition-blend", str(blend),
+        "--stack-rank-scale", str(rank_scale),
+        "--stack-rank-max", str(rank_max),
         "--temperature", str(temp),
         "--n-records", str(n_records),
         "--n-streams", str(n_streams),
@@ -131,6 +155,8 @@ def _summarize(
     temp: float,
     blend: float,
     force_phase: bool,
+    rank_scale: float,
+    rank_max: int,
 ) -> dict:
     data = json.loads(path.read_text())
     fake = data["fake"]
@@ -145,6 +171,8 @@ def _summarize(
         "temperature": temp,
         "transition_blend": blend,
         "force_phase_schedule": force_phase,
+        "stack_rank_scale": rank_scale,
+        "stack_rank_max": rank_max,
         "uses_neural_marks": data.get("uses_neural_marks"),
         "hrc_mae": gap["hrc_mae"],
         "fake_reuse": fake["reuse_access_rate"],
@@ -224,11 +252,14 @@ def _label(
     temp: float,
     blend: float,
     force_phase: bool,
+    rank_scale: float,
+    rank_max: int,
 ) -> str:
     phase = "forced" if force_phase else "natural"
     return (
         f"{prefix}_{n_streams}x{n_records}_seed-{seed}"
-        f"_temp-{_slug(temp)}_blend-{_slug(blend)}_phase-{phase}_eval.json"
+        f"_temp-{_slug(temp)}_blend-{_slug(blend)}_phase-{phase}"
+        f"_rankscale-{_slug(rank_scale)}_rankmax-{rank_max}_eval.json"
     )
 
 
