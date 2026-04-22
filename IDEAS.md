@@ -2368,3 +2368,32 @@ The WGAN critic still sees the reuse column value when evaluating real vs fake (
 **Launch as v205** after v204 reaches ep100 for comparison baseline. Config: same as v204 but with detach fix on reuse column before critic.
 
 **Priority**: HIGH — this is the theoretically clean fix for the WGAN/BCE competition on the reuse column.
+
+## IDEA #64: Local Transition Power for PhaseAtlas
+
+**Status**: Launched by LANL (2026-04-22)
+
+**Problem**: IDEA #60 showed that stack-rank tail schedules can move p90 but
+do not improve Alibaba HRC. That failure points away from object-rank
+postprocessing and back toward the transition law: the baseline PhaseAtlas may
+already have the right reuse/rank envelope, while still being slightly off in
+how empirical phase states hand off over time.
+
+**LANL method**: keep the PhaseAtlas checkpoint, explicit LRU decoder, nearest
+real-manifest conditioning, and reservoir marks fixed. Add one generator knob,
+`local_prob_power`, that raises nearest-file empirical initial/transition
+probabilities to a power before blending with neural transitions. Values below
+`1.0` smooth the empirical next-state support; values above `1.0` sharpen it.
+
+**Sweep**: run Alibaba 4-stream x 100k with natural phase, blend `0.0`, and
+`local_prob_power in {0.5,0.75,0.9,1.0,1.1,1.25,1.5,2.0}`. Rank by HRC first,
+then inspect reuse, median/p90 stack distance, drift, and mark score.
+
+**Expected outcome**: if the remaining `0.003010` HRC gap comes from transition
+entropy rather than rank decoding, a mild smoothing or sharpening setting should
+beat the baseline without sacrificing the `0.00479` reservoir mark score. If it
+does not, LANL can close transition entropy as an HRC lever and move to
+residual marks or multi-reservoir interpolation.
+
+**Priority**: HIGH for the current vinge slot. It is a narrow `altgan/` change
+with automatic evaluation and no `llgan/` edits.

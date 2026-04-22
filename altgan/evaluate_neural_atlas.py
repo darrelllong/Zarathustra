@@ -38,6 +38,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--transition-blend", type=float, default=0.75,
                    help="1.0 means pure neural transitions; 0.0 means nearest-file atlas.")
+    p.add_argument("--local-prob-power", type=float, default=1.0,
+                   help="Power applied to nearest-file empirical initial/transition probabilities before blending.")
     p.add_argument("--force-phase-schedule", action="store_true",
                    help="For phase atlases, force phase from synthetic stream position.")
     p.add_argument("--stack-rank-scale", type=float, default=1.0,
@@ -96,6 +98,7 @@ def main() -> int:
         conds=conds,
         temperature=args.temperature,
         transition_blend=args.transition_blend,
+        local_prob_power=args.local_prob_power,
         force_phase_schedule=args.force_phase_schedule,
         stack_rank_scale=args.stack_rank_scale,
         stack_rank_max=None if args.stack_rank_max < 0 else args.stack_rank_max,
@@ -131,6 +134,7 @@ def main() -> int:
         "n_streams": args.n_streams,
         "temperature": args.temperature,
         "transition_blend": args.transition_blend,
+        "local_prob_power": args.local_prob_power,
         "force_phase_schedule": args.force_phase_schedule,
         "stack_rank_scale": args.stack_rank_scale,
         "stack_rank_max": args.stack_rank_max,

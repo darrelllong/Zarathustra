@@ -75,6 +75,7 @@ class NeuralAtlasModel:
         conds: np.ndarray | None = None,
         temperature: float = 1.0,
         transition_blend: float = 0.75,
+        local_prob_power: float = 1.0,
         force_phase_schedule: bool = False,
         stack_rank_scale: float = 1.0,
         stack_rank_max: int | None = None,
@@ -98,6 +99,7 @@ class NeuralAtlasModel:
         rng = np.random.default_rng(seed)
         conds = self._resolve_conds(conds, n_streams, rng)
         transition_blend = float(np.clip(transition_blend, 0.0, 1.0))
+        local_prob_power = max(float(local_prob_power), 0.0)
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_categorical_source not in {"neural", "reservoir"}:
@@ -134,7 +136,12 @@ class NeuralAtlasModel:
         base_span = self.n_time_bins * self.n_size_bins * StackAtlasModel.N_ACTIONS
         for stream_id in range(n_streams):
             reservoir = self._nearest_reservoir(conds[stream_id])
-            init_p = self._blend_initial(init_probs[stream_id], reservoir, transition_blend)
+            init_p = self._blend_initial(
+                init_probs[stream_id],
+                reservoir,
+                transition_blend,
+                local_prob_power,
+            )
             state = int(rng.choice(self.n_states, p=init_p))
             stack: List[int] = []
             in_stack: set[int] = set()
@@ -223,6 +230,7 @@ class NeuralAtlasModel:
                     state,
                     trans_probs[stream_id, state],
                     transition_blend,
+                    local_prob_power,
                     rng,
                 )
 
@@ -269,16 +277,18 @@ class NeuralAtlasModel:
         return samples[int(rng.integers(0, len(samples)))]
 
     def _blend_initial(self, neural_p: np.ndarray, reservoir: AtlasReservoir,
-                       transition_blend: float) -> np.ndarray:
+                       transition_blend: float, local_prob_power: float) -> np.ndarray:
         local_p = np.zeros(self.n_states, dtype=np.float64)
         local_p[reservoir.initial_states] = reservoir.initial_probs
         if local_p.sum() <= 0:
             local_p[self.global_initial_states] = self.global_initial_probs
+        local_p = _power_probs(local_p, local_prob_power)
         p = transition_blend * neural_p.astype(np.float64) + (1.0 - transition_blend) * local_p
         return _renorm(p)
 
     def _next_state(self, reservoir: AtlasReservoir, state: int, neural_p: np.ndarray,
-                    transition_blend: float, rng: np.random.Generator) -> int:
+                    transition_blend: float, local_prob_power: float,
+                    rng: np.random.Generator) -> int:
         local_p = np.zeros(self.n_states, dtype=np.float64)
         states_probs = reservoir.transitions.get(int(state)) or self.global_transitions.get(int(state))
         if states_probs is not None:
@@ -286,6 +296,7 @@ class NeuralAtlasModel:
             local_p[states] = probs
         else:
             local_p[self.global_initial_states] = self.global_initial_probs
+        local_p = _power_probs(local_p, local_prob_power)
         p = transition_blend * neural_p.astype(np.float64) + (1.0 - transition_blend) * local_p
         return int(rng.choice(self.n_states, p=_renorm(p)))
 
@@ -591,6 +602,18 @@ def _calibrated_stack_rank(
     if stack_rank_max is not None and stack_rank_max >= 0:
         rank = min(rank, int(stack_rank_max))
     return min(max(rank, 0), int(stack_len) - 1)
+
+
+def _power_probs(probs: np.ndarray, power: float) -> np.ndarray:
+    arr = probs.astype(np.float64, copy=True)
+    if power == 1.0:
+        return arr
+    support = arr > 0
+    if not np.any(support):
+        return arr
+    arr[support] = np.power(arr[support], power)
+    arr[~support] = 0.0
+    return _renorm(arr)
 
 
 def _phase_value(values: Sequence, phase: int, default):

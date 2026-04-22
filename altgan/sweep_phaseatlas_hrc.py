@@ -31,6 +31,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--seeds", default="42")
     p.add_argument("--temperatures", default="1.0")
     p.add_argument("--transition-blends", default="0.0,0.25,0.5,0.75,1.0")
+    p.add_argument("--local-prob-powers", default="1.0",
+                   help="Comma-separated powers for empirical nearest-file initial/transition probabilities.")
     p.add_argument("--phase-modes", default="natural,forced",
                    help="Comma-separated phase modes: natural, forced.")
     p.add_argument("--stack-rank-scales", default="1.0",
@@ -63,58 +65,62 @@ def main() -> int:
         for seed in _split_int(args.seeds):
             for temp in _split_float(args.temperatures):
                 for blend in _split_float(args.transition_blends):
-                    for phase_mode in _split_str(args.phase_modes):
-                        force_phase = _parse_phase_mode(phase_mode)
-                        for rank_scale in _split_float(args.stack_rank_scales):
-                            for rank_max in _split_int(args.stack_rank_maxes):
-                                for phase_scale_schedule in _split_schedules(
-                                    args.phase_stack_rank_scale_schedules,
-                                    include_baseline=not args.no_global_baseline,
-                                ):
-                                    for phase_max_schedule in _split_schedules(
-                                        args.phase_stack_rank_max_schedules,
+                    for local_prob_power in _split_float(args.local_prob_powers):
+                        for phase_mode in _split_str(args.phase_modes):
+                            force_phase = _parse_phase_mode(phase_mode)
+                            for rank_scale in _split_float(args.stack_rank_scales):
+                                for rank_max in _split_int(args.stack_rank_maxes):
+                                    for phase_scale_schedule in _split_schedules(
+                                        args.phase_stack_rank_scale_schedules,
                                         include_baseline=not args.no_global_baseline,
                                     ):
-                                        output = out_dir / _label(
-                                            args.prefix,
-                                            n_streams=n_streams,
-                                            n_records=n_records,
-                                            seed=seed,
-                                            temp=temp,
-                                            blend=blend,
-                                            force_phase=force_phase,
-                                            rank_scale=rank_scale,
-                                            rank_max=rank_max,
-                                            phase_scale_schedule=phase_scale_schedule,
-                                            phase_max_schedule=phase_max_schedule,
-                                        )
-                                        _run_eval(
-                                            args,
-                                            output,
-                                            n_streams=n_streams,
-                                            n_records=n_records,
-                                            seed=seed,
-                                            temp=temp,
-                                            blend=blend,
-                                            force_phase=force_phase,
-                                            rank_scale=rank_scale,
-                                            rank_max=rank_max,
-                                            phase_scale_schedule=phase_scale_schedule,
-                                            phase_max_schedule=phase_max_schedule,
-                                        )
-                                        rows.append(_summarize(
-                                            output,
-                                            n_streams,
-                                            n_records,
-                                            seed,
-                                            temp,
-                                            blend,
-                                            force_phase,
-                                            rank_scale,
-                                            rank_max,
-                                            phase_scale_schedule,
-                                            phase_max_schedule,
-                                        ))
+                                        for phase_max_schedule in _split_schedules(
+                                            args.phase_stack_rank_max_schedules,
+                                            include_baseline=not args.no_global_baseline,
+                                        ):
+                                            output = out_dir / _label(
+                                                args.prefix,
+                                                n_streams=n_streams,
+                                                n_records=n_records,
+                                                seed=seed,
+                                                temp=temp,
+                                                blend=blend,
+                                                local_prob_power=local_prob_power,
+                                                force_phase=force_phase,
+                                                rank_scale=rank_scale,
+                                                rank_max=rank_max,
+                                                phase_scale_schedule=phase_scale_schedule,
+                                                phase_max_schedule=phase_max_schedule,
+                                            )
+                                            _run_eval(
+                                                args,
+                                                output,
+                                                n_streams=n_streams,
+                                                n_records=n_records,
+                                                seed=seed,
+                                                temp=temp,
+                                                blend=blend,
+                                                local_prob_power=local_prob_power,
+                                                force_phase=force_phase,
+                                                rank_scale=rank_scale,
+                                                rank_max=rank_max,
+                                                phase_scale_schedule=phase_scale_schedule,
+                                                phase_max_schedule=phase_max_schedule,
+                                            )
+                                            rows.append(_summarize(
+                                                output,
+                                                n_streams,
+                                                n_records,
+                                                seed,
+                                                temp,
+                                                blend,
+                                                local_prob_power,
+                                                force_phase,
+                                                rank_scale,
+                                                rank_max,
+                                                phase_scale_schedule,
+                                                phase_max_schedule,
+                                            ))
 
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
@@ -134,6 +140,7 @@ def _run_eval(
     seed: int,
     temp: float,
     blend: float,
+    local_prob_power: float,
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
@@ -152,6 +159,7 @@ def _run_eval(
         "--cond-dim", str(args.cond_dim),
         "--condition-from-real-manifest",
         "--transition-blend", str(blend),
+        "--local-prob-power", str(local_prob_power),
         "--stack-rank-scale", str(rank_scale),
         "--stack-rank-max", str(rank_max),
         "--temperature", str(temp),
@@ -180,6 +188,7 @@ def _summarize(
     seed: int,
     temp: float,
     blend: float,
+    local_prob_power: float,
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
@@ -198,6 +207,7 @@ def _summarize(
         "seed": seed,
         "temperature": temp,
         "transition_blend": blend,
+        "local_prob_power": local_prob_power,
         "force_phase_schedule": force_phase,
         "stack_rank_scale": rank_scale,
         "stack_rank_max": rank_max,
@@ -291,6 +301,7 @@ def _label(
     seed: int,
     temp: float,
     blend: float,
+    local_prob_power: float,
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
@@ -302,7 +313,8 @@ def _label(
     phase_max = _slug(phase_max_schedule) if phase_max_schedule else "none"
     return (
         f"{prefix}_{n_streams}x{n_records}_seed-{seed}"
-        f"_temp-{_slug(temp)}_blend-{_slug(blend)}_phase-{phase}"
+        f"_temp-{_slug(temp)}_blend-{_slug(blend)}_localpow-{_slug(local_prob_power)}"
+        f"_phase-{phase}"
         f"_rankscale-{_slug(rank_scale)}_rankmax-{rank_max}"
         f"_phasescale-{phase_scale}_phasemax-{phase_max}_eval.json"
     )

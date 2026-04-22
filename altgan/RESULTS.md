@@ -67,6 +67,45 @@ p90 `177` vs `174`. It improved stack p90 but made HRC and drift worse than
 the `1024 files x 5k` row, so Tencent currently prefers broader file coverage
 over deeper per-file slices.
 
+## Alibaba PhaseAtlas Calibration Ablations
+
+Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
+`/tiamat/zarathustra/checkpoints/altgan/alibaba_phaseatlas_holdout_allx25k_e900.pkl.gz`
+against the fixed real manifest
+`/home/darrell/long_rollout_manifests/alibaba_stackatlas.json`.
+
+The rank-tail schedule sweep closed negative. The baseline PhaseAtlas row is
+still best HRC. A late-phase rank expansion moved stack p90 closer to real, but
+HRC worsened; phase caps over-shortened the deep tail and lost clearly.
+
+| Variant | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Baseline, natural phase | **0.003010** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 0.00479 |
+| Late-phase rank expansion, no cap | 0.003145 | 0.27125 | 0.26909 | 205 | 201 | 1474 | 1452 | 0.00479 |
+| Late-phase rank compression, no cap | 0.004279 | 0.27125 | 0.26909 | 184 | 201 | 1236 | 1452 | 0.00479 |
+| Baseline ranks, late caps | 0.006727 | 0.27125 | 0.26909 | 205 | 201 | 787 | 1452 | 0.00479 |
+
+Conclusion: stack-rank postprocessing is not the next winning LANL path. The
+best next experiment should perturb the empirical phase transition law itself,
+while leaving the explicit LRU decoder and reservoir marks intact.
+
+The empirical transition-power sweep also closed negative. It raised the
+nearest-file initial/transition probability vectors to `local_prob_power`
+before sampling. The unchanged empirical law remains best; smoothing to `0.9`
+nearly preserves HRC but worsens mark score and reuse, while sharper settings
+under-reuse and collapse the stack tail.
+
+| local_prob_power | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | 0.038345 | 0.31570 | 0.26909 | 112 | 201 | 3132 | 1452 | 0.01942 |
+| 0.75 | 0.014896 | 0.28666 | 0.26909 | 179 | 201 | 1508 | 1452 | 0.00918 |
+| 0.90 | 0.003616 | 0.27392 | 0.26909 | 196 | 201 | 1480 | 1452 | 0.01072 |
+| 1.00 | **0.003010** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 0.00479 |
+| 1.10 | 0.031861 | 0.23719 | 0.26909 | 224 | 201 | 1480 | 1452 | 0.03283 |
+| 1.25 | 0.021938 | 0.24671 | 0.26909 | 221 | 201 | 1355 | 1452 | 0.01876 |
+| 1.50 | 0.035989 | 0.22775 | 0.26909 | 210 | 201 | 934 | 1452 | 0.00892 |
+| 2.00 | 0.068274 | 0.17253 | 0.26909 | 198 | 201 | 530 | 1452 | 0.01768 |
+
 ## Mark Quality Panel
 
 LLNL's v198 response correctly asks whether LANL's reservoir marks are weaker
@@ -96,6 +135,17 @@ mark head scores `0.04044`, mostly from timing and size regression drift. Treat
 this as a negative result for direct autoregressive mark replacement and move
 next to noise/temperature ablations or residual/hybrid marks around the
 reservoir sampler.
+
+The zero-noise neural-mark temperature sweep also closed negative. Lowering
+temperature preserved the object process exactly but collapsed categorical mark
+diversity, driving opcode and tenant TV sharply upward.
+
+| Neural mark temp/noise | HRC-MAE | Mark score | opcode TV | tenant TV |
+|---|---:|---:|---:|---:|
+| temp 1.0, noise 0 | 0.003010 | 0.04427 | 0.03014 | 0.02968 |
+| temp 0.5, noise 0 | 0.003010 | 0.15518 | 0.24405 | 0.24379 |
+| temp 0.25, noise 0 | 0.003010 | 0.16519 | 0.26397 | 0.26395 |
+| temp 0.05, noise 0 | 0.003010 | 0.16526 | 0.26413 | 0.26415 |
 
 ## StackAtlas 100k Long-Rollout Panel
 
