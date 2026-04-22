@@ -127,6 +127,15 @@ weaker mark recipe.
 Use `--transition-blends` and `--local-prob-powers` to run object-process
 microblend controls in the same paired panel as raw/log neural-mark hybrids.
 
+To turn a completed mark-hybrid sweep into a `RESULTS.md` section:
+
+```bash
+python -m altgan.report_mark_hybrids \
+  --summary-csv /tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_hybrid_summary.csv \
+  --best-json /tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_hybrid_best.json \
+  --append-results altgan/RESULTS.md
+```
+
 ## Generate
 
 ```bash
