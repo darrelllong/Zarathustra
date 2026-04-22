@@ -41,6 +41,7 @@ def generate(
     lru_stack_exact_fit: bool = False,
     lru_stack_pmf: str = "",
     lru_stack_reuse_rate: float = -1.0,
+    lru_stack_max_depth: int = 2048,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -227,23 +228,26 @@ def generate(
             if lru_stack_pmf:
                 pmf_vals = np.array([float(x) for x in lru_stack_pmf.split(",")])
                 print(f"[lru-stack] Using explicit PMF: {np.round(pmf_vals, 4)}")
-                lru_decoder_proto = LRUStackDecoder(pmf_vals)
+                lru_decoder_proto = LRUStackDecoder(pmf_vals, max_stack_depth=lru_stack_max_depth)
             elif lru_stack_real_csv:
                 import pandas as _pd
                 real_df = _pd.read_csv(lru_stack_real_csv)
                 if "obj_id" not in real_df.columns:
                     print(f"[lru-stack] WARN: no obj_id in {lru_stack_real_csv}; "
                           "using default PMF")
-                    lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+                    lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus,
+                                                                      max_stack_depth=lru_stack_max_depth)
                 else:
                     print(f"[lru-stack] Fitting PMF from {lru_stack_real_csv} "
                           f"(exact={lru_stack_exact_fit})")
                     lru_decoder_proto = LRUStackDecoder.fit_from_df(
-                        real_df, exact=lru_stack_exact_fit
+                        real_df, exact=lru_stack_exact_fit,
+                        max_stack_depth=lru_stack_max_depth
                     )
             else:
                 print(f"[lru-stack] Using default PMF for corpus={lru_stack_corpus!r}")
-                lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+                lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus,
+                                                                  max_stack_depth=lru_stack_max_depth)
             lru_decoder_proto.print_pmf()
 
     # Inverse-transform each stream independently (cumsum stays within stream),
@@ -349,6 +353,11 @@ def parse_args():
                    help="Override generator's obj_id_reuse signal with Bernoulli(P). "
                         "P=-1 (default) uses generator signal. Use P=real_reuse_rate "
                         "to ablate the reuse signal and test stack decoder alone.")
+    p.add_argument("--lru-stack-max-depth", type=int, default=2048,
+                   metavar="D",
+                   help="LRU stack maximum depth. Objects beyond this rank are evicted. "
+                        "Default 2048. Set >= footprint (n_records*(1-reuse_rate)) to "
+                        "avoid capping the working set.")
     return p.parse_args()
 
 
@@ -370,4 +379,5 @@ if __name__ == "__main__":
         lru_stack_exact_fit=args.lru_stack_exact_fit,
         lru_stack_pmf=args.lru_stack_pmf,
         lru_stack_reuse_rate=args.lru_stack_reuse_rate,
+        lru_stack_max_depth=args.lru_stack_max_depth,
     )
