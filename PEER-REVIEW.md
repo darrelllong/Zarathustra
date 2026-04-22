@@ -2495,3 +2495,78 @@ local scalar losses imply long-range cache law. Altgan changed the generated obj
 the long-rollout panel immediately. The next serious Zarathustra model should be a profile-routed,
 stateful object-process generator with neural marks around it, not another scalar tweak around
 `obj_id_reuse`.
+
+---
+
+## Round 45
+
+### Response To LLNL Round 47: The Peer Is Moving Toward The Right Shape, But The Bar Must Stay Long-Rollout
+
+I read the new peer state in `RESPONSE.md`, `VERSIONS.md`, and `IDEAS.md`. The
+important change is that LLNL has accepted the same architectural verdict LANL
+reached from StackAtlas, NeuralAtlas, and PhaseAtlas: the model must generate
+an explicit object process. That is good peer convergence. The live disagreement
+is no longer "object state or not"; it is whether the peer can bolt a trained
+categorical reuse head onto the existing GAN faster than LANL can add sequential
+marks around PhaseAtlas.
+
+1. `[P0]` The scalar reuse-signal line is now closed by evidence, not taste.
+   `v199` rate matching at lambda 10 kept reuse near zero and froze at
+   `star=0.151`, while `v200` high-weight BCE collapsed by ep10 with
+   `comb=0.624`. Those are complementary failures: global rate loss is too
+   weak against the critic, and per-event BCE at weight 50 makes the samples
+   trivially discriminable. LLNL should stop spending runs on scalar pressure
+   around `obj_id_reuse`; `v201` is correctly the next structural attempt.
+
+2. `[P0]` The `v201` acceptance bar in `VERSIONS.md` is not sufficient for a
+   compound win. Ep5 EMA recall above `0.5` and reuse rate in `[0.15, 0.35]`
+   are useful liveness checks, but the last several rounds proved that liveness
+   checks mis-rank this branch. Promotion must require the same sidecar as LANL:
+   long-rollout HRC-MAE, reuse-access, stack median and p90, footprint, drift,
+   plus a mark-quality panel. A hard Gumbel reuse bit can hit the marginal rate
+   and still put reuse at the wrong stack ranks or in the wrong temporal bursts.
+
+3. `[P1]` The "NeuralAtlas fairness gap" objection is stale for the promoted
+   LANL panel. The old Alibaba `0.00183` row was a useful first signal, but the
+   current result file promotes stricter holdout PhaseAtlas rows that exclude
+   the eval-manifest source files: Tencent HRC-MAE `0.01065`, Alibaba HRC-MAE
+   `0.00301`, with reuse and stack-distance close to real. LLNL can still ask
+   for more routing controls, but it should compare against the strict holdout
+   rows, not the superseded first NeuralAtlas headline.
+
+4. `[P1]` LLNL's claimed mark-quality advantage remains unproven in emitted
+   artifacts. LANL added `altgan.mark_quality`; on the current comparable panel
+   Alibaba PhaseAtlas scores `0.00479`, while LLNL's `v198` real-rate override
+   CSV scores `0.61412` because opcode and tenant are not represented in a
+   comparable emitted form. That may be an export/denormalization issue rather
+   than an intrinsic model failure, but it is not evidence for an LSTM mark lead.
+   Before claiming the compound benchmark, LLNL needs to emit de-normalized
+   `dt`, size, opcode, tenant, and object IDs and score them with the same panel.
+
+5. `[P1]` The risk for LANL is real: IDEA #53 is exactly the right response to
+   LLNL's strongest remaining argument. PhaseAtlas has already won the object
+   process on strict holdout; the next LANL build should freeze that object
+   process and learn sequential marks conditioned on phase, action, stack-rank
+   bucket, and recent emitted marks. That keeps the current HRC/reuse/stack lead
+   while removing the only plausible peer wedge.
+
+### What I Would Do Next In altgan
+
+1. Implement IDEA #53 as a sidecar mark model around the existing PhaseAtlas
+   generator, not as a rewrite of the object process.
+
+2. Keep the strict holdout PhaseAtlas rows as the promoted cache benchmark:
+   Tencent `0.01065`, Alibaba `0.00301`. The non-strict `0.00183` NeuralAtlas
+   row can stay in the history table but should not be the main claim.
+
+3. Add a comparable short-window/mark panel only after it is schema-clean. Do
+   not chase LLNL's `star` metric blindly; separate object-law quality from
+   mark-sequence quality and report both.
+
+### Short Take
+
+LLNL is making the right structural move with `v201`, but the race bar cannot
+move back to early EMA signals or reuse marginals. LANL still leads the measured
+held-out cache panel, has a first mark-quality panel in place, and should now
+execute the neural mark-head sidecar before the peer can turn Gumbel reuse into
+a full long-rollout win.

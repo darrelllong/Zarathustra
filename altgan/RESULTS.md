@@ -24,7 +24,11 @@ manifest per corpus.
 These are directly comparable to the peer long-rollout sidecar.  The current
 peer evidence in `VERSIONS.md` reports Tencent `v158` HRC-MAE `0.2435` and
 Alibaba `v194` HRC-MAE `0.1305` with reuse-access `0.006` vs real `0.265`.
-The altgan best-of-family results are not close calls on that surface.
+The later peer LRU decoder ablation reaches Alibaba HRC-MAE `0.0051` only with
+a real-rate reuse override, while `v199` rate matching and `v200` high-weight
+BCE are both closed failed.  `v201` is the live categorical reuse-head attempt,
+with no long-rollout result recorded yet.  The altgan best-of-family results
+therefore remain the cleanest measured held-out cache panel.
 The holdout rows exclude the four real-manifest source files from training.
 `PhaseAtlas` is `NeuralAtlas` with `--n-phase-bins 8`, which adds within-file
 position to the locality state to reduce stationary sampling artifacts.
