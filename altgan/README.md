@@ -190,6 +190,15 @@ global knobs at `1.0` and `-1` for the unmodified PhaseAtlas baseline. When
 phase schedules are supplied, the runner also includes the unscheduled global
 baseline unless `--no-global-baseline` is set.
 
+To turn a completed sweep CSV into a `RESULTS.md` section:
+
+```bash
+python -m altgan.report_phaseatlas_hrc \
+  --summary-csv /tiamat/zarathustra/altgan-output/alibaba_phaseatlas_hrc_summary.csv \
+  --top-n 5 \
+  --append-results altgan/RESULTS.md
+```
+
 The evaluator also writes a `mark_quality` block for timing, size, opcode, and
 tenant realism. To compare two already-generated CSVs directly:
 
