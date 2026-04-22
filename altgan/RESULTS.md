@@ -88,8 +88,24 @@ p90 both moved closer to real.
 | 0.65 | 1.10 | 0.011175 | 0.61604 | 0.61493 | 50 | 60 | 174 | 174 | 0.04633 |
 
 Unlike the Alibaba seed-42 microblend, this Tencent winner improves HRC, reuse,
-stack p90, and mark score on the fixed panel. A multi-seed confirmation pass is
-running before promoting it as the conservative Tencent champion.
+stack p90, and mark score on the fixed panel. The seed-confirmation pass kept
+the microblend family useful, but it did not promote the exact seed-42 cell as
+the conservative Tencent champion. Across seeds 43-45, the best mean HRC row
+was `blend=0.5, local_prob_power=0.9` at mean HRC `0.010422`, narrowly ahead
+of `blend=0.65, local_prob_power=1.0` at `0.010439`. The seed-42 HRC leader
+`blend=0.65, local_prob_power=0.9` regressed to mean HRC `0.011458`, mostly
+from seed 45.
+
+| Confirm row | Seeds | mean HRC-MAE | HRC range | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| blend 0.5, local power 0.9 | 43-45 | **0.010422** | 0.010102-0.010992 | 0.61174 | 0.61493 | 48.3 | 60 | 154.3 | 174 | 0.04909 |
+| blend 0.65, local power 1.0 | 43-45 | 0.010439 | 0.010182-0.010737 | 0.61290 | 0.61493 | 50.3 | 60 | 154.0 | 174 | **0.04632** |
+| blend 0.65, local power 0.9 | 43-45 | 0.011458 | 0.009940-0.013167 | 0.61121 | 0.61493 | 50.7 | 60 | 150.3 | 174 | 0.04824 |
+| blend 0.5, local power 1.0 | 43-45 | 0.013709 | 0.010649-0.017671 | 0.60536 | 0.61493 | 47.7 | 60 | 155.0 | 174 | 0.04727 |
+
+The practical Tencent setting remains the smoothed local-power row
+(`blend=0.5, local_prob_power=0.9`) until a new mechanism moves stack p90
+toward 174 without giving back HRC.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 
