@@ -78,6 +78,8 @@ class NeuralAtlasModel:
         force_phase_schedule: bool = False,
         stack_rank_scale: float = 1.0,
         stack_rank_max: int | None = None,
+        stack_rank_phase_scales: Sequence[float] | None = None,
+        stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
         mark_numeric_noise: float = 0.05,
         mark_numeric_blend: float = 1.0,
@@ -141,16 +143,20 @@ class NeuralAtlasModel:
             ts = 0.0
 
             for pos in range(per_stream):
+                phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                 if force_phase_schedule and self.n_phase_bins > 1:
-                    phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                     state = _state_with_phase(state, phase, base_span)
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
                 if wants_reuse and stack:
+                    phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                    phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                    if phase_rank_max is not None and phase_rank_max < 0:
+                        phase_rank_max = None
                     rank = _calibrated_stack_rank(
                         ev.stack_distance,
-                        stack_rank_scale=stack_rank_scale,
-                        stack_rank_max=stack_rank_max,
+                        stack_rank_scale=phase_rank_scale,
+                        stack_rank_max=phase_rank_max,
                         stack_len=len(stack),
                     )
                     obj_id = stack[rank]
@@ -585,6 +591,13 @@ def _calibrated_stack_rank(
     if stack_rank_max is not None and stack_rank_max >= 0:
         rank = min(rank, int(stack_rank_max))
     return min(max(rank, 0), int(stack_len) - 1)
+
+
+def _phase_value(values: Sequence, phase: int, default):
+    if not values:
+        return default
+    idx = min(max(int(phase), 0), len(values) - 1)
+    return values[idx]
 
 
 def _normalize_counts(counts: Dict[int, int]) -> Tuple[np.ndarray, np.ndarray]:

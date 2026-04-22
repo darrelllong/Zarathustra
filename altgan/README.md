@@ -176,14 +176,17 @@ python -m altgan.sweep_phaseatlas_hrc \
   --phase-modes natural,forced \
   --stack-rank-scales 0.75,1.0,1.25 \
   --stack-rank-maxes -1,512,1024 \
+  --phase-stack-rank-scale-schedules "0.75,0.9,1.0,1.0,1.1,1.15,1.2,1.25" \
+  --phase-stack-rank-max-schedules "-1,-1,1024,1024,768,768,512,512" \
   --panels 4x100000,8x50000 \
   --skip-existing
 ```
 
 The sweep writes `*_summary.csv` and `*_best.json`, ranked by HRC-MAE first, so
 interrupted remote runs can resume without losing completed cells. The stack
-rank scale/max controls are HRC calibration knobs around the reuse tail; leave
-both at `1.0` and `-1` for the unmodified PhaseAtlas baseline.
+rank scale/max controls are HRC calibration knobs around the reuse tail. Phase
+schedules let those knobs vary across PhaseAtlas bins; omit them and leave the
+global knobs at `1.0` and `-1` for the unmodified PhaseAtlas baseline.
 
 The evaluator also writes a `mark_quality` block for timing, size, opcode, and
 tenant realism. To compare two already-generated CSVs directly:

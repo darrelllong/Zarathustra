@@ -44,6 +44,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Scale sampled reuse stack ranks before LRU lookup.")
     p.add_argument("--stack-rank-max", type=int, default=-1,
                    help="Optional maximum reuse stack rank after scaling; negative disables.")
+    p.add_argument("--stack-rank-phase-scales", default="",
+                   help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
+    p.add_argument("--stack-rank-phase-maxes", default="",
+                   help="Comma-separated per-phase stack-rank caps; negative disables a phase cap.")
     p.add_argument("--disable-neural-marks", action="store_true",
                    help="Ignore an attached neural mark head and use atlas reservoir marks.")
     p.add_argument("--mark-temperature", type=float, default=None,
@@ -95,6 +99,8 @@ def main() -> int:
         force_phase_schedule=args.force_phase_schedule,
         stack_rank_scale=args.stack_rank_scale,
         stack_rank_max=None if args.stack_rank_max < 0 else args.stack_rank_max,
+        stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
+        stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
         mark_numeric_noise=args.mark_numeric_noise,
         mark_numeric_blend=args.mark_numeric_blend,
@@ -128,6 +134,8 @@ def main() -> int:
         "force_phase_schedule": args.force_phase_schedule,
         "stack_rank_scale": args.stack_rank_scale,
         "stack_rank_max": args.stack_rank_max,
+        "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
+        "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,
         "mark_numeric_noise": args.mark_numeric_noise,
         "mark_numeric_blend": args.mark_numeric_blend,
@@ -180,6 +188,14 @@ def _lookup_cond(cond_lookup: dict, name_or_path: str, cond_dim: int) -> np.ndar
                 arr = np.pad(arr, (0, cond_dim - len(arr)))
             return arr[:cond_dim]
     raise KeyError(f"no characterization vector for {name_or_path}")
+
+
+def _parse_float_list(text: str) -> list[float]:
+    return [float(x.strip()) for x in text.split(",") if x.strip()]
+
+
+def _parse_int_list(text: str) -> list[int]:
+    return [int(x.strip()) for x in text.split(",") if x.strip()]
 
 
 if __name__ == "__main__":

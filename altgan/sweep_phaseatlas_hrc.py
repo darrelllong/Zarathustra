@@ -37,6 +37,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated multipliers for sampled reuse stack ranks.")
     p.add_argument("--stack-rank-maxes", default="-1",
                    help="Comma-separated max stack ranks; -1 disables capping.")
+    p.add_argument("--phase-stack-rank-scale-schedules", default="",
+                   help="Semicolon-separated per-phase rank-scale schedules, each comma-separated.")
+    p.add_argument("--phase-stack-rank-max-schedules", default="",
+                   help="Semicolon-separated per-phase rank-cap schedules, each comma-separated.")
     p.add_argument("--disable-neural-marks", action="store_true",
                    help="Force reservoir marks when the checkpoint has a mark head.")
     p.add_argument("--skip-existing", action="store_true",
@@ -61,40 +65,52 @@ def main() -> int:
                         force_phase = _parse_phase_mode(phase_mode)
                         for rank_scale in _split_float(args.stack_rank_scales):
                             for rank_max in _split_int(args.stack_rank_maxes):
-                                output = out_dir / _label(
-                                    args.prefix,
-                                    n_streams=n_streams,
-                                    n_records=n_records,
-                                    seed=seed,
-                                    temp=temp,
-                                    blend=blend,
-                                    force_phase=force_phase,
-                                    rank_scale=rank_scale,
-                                    rank_max=rank_max,
-                                )
-                                _run_eval(
-                                    args,
-                                    output,
-                                    n_streams=n_streams,
-                                    n_records=n_records,
-                                    seed=seed,
-                                    temp=temp,
-                                    blend=blend,
-                                    force_phase=force_phase,
-                                    rank_scale=rank_scale,
-                                    rank_max=rank_max,
-                                )
-                                rows.append(_summarize(
-                                    output,
-                                    n_streams,
-                                    n_records,
-                                    seed,
-                                    temp,
-                                    blend,
-                                    force_phase,
-                                    rank_scale,
-                                    rank_max,
-                                ))
+                                for phase_scale_schedule in _split_schedules(
+                                    args.phase_stack_rank_scale_schedules
+                                ):
+                                    for phase_max_schedule in _split_schedules(
+                                        args.phase_stack_rank_max_schedules
+                                    ):
+                                        output = out_dir / _label(
+                                            args.prefix,
+                                            n_streams=n_streams,
+                                            n_records=n_records,
+                                            seed=seed,
+                                            temp=temp,
+                                            blend=blend,
+                                            force_phase=force_phase,
+                                            rank_scale=rank_scale,
+                                            rank_max=rank_max,
+                                            phase_scale_schedule=phase_scale_schedule,
+                                            phase_max_schedule=phase_max_schedule,
+                                        )
+                                        _run_eval(
+                                            args,
+                                            output,
+                                            n_streams=n_streams,
+                                            n_records=n_records,
+                                            seed=seed,
+                                            temp=temp,
+                                            blend=blend,
+                                            force_phase=force_phase,
+                                            rank_scale=rank_scale,
+                                            rank_max=rank_max,
+                                            phase_scale_schedule=phase_scale_schedule,
+                                            phase_max_schedule=phase_max_schedule,
+                                        )
+                                        rows.append(_summarize(
+                                            output,
+                                            n_streams,
+                                            n_records,
+                                            seed,
+                                            temp,
+                                            blend,
+                                            force_phase,
+                                            rank_scale,
+                                            rank_max,
+                                            phase_scale_schedule,
+                                            phase_max_schedule,
+                                        ))
 
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
@@ -117,6 +133,8 @@ def _run_eval(
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
+    phase_scale_schedule: str,
+    phase_max_schedule: str,
 ) -> None:
     if args.skip_existing and output.exists():
         print(f"[altgan.sweep_phaseatlas_hrc] reusing {output}", flush=True)
@@ -139,6 +157,10 @@ def _run_eval(
         "--real-manifest", args.real_manifest,
         "--output", str(output),
     ]
+    if phase_scale_schedule:
+        cmd.extend(["--stack-rank-phase-scales", phase_scale_schedule])
+    if phase_max_schedule:
+        cmd.extend(["--stack-rank-phase-maxes", phase_max_schedule])
     if force_phase:
         cmd.append("--force-phase-schedule")
     if args.disable_neural_marks:
@@ -157,6 +179,8 @@ def _summarize(
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
+    phase_scale_schedule: str,
+    phase_max_schedule: str,
 ) -> dict:
     data = json.loads(path.read_text())
     fake = data["fake"]
@@ -173,6 +197,8 @@ def _summarize(
         "force_phase_schedule": force_phase,
         "stack_rank_scale": rank_scale,
         "stack_rank_max": rank_max,
+        "stack_rank_phase_scales": phase_scale_schedule,
+        "stack_rank_phase_maxes": phase_max_schedule,
         "uses_neural_marks": data.get("uses_neural_marks"),
         "hrc_mae": gap["hrc_mae"],
         "fake_reuse": fake["reuse_access_rate"],
@@ -239,8 +265,14 @@ def _split_str(text: str) -> list[str]:
     return [x.strip() for x in text.split(",") if x.strip()]
 
 
+def _split_schedules(text: str) -> list[str]:
+    if not text.strip():
+        return [""]
+    return [x.strip() for x in text.split(";")]
+
+
 def _slug(value: object) -> str:
-    return str(value).replace(".", "p").replace("-", "m")
+    return str(value).replace(".", "p").replace("-", "m").replace(",", "-").replace(";", "_")
 
 
 def _label(
@@ -254,12 +286,17 @@ def _label(
     force_phase: bool,
     rank_scale: float,
     rank_max: int,
+    phase_scale_schedule: str,
+    phase_max_schedule: str,
 ) -> str:
     phase = "forced" if force_phase else "natural"
+    phase_scale = _slug(phase_scale_schedule) if phase_scale_schedule else "none"
+    phase_max = _slug(phase_max_schedule) if phase_max_schedule else "none"
     return (
         f"{prefix}_{n_streams}x{n_records}_seed-{seed}"
         f"_temp-{_slug(temp)}_blend-{_slug(blend)}_phase-{phase}"
-        f"_rankscale-{_slug(rank_scale)}_rankmax-{rank_max}_eval.json"
+        f"_rankscale-{_slug(rank_scale)}_rankmax-{rank_max}"
+        f"_phasescale-{phase_scale}_phasemax-{phase_max}_eval.json"
     )
 
 
