@@ -287,6 +287,15 @@ def generate(
 
     df = pd.concat(per_stream_dfs, ignore_index=True).head(n_records)
 
+    # Cast integer-category columns to int so mark_quality TV scores
+    # compare "1" vs "1" (not "1.0" vs "1" from inverse_transform float output).
+    for _col in ("opcode", "tenant"):
+        if _col in df.columns:
+            try:
+                df[_col] = df[_col].round().astype(int)
+            except (ValueError, TypeError):
+                pass
+
     df.to_csv(output_path, index=False)
     print(f"Generated {len(df):,} records ({n_streams} stream(s)) → {output_path}")
 
