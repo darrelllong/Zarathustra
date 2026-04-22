@@ -1997,7 +1997,7 @@ count coarse, report pure-neural and routed blends, and require held-out manifes
 
 ---
 
-### 52. Neural mark head around a frozen object atlas
+### 53. Neural mark head around a frozen object atlas
 
 **Gap attacked**: the peer's v198 response is aiming at LANL's presumed weak point: reservoir
 sampling for non-object marks. The first `altgan.mark_quality` panel says the current PhaseAtlas
