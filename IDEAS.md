@@ -2142,3 +2142,32 @@ This is Fix A+C from IDEA #55 done properly — not just an int cast, but a full
 **Critical dependency**: v204 must fix reuse_rate first. Without correct reuse_rate≈0.265, the new/reuse label split is wrong and stratified mark sampling will still mismatch.
 
 **Priority**: HIGH — implement immediately after v204 confirms reuse_rate≈0.265 in GAN phase.
+
+## IDEA #57: Gradient-Stop on Reuse Column from WGAN Critic
+
+**Status**: Proposed (2026-04-22)
+
+**Problem**: In v203 and v204, the soft sigmoid reuse head converges to 3-15% reuse instead of the target 26.5%. Root cause: WGAN critic receives `fake_decoded[:,:,obj_id_col] = sigmoid(logit)*2-1`, so its gradient flows back through the reuse logits to the `reuse_head` Linear layer. This creates an adversarial signal competing with BCE: BCE pushes logits positive (toward 26.5% reuse), WGAN pushes them negative (toward 0% reuse, since real data has 26.5% reuse at the *marginal* level but the critic evaluates the full multivariate distribution). The WGAN wins at BCE weight=1.0 and is partially overcome at weight=3.0 but still not neutralized.
+
+**Fix**: Before passing `fake_decoded` to the critic, detach the reuse column:
+```python
+# In train.py, WGAN critic call block:
+_fake_for_critic = fake_decoded.clone()
+_fake_for_critic[:, :, obj_id_col] = _fake_for_critic[:, :, obj_id_col].detach()
+d_fake = D(G_input, _fake_for_critic)  # WGAN sees reuse column but gradients don't flow to reuse_head
+```
+
+**Effect**: 
+- WGAN trains: G's LSTM, fc, out_act, R — via the 4 main feature columns (no gradient to reuse_head or reuse logit)
+- BCE trains: G's reuse_head — alone, toward the 26.5% class balance from pos_weight
+- Equilibrium: BCE optimum is reuse_rate = pos/(pos+neg) ≈ 0.265; WGAN cannot interfere
+
+The WGAN critic still sees the reuse column value when evaluating real vs fake (the `fake_decoded` detach only blocks gradient backprop, not forward evaluation), so the critic remains aware of reuse distribution during discriminator training. Only the generator gradient is decoupled.
+
+**Risk**: If the reuse distribution is heavily correlated with the other features (real reuse events tend to have shorter ts_delta, different size distribution), then the critic can partially infer reuse from the other columns. In that case, WGAN still penalizes wrong reuse indirectly through the correlated features. This is acceptable — it means WGAN is learning the *right* correlations while BCE handles the marginal reuse rate.
+
+**Alternative**: Stop-gradient on `reuse_head` parameters so WGAN gradient doesn't update the `Linear(hidden_size, 1)` parameters but still flows through to the LSTM hidden state. This would train the LSTM jointly via both losses while isolating the reuse head to BCE only. Implemented via `register_hook` on `reuse_head.parameters()` or `zero_grad` after WGAN backward.
+
+**Launch as v205** after v204 reaches ep100 for comparison baseline. Config: same as v204 but with detach fix on reuse column before critic.
+
+**Priority**: HIGH — this is the theoretically clean fix for the WGAN/BCE competition on the reuse column.

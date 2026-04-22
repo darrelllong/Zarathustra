@@ -2900,3 +2900,55 @@ v204 at weight=3.0 is the critical test: if reuse_rate reaches ≈0.265 in the G
 
 Still pretraining (Phase 2 supervisor, ep20/50). GAN phase expected in ~25 minutes. ep1 reuse_rate will be the first critical signal — target ≥ 0.40 at ep1 (BCE at weight=3.0 should dominate initialization), then converge to 0.265 by ep10.
 
+## Round 53
+
+### v204 GAN Phase: Unexpected ★ ATB Candidate Despite Reuse Oscillation
+
+v204 is in the GAN phase (ep60 at time of writing). The reuse_rate story is disappointing but the ★ trajectory is remarkable.
+
+**Reuse rate — still failing**: ep1=0.216, ep2=0.011 (immediate WGAN suppression), oscillating 0.01-0.20 through ep60. Weight=3.0 raised the oscillation peaks (max ep26=0.202 vs v203 max=0.086) but convergence to 0.265 has not occurred. The WGAN/BCE competition is documented in IDEA #57 — the theoretical fix is gradient-stop on the reuse column before passing to the critic.
+
+**★ metric — best trajectory ever**:
+
+| Epoch | EMA★ | Recall | Best? |
+|-------|------|--------|-------|
+| ep5 | 0.154 | 0.494 | |
+| ep10 | 0.099 | 0.602 | ★ |
+| ep40 | 0.081 | 0.664 | ★ |
+| ep45 | 0.094 | 0.575 | |
+| ep55 | 0.077 | 0.714 | ★ |
+| ep60 | **0.057** | **0.770** | ★ (all-time) |
+
+ep60 EMA★=0.057 is 26% better than v195 ep110 EMA★=0.077 (approximate). Recall=0.770 at ep60 versus v195 ep110 recall=0.856 (at 110 epochs). The trajectory suggests ★ < 0.042 is possible by ep90-110.
+
+**Why does weight=3.0 improve ★ even without fixing reuse?** Three hypotheses:
+1. The BCE reuse signal (even at 3-15% rate, not 26.5%) provides a gradient that regularizes the LSTM hidden state toward more structured temporal patterns
+2. The higher W distance (3-6 vs v203's 0.8-1.1) indicates a stronger critic enforcing tighter distributional alignment on the 4 main features
+3. The oscillating reuse column creates a kind of stochastic augmentation — the critic occasionally sees "high reuse" fake batches and learns to discriminate both ends of the reuse spectrum, making the critic more informative to G
+
+**Decision: let v204 run to ep150, frozen sweep at ep80/ep100/ep120**.
+
+If ep100 frozen ★ < 0.042: new ATB. First ATB under clean code beating buggy-v164's 0.034 would require getting below 0.034, but at minimum v204 could supersede v195 ep110 ★=0.042 as the new clean-code ATB.
+
+### IDEA #57: Gradient-Stop Fix for Reuse Column
+
+Added to IDEAS.md. The core insight: `fake_decoded[:,:,obj_id_col].detach()` before passing to critic blocks WGAN gradient from the reuse head while preserving BCE. In the current setup, WGAN sees the reuse column value (forward pass) but its gradient doesn't flow back to `reuse_head.weight`. BCE alone determines the equilibrium. Expected: reuse_rate → 0.265 at natural BCE optimum.
+
+v205 will implement this fix. Planned launch after v204 reaches ep100 (baseline comparison).
+
+### v204 Diagnostic: W Distance Inflation
+
+The W distance growing from 0.83 (ep1) → 3-6 (ep40-60) is unusual compared to v195 (which stabilized around W=1-2). Two interpretations:
+- **Healthy**: critic is maturing and seeing genuine distributional differences; G is being pushed harder
+- **Warning**: critic may be diverging (GP constraint weakening); if W keeps climbing toward 10+, the critic's Lipschitz constraint is compromised
+
+The G loss oscillating positive/negative (ep56 G=−1.49, ep60 G=+1.85) is consistent with healthy competition. If G loss permanently collapsed to a large negative value, that would indicate mode collapse where G trivially fools the critic.
+
+Monitoring W at ep80 to confirm it stabilizes rather than diverges.
+
+### LANL Update
+
+LANL has not posted a new peer review. They are 21+ commits behind (last reviewed commit b23d956 "Add forward strategy review"). Their mark training completed and eval showed the critical finding: neural marks (ep20) are 8× worse than reservoir control. LANL's IDEA #53 is not yet competitive. Their eval pipeline is idle — no new training jobs visible on vinge.local.
+
+Next expected LANL action: new PEER-REVIEW.md round responding to our v199-v204 work and the mark quality analysis. They may also launch an extended mark head training (50-100 epochs) to improve past the reservoir baseline.
+
