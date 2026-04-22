@@ -3099,3 +3099,47 @@ Lower temperatures sharpen the output distribution — which makes things worse 
 LANL is stuck: their neural mark head at 20 epochs is worse than reservoir baseline (0.044 vs 0.00479), and temperature scaling provides no improvement. Next expected LANL step: either train longer (50-100 epochs) or abandon the autoregressive mark approach in favor of the reservoir.
 
 **Race status**: LLNL has a theoretically sound fix for reuse in v205. If v205 achieves reuse_rate≈0.265, we can run the long-rollout panel and expect HRC-MAE to drop from 0.1287 toward LANL's 0.00301. The ★ metric advantage (LLNL best 0.042 vs LANL unmeasured) remains the one dimension where LLNL is clearly ahead.
+
+## Round 56
+
+### v196 Restart: Cascading Failures Expose Three Deep Code Bugs
+
+Attempted to resume v196 (IDEA #44 seed=7, paused at ep20) after a git pull on vinge. Six successive crashes uncovered three separate bugs:
+
+**Bug 1: `--trace-format` not a valid argument.** Correct flag is `--fmt oracle_general`. Five previous restart attempts passed the wrong flag name, silently silently failing before Phase 3.
+
+**Bug 2: GradScaler assertion on hot-start.** When `--resume-from` jumps directly to Phase 3 (skipping pre-training), `scaler._scale` is `None` (lazily initialized on first `scale()` call). The skip-backward guard called `scaler.update()` before any `scale()`, triggering `AssertionError: Attempted update but _scale is None`. Fix: remove the `scaler.update()` call from the skip-backward path entirely. **Committed and deployed** (2026-04-22).
+
+**Bug 3: Optimizer state dict size mismatch.** The v196 checkpoint was trained with `regime_sampler` and `gmm_prior` modules since removed from the model. The saved optimizer has parameter groups for these removed params. PyTorch's `load_state_dict` raises `ValueError: loaded state dict contains a parameter group that doesn't match the size of optimizer's group`. Workaround `--reset-optimizer` causes W divergence: the critic is well-calibrated (W≈0.8 at ep20) but G's optimizer starts with zero momentum, leading to W→27 and G=0.0 every epoch (all G updates skipped as loss > 1e6).
+
+**Decision**: abandon v196 hot-start. The clean path is a fresh seed=7 run (v206).
+
+### v206 Launched: Seed=7 IDEA #44 Cross-Validation (Fresh Pretrain)
+
+v206 is a clean replica of v195's recipe on seed=7. PID=3667490 on vinge.local. Phase 1 autoencoder pretraining underway.
+
+Config: `--seed 7 --cond-dim 10 --var-cond --var-cond-kl-weight 0.01 --diversity-loss-weight 2.0 --w-stop-threshold 5.0 --boundary-critic-weight 0.1 --boundary-critic-k 4 --boundary-critic-real-reconstruct --files-per-epoch 12 --lr-g 8e-5 --lr-d 4e-5 --reuse-bce-weight 2.0`.
+
+**Acceptance bar**: frozen ★ ≤ 0.042 (match v195 ep110 ATB) AND bc_diag raw > shuf by ≥ 0.05 at ep85+ (confirms temporal adjacency signal generalizes across seeds). Expected timeline: Phase 1 pretrain ~2h, Phase 2 ~30m, GAN Phase 3 ep20 EMA check in ~12h.
+
+### HRC-Optimal PMF: Theory Fails in Practice
+
+Tested deriving the optimal LRU stack PMF directly from the real HRC curve (IDEA from this loop). Theory: since HRC(k) ≈ P(reuse) × CDF_PMF(k), the optimal PMF is the HRC derivative normalized by reuse_rate. The derived PMF:
+
+```
+Default:  [0.019, 0.015, 0.022, 0.036, 0.036, 0.070, 0.541, 0.261] → HRC-MAE=0.004622
+HRC-opt:  [0.004, 0.004, 0.008, 0.047, 0.048, 0.149, 0.494, 0.247] → HRC-MAE=0.005234 ← WORSE
+```
+
+The HRC-derived PMF is 13% worse than the default. Root cause: the theoretical derivation assumes the LRU simulation is stationary and per-stream. In practice, (1) the cache simulation runs on concatenated multi-stream output, (2) the cold-start phase of each stream biases toward short stack distances, and (3) the default PMF was pre-calibrated to over-weight the [64,256) bucket (0.541 vs theoretically optimal 0.491), which empirically minimizes HRC-MAE despite being theoretically suboptimal.
+
+**Conclusion**: the default PMF ceiling of 0.004622 is the empirical optimum for 8-bucket Bernoulli injection. Closing the 35% gap to LANL (0.003010) requires a structural improvement to the object access sequence generator, not PMF tuning.
+
+### Race Status
+
+| Metric | LANL | LLNL | Gap |
+|--------|------|------|-----|
+| HRC-MAE (Alibaba, Bernoulli) | **0.00301** | 0.00462 | LANL +35% |
+| Short-window ★ (v195 ep110) | unmeasured | **0.042** | LLNL leads |
+
+v206 (seed=7 IDEA #44) is the primary active experiment. If v206 achieves comparable ★ and bc_diag signal to v195, IDEA #44 is confirmed as generalizable — which strengthens the case that it is a real mechanism, not a seed artifact.

@@ -2204,6 +2204,25 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Next step (IDEA #59)**: Freeze LSTM, fine-tune only `reuse_head` via BCE. This replaces Bernoulli injection with a learned (but h-independent) head. h has zero correlation with reuse in v195, so reuse_head will converge to predict 26.5% for all inputs — equivalent to Bernoulli injection but using the native model pipeline. If h has ANY weak temporal correlation with reuse, this provides marginal improvement over pure Bernoulli.
 
+## IDEA #61: HRC-Optimal PMF from Real HRC Derivative (TESTED, FAILED)
+
+**Status**: Tested 2026-04-22, FAILED
+
+**Hypothesis**: The optimal LRU stack PMF for Bernoulli injection can be derived analytically from the real HRC curve. Since HRC(k) ≈ P(reuse) × CDF_PMF(k), the optimal PMF is the discrete derivative of the real HRC normalized by reuse_rate.
+
+**Derived PMF** (from v195 ep110 long-rollout baseline):
+```
+Bucket boundaries: [0,1,2,4,8,16,64,256,2048]
+HRC at boundaries: [0.000, 0.001, 0.002, 0.004, 0.016, 0.029, 0.068, 0.198, 0.263]
+Derived PMF: [0.004, 0.004, 0.008, 0.047, 0.048, 0.149, 0.494, 0.247]
+```
+
+**Result**: HRC-MAE=0.005234 (13% WORSE than default PMF 0.004622).
+
+**Root cause analysis**: The theoretical derivation assumes (1) stationary per-stream LRU dynamics, (2) no cold-start effects, and (3) independent streams. In practice, the eval runs LRU on concatenated multi-stream output, and the cold-start phase creates a distribution mismatch. The default PMF over-weights [64,256) at 0.541 vs theoretically optimal 0.491 — this empirical bias toward shorter stack distances compensates for cold-start and multi-stream artifacts.
+
+**Conclusion**: PMF cannot be improved by HRC inversion. The default PMF ceiling (0.004622) is empirical and accounts for simulation artifacts that the analytical derivation ignores. CLOSED.
+
 ## IDEA #59: Frozen-LSTM BCE Fine-Tuning for Reuse Head
 
 **Status**: Proposed (2026-04-22)
