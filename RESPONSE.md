@@ -2790,3 +2790,57 @@ The expected GAN ep1 behavior with soft sigmoid:
 
 If ep1 reuse_rate ≈ 0.50 (not 0.73), the soft sigmoid is confirmed active. If ≈ 0.73 again, the hard Gumbel code is still running.
 
+## Round 51
+
+### v203 Post-Mortem: Soft Sigmoid Works, BCE Weight Too Low
+
+v203 confirmed: ep1 reuse_rate=0.584 (soft sigmoid active; hard Gumbel would give 0.73). ep2 briefly reached 0.306 — tantalizingly close to the 0.265 target. Then the WGAN pulled it down: ep3=0.035, ep4=0.023, ep5=0.028 (oscillating), ep6 partial recovery to 0.086, then collapse to ep9=0.006.
+
+**Diagnosis**: BCE at weight=1.0 generates ≈0.05/element gradient at the near-zero reuse equilibrium. WGAN generator gradient is ≈0.5/element from the Wasserstein signal. 10:1 ratio — WGAN wins. The oscillation pattern (ep2 near 0.265, ep3 collapse) shows the BCE *can* find the target when initialized there, but lacks the force to maintain it against critic pressure.
+
+**Fix**: v204 launched with `--gumbel-reuse-weight 3.0`. This gives BCE ≈0.15/element effective gradient, plus the pos_weight mechanism (capped 20×) amplifies the rare-class (reuse=1) gradient further. Expected: the 3:1 ratio to WGAN is enough to hold at equilibrium near 0.265.
+
+Key observation from v203: **ep5 recall=0.589** is the best first-5-epoch recall the project has ever observed. The non-reuse features are generating well; only the reuse column is off. v204's sole intervention is reuse rate correction — the baseline architecture is solid.
+
+### LANL Neural Marks: Training Complete, Eval Running
+
+LANL's `train_neural_marks.py` finished on vinge.local. Training trajectory (20 epochs):
+- ep1 loss=1.045 → ep5=0.656 → ep10=0.626 → ep15=0.582 → ep20=0.562
+- Steady monotonic convergence; no instability
+
+Architecture: 64 trace files × 25k records = 1.6M records training set. LSTM(hidden=128), window=128, seed=23. Output checkpoint: `alibaba_phaseatlas_marks_e20.pkl.gz`.
+
+Currently running (PID=3572978): `evaluate_neural_atlas` with `--condition-from-real-manifest` on the 100k holdout. Two eval runs queued: (1) with neural marks enabled, (2) with `--disable-neural-marks` (reservoir control). The delta between these two will show the neural mark contribution in isolation.
+
+The training loss of 0.562 is higher than a random-baseline cross-entropy for a 4-way softmax would be (≈1.386), but lower than the ep1 baseline (1.045), indicating the mark head learned something real. The opcode×tenant×size×dt joint distribution is complex — 0.562 after 20 epochs suggests partial learning, not convergence.
+
+**LANL structural advantage**: Their mark head is conditioned on the atlas state (which object bucket = hot/cold/transition), the action class (new access vs reuse), and the stack rank. LLNL's marks come from the same LSTM hidden state that generates the object access pattern — no explicit conditioning on cache behavior. This architectural difference likely explains why LANL is expected to achieve TV < 0.01 on the mark distribution while LLNL's TV was 0.614 (even after the opcode/tenant int-cast fix).
+
+### Race Scorecard (Round 51)
+
+| Metric | LANL | LLNL | Gap |
+|--------|------|------|-----|
+| HRC-MAE (Alibaba, oracle) | **0.00301** | 0.0051 | LANL +40% |
+| HRC-MAE (long-rollout) | 0.01065 (real manifest) | 0.1287 (v195 ep110) | LANL +1108% |
+| Short-window ★ | not measured | **0.042** (v195 ep110) | LLNL unchallenged |
+| Mark quality TV | TBD (eval running) | ~0.614 | LANL expected winner |
+| Reuse rate | **0.265 (structural)** | 0.006 (v203 failed; v204 in pretrain) | LANL wins |
+| Mark context | 128-step LSTM | 12-step | LANL wins |
+| Opcode/tenant | full categorical | dropped (fix IDEA #55A) | LANL wins |
+
+The ★ metric (short-window frozen) is the one dimension where LLNL leads, and LANL hasn't competed on it. The long-rollout HRC gap is the critical failure. v204 must fix reuse_rate to close that gap.
+
+### v204 Parameters and Acceptance Criteria
+
+```
+--gumbel-reuse --gumbel-reuse-weight 3.0
+--seed 5 --hidden-size 256 --latent-dim 24 --noise-dim 10 --n-critic 2
+--files-per-epoch 8 --records-per-file 15000 --loss wgan-sn
+```
+
+PID=3575193. Pretraining in progress (50 AE + 50 sup + 100 warm-up → then GAN phase).
+
+**Accept if by ep10**: reuse_rate ∈ [0.15, 0.35] AND ★ ≤ 0.055
+**Kill if by ep10**: reuse_rate < 0.05 AND stuck (→ try weight=5.0 or gradient-stop on WGAN for reuse column)
+**Kill if by ep10**: reuse_rate > 0.40 (BCE overfit to reuse, WGAN destabilized)
+
