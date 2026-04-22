@@ -78,6 +78,8 @@ class NeuralAtlasModel:
         force_phase_schedule: bool = False,
         mark_temperature: float | None = None,
         mark_numeric_noise: float = 0.05,
+        mark_numeric_blend: float = 1.0,
+        mark_categorical_source: str = "neural",
     ):
         import pandas as pd
         import torch
@@ -92,6 +94,9 @@ class NeuralAtlasModel:
         rng = np.random.default_rng(seed)
         conds = self._resolve_conds(conds, n_streams, rng)
         transition_blend = float(np.clip(transition_blend, 0.0, 1.0))
+        mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
+        if mark_categorical_source not in {"neural", "reservoir"}:
+            raise ValueError("mark_categorical_source must be 'neural' or 'reservoir'")
         mark_runtime = None
         mark_model = getattr(self, "mark_model", None)
         if mark_model is not None:
@@ -152,7 +157,7 @@ class NeuralAtlasModel:
 
                 mark = ev
                 if mark_runtime is not None:
-                    mark = mark_runtime.sample(
+                    neural_mark = mark_runtime.sample(
                         stream_id=stream_id,
                         cond=conds[stream_id],
                         state=state,
@@ -160,6 +165,34 @@ class NeuralAtlasModel:
                         stack_distance=ev.stack_distance,
                         stride=ev.stride,
                     )
+                    if mark_numeric_blend >= 1.0 and mark_categorical_source == "neural":
+                        mark = neural_mark
+                    else:
+                        dt = (
+                            (1.0 - mark_numeric_blend) * max(float(ev.dt), 0.0)
+                            + mark_numeric_blend * max(float(neural_mark.dt), 0.0)
+                        )
+                        obj_size = (
+                            (1.0 - mark_numeric_blend) * max(float(ev.obj_size), 1.0)
+                            + mark_numeric_blend * max(float(neural_mark.obj_size), 1.0)
+                        )
+                        mark = EventSample(
+                            dt=float(dt),
+                            obj_size=float(obj_size),
+                            opcode=(
+                                neural_mark.opcode
+                                if mark_categorical_source == "neural"
+                                else ev.opcode
+                            ),
+                            tenant=(
+                                neural_mark.tenant
+                                if mark_categorical_source == "neural"
+                                else ev.tenant
+                            ),
+                            stride=int(ev.stride),
+                            stack_distance=int(ev.stack_distance),
+                            action_class=int(ev.action_class),
+                        )
 
                 ts += max(float(mark.dt), 0.0)
                 rows.append({

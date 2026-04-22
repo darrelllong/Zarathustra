@@ -96,6 +96,8 @@ Use `altgan.evaluate_neural_atlas --disable-neural-marks` on an attached
 checkpoint to run the paired reservoir-mark control.
 Use `--mark-temperature` and `--mark-numeric-noise` to ablate sampling noise
 without retraining the object process.
+Use `--mark-numeric-blend` and `--mark-categorical-source reservoir` for the
+hybrid control: keep reservoir opcode/tenant and blend only neural timing/size.
 
 ## Generate
 
