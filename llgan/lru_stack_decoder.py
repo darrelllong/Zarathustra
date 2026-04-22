@@ -107,6 +107,7 @@ class LRUStackDecoder:
         self._stack: list[int] = []
         self._next_id: int = 0
         self._prev_bucket: int = -1  # -1 = no prior reuse event yet (cold start)
+        self.markov_blend: float = 1.0  # 0=pure pmf, 1=pure markov; adjustable
         if transition_matrix is not None:
             T = np.asarray(transition_matrix, dtype=np.float64)
             # Normalise each row; add tiny uniform prior to avoid zero rows.
@@ -125,7 +126,9 @@ class LRUStackDecoder:
         if is_reuse and self._stack:
             # IDEA #62: Markov atlas — condition on previous bucket when available.
             if self.transition_matrix is not None and self._prev_bucket >= 0:
-                pmf = self.transition_matrix[self._prev_bucket]
+                # Blend: (1-markov_blend)*pmf + markov_blend*T[prev]
+                pmf = ((1.0 - self.markov_blend) * self.bucket_pmf
+                       + self.markov_blend * self.transition_matrix[self._prev_bucket])
             else:
                 pmf = self.bucket_pmf
             bucket = int(self.rng.choice(N_BUCKETS, p=pmf))

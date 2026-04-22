@@ -43,6 +43,7 @@ def generate(
     lru_stack_reuse_rate: float = -1.0,
     lru_stack_max_depth: int = 2048,
     lru_markov_atlas: str = "",
+    lru_markov_blend: float = 1.0,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -229,9 +230,10 @@ def generate(
             if lru_markov_atlas:
                 T = np.load(lru_markov_atlas)
                 print(f"[lru-stack] Markov atlas loaded from {lru_markov_atlas} "
-                      f"shape={T.shape}")
+                      f"shape={T.shape}, blend={lru_markov_blend:.2f}")
                 lru_decoder_proto = LRUStackDecoder.from_markov_matrix(
                     T, corpus=lru_stack_corpus, max_stack_depth=lru_stack_max_depth)
+                lru_decoder_proto.markov_blend = lru_markov_blend
                 lru_decoder_proto.print_pmf()
                 lru_decoder_proto.print_transition_matrix()
             elif lru_stack_pmf:
@@ -277,6 +279,7 @@ def generate(
                 lru_decoder_proto.max_stack_depth,
                 transition_matrix=T_copy,
             )
+            dec.markov_blend = lru_decoder_proto.markov_blend
             reuse_signal = arr_s[:, reuse_col_idx]
             # Override reuse signal with Bernoulli(p) if --lru-stack-reuse-rate
             # is set. This ablates the generator's broken reuse signal to test
@@ -378,6 +381,11 @@ def parse_args():
                         "(.npy file from compute_markov_atlas.py). When set, the LRU "
                         "stack decoder samples bucket from P(next|prev) instead of the "
                         "global PMF. Requires --lru-stack-decoder.")
+    p.add_argument("--lru-markov-blend", type=float, default=1.0,
+                   metavar="ALPHA",
+                   help="IDEA #62: blend coefficient for Markov atlas. "
+                        "0.0=pure i.i.d. PMF (baseline), 1.0=pure Markov, "
+                        "intermediate=weighted average. Default 1.0 (pure Markov).")
     return p.parse_args()
 
 
@@ -401,4 +409,5 @@ if __name__ == "__main__":
         lru_stack_reuse_rate=args.lru_stack_reuse_rate,
         lru_stack_max_depth=args.lru_stack_max_depth,
         lru_markov_atlas=args.lru_markov_atlas,
+        lru_markov_blend=args.lru_markov_blend,
     )
