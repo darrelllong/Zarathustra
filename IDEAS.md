@@ -2188,7 +2188,40 @@ python eval_pregenerated.py \
 
 **Saved artifacts**: `/tiamat/zarathustra/llgan-output/alibaba_v195_ep110_bernoulli265_8x50k_result.json`
 
-**Next step (IDEA #59)**: Apply same Bernoulli injection to tencent (v158 ep110 or v165) to get tencent HRC-MAE. Also consider whether the sd_p90 mismatch can be closed via a hybrid approach: fit a per-stream PMF from per-stream real characterizations rather than corpus-wide default.
+**PMF and depth sweep complete** (2026-04-22): Every PMF variant and max_stack_depth variant tested is WORSE than the default PMF + depth=2048:
+
+| PMF variant | depth | HRC-MAE |
+|-------------|-------|---------|
+| Default (p256=0.261) | **2048** | **0.004622** ← best |
+| p256=0.122 (analytical p90=577) | 2048 | 0.006617 |
+| p256=0.108 (reduced deep tail) | 2048 | 0.007750 |
+| Real PMF fit (v198 CSV) | 2048 | 0.009593 |
+| Default | 8192 | 0.006395 |
+
+Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectly. The default PMF minimizes the HRC curve integral error even though it doesn't match individual percentiles. The depth=2048 cap actually bounds the [256,+∞) bucket to [256,2047], which incidentally produces better HRC-MAE than uncapped (depth=8192) because it prevents very deep stack samples.
+
+**Tencent result**: Bernoulli injection with rate=0.6045 gives HRC-MAE=0.041 (against v158 baseline) or 0.064 (against LANL manifest4 test set). The 8-bucket PMF structure cannot match tencent's short-range distribution (median=60, p90=174) — the [16,64) and [64,256) bucket boundaries are poorly aligned for tencent.
+
+**Next step (IDEA #59)**: Freeze LSTM, fine-tune only `reuse_head` via BCE. This replaces Bernoulli injection with a learned (but h-independent) head. h has zero correlation with reuse in v195, so reuse_head will converge to predict 26.5% for all inputs — equivalent to Bernoulli injection but using the native model pipeline. If h has ANY weak temporal correlation with reuse, this provides marginal improvement over pure Bernoulli.
+
+## IDEA #59: Frozen-LSTM BCE Fine-Tuning for Reuse Head
+
+**Status**: Proposed (2026-04-22)
+
+**Problem**: IDEA #58 Bernoulli injection achieves HRC-MAE=0.004622 (35% gap to LANL). The gap is from temporal reuse structure: Bernoulli is i.i.d., real traces have bursty temporal correlation. The LSTM (h) was trained to encode workload sequence patterns and MAY have weak temporal correlation with reuse events, even though the mean reuse rate is 0.8%.
+
+**Approach**: Freeze all Generator parameters EXCEPT `reuse_head`. Fine-tune for ~10 epochs using only BCE loss on `reuse_head(h)` with `pos_weight = 0.735/0.265 ≈ 2.77`.
+
+**Key insight**: With frozen LSTM, the h-oscillation problem disappears — h is fixed. The WGAN critic also has nothing to train (all G params frozen except reuse_head). BCE alone determines the reuse_head equilibrium: if h has no correlation with reuse (which is likely), reuse_head converges to `sigmoid(w·h + b) ≈ 0.265` for all h, equivalent to Bernoulli injection. If h has WEAK correlation, we get slightly better temporal structure.
+
+**Expected outcome**:
+- If h is truly reuse-agnostic: HRC-MAE ≈ 0.004622 (same as Bernoulli) — confirms result
+- If h has weak temporal correlation: HRC-MAE < 0.004622 — marginal improvement
+- Either way: this validates the Bernoulli approach and provides a "trained" reuse signal
+
+**Implementation**: Single flag `--freeze-lstm` + `--bce-only-epochs N` in train.py, or a separate fine-tuning script that loads v195 ep110, freezes everything except reuse_head, and runs BCE for 10 epochs.
+
+**Priority**: LOW — IDEA #58 is already the ceiling via Bernoulli. Only worth trying if we need the "native model" pipeline (no generate.py --lru-stack-reuse-rate injection).
 
 ## IDEA #57: Gradient-Stop on Reuse Column from WGAN Critic
 
