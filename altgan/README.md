@@ -110,8 +110,12 @@ python -m altgan.sweep_mark_hybrids \
   --real-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
   --output-dir /tiamat/zarathustra/altgan-output \
   --prefix alibaba_phaseatlas_marks_hybrid \
-  --include-reservoir-control
+  --include-reservoir-control \
+  --skip-existing
 ```
+
+The sweep writes both `*_summary.csv` and `*_best.json`; use `--skip-existing`
+when resuming a remote run so completed eval JSONs are reused.
 
 ## Generate
 

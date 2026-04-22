@@ -35,7 +35,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--mark-numeric-blends", default="0.0,0.25,0.5,0.75,1.0")
     p.add_argument("--categorical-sources", default="reservoir,neural")
     p.add_argument("--include-reservoir-control", action="store_true")
+    p.add_argument("--skip-existing", action="store_true",
+                   help="Reuse existing eval JSONs instead of rerunning completed cells.")
     p.add_argument("--summary-csv", default="")
+    p.add_argument("--best-json", default="",
+                   help="Optional path for a compact best-candidate summary.")
     return p.parse_args()
 
 
@@ -74,10 +78,16 @@ def main() -> int:
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
     print(f"[altgan.sweep_mark_hybrids] wrote {summary_path}", flush=True)
+    best_path = Path(args.best_json) if args.best_json else out_dir / f"{args.prefix}_best.json"
+    _write_best(best_path, rows)
+    print(f"[altgan.sweep_mark_hybrids] wrote {best_path}", flush=True)
     return 0
 
 
 def _run_eval(args: argparse.Namespace, output: Path, *, extra: list[str]) -> None:
+    if args.skip_existing and output.exists():
+        print(f"[altgan.sweep_mark_hybrids] reusing {output}", flush=True)
+        return
     cmd = [
         sys.executable, "-u", "-m", "altgan.evaluate_neural_atlas",
         "--model", args.model,
@@ -135,6 +145,20 @@ def _write_summary(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _write_best(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    by_hrc = sorted(rows, key=lambda r: (float(r["hrc_mae"]), float(r["mark_score"])))
+    by_mark = sorted(rows, key=lambda r: (float(r["mark_score"]), float(r["hrc_mae"])))
+    payload = {
+        "best_hrc": by_hrc[0],
+        "best_mark_score": by_mark[0],
+        "n_rows": len(rows),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
 def _split_float(text: str) -> list[float]:
