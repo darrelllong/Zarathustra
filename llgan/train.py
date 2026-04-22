@@ -2694,8 +2694,7 @@ def parse_args() -> Config:
     p.add_argument("--retrieval-reuse-bce-weight", type=float, default=0.0,
                    help="Retrieval memory: weight on BCE(p_reuse, gt_reuse) auxiliary loss "
                         "(default 0.0 = off; module is then a pure architectural prior). "
-                        "Reading gt_reuse from the obj_id_reuse channel of the real window "
-                        "is added in a follow-up commit; for now this flag is reserved.")
+                        "gt_reuse is read from the obj_id_reuse channel of the real window.")
     p.add_argument("--cache-descriptor-file", default="",
                    metavar="JSONL",
                    help="Cache-descriptor distillation (IDEAS.md idea #18, Phase A): "

@@ -3,11 +3,10 @@ Retrieval memory module (IDEAS.md idea #17 — design + implementation).
 
 Status
 ------
-DESIGN+IMPL — module class is implemented and unit-testable, but the wiring
-into Generator/Recovery is not yet committed. A separate train.py CLI flag
-(`--retrieval-memory`) will gate activation. We deliberately keep the module
-backward-compatible: when disabled, the existing v114/v136 ATB recipes are
-untouched and reproducible.
+IMPL — wired into Generator/Recovery, gated by `--retrieval-memory` CLI flag.
+Confirmed HARMFUL on alibaba (4x failures); do not enable without a specific
+experiment plan. Backward-compatible: when disabled, checkpoint loading and
+training are unaffected.
 
 Motivation (from IDEAS.md #17)
 ------------------------------

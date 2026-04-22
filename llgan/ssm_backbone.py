@@ -3,10 +3,9 @@ Selective diagonal state-space backbone (IDEAS.md idea #19 — design + module).
 
 Status
 ------
-DESIGN+IMPL — drop-in replacement for ``nn.LSTM(input_size, hidden_size,
-num_layers=1, batch_first=True)`` with the same forward signature. NOT
-YET WIRED into Generator (separate commit will gate via
-``--ssm-backbone`` CLI flag). Backward compatible by construction:
+IMPL — drop-in replacement for ``nn.LSTM(input_size, hidden_size,
+num_layers=1, batch_first=True)`` with the same forward signature.
+Wired into Generator via ``--ssm-backbone`` CLI flag. Backward compatible:
 when disabled, training is byte-identical.
 
 Motivation

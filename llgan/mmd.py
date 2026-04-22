@@ -329,11 +329,10 @@ def evaluate_metrics(
             else:
                 from dataset import compute_window_descriptors
                 cond = compute_window_descriptors(real, col_names=col_names)
-            # Unify z_global path with training (Round 5 TODO):
-            # Apply cond_encoder (deterministic μ), regime_sampler, and
-            # gmm_prior — the same stack _make_z_global uses at train time.
-            # Previously this was raw torch.cat([cond, noise]), skipping all
-            # three transformations and causing 30-75% train→eval gaps.
+            # Mirror _make_z_global(training=False) from train.py:
+            # cond_encoder → regime_sampler → gmm_prior then cat with noise.
+            # Previously this skipped all three transformations, causing
+            # 30-75% train→eval gaps (fixed Round 5).
             if getattr(generator, 'cond_encoder', None) is not None:
                 cond, _ = generator.cond_encoder(cond, training=False)
             if getattr(generator, 'regime_sampler', None) is not None:

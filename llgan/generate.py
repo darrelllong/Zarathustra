@@ -143,9 +143,8 @@ def generate(
                 cond = cond_vec
             else:
                 cond = torch.randn(n_streams, cond_dim, device=device) * 0.5
-            # Unify z_global path with training (Round 5 TODO):
-            # Apply cond_encoder, regime_sampler, gmm_prior — same as
-            # _make_z_global(training=False) in train.py.
+            # Mirror _make_z_global(training=False) from train.py:
+            # cond_encoder → regime_sampler → gmm_prior then cat with noise.
             if getattr(G, 'cond_encoder', None) is not None:
                 cond, _ = G.cond_encoder(cond, training=False)
             if getattr(G, 'regime_sampler', None) is not None:
