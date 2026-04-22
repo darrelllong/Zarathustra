@@ -154,10 +154,16 @@ def fit_mark_head(
     window_len: int = 128,
     lr: float = 1e-3,
     seed: int = 7,
+    device: str = "auto",
+    progress_every: int = 1,
 ) -> NeuralMarkHead:
     import torch
     import torch.nn.functional as F
 
+    if device == "auto":
+        run_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        run_device = torch.device(device)
     rng = np.random.default_rng(seed)
     raw = [_mark_sequence(base, df, cond) for df, cond in zip(frames, conds) if len(df) > 1]
     raw = [seq for seq in raw if len(seq["states"]) > 1]
@@ -200,13 +206,14 @@ def fit_mark_head(
         len(opcodes),
         len(tenants),
     )
+    net.to(run_device)
     opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-4)
     losses: list[float] = []
     for epoch in range(int(epochs)):
         net.train()
         epoch_loss = 0.0
         for _ in range(int(steps_per_epoch)):
-            batch = _sample_batch(eligible, actual_window, batch_size, rng)
+            batch = _to_device(_sample_batch(eligible, actual_window, batch_size, rng), run_device)
             opt.zero_grad()
             out, _ = net(
                 batch["cond"],
@@ -232,8 +239,15 @@ def fit_mark_head(
             loss.backward()
             opt.step()
             epoch_loss += float(loss.detach().cpu())
+        avg_loss = epoch_loss / max(int(steps_per_epoch), 1)
         if epoch == 0 or (epoch + 1) % max(1, epochs // 10) == 0:
-            losses.append(epoch_loss / max(int(steps_per_epoch), 1))
+            losses.append(avg_loss)
+        if progress_every and ((epoch + 1) % max(int(progress_every), 1) == 0):
+            print(
+                "[altgan.neural_marks] "
+                f"epoch={epoch + 1}/{int(epochs)} loss={avg_loss:.6f} device={run_device}",
+                flush=True,
+            )
 
     return NeuralMarkHead(
         version=1,
@@ -260,6 +274,7 @@ def fit_mark_head(
             "window_len": int(actual_window),
             "lr": float(lr),
             "seed": int(seed),
+            "device": str(run_device),
             "loss_trace": losses,
         },
     )
@@ -419,6 +434,10 @@ def _sample_batch(seqs: Sequence[dict[str, np.ndarray]], length: int, batch_size
         "opcode": torch.tensor(np.stack(batch["opcode"]), dtype=torch.long),
         "tenant": torch.tensor(np.stack(batch["tenant"]), dtype=torch.long),
     }
+
+
+def _to_device(batch: dict[str, Any], device: Any) -> dict[str, Any]:
+    return {key: value.to(device) for key, value in batch.items()}
 
 
 def _sample_logits(logits: np.ndarray, temperature: float, rng: np.random.Generator) -> int:

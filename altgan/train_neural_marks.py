@@ -47,6 +47,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--window-len", type=int, default=128)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--device", default="auto",
+                   help="Torch device for mark-head training: auto, cuda, or cpu.")
+    p.add_argument("--progress-every", type=int, default=1,
+                   help="Print flushed progress every N epochs; 0 disables progress prints.")
     return p.parse_args()
 
 
@@ -64,11 +68,14 @@ def main() -> int:
         if cond is None:
             missing.append(path.name)
             continue
-        print(f"[altgan.train_neural_marks] reading {i}/{len(paths)} {path}")
+        print(f"[altgan.train_neural_marks] reading {i}/{len(paths)} {path}", flush=True)
         frames.append(reader(str(path), args.records_per_file))
         conds.append(cond)
     if missing:
-        print(f"[altgan.train_neural_marks] skipped {len(missing)} files without char profiles")
+        print(
+            f"[altgan.train_neural_marks] skipped {len(missing)} files without char profiles",
+            flush=True,
+        )
     if not frames:
         raise RuntimeError("no files had usable conditioning profiles")
 
@@ -83,6 +90,8 @@ def main() -> int:
         window_len=args.window_len,
         lr=args.lr,
         seed=args.seed,
+        device=args.device,
+        progress_every=args.progress_every,
     )
     model.mark_model = mark_model
     model.metadata.setdefault("attached_models", {})
@@ -94,8 +103,8 @@ def main() -> int:
         "records_per_file": args.records_per_file,
     }
     model.save(args.output)
-    print(f"[altgan.train_neural_marks] wrote {args.output}")
-    print(json.dumps(mark_model.metadata, indent=2))
+    print(f"[altgan.train_neural_marks] wrote {args.output}", flush=True)
+    print(json.dumps(mark_model.metadata, indent=2), flush=True)
     return 0
 
 
@@ -109,7 +118,8 @@ def _select_paths(args: argparse.Namespace) -> list[Path]:
         paths = [p for p in paths if p.name not in excluded]
         print(
             "[altgan.train_neural_marks] excluded "
-            f"{before - len(paths)} manifest source files from training"
+            f"{before - len(paths)} manifest source files from training",
+            flush=True,
         )
     if args.max_files and len(paths) > args.max_files:
         rng = random.Random(args.seed)

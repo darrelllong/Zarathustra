@@ -84,6 +84,7 @@ python -m altgan.train_neural_marks \
   --max-files 64 \
   --records-per-file 25000 \
   --epochs 20 \
+  --device auto \
   --output checkpoints/altgan/alibaba_phaseatlas_marks.pkl.gz
 ```
 
