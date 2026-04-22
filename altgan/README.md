@@ -186,7 +186,9 @@ The sweep writes `*_summary.csv` and `*_best.json`, ranked by HRC-MAE first, so
 interrupted remote runs can resume without losing completed cells. The stack
 rank scale/max controls are HRC calibration knobs around the reuse tail. Phase
 schedules let those knobs vary across PhaseAtlas bins; omit them and leave the
-global knobs at `1.0` and `-1` for the unmodified PhaseAtlas baseline.
+global knobs at `1.0` and `-1` for the unmodified PhaseAtlas baseline. When
+phase schedules are supplied, the runner also includes the unscheduled global
+baseline unless `--no-global-baseline` is set.
 
 The evaluator also writes a `mark_quality` block for timing, size, opcode, and
 tenant realism. To compare two already-generated CSVs directly:

@@ -41,6 +41,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Semicolon-separated per-phase rank-scale schedules, each comma-separated.")
     p.add_argument("--phase-stack-rank-max-schedules", default="",
                    help="Semicolon-separated per-phase rank-cap schedules, each comma-separated.")
+    p.add_argument("--no-global-baseline", action="store_true",
+                   help="Do not prepend the unscheduled global rank baseline when schedules are supplied.")
     p.add_argument("--disable-neural-marks", action="store_true",
                    help="Force reservoir marks when the checkpoint has a mark head.")
     p.add_argument("--skip-existing", action="store_true",
@@ -66,10 +68,12 @@ def main() -> int:
                         for rank_scale in _split_float(args.stack_rank_scales):
                             for rank_max in _split_int(args.stack_rank_maxes):
                                 for phase_scale_schedule in _split_schedules(
-                                    args.phase_stack_rank_scale_schedules
+                                    args.phase_stack_rank_scale_schedules,
+                                    include_baseline=not args.no_global_baseline,
                                 ):
                                     for phase_max_schedule in _split_schedules(
-                                        args.phase_stack_rank_max_schedules
+                                        args.phase_stack_rank_max_schedules,
+                                        include_baseline=not args.no_global_baseline,
                                     ):
                                         output = out_dir / _label(
                                             args.prefix,
@@ -224,9 +228,10 @@ def _write_summary(path: Path, rows: list[dict]) -> None:
 def _write_best(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
-    best_hrc = min(rows, key=lambda r: float(r["hrc_mae"]))
+    by_hrc = sorted(rows, key=lambda r: float(r["hrc_mae"]))
     payload = {
-        "best_hrc": best_hrc,
+        "best_hrc": by_hrc[0],
+        "top_hrc": by_hrc[: min(5, len(by_hrc))],
         "n_rows": len(rows),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -265,10 +270,13 @@ def _split_str(text: str) -> list[str]:
     return [x.strip() for x in text.split(",") if x.strip()]
 
 
-def _split_schedules(text: str) -> list[str]:
+def _split_schedules(text: str, *, include_baseline: bool) -> list[str]:
     if not text.strip():
         return [""]
-    return [x.strip() for x in text.split(";")]
+    items = [x.strip() for x in text.split(";")]
+    if include_baseline:
+        items = ["", *items]
+    return items
 
 
 def _slug(value: object) -> str:
