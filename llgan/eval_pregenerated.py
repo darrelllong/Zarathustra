@@ -67,23 +67,29 @@ def evaluate(fake_csv: str, real_json: str, output: str) -> dict:
         },
         "real": {
             "reuse_access_rate":        round(real_m["reuse_access_rate"], 5),
-            "stack_distance_median":    int(real_m["stack_distance_median"]),
-            "stack_distance_p90":       int(real_m["stack_distance_p90"]),
+            "stack_distance_median":    int(real_m.get("stack_distance_median", -1)),
+            "stack_distance_p90":       int(real_m.get("stack_distance_p90", -1)),
             "footprint_mean_per_stream":round(real_m["footprint_mean_per_stream"], 1),
         },
     }
 
+    real_sd_med = real_m.get("stack_distance_median", -1)
+    real_sd_p90 = real_m.get("stack_distance_p90", -1)
     print(f"\n{'Metric':<35} {'Fake':>12} {'Real':>12} {'Ratio':>8}")
     print("-" * 70)
     print(f"{'HRC-MAE':<35} {hrc_mae:>12.6f} {'—':>12}")
     print(f"{'reuse_access_rate':<35} {fake_m['reuse_access_rate']:>12.5f} "
           f"{real_m['reuse_access_rate']:>12.5f} "
           f"{fake_m['reuse_access_rate']/max(real_m['reuse_access_rate'],1e-9):>8.3f}x")
-    print(f"{'stack_distance_median':<35} {fake_m['stack_distance_median']:>12} "
-          f"{real_m['stack_distance_median']:>12} "
-          f"{fake_m['stack_distance_median']/max(real_m['stack_distance_median'],1):>8.3f}x")
-    print(f"{'stack_distance_p90':<35} {fake_m['stack_distance_p90']:>12} "
-          f"{real_m['stack_distance_p90']:>12}")
+    if real_sd_med >= 0:
+        print(f"{'stack_distance_median':<35} {fake_m['stack_distance_median']:>12} "
+              f"{real_sd_med:>12} "
+              f"{fake_m['stack_distance_median']/max(real_sd_med,1):>8.3f}x")
+        print(f"{'stack_distance_p90':<35} {fake_m['stack_distance_p90']:>12} "
+              f"{real_sd_p90:>12}")
+    else:
+        print(f"{'stack_distance_median':<35} {fake_m['stack_distance_median']:>12} {'N/A':>12}")
+        print(f"{'stack_distance_p90':<35} {fake_m['stack_distance_p90']:>12} {'N/A':>12}")
     print(f"{'footprint_mean_per_stream':<35} {fake_m['footprint_mean_per_stream']:>12.0f} "
           f"{real_m['footprint_mean_per_stream']:>12.0f}")
 
