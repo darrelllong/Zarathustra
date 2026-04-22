@@ -525,6 +525,7 @@ def train(cfg: Config) -> None:
                   ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
                   mtpp_timing=getattr(cfg, "mtpp_timing", False),
                   mtpp_sigma_min=getattr(cfg, "mtpp_sigma_min", 0.05),
+                  reuse_head=getattr(cfg, "gumbel_reuse", False),
                   ).to(device)
     if getattr(cfg, "retrieval_memory", False):
         n_ret = sum(p.numel() for p in G.retrieval.parameters()) \
@@ -1614,7 +1615,11 @@ def train(cfg: Config) -> None:
                         getattr(cfg, 'gumbel_tau_start', 1.0) - getattr(cfg, 'gumbel_tau_end', 0.5)
                     ) / max(cfg.epochs - 1, 1)
                     _tau = max(_tau, 0.1)
-                    _reuse_logit = fake_decoded[:, :, obj_id_col]   # (B, T)
+                    # Use direct-from-hidden head when available (bypasses R bottleneck)
+                    if G._last_reuse_aux is not None:
+                        _reuse_logit = G._last_reuse_aux["logits"]   # (B, T)
+                    else:
+                        _reuse_logit = fake_decoded[:, :, obj_id_col]   # (B, T) fallback
                     # 2-class logits: scale by 2 to make the logit range wider
                     _logits_2 = torch.stack([-_reuse_logit, _reuse_logit], dim=-1) * 2.0
                     # Hard Gumbel-Softmax (straight-through); no_grad on the sampling noise

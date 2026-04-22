@@ -583,6 +583,7 @@ class Generator(nn.Module):
         ssm_state_dim: int = 16,
         mtpp_timing: bool = False,
         mtpp_sigma_min: float = 0.05,
+        reuse_head: bool = False,
     ):
         super().__init__()
         self.noise_dim   = noise_dim
@@ -727,6 +728,11 @@ class Generator(nn.Module):
             self.timing_head = None
         self._last_timing_aux: Optional[dict] = None
 
+        # Direct-from-hidden reuse head (IDEA #54 v2): bypasses Recovery decoder
+        # Jacobian bottleneck by applying a 1-layer MLP directly on LSTM output h.
+        self.reuse_head = nn.Linear(hidden_size, 1) if reuse_head else None
+        self._last_reuse_aux: Optional[dict] = None
+
         self._init_weights()
 
     def sample_noise(
@@ -863,6 +869,14 @@ class Generator(nn.Module):
             self._last_timing_aux = {"mu": mu_t, "sigma": sigma_t}
         else:
             self._last_timing_aux = None
+
+        # Direct reuse head: logits computed from h before Recovery decoder.
+        # Gradient path: BCE→logits→h→G — no R Jacobian bottleneck.
+        if self.reuse_head is not None:
+            _rlogits = self.reuse_head(h).squeeze(-1)  # (B, T)
+            self._last_reuse_aux = {"logits": _rlogits}
+        else:
+            self._last_reuse_aux = None
 
         out = self.out_act(self.fc(h))
         if return_retrieval_state and return_hidden:
