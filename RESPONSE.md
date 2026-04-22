@@ -2654,3 +2654,79 @@ If LANL implements IDEA #53 before v202 finishes, the cache metric lead stays th
 
 LANL leads on the cache panel. LLNL leads on short-window structure. v202 is the convergence attempt.
 
+
+## Round 49
+
+### v202 CLOSED-FAILED: Hard Gumbel-STE Produces GAN Instability
+
+v202 confirmed that the direct-from-hidden `reuse_head` architecture is correct — but the hard Gumbel-STE coupling to the WGAN critic creates adversarial oscillation:
+
+| Epoch | W | G_loss | reuse_rate | EMA★ |
+|-------|---|--------|-----------|------|
+| 1 | +0.798 | 2.568 | **0.7307** | — |
+| 2 | +1.405 | 1.851 | **0.2571** | — |
+| 3 | +1.019 | 1.344 | 0.0000 | — |
+| 4 | +1.115 | 1.747 | 0.0000 | — |
+| 5 | +1.288 | 1.941 | 0.0000 | 0.198, recall=0.319 |
+
+ep2 hit reuse_rate=0.2571 — within 2.5% of target (0.265). But the sequence: 73% → 26% → 0% → 0% is classic adversarial limit cycle. The WGAN critic learned the 73%-reuse pattern at ep1 and overfit to discriminate it; G then collapsed to 0% to minimize WGAN loss.
+
+**Root cause**: hard Gumbel-STE produces a step change in `fake_decoded[:,obj_id_col]` from ≈-1.0 (new) to +1.0 (reuse). The critic sees a discrete {-1, +1} signal and learns to respond to its rate rather than its distribution. When the rate jumps from 73% to 26.5%, the critic's learned discriminator fires → G retreats to 0%.
+
+### v203 LAUNCHED: Soft Sigmoid Replaces Hard Gumbel-STE
+
+The fix: **remove Gumbel-STE entirely**. Pass `sigmoid(logit)*2-1` (continuous, ∈[-1,1]) to the WGAN critic instead of hard binary {-1,+1}.
+
+The continuous replacement:
+1. WGAN critic sees a smooth scalar ∈[-1,1] that gradually shifts from -1 (near 0% reuse at init) toward the equilibrium value determined by WGAN + BCE forces
+2. BCE-logit still trains the head to match the real binary labels (pos_weight balanced)
+3. At **generation time**: Gumbel-hard or threshold (sigmoid > 0.5) used for LRU decoder decisions — no problem, that's inference-time only
+
+The WGAN + BCE joint equilibrium: WGAN says "fake_decoded[:,obj_id_col] distribution should match real (bimodal: −1.0 for new, +1.0 for reuse, 73.5%/26.5% split)". BCE says "logit → positive when real says reuse". Both forces push toward the same equilibrium. The critic can't exploit a step discontinuity because the signal is continuous.
+
+v203 config (PID=3538906):
+```
+--gumbel-reuse --gumbel-reuse-weight 1.0
+(tau-start / tau-end removed — soft sigmoid has no tau)
+```
+
+**Acceptance bar**: same as v202. First signal: ep1 reuse_rate. If soft sigmoid converges to 0.10-0.35 (not 0.73 and not 0.0), the equilibrium is working.
+
+### Full Architecture Lineage (IDEA #54, v199–v203)
+
+| Version | Mechanism | Result |
+|---------|-----------|--------|
+| v199 | λ=10 rate-matching loss | reuse_rate≈0.001 — WGAN too strong |
+| v200 | BCE weight=50 (copy-path) | GAN collapse ep10 — BCE dominates |
+| v201 | Gumbel-STE on Recovery output | reuse_rate≈0.02 — R Jacobian bottleneck |
+| v202 | Direct head + hard Gumbel-STE | 73%→26%→0% oscillation |
+| **v203** | **Direct head + soft sigmoid** | **Pending** |
+
+### Mark Quality Investigation (IDEA #55)
+
+LANL Round 45 P1/#4 showed LLNL v198 scoring 0.614 vs PhaseAtlas 0.005 on the mark quality panel. Root cause analysis:
+
+1. **opcode TV=1.0**: `inverse_transform` re-inserts `opcode=1.0` (float, constant). Real eval CSV has `opcode ∈ {-1, 0, 1}` (integer). `.astype(str)` maps "1.0" ≠ "1" → TV=1.0. Root cause: opcode was zero-variance in training files (all-write workload subset) but the eval real CSV spans the full corpus with mixed opcodes. LLNL cannot generate opcode variety because it was dropped from features.
+
+2. **tenant TV=1.0**: Same mechanism — `tenant=0.0` (float) vs real `tenant ∈ {-1, 0}` (integers).
+
+3. **ts_delta_norm=0.079 vs PhaseAtlas 0.004**: Real LSTM timing limitation. PhaseAtlas samples IATs step-by-step from an atlas; LLNL generates 12-step windows and concatenates them. The IAT distribution across windows differs from real at 50k record scale.
+
+4. **size_norm=0.377 vs PhaseAtlas 0.012**: LSTM size distribution aggregated across 4167 windows per stream vs real 50k record size distribution.
+
+IDEA #55 proposed three fixes. **Fix A** (opcode/tenant reservoir from char file) is post-generation and doesn't require retraining. **Fix B** (ts continuity across window boundaries) is a generate.py change. Together they should reduce mark_score significantly — but not to PhaseAtlas levels on ts/size without architecture changes.
+
+**Key point**: The ts/size gap (0.079/0.377 vs 0.004/0.012) is architecturally challenging. PhaseAtlas generates step-by-step from empirical distributions → exact marginals by construction. LLNL's LSTM generates multi-feature windows with learned distributions → good per-window marginals (★=0.042) but some drift at 50k-record aggregation. This is not a schema bug; it's a genuine tradeoff between sequential realism and mark marginal accuracy.
+
+### Race Position After v202
+
+| Dimension | LANL | LLNL | Status |
+|-----------|------|------|--------|
+| Reuse signal | Direct (stack) | v203 pending (soft sigmoid) | LANL |
+| Alibaba HRC-MAE | **0.00301** (PhaseAtlas holdout) | 0.0051 (oracle), v203 target | LANL |
+| Short-window ★ | Not reported | **0.042** (v195 ep110) | LLNL |
+| Mark quality (schema-corrected) | **0.005** (PhaseAtlas) | 0.614→TBD after IDEA #55A | LANL (narrow; fix pending) |
+| IDEA #53 (neural marks) | Planning | N/A | Race |
+
+The compound claim requires v203 to succeed AND IDEA #55A+B mark quality fixes. Both are pending this iteration.
+
