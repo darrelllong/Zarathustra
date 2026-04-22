@@ -1611,24 +1611,18 @@ def train(cfg: Config) -> None:
                 # gradient ~0.88 vs WGAN ~0.5 — sufficient to enforce rate without
                 # causing the GAN collapse seen at BCE weight=50 (v200).
                 if getattr(cfg, 'gumbel_reuse', False) and obj_id_col >= 0:
-                    _tau = getattr(cfg, 'gumbel_tau_start', 1.0) - epoch * (
-                        getattr(cfg, 'gumbel_tau_start', 1.0) - getattr(cfg, 'gumbel_tau_end', 0.5)
-                    ) / max(cfg.epochs - 1, 1)
-                    _tau = max(_tau, 0.1)
                     # Use direct-from-hidden head when available (bypasses R bottleneck)
                     if G._last_reuse_aux is not None:
                         _reuse_logit = G._last_reuse_aux["logits"]   # (B, T)
                     else:
                         _reuse_logit = fake_decoded[:, :, obj_id_col]   # (B, T) fallback
-                    # 2-class logits: scale by 2 to make the logit range wider
-                    _logits_2 = torch.stack([-_reuse_logit, _reuse_logit], dim=-1) * 2.0
-                    # Hard Gumbel-Softmax (straight-through); no_grad on the sampling noise
-                    _hard_gs = nn.functional.gumbel_softmax(_logits_2, tau=_tau, hard=True)
-                    _is_reuse_hard = _hard_gs[:, :, 1]  # (B, T), 0 or 1
-                    # Replace continuous scalar with hard binary in [-1, 1] space
-                    _fake_decoded_gs = fake_decoded.clone()
-                    _fake_decoded_gs[:, :, obj_id_col] = _is_reuse_hard * 2.0 - 1.0
-                    fake_decoded = _fake_decoded_gs
+                    # Soft sigmoid replacement: pass continuous probability to critic.
+                    # Hard Gumbel-binary caused 0%→73% oscillation (v202 ep1-4).
+                    # Soft replacement lets WGAN + BCE jointly find equilibrium at 26.5%.
+                    _reuse_prob = torch.sigmoid(_reuse_logit)  # (B, T) ∈ (0, 1)
+                    _fake_decoded_soft = fake_decoded.clone()
+                    _fake_decoded_soft[:, :, obj_id_col] = _reuse_prob * 2.0 - 1.0
+                    fake_decoded = _fake_decoded_soft
                     # BCE-logit supervision (class-balanced, pos_weight caps at 20×)
                     _real_binary = (real_batch[:, :, obj_id_col] > 0).float()
                     _n_pos = _real_binary.sum().clamp(min=1.0)
@@ -1639,7 +1633,7 @@ def train(cfg: Config) -> None:
                     )
                     _grw = getattr(cfg, 'gumbel_reuse_weight', 1.0)
                     g_loss = g_loss + _grw * _loss_gs
-                    reuse_rate_samples.append(_is_reuse_hard.mean().item())
+                    reuse_rate_samples.append(_reuse_prob.mean().item())
 
                 # --- Auxiliary losses (in feature space) ---
                 # Moment matching (L_V): penalise differences in per-feature mean,
