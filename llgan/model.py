@@ -732,6 +732,7 @@ class Generator(nn.Module):
         # Jacobian bottleneck by applying a 1-layer MLP directly on LSTM output h.
         self.reuse_head = nn.Linear(hidden_size, 1) if reuse_head else None
         self._last_reuse_aux: Optional[dict] = None
+        self._last_h_for_reuse: Optional[torch.Tensor] = None
 
         self._init_weights()
 
@@ -871,12 +872,15 @@ class Generator(nn.Module):
             self._last_timing_aux = None
 
         # Direct reuse head: logits computed from h before Recovery decoder.
-        # Gradient path: BCE→logits→h→G — no R Jacobian bottleneck.
+        # IDEA #57 (v205): store h so train.py can recompute logits with h.detach(),
+        # blocking WGAN gradient from reaching reuse_head via the shared LSTM h.
         if self.reuse_head is not None:
             _rlogits = self.reuse_head(h).squeeze(-1)  # (B, T)
             self._last_reuse_aux = {"logits": _rlogits}
+            self._last_h_for_reuse = h  # exposed for grad-stop BCE in train.py
         else:
             self._last_reuse_aux = None
+            self._last_h_for_reuse = None
 
         out = self.out_act(self.fc(h))
         if return_retrieval_state and return_hidden:

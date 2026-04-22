@@ -1611,14 +1611,20 @@ def train(cfg: Config) -> None:
                 # gradient ~0.88 vs WGAN ~0.5 — sufficient to enforce rate without
                 # causing the GAN collapse seen at BCE weight=50 (v200).
                 if getattr(cfg, 'gumbel_reuse', False) and obj_id_col >= 0:
-                    # Use direct-from-hidden head when available (bypasses R bottleneck)
-                    if G._last_reuse_aux is not None:
-                        _reuse_logit = G._last_reuse_aux["logits"]   # (B, T)
+                    # IDEA #57 (v205): gradient-stop BCE — recompute reuse logits from
+                    # h.detach() so BCE trains reuse_head.weight in isolation.  WGAN
+                    # gradient flows through H_fake→fc(h) and trains all main G params;
+                    # BCE gradient only reaches reuse_head.weight (not LSTM) because h
+                    # is detached before reuse_head.  This breaks the WGAN/BCE competition
+                    # that caused reuse_rate oscillation in v201-v204.
+                    if G.reuse_head is not None and G._last_h_for_reuse is not None:
+                        _reuse_logit = G.reuse_head(
+                            G._last_h_for_reuse.detach()
+                        ).squeeze(-1)  # (B, T) — grad-stop: no LSTM gradient from BCE
+                    elif G._last_reuse_aux is not None:
+                        _reuse_logit = G._last_reuse_aux["logits"]   # fallback (grad-attached)
                     else:
-                        _reuse_logit = fake_decoded[:, :, obj_id_col]   # (B, T) fallback
-                    # Soft sigmoid replacement: pass continuous probability to critic.
-                    # Hard Gumbel-binary caused 0%→73% oscillation (v202 ep1-4).
-                    # Soft replacement lets WGAN + BCE jointly find equilibrium at 26.5%.
+                        _reuse_logit = fake_decoded[:, :, obj_id_col]   # R-output fallback
                     _reuse_prob = torch.sigmoid(_reuse_logit)  # (B, T) ∈ (0, 1)
                     _fake_decoded_soft = fake_decoded.clone()
                     _fake_decoded_soft[:, :, obj_id_col] = _reuse_prob * 2.0 - 1.0
