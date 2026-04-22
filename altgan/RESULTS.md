@@ -13,8 +13,8 @@ manifest per corpus.
 
 | Corpus | Model | Fit | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 |
-| Alibaba | PhaseAtlas | 233 files x 25k holdout, blend 0.0 | **0.00301** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 |
+| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.65 + local power 0.9 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 |
+| Alibaba | PhaseAtlas | 233 files x 25k holdout, blend 0.2 + local power 0.9 | **0.00222** | 0.27363 | 0.26909 | 192 | 201 | 1508 | 1452 |
 | Tencent | NeuralAtlas | 1024 files x 5k holdout, blend 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 |
 | Alibaba | NeuralAtlas | 233 files x 25k holdout, blend 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 |
 | Tencent | NeuralAtlas | 64 files x 25k, blend 0.0 | 0.01845 | 0.62314 | 0.61493 | 55 | 60 | 145 | 174 |
@@ -43,16 +43,19 @@ pool. The holdout models exclude those files.
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Tencent | NeuralAtlas | 1024 files x 5k, holdout | 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 | 0.0199 | 0.0096 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.0579 | 0.0293 |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend | 0.65 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | pending | pending |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 1.0 | 0.01982 | 0.63573 | 0.61493 | 60 | 60 | 186 | 174 | 0.0497 | 0.0390 |
 | Alibaba | NeuralAtlas | 233 files x 25k, holdout | 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 | 0.3251 | 1.1296 |
-| Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | **0.00301** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
+| Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | 0.00301 | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
+| Alibaba | PhaseAtlas | 233 files x 25k, holdout + microblend | 0.2 | **0.00222** | 0.27363 | 0.26909 | 192 | 201 | 1508 | 1452 | pending | pending |
 
 The PhaseAtlas rows are the better answer to the "statistically
 indistinguishable" goal. Tencent still under-expresses timing and size drift,
 but phase conditioning improves HRC and moves drift in the right direction.
-Alibaba PhaseAtlas is currently the cleanest all-around held-out result:
-cache metrics are close and first-half/second-half timing and size drift are
-within the same order as real.
+Alibaba PhaseAtlas is currently the cleanest held-out object-process result.
+The original blend `0.0` row keeps the best reservoir mark score. The
+microblend row is the seed-42 HRC leader, but the seed-confirmation pass below
+shows it is not stable enough yet to replace the conservative baseline.
 
 A forced phase-schedule ablation, where generation overwrites the sampled phase
 with the synthetic stream position, did not improve the best rows. Tencent
@@ -66,6 +69,27 @@ A longer-file Tencent phase run also failed to beat the champion. The
 p90 `177` vs `174`. It improved stack p90 but made HRC and drift worse than
 the `1024 files x 5k` row, so Tencent currently prefers broader file coverage
 over deeper per-file slices.
+
+## Tencent PhaseAtlas Microblend Calibration
+
+Recorded 2026-04-22. The Alibaba transition-power result suggested that a
+small amount of neural transition smoothing could help when the coarse blend
+grid missed the optimum. On Tencent, the same idea produced a cleaner win than
+Alibaba: HRC improved from `0.010647` at the prior blend `0.5` baseline to
+`0.009831` at blend `0.65` with `local_prob_power=0.9`, while reuse and stack
+p90 both moved closer to real.
+
+| transition_blend | local_prob_power | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | 1.00 | 0.010647 | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.04557 |
+| 0.50 | 0.90 | 0.010446 | 0.61215 | 0.61493 | 49 | 60 | 170 | 174 | 0.04562 |
+| 0.55 | 1.00 | 0.009983 | 0.61177 | 0.61493 | 49 | 60 | 159 | 174 | 0.05050 |
+| 0.65 | 0.90 | **0.009831** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | **0.04490** |
+| 0.65 | 1.10 | 0.011175 | 0.61604 | 0.61493 | 50 | 60 | 174 | 174 | 0.04633 |
+
+Unlike the Alibaba seed-42 microblend, this Tencent winner improves HRC, reuse,
+stack p90, and mark score on the fixed panel. A multi-seed confirmation pass is
+running before promoting it as the conservative Tencent champion.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 
@@ -105,6 +129,42 @@ under-reuse and collapse the stack tail.
 | 1.25 | 0.021938 | 0.24671 | 0.26909 | 221 | 201 | 1355 | 1452 | 0.01876 |
 | 1.50 | 0.035989 | 0.22775 | 0.26909 | 210 | 201 | 934 | 1452 | 0.00892 |
 | 2.00 | 0.068274 | 0.17253 | 0.26909 | 198 | 201 | 530 | 1452 | 0.01768 |
+
+The follow-up microblend sweep found a new best HRC row. The earlier
+transition-blend grid jumped from `0.0` to `0.25`; the winning cell lives just
+inside that interval and combines a little neural transition smoothing with a
+slightly smoothed empirical local transition law.
+
+| transition_blend | local_prob_power | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.00 | 1.00 | 0.003010 | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | **0.00479** |
+| 0.15 | 0.90 | 0.003344 | 0.26716 | 0.26909 | 199 | 201 | 1481 | 1452 | 0.00799 |
+| 0.20 | 0.90 | **0.002217** | 0.27363 | 0.26909 | 192 | 201 | 1508 | 1452 | 0.00815 |
+| 0.05 | 1.00 | 0.005617 | 0.27784 | 0.26909 | 203 | 201 | 1393 | 1452 | 0.01429 |
+| 0.10 | 1.00 | 0.005629 | 0.27816 | 0.26909 | 203 | 201 | 1396 | 1452 | 0.00549 |
+| 0.20 | 1.00 | 0.016089 | 0.25239 | 0.26909 | 211 | 201 | 1394 | 1452 | 0.02345 |
+
+This is the first post-baseline LANL object-process improvement on the fixed
+seed-42 panel: HRC drops from `0.003010` to `0.002217`. The tradeoff is a
+mark-score regression from `0.00479` to `0.00815`, still far below LLNL's
+post-hoc CSV mark gap but no longer the reservoir-mark ceiling.
+
+The seed-confirmation pass did not validate `blend=0.2, local_prob_power=0.9`
+as a durable champion. Across seeds 43-45, the best confirmation row was
+`blend=0.0, local_prob_power=0.9` at seed 43 with HRC `0.002373`; the seed-42
+winner regressed to `0.005579`, `0.011897`, and `0.014313` on seeds 43, 44,
+and 45. Treat microblend as a useful stochastic tuning signal, not a stable
+replacement for the baseline.
+
+| Confirm row | Seed | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| blend 0.0, local power 0.9 | 43 | **0.002373** | 0.26882 | 0.26909 | 203 | 201 | 1481 | 1452 | 0.01270 |
+| baseline, blend 0.0, local power 1.0 | 43 | 0.004657 | 0.27146 | 0.26909 | 216 | 201 | 1481 | 1452 | 0.00605 |
+| blend 0.2, local power 0.9 | 43 | 0.005579 | 0.28171 | 0.26909 | 200 | 201 | 1601 | 1452 | 0.01072 |
+| baseline, blend 0.0, local power 1.0 | 44 | 0.006050 | 0.26750 | 0.26909 | 212 | 201 | 1481 | 1452 | 0.00595 |
+| blend 0.2, local power 0.9 | 44 | 0.011897 | 0.28915 | 0.26909 | 203 | 201 | 1481 | 1452 | 0.01560 |
+| blend 0.0, local power 0.9 | 45 | 0.004801 | 0.26395 | 0.26909 | 179 | 201 | 1442 | 1452 | 0.00830 |
+| blend 0.2, local power 0.9 | 45 | 0.014313 | 0.24905 | 0.26909 | 184 | 201 | 1480 | 1452 | 0.01414 |
 
 ## Mark Quality Panel
 
