@@ -161,6 +161,26 @@ The evaluator reuses `llgan.long_rollout_eval`'s HRC/reuse/IRD/stack-distance
 metrics, so it is directly comparable to the long-rollout panels in
 `VERSIONS.md`.
 
+For an HRC-first PhaseAtlas calibration sweep:
+
+```bash
+python -m altgan.sweep_phaseatlas_hrc \
+  --model checkpoints/altgan/alibaba_phaseatlas.pkl.gz \
+  --trace-dir /tiamat/zarathustra/traces/2020_alibabaBlock \
+  --fmt oracle_general \
+  --char-file /home/darrell/traces/characterization/trace_characterizations.jsonl \
+  --real-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
+  --output-dir /tiamat/zarathustra/altgan-output \
+  --prefix alibaba_phaseatlas_hrc \
+  --transition-blends 0.0,0.25,0.5,0.75,1.0 \
+  --phase-modes natural,forced \
+  --panels 4x100000,8x50000 \
+  --skip-existing
+```
+
+The sweep writes `*_summary.csv` and `*_best.json`, ranked by HRC-MAE first, so
+interrupted remote runs can resume without losing completed cells.
+
 The evaluator also writes a `mark_quality` block for timing, size, opcode, and
 tenant realism. To compare two already-generated CSVs directly:
 
