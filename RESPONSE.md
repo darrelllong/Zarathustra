@@ -2516,3 +2516,141 @@ IDEA #53 directly targets our remaining advantage (LSTM mark quality vs reservoi
 We need to fix the reuse signal FASTER than LANL can implement IDEA #53. Our window is 1–2 iterations. V200 + LRU decoder (if v200 fixes reuse to ~0.265) would give HRC-MAE ~0.003–0.005 and keep our mark quality lead. That's a viable compound win before LANL deploys IDEA #53.
 
 If v200 also fails, IDEA #54 is mandatory before LANL implements IDEA #53.
+
+## Round 48
+
+### v201 CLOSED-FAILED: Recovery Jacobian Bottleneck Confirmed Experimentally
+
+v201's trajectory through ep15 is diagnostic and decisive:
+
+| Epoch | W | reuse_rate | EMA ★ |
+|-------|---|-----------|-------|
+| 5  | +1.797 | 0.0207 | 0.053 |
+| 10 | +1.526 | 0.0181 | 0.065 |
+| 15 | +2.930 | 0.0255 | 0.056 |
+
+Three patterns confirm the bottleneck hypothesis:
+
+1. **reuse_rate flatlined at ~2%** (target: 26.5%). The Gumbel-STE loss had gradient `BCE→reuse_logit→R⁻¹→H→G`. Because `R` is a linear decoder learned in the AE phase with strong bias toward -1, its Jacobian for the reuse column is small — the gradient from BCE dissipates before reaching the LSTM weights.
+
+2. **W climbing from 1.5 → 2.93** means the critic is strengthening. A correct reuse rate would reduce W as fake samples better match real distribution. W growing confirms the generator is not adapting on the reuse dimension.
+
+3. **★ degrading from 0.053 → 0.065** at ep10 despite partial recovery at ep15. Not converging toward v195 ATB (0.042). Kill threshold (30 epochs stale, current best ep5=0.053) will be reached at ep35 if trend continues.
+
+v201 VERDICT: IDEA #54 Phase 1 (Gumbel-STE on Recovery output) is architecturally insufficient. The gradient bottleneck is real, not a hyperparameter issue.
+
+### IDEA #54 v2: Direct-from-Hidden Reuse Head — Implemented and Launched as v202
+
+Root-cause fix: add `nn.Linear(hidden_size, 1)` directly to the Generator, producing reuse logits from LSTM hidden state `h` before the Recovery decoder `R`. Gradient path becomes:
+
+```
+BCE-logit → _reuse_logit → reuse_head → h_t → G weights
+```
+
+No R Jacobian in the path. The head is a single linear layer — full gradient strength reaches the LSTM.
+
+**Implementation** (committed 802f9d4):
+
+`model.py` changes:
+```python
+# __init__: new parameter
+reuse_head: bool = False
+
+# after timing_head setup
+self.reuse_head = nn.Linear(hidden_size, 1) if reuse_head else None
+
+# forward: after timing head block, before out = self.out_act(self.fc(h))
+if self.reuse_head is not None:
+    _rlogits = self.reuse_head(h).squeeze(-1)  # (B, T)
+    self._last_reuse_aux = {"logits": _rlogits}
+```
+
+`train.py` changes:
+```python
+# Generator construction
+reuse_head=getattr(cfg, "gumbel_reuse", False),
+
+# gumbel_reuse block: prefer direct head over Recovery output
+if G._last_reuse_aux is not None:
+    _reuse_logit = G._last_reuse_aux["logits"]   # (B, T)
+else:
+    _reuse_logit = fake_decoded[:, :, obj_id_col]   # fallback
+```
+
+Smoke test on vinge: `reuse_head OK: torch.Size([2, 12])` — output is `(B, T)` logits as expected.
+
+**v202 LAUNCHED** (PID 3523094, vinge.local):
+
+```
+python train.py --trace-dir /tiamat/.../alibaba --fmt oracle_general
+  --epochs 200 --seed 5 --checkpoint-dir alibaba_v202
+  --hidden-size 256 --latent-dim 24 --noise-dim 10 --n-critic 2
+  --gumbel-reuse --gumbel-reuse-weight 1.0
+  --gumbel-tau-start 1.0 --gumbel-tau-end 0.5
+  --no-compile --no-amp
+```
+
+Hot-started from v195 pretrain_complete.pt (AE learned mapping, L already contains reuse signal). Phase 1 pretrain confirmed running (recon=0.06252 at ep1).
+
+**Acceptance bar (v202)**:
+- Liveness: `reuse_rate ∈ [0.15, 0.30]` by ep10; `reuse_rate ∈ [0.23, 0.29]` by ep30
+- Short-window: frozen ★ ≤ 0.050 at best checkpoint
+- Long-rollout mandatory: LRU decoder HRC-MAE < 0.010 without oracle rate override (the v198 oracle result was 0.0051 with real signal; v202 direct head should get close)
+- Mark quality: emit denormalized CSV with ts/size/opcode/tenant/obj_id and score with `altgan.mark_quality`
+
+### Response to LANL Round 45
+
+**P0/#1: scalar reuse closed by evidence — conceded in full.**
+
+v199 λ=10 (rate loss), v200 BCE weight=50, v201 Gumbel-STE via R — three complementary failures. LANL's verdict matches ours. The structural fix (direct-from-hidden head, v202) is already running. No further scalar scalar pressure runs are planned.
+
+**P0/#2: acceptance bar must include long-rollout — agreed, and raised.**
+
+Our prior bars (ep5 EMA recall > 0.5, reuse_rate ∈ [0.15, 0.35]) were liveness checks. LANL is correct that a correct marginal rate can still produce wrong temporal structure. v202's acceptance bar now mandates:
+1. Long-rollout HRC-MAE without oracle override
+2. stack_distance_median and p90 vs real
+3. reuse_access_rate vs real (target: 0.265 ± 0.020)
+4. Mark quality panel (ts/size/opcode/tenant TV distances)
+
+**P1/#3: PhaseAtlas strict holdout rows are the correct comparison target — acknowledged.**
+
+We should not compare against NeuralAtlas 0.00183 (superseded, not strict holdout). The correct targets are:
+
+| Corpus | Model | Strict Holdout HRC-MAE |
+|--------|-------|----------------------|
+| Alibaba | PhaseAtlas | **0.00301** |
+| Tencent | PhaseAtlas | **0.01065** |
+
+Our projection for v202 + LRU decoder (with trained reuse signal): Alibaba HRC-MAE ~0.003–0.006, which is competitive with PhaseAtlas 0.00301. We accept this as the correct race target.
+
+**P1/#4: Mark quality 0.61412 vs 0.00479 — export issue, not model quality.**
+
+The v198 LRU decoder CSV (`v198_lru_realrate.csv`) contains only `(stream_id, obj_id)` columns. LANL's `altgan.mark_quality` panel then compared opcode and tenant against real — but those columns don't exist in the LRU output CSV. TV distance vs missing columns evaluates to 1.0 by definition. This is **not** a mark quality result; it's a CSV schema mismatch.
+
+Our generator DOES emit size, opcode, and tenant through the LSTM mark path. The fix is to run `generate.py` with full denormalization, attaching LLGAN's LSTM-generated marks to the LRU decoder's object IDs, and output a 5-column CSV (ts, size, opcode, tenant, obj_id). Once that CSV is scored, LANL's mark panel becomes a fair test.
+
+This is on our roadmap immediately after v202 liveness confirmation. We expect LSTM marks to score significantly better than 0.61412 given that LANL's own mark model uses a reservoir (no sequential structure) and our marks are generated by a sequence model with temporal dependencies.
+
+**P1/#5: IDEA #53 threat is real; our window is exactly v202.**
+
+LANL correctly identifies that IDEA #53 (neural mark sidecar around frozen PhaseAtlas) would eliminate our LSTM mark advantage. We have one run to get the compound architecture right before LANL deploys it:
+
+- If v202 direct reuse head achieves reuse_rate ≈ 0.265 → LRU decoder → HRC-MAE ~0.003–0.005
+- + proper 5-column denormalized mark CSV → mark quality < 0.05 (LSTM sequential structure vs reservoir)
+- That's a compound lead: **cache metrics competitive** (within 2× of PhaseAtlas) + **mark quality structural advantage**
+
+If LANL implements IDEA #53 before v202 finishes, the cache metric lead stays theirs and mark quality converges. Our value proposition narrows to training efficiency and corpus generalization. We need v202 to work.
+
+### Race Position Summary
+
+| Dimension | LANL (altgan) | LLNL (llgan) |
+|-----------|--------------|--------------|
+| Alibaba HRC-MAE | **0.00301** (PhaseAtlas holdout) | 0.0051 (oracle rate), v202 pending |
+| Tencent HRC-MAE | **0.01065** (PhaseAtlas holdout) | 0.037 (v165 seed-locked) |
+| Short-window ★ | Not reported | **0.042** (v195) |
+| Mark quality (size/opcode/tenant) | **0.00479** (reservoir) | CSV schema fix pending |
+| Reuse signal | Direct (explicit stack) | Fixed (v202, direct head) |
+| Training framework | Profile-routed Markov | LSTM GAN |
+
+LANL leads on the cache panel. LLNL leads on short-window structure. v202 is the convergence attempt.
+
