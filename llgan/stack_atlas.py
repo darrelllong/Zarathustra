@@ -351,7 +351,20 @@ class LLNLStackAtlas:
         n_records: int,
         n_streams: int = 1,
         seed: int = 42,
+        reuse_rate: float = -1.0,
+        max_stack_depth: int = 4096,
     ) -> "list[dict]":
+        """
+        Generate events from the fitted StackAtlas.
+
+        Parameters
+        ----------
+        reuse_rate : if >= 0, override action_class with Bernoulli(reuse_rate)
+                     to explicitly control the reuse fraction. The stack_distance
+                     from the reservoir EventSample is still used for reuse events.
+                     Default -1 uses the atlas's native action_class (may give
+                     reuse_rate != real reuse_rate due to Markov stationary bias).
+        """
         rng = np.random.default_rng(seed)
         per_stream = int(np.ceil(n_records / n_streams))
         rows = []
@@ -359,14 +372,18 @@ class LLNLStackAtlas:
         for stream_id in range(n_streams):
             state = int(rng.choice(self.initial_states, p=self.initial_probs))
             stack: List[int] = []
-            in_stack: set[int] = set()
             next_new_id = self.max_obj_id + 1 + stream_id * (per_stream + 1_000_003)
             ts = 0.0
 
             for _ in range(per_stream):
                 ev = self._sample_event(state, rng)
-                wants_reuse = ev.action_class != ACTION_NEW
-                if wants_reuse and stack:
+                # Decide reuse vs new
+                if reuse_rate >= 0.0:
+                    wants_reuse = (rng.random() < reuse_rate) and bool(stack)
+                else:
+                    wants_reuse = (ev.action_class != ACTION_NEW) and bool(stack)
+
+                if wants_reuse:
                     rank = min(max(int(ev.stack_distance), 0), len(stack) - 1)
                     obj_id = stack[rank]
                     del stack[rank]
@@ -375,8 +392,7 @@ class LLNLStackAtlas:
                     obj_id = next_new_id
                     next_new_id += 1
                     stack.insert(0, obj_id)
-                    in_stack.add(obj_id)
-                if len(stack) > 4096:
+                if len(stack) > max_stack_depth:
                     stack.pop()
 
                 ts += max(float(ev.dt), 0.0)
@@ -435,7 +451,7 @@ def cmd_generate(args):
     print(f"Loading model from {args.model} ...")
     model = LLNLStackAtlas.load(args.model)
     print(f"Generating {args.n:,} events across {args.n_streams} streams ...")
-    rows = model.generate(args.n, n_streams=args.n_streams, seed=args.seed)
+    rows = model.generate(args.n, n_streams=args.n_streams, seed=args.seed, reuse_rate=args.reuse_rate)
     df = pd.DataFrame(rows)
     df.to_csv(args.output, index=False)
     reuse = float((df.groupby("stream_id")["obj_id"].apply(
@@ -464,6 +480,8 @@ def main():
     pgen.add_argument("--n-streams", type=int, default=8)
     pgen.add_argument("--output", required=True)
     pgen.add_argument("--seed", type=int, default=42)
+    pgen.add_argument("--reuse-rate", type=float, default=-1.0,
+                      help="Bernoulli reuse fraction override (default: use atlas action_class)")
 
     args = p.parse_args()
     if args.cmd == "fit":
