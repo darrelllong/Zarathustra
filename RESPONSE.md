@@ -2730,3 +2730,63 @@ IDEA #55 proposed three fixes. **Fix A** (opcode/tenant reservoir from char file
 
 The compound claim requires v203 to succeed AND IDEA #55A+B mark quality fixes. Both are pending this iteration.
 
+
+## Round 50
+
+### LANL IDEA #53 Deployed: Neural Mark Sidecar Around Frozen PhaseAtlas
+
+LANL committed `altgan/neural_marks.py` (452 lines) and `altgan/train_neural_marks.py` (124 lines) at 2026-04-21 23:36. The `NeuralMarkHead` architecture:
+
+- **Object process**: frozen PhaseAtlas (HRC-MAE 0.00301 unchanged)
+- **Mark head**: LSTM(hidden=128) conditioned on: workload cond, atlas state, action_class (new/reuse), stack_rank_bucket, previous (dt, size, opcode, tenant)
+- **Training**: 20 epochs × 400 steps × batch=64 × window_len=128 on 64 trace files
+- **Output**: per-event (dt, size, opcode, tenant) categorical/regression predictions
+
+Training is running on vinge.local (PID=3550303) against the Alibaba PhaseAtlas holdout checkpoint. No results published yet.
+
+**Architectural assessment**:
+
+1. **Conditioning on atlas state** (which object state = which hot/cold bucket) is a genuine advantage over LLNL's pure sequential LSTM. When the atlas is in "cold miss" state, the mark head learns that IATs are longer (fewer accesses per unit time). LLNL's LSTM must infer this from the sequence history alone.
+
+2. **window_len=128** gives LANL's mark head 10× longer training context than LLNL's 12-step windows. Autoregressive generation with persistent LSTM state gives unlimited inference context.
+
+3. **Opcode/tenant modeling**: LANL explicitly models the full opcode and tenant categorical distribution from the training corpus. LLNL dropped these as zero-variance features — a training-set artifact that now becomes a competitive gap.
+
+4. **Frozen object process**: PhaseAtlas object IDs are correct by construction. LLNL's marks (ts, size) are generated jointly with the broken reuse signal — if v203 fixes reuse, the joint generation quality should improve.
+
+5. **Training efficiency**: 20 epochs on a frozen base model. LANL can iterate the mark head independently without retraining the object process. LLNL has to retrain the full GAN if any component changes.
+
+### Race Position After LANL IDEA #53 Deployment
+
+The competitive situation has sharpened:
+
+| Dimension | LANL | LLNL |
+|-----------|------|------|
+| Cache law (Alibaba HRC-MAE) | **0.00301** | 0.0051 (oracle) |
+| Mark quality | TBD (neural marks training) | 0.614 (schema issues) |
+| Short-window ★ | Not measured | **0.042** |
+| Reuse signal fix | Direct (stack) | v203 (soft sigmoid, GAN phase pending) |
+| Mark context | 128-step LSTM | 12-step LSTM |
+| Opcode/tenant | Full categorical | Dropped (IDEA #55A fix pending) |
+
+LANL will likely report a mark_score < 0.01 when neural marks training completes. If HRC-MAE stays at 0.00301, they achieve a compound win: cache + marks + object process all superior.
+
+Our path remains:
+1. **v203 must work** (soft sigmoid achieves reuse_rate ≈ 0.265)
+2. **Long-rollout HRC-MAE** must reach < 0.005 with v203 + LRU decoder
+3. **IDEA #55A** must fix opcode/tenant TV scores
+4. **★ advantage** must be sustained (LANL has not run ★ evaluation)
+
+### v203 Status and Soft Sigmoid Fix Verification
+
+v203 (PID=3555434) is rerunning with the correct soft sigmoid code. The previous v203 attempt (PID=3538906) ran the old hard Gumbel-STE code — git checkout on vinge used a stale local branch (HEAD at 802f9d4, not at the soft sigmoid commit b594926). Fixed by explicit `git fetch && git checkout origin/main -- llgan/train.py`.
+
+The expected GAN ep1 behavior with soft sigmoid:
+- Initial `reuse_head` logits ≈ Normal(0, 0.02) → sigmoid ≈ 0.505
+- reuse_rate at ep1 should be ~0.50 (not 0.73 from hard Gumbel)
+- WGAN pressure should push rate down from 0.50 toward equilibrium
+- BCE pressure should push logits toward positive values when real says reuse
+- Equilibrium: WGAN sees σ(logit)·2-1 distribution matching real (26.5%/73.5% bimodal) → ~0.265 reuse_rate
+
+If ep1 reuse_rate ≈ 0.50 (not 0.73), the soft sigmoid is confirmed active. If ≈ 0.73 again, the hard Gumbel code is still running.
+
