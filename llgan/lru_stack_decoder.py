@@ -84,9 +84,13 @@ class LRUStackDecoder:
 
     Parameters
     ----------
-    bucket_pmf      : (8,) probability vector over stack-distance buckets
-    max_stack_depth : cap on LRU stack size (objects beyond depth are evicted)
-    seed            : RNG seed for reproducibility
+    bucket_pmf        : (8,) probability vector over stack-distance buckets
+    max_stack_depth   : cap on LRU stack size (objects beyond depth are evicted)
+    seed              : RNG seed for reproducibility
+    transition_matrix : optional (8, 8) Markov transition matrix over buckets.
+                        Row i = P(next_bucket | prev_bucket=i). When supplied,
+                        consecutive reuse events sample from the conditional row
+                        instead of the global PMF (IDEA #62 Markov Atlas).
     """
 
     def __init__(
@@ -94,6 +98,7 @@ class LRUStackDecoder:
         bucket_pmf: np.ndarray,
         max_stack_depth: int = 2048,
         seed: Optional[int] = None,
+        transition_matrix: Optional[np.ndarray] = None,
     ):
         self.bucket_pmf = np.asarray(bucket_pmf, dtype=np.float64)
         self.bucket_pmf /= self.bucket_pmf.sum()
@@ -101,15 +106,30 @@ class LRUStackDecoder:
         self.rng = np.random.default_rng(seed)
         self._stack: list[int] = []
         self._next_id: int = 0
+        self._prev_bucket: int = -1  # -1 = no prior reuse event yet (cold start)
+        if transition_matrix is not None:
+            T = np.asarray(transition_matrix, dtype=np.float64)
+            # Normalise each row; add tiny uniform prior to avoid zero rows.
+            T += 1e-8
+            self.transition_matrix: Optional[np.ndarray] = T / T.sum(axis=1, keepdims=True)
+        else:
+            self.transition_matrix = None
 
     def reset(self) -> None:
         self._stack = []
         self._next_id = 0
+        self._prev_bucket = -1
 
     def step(self, is_reuse: bool) -> int:
         """Process one event. Returns assigned obj_id."""
         if is_reuse and self._stack:
-            bucket = int(self.rng.choice(N_BUCKETS, p=self.bucket_pmf))
+            # IDEA #62: Markov atlas — condition on previous bucket when available.
+            if self.transition_matrix is not None and self._prev_bucket >= 0:
+                pmf = self.transition_matrix[self._prev_bucket]
+            else:
+                pmf = self.bucket_pmf
+            bucket = int(self.rng.choice(N_BUCKETS, p=pmf))
+            self._prev_bucket = bucket
             lo = int(_EDGES[bucket])
             hi = int(_EDGES[bucket + 1]) - 1
             max_rank = len(self._stack) - 1
@@ -120,6 +140,7 @@ class LRUStackDecoder:
             obj = self._stack[rank]
             del self._stack[rank]
         else:
+            self._prev_bucket = -1  # cold miss resets Markov state
             obj = self._next_id
             self._next_id += 1
         self._stack.insert(0, obj)
@@ -209,6 +230,50 @@ class LRUStackDecoder:
         return cls.fit_from_obj_ids(arr, max_fit_events=max_fit_events,
                                     exact=exact, **kwargs)
 
+    @classmethod
+    def from_markov_matrix(
+        cls,
+        transition_matrix: np.ndarray,
+        corpus: str = "alibaba",
+        **kwargs,
+    ) -> "LRUStackDecoder":
+        """Construct with Markov atlas; marginal PMF from corpus default."""
+        pmf = _DEFAULT_PMFS.get(corpus.lower(), _DEFAULT_PMFS["alibaba"]).copy()
+        return cls(pmf, transition_matrix=transition_matrix, **kwargs)
+
+    @classmethod
+    def fit_transition_matrix_from_obj_ids(
+        cls,
+        obj_ids: np.ndarray,
+        max_fit_events: int = 1_000_000,
+        exact: bool = False,
+    ) -> np.ndarray:
+        """
+        Compute 8×8 Markov transition matrix from a real obj_id sequence.
+        Returns T[i][j] = P(next_bucket=j | prev_bucket=i), not normalized.
+        Caller normalizes or passes to from_markov_matrix().
+        """
+        arr = np.asarray(obj_ids, dtype=np.int64)
+        if len(arr) > max_fit_events:
+            arr = arr[:max_fit_events]
+
+        T = np.zeros((N_BUCKETS, N_BUCKETS), dtype=np.float64)
+        last_pos: dict[int, int] = {}
+        prev_bucket: int = -1
+        for i, oid in enumerate(arr.tolist()):
+            oid = int(oid)
+            if oid in last_pos:
+                dist = i - last_pos[oid]
+                b = int(np.searchsorted(_EDGES[1:], dist, side="right"))
+                b = min(b, N_BUCKETS - 1)
+                if prev_bucket >= 0:
+                    T[prev_bucket][b] += 1
+                prev_bucket = b
+            else:
+                prev_bucket = -1  # cold miss resets chain
+            last_pos[oid] = i
+        return T
+
     def print_pmf(self) -> None:
         """Display fitted bucket distribution."""
         labels = [f"[{_EDGES[k]},{_EDGES[k+1]})" for k in range(N_BUCKETS)]
@@ -216,6 +281,18 @@ class LRUStackDecoder:
         for label, p in zip(labels, self.bucket_pmf):
             bar = "█" * int(p * 40)
             print(f"  {label:>12s}  {p:.3f}  {bar}")
+
+    def print_transition_matrix(self) -> None:
+        """Display the Markov transition matrix if set."""
+        if self.transition_matrix is None:
+            print("  [no Markov atlas — using i.i.d. PMF]")
+            return
+        labels = [f"[{_EDGES[k]},{_EDGES[k+1]})" for k in range(N_BUCKETS)]
+        labels[-1] = f"[{_EDGES[-2]},+∞)"
+        print(f"  {'':>12s}  " + "  ".join(f"{l:>12s}" for l in labels))
+        for i, row in enumerate(self.transition_matrix):
+            vals = "  ".join(f"{v:.3f}" for v in row)
+            print(f"  {labels[i]:>12s}  {vals}")
 
 
 # ------------------------------------------------------------------

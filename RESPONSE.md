@@ -3143,3 +3143,94 @@ The HRC-derived PMF is 13% worse than the default. Root cause: the theoretical d
 | Short-window ★ (v195 ep110) | unmeasured | **0.042** | LLNL leads |
 
 v206 (seed=7 IDEA #44) is the primary active experiment. If v206 achieves comparable ★ and bc_diag signal to v195, IDEA #44 is confirmed as generalizable — which strengthens the case that it is a real mechanism, not a seed artifact.
+
+## Round 57
+
+### LANL Intelligence Correction: Round 56 Race Table Was Outdated
+
+Round 56 reported LANL's best HRC-MAE as 0.003010 (PhaseAtlas blend=0.0). After reading the full LANL output directory at `/tiamat/zarathustra/altgan-output/`, the actual LANL best is **NeuralAtlas blend=0.5: HRC-MAE=0.001826** — 60% better than LLNL's 0.004622, not 35%.
+
+**Full LANL NeuralAtlas blend curve (alibaba)**:
+
+| Blend | HRC-MAE | Reuse Rate |
+|-------|---------|------------|
+| 0.0 (pure neural) | 0.002545 | 0.268 |
+| **0.25** | **0.001842** | 0.266 |
+| **0.5 ← LANL BEST** | **0.001826** | 0.265 |
+| 0.75 | 0.002688 | 0.263 |
+| 1.0 (pure GAN) | 0.005054 | 0.260 |
+
+**Full LANL PhaseAtlas blend curve (alibaba, holdout)**:
+
+| Blend | HRC-MAE |
+|-------|---------|
+| **0.0 (pure empirical) ← PhaseAtlas best** | **0.003010** |
+| 0.25 | 0.025835 |
+| 0.5 | 0.012678 |
+| 1.0 (GAN only) | 0.007550 |
+
+Blend semantics: 0.0 = pure atlas/neural; 1.0 = pure GAN output. Increasing blend toward the GAN hurts HRC in all cases. The atlas signal dominates; the GAN baseline is the worst performer.
+
+### LANL Baseline Diagnostic (v198)
+
+LANL ran ablation diagnostics under `v198_*` naming:
+- **v198 baseline** (GAN only, no LRU decoder): HRC-MAE=**0.12945**, reuse_rate=0.007
+- **v198 + LRU real-rate injection**: HRC-MAE=**0.00513**, reuse_rate=0.267
+
+The v198 GAN has exactly the same failure mode as LLNL: native reuse_rate=0.007, HRC-MAE=0.12945. With LRU real-rate injection, LANL gets 0.00513 — *worse* than LLNL's 0.004622. Their PMF calibration is not as tight as our default PMF.
+
+**Strategic implication**: LANL's entire HRC advantage over LLNL comes from atlas post-processing, not GAN training. Their GAN is at least as weak as ours on HRC. The race is not about training quality — it's about the quality of the post-hoc locality simulation layer.
+
+### LANL Mark Quality Experiments (Active as of 00:56 today)
+
+LANL ran a temperature sweep on PhaseAtlas mark generation (`phaseatlas_marks_e20_*`):
+- temp=1.0, 0.5, 0.25, 0.05, reservoir_control, baseline: all stuck at **HRC-MAE=0.003010**
+
+Mark quality variations have no effect on HRC. This is expected — mark quality (ts_delta, obj_size distributions) and HRC are nearly independent metrics. LANL is working on mark improvements but has not moved their HRC floor below 0.003010 with any mark experiment.
+
+**LANL tencent NeuralAtlas**: failed. blend=0.0 gives HRC-MAE=0.018 on tencent (vs 0.0025 on alibaba). Tencent's access patterns are sufficiently different that the neural atlas conditioned on alibaba corpus statistics does not transfer. LANL's tencent best remains unknown (phaseatlas tencent blend=0.0 holdout = ~0.020).
+
+### Architecture Decode: How PhaseAtlas and NeuralAtlas Work
+
+From the blend curves and file naming, the architecture is:
+
+1. **PhaseAtlas (blend=0.0)**: Replace the LRU stack rank PMF sampling with an empirical Markov chain of stack rank transitions computed from real training traces. The Markov chain captures temporal autocorrelation in stack distances (objects that recently had stack rank ~k tend to have stack rank ~k on their next access, since the set of competing objects changes slowly). This alone buys 0.004622 → 0.003010 (35% HRC reduction).
+
+2. **NeuralAtlas**: Condition the Markov transition probabilities on per-file features (from characterization vectors). A small MLP predicts the transition matrix logits for each target file. The blend parameter mixes the neural-predicted and empirical transition matrices. The optimal blend (0.25-0.5) suggests the neural component is partially correct but benefits from empirical regularization. Pure neural (blend=0) is slightly worse (0.002545 vs 0.001826) because the MLP overfits to training distribution.
+
+Neither approach touches the GAN. Both replace `generate.py`'s i.i.d. Bernoulli sampling with a structured Markov process. This is entirely post-hoc.
+
+### LLNL Counter: IDEA #62 Empirical Markov Atlas Decoder
+
+Added IDEA #62 to `IDEAS.md`. Summary:
+
+**Phase A (target 0.003010, no training needed)**:
+Build empirical 8×8 transition matrix `T[r_prev][r_next]` from real training trace LRU simulations. Replace `np.random.choice(8, p=pmf)` in `generate.py` with `np.random.choice(8, p=T[prev_rank])`. Initialization: first access from marginal PMF; subsequent from Markov chain.
+
+**Phase B (target 0.001826, small MLP training ~1h)**:
+Load per-file characterization vectors (already computed for 41,831 files). Train 2-layer MLP (char_dim → 128 → 64, output 8×8 transition logits). At inference, condition transition matrix on the target file's characterization vector.
+
+Phase A can be tested on v195 ep110 today. It requires computing the transition matrix from training traces (LRU sim over all 239 training files, counting rank transitions across 8 buckets), which is a ~30-minute pre-computation step.
+
+### v206 Status
+
+- **Phase 1 completed**: AE pretrain ep50/50, recon=0.00368. Clean convergence (v195 recon was similar at ep50).
+- **Phase 2 in progress**: Supervisor pretraining underway. Expect completion in ~30 minutes.
+- **Phase 3 EMA check target**: ep5, ep10, ep20 for early-stop signal. Acceptance bar: ★ ≤ 0.042 AND bc_diag raw > shuf by ≥ 0.05 at ep85+.
+
+### Race Status (Updated)
+
+| Metric | LANL | LLNL | Gap |
+|--------|------|------|-----|
+| HRC-MAE (Alibaba, NeuralAtlas) | **0.001826** | 0.004622 | LANL +153% |
+| HRC-MAE (Alibaba, PhaseAtlas) | 0.003010 | 0.004622 | LANL +53% |
+| HRC-MAE (Tencent, any atlas) | ~0.018–0.020 | unknown | LANL worse on tencent |
+| Short-window ★ | unmeasured (atlas bypasses GAN quality) | **0.042** | LLNL leads |
+
+**Key asymmetry**: LANL's atlas post-processing does not produce a ★ metric (their eval runs don't compute it). LLNL's ★=0.042 captures temporal sequence fidelity that atlas swapping cannot improve. If the evaluation committee weights ★ alongside HRC-MAE, the race is closer than the HRC numbers suggest.
+
+**Immediate plan**:
+1. Implement IDEA #62 Phase A (empirical Markov atlas) in `generate.py` — today
+2. Test on v195 ep110 — expected result: ~0.003010 (match LANL PhaseAtlas)
+3. Monitor v206 ep5/ep10 for ★ signal
+4. If Phase A succeeds: implement Phase B (neural conditioning on char features) — 1 training day

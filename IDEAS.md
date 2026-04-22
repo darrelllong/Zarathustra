@@ -2204,6 +2204,38 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Next step (IDEA #59)**: Freeze LSTM, fine-tune only `reuse_head` via BCE. This replaces Bernoulli injection with a learned (but h-independent) head. h has zero correlation with reuse in v195, so reuse_head will converge to predict 26.5% for all inputs — equivalent to Bernoulli injection but using the native model pipeline. If h has ANY weak temporal correlation with reuse, this provides marginal improvement over pure Bernoulli.
 
+## IDEA #62: Empirical Markov Atlas Decoder (Counter-NeuralAtlas)
+
+**Status**: Proposed (2026-04-22) — HIGH PRIORITY
+
+**Motivation**: LANL's PhaseAtlas (blend=0.0) achieves HRC-MAE=0.003010 vs LLNL's 0.004622 using an empirical Markov atlas over LRU stack ranks. Their NeuralAtlas further achieves 0.001826 at blend=0.25-0.5 by conditioning atlas transitions on per-file features. Both are pure post-processing layers applied on top of the GAN output — no GAN training required.
+
+**LLNL GAN diagnostic**: LANL's v198 baseline GAN achieves HRC-MAE=0.12945 with reuse_rate=0.007 (identical to LLNL native). Their v198 + LRU real-rate injection achieves 0.00513 — comparable to LLNL's 0.004622. The entire LANL HRC advantage comes from atlas post-processing, not GAN quality.
+
+**Architecture**:
+1. **Phase A — Empirical Atlas** (target: 0.003010): From all real training traces, compute the empirical LRU stack rank transition matrix `T[r_prev][r_next]` where `r` is bucketed into the same 8 bins as Bernoulli injection. At generation time, instead of sampling `r ~ PMF` i.i.d., sample `r_k ~ T[r_{k-1}]` as a Markov chain. Initialization: first access uses the marginal PMF; subsequent accesses use the transition matrix.
+2. **Phase B — Per-File Conditioned Atlas** (target: 0.001826): Train a small MLP (input: file characterization features from trace_characterizations.jsonl, output: 8×8 transition matrix logits) that predicts per-file atlas transitions. Use the 41,831 file characterizations already computed. At inference time, condition the Markov chain on the target file's characterization vector.
+
+**Implementation** (Phase A, no training):
+```python
+# In generate.py, build empirical_transition_matrix from real traces at load time:
+# T[r_prev][r_next] = count(r_next | r_prev) / sum(count(r_next | r_prev) over r_next)
+# Then replace:
+#   rank = np.random.choice(8, p=pmf)
+# With:
+#   rank = np.random.choice(8, p=T[prev_rank])
+```
+
+**Key difference from Bernoulli**: Bernoulli samples ranks i.i.d.; real reuse events are autocorrelated in stack rank (objects that recently had short stack distances tend to have short stack distances again — temporal locality clustering). The Markov chain captures this first-order temporal correlation.
+
+**Expected outcome**:
+- Phase A: HRC-MAE ~0.003010 (match LANL PhaseAtlas) — gain purely from transition correlation
+- Phase B: HRC-MAE ~0.001826 (match LANL NeuralAtlas) — additional gain from per-file specialization
+
+**Note on ★ metric**: LANL does not report ★ for any atlas runs. LLNL's ★=0.042 advantage remains unchallenged on the temporal sequence quality axis. Atlas post-processing only improves HRC by replacing GAN's weak locality with empirical locality; it does not improve ★.
+
+**Implementation effort**: Phase A is ~50 lines in generate.py, no training. Can be tested today on v195 ep110.
+
 ## IDEA #61: HRC-Optimal PMF from Real HRC Derivative (TESTED, FAILED)
 
 **Status**: Tested 2026-04-22, FAILED

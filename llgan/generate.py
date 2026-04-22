@@ -42,6 +42,7 @@ def generate(
     lru_stack_pmf: str = "",
     lru_stack_reuse_rate: float = -1.0,
     lru_stack_max_depth: int = 2048,
+    lru_markov_atlas: str = "",
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -225,7 +226,15 @@ def generate(
             print("[lru-stack] WARN: obj_id_reuse column not in preprocessor col_names; "
                   "decoder disabled")
         else:
-            if lru_stack_pmf:
+            if lru_markov_atlas:
+                T = np.load(lru_markov_atlas)
+                print(f"[lru-stack] Markov atlas loaded from {lru_markov_atlas} "
+                      f"shape={T.shape}")
+                lru_decoder_proto = LRUStackDecoder.from_markov_matrix(
+                    T, corpus=lru_stack_corpus, max_stack_depth=lru_stack_max_depth)
+                lru_decoder_proto.print_pmf()
+                lru_decoder_proto.print_transition_matrix()
+            elif lru_stack_pmf:
                 pmf_vals = np.array([float(x) for x in lru_stack_pmf.split(",")])
                 print(f"[lru-stack] Using explicit PMF: {np.round(pmf_vals, 4)}")
                 lru_decoder_proto = LRUStackDecoder(pmf_vals, max_stack_depth=lru_stack_max_depth)
@@ -261,8 +270,13 @@ def generate(
         # in the normalized feature array. Decoder returns integer obj_ids.
         lru_obj_ids = None
         if lru_decoder_proto is not None and reuse_col_idx >= 0:
-            dec = type(lru_decoder_proto)(lru_decoder_proto.bucket_pmf.copy(),
-                                         lru_decoder_proto.max_stack_depth)
+            T_copy = (lru_decoder_proto.transition_matrix.copy()
+                      if lru_decoder_proto.transition_matrix is not None else None)
+            dec = type(lru_decoder_proto)(
+                lru_decoder_proto.bucket_pmf.copy(),
+                lru_decoder_proto.max_stack_depth,
+                transition_matrix=T_copy,
+            )
             reuse_signal = arr_s[:, reuse_col_idx]
             # Override reuse signal with Bernoulli(p) if --lru-stack-reuse-rate
             # is set. This ablates the generator's broken reuse signal to test
@@ -358,6 +372,12 @@ def parse_args():
                    help="LRU stack maximum depth. Objects beyond this rank are evicted. "
                         "Default 2048. Set >= footprint (n_records*(1-reuse_rate)) to "
                         "avoid capping the working set.")
+    p.add_argument("--lru-markov-atlas", default="",
+                   metavar="NPY",
+                   help="IDEA #62: path to precomputed 8×8 Markov transition matrix "
+                        "(.npy file from compute_markov_atlas.py). When set, the LRU "
+                        "stack decoder samples bucket from P(next|prev) instead of the "
+                        "global PMF. Requires --lru-stack-decoder.")
     return p.parse_args()
 
 
@@ -380,4 +400,5 @@ if __name__ == "__main__":
         lru_stack_pmf=args.lru_stack_pmf,
         lru_stack_reuse_rate=args.lru_stack_reuse_rate,
         lru_stack_max_depth=args.lru_stack_max_depth,
+        lru_markov_atlas=args.lru_markov_atlas,
     )
