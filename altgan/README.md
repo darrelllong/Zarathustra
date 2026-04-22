@@ -99,6 +99,20 @@ without retraining the object process.
 Use `--mark-numeric-blend` and `--mark-categorical-source reservoir` for the
 hybrid control: keep reservoir opcode/tenant and blend only neural timing/size.
 
+To run the full paired hybrid sweep and write a CSV summary:
+
+```bash
+python -m altgan.sweep_mark_hybrids \
+  --model checkpoints/altgan/alibaba_phaseatlas_marks.pkl.gz \
+  --trace-dir /tiamat/zarathustra/traces/2020_alibabaBlock \
+  --fmt oracle_general \
+  --char-file /home/darrell/traces/characterization/trace_characterizations.jsonl \
+  --real-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
+  --output-dir /tiamat/zarathustra/altgan-output \
+  --prefix alibaba_phaseatlas_marks_hybrid \
+  --include-reservoir-control
+```
+
 ## Generate
 
 ```bash
