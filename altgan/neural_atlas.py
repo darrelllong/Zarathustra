@@ -63,6 +63,7 @@ class NeuralAtlasModel:
     global_samples_by_state: Dict[int, List[EventSample]]
     global_samples: List[EventSample]
     max_obj_id: int
+    mark_model: object | None = None
     metadata: dict = field(default_factory=dict)
 
     def generate(
@@ -89,6 +90,14 @@ class NeuralAtlasModel:
         rng = np.random.default_rng(seed)
         conds = self._resolve_conds(conds, n_streams, rng)
         transition_blend = float(np.clip(transition_blend, 0.0, 1.0))
+        mark_runtime = None
+        mark_model = getattr(self, "mark_model", None)
+        if mark_model is not None:
+            mark_runtime = mark_model.runtime(
+                n_streams=n_streams,
+                seed=seed + 17,
+                temperature=temperature,
+            )
 
         net = _CondTransitionNet(self.cond_dim, self.hidden_dim, self.n_states)
         net.load_state_dict(self.state_dict)
@@ -138,14 +147,25 @@ class NeuralAtlasModel:
                     stack.insert(0, obj_id)
                     in_stack.add(obj_id)
 
-                ts += max(float(ev.dt), 0.0)
+                mark = ev
+                if mark_runtime is not None:
+                    mark = mark_runtime.sample(
+                        stream_id=stream_id,
+                        cond=conds[stream_id],
+                        state=state,
+                        action_class=ev.action_class,
+                        stack_distance=ev.stack_distance,
+                        stride=ev.stride,
+                    )
+
+                ts += max(float(mark.dt), 0.0)
                 rows.append({
                     "stream_id": stream_id,
                     "ts": ts,
                     "obj_id": int(obj_id),
-                    "obj_size": max(int(round(ev.obj_size)), 1),
-                    "opcode": ev.opcode,
-                    "tenant": ev.tenant,
+                    "obj_size": max(int(round(mark.obj_size)), 1),
+                    "opcode": mark.opcode,
+                    "tenant": mark.tenant,
                 })
                 prev_obj = int(obj_id)
                 state = self._next_state(

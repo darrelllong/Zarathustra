@@ -69,6 +69,31 @@ For a nonstationary phase-conditioned atlas, add `--n-phase-bins 8`. For a
 strict long-rollout holdout, add `--exclude-manifest path/to/real_manifest.json`
 so the real eval stream files cannot be used as routed source atlases.
 
+## Attach Neural Marks
+
+Freeze a trained NeuralAtlas/PhaseAtlas object process and add the IDEA #53 mark
+sidecar:
+
+```bash
+python -m altgan.train_neural_marks \
+  --model checkpoints/altgan/alibaba_phaseatlas.pkl.gz \
+  --trace-dir /tiamat/zarathustra/traces/2020_alibabaBlock \
+  --fmt oracle_general \
+  --char-file /home/darrell/traces/characterization/trace_characterizations.jsonl \
+  --exclude-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
+  --max-files 64 \
+  --records-per-file 25000 \
+  --epochs 20 \
+  --output checkpoints/altgan/alibaba_phaseatlas_marks.pkl.gz
+```
+
+The attached mark head conditions on workload profile, atlas state,
+new/reuse-action class, stack-rank bucket, and previous emitted marks. It leaves
+the explicit LRU object decoder untouched, so HRC/reuse/stack-distance can be
+compared directly against the reservoir-mark PhaseAtlas checkpoint.
+Use `altgan.evaluate_neural_atlas --disable-neural-marks` on an attached
+checkpoint to run the paired reservoir-mark control.
+
 ## Generate
 
 ```bash
