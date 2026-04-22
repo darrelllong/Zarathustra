@@ -1230,6 +1230,7 @@ def train(cfg: Config) -> None:
         t0 = time.time()
         c_losses, g_losses, w_dists = [], [], []
         cp_bce_losses, cp_stride_losses = [], []   # copy-path tracking
+        reuse_rate_samples = []                    # IDEA #51: track fake reuse rate
         pcf_losses = []   # PCF loss tracking
         bc_real_scores, bc_fake_scores = [], []   # boundary critic logging (P1#2)
         bc_raw_real_scores, bc_shuf_real_scores = [], []  # IDEA #44 diagnostics (raw vs shuffled)
@@ -1769,12 +1770,25 @@ def train(cfg: Config) -> None:
                         pos_w = (1.0 - mean_reuse) / mean_reuse  # e.g. 0.9/0.1 = 9.0
                     weight = real_p * pos_w + (1.0 - real_p)      # per-element weight
                     loss_reuse_bce = nn.functional.binary_cross_entropy(
-                        fake_p.clamp(1e-6, 1.0 - 1e-6), real_p,
-                        weight=weight,
+                        fake_p.clamp(1e-6, 1.0 - 1e-6).float(), real_p.float(),
+                        weight=weight.float(),
                         reduction='mean',
                     )
                     g_loss = g_loss + cfg.reuse_bce_weight * loss_reuse_bce
                     cp_bce_losses.append(loss_reuse_bce.item())
+
+                    # IDEA #51: global reuse-rate matching loss.
+                    # BCE alone can't enforce aggregate reuse rate — G produces 0.1%
+                    # reuse despite 26.5% real (v198 diagnostic). A scalar constraint
+                    # on mean(sigmoid(reuse)) directly fixes this without per-event targets.
+                    _rrw = getattr(cfg, 'reuse_rate_loss_weight', 0.0)
+                    _fake_reuse_prob = (obj_fake_reuse_cp + 1.0) / 2.0  # [-1,1]→[0,1]
+                    _fake_rate = _fake_reuse_prob.mean()
+                    reuse_rate_samples.append(_fake_rate.item())
+                    if _rrw > 0.0:
+                        _r_target = getattr(cfg, 'reuse_rate_target', 0.265)
+                        loss_reuse_rate = (_fake_rate - _r_target) ** 2
+                        g_loss = g_loss + _rrw * loss_reuse_rate
 
                     # Stride-reuse consistency: penalise |stride| where real says reuse.
                     stride_fake = fake_decoded[:, :, stride_col]
@@ -1795,7 +1809,7 @@ def train(cfg: Config) -> None:
                     p_reuse = G._last_retrieval_aux["p_reuse_seq"]  # (B, T)
                     gt_reuse = ((real_batch[:, :, obj_id_col] + 1.0) / 2.0).detach()
                     loss_ret_bce = nn.functional.binary_cross_entropy(
-                        p_reuse.clamp(1e-6, 1.0 - 1e-6), gt_reuse,
+                        p_reuse.clamp(1e-6, 1.0 - 1e-6).float(), gt_reuse.float(),
                         reduction='mean',
                     )
                     g_loss = g_loss + _rw * loss_ret_bce
@@ -2168,6 +2182,9 @@ def train(cfg: Config) -> None:
             cp_bce_m = sum(cp_bce_losses) / len(cp_bce_losses)
             cp_str_m = sum(cp_stride_losses) / len(cp_stride_losses) if cp_stride_losses else 0.0
             log += f"  reuse_bce={cp_bce_m:.4f}  stride_con={cp_str_m:.4f}"
+        if reuse_rate_samples:
+            rr_m = sum(reuse_rate_samples) / len(reuse_rate_samples)
+            log += f"  reuse_rate={rr_m:.4f}"
         if pcf_losses:
             pcf_m = sum(pcf_losses) / len(pcf_losses)
             log += f"  pcf={pcf_m:.4f}"
@@ -2577,6 +2594,13 @@ def parse_args() -> Config:
     p.add_argument("--reuse-bce-weight", type=float, default=2.0,
                    help="Copy-path: per-timestep BCE weight on reuse column (default 2.0). "
                         "Class-weighted to handle seek/reuse imbalance.")
+    p.add_argument("--reuse-rate-loss-weight", type=float, default=0.0,
+                   help="IDEA #51: global reuse-rate matching loss weight. "
+                        "L = w * (mean(sigmoid(reuse_raw)) - reuse_rate_target)^2. "
+                        "Directly penalises aggregate reuse rate mismatch. Try 5.0-20.0.")
+    p.add_argument("--reuse-rate-target", type=float, default=0.265,
+                   help="IDEA #51: target reuse rate for --reuse-rate-loss-weight. "
+                        "alibaba=0.265, tencent=0.621 (from real corpus statistics).")
     p.add_argument("--stride-consistency-weight", type=float, default=1.0,
                    help="Copy-path: penalise |stride| when real reuse=+1 (default 1.0).")
     p.add_argument("--pcf-loss-weight",      type=float, default=0.0,
@@ -2875,6 +2899,8 @@ def parse_args() -> Config:
     cfg.copy_path                   = args.copy_path
     cfg.copy_path_loss_only         = args.copy_path_loss_only
     cfg.reuse_bce_weight            = args.reuse_bce_weight
+    cfg.reuse_rate_loss_weight      = args.reuse_rate_loss_weight
+    cfg.reuse_rate_target           = args.reuse_rate_target
     cfg.stride_consistency_weight   = args.stride_consistency_weight
     cfg.pcf_loss_weight             = args.pcf_loss_weight
     cfg.pcf_n_freqs                 = args.pcf_n_freqs
