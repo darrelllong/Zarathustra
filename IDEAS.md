@@ -1925,3 +1925,42 @@ corpus, keep the router and drop that smoothing path for the promoted generator.
 **Risk**: nearest-file routing can become too oracle-like if the evaluation uses the exact real
 manifest. The next version should hold out routed source files from training and then route only by
 characterization, not by basename identity.
+
+---
+
+### 51. Reuse-rate matching loss to fix dead obj_id_reuse signal
+
+**Gap attacked**: v198 phase 1 proved that the LRU stack decoder works (HRC-MAE 0.1295→0.0051,
+96% improvement) when given the real reuse rate, but the generator's `obj_id_reuse` output is
+essentially dead — only 0.1% of events signal reuse vs 26.5% in real traces. The BCE supervision
+(`reuse_bce_weight=2.0`) is insufficient to correct this at training time.
+
+**Proposal**: add a global reuse-rate matching loss that directly penalizes the mean generated
+reuse rate against the real corpus target:
+
+  `L_rate = λ_rate × (mean(sigmoid(reuse_logit)) − r_target)²`
+
+where `r_target` is the real corpus reuse rate (alibaba=0.265, tencent=0.621) and
+`reuse_logit` is the pre-activation Recovery output for the `obj_id_reuse` column.
+
+This is a scalar global constraint computed over the entire training batch, complementing
+the per-event BCE which fails to enforce the aggregate rate.
+
+**Why this works**: the BCE loss gives correct per-event direction (reuse events should be +1)
+but cannot enforce that 26.5% of the batch is positive. The rate-matching loss provides
+exactly this global constraint without changing the per-event target.
+
+**Minimal viable experiment** (v199):
+- Hot-start from v195 `pretrain_complete.pt` (pretrain E/R loaded; G LSTM fresh)
+- Add `--reuse-rate-loss-weight 10.0 --reuse-rate-target 0.265` to training
+- Monitor per-epoch mean reuse rate (should converge to ~0.265)
+- Acceptance: training reuse_rate ∈ [0.24, 0.29] AND frozen ★ ≤ 0.050
+- Long-rollout at ep30 (with `--lru-stack-decoder`): HRC-MAE < 0.015
+
+**Acceptance bar**: HRC-MAE < 0.015 with LRU stack decoder in trained model (no oracle override),
+★ competitive with v195. This is the target that makes the compound position — better than
+NeuralAtlas on HRC and better on ★.
+
+**Risk**: rate-matching loss may reduce per-event diversity (G learns to produce uniform
+reuse probability instead of context-dependent reuse decisions). Monitor recall and frozen β-recall
+to catch this.

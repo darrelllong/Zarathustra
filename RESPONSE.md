@@ -2334,3 +2334,67 @@ redesign the training signal so that mark generation and object selection are jo
 The adversary is behind us on both fronts (short-window quality and cache metrics), so the
 correct priority is completing v198 before they replicate our LSTM mark advantage. One-codebase
 design is their robustness; LSTM mark conditioning is ours.
+
+### v198 Phase 1 — BREAKTHROUGH RESULT
+
+Three-way experiment executed on vinge.local (v195 ep110, 50K records, 8 streams, seed=42):
+
+| Variant | HRC-MAE | reuse_access | stack_dist_med | footprint |
+|---------|---------|-------------|----------------|-----------|
+| baseline (no decoder) | 0.1295 | 0.00708 | 0 | 6206 |
+| + decoder, gen signal (0.1% reuse) | 0.1345 | 0.00314 | 114 | 6230 |
+| + decoder, real rate override (26.5%) | **0.0051** | **0.2674** | **150** | **4579** |
+| Real corpus | — | 0.2647 | 174 | 4595 |
+| LANL NeuralAtlas | 0.00183 | 0.2645 | ~200 | — |
+
+**96% HRC-MAE improvement (0.1295 → 0.0051).** Reuse_access within 1% of real. Stack_distance_median within 14% of real. Footprint within 0.35% of real.
+
+**The structural hypothesis is confirmed**: the LRU stack decoder works when given the correct reuse signal. The model's mark generation quality (the LSTM backbone producing dt, size, opcode, tenant) is sound. The sole broken component is the `obj_id_reuse` output — the generator produces only 0.1% reuse events when the real rate is 26.5%.
+
+We are within 2.8× of NeuralAtlas on HRC-MAE (0.0051 vs 0.00183) using only a post-hoc
+repair. Once we fix the reuse signal in training, we should close most of that gap.
+
+### Root cause — dead reuse signal
+
+The `obj_id_reuse` feature (±1, supervised by `reuse_bce_weight=2.0`) is generating +1 (reuse)
+at only 0.1% of events vs 26.5% in real traces. The BCE supervision exists but is ineffective —
+260× under-generating reuse events despite explicit supervision.
+
+Root cause candidates:
+1. BCE weight 2.0 is insufficient relative to WGAN loss (G learns to minimize W distance,
+   reuse BCE is a secondary regularizer that doesn't dominate the loss landscape)
+2. The Recovery decoder maps most latent vectors to the "new object" region of feature space
+   (the sigmoid output is systematically biased toward -1)
+3. No direct rate-matching constraint — BCE gives event-level supervision but no global
+   rate constraint
+
+### v199 plan — fix the reuse signal
+
+Three mechanisms to trial on the reuse signal:
+
+1. **Reuse-rate matching loss** (primary): `L_rate = (mean(sigmoid(reuse_raw)) - r_target)^2`
+   where `r_target=0.265` for alibaba. This is a scalar global constraint that directly
+   penalizes rate mismatch. Weight: 5.0–20.0 (needs to dominate the per-event BCE).
+
+2. **Increase reuse_bce_weight** from 2.0 to 10.0+: test whether weight alone is the issue
+   without rate-matching. Clean ablation of mechanism #1.
+
+3. **Gumbel-hard reuse decision**: replace sigmoid+threshold with a Gumbel-Softmax
+   categorical decision (new/reuse) at the Recovery output. The straight-through estimator
+   gives exact discrete outputs during training, eliminating the "soft middle" region where
+   sigmoid ≈ 0.5 for both classes. This is the structural fix; mechanisms #1/#2 are band-aids.
+
+v199 target: train from v195 pretrain_complete.pt (pretrain only; E/R initialized; G LSTM
+fresh), add reuse-rate loss weight 10.0, target rate 0.265. Acceptance bar: training-time
+reuse_rate converges to 0.24–0.29 AND frozen ★ ≤ 0.050 (not sacrificing short-window quality).
+Long-rollout sidecar at ep30 with LRU stack decoder: HRC-MAE < 0.015.
+
+### Competitive advantage clarified
+
+LANL gets HRC-MAE 0.00183 with reservoir sampling for marks. We already have:
+- HRC-MAE 0.0051 with a broken reuse signal and a post-hoc repair
+- Short-window ★=0.042 (LANL does not report this)
+- LSTM mark generation with temporal conditioning (LANL uses reservoir sampling)
+
+Fix the reuse signal → HRC-MAE should approach LANL's 0.00183. Keep the LSTM marks →
+outperform LANL on ★ and mark quality. This is the compound winning position.

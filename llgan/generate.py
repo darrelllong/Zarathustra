@@ -39,6 +39,8 @@ def generate(
     lru_stack_corpus: str = "alibaba",
     lru_stack_real_csv: str = "",
     lru_stack_exact_fit: bool = False,
+    lru_stack_pmf: str = "",
+    lru_stack_reuse_rate: float = -1.0,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -208,61 +210,82 @@ def generate(
             for s in range(n_streams):
                 stream_windows[s].append(out_np[s])  # (timestep, num_cols)
 
+    # IDEA #48: post-hoc LRU stack decoder.
+    # obj_id_reuse is only in the normalized feature space (before inverse_transform),
+    # so build the decoder here and apply it per-stream before inverse_transform.
+    lru_decoder_proto = None
+    reuse_col_idx = -1
+    if lru_stack_decoder:
+        from lru_stack_decoder import LRUStackDecoder
+        col_names = getattr(prep, "col_names", None)
+        if col_names and "obj_id_reuse" in col_names:
+            reuse_col_idx = list(col_names).index("obj_id_reuse")
+        if reuse_col_idx < 0:
+            print("[lru-stack] WARN: obj_id_reuse column not in preprocessor col_names; "
+                  "decoder disabled")
+        else:
+            if lru_stack_pmf:
+                pmf_vals = np.array([float(x) for x in lru_stack_pmf.split(",")])
+                print(f"[lru-stack] Using explicit PMF: {np.round(pmf_vals, 4)}")
+                lru_decoder_proto = LRUStackDecoder(pmf_vals)
+            elif lru_stack_real_csv:
+                import pandas as _pd
+                real_df = _pd.read_csv(lru_stack_real_csv)
+                if "obj_id" not in real_df.columns:
+                    print(f"[lru-stack] WARN: no obj_id in {lru_stack_real_csv}; "
+                          "using default PMF")
+                    lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+                else:
+                    print(f"[lru-stack] Fitting PMF from {lru_stack_real_csv} "
+                          f"(exact={lru_stack_exact_fit})")
+                    lru_decoder_proto = LRUStackDecoder.fit_from_df(
+                        real_df, exact=lru_stack_exact_fit
+                    )
+            else:
+                print(f"[lru-stack] Using default PMF for corpus={lru_stack_corpus!r}")
+                lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+            lru_decoder_proto.print_pmf()
+
     # Inverse-transform each stream independently (cumsum stays within stream),
     # then label and concatenate for a single output file.
     import pandas as pd
     per_stream_dfs = []
     for s in range(n_streams):
         arr_s = np.concatenate(stream_windows[s], axis=0)[:records_per_stream]
+
+        # Apply LRU stack decoder before inverse_transform: obj_id_reuse lives
+        # in the normalized feature array. Decoder returns integer obj_ids.
+        lru_obj_ids = None
+        if lru_decoder_proto is not None and reuse_col_idx >= 0:
+            dec = type(lru_decoder_proto)(lru_decoder_proto.bucket_pmf.copy(),
+                                         lru_decoder_proto.max_stack_depth)
+            reuse_signal = arr_s[:, reuse_col_idx]
+            # Override reuse signal with Bernoulli(p) if --lru-stack-reuse-rate
+            # is set. This ablates the generator's broken reuse signal to test
+            # whether the stack decoder alone can produce correct HRC when given
+            # the correct reuse rate.
+            if lru_stack_reuse_rate >= 0.0:
+                ruse_rng = np.random.default_rng(42 + s)
+                reuse_signal = np.where(
+                    ruse_rng.random(len(reuse_signal)) < lru_stack_reuse_rate,
+                    1.0, -1.0
+                )
+            lru_obj_ids = dec.decode_stream(reuse_signal)
+
         df_s = prep.inverse_transform(arr_s)
         df_s.insert(0, "stream_id", s)
+
+        if lru_obj_ids is not None and "obj_id" in df_s.columns:
+            df_s["obj_id"] = lru_obj_ids
+            if s == 0:
+                reuse_rate = float((arr_s[:, reuse_col_idx] > 0).mean())
+                print(f"[lru-stack] stream 0: {len(lru_obj_ids):,} events, "
+                      f"{len(np.unique(lru_obj_ids)):,} unique objects, "
+                      f"reuse_rate={reuse_rate:.3f}")
+
         per_stream_dfs.append(df_s)
 
     df = pd.concat(per_stream_dfs, ignore_index=True).head(n_records)
-
-    # IDEA #48: post-hoc LRU stack decoder — replace generated obj_id stream
-    # with one produced by an explicit LRU stack conditioned on the generator's
-    # obj_id_reuse signal and a corpus-fitted stack-distance bucket PMF.
-    if lru_stack_decoder:
-        from lru_stack_decoder import LRUStackDecoder
-        reuse_col = "obj_id_reuse" if "obj_id_reuse" in df.columns else None
-        obj_col = "obj_id" if "obj_id" in df.columns else None
-        if reuse_col is None:
-            print("[lru-stack] WARN: no obj_id_reuse column found; skipping decoder")
-        elif obj_col is None:
-            print("[lru-stack] WARN: no obj_id column found; skipping decoder")
-        else:
-            # Build decoder: prefer fitting from supplied real CSV, else use defaults.
-            if lru_stack_real_csv:
-                real_df = pd.read_csv(lru_stack_real_csv)
-                if "obj_id" not in real_df.columns:
-                    print(f"[lru-stack] WARN: {lru_stack_real_csv} has no obj_id column; "
-                          "falling back to default PMF")
-                    decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
-                else:
-                    print(f"[lru-stack] Fitting PMF from {lru_stack_real_csv} "
-                          f"(exact={lru_stack_exact_fit})")
-                    decoder_proto = LRUStackDecoder.fit_from_df(
-                        real_df, exact=lru_stack_exact_fit
-                    )
-            else:
-                print(f"[lru-stack] Using default PMF for corpus={lru_stack_corpus!r}")
-                decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
-            decoder_proto.print_pmf()
-
-            # Apply per-stream independently (each stream has its own LRU stack).
-            all_ids = []
-            for s_id, grp in df.groupby("stream_id", sort=True):
-                from lru_stack_decoder import LRUStackDecoder as _LRU
-                dec = _LRU(decoder_proto.bucket_pmf.copy(),
-                           decoder_proto.max_stack_depth)
-                ids = dec.decode_stream(grp[reuse_col].values)
-                all_ids.append(ids)
-            df[obj_col] = np.concatenate(all_ids)
-            n_unique = df[obj_col].nunique()
-            reuse_rate = (df[reuse_col] > 0).mean()
-            print(f"[lru-stack] decoded {len(df):,} events, {n_unique:,} unique objects, "
-                  f"reuse_rate={reuse_rate:.3f}")
 
     df.to_csv(output_path, index=False)
     print(f"Generated {len(df):,} records ({n_streams} stream(s)) → {output_path}")
@@ -307,6 +330,16 @@ def parse_args():
     p.add_argument("--lru-stack-exact-fit", action="store_true",
                    help="Use BIT-based exact stack distances for PMF fitting (slower, "
                         "more accurate). Default: IRD approximation.")
+    p.add_argument("--lru-stack-pmf", default="",
+                   metavar="P0,P1,...,P7",
+                   help="Explicit 8-value comma-separated PMF for stack-distance buckets "
+                        "[0,1),[1,2),[2,4),[4,8),[8,16),[16,64),[64,256),[256+). "
+                        "Overrides --lru-stack-corpus and --lru-stack-real-csv.")
+    p.add_argument("--lru-stack-reuse-rate", type=float, default=-1.0,
+                   metavar="P",
+                   help="Override generator's obj_id_reuse signal with Bernoulli(P). "
+                        "P=-1 (default) uses generator signal. Use P=real_reuse_rate "
+                        "to ablate the reuse signal and test stack decoder alone.")
     return p.parse_args()
 
 
@@ -326,4 +359,6 @@ if __name__ == "__main__":
         lru_stack_corpus=args.lru_stack_corpus,
         lru_stack_real_csv=args.lru_stack_real_csv,
         lru_stack_exact_fit=args.lru_stack_exact_fit,
+        lru_stack_pmf=args.lru_stack_pmf,
+        lru_stack_reuse_rate=args.lru_stack_reuse_rate,
     )
