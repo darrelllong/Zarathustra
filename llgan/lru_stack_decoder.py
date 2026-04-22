@@ -87,10 +87,12 @@ class LRUStackDecoder:
     bucket_pmf        : (8,) probability vector over stack-distance buckets
     max_stack_depth   : cap on LRU stack size (objects beyond depth are evicted)
     seed              : RNG seed for reproducibility
-    transition_matrix : optional (8, 8) Markov transition matrix over buckets.
-                        Row i = P(next_bucket | prev_bucket=i). When supplied,
-                        consecutive reuse events sample from the conditional row
-                        instead of the global PMF (IDEA #62 Markov Atlas).
+    transition_matrix : optional (8, 8) Markov transition matrix (IDEA #62, unused)
+    cond_pmf          : optional (N, 8) conditional PMF P(bucket | dt_bin)
+                        (IDEA #63 StackAtlas Lite). When supplied with dt_edges,
+                        bucket is sampled from cond_pmf[dt_bin] instead of the
+                        global PMF.
+    dt_edges          : optional (N-1,) log1p-dt quantile bin edges for cond_pmf.
     """
 
     def __init__(
@@ -99,6 +101,8 @@ class LRUStackDecoder:
         max_stack_depth: int = 2048,
         seed: Optional[int] = None,
         transition_matrix: Optional[np.ndarray] = None,
+        cond_pmf: Optional[np.ndarray] = None,
+        dt_edges: Optional[np.ndarray] = None,
     ):
         self.bucket_pmf = np.asarray(bucket_pmf, dtype=np.float64)
         self.bucket_pmf /= self.bucket_pmf.sum()
@@ -115,6 +119,15 @@ class LRUStackDecoder:
             self.transition_matrix: Optional[np.ndarray] = T / T.sum(axis=1, keepdims=True)
         else:
             self.transition_matrix = None
+        # IDEA #63: time-conditioned PMF
+        if cond_pmf is not None and dt_edges is not None:
+            C = np.asarray(cond_pmf, dtype=np.float64)
+            C += 1e-10  # small prior to avoid zero rows
+            self.cond_pmf: Optional[np.ndarray] = C / C.sum(axis=1, keepdims=True)
+            self.dt_edges: Optional[np.ndarray] = np.asarray(dt_edges, dtype=np.float64)
+        else:
+            self.cond_pmf = None
+            self.dt_edges = None
 
     def reset(self) -> None:
         self._stack = []
@@ -151,19 +164,58 @@ class LRUStackDecoder:
             self._stack.pop()
         return obj
 
-    def decode_stream(self, reuse_signal: np.ndarray) -> np.ndarray:
+    def step_dt(self, is_reuse: bool, dt_log1p: float) -> int:
+        """Like step() but uses conditional PMF P(bucket | dt_bin) if set."""
+        if is_reuse and self._stack:
+            if self.cond_pmf is not None and self.dt_edges is not None:
+                dt_bin = int(np.searchsorted(self.dt_edges, dt_log1p, side="right"))
+                dt_bin = max(0, min(dt_bin, len(self.cond_pmf) - 1))
+                pmf = self.cond_pmf[dt_bin]
+            elif self.transition_matrix is not None and self._prev_bucket >= 0:
+                pmf = ((1.0 - self.markov_blend) * self.bucket_pmf
+                       + self.markov_blend * self.transition_matrix[self._prev_bucket])
+            else:
+                pmf = self.bucket_pmf
+            bucket = int(self.rng.choice(N_BUCKETS, p=pmf))
+            self._prev_bucket = bucket
+            lo = int(_EDGES[bucket])
+            hi = int(_EDGES[bucket + 1]) - 1
+            max_rank = len(self._stack) - 1
+            lo = min(lo, max_rank)
+            hi = min(hi, max_rank)
+            rank = int(self.rng.integers(lo, hi + 1))
+            obj = self._stack[rank]
+            del self._stack[rank]
+        else:
+            self._prev_bucket = -1
+            obj = self._next_id
+            self._next_id += 1
+        self._stack.insert(0, obj)
+        if len(self._stack) > self.max_stack_depth:
+            self._stack.pop()
+        return obj
+
+    def decode_stream(self, reuse_signal: np.ndarray,
+                      dt_log1p: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Parameters
         ----------
         reuse_signal : (N,) float — > 0 → reuse, ≤ 0 → new object
+        dt_log1p     : (N,) float — log1p(interarrival_time) for conditional PMF;
+                       if None, uses global PMF or Markov chain.
 
         Returns
         -------
         (N,) int64 array of assigned obj_ids
         """
         out = np.empty(len(reuse_signal), dtype=np.int64)
-        for i in range(len(reuse_signal)):
-            out[i] = self.step(float(reuse_signal[i]) > 0.0)
+        if dt_log1p is not None and len(dt_log1p) == len(reuse_signal):
+            for i in range(len(reuse_signal)):
+                out[i] = self.step_dt(float(reuse_signal[i]) > 0.0,
+                                      float(dt_log1p[i]))
+        else:
+            for i in range(len(reuse_signal)):
+                out[i] = self.step(float(reuse_signal[i]) > 0.0)
         return out
 
     # ------------------------------------------------------------------
@@ -232,6 +284,18 @@ class LRUStackDecoder:
             arr = df[obj_col].values
         return cls.fit_from_obj_ids(arr, max_fit_events=max_fit_events,
                                     exact=exact, **kwargs)
+
+    @classmethod
+    def from_cond_pmf(
+        cls,
+        cond_pmf: np.ndarray,
+        dt_edges: np.ndarray,
+        corpus: str = "alibaba",
+        **kwargs,
+    ) -> "LRUStackDecoder":
+        """Construct with IDEA #63 time-conditioned PMF; marginal from corpus default."""
+        pmf = _DEFAULT_PMFS.get(corpus.lower(), _DEFAULT_PMFS["alibaba"]).copy()
+        return cls(pmf, cond_pmf=cond_pmf, dt_edges=dt_edges, **kwargs)
 
     @classmethod
     def from_markov_matrix(

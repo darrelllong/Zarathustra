@@ -44,6 +44,8 @@ def generate(
     lru_stack_max_depth: int = 2048,
     lru_markov_atlas: str = "",
     lru_markov_blend: float = 1.0,
+    lru_cond_pmf: str = "",
+    lru_cond_pmf_edges: str = "",
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -227,7 +229,15 @@ def generate(
             print("[lru-stack] WARN: obj_id_reuse column not in preprocessor col_names; "
                   "decoder disabled")
         else:
-            if lru_markov_atlas:
+            if lru_cond_pmf and lru_cond_pmf_edges:
+                C = np.load(lru_cond_pmf)
+                E = np.load(lru_cond_pmf_edges)
+                print(f"[lru-stack] Cond PMF (IDEA #63) loaded: shape={C.shape}, "
+                      f"n_bins={len(C)}, edges={np.round(E, 3)}")
+                lru_decoder_proto = LRUStackDecoder.from_cond_pmf(
+                    C, E, corpus=lru_stack_corpus, max_stack_depth=lru_stack_max_depth)
+                lru_decoder_proto.print_pmf()
+            elif lru_markov_atlas:
                 T = np.load(lru_markov_atlas)
                 print(f"[lru-stack] Markov atlas loaded from {lru_markov_atlas} "
                       f"shape={T.shape}, blend={lru_markov_blend:.2f}")
@@ -274,10 +284,16 @@ def generate(
         if lru_decoder_proto is not None and reuse_col_idx >= 0:
             T_copy = (lru_decoder_proto.transition_matrix.copy()
                       if lru_decoder_proto.transition_matrix is not None else None)
+            C_copy = (lru_decoder_proto.cond_pmf.copy()
+                      if lru_decoder_proto.cond_pmf is not None else None)
+            E_copy = (lru_decoder_proto.dt_edges.copy()
+                      if lru_decoder_proto.dt_edges is not None else None)
             dec = type(lru_decoder_proto)(
                 lru_decoder_proto.bucket_pmf.copy(),
                 lru_decoder_proto.max_stack_depth,
                 transition_matrix=T_copy,
+                cond_pmf=C_copy,
+                dt_edges=E_copy,
             )
             dec.markov_blend = lru_decoder_proto.markov_blend
             reuse_signal = arr_s[:, reuse_col_idx]
@@ -291,7 +307,19 @@ def generate(
                     ruse_rng.random(len(reuse_signal)) < lru_stack_reuse_rate,
                     1.0, -1.0
                 )
-            lru_obj_ids = dec.decode_stream(reuse_signal)
+            # IDEA #63: extract log1p(ts_delta) from normalized ts column
+            dt_log1p_signal = None
+            if dec.cond_pmf is not None and dec.dt_edges is not None:
+                col_names = getattr(prep, "col_names", [])
+                ts_idx = list(col_names).index("ts") if "ts" in col_names else -1
+                if ts_idx >= 0:
+                    ts_stats = getattr(prep, "_stats", {}).get("ts", {})
+                    lo = ts_stats.get("lo", 0.0)
+                    hi = ts_stats.get("hi", 1.0)
+                    span = hi - lo if hi > lo else 1.0
+                    # Undo min-max normalization to get log1p(ts_delta)
+                    dt_log1p_signal = (arr_s[:, ts_idx] + 1) / 2 * span + lo
+            lru_obj_ids = dec.decode_stream(reuse_signal, dt_log1p=dt_log1p_signal)
 
         df_s = prep.inverse_transform(arr_s)
         df_s.insert(0, "stream_id", s)
@@ -386,6 +414,15 @@ def parse_args():
                    help="IDEA #62: blend coefficient for Markov atlas. "
                         "0.0=pure i.i.d. PMF (baseline), 1.0=pure Markov, "
                         "intermediate=weighted average. Default 1.0 (pure Markov).")
+    p.add_argument("--lru-cond-pmf", default="",
+                   metavar="NPY",
+                   help="IDEA #63: path to (N,8) conditional PMF array "
+                        "P(bucket|dt_bin) from compute_cond_pmf.py. "
+                        "Requires --lru-cond-pmf-edges and --lru-stack-decoder.")
+    p.add_argument("--lru-cond-pmf-edges", default="",
+                   metavar="NPY",
+                   help="IDEA #63: path to (N-1,) dt bin edges array "
+                        "from compute_cond_pmf.py.")
     return p.parse_args()
 
 
@@ -410,4 +447,6 @@ if __name__ == "__main__":
         lru_stack_max_depth=args.lru_stack_max_depth,
         lru_markov_atlas=args.lru_markov_atlas,
         lru_markov_blend=args.lru_markov_blend,
+        lru_cond_pmf=args.lru_cond_pmf,
+        lru_cond_pmf_edges=args.lru_cond_pmf_edges,
     )
