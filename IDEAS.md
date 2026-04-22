@@ -2084,3 +2084,29 @@ The LRU stack state carries per-stream across windows (or resets at window bound
 
 **Connection to LANL IDEA #53**: LANL is adding a neural mark head to their frozen PhaseAtlas. IDEA #54 is the symmetric move — adding a trained object-state head to our neural mark generator. The compound architectures then converge: both teams will have explicit object processes + neural marks. The differentiator becomes training efficiency and generalization quality.
 
+
+---
+
+## IDEA #55: Mark Quality Repair — Opcode/Tenant Reservoir + TS Continuity Fix
+
+**Status**: Proposed (2026-04-21)
+
+**Problem**: LANL's `altgan.mark_quality` panel gives LLNL v198 a score of 0.614 vs PhaseAtlas 0.005. Root cause analysis:
+
+1. **opcode TV = 1.0**: opcode was auto-dropped as zero-variance during LLGAN training (the training files are all-write). The `inverse_transform` re-inserts `opcode=1.0` (constant float) for all records. The evaluation real CSV has `opcode ∈ {-1, 0, 1}` (mixed read/write + sentinel). After `.astype(str)`, "1.0" ≠ "1", so TV=1.0 by dtype mismatch AND by distribution mismatch.
+
+2. **tenant TV = 1.0**: Same — dropped as zero-variance in training, eval CSV has `tenant ∈ {-1, 0}`. Float "0.0" ≠ int "0" → TV=1.0.
+
+3. **ts_delta_norm = 0.079 vs 0.004**: LLNL generates 12-step windows with IATs from the LSTM. The quantile W1 distance between generated IAT log-distribution and real is 0.0869 (normalized: 0.079). PhaseAtlas generates step-by-step and exactly mirrors the empirical IAT distribution from the transition atlas.
+
+4. **size_norm = 0.377 vs 0.012**: LLNL's LSTM generates sizes that deviate from real at 50k scale. Window-to-window size distributions are correctly learned within windows (★=0.042), but at 50k scale the aggregate distribution drifts.
+
+**Fix A (opcode/tenant — high priority)**: Sample opcode and tenant from per-file empirical distributions stored in the characterization file, rather than using the dropped constant. The characterization file already has `opcode_switch_ratio` and `tenant_unique`. We can reconstruct a Bernoulli (read/write) opcode sampler per stream using this and a reservoir of tenant IDs. Add to `generate.py` post-LRU-decoder step.
+
+**Fix B (ts continuity — medium priority)**: Carry the last ts value per stream across window boundaries in `generate.py`. After `df_s = prep.inverse_transform(arr_s)`, the delta-encoding makes ts start fresh at each window. Fix: track `last_ts[s]` and add to each window's decoded ts column on emit. Requires one-line change to the concatenation logic in `generate.py`.
+
+**Fix C (size drift — low priority, architecture-level)**: The size distribution at 50k scale drifts because the LSTM generates size conditioned on the 12-step window context, not the full stream. This is a fundamental architecture limitation. Potential fix: at generation time, importance-resample generated windows to match the per-file size histogram (from characterization file). Zero training change; only affects generate.py output.
+
+**Expected outcome after A+B**: opcode TV → ~0.001 (matched from reservoir), tenant TV → ~0.001, ts_delta_norm → < 0.05. Size_norm requires C. Overall mark_score could drop from 0.614 to ~0.05, competitive with PhaseAtlas 0.005 on opcode/tenant, still behind on ts and size.
+
+**Priority**: Implement A immediately (post v202 liveness check). It directly answers LANL Round 45 P1/#4 challenge and requires only generate.py changes (no model retraining).
