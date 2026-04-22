@@ -2454,3 +2454,65 @@ If v199 achieves reuse_rate=0.265 in training:
 If HRC-MAE converges to 0.003–0.005 and ★ stays ≤ 0.050, we have a compound lead: better mark quality AND competitive cache metrics. The adversary is not on this trajectory — they've committed to reservoir marks with explicit object states. Their marks cannot improve beyond reservoir accuracy without adopting sequential mark modeling (LSTM or similar).
 
 v199 ep1 reuse_rate log will be the first signal. Watching for convergence toward 0.265 within 5–10 epochs.
+
+## Round 47
+
+### v199 CLOSED-FAILED: IDEA #51 (λ=10) Cannot Override WGAN Gradient
+
+The v199 diagnostic is definitive. Reuse-rate matching loss at λ=10 failed to converge:
+
+| Epoch | W | reuse_rate |
+|-------|---|-----------|
+| 21 | 2.6 | 0.0014 |
+| 22 | 4.1 | 0.0055 |
+| 23 | 4.3 | 0.0015 |
+| 24 | 4.3 | 0.0005 |
+| 25 | 4.1 | 0.0009 |
+| 27 | 5.0 | 0.0002 |
+| 30 | 4.6 | 0.0002 |
+| 34 | 4.3 | 0.0017 |
+
+The target was 0.265. The achieved rate oscillated between 0.0002 and 0.0055 — approximately zero throughout. Frozen sweep: ep30 ★=0.151 vs v195 ATB ★=0.042 (3.6× worse). Training EMA ★=0.031 at ep25 was a 5× optimism gap (35th mis-rank).
+
+**Root cause analysis**: At λ=10, the rate-matching gradient per element is:
+```
+dL/d(fake_decoded) = 2 × 10 × (0.001 − 0.265) / (B × T) ≈ 0.055 per element
+```
+The WGAN generator gradient is ~`W / B ≈ 4.5 / 8 ≈ 0.56 per sample` — roughly 10× stronger. WGAN wins. The rate-matching signal perturbs training dynamics (hurts frozen ★) without redirecting the reuse rate.
+
+IDEA #51 VERDICT: A global mean-squared rate penalty is insufficient to override per-element WGAN supervision. The WGAN critic is telling G that windows with 0% reuse are realistic (because many real windows ARE in cold/transition regimes), and the rate penalty cannot counteract this.
+
+### v200 LAUNCHED: High-Weight BCE to Test Per-Event Supervision Mechanism
+
+v200 tests the next mechanism: **copy-path BCE at weight=50.0** (no rate-matching loss). The difference from v199:
+- BCE is computed **per-element** (gradient ≈ 50 × BCEgrad per element, not the global mean)
+- At `fake_p ≈ 0.001` and `real_p = 1.0`, the BCE gradient approaches +∞: the loss is `-log(0.001) = 6.9 nats`, and the gradient through sigmoid is very steep
+- The class-weighted BCE (`pos_weight × real_bce + fake_bce`) further amplifies the signal when real says reuse and fake says new
+
+v200 acceptance test at ep5: if `reuse_bce < 2.0` (loss converging) and `reuse_rate > 0.10`, the per-event BCE is working. Otherwise, IDEA #54 (Gumbel-Softmax categorical head) is the correct path.
+
+### IDEA #54: Categorical Gumbel-Softmax Reuse Head (Added to IDEAS.md)
+
+The fundamental issue with scalar approaches: the `obj_id_reuse` Recovery output is a continuous scalar constrained to [-1, 1] by the normalization. Any gradient-based approach must overcome the Recovery decoder's learned prior (bias toward -1 = new object). Continuous scalars cannot be cleanly binary-constrained.
+
+IDEA #54 replaces the scalar reuse output with a **Gumbel-Softmax 2-class (new/reuse) head** plus **8-bucket stack-distance head** for reuse events:
+- Categorical cross-entropy supervision (class-balanced binary for new/reuse)
+- Straight-through estimator: hard binary decision at training time
+- Automatic rate calibration: cross-entropy on real data balances to ~26.5% rate
+- Corpus-agnostic: learn from data, no fixed PMF
+
+This is the symmetric structural move to LANL's StackAtlas, implemented within the LLGAN training framework. If v200's high-weight BCE fails (reuse_rate stays near zero), IDEA #54 is v201.
+
+### LANL IDEA #52 / #53 Alert
+
+LANL has added two new IDEAs to IDEAS.md:
+- **IDEA #52** (Phase-conditioned atlas): extend NeuralAtlas with within-file phase conditioning to fix nonstationarity
+- **IDEA #53** (Neural mark head): freeze PhaseAtlas for object IDs, add a lightweight sequential model for `dt`, `size`, `opcode`, `tenant`
+
+IDEA #53 directly targets our remaining advantage (LSTM mark quality vs reservoir sampling). If LANL implements this, the compound benchmark becomes:
+- Cache law: LANL leads (HRC-MAE 0.00183 vs our best 0.0051)
+- Mark quality: LANL catches up (neural mark head closes our LSTM advantage)
+
+We need to fix the reuse signal FASTER than LANL can implement IDEA #53. Our window is 1–2 iterations. V200 + LRU decoder (if v200 fixes reuse to ~0.265) would give HRC-MAE ~0.003–0.005 and keep our mark quality lead. That's a viable compound win before LANL deploys IDEA #53.
+
+If v200 also fails, IDEA #54 is mandatory before LANL implements IDEA #53.

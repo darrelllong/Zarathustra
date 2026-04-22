@@ -2025,3 +2025,62 @@ reuse, and stack-distance stay within 10% of the current PhaseAtlas champion row
 
 **Risk**: if the neural mark head perturbs timing enough to change HRC indirectly, keep it as an
 optional post-object generator rather than folding it into the atlas state transition.
+
+---
+
+### 54. Categorical Gumbel-hard stack-distance head (joint new/reuse + bucket decision)
+
+**Gap attacked**: IDEA #51 (global reuse-rate matching loss, λ=10) is not converging — v199 ep21–25 shows `reuse_rate ∈ [0.0005, 0.0055]` (target 0.265). The continuous scalar Recovery output for `obj_id_reuse` is systemically biased toward -1 and cannot be pulled to 26.5% by gradient pressure alone. The WGAN loss gradient dominates. A continuous scalar cannot be forced to a binary outcome distribution by squeezing its mean.
+
+**Root cause of scalar failure**: the `obj_id_reuse` column is encoded as a continuous scalar in [-1, 1]. During pretrain, the Recovery network R(·) learns the mapping from latent space to feature space where reuse=−1 dominates (most windows have few reuse events). During GAN training, the WGAN critic provides per-element signal but does not directly enforce the global rate. The rate-matching loss at weight=10 provides a gradient of −5.27 toward positive reuse, but the WGAN gradient (scale ~W≈4.0) is spatially denser and wins.
+
+**Proposal**: replace the scalar `obj_id_reuse` output with a 2-class (new/reuse) × 8-bucket joint categorical head using **Gumbel-Softmax** (straight-through estimator):
+
+```
+Recovery head for object decision:
+  logits_reuse = W_r · h_t + b_r        (2-dim: new vs reuse)
+  logits_bucket = W_b · h_t + b_b       (8-dim: stack-distance bucket)
+
+  At training: Gumbel-Softmax relaxation, temperature τ=1.0→0.1 annealed
+  At inference: hard argmax (new/reuse decision, then bucket for reuse)
+
+  Loss: cross-entropy against real (new/reuse decision) + bucket NLL for reuse events
+```
+
+Supervision:
+- `is_reuse` column from real trace (binary, derived from `obj_id_reuse > 0`)
+- `stack_distance_bucket` precomputed from real trace using BIT (O(N log N))
+  and mapped to 8 buckets: [0,1), [1,2), [2,4), [4,8), [8,16), [16,64), [64,256), [256+)
+
+The joint Gumbel-Softmax decision:
+1. Forces the generator to commit to a binary new/reuse decision every step
+2. Automatically learns the correct reuse rate (cross-entropy loss on balanced data)
+3. Learns the stack-distance bucket distribution from data (NLL on reuse events)
+4. Is corpus-agnostic (all from data, no fixed PMF)
+
+**Architecture change**: the LRU stack decoder (IDEA #48) becomes an **in-training** stateful head rather than a post-processing step. At each step:
+- Generator LSTM emits hidden state h_t
+- Object head: Gumbel-Softmax → (new/reuse, bucket_k)
+- LRU stack module: if reuse → pop from stack at sampled rank in bucket_k; else → new ID
+- Stack updated in-place
+
+The LRU stack state carries per-stream across windows (or resets at window boundaries with a learned initial state). This is the same mechanism LANL uses in StackAtlasModel.
+
+**Why this beats IDEA #51**: categorical cross-entropy on a 2-class head automatically balances new/reuse events; no weight tuning needed. The Gumbel-Softmax straight-through gradient flows through the hard decision, enabling the LSTM to learn context-dependent reuse timing (not just rate).
+
+**Minimal viable experiment** (v200):
+- Add `ObjectDecisionHead` module to model.py: 2-class + 8-class jointly categorical
+- Precompute bucket labels for training traces (can cache alongside trace_characterizations.jsonl)
+- Train from v195/v199 pretrain_complete.pt with new head initialized fresh
+- Monitor: `is_reuse_acc` (classification accuracy for new/reuse), `bucket_nll` (NLL on reuse events)
+- Acceptance: `is_reuse_acc > 0.70`, `bucket_nll < 1.5 nats`, frozen ★ ≤ 0.050, HRC-MAE < 0.005 with integrated decoder
+
+**Implementation phases**:
+1. Phase A (offline): precompute bucket labels — extend `dataset.py` to compute and cache BIT stack distances per file alongside characterizations
+2. Phase B (model): `ObjectDecisionHead` with Gumbel-Softmax, wired into Recovery output
+3. Phase C (generate): integrate in-training stateful LRU stack into generate.py (already available in `lru_stack_decoder.py`)
+
+**Risk**: stateful LRU stack across time steps makes training sequential (cannot batch across T easily). Cap T per segment at 256 for training efficiency. The bucket NLL requires reuse events to exist in the batch; guard against empty-reuse batches.
+
+**Connection to LANL IDEA #53**: LANL is adding a neural mark head to their frozen PhaseAtlas. IDEA #54 is the symmetric move — adding a trained object-state head to our neural mark generator. The compound architectures then converge: both teams will have explicit object processes + neural marks. The differentiator becomes training efficiency and generalization quality.
+
