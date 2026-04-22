@@ -42,6 +42,10 @@ def _parse_args() -> argparse.Namespace:
                    help="For phase atlases, force phase from synthetic stream position.")
     p.add_argument("--disable-neural-marks", action="store_true",
                    help="Ignore an attached neural mark head and use atlas reservoir marks.")
+    p.add_argument("--mark-temperature", type=float, default=None,
+                   help="Sampling temperature for an attached neural mark head.")
+    p.add_argument("--mark-numeric-noise", type=float, default=0.05,
+                   help="Gaussian noise applied to neural mark dt/size z-scores.")
     p.add_argument("--real-manifest", default="")
     p.add_argument("--cache-sizes", default="")
     p.add_argument("--output", default="")
@@ -81,6 +85,8 @@ def main() -> int:
         temperature=args.temperature,
         transition_blend=args.transition_blend,
         force_phase_schedule=args.force_phase_schedule,
+        mark_temperature=args.mark_temperature,
+        mark_numeric_noise=args.mark_numeric_noise,
     )
     if args.disable_neural_marks:
         model.mark_model = saved_mark_model
@@ -108,6 +114,8 @@ def main() -> int:
         "temperature": args.temperature,
         "transition_blend": args.transition_blend,
         "force_phase_schedule": args.force_phase_schedule,
+        "mark_temperature": args.mark_temperature,
+        "mark_numeric_noise": args.mark_numeric_noise,
         "uses_neural_marks": saved_mark_model is not None and not args.disable_neural_marks,
         "source_traces": source_names,
         "fake": fake_m,

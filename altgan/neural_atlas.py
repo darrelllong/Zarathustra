@@ -76,6 +76,8 @@ class NeuralAtlasModel:
         temperature: float = 1.0,
         transition_blend: float = 0.75,
         force_phase_schedule: bool = False,
+        mark_temperature: float | None = None,
+        mark_numeric_noise: float = 0.05,
     ):
         import pandas as pd
         import torch
@@ -96,7 +98,8 @@ class NeuralAtlasModel:
             mark_runtime = mark_model.runtime(
                 n_streams=n_streams,
                 seed=seed + 17,
-                temperature=temperature,
+                temperature=temperature if mark_temperature is None else mark_temperature,
+                numeric_noise=mark_numeric_noise,
             )
 
         net = _CondTransitionNet(self.cond_dim, self.hidden_dim, self.n_states)

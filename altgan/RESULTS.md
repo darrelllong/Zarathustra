@@ -78,6 +78,7 @@ better.
 |---|---|---:|---:|---:|---:|---:|
 | Tencent PhaseAtlas 1024x5k holdout, blend 0.5 | HRC `0.01065` | **0.04557** | 0.02988 | 0.07768 | 0.03737 | 0.03737 |
 | Alibaba PhaseAtlas allx25k holdout, blend 0.0 | HRC `0.00301` | **0.00479** | 0.00386 | 0.01233 | 0.00148 | 0.00148 |
+| Alibaba PhaseAtlas + neural marks e20 | HRC `0.00301` | 0.04044 | 0.05148 | 0.06641 | 0.02305 | 0.02083 |
 | LLNL v198 real-rate override CSV | HRC `0.00513` | 0.61412 | 0.07914 | 0.37735 | 1.00000 | 1.00000 |
 
 The LLNL row uses their emitted `/tiamat/zarathustra/altgan-output/v198_lru_realrate.csv`
@@ -86,6 +87,15 @@ competitive split: their post-hoc LRU repair can approach HRC when handed the
 real reuse rate, but the emitted mark representation is not yet competitive on
 size/opcode/tenant realism. LANL's PhaseAtlas currently leads on fair held-out
 object process and on this mark panel.
+
+The first IDEA #53 sidecar kept the Alibaba PhaseAtlas object law intact:
+HRC-MAE stayed `0.00301`, reuse stayed `0.27125` vs real `0.26909`, and stack
+median stayed `205` vs real `201`. It did not beat reservoir marks. The paired
+control on the same attached checkpoint scores `0.00479`, while the e20 neural
+mark head scores `0.04044`, mostly from timing and size regression drift. Treat
+this as a negative result for direct autoregressive mark replacement and move
+next to noise/temperature ablations or residual/hybrid marks around the
+reservoir sampler.
 
 ## StackAtlas 100k Long-Rollout Panel
 

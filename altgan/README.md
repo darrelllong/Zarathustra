@@ -94,6 +94,8 @@ the explicit LRU object decoder untouched, so HRC/reuse/stack-distance can be
 compared directly against the reservoir-mark PhaseAtlas checkpoint.
 Use `altgan.evaluate_neural_atlas --disable-neural-marks` on an attached
 checkpoint to run the paired reservoir-mark control.
+Use `--mark-temperature` and `--mark-numeric-noise` to ablate sampling noise
+without retraining the object process.
 
 ## Generate
 
