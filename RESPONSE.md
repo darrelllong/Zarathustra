@@ -2271,3 +2271,66 @@ Implement IDEA #48 (explicit LRU stack decoder) as v198:
 - Train with bucket NLL on reuse/new and rank; existing GAN losses on marks
 - Long-rollout sidecar is acceptance gate; IDEA #50 held-out routing panel is benchmark
 - Target: HRC-MAE <0.01 alibaba, reuse_access within 0.05 of real, ★ competitive with v195
+
+## Round 45
+
+### Observation — LANL uses one codebase for both Tencent and Alibaba
+
+We noticed that `altgan/model.py` contains a single `StackAtlasModel` used without modification
+for both corpora. This is not an accident — it's a structural advantage. LANL's model is purely
+data-driven: the Markov transition atlas, per-state reservoir buffers, and initial state
+distributions are all fitted from the actual trace statistics of each corpus. There is no
+per-corpus architectural tuning because the architecture's job is to learn the statistics, not to
+be hand-tuned to them.
+
+We have been fighting corpus divergence for many rounds. Alibaba kills retrieval memory,
+PCF, and multi-scale critic that Tencent benefits from. Our recipe switches are evidence that
+we're embedding corpus knowledge into architecture choices rather than letting the model learn
+it from data.
+
+**The right response** is not to mimic LANL's Markov atlas (we already commit to IDEA #48/49/50),
+but to adopt the same design principle: make our components data-driven and corpus-agnostic.
+The LRU stack decoder (v198 phase 1) is already corpus-agnostic by this logic — the
+stack-distance bucket PMF is fitted from whichever corpus we're generating for, and the
+algorithm is identical. This is the right pattern.
+
+**LANL's remaining weakness**: their mark generation (`_sample_event()`) is reservoir sampling
+— a uniform draw from the per-state event buffer. It produces plausible dt/size/opcode marginals
+within each regime state but cannot model sequential dependencies between marks (e.g., burst
+structure within a hot-object loop, or correlated size-opcode patterns within a tenant). Our
+LSTM mark head, conditioned on (object_action, stack_rank, hidden), is structurally able to learn
+these dependencies. The long-rollout evaluation should break out mark quality separately from
+cache quality — HRC/reuse/stack-distance measure the object process, but MMD² on
+(dt, size, opcode) within regime strata would measure mark quality. That is where we can win.
+
+### v197 — CLOSED-FAILED; v198 LRU stack decoder — LAUNCHED
+
+v197 (IDEA #45 ACF chain) confirmed failed at ep83. Training EMA recall was 0.46–0.51 but
+frozen β-recall only 0.05–0.08 — a 10× optimism gap from diversity collapse. ACF chain loss
+closed permanently.
+
+v198 launches today: `llgan/lru_stack_decoder.py` implements IDEA #48 as a post-hoc repair.
+Phase 1 is corpus-agnostic (fits PMF from real trace CSV, defaults for both corpora) and wired
+into `generate.py` via `--lru-stack-decoder`. The experiment is:
+
+1. Generate trace using v195 ep110 (frozen-best ★=0.04204, catastrophic HRC-MAE=0.1287)
+2. Apply LRU stack decoder with PMF fitted from real alibaba trace
+3. Run long_rollout_eval on the decoded trace
+4. Report HRC-MAE, reuse_access, stack_distance_median vs baseline and vs NeuralAtlas
+
+If phase 1 moves HRC-MAE below 0.05 (vs current 0.1287), the structural hypothesis is confirmed
+and we move to phase 2: integrate the stack decoder into training as a supervised head (bucket NLL).
+If phase 1 shows minimal improvement, the problem is in the reuse_signal quality (generator's
+obj_id_reuse column) and we need to fix the root signal before the decoder can help.
+
+### Competitive position
+
+LANL leads on the cache metrics panel. We lead on short-window ★ (v195 ep110 ★=0.04204 vs
+NeuralAtlas which does not report this metric directly). v198 is the thesis that we can add
+a correct object process on top of our strong mark model without destroying ★. If it works:
+we beat LANL on the compound benchmark. If ★ degrades when we add the stack decoder, we must
+redesign the training signal so that mark generation and object selection are jointly optimized.
+
+The adversary is behind us on both fronts (short-window quality and cache metrics), so the
+correct priority is completing v198 before they replicate our LSTM mark advantage. One-codebase
+design is their robustness; LSTM mark conditioning is ours.

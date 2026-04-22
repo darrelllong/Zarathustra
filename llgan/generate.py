@@ -35,6 +35,10 @@ def generate(
     char_file: str = "",
     source_trace: str = "",
     retrieval_persist_across_windows: bool = False,
+    lru_stack_decoder: bool = False,
+    lru_stack_corpus: str = "alibaba",
+    lru_stack_real_csv: str = "",
+    lru_stack_exact_fit: bool = False,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -215,6 +219,51 @@ def generate(
         per_stream_dfs.append(df_s)
 
     df = pd.concat(per_stream_dfs, ignore_index=True).head(n_records)
+
+    # IDEA #48: post-hoc LRU stack decoder — replace generated obj_id stream
+    # with one produced by an explicit LRU stack conditioned on the generator's
+    # obj_id_reuse signal and a corpus-fitted stack-distance bucket PMF.
+    if lru_stack_decoder:
+        from lru_stack_decoder import LRUStackDecoder
+        reuse_col = "obj_id_reuse" if "obj_id_reuse" in df.columns else None
+        obj_col = "obj_id" if "obj_id" in df.columns else None
+        if reuse_col is None:
+            print("[lru-stack] WARN: no obj_id_reuse column found; skipping decoder")
+        elif obj_col is None:
+            print("[lru-stack] WARN: no obj_id column found; skipping decoder")
+        else:
+            # Build decoder: prefer fitting from supplied real CSV, else use defaults.
+            if lru_stack_real_csv:
+                real_df = pd.read_csv(lru_stack_real_csv)
+                if "obj_id" not in real_df.columns:
+                    print(f"[lru-stack] WARN: {lru_stack_real_csv} has no obj_id column; "
+                          "falling back to default PMF")
+                    decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+                else:
+                    print(f"[lru-stack] Fitting PMF from {lru_stack_real_csv} "
+                          f"(exact={lru_stack_exact_fit})")
+                    decoder_proto = LRUStackDecoder.fit_from_df(
+                        real_df, exact=lru_stack_exact_fit
+                    )
+            else:
+                print(f"[lru-stack] Using default PMF for corpus={lru_stack_corpus!r}")
+                decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus)
+            decoder_proto.print_pmf()
+
+            # Apply per-stream independently (each stream has its own LRU stack).
+            all_ids = []
+            for s_id, grp in df.groupby("stream_id", sort=True):
+                from lru_stack_decoder import LRUStackDecoder as _LRU
+                dec = _LRU(decoder_proto.bucket_pmf.copy(),
+                           decoder_proto.max_stack_depth)
+                ids = dec.decode_stream(grp[reuse_col].values)
+                all_ids.append(ids)
+            df[obj_col] = np.concatenate(all_ids)
+            n_unique = df[obj_col].nunique()
+            reuse_rate = (df[reuse_col] > 0).mean()
+            print(f"[lru-stack] decoded {len(df):,} events, {n_unique:,} unique objects, "
+                  f"reuse_rate={reuse_rate:.3f}")
+
     df.to_csv(output_path, index=False)
     print(f"Generated {len(df):,} records ({n_streams} stream(s)) → {output_path}")
 
@@ -243,6 +292,21 @@ def parse_args():
                         "across window boundaries during generation instead of "
                         "re-initialising each window. No-op if the checkpoint "
                         "has no retrieval memory.")
+    # IDEA #48: post-hoc LRU stack decoder
+    p.add_argument("--lru-stack-decoder", action="store_true",
+                   help="IDEA #48: replace generated obj_id stream with an explicit "
+                        "LRU stack decoder. Uses generator's obj_id_reuse signal and "
+                        "a corpus-fitted stack-distance bucket PMF.")
+    p.add_argument("--lru-stack-corpus", default="alibaba",
+                   choices=["alibaba", "tencent"],
+                   help="Corpus for default stack-distance PMF when no real CSV supplied.")
+    p.add_argument("--lru-stack-real-csv", default="",
+                   metavar="CSV",
+                   help="Path to real trace CSV with obj_id column for PMF fitting. "
+                        "If omitted, uses --lru-stack-corpus default PMF.")
+    p.add_argument("--lru-stack-exact-fit", action="store_true",
+                   help="Use BIT-based exact stack distances for PMF fitting (slower, "
+                        "more accurate). Default: IRD approximation.")
     return p.parse_args()
 
 
@@ -258,4 +322,8 @@ if __name__ == "__main__":
         char_file=args.char_file,
         source_trace=args.source_trace,
         retrieval_persist_across_windows=args.retrieval_persist_across_windows,
+        lru_stack_decoder=args.lru_stack_decoder,
+        lru_stack_corpus=args.lru_stack_corpus,
+        lru_stack_real_csv=args.lru_stack_real_csv,
+        lru_stack_exact_fit=args.lru_stack_exact_fit,
     )
