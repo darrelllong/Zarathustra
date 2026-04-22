@@ -33,7 +33,9 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     rows = _read_rows(Path(args.summary_csv))
+    _augment_rows_from_eval_json(rows)
     means = _read_means(Path(args.best_json)) if args.best_json else []
+    _augment_means_from_rows(means, rows)
     markdown = _render_markdown(
         rows,
         means,
@@ -93,14 +95,15 @@ def _render_markdown(
         "",
         f"Recorded: {date.today().isoformat()}. Source: `{source}`.",
         "",
-        "| rank | seed | transition blend | local power | source | numeric blend | space | temp | noise | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score | timing norm | size norm | opcode TV | tenant TV |",
-        "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| rank | seed | transition blend | local power | source | numeric blend | space | temp | noise | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | reuse drift delta | timing drift ratio | size drift ratio | mark score | timing norm | size norm | opcode TV | tenant TV |",
+        "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for idx, row in enumerate(top, start=1):
         lines.append(
             "| {rank} | {seed} | {tb} | {lp} | {source} | {blend} | {space} | {temp} | {noise} | "
             "**{hrc}** | {fake_reuse} | {real_reuse} | {fake_med} | {real_med} | "
-            "{fake_p90} | {real_p90} | {mark} | {ts} | {size} | {opcode} | {tenant} |".format(
+            "{fake_p90} | {real_p90} | {reuse_drift} | {ts_drift} | {size_drift} | "
+            "{mark} | {ts} | {size} | {opcode} | {tenant} |".format(
                 rank=idx,
                 seed=row["seed"],
                 tb=_fmt(row["transition_blend"]),
@@ -117,6 +120,9 @@ def _render_markdown(
                 real_med=_fmt(row["real_stack_median"]),
                 fake_p90=_fmt(row["fake_stack_p90"]),
                 real_p90=_fmt(row["real_stack_p90"]),
+                reuse_drift=_fmt(row.get("reuse_local_drift_delta", "")),
+                ts_drift=_fmt(row.get("drift_ts_delta_ratio", "")),
+                size_drift=_fmt(row.get("drift_obj_size_ratio", "")),
                 mark=_fmt(row["mark_score"]),
                 ts=_fmt(row["ts_delta_norm"]),
                 size=_fmt(row["size_norm"]),
@@ -130,13 +136,13 @@ def _render_markdown(
             "",
             "Seed-mean ranking:",
             "",
-            "| rank | seeds | transition blend | local power | source | numeric blend | space | temp | noise | mean HRC-MAE | mean mark score |",
-            "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|",
+            "| rank | seeds | transition blend | local power | source | numeric blend | space | temp | noise | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |",
+            "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|---:|---:|",
         ])
         for idx, row in enumerate(means[: max(int(mean_top_n), 1)], start=1):
             lines.append(
                 "| {rank} | {seeds} | {tb} | {lp} | {source} | {blend} | {space} | {temp} | {noise} | "
-                "**{hrc}** | {mark} |".format(
+                "**{hrc}** | {mark} | {ts_drift} | {size_drift} |".format(
                     rank=idx,
                     seeds=row["n_seeds"],
                     tb=_fmt(row["transition_blend"]),
@@ -148,6 +154,8 @@ def _render_markdown(
                     noise=_fmt(row["mark_numeric_noise"]),
                     hrc=_fmt(row["mean_hrc_mae"]),
                     mark=_fmt(row["mean_mark_score"]),
+                    ts_drift=_fmt(row.get("mean_drift_ts_delta_ratio", "")),
+                    size_drift=_fmt(row.get("mean_drift_obj_size_ratio", "")),
                 )
             )
 
@@ -166,6 +174,82 @@ def _fmt(value: object) -> str:
     if num.is_integer() and abs(num) >= 10:
         return str(int(num))
     return f"{num:.6g}"
+
+
+def _augment_rows_from_eval_json(rows: list[dict[str, str]]) -> None:
+    for row in rows:
+        if row.get("drift_ts_delta_ratio") and row.get("drift_obj_size_ratio"):
+            continue
+        path = row.get("path", "")
+        if not path:
+            continue
+        try:
+            data = json.loads(Path(path).read_text())
+        except OSError:
+            continue
+        gap = data.get("gap", {})
+        if not row.get("reuse_local_drift_delta"):
+            row["reuse_local_drift_delta"] = str(
+                gap.get("reuse_decile_local_drift_fake_minus_real", "")
+            )
+        if not row.get("drift_ts_delta_ratio"):
+            row["drift_ts_delta_ratio"] = str(gap.get("drift_ts_delta_w1_ratio", ""))
+        if not row.get("drift_obj_size_ratio"):
+            row["drift_obj_size_ratio"] = str(gap.get("drift_obj_size_w1_ratio", ""))
+
+
+def _augment_means_from_rows(means: list[dict[str, Any]], rows: list[dict[str, str]]) -> None:
+    grouped: dict[tuple[str, str, str, str, str, str, str], list[dict[str, str]]] = {}
+    for row in rows:
+        key = (
+            row["transition_blend"],
+            row["local_prob_power"],
+            row["categorical_source"],
+            row["mark_numeric_blend"],
+            row["mark_numeric_blend_space"],
+            row["mark_temperature"],
+            row["mark_numeric_noise"],
+        )
+        grouped.setdefault(key, []).append(row)
+
+    for mean in means:
+        if mean.get("mean_drift_ts_delta_ratio") and mean.get("mean_drift_obj_size_ratio"):
+            continue
+        key = (
+            str(mean["transition_blend"]),
+            str(mean["local_prob_power"]),
+            str(mean["categorical_source"]),
+            str(mean["mark_numeric_blend"]),
+            str(mean["mark_numeric_blend_space"]),
+            str(mean["mark_temperature"]),
+            str(mean["mark_numeric_noise"]),
+        )
+        group = grouped.get(key)
+        if not group:
+            continue
+        if not mean.get("mean_reuse_local_drift_delta"):
+            mean["mean_reuse_local_drift_delta"] = _mean_present(
+                g.get("reuse_local_drift_delta", "") for g in group
+            )
+        if not mean.get("mean_drift_ts_delta_ratio"):
+            mean["mean_drift_ts_delta_ratio"] = _mean_present(
+                g.get("drift_ts_delta_ratio", "") for g in group
+            )
+        if not mean.get("mean_drift_obj_size_ratio"):
+            mean["mean_drift_obj_size_ratio"] = _mean_present(
+                g.get("drift_obj_size_ratio", "") for g in group
+            )
+
+
+def _mean_present(values: Any) -> str:
+    nums = []
+    for value in values:
+        if value == "":
+            continue
+        nums.append(float(value))
+    if not nums:
+        return ""
+    return str(sum(nums) / len(nums))
 
 
 def _as_float(value: object) -> float:

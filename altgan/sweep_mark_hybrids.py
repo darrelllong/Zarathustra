@@ -220,6 +220,9 @@ def _summarize(
         "real_stack_median": real["stack_distance_median"],
         "fake_stack_p90": fake["stack_distance_p90"],
         "real_stack_p90": real["stack_distance_p90"],
+        "reuse_local_drift_delta": gap["reuse_decile_local_drift_fake_minus_real"],
+        "drift_ts_delta_ratio": gap["drift_ts_delta_w1_ratio"],
+        "drift_obj_size_ratio": gap["drift_obj_size_w1_ratio"],
         "mark_score": mark["mark_score"],
         "ts_delta_norm": mark["ts_delta_log_w1_norm"],
         "size_norm": mark["obj_size_log_w1_norm"],
@@ -316,6 +319,15 @@ def _candidate_means(rows: list[dict]) -> list[dict]:
             "n_seeds": len(group),
             "mean_hrc_mae": float(np_mean([g["hrc_mae"] for g in group])),
             "mean_mark_score": float(np_mean([g["mark_score"] for g in group])),
+            "mean_reuse_local_drift_delta": float(np_mean([
+                g["reuse_local_drift_delta"] for g in group
+            ])),
+            "mean_drift_ts_delta_ratio": float(np_mean([
+                g["drift_ts_delta_ratio"] for g in group
+            ])),
+            "mean_drift_obj_size_ratio": float(np_mean([
+                g["drift_obj_size_ratio"] for g in group
+            ])),
         })
     return sorted(summary, key=lambda r: (r["mean_hrc_mae"], r["mean_mark_score"]))
 
