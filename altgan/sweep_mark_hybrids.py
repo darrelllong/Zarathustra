@@ -36,6 +36,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--mark-temperatures", default="1.0,0.5,0.25,0.05")
     p.add_argument("--mark-numeric-noises", default="0.0")
     p.add_argument("--mark-numeric-blends", default="0.0,0.25,0.5,0.75,1.0")
+    p.add_argument("--mark-numeric-blend-spaces", default="raw",
+                   help="Comma-separated numeric blend spaces: raw, log.")
     p.add_argument("--categorical-sources", default="reservoir,neural")
     p.add_argument("--include-reservoir-control", action="store_true")
     p.add_argument("--skip-existing", action="store_true",
@@ -63,30 +65,33 @@ def main() -> int:
                 include_seed=len(seeds) > 1,
             )
             _run_eval(args, control, seed=seed, extra=["--disable-neural-marks"])
-            rows.append(_summarize(control, seed, "reservoir", "", "", ""))
+            rows.append(_summarize(control, seed, "reservoir", "", "", "", ""))
 
     for source in _split_str(args.categorical_sources):
-        for blend in _split_float(args.mark_numeric_blends):
-            for temp in _split_float(args.mark_temperatures):
-                for noise in _split_float(args.mark_numeric_noises):
-                    for seed in seeds:
-                        suffix = (
-                            f"cat-{source}_blend-{_slug(blend)}"
-                            f"_temp-{_slug(temp)}_noise-{_slug(noise)}_eval_100k.json"
-                        )
-                        path = out_dir / _label(args.prefix, seed, suffix, include_seed=len(seeds) > 1)
-                        _run_eval(
-                            args,
-                            path,
-                            seed=seed,
-                            extra=[
-                                "--mark-categorical-source", source,
-                                "--mark-numeric-blend", str(blend),
-                                "--mark-temperature", str(temp),
-                                "--mark-numeric-noise", str(noise),
-                            ],
-                        )
-                        rows.append(_summarize(path, seed, source, blend, temp, noise))
+        for blend_space in _split_blend_spaces(args.mark_numeric_blend_spaces):
+            for blend in _split_float(args.mark_numeric_blends):
+                for temp in _split_float(args.mark_temperatures):
+                    for noise in _split_float(args.mark_numeric_noises):
+                        for seed in seeds:
+                            suffix = (
+                                f"cat-{source}_blend-{_slug(blend)}"
+                                f"_space-{blend_space}_temp-{_slug(temp)}"
+                                f"_noise-{_slug(noise)}_eval_100k.json"
+                            )
+                            path = out_dir / _label(args.prefix, seed, suffix, include_seed=len(seeds) > 1)
+                            _run_eval(
+                                args,
+                                path,
+                                seed=seed,
+                                extra=[
+                                    "--mark-categorical-source", source,
+                                    "--mark-numeric-blend", str(blend),
+                                    "--mark-numeric-blend-space", blend_space,
+                                    "--mark-temperature", str(temp),
+                                    "--mark-numeric-noise", str(noise),
+                                ],
+                            )
+                            rows.append(_summarize(path, seed, source, blend, blend_space, temp, noise))
 
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
@@ -122,7 +127,15 @@ def _run_eval(args: argparse.Namespace, output: Path, *, seed: int, extra: list[
     subprocess.run(cmd, check=True)
 
 
-def _summarize(path: Path, seed: int, source: object, blend: object, temp: object, noise: object) -> dict:
+def _summarize(
+    path: Path,
+    seed: int,
+    source: object,
+    blend: object,
+    blend_space: object,
+    temp: object,
+    noise: object,
+) -> dict:
     data = json.loads(path.read_text())
     mark = data["mark_quality"]
     fake = data["fake"]
@@ -133,6 +146,7 @@ def _summarize(path: Path, seed: int, source: object, blend: object, temp: objec
         "seed": seed,
         "categorical_source": source,
         "mark_numeric_blend": blend,
+        "mark_numeric_blend_space": blend_space,
         "mark_temperature": temp,
         "mark_numeric_noise": noise,
         "uses_neural_marks": data.get("uses_neural_marks"),
@@ -184,6 +198,14 @@ def _split_str(text: str) -> list[str]:
     return [x.strip() for x in text.split(",") if x.strip()]
 
 
+def _split_blend_spaces(text: str) -> list[str]:
+    values = _split_str(text)
+    invalid = [v for v in values if v not in {"raw", "log"}]
+    if invalid:
+        raise ValueError(f"invalid mark numeric blend spaces: {', '.join(invalid)}")
+    return values
+
+
 def _split_int(text: str) -> list[int]:
     return [int(x.strip()) for x in text.split(",") if x.strip()]
 
@@ -199,21 +221,23 @@ def _label(prefix: str, seed: int, suffix: str, *, include_seed: bool) -> str:
 
 
 def _candidate_means(rows: list[dict]) -> list[dict]:
-    grouped: dict[tuple[object, object, object, object], list[dict]] = {}
+    grouped: dict[tuple[object, object, object, object, object], list[dict]] = {}
     for row in rows:
         key = (
             row["categorical_source"],
             row["mark_numeric_blend"],
+            row["mark_numeric_blend_space"],
             row["mark_temperature"],
             row["mark_numeric_noise"],
         )
         grouped.setdefault(key, []).append(row)
 
     summary = []
-    for (source, blend, temp, noise), group in grouped.items():
+    for (source, blend, blend_space, temp, noise), group in grouped.items():
         summary.append({
             "categorical_source": source,
             "mark_numeric_blend": blend,
+            "mark_numeric_blend_space": blend_space,
             "mark_temperature": temp,
             "mark_numeric_noise": noise,
             "n_seeds": len(group),

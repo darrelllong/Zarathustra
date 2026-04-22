@@ -98,6 +98,8 @@ Use `--mark-temperature` and `--mark-numeric-noise` to ablate sampling noise
 without retraining the object process.
 Use `--mark-numeric-blend` and `--mark-categorical-source reservoir` for the
 hybrid control: keep reservoir opcode/tenant and blend only neural timing/size.
+Add `--mark-numeric-blend-space log` to blend timing/size in the same log scale
+used by the mark-quality score; the default `raw` mode preserves prior results.
 
 To run the full paired hybrid sweep and write a CSV summary:
 
@@ -110,6 +112,7 @@ python -m altgan.sweep_mark_hybrids \
   --real-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
   --output-dir /tiamat/zarathustra/altgan-output \
   --prefix alibaba_phaseatlas_marks_hybrid \
+  --mark-numeric-blend-spaces raw,log \
   --include-reservoir-control \
   --skip-existing
 ```

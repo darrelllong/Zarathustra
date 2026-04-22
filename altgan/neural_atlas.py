@@ -84,6 +84,7 @@ class NeuralAtlasModel:
         mark_temperature: float | None = None,
         mark_numeric_noise: float = 0.05,
         mark_numeric_blend: float = 1.0,
+        mark_numeric_blend_space: str = "raw",
         mark_categorical_source: str = "neural",
     ):
         import pandas as pd
@@ -102,6 +103,8 @@ class NeuralAtlasModel:
         local_prob_power = max(float(local_prob_power), 0.0)
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
+        if mark_numeric_blend_space not in {"raw", "log"}:
+            raise ValueError("mark_numeric_blend_space must be 'raw' or 'log'")
         if mark_categorical_source not in {"neural", "reservoir"}:
             raise ValueError("mark_categorical_source must be 'neural' or 'reservoir'")
         mark_runtime = None
@@ -189,13 +192,11 @@ class NeuralAtlasModel:
                     if mark_numeric_blend >= 1.0 and mark_categorical_source == "neural":
                         mark = neural_mark
                     else:
-                        dt = (
-                            (1.0 - mark_numeric_blend) * max(float(ev.dt), 0.0)
-                            + mark_numeric_blend * max(float(neural_mark.dt), 0.0)
-                        )
-                        obj_size = (
-                            (1.0 - mark_numeric_blend) * max(float(ev.obj_size), 1.0)
-                            + mark_numeric_blend * max(float(neural_mark.obj_size), 1.0)
+                        dt, obj_size = _blend_numeric_marks(
+                            ev,
+                            neural_mark,
+                            mark_numeric_blend,
+                            mark_numeric_blend_space,
                         )
                         mark = EventSample(
                             dt=float(dt),
@@ -621,6 +622,26 @@ def _phase_value(values: Sequence, phase: int, default):
         return default
     idx = min(max(int(phase), 0), len(values) - 1)
     return values[idx]
+
+
+def _blend_numeric_marks(
+    reservoir_mark: EventSample,
+    neural_mark: EventSample,
+    blend: float,
+    space: str,
+) -> tuple[float, float]:
+    r_dt = max(float(reservoir_mark.dt), 0.0)
+    n_dt = max(float(neural_mark.dt), 0.0)
+    r_size = max(float(reservoir_mark.obj_size), 1.0)
+    n_size = max(float(neural_mark.obj_size), 1.0)
+    if space == "log":
+        dt_log = (1.0 - blend) * np.log1p(r_dt) + blend * np.log1p(n_dt)
+        size_log = (1.0 - blend) * np.log(r_size) + blend * np.log(n_size)
+        return max(float(np.expm1(dt_log)), 0.0), max(float(np.exp(size_log)), 1.0)
+    return (
+        (1.0 - blend) * r_dt + blend * n_dt,
+        (1.0 - blend) * r_size + blend * n_size,
+    )
 
 
 def _normalize_counts(counts: Dict[int, int]) -> Tuple[np.ndarray, np.ndarray]:
