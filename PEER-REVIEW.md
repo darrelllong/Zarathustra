@@ -2135,3 +2135,98 @@ The project did the right thing by adding diagnostics, but the answer so far is 
 decoded boundary criticism is separating real/fake texture, not adjacent/non-adjacent joins. The
 next real progress is not to keep nursing that family. It is to train continuation directly and make
 object reuse distance an explicit generated state.
+
+---
+
+## Round 41
+
+### v195 Is A Short-Window Win; v197 Is Not Yet The Long-Window Test It Claims To Be
+
+The new commits since Round 40 add the Round 39/40 responses, fix the singleton-batch shuffled
+diagnostic crash, update v195/v196/v194 status, and implement `--acf-chain-weight` for v197 in
+[llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py). The important
+new evidence is clear: v195 found the best clean-code short-window frozen score so far, but its
+long-rollout locality is catastrophic. The new ACF-chain implementation is also not yet the
+long-window real-vs-fake comparison described in the response.
+
+1. `[P1]` v197's ACF-chain loss matches a 48-step carried fake rollout against a 12-step shuffled
+   real-window target. The fake side really chains windows with hidden-state carry in
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1887) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1905), but the
+   real EMA target is computed from the ordinary `real_batch[:, :, obj_id_col]` at
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1292) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1308). With the
+   current recipe that means `T_real=12` while `T_fake=48`; if `--acf-chain-n-lags` is ever raised
+   toward the IDEA #45 text's `1..50`, every real lag `>= timestep` is forced to zero by
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1299) through
+   [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py#L1302). That is
+   not a chained-window ACF target, and it cannot validate or falsify long-gap reuse structure. Fix
+   this before interpreting v197: sample contiguous real spans of length `timestep * acf_chain_windows`
+   from the same per-file arrays used by the boundary critic, compute real ACF on those spans, and
+   only then compare to the carried fake rollout.
+
+2. `[P1]` v195 should not be called an "overall ATB." The top table is mostly careful, calling
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/VERSIONS.md#L21) the best
+   clean-code short-window point while noting the single seed and catastrophic long rollout. But the
+   detailed v195 block still says "NEW OVERALL ATB" in
+   [VERSIONS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/VERSIONS.md#L241). That language is
+   wrong now that the same row reports `reuse_access=0.0081` versus real `0.2647` and HRC-MAE
+   `0.1287`. The honest label is "best clean-code frozen-bundle short-window score, failed
+   long-rollout locality gate." If the project keeps calling short-window winners "overall" after the
+   long-rollout sidecar fails them, the sidecar stops being a gate and becomes decoration.
+
+3. `[P1]` The execution order is still too willing to spend the next slot on a cheap scalar proxy.
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L1988) through
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L1993) says v197 will
+   run before IDEA #47 because it is cheap and zero-architecture. That is exactly the local loop the
+   review has been warning against. A small diagnostic run is fine after the target bug above is fixed,
+   but it should not be allowed to delay real-prefix continuation training. The current evidence says
+   the model can win `★` while losing object-process law by two orders of magnitude; another loss on
+   `obj_id_reuse` cannot be the mainline response unless it moves the long-rollout panel immediately.
+
+4. `[P2]` IDEA #45 still contains stale and technically wrong cache-language after the response
+   accepted the correction. [IDEAS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/IDEAS.md#L1682)
+   through [IDEAS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/IDEAS.md#L1686) still says fake
+   traces behave as infinite working sets where every LRU cache always misses. [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L2097)
+   through [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L2110) accepts the
+   more precise wording: the few reuses are mostly immediate repeats, while most objects never
+   participate in realistic longer-gap reuse. Update IDEAS before someone implements against the
+   stronger but false cache interpretation.
+
+5. `[P2]` The v196 acceptance bar was fixed in the response but not in the live version table.
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L2041) through
+   [RESPONSE.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/RESPONSE.md#L2046) correctly adds
+   `bc_real > bc_shuf` as a required criterion. [VERSIONS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/VERSIONS.md#L240)
+   still lists only frozen `★ <= 0.054` and long-rollout `reuse_access >= 0.10`. The run-state file is
+   what people will consult when launching or promoting v196, so it needs the same three-part gate as
+   the response.
+
+### What I Would Do Next
+
+1. Patch `--acf-chain-weight` so the real target is a true contiguous long-window ACF target with the
+   same effective length and lag set as the fake carried rollout.
+
+2. Rename v195 everywhere to "best clean-code short-window score" and explicitly mark it as failed
+   for long-rollout/locality promotion.
+
+3. Run v197 only as a bounded diagnostic after the real-target fix; do not let it displace IDEA #47
+   real-prefix continuation or IDEA #48 stateful object decoding.
+
+4. Keep the promotion gate strict: no model gets "overall" language unless it clears frozen-bundle,
+   long-rollout reuse/HRC, and any mechanism-specific diagnostic it claims to validate.
+
+### Verification
+
+- Reviewed commits since the last automation timestamp through `8b7a6c8`.
+- Read the current review/response chain plus [VERSIONS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/VERSIONS.md),
+  [IDEAS.md](/Users/darrell/.codex/worktrees/37df/Zarathustra/IDEAS.md), and the new
+  [llgan/train.py](/Users/darrell/.codex/worktrees/37df/Zarathustra/llgan/train.py) ACF-chain path.
+- `/opt/homebrew/bin/python3 -m py_compile llgan/train.py llgan/boundary_critic.py llgan/long_rollout_eval.py`
+  passes.
+
+### Short Take
+
+The best new result is also the best warning: v195 can set a clean-code short-window record while
+almost completely failing long-rollout reuse. That should end "overall ATB" language for short-window
+scores. Fix v197's real-target bug if you want the cheap ACF diagnostic, but the next real architecture
+slot should stay on continuation training and explicit object-locality generation.
