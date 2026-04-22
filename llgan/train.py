@@ -2126,8 +2126,6 @@ def train(cfg: Config) -> None:
             # Skip the backward pass entirely — EMA weights are not touched.
             if not torch.isfinite(g_loss) or g_loss.abs() > 1e6:
                 opt_G.zero_grad()
-                if use_amp:
-                    scaler.update()
                 g_losses.append(0.0)
             else:
                 scaler.scale(g_loss).backward()
