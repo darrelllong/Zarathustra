@@ -17,6 +17,7 @@ sys.path.insert(0, str(_LLGAN))
 from llgan.dataset import load_file_characterizations  # noqa: E402
 from llgan.long_rollout_eval import _gap, _metrics_for_stream, _per_stream_obj_ids, _sample_real_stream  # noqa: E402
 
+from .mark_quality import mark_quality  # noqa: E402
 from .neural_atlas import NeuralAtlasModel  # noqa: E402
 
 
@@ -89,6 +90,7 @@ def main() -> int:
     fake_m = _metrics_for_stream(fake_df, cache_sizes)
     real_m = _metrics_for_stream(real_df, cache_sizes)
     gap_m = _gap(fake_m, real_m)
+    mark_m = mark_quality(fake_df, real_df)
     result = {
         "model": args.model,
         "trace_dir": args.trace_dir,
@@ -103,6 +105,7 @@ def main() -> int:
         "fake": fake_m,
         "real": real_m,
         "gap": gap_m,
+        "mark_quality": mark_m,
         "real_manifest": real_manifest,
     }
     out_path = Path(args.output) if args.output else Path(args.model).with_suffix("").with_suffix(".neural_atlas_eval.json")
@@ -117,6 +120,7 @@ def main() -> int:
         "real_stack_median": real_m["stack_distance_median"],
         "fake_stack_p90": fake_m["stack_distance_p90"],
         "real_stack_p90": real_m["stack_distance_p90"],
+        "mark_score": mark_m["mark_score"],
     }, indent=2))
     return 0
 

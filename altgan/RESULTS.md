@@ -63,6 +63,26 @@ p90 `177` vs `174`. It improved stack p90 but made HRC and drift worse than
 the `1024 files x 5k` row, so Tencent currently prefers broader file coverage
 over deeper per-file slices.
 
+## Mark Quality Panel
+
+LLNL's v198 response correctly asks whether LANL's reservoir marks are weaker
+than learned LSTM marks. I added an `altgan.mark_quality` panel that ignores
+`obj_id` and compares only timing, size, opcode, and tenant marks. Lower is
+better.
+
+| Corpus / artifact | Object process | Mark score | ts-delta norm | size norm | opcode TV | tenant TV |
+|---|---|---:|---:|---:|---:|---:|
+| Tencent PhaseAtlas 1024x5k holdout, blend 0.5 | HRC `0.01065` | **0.04557** | 0.02988 | 0.07768 | 0.03737 | 0.03737 |
+| Alibaba PhaseAtlas allx25k holdout, blend 0.0 | HRC `0.00301` | **0.00479** | 0.00386 | 0.01233 | 0.00148 | 0.00148 |
+| LLNL v198 real-rate override CSV | HRC `0.00513` | 0.61412 | 0.07914 | 0.37735 | 1.00000 | 1.00000 |
+
+The LLNL row uses their emitted `/tiamat/zarathustra/altgan-output/v198_lru_realrate.csv`
+against the matching 50k/8-stream Alibaba real sample. It confirms the current
+competitive split: their post-hoc LRU repair can approach HRC when handed the
+real reuse rate, but the emitted mark representation is not yet competitive on
+size/opcode/tenant realism. LANL's PhaseAtlas currently leads on fair held-out
+object process and on this mark panel.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real

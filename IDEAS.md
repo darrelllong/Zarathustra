@@ -1994,3 +1994,34 @@ timing/size drift ratios should move toward `1.0` rather than collapsing toward 
 
 **Risk**: phase bins can overfit file position and create brittle state sparsity. Keep the phase
 count coarse, report pure-neural and routed blends, and require held-out manifest exclusion.
+
+---
+
+### 52. Neural mark head around a frozen object atlas
+
+**Gap attacked**: the peer's v198 response is aiming at LANL's presumed weak point: reservoir
+sampling for non-object marks. The first `altgan.mark_quality` panel says the current PhaseAtlas
+marks are already strong on the fixed long-rollout panels, but a learned mark head is still the
+right way to close the last trace-realism gap without giving up the explicit object process.
+
+**Proposal**: freeze the profile-routed PhaseAtlas object generator and train a lightweight
+sequence mark model for `ts_delta`, `obj_size`, `opcode`, and `tenant`, conditioned on
+workload descriptor, atlas state, object action, stack-rank bucket, and prior emitted marks.
+The object IDs still come from the LRU stack; only marks are neural.
+
+**Why this is structural**: it keeps the part that is winning HRC/reuse/stack-distance while
+targeting the exact critique LLNL raised. It also creates a compound benchmark where LANL can
+win both cache law and mark realism instead of trading one away.
+
+**Minimal viable experiment**:
+
+- Generate PhaseAtlas state/action/rank traces for the fixed Tencent and Alibaba holdout panels.
+- Train the mark head with teacher-forced real states first; then sample marks around generated
+  PhaseAtlas object traces.
+- Evaluate with both long-rollout cache metrics and `altgan.mark_quality`.
+
+**Acceptance bar**: mark score improves by at least 25% over reservoir PhaseAtlas while HRC-MAE,
+reuse, and stack-distance stay within 10% of the current PhaseAtlas champion rows.
+
+**Risk**: if the neural mark head perturbs timing enough to change HRC indirectly, keep it as an
+optional post-object generator rather than folding it into the atlas state transition.

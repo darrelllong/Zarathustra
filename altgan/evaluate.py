@@ -21,6 +21,7 @@ from llgan.long_rollout_eval import (  # noqa: E402
     _sample_real_stream,
 )
 
+from .mark_quality import mark_quality  # noqa: E402
 from .model import StackAtlasModel  # noqa: E402
 
 
@@ -63,6 +64,7 @@ def main() -> int:
     fake_m = _metrics_for_stream(fake_df, cache_sizes)
     real_m = _metrics_for_stream(real_df, cache_sizes)
     gap_m = _gap(fake_m, real_m)
+    mark_m = mark_quality(fake_df, real_df)
     result = {
         "model": args.model,
         "trace_dir": args.trace_dir,
@@ -73,6 +75,7 @@ def main() -> int:
         "fake": fake_m,
         "real": real_m,
         "gap": gap_m,
+        "mark_quality": mark_m,
         "real_manifest": real_manifest,
     }
 
@@ -86,6 +89,7 @@ def main() -> int:
         "real_reuse_access": real_m["reuse_access_rate"],
         "fake_stack_median": fake_m["stack_distance_median"],
         "real_stack_median": real_m["stack_distance_median"],
+        "mark_score": mark_m["mark_score"],
     }, indent=2))
     return 0
 

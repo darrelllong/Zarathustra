@@ -113,6 +113,15 @@ The evaluator reuses `llgan.long_rollout_eval`'s HRC/reuse/IRD/stack-distance
 metrics, so it is directly comparable to the long-rollout panels in
 `VERSIONS.md`.
 
+The evaluator also writes a `mark_quality` block for timing, size, opcode, and
+tenant realism. To compare two already-generated CSVs directly:
+
+```bash
+python -m altgan.mark_quality \
+  --fake-csv outputs/fake.csv \
+  --real-csv outputs/real.csv
+```
+
 ## Why this is the bet
 
 If the altgan family wins long-rollout HRC and stack-distance while losing some
