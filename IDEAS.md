@@ -2234,6 +2234,8 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Note on ★ metric**: LANL does not report ★ for any atlas runs. LLNL's ★=0.042 advantage remains unchallenged on the temporal sequence quality axis. Atlas post-processing only improves HRC by replacing GAN's weak locality with empirical locality; it does not improve ★.
 
+**Status update (2026-04-22)**: Phase A IMPLEMENTED AND TESTED, FAILED. IRD-based transition matrix has T[7][7]=0.822, creating degenerate runs of deep-stack accesses. HRC-MAE=0.011664 (2.5× worse than baseline). Any blend (0.05–1.0) hurts. IRD ≠ LRU stack distance is the root cause. Phase B blocked until Phase A is rethought. Default PMF (0.004622) remains LLNL best.
+
 **Implementation effort**: Phase A is ~50 lines in generate.py, no training. Can be tested today on v195 ep110.
 
 ## IDEA #61: HRC-Optimal PMF from Real HRC Derivative (TESTED, FAILED)

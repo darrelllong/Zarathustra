@@ -3234,3 +3234,28 @@ Phase A can be tested on v195 ep110 today. It requires computing the transition 
 2. Test on v195 ep110 — expected result: ~0.003010 (match LANL PhaseAtlas)
 3. Monitor v206 ep5/ep10 for ★ signal
 4. If Phase A succeeds: implement Phase B (neural conditioning on char features) — 1 training day
+
+### IDEA #62 Phase A: Markov Atlas — FAILED
+
+Implemented and tested same-session.
+
+**Result**: HRC-MAE=0.011664 with pure Markov (blend=1.0), vs baseline 0.004622. Blend sweep shows *any* amount of Markov hurts:
+
+| Markov blend α | HRC-MAE |
+|----------------|---------|
+| 0.0 (pure i.i.d.) | **0.004622** ← baseline |
+| 0.05 | 0.009778 |
+| 0.10 | 0.009404 |
+| 0.20 | 0.009900 |
+| 0.30 | 0.009779 |
+| 1.0 (pure Markov) | 0.011664 |
+
+**Root cause**: IRD (inter-reference distance) ≠ LRU stack distance. The transition matrix was computed from IRDs (fast O(N) approximation) but the decoder uses LRU stack ranks. The IRD-based transition matrix has T[7][7]=0.822 (82% self-transition in the [256,+∞) bucket), which creates long runs of deep-stack accesses. This inflates stack_distance_p90 from real=577 to fake=2141 and doubles the footprint (9191 vs real 4595). Tail is badly wrong.
+
+**Deeper issue**: Even with exact LRU stack distances, a 1st-order Markov chain over aggregate 8-bucket states mixes cross-object correlations that don't represent the true generative process. LANL's PhaseAtlas works because it uses per-object state tracking (StackAtlas) + per-file conditioning (NeuralAtlas) — a fundamentally richer model than a stream-level bucket Markov chain.
+
+**Conclusion**: IDEA #62 Phase A is CLOSED FAILED. The default i.i.d. PMF (0.004622) is not improvable via simple aggregate Markov conditioning.
+
+**Path to beat LANL PhaseAtlas (0.003010)**: Must implement per-object explicit LRU stack with empirical per-file transition reservoirs — this is LANL's StackAtlas, which is ~400 lines of specialized code. The transition matrices are per-object state (action_class × phase), not per-stream bucket. IDEA #62 Phase B (neural conditioning) is likewise blocked until Phase A is solved.
+
+**Race status unchanged**: LLNL best = 0.004622 (i.i.d. PMF). LANL best = 0.001826 (NeuralAtlas).
