@@ -49,6 +49,7 @@ class NeuralAtlasModel:
     hidden_dim: int
     n_time_bins: int
     n_size_bins: int
+    n_phase_bins: int
     n_states: int
     time_edges: np.ndarray
     size_edges: np.ndarray
@@ -73,6 +74,7 @@ class NeuralAtlasModel:
         conds: np.ndarray | None = None,
         temperature: float = 1.0,
         transition_blend: float = 0.75,
+        force_phase_schedule: bool = False,
     ):
         import pandas as pd
         import torch
@@ -107,6 +109,7 @@ class NeuralAtlasModel:
 
         per_stream = int(np.ceil(n_records / n_streams))
         rows = []
+        base_span = self.n_time_bins * self.n_size_bins * StackAtlasModel.N_ACTIONS
         for stream_id in range(n_streams):
             reservoir = self._nearest_reservoir(conds[stream_id])
             init_p = self._blend_initial(init_probs[stream_id], reservoir, transition_blend)
@@ -117,7 +120,10 @@ class NeuralAtlasModel:
             prev_obj = next_new_id
             ts = 0.0
 
-            for _ in range(per_stream):
+            for pos in range(per_stream):
+                if force_phase_schedule and self.n_phase_bins > 1:
+                    phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
+                    state = _state_with_phase(state, phase, base_span)
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
                 if wants_reuse and stack:
@@ -256,6 +262,7 @@ def fit_neural_atlas(
     *,
     n_time_bins: int = 4,
     n_size_bins: int = 4,
+    n_phase_bins: int = 1,
     hidden_dim: int = 96,
     epochs: int = 800,
     lr: float = 2e-3,
@@ -279,7 +286,8 @@ def fit_neural_atlas(
     ])
     time_edges = _quantile_edges(np.log1p(all_dt), n_time_bins)
     size_edges = _quantile_edges(np.log(all_size), n_size_bins)
-    n_states = n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS
+    n_phase_bins = max(int(n_phase_bins), 1)
+    n_states = n_phase_bins * n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS
 
     reservoirs: List[AtlasReservoir] = []
     file_conds = []
@@ -304,7 +312,9 @@ def fit_neural_atlas(
             name,
             time_edges=time_edges,
             size_edges=size_edges,
+            n_time_bins=n_time_bins,
             n_size_bins=n_size_bins,
+            n_phase_bins=n_phase_bins,
             n_states=n_states,
             max_samples_per_state=max_samples_per_state,
             rng=rng,
@@ -389,6 +399,7 @@ def fit_neural_atlas(
         "seed": seed,
         "model": "NeuralAtlasModel",
         "n_transition_rows": int(len(trans_states)),
+        "n_phase_bins": n_phase_bins,
     }
     return NeuralAtlasModel(
         version=1,
@@ -396,6 +407,7 @@ def fit_neural_atlas(
         hidden_dim=hidden_dim,
         n_time_bins=n_time_bins,
         n_size_bins=n_size_bins,
+        n_phase_bins=n_phase_bins,
         n_states=n_states,
         time_edges=time_edges,
         size_edges=size_edges,
@@ -414,7 +426,8 @@ def fit_neural_atlas(
 
 
 def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
-                    size_edges: np.ndarray, n_size_bins: int, n_states: int,
+                    size_edges: np.ndarray, n_time_bins: int, n_size_bins: int,
+                    n_phase_bins: int, n_states: int,
                     max_samples_per_state: int, rng: np.random.Generator):
     ts = df["ts"].to_numpy(dtype=np.float64)
     obj_ids = df["obj_id"].to_numpy(dtype=np.int64)
@@ -424,8 +437,11 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
     strides = np.diff(obj_ids, prepend=obj_ids[0]).astype(np.int64)
     time_bins = np.searchsorted(time_edges, np.log1p(dt), side="right")
     size_bins = np.searchsorted(size_edges, np.log(sizes), side="right")
+    phase_bins = _phase_bins(len(df), n_phase_bins)
     actions = np.array([_action_class(int(x)) for x in stack_d], dtype=np.int64)
-    states = _state_id(time_bins, size_bins, actions, n_size_bins)
+    base_states = _state_id(time_bins, size_bins, actions, n_size_bins)
+    states = (phase_bins * (n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS)
+              + base_states).astype(np.int64)
     opcodes = df["opcode"].to_numpy(dtype=object)
     tenants = df["tenant"].to_numpy(dtype=object)
 
@@ -481,6 +497,17 @@ def _dense_counts(counts: Dict[int, int], n_states: int, alpha: float = 1e-4) ->
         if 0 <= int(state) < n_states:
             out[int(state)] += float(count)
     return out / out.sum()
+
+
+def _phase_bins(n_rows: int, n_phase_bins: int) -> np.ndarray:
+    if n_phase_bins <= 1 or n_rows <= 0:
+        return np.zeros(max(n_rows, 0), dtype=np.int64)
+    raw = np.floor(np.arange(n_rows, dtype=np.float64) * n_phase_bins / n_rows).astype(np.int64)
+    return np.clip(raw, 0, n_phase_bins - 1)
+
+
+def _state_with_phase(state: int, phase: int, base_span: int) -> int:
+    return int(phase) * int(base_span) + (int(state) % int(base_span))
 
 
 def _normalize_counts(counts: Dict[int, int]) -> Tuple[np.ndarray, np.ndarray]:

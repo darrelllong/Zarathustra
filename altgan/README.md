@@ -59,6 +59,10 @@ python -m altgan.train_neural_atlas \
   --output checkpoints/altgan/alibaba_neuralatlas.pkl.gz
 ```
 
+For a nonstationary phase-conditioned atlas, add `--n-phase-bins 8`. For a
+strict long-rollout holdout, add `--exclude-manifest path/to/real_manifest.json`
+so the real eval stream files cannot be used as routed source atlases.
+
 ## Generate
 
 ```bash

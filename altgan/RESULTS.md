@@ -13,14 +13,48 @@ manifest per corpus.
 
 | Corpus | Model | Fit | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Tencent | NeuralAtlas | 64 files x 25k, blend 0.0 | **0.01845** | 0.62314 | 0.61493 | 55 | 60 | 145 | 174 |
-| Alibaba | NeuralAtlas | 64 files x 25k, blend 0.5 | **0.00183** | 0.26451 | 0.26909 | 197 | 201 | 1267 | 1452 |
+| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 |
+| Alibaba | PhaseAtlas | 233 files x 25k holdout, blend 0.0 | **0.00301** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 |
+| Tencent | NeuralAtlas | 1024 files x 5k holdout, blend 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 |
+| Alibaba | NeuralAtlas | 233 files x 25k holdout, blend 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 |
+| Tencent | NeuralAtlas | 64 files x 25k, blend 0.0 | 0.01845 | 0.62314 | 0.61493 | 55 | 60 | 145 | 174 |
+| Alibaba | NeuralAtlas | 64 files x 25k, blend 0.5 | 0.00183 | 0.26451 | 0.26909 | 197 | 201 | 1267 | 1452 |
 | Alibaba | NeuralStack | 64 files x 25k, temp 1.0 | 0.00333 | 0.27373 | 0.26909 | 204 | 201 | 1331 | 1452 |
 
 These are directly comparable to the peer long-rollout sidecar.  The current
 peer evidence in `VERSIONS.md` reports Tencent `v158` HRC-MAE `0.2435` and
 Alibaba `v194` HRC-MAE `0.1305` with reuse-access `0.006` vs real `0.265`.
 The altgan best-of-family results are not close calls on that surface.
+The holdout rows exclude the four real-manifest source files from training.
+`PhaseAtlas` is `NeuralAtlas` with `--n-phase-bins 8`, which adds within-file
+position to the locality state to reduce stationary sampling artifacts.
+
+## Strict Holdout And Phase Results
+
+These runs were added after the first challenge because the initial 64-file
+panel was too narrow and allowed exact eval-manifest files into the training
+pool. The holdout models exclude those files.
+
+| Corpus | Model | Fit | blend | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | timing drift ratio | size drift ratio |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Tencent | NeuralAtlas | 1024 files x 5k, holdout | 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 | 0.0199 | 0.0096 |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout | 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.0579 | 0.0293 |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout | 1.0 | 0.01982 | 0.63573 | 0.61493 | 60 | 60 | 186 | 174 | 0.0497 | 0.0390 |
+| Alibaba | NeuralAtlas | 233 files x 25k, holdout | 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 | 0.3251 | 1.1296 |
+| Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | **0.00301** | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
+
+The PhaseAtlas rows are the better answer to the "statistically
+indistinguishable" goal. Tencent still under-expresses timing and size drift,
+but phase conditioning improves HRC and moves drift in the right direction.
+Alibaba PhaseAtlas is currently the cleanest all-around held-out result:
+cache metrics are close and first-half/second-half timing and size drift are
+within the same order as real.
+
+A forced phase-schedule ablation, where generation overwrites the sampled phase
+with the synthetic stream position, did not improve the best rows. Tencent
+blend 0.5 moved from HRC-MAE `0.01065` to `0.01131`; Alibaba's best forced row
+was blend 0.5 at `0.00320` versus the unforced blend 0.0 row at `0.00301`.
+Keep forced phase as a diagnostic flag, not the default generator.
 
 ## StackAtlas 100k Long-Rollout Panel
 
@@ -86,7 +120,12 @@ Remote NeuralAtlas artifacts:
 
 - `/tiamat/zarathustra/checkpoints/altgan/tencent_neuralatlas_64x25k_e900.pkl.gz`
 - `/tiamat/zarathustra/checkpoints/altgan/alibaba_neuralatlas_64x25k_e900.pkl.gz`
+- `/tiamat/zarathustra/checkpoints/altgan/tencent_neuralatlas_holdout_1024x5k_e900.pkl.gz`
+- `/tiamat/zarathustra/checkpoints/altgan/alibaba_neuralatlas_holdout_allx25k_e900.pkl.gz`
+- `/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_holdout_1024x5k_e900.pkl.gz`
+- `/tiamat/zarathustra/checkpoints/altgan/alibaba_phaseatlas_holdout_allx25k_e900.pkl.gz`
 - `/tiamat/zarathustra/altgan-output/*neuralatlas*eval_100k.json`
+- `/tiamat/zarathustra/altgan-output/*phaseatlas*eval_100k.json`
 
 ## Interpretation
 
@@ -113,3 +152,8 @@ increasing `transition_blend` monotonically worsens HRC-MAE from `0.01845` to
 the best blend.  That is the right negative result: the architecture should
 promote profile-routed object-state generation now, and only keep neural
 smoothing where the long-rollout panel proves it helps.
+
+The stricter holdout/phase pass changes the practical recommendation. A
+profile-routed atlas is still the right base, but within-file phase must be
+part of the generated state. Otherwise the synthetic trace can get HRC right
+while looking too stationary across the rollout.

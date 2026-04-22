@@ -21,7 +21,12 @@ def _collect_files(trace_dir: str, fmt: str) -> list[Path]:
     d = Path(trace_dir)
     if not d.exists():
         raise FileNotFoundError(trace_dir)
-    files = [p for p in d.iterdir() if p.is_file() and not p.name.startswith(".")]
+    files = [
+        p for p in d.iterdir()
+        if p.is_file()
+        and not p.name.startswith(".")
+        and p.name.upper() not in {"README", "README.TXT"}
+    ]
     if fmt in {"oracle_general", "lcs"}:
         files = [
             p for p in files

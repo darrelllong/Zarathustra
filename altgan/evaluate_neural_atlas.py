@@ -37,6 +37,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--transition-blend", type=float, default=0.75,
                    help="1.0 means pure neural transitions; 0.0 means nearest-file atlas.")
+    p.add_argument("--force-phase-schedule", action="store_true",
+                   help="For phase atlases, force phase from synthetic stream position.")
     p.add_argument("--real-manifest", default="")
     p.add_argument("--cache-sizes", default="")
     p.add_argument("--output", default="")
@@ -72,6 +74,7 @@ def main() -> int:
         conds=conds,
         temperature=args.temperature,
         transition_blend=args.transition_blend,
+        force_phase_schedule=args.force_phase_schedule,
     )
 
     if args.cache_sizes:
@@ -95,6 +98,7 @@ def main() -> int:
         "n_streams": args.n_streams,
         "temperature": args.temperature,
         "transition_blend": args.transition_blend,
+        "force_phase_schedule": args.force_phase_schedule,
         "source_traces": source_names,
         "fake": fake_m,
         "real": real_m,

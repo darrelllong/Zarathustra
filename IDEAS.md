@@ -1964,3 +1964,33 @@ NeuralAtlas on HRC and better on ★.
 **Risk**: rate-matching loss may reduce per-event diversity (G learns to produce uniform
 reuse probability instead of context-dependent reuse decisions). Monitor recall and frozen β-recall
 to catch this.
+
+---
+
+### 52. Phase-conditioned nonstationary trace atlas
+
+**Gap attacked**: a profile-routed atlas can match HRC, reuse, and stack distance while still being
+too stationary. The first strict holdout pass exposed this: cache metrics stayed strong, but
+first-half/second-half timing and size drift were much lower than the real traces.
+
+**Proposal**: include within-file phase in the generated locality state. Instead of states being only
+`time_bin x size_bin x object_action`, make them
+`phase_bin x time_bin x size_bin x object_action`, where phase is a coarse position bin through the
+source file or synthetic rollout.
+
+**Why this is structural**: real traces are not exchangeable bags of events. Warmup, burst periods,
+tenant/application shifts, and late-run tails are part of the trace identity. A generator that routes
+to the right file family but samples that family stationarily can still fail the "statistically
+indistinguishable" goal.
+
+**Minimal viable experiment**:
+
+- Train `NeuralAtlas` with `--n-phase-bins 8` under the same manifest-excluded holdout protocol.
+- Compare HRC/reuse/stack-distance and drift ratios against the non-phase model.
+- Promote phase conditioning only if it improves nonstationary drift without destroying cache law.
+
+**Acceptance bar**: HRC-MAE must stay below the peer long-rollout failures by a wide margin, and
+timing/size drift ratios should move toward `1.0` rather than collapsing toward zero.
+
+**Risk**: phase bins can overfit file position and create brittle state sparsity. Keep the phase
+count coarse, report pure-neural and routed blends, and require held-out manifest exclusion.
