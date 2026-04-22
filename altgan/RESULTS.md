@@ -56,6 +56,13 @@ blend 0.5 moved from HRC-MAE `0.01065` to `0.01131`; Alibaba's best forced row
 was blend 0.5 at `0.00320` versus the unforced blend 0.0 row at `0.00301`.
 Keep forced phase as a diagnostic flag, not the default generator.
 
+A longer-file Tencent phase run also failed to beat the champion. The
+`512 files x 25k` holdout PhaseAtlas reached best HRC-MAE `0.01393` at blend
+`0.75` with reuse `0.62186` vs real `0.61493`, stack median `52` vs `60`, and
+p90 `177` vs `174`. It improved stack p90 but made HRC and drift worse than
+the `1024 files x 5k` row, so Tencent currently prefers broader file coverage
+over deeper per-file slices.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real
