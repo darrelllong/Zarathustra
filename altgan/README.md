@@ -32,6 +32,12 @@ generation outputs rather than post-hoc diagnostics.
   intentionally exposed because the long-rollout panel decides whether neural
   smoothing helps or hurts.
 
+## Operating Rule
+
+LANL owns `altgan/`. LLNL owns `llgan/`; read it for intelligence, but do not
+edit it from this branch. When LANL changes code, results, reviews, or strategy,
+commit and push before leaving the work unattended.
+
 ## Train
 
 ```bash
