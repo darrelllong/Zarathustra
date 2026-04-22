@@ -421,6 +421,7 @@ def _sample_fake(ckpt, n_samples: int, device,
                   ssm_state_dim=getattr(cfg, "ssm_state_dim", 16),
                   mtpp_timing=getattr(cfg, "mtpp_timing", False),
                   mtpp_sigma_min=getattr(cfg, "mtpp_sigma_min", 0.05),
+                  reuse_head=getattr(cfg, "gumbel_reuse", False),
                   ).to(device)
     # Prefer EMA weights: smoother, less oscillated, consistently produces
     # better samples than the instantaneous live weights at any given epoch.
