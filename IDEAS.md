@@ -1885,3 +1885,41 @@ long-rollout segment.
 **Risk**: the router can cheat by memorizing corpus or filename identity. Hold out files, include
 within-file position features cautiously, and require held-out window-label accuracy before using
 the gates in training.
+
+---
+
+### 50. Profile-routed transition atlas
+
+**Gap attacked**: a binary reuse loss or a per-file action marginal can still lose the temporal law
+that determines cache behavior. The first trained `NeuralStack` probe made this visible: Alibaba
+benefited from workload-conditioned action/rank probabilities, but Tencent regressed when the model
+dropped StackAtlas's transition state.
+
+**Proposal**: make the object process a routed transition system:
+
+1. Fit per-file or per-window atlases over coarse time/size/object-action states.
+2. Use characterization vectors to route generation to the nearest compatible atlas or a small
+   mixture of atlases.
+3. Train a neural smoother over initial-state and transition distributions, but keep a measured
+   blend knob so the long-rollout panel can reject smoothing when it destroys locality.
+4. Decode through an explicit LRU stack, never through raw scalar `obj_id` regression.
+
+**Why this is structural**: it moves the core generated state from local scalar features to the
+cache-native transition object: "given this workload profile and current locality state, what state
+comes next, and which object does that imply?" This is a different contract from adding another
+regularizer to `obj_id_reuse`.
+
+**Minimal viable experiment**:
+
+- Train a `NeuralAtlas` over 64 held-out files per corpus.
+- Evaluate blend `{0.0, 0.25, 0.5, 0.75, 1.0}` against fixed real manifests.
+- Promote the profile-routed atlas if it beats the peer on HRC-MAE, reuse-access, and stack-distance
+  without relying on manifest-oracle training files.
+
+**Acceptance bar**: the model must beat the current peer long-rollout sidecar by a wide margin and
+must report the pure-neural blend as an ablation, not hide it. If the neural smoother worsens a
+corpus, keep the router and drop that smoothing path for the promoted generator.
+
+**Risk**: nearest-file routing can become too oracle-like if the evaluation uses the exact real
+manifest. The next version should hold out routed source files from training and then route only by
+characterization, not by basename identity.
