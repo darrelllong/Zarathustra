@@ -112,6 +112,8 @@ python -m altgan.sweep_mark_hybrids \
   --real-manifest /home/darrell/long_rollout_manifests/alibaba_stackatlas.json \
   --output-dir /tiamat/zarathustra/altgan-output \
   --prefix alibaba_phaseatlas_marks_hybrid \
+  --transition-blends 0.0,0.2 \
+  --local-prob-powers 0.9,1.0 \
   --mark-numeric-blend-spaces raw,log \
   --include-reservoir-control \
   --skip-existing
@@ -122,6 +124,8 @@ when resuming a remote run so completed eval JSONs are reused. Add
 `--seeds 42,43,44,45` for the stability pass; the best JSON then includes
 candidate means across seeds so a single lucky HRC draw does not promote a
 weaker mark recipe.
+Use `--transition-blends` and `--local-prob-powers` to run object-process
+microblend controls in the same paired panel as raw/log neural-mark hybrids.
 
 ## Generate
 
