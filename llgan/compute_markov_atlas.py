@@ -8,7 +8,7 @@ Saving it as a .npy file for use with --lru-markov-atlas in generate.py.
 
 Usage
 -----
-    python -m llgan.compute_markov_atlas \
+    python compute_markov_atlas.py \
         --trace-dir /tiamat/zarathustra/traces/alibaba \
         --output markov_atlas_alibaba.npy \
         [--max-files 239] \
@@ -22,22 +22,51 @@ Output
 import argparse
 import glob
 import os
+import subprocess
 
 import numpy as np
-import pandas as pd
 
 from lru_stack_decoder import LRUStackDecoder, N_BUCKETS, _EDGES
 
 
+def _read_oracle_general_obj_ids(path: str, max_records: int) -> np.ndarray:
+    """Read obj_id column from libCacheSim oracleGeneral .zst binary file."""
+    n_bytes = max_records * 24
+    if path.endswith(".zst"):
+        proc = subprocess.Popen(
+            ["zstd", "-d", "-c", path],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        raw = proc.stdout.read(n_bytes)
+        proc.stdout.close()
+        proc.wait()
+    else:
+        with open(path, "rb") as f:
+            raw = f.read(n_bytes)
+
+    dt = np.dtype([
+        ("ts",       "<u4"),
+        ("obj_id",   "<u8"),
+        ("obj_size", "<u4"),
+        ("vtime",    "<i4"),
+        ("op",       "<i2"),
+        ("tenant",   "<i2"),
+    ])
+    n = len(raw) // 24
+    if n == 0:
+        return np.zeros(0, dtype=np.int64)
+    arr = np.frombuffer(raw[:n * 24], dtype=dt)
+    return arr["obj_id"].astype(np.int64)
+
+
 def compute_transition_matrix(
     trace_dir: str,
-    fmt: str = "oracle_general",
     max_files: int = 0,
     max_events_per_file: int = 500_000,
     verbose: bool = True,
 ) -> np.ndarray:
     """
-    Walk all CSV files in trace_dir and accumulate the 8×8 transition matrix
+    Walk all .zst files in trace_dir and accumulate the 8×8 transition matrix
     using IRD-proxy stack distances (same approximation as LRUStackDecoder.fit).
 
     Returns raw count matrix (unnormalised).
@@ -45,21 +74,24 @@ def compute_transition_matrix(
     T = np.zeros((N_BUCKETS, N_BUCKETS), dtype=np.float64)
     total_transitions = 0
 
-    files = sorted(glob.glob(os.path.join(trace_dir, "*.csv")))
+    files = sorted(glob.glob(os.path.join(trace_dir, "*.oracleGeneral.zst")))
+    if not files:
+        files = sorted(glob.glob(os.path.join(trace_dir, "*.zst")))
     if max_files > 0:
         files = files[:max_files]
 
+    print(f"Found {len(files)} trace files in {trace_dir}")
+
     for fi, fpath in enumerate(files):
         try:
-            df = pd.read_csv(fpath)
+            obj_ids = _read_oracle_general_obj_ids(fpath, max_events_per_file)
         except Exception as e:
             print(f"  SKIP {os.path.basename(fpath)}: {e}")
             continue
 
-        if "obj_id" not in df.columns:
+        if len(obj_ids) == 0:
             continue
 
-        obj_ids = df["obj_id"].values[:max_events_per_file].astype(np.int64)
         T_file = LRUStackDecoder.fit_transition_matrix_from_obj_ids(
             obj_ids, max_fit_events=max_events_per_file
         )
@@ -118,12 +150,15 @@ def main():
         print(f"  {labels[i]:>12s}  {vals}")
 
     # Compare marginal (row-sum) vs default PMF
-    marginal = T_raw.sum(axis=0)
-    marginal = marginal / marginal.sum()
-    print(f"\nMarginal PMF from transition counts:")
-    for label, p_val in zip(labels, marginal):
-        bar = "█" * int(p_val * 40)
-        print(f"  {label:>12s}  {p_val:.4f}  {bar}")
+    total_counts = T_raw.sum()
+    if total_counts > 0:
+        marginal = T_raw.sum(axis=0) / total_counts
+        print(f"\nMarginal PMF from transition counts:")
+        for label, p_val in zip(labels, marginal):
+            bar = "█" * int(p_val * 40)
+            print(f"  {label:>12s}  {p_val:.4f}  {bar}")
+    else:
+        print("\nWARN: no transitions counted — check trace files and format")
 
 
 if __name__ == "__main__":
