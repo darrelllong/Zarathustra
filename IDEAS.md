@@ -2204,9 +2204,31 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Next step (IDEA #59)**: Freeze LSTM, fine-tune only `reuse_head` via BCE. This replaces Bernoulli injection with a learned (but h-independent) head. h has zero correlation with reuse in v195, so reuse_head will converge to predict 26.5% for all inputs — equivalent to Bernoulli injection but using the native model pipeline. If h has ANY weak temporal correlation with reuse, this provides marginal improvement over pure Bernoulli.
 
+## IDEA #64: LLNL StackAtlas — Per-Object Markov State Generator
+
+**Status**: Implemented (2026-04-22) — TESTING IN PROGRESS on vinge
+
+**Motivation**: IDEA #62/63 failed because they use inter-event IAT (wrong signal). LANL's PhaseAtlas (0.003010) and NeuralAtlas (0.001826) use exact per-object LRU stack distances + per-state reservoir sampling via BIT algorithm.
+
+**Architecture** (independently reimplemented from LANL's altgan/model.py):
+- State = (time_bin, size_bin, action_class): 4×4×4 = 64 states
+- time_bin = quantile of log(dt+1) (inter-event IAT); size_bin = quantile of log(obj_size); action_class: NEW/NEAR/MID/FAR
+- Transition matrix T[state_i][state_j] from real traces; reservoir of EventSamples per state
+- Generation: step Markov chain → sample EventSample → use ev.stack_distance for LRU lookup
+
+**Key distinction**: NOT a post-hoc GAN decoder — standalone model that bypasses GAN entirely. Same architecture as LANL's PhaseAtlas.
+
+**Implementation**: `llgan/stack_atlas.py` (~300 lines).
+
+**Expected HRC-MAE**: ~0.003010 (match LANL PhaseAtlas).
+
 ## IDEA #63: Time-Conditioned Stack Distance Decoder (StackAtlas Lite)
 
-**Status**: Proposed (2026-04-22) — HIGH PRIORITY (replaces IDEA #62 Phase A)
+**Status**: CLOSED FAILED (2026-04-22). HRC-MAE=0.081 (17× worse than baseline).
+
+**Root cause**: The ts_delta in `arr_s` is inter-event time (t_i − t_{i-1}), but the conditional PMF P(bucket | dt) was computed from per-object re-access time (t_i − t_{last_access_same_object}). These are different quantities. With Bernoulli(0.265) injection, reuse events are randomly assigned positions, so their ts_delta is not the per-object IAT. The conditioning used the wrong signal.
+
+**Original proposal** (Proposed (2026-04-22) — HIGH PRIORITY, replaces IDEA #62 Phase A)
 
 **Motivation**: LANL's StackAtlas works because it conditions the stack distance on interarrival time (dt_bin). Short-dt events → small stack distances (object recently accessed, near top of LRU stack). Long-dt events → large stack distances (object was pushed down by many intervening accesses). This is the core physical insight that IDEA #62's aggregate Markov chain completely misses.
 

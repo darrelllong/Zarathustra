@@ -3259,3 +3259,68 @@ Implemented and tested same-session.
 **Path to beat LANL PhaseAtlas (0.003010)**: Must implement per-object explicit LRU stack with empirical per-file transition reservoirs — this is LANL's StackAtlas, which is ~400 lines of specialized code. The transition matrices are per-object state (action_class × phase), not per-stream bucket. IDEA #62 Phase B (neural conditioning) is likewise blocked until Phase A is solved.
 
 **Race status unchanged**: LLNL best = 0.004622 (i.i.d. PMF). LANL best = 0.001826 (NeuralAtlas).
+
+## Round 58
+
+### v206 Failure: Seed=7 Incompatible with IDEA #44 Recipe
+
+v206 (seed=7 IDEA #44 cross-validation) failed at Phase 3 ep3. W=6.4→15.6→21.1, G=0.0 all three epochs. W-spike guard fired (`--w-stop-threshold 5.0`). Root cause: seed=7 produces an initial G-parameter distribution that is immediately out-of-distribution for the WGAN-SN critic, causing g_loss>1e6 on every G step. The critic never encounters meaningful fake data and drives W→∞.
+
+Phase 2.5 (G warm-up) sup→0.00000 by ep10 — generator matched the AE reconstruction but this doesn't guarantee WGAN-valid initialization. bc_diag raw≈shuf (gap≈0.000) confirms G never generated learnable sequences in Phase 3.
+
+**Implication**: IDEA #44 is confirmed in v195 (seed=5) but NOT validated cross-seed. The ★=0.042 result remains a single-seed claim. Next cross-seed attempt: seed=11 or seed=3, both known to be in the v167 basin.
+
+### IDEA #63 Failure: Per-Object Re-Access Time ≠ Inter-Event Time
+
+Tested IDEA #63 (time-conditioned stack decoder) on v195 ep110. HRC-MAE=0.081130 — 17× worse than baseline 0.004622.
+
+**Root cause**: The conditional PMF P(bucket | dt_bin) was computed from real traces using `t_i - last_t_same_object` (per-object interarrival time for reuse events). But the ts_delta in `arr_s` is `t_i - t_{i-1}` (inter-event time for all events). These are completely different quantities:
+
+| Quantity | Meaning | Example |
+|----------|---------|---------|
+| Per-object IAT | Time since same object's last access | 5 minutes (for a warm object) |
+| Inter-event IAT | Time since any event | 1ms (between consecutive requests) |
+
+With Bernoulli(0.265) injection, reuse events are randomly selected from all events. A reuse event at position i has ts_delta[i] = inter-event time, NOT the time since the reused object was last accessed. So conditioning on ts_delta[i] uses the wrong signal.
+
+**Physical insight from LANL's model**: LANL's StackAtlas avoids this by tracking per-object last-access time explicitly. Their state for each object is `(t_current - t_last_access_to_same_object, obj_size, action_class)`. LANL's generator is not just a post-hoc decoder — it's a stateful per-object tracker that knows each object's history.
+
+**Conclusion**: IDEA #63 CLOSED FAILED. Any time-conditioned decoder that uses inter-event IAT instead of per-object IAT is using the wrong signal.
+
+### What It Takes to Match LANL's PhaseAtlas (0.003010)
+
+After exhausting IDEA #62 and IDEA #63, the architectural requirement is now clear:
+
+**The only viable path to ≤0.003010 HRC-MAE is to implement per-object state tracking (IDEA #64 StackAtlas).** Specifically:
+
+1. For each training trace, run BIT-based exact LRU stack distances
+2. Build a set of `(prev_state, next_state, EventSample)` tuples where state = (time_bin, size_bin, action_class) and time_bin is derived from per-object IAT, not inter-event IAT
+3. At generation time, maintain per-object last-access-time tracking; for each reuse event, compute per-object IAT, look up state, sample next state from Markov chain, sample EventSample from reservoir[next_state]
+
+This is the LANL StackAtlas algorithm verbatim. LANL's implementation is ~400 lines in `altgan/model.py`. An LLNL-native implementation would require:
+- Fitting phase: process all training traces, build per-state transition tables (~30 min on vinge)
+- Generation phase: stateful per-object tracking in the LRU decoder
+
+**Critical difference from IDEA #62/63**: IDEA #64 is not a post-hoc modification to Bernoulli injection. It replaces Bernoulli injection with a fundamentally different generative process that tracks per-object state. This is a ~200-line implementation in a new `stack_atlas.py` file.
+
+### Race Status (Updated)
+
+| Metric | LANL | LLNL | Status |
+|--------|------|------|--------|
+| HRC-MAE (Alibaba, best) | **0.001826** (NeuralAtlas) | 0.004622 (i.i.d. PMF) | LANL +153% |
+| HRC-MAE (Alibaba, simple atlas) | 0.003010 (PhaseAtlas) | 0.004622 | LANL +53% |
+| Short-window ★ (best) | unmeasured (atlas bypasses GAN ★) | **0.042** (v195 ep110) | LLNL leads |
+| Active training | marking experiments (stuck) | v206 DEAD | both paused |
+
+**Next actions**:
+1. Implement IDEA #64 (StackAtlas): per-object state tracker, fit from training traces, generate without GAN. High-effort but the only viable HRC path.
+2. Launch fresh GAN training with seed=11 or seed=3 for IDEA #44 cross-validation (v207).
+3. Read LANL's full altgan/model.py for StackAtlas implementation details before starting IDEA #64.
+
+### LANL Latest Activity
+
+LANL's most recent output files (as of 00:56 today) are all `phaseatlas_marks_*` experiments — temperature and noise sweeps on mark quality for their phaseatlas model. All stuck at HRC-MAE=0.003010. LANL is trying to improve mark quality (ts_delta, obj_size distributions) but is not advancing HRC. Their NeuralAtlas 0.001826 remains their peak result from Apr 21 18:47.
+
+LANL's NeuralAtlas also failed on tencent (HRC-MAE=0.018 at blend=0.0 vs 0.001826 on alibaba). The per-file conditioning that makes NeuralAtlas work on alibaba does not transfer to tencent. LANL is as stuck on tencent as LLNL.
+
+**LLNL's tencent path**: LLNL has not run HRC evaluation on tencent. v158 final.pt (tencent ATB ★=0.039) should be evaluated with the Bernoulli LRU decoder to establish tencent HRC-MAE baseline. If it matches LANL's ~0.018 or beats it, LLNL leads on tencent.
