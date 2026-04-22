@@ -115,7 +115,10 @@ python -m altgan.sweep_mark_hybrids \
 ```
 
 The sweep writes both `*_summary.csv` and `*_best.json`; use `--skip-existing`
-when resuming a remote run so completed eval JSONs are reused.
+when resuming a remote run so completed eval JSONs are reused. Add
+`--seeds 42,43,44,45` for the stability pass; the best JSON then includes
+candidate means across seeds so a single lucky HRC draw does not promote a
+weaker mark recipe.
 
 ## Generate
 
