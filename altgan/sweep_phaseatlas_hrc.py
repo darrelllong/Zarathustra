@@ -162,9 +162,9 @@ def _run_eval(
         "--output", str(output),
     ]
     if phase_scale_schedule:
-        cmd.extend(["--stack-rank-phase-scales", phase_scale_schedule])
+        cmd.append(f"--stack-rank-phase-scales={phase_scale_schedule}")
     if phase_max_schedule:
-        cmd.extend(["--stack-rank-phase-maxes", phase_max_schedule])
+        cmd.append(f"--stack-rank-phase-maxes={phase_max_schedule}")
     if force_phase:
         cmd.append("--force-phase-schedule")
     if args.disable_neural_marks:
