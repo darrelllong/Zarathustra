@@ -1601,6 +1601,41 @@ def train(cfg: Config) -> None:
                 else:
                     fake_decoded = H_fake
 
+                # IDEA #54: Gumbel-Softmax hard binary reuse head.
+                # Replace the continuous scalar Recovery output for obj_id_reuse with a
+                # hard 0/1 decision via Gumbel-Softmax (straight-through estimator).
+                # BCE-logit supervision calibrates the reuse rate naturally from data
+                # (no explicit rate target), while the hard binary output matches the
+                # real trace's binary reuse contract.  Weight=1.0 gives per-element
+                # gradient ~0.88 vs WGAN ~0.5 — sufficient to enforce rate without
+                # causing the GAN collapse seen at BCE weight=50 (v200).
+                if getattr(cfg, 'gumbel_reuse', False) and obj_id_col >= 0:
+                    _tau = getattr(cfg, 'gumbel_tau_start', 1.0) - epoch * (
+                        getattr(cfg, 'gumbel_tau_start', 1.0) - getattr(cfg, 'gumbel_tau_end', 0.5)
+                    ) / max(cfg.epochs - 1, 1)
+                    _tau = max(_tau, 0.1)
+                    _reuse_logit = fake_decoded[:, :, obj_id_col]   # (B, T)
+                    # 2-class logits: scale by 2 to make the logit range wider
+                    _logits_2 = torch.stack([-_reuse_logit, _reuse_logit], dim=-1) * 2.0
+                    # Hard Gumbel-Softmax (straight-through); no_grad on the sampling noise
+                    _hard_gs = nn.functional.gumbel_softmax(_logits_2, tau=_tau, hard=True)
+                    _is_reuse_hard = _hard_gs[:, :, 1]  # (B, T), 0 or 1
+                    # Replace continuous scalar with hard binary in [-1, 1] space
+                    _fake_decoded_gs = fake_decoded.clone()
+                    _fake_decoded_gs[:, :, obj_id_col] = _is_reuse_hard * 2.0 - 1.0
+                    fake_decoded = _fake_decoded_gs
+                    # BCE-logit supervision (class-balanced, pos_weight caps at 20×)
+                    _real_binary = (real_batch[:, :, obj_id_col] > 0).float()
+                    _n_pos = _real_binary.sum().clamp(min=1.0)
+                    _n_neg = (_real_binary.numel() - _real_binary.sum()).clamp(min=1.0)
+                    _pos_w = (_n_neg / _n_pos).clamp(max=20.0)
+                    _loss_gs = nn.functional.binary_cross_entropy_with_logits(
+                        _reuse_logit, _real_binary, pos_weight=_pos_w
+                    )
+                    _grw = getattr(cfg, 'gumbel_reuse_weight', 1.0)
+                    g_loss = g_loss + _grw * _loss_gs
+                    reuse_rate_samples.append(_is_reuse_hard.mean().item())
+
                 # --- Auxiliary losses (in feature space) ---
                 # Moment matching (L_V): penalise differences in per-feature mean,
                 # std, slope, and skewness (ChronoGAN, ICMLA 2024).
@@ -2602,6 +2637,19 @@ def parse_args() -> Config:
     p.add_argument("--reuse-rate-target", type=float, default=0.265,
                    help="IDEA #51: target reuse rate for --reuse-rate-loss-weight. "
                         "alibaba=0.265, tencent=0.621 (from real corpus statistics).")
+    p.add_argument("--gumbel-reuse", action="store_true", default=False,
+                   help="IDEA #54: replace scalar obj_id_reuse with Gumbel-Softmax hard "
+                        "binary decision + BCE-logit supervision. Straight-through gradient "
+                        "forces discrete reuse decisions, naturally calibrating the rate.")
+    p.add_argument("--gumbel-reuse-weight", type=float, default=1.0,
+                   help="IDEA #54: BCE-logit weight for Gumbel-reuse supervision (default 1.0). "
+                        "At 1.0 the per-element BCE-logit gradient (~0.88) slightly dominates "
+                        "the WGAN gradient (~0.5), enforcing rate calibration without collapse.")
+    p.add_argument("--gumbel-tau-start", type=float, default=1.0,
+                   help="IDEA #54: initial Gumbel temperature (default 1.0). Annealed to "
+                        "--gumbel-tau-end over training.")
+    p.add_argument("--gumbel-tau-end", type=float, default=0.5,
+                   help="IDEA #54: final Gumbel temperature (default 0.5).")
     p.add_argument("--stride-consistency-weight", type=float, default=1.0,
                    help="Copy-path: penalise |stride| when real reuse=+1 (default 1.0).")
     p.add_argument("--pcf-loss-weight",      type=float, default=0.0,
@@ -2902,6 +2950,10 @@ def parse_args() -> Config:
     cfg.reuse_bce_weight            = args.reuse_bce_weight
     cfg.reuse_rate_loss_weight      = args.reuse_rate_loss_weight
     cfg.reuse_rate_target           = args.reuse_rate_target
+    cfg.gumbel_reuse                = args.gumbel_reuse
+    cfg.gumbel_reuse_weight         = args.gumbel_reuse_weight
+    cfg.gumbel_tau_start            = args.gumbel_tau_start
+    cfg.gumbel_tau_end              = args.gumbel_tau_end
     cfg.stride_consistency_weight   = args.stride_consistency_weight
     cfg.pcf_loss_weight             = args.pcf_loss_weight
     cfg.pcf_n_freqs                 = args.pcf_n_freqs
