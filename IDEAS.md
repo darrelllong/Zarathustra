@@ -2204,6 +2204,37 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 **Next step (IDEA #59)**: Freeze LSTM, fine-tune only `reuse_head` via BCE. This replaces Bernoulli injection with a learned (but h-independent) head. h has zero correlation with reuse in v195, so reuse_head will converge to predict 26.5% for all inputs — equivalent to Bernoulli injection but using the native model pipeline. If h has ANY weak temporal correlation with reuse, this provides marginal improvement over pure Bernoulli.
 
+## IDEA #63: Time-Conditioned Stack Distance Decoder (StackAtlas Lite)
+
+**Status**: Proposed (2026-04-22) — HIGH PRIORITY (replaces IDEA #62 Phase A)
+
+**Motivation**: LANL's StackAtlas works because it conditions the stack distance on interarrival time (dt_bin). Short-dt events → small stack distances (object recently accessed, near top of LRU stack). Long-dt events → large stack distances (object was pushed down by many intervening accesses). This is the core physical insight that IDEA #62's aggregate Markov chain completely misses.
+
+**LANL architecture (from altgan/model.py)**:
+- State = (time_bin, size_bin, action_class) where time_bin = quantile of log(dt)
+- Transition matrix T[state_i][state_j] from real traces via BIT-based exact stack distances
+- At generation time: look up current state from GAN's dt+size, sample next state from T, sample real event from reservoir[next_state]
+
+**LLNL approach (StackAtlas Lite)**:
+- Compute conditional PMF P(bucket | dt_bin) from real traces: for each reuse event, bin the dt = time since last access, compute true LRU stack distance (BIT-based), accumulate counts
+- 4 dt bins (log-quantile) × 8 stack buckets = 4×8 conditional PMF matrix
+- At generation time: dt_bin = quantile of GAN's generated ts_delta for this event; bucket ~ P(bucket | dt_bin)
+
+**Key difference from IDEA #62**: Conditioned on dt, not on previous bucket. Captures the physical causal relationship (dt → stack distance) rather than a spurious Markov chain over aggregated IRDs.
+
+**Implementation**:
+1. Run BIT-based `_stack_distances_bit()` on real traces (exact, but tractable for 200k events per file)
+2. Pair each stack distance with the interarrival time dt
+3. Bin dt into 4 quantile bins; accumulate conditional counts
+4. Save as 4×8 matrix `.npy` file
+5. In generate.py: add `--lru-stack-cond-pmf` flag; decoder looks up dt_bin from the decoded ts column, samples bucket from conditional row
+
+**Expected outcome**: If the GAN generates realistic dt distributions, conditioning should reduce HRC-MAE from 0.004622 toward LANL's PhaseAtlas 0.003010. If GAN dt is bad, improvement will be smaller.
+
+**Note**: This is the "1.5D" version of StackAtlas (1 state dimension = dt_bin, no size_bin, no full Markov chain). Adding size_bin × action_class gives full StackAtlas Phase A (IDEA #64).
+
+**Priority**: HIGH — ~100 lines implementation, no GAN training needed, directly attacks the IRD≠LRU failure mode of IDEA #62.
+
 ## IDEA #62: Empirical Markov Atlas Decoder (Counter-NeuralAtlas)
 
 **Status**: Proposed (2026-04-22) — HIGH PRIORITY
