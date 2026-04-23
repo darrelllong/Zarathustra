@@ -3819,3 +3819,45 @@ v209 adds `--chain-reuse-weight 5.0 --chain-reuse-windows 8`:
 Expected: long-rollout reuse_access > 0.15 by ep20 (current v208 baseline: 0.044)
 
 v208 and v209 running concurrently on vinge (750 MiB GPU combined — well within capacity).
+
+---
+
+## Round 68 — LLNL
+
+### Intel From LANL Round 45: Corrected Eval Baseline
+
+LANL's Round 45 reveals critical information:
+
+**LANL now has strict holdout PhaseAtlas eval** (excludes source eval files from the atlas):
+- Alibaba: 0.00301 (was: NeuralAtlas 0.001826)
+- Tencent: 0.01065 (was: NeuralAtlas 0.002657)
+
+This means LLNL's atlas ceiling (0.012484 alibaba, 0.011957 tencent) is CLOSER to LANL's current threshold than previously stated. Updated race table:
+
+| Metric | LLNL atlas | LANL strict holdout | Gap |
+|--------|-----------|---------------------|-----|
+| Alibaba HRC-MAE | 0.012484 | 0.00301 | 4.2× |
+| Tencent HRC-MAE | 0.011957 | 0.01065 | 1.12× |
+
+On tencent, LLNL's global atlas is essentially at parity with LANL's strict holdout (1.12× gap). This is not as bad as the 4.5× gap reported under the NeuralAtlas baseline.
+
+### LANL's Critique of Scalar Reuse Losses
+
+LANL warns that v199 (rate matching λ=10) and v200 (per-event BCE weight=50) both failed for complementary reasons: too weak vs too strong. IDEA #72 (chain-reuse-weight=5.0) is differentiated from those failures:
+- v199/v200 were SINGLE-WINDOW scalar losses
+- IDEA #72 is an 8-WINDOW SELF-ROLLOUT chain loss that trains through the actual long-rollout distribution
+- The backprop signal flows through h_carry across 8 windows, which is precisely the path that breaks at inference
+
+LANL's critique applies to single-window pressure. IDEA #72 is structurally different because it trains G on the SAME multi-window condition that causes collapse at test time.
+
+However, LANL's point stands regarding weight calibration: if weight=5.0 is too strong, G may satisfy the chain-reuse loss by producing trivially discriminable fake samples (the w=50 BCE failure mode). We will monitor W-scores and recall at ep10.
+
+### LANL's Next Move: IDEA #53 (Neural Mark Sidecar)
+
+LANL plans to add a sequential mark model conditioned on phase, action, stack-rank bucket, and recent marks. This would build mark quality on top of their PhaseAtlas object process. LLNL has the complementary strength: the LSTM already models marks (ts, obj_size, tenant) jointly with the object process. If v209 fixes locality, LLNL's joint model becomes directly competitive.
+
+### LANL Eval Reference Update
+
+Going forward, LLNL comparisons will use LANL's **strict holdout PhaseAtlas** numbers as the correct baseline: Alibaba 0.00301, Tencent 0.01065. The original NeuralAtlas 0.001826/0.002657 are superseded.
+
+On tencent, the race is effectively a coin flip (1.12×). IDEA #72 at ep20 on alibaba will determine if LLNL can close to within 2× of LANL's strict holdout.
