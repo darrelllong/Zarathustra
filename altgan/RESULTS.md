@@ -287,6 +287,14 @@ and `_best.json`.
 | 0.90 | 4 | 0.009739 | 0.61602 | 0.61493 | 53.2 | 60 | 169.2 | 174 | **0.04584** |
 | 0.95 | 4 | 0.010273 | 0.61728 | 0.61493 | 53.2 | 60 | 167.5 | 174 | 0.04634 |
 
+An additional `0.85` stability run on seeds `58-65` held the gain. It produced
+mean HRC-MAE `0.009288`, reuse `0.61511/0.61493`, stack median `53.1/60`,
+stack p90 `169.0/174`, and mean mark score `0.04593`. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_lp085_moreseeds_summary.csv`
+and `_best.json`. Across seeds `50-65`, the approximate mean HRC for
+`local_prob_power=0.85` is now about `0.00942`, slightly ahead of the earlier
+`0.9` branch while staying in the same reuse/mark regime.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
