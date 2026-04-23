@@ -223,6 +223,39 @@ diversity, driving opcode and tenant TV sharply upward.
 | temp 0.25, noise 0 | 0.003010 | 0.16519 | 0.26397 | 0.26395 |
 | temp 0.05, noise 0 | 0.003010 | 0.16526 | 0.26413 | 0.26415 |
 
+## Alibaba Mark-Hybrid Transition Confirmation
+
+Recorded 2026-04-22. This sweep used the attached Alibaba PhaseAtlas mark
+checkpoint
+`/tiamat/zarathustra/checkpoints/altgan/alibaba_phaseatlas_marks_e20.pkl.gz`
+with seeds `42,43,44,45`, transition blends `0.0,0.2`, local probability
+powers `0.9,1.0`, reservoir opcode/tenant, numeric blends `0.25,0.5,0.75,1.0`,
+and both raw/log numeric blend spaces. The full artifacts are
+`/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_hybrid_transition_confirm_summary.csv`
+and `_best.json`.
+
+| Candidate | Seeds | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio | mean fake reuse | mean stack med | mean stack p90 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| reservoir control, blend 0.0/local power 1.0 | 4 | 0.008698 | **0.00895** | 1.175 | 1.416 | 0.26152 | 203.0 | 1351.2 |
+| reservoir control, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01117 | 1.307 | 0.931 | 0.26699 | 198.2 | 1477.8 |
+| reservoir control, blend 0.2/local power 0.9 | 4 | 0.008501 | 0.01215 | 0.825 | 0.712 | 0.27338 | 194.8 | 1517.5 |
+| reservoir control, blend 0.2/local power 1.0 | 4 | 0.011285 | 0.01662 | 1.193 | 1.251 | 0.25797 | 203.5 | 1373.2 |
+| best hybrid so far: blend 0.0/local power 1.0, numeric 0.25 log | 4 | 0.008698 | 0.01839 | 0.000 | 1.190 | 0.26152 | 203.0 | 1351.2 |
+| hybrid: blend 0.2/local power 0.9, numeric 0.25 log | 4 | 0.008501 | 0.01890 | 0.012 | 0.644 | 0.27338 | 194.8 | 1517.5 |
+| hybrid: blend 0.0/local power 0.9, numeric 0.25 log | 4 | 0.005280 | 0.02093 | 0.000 | 0.794 | 0.26699 | 198.2 | 1477.8 |
+
+The seed-42 HRC leader is still the reservoir-control microblend row
+(`transition_blend=0.2`, `local_prob_power=0.9`) at HRC-MAE `0.002217`,
+but the four-seed mean again prefers the conservative object process
+(`transition_blend=0.0`, `local_prob_power=0.9`) on HRC. More importantly,
+every numeric neural-mark hybrid worsened mark score versus its paired
+reservoir control. Log-space blending softened the damage at low blend, but
+the best log hybrid still more than doubled mark score relative to the best
+reservoir control and collapsed timing drift toward zero. Treat direct
+post-hoc numeric blending as closed negative; the next mark-side attempt
+should be a residual or quantile-conditioned reservoir correction, not direct
+interpolation with the autoregressive mark head.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real
