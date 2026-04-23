@@ -3646,6 +3646,26 @@ To close the temporal clustering gap without a full sequence model, we propose a
 
 Target: match HRC@18 ≈ 0.056 on alibaba without training a sequence model. If p_burst≈0.05 and burst length follows Geom(0.9), the expected contribution at cs=18 is ≈ (0.05 × burst_len / total) ≈ 0.05 × 10 / 100 ≈ 0.05 which is in the right ballpark.
 
-### v208 Status: ep14 Stable
+**Empirical result (2026-04-23)**: Implemented and tested two variants:
 
-Ep14: W=+1.076, G=+0.715, no AMP overflow. Best so far ep5 (comb=0.141, recall=0.524). Standard early-epoch high-MMD² phase. Long-rollout eval scheduled at ep20.
+*Variant 1* (extra reuse — fires BEFORE normal step): burst adds extra reuse events at small ranks. p_burst=0.02 gets HRC@18=0.048 (closer to 0.056) but overall MAE=0.021 (WORSE than 0.012 baseline) because it inflates the entire HRC curve.
+
+*Variant 2* (redirect reuse — fires WITHIN wants_reuse): burst redirects existing reuse events to top-K pool without adding extra accesses.
+
+| p_burst | HRC-MAE | HRC@18 | vs LANL |
+|---------|---------|--------|---------|
+| 0.000 | 0.012484 | 0.032 | ✗ 6.8× worse |
+| 0.020 | 0.012763 | 0.035 | ✗ |
+| 0.040 | 0.012652 | 0.039 | ✗ |
+| 0.100 | 0.013858 | 0.051 | ✗ |
+| 0.150 | 0.017308 | 0.062 | ✗ |
+
+**Conclusion**: Burst injection cannot close the HRC-MAE gap vs LANL NeuralAtlas (0.001826). Variant 2 matches HRC@18 ≈ 0.056 at p_burst≈0.15 but increases MAE at large cache sizes (redirected reuses leave those ranks under-populated). The temporal clustering problem requires a working-set window model or a sequence model — marginal PMF sampling with any simple correction has a floor around HRC-MAE=0.012 on LANL's eval framework.
+
+**IDEA #67 status**: CLOSED-INSUFFICIENT. Atlas-based temporal clustering fix has a structural floor. Proper fix requires either: (a) Markov chain over object transitions (StackAtlas approach), or (b) working-set window generator that cycles K=18 hot objects per window of length W.
+
+### v208 Status: ep16, Strong Trajectory
+
+Ep15: EMA MMD²=0.01821, recall=0.578, comb=**0.10261** ★. Ep16: W=+1.003, G=+0.847. No AMP overflow.
+
+At ep15, v208 already beats v195's ep15 equivalent significantly. v195 reached comb=0.042 at ep110. If v208's trajectory holds, it may reach a new ★ record. Long-rollout eval scheduled at ep20.

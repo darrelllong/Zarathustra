@@ -2479,22 +2479,25 @@ with automatic evaluation and no `llgan/` edits.
 
 ## IDEA #67 (LLNL): Burst Injection for Temporal Clustering
 
-**Status**: PROPOSED (2026-04-23)
+**Status**: CLOSED-INSUFFICIENT (2026-04-23)
 
 **Problem**: IDEA #65b atlas samples LRU rank independently per access from the marginal PMF — no temporal autocorrelation. Real cache traces have short-window working sets: K≈10-20 hot objects accessed in bursts before shifting to a new working set. At cs=18: real HRC@18=0.056, LANL NeuralAtlas=0.056 (exact match), LLNL=0.0007 (80× worse). This accounts for LLNL's 11.5× deficit vs LANL on alibaba under LANL's eval framework.
 
-**Approach**: Zero-training-cost Markov approximation:
-1. Maintain a hot-object pool of K=20 recently-active synthetic object IDs
-2. At each generation step: with probability p_burst sample from hot pool (geometric burst), else sample from normal LRU PMF as today
-3. Hot pool update: when generating a "cold" access that maps to a new rank, add it to the pool; evict LRU pool member
-4. p_burst ≈ 0.05, burst run length ~ Geom(0.9) ≈ 10 accesses → expected HRC@K contribution ≈ p_burst × burst_len / per_access ≈ 0.05
+**Implementation**: Added `burst_prob` and `burst_pool_size` parameters to `PhasePMFAtlas.generate()`. Two variants tested:
+1. Extra reuse: fires before normal step, adds extra accesses to top-K pool → inflates total reuse rate
+2. Redirect reuse: fires within wants_reuse path, redirects fraction of reuse to top-K pool → preserves reuse rate
 
-**Expected outcome**:
-- HRC@18 shifts from 0.0007 → ~0.05 (matching real 0.056)
-- HRC at larger cache sizes unchanged (hot pool accesses still draw from top-ranked LRU objects)
-- No model training required; pure generation-time modification to phase_pmf_atlas.py
+**Empirical results (redirect variant, alibaba vs LANL eval framework)**:
+| p_burst | HRC-MAE | HRC@18 |
+|---------|---------|--------|
+| 0.000 | 0.012484 | 0.032 |
+| 0.040 | 0.012652 | 0.039 |
+| 0.100 | 0.013858 | 0.051 |
+| 0.150 | 0.017308 | 0.062 ≈ target |
 
-**Implementation**: Add `burst_prob` and `burst_pool_size` parameters to `PhasePMFAtlas.generate()`. Track per-stream hot pool. When bursting, resample the SAME object ID from the previous burst step; when switching, sample new LRU rank then map to object ID.
+**Conclusion**: At p=0.15, HRC@18≈0.062 matches the target but overall HRC-MAE=0.017 is WORSE than the baseline 0.012. Redirecting reuse to small ranks depletes large-rank hits → error shifts from small to large cache sizes. Net MAE does not improve.
 
-**Priority**: HIGH — this closes the structural gap vs LANL sequence models at small cache sizes.
+**Root cause**: The structural floor for marginal PMF sampling is ~HRC-MAE=0.012 on LANL's eval framework. Burst injection cannot break this floor. The real fix requires either: (a) Markov chain object transitions (StackAtlas), or (b) working-set window generator with K hot objects per window of length W. Both require fitting from trace data, not just calibrating from eval JSON histogram statistics.
+
+**Lesson**: Temporal clustering operates at the level of OBJECT IDENTITY sequences, not just LRU rank distributions. Matching the marginal LRU rank PMF is necessary but not sufficient for temporal clustering.
 
