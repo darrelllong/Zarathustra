@@ -1838,23 +1838,26 @@ def train(cfg: Config) -> None:
                     loss_reuse_rate = (_fake_rate - _r_target) ** 2
                     g_loss = g_loss + _rrw * loss_reuse_rate
 
-                # IDEA #72: long-chain reuse-rate loss (v2: sharp-sigmoid fix).
+                # IDEA #72 / #76: long-chain reuse-rate loss (v3: straight-through fix).
                 # Generate chain_reuse_windows windows with carried LSTM hidden
                 # state (self-rollout, matching inference) and penalise the mean
                 # reuse rate over the full chain vs the target.  Directly attacks
                 # the cascade locality collapse seen at long rollout (ep20/30: 4.5%
                 # reuse vs real 26.9%) where single-window reuse BCE is ineffective.
                 #
-                # FIX (v2): v209 used (val+1)/2 linear mapping which allowed G to
-                # satisfy the mean constraint at val≈-0.47 (prob=0.265) without
-                # any value exceeding the inference threshold at 0.  At inference,
-                # all -0.47 values → reuse=False → 0% actual reuse.
-                # v2 uses sigmoid(val * _SHARP_T) which approximates the hard
-                # threshold at 0: negative → ~0, positive → ~1.  G must now produce
-                # values that EXCEED 0 to contribute to the rate.
+                # v1 failure: (val+1)/2 — G set val≈-0.47 (prob=0.265) below threshold
+                # v2 failure: sigmoid(val*10) — G set val≈-0.102 (sigmoid=0.265) below threshold
+                # Both allow zero-gradient degenerate solutions below inference threshold.
+                #
+                # v3 FIX (IDEA #76): Straight-through estimator.
+                # forward = actual hard binary reuse (val>=0).float() — loss is non-zero
+                # at the degenerate solution (binary reuse=0 → loss=(0-target)²>0)
+                # backward = sigmoid gradient flows through — no zero-gradient trap
+                # This matches inference exactly in the forward pass, breaking all
+                # sub-threshold degenerate solutions.
                 _crw = getattr(cfg, 'chain_reuse_weight', 0.0)
                 _cr_windows = int(getattr(cfg, 'chain_reuse_windows', 8))
-                _SHARP_T = 10.0  # temperature: sigmoid(x*10) ≈ step(x)
+                _SHARP_T = 10.0  # temperature for straight-through backward gradient
                 if _crw > 0.0 and obj_id_col >= 0:
                     _z_gc_cr, _ = _make_z_global(B, cfg, device,
                                                   real_features=real_batch,
@@ -1870,9 +1873,13 @@ def train(cfg: Config) -> None:
                                              hidden=_h_cr, return_hidden=True)
                         _cr_reuse_chunks.append(_H_cr[:, :, obj_id_col])
                     _cr_reuse_all = torch.cat(_cr_reuse_chunks, dim=1)  # (B, T*N)
-                    # Sharp sigmoid approximates hard threshold at 0 (inference).
-                    # G must produce values > 0 to contribute to the mean rate.
-                    _cr_rate = torch.sigmoid(_cr_reuse_all * _SHARP_T).mean()
+                    # Straight-through estimator: hard binary in forward, sigmoid grad in back.
+                    # Degenerate solution (all val<0): binary rate=0 → loss=(0-target)²>0.
+                    # Gradient at val<0: d/d_val[sigmoid(val*T)] ≠ 0 → pushes val above 0.
+                    _cr_soft = torch.sigmoid(_cr_reuse_all * _SHARP_T)
+                    _cr_hard = (_cr_reuse_all >= 0).float()
+                    _cr_rate = _cr_soft + (_cr_hard - _cr_soft).detach()
+                    _cr_rate = _cr_rate.mean()
                     _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)
                     g_loss = g_loss + _crw * loss_chain_reuse
