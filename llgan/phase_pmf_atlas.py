@@ -173,9 +173,9 @@ class PhasePMFAtlas:
     ) -> "PhasePMFAtlas":
         import itertools
         rng = np.random.default_rng(seed)
-        files = sorted(glob.glob(os.path.join(trace_dir, "**", "*.zst"), recursive=True))
-        if not files:
-            files = sorted(glob.glob(os.path.join(trace_dir, "*.zst")))
+        # Top-level files only — matches training data; subdirs (e.g. 100K/) have
+        # pre-cropped traces with artificially high reuse rates.
+        files = sorted(glob.glob(os.path.join(trace_dir, "*.zst")))
         if max_files > 0:
             idx = rng.choice(len(files), min(max_files, len(files)), replace=False)
             files = [files[i] for i in sorted(idx)]
