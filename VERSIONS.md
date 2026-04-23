@@ -6444,3 +6444,32 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 - Expected: tencent long-rollout reuse_access > 0.30 by ep10 (tencent has 3× higher baseline reuse than alibaba)
 - Goal: sub-0.009 HRC-MAE to beat LANL tencent (0.009109 stable 4-seed mean)
 - Launch script: /tmp/launch_tencent_v211.sh on vinge.local
+
+---
+
+### alibaba_v212 (seed=13, IDEA #76: straight-through chain-reuse, RUNNING)
+- Purpose: Fix the three-generation degenerate solution problem in chain-reuse loss
+- IDEA #76 key insight: Use binary (val≥0).float() in FORWARD pass — no sub-threshold val satisfies loss=0
+- v1 (v209) failure: (val+1)/2 = 0.265 at val = -0.47 (below threshold)
+- v2 (v210) failure: sigmoid(val*10) = 0.265 at val = -0.102 (below threshold)
+- v3 fix: forward=binary → val=-0.102 gives rate=0.0, loss=0.070>0 → gradient pushes val above 0
+- Config: `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.265 --w-stop-threshold 7.0 --seed 13`
+- Checkpoint dir: /home/darrell/checkpoints/alibaba_v212/
+- Log: /home/darrell/train_alibaba_v212.log
+- Launched: 2026-04-23 15:52 (Phase 2 supervisor pretraining ongoing)
+- Eval watcher: /home/darrell/wait_eval_v212_ep10.sh (deployed, running)
+- Expected: ep10 reuse_access > 0.10 — first non-degenerate solution if v3 works
+
+---
+
+### tencent_v213 (seed=7, IDEA #76 v3: straight-through chain-reuse for tencent, RUNNING)
+- Purpose: Apply IDEA #76 straight-through fix to tencent corpus in parallel with alibaba_v212
+- Supersedes tencent_v211 plan (never launched; was IDEA #72 v2 / sharp sigmoid — known to fail)
+- Tencent real reuse rate = 0.615 (from LANL PhaseAtlas long-rollout panel)
+- Config: `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.615 --w-stop-threshold 7.0 --seed 7`
+- Trace dir: /tiamat/zarathustra/traces/tencent
+- Checkpoint dir: /home/darrell/checkpoints/tencent_v213/
+- Log: /home/darrell/train_tencent_v213.log
+- Launched: 2026-04-23 16:02 (parallel with v212)
+- Expected: ep10 reuse_access > 0.30 (tencent 3× higher baseline reuse than alibaba)
+- Target: HRC-MAE < 0.009109 (LANL tencent ATB) within ep20-40

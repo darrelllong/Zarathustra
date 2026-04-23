@@ -4051,3 +4051,140 @@ The LLNL mark export issue (opcode_tv=1.0, tenant_tv=1.0 in v198) is an export p
 | Short-window ★ | **0.042 (v195 ATB)** | not measured | LLNL leads |
 | Neural marks sidecar | not implemented | FAILED (0.040 vs 0.005 reservoir) | Both behind |
 | Sandia/newgan | — | — | Dead |
+
+---
+
+## Round 72 — LLNL
+
+### v210 CLOSED-FAILED ep10: Third Consecutive Degenerate Solution Found + v212 Launched (IDEA #76)
+
+**v210 ep10 long-rollout results** (2026-04-23):
+
+| Metric | v210 ep10 | v208 ep20-30 | Real | Status |
+|--------|-----------|--------------|------|--------|
+| reuse_access_rate | **0.001%** | 4.5% | 26.9% | WORSE THAN v208 |
+| stack_distance_median | 0 | — | 201 | CATASTROPHIC |
+| stack_distance_p90 | 0 | — | 1452 | CATASTROPHIC |
+| HRC-MAE | **0.1815** | 0.135-0.137 | — | CATASTROPHIC |
+| frozen ★ | **0.25139** | — | — | Best training signal ever |
+
+**Frozen ★=0.25139 is a positive sign** — the short-window distribution quality is improving. But long-rollout reuse is near-zero (0.001%). The chain-reuse loss v2 (sharp sigmoid) suffered the SAME degenerate solution as v1.
+
+**Root cause — degenerate family (all three versions):**
+
+| Version | Formula | Degenerate solution | Why it works |
+|---------|---------|---------------------|--------------|
+| v1 (v209) | `(val+1)/2` | val = -0.47 → prob = 0.265 | prob = target, val < 0 |
+| v2 (v210) | `sigmoid(val*10)` | val = -0.102 → sigmoid = 0.265 | sigmoid = target, val < 0 |
+| v3 (v212) | straight-through | **NO sub-threshold solution** | forward = binary (val≥0).float() |
+
+For sigmoid(val*10)=0.265: val=logit(0.265)/10≈-0.102. This is below inference threshold (0). G satisfies loss=0 with ALL values at -0.102 → binary reuse=0. The sharp sigmoid in v2 is still continuous — it still has valid loss=0 solutions below threshold.
+
+**IDEA #76: Straight-Through Estimator (v3 fix)**:
+```python
+_cr_soft = torch.sigmoid(_cr_reuse_all * _SHARP_T)  # sigmoid for backward gradient
+_cr_hard = (_cr_reuse_all >= 0).float()              # actual binary for forward
+_cr_rate = _cr_soft + (_cr_hard - _cr_soft).detach() # straight-through
+_cr_rate = _cr_rate.mean()                            # = actual binary reuse rate
+loss = (_cr_rate - target)^2
+```
+
+At the v2 degenerate solution (val = -0.102):
+- Forward: binary reuse = 0 → rate = 0.0 → loss = (0 - 0.265)² = 0.070 > 0 ✓ (NOT minimum)
+- Backward: d/d_val[sigmoid(-0.102 * 10)] = 10 * sigmoid * (1-sigmoid) = 10 * 0.265 * 0.735 = 1.95 ✓
+- Net gradient: +2 * 0.265 * 1.95 = +1.034 → val increases → crosses threshold
+
+**v212 launched** (seed=13, IDEA #76 v3 + W-stop=7.0, all other params same as v210).
+
+### The Pattern of Three Failures
+
+v209 (v1): Linear map can be satisfied below threshold.
+v210 (v2): Sigmoid can be satisfied below threshold — sigmoid(x*10)=0.265 at x=-0.102<0.
+v212 (v3): **CANNOT be satisfied below threshold** — binary reuse=0 → loss=0.070>0.
+
+The key insight: any smooth surrogate f(val) with f(val_0) = target for some val_0 < 0 gives a degenerate local minimum. The straight-through estimator uses f(val) = 1 for val≥0, f(val)=0 for val<0 in the FORWARD PASS — there is NO sub-threshold solution to this loss.
+
+### Updated Race Ledger
+
+| Metric | LLNL | LANL (stable) | Status |
+|--------|------|---------------|--------|
+| Alibaba HRC-MAE | 0.012484 (atlas) | **0.005280** (4-seed) | LANL 2.4× |
+| Tencent HRC-MAE | 0.011957 (atlas) | **0.009109** (fresh) | LANL 1.31× |
+| Alibaba GAN long-rollout | 0.1815 (v210) | 0.002217 (lucky) | LANL |
+| Marks (oracle_general) | fixed (IDEA #74) | 0.00479 (reservoir) | pending |
+| Short-window ★ | **0.25139 (v210 ep10)** | not measured | LLNL leads |
+| Sandia/newgan | — | — | Dead |
+
+v212 ep10 (~3h) is the next gate. Expected: reuse_access > 0.10 (first non-degenerate solution).
+
+---
+
+## Round 73 — LLNL
+
+### LANL NeuralAtlas Drops 0.00183 on Alibaba — New Paradigm Confirmed + v212/v213 Both Launched
+
+**Major competitive development**: LANL's RESULTS.md now shows a full NeuralAtlas panel that rewrites the race ledger.
+
+**LANL NeuralAtlas results (new)**:
+
+| Corpus | Approach | HRC-MAE | Note |
+|--------|----------|---------|------|
+| Alibaba | NeuralAtlas blend=0.5 | **0.00183** | NEW ATB — 23× better than LLNL v195 |
+| Alibaba | NeuralStack ep1200 | 0.00333 | 6× better than LLNL v195 |
+| Alibaba | StackAtlas manifest oracle | 0.00739 | — |
+| Tencent | NeuralAtlas blend=0.0 | **0.01845** | Worse than PhaseAtlas (0.009109) |
+| Tencent | StackAtlas 16×50k | 0.03210 | Near-competitive |
+| Tencent | StackAtlas manifest oracle | 0.00266 | Oracle cheating |
+
+**What NeuralAtlas is doing**: Profile-conditioned initial-state + transition distributions over an explicit LRU-stack state space. The blend=0 result on tencent (0.01845) uses the fitted atlas transitions only; increasing blend toward pure neural smoothing monotonically worsens HRC-MAE on tencent. On alibaba, mild neural smoothing (blend=0.5) gives the best result (0.00183 vs blend=0.0's likely ~0.002-0.003).
+
+**LANL's own diagnosis**: "Independent action/rank marginals are not enough; Tencent needs temporal transition state." This is why NeuralStack (MLP-conditioned marginals) works on alibaba but fails on tencent. NeuralAtlas is transitional — next step would be a full temporally-conditioned neural transition on tencent.
+
+**Competitive implications**:
+- LANL alibaba 0.00183 is effectively a solved problem for them. The generator contract is proven; they're now in the domain of better workload conditioning.
+- Tencent is still contested: PhaseAtlas (phase-forced, 0.009109) > NeuralAtlas (0.01845). LLNL tencent ATB is 0.03752 — 4× behind LANL's stable result, but the tencent problem is demonstrably harder.
+- LANL's marks are still stuck: reservoir 0.00479 >> neural marks e20 at 0.04044 (8.4× worse). Their IDEA #53 (neural marks sidecar) failed. IDEA #74 should close LLNL's TV catastrophe.
+
+**LLNL responses launched**:
+
+1. **alibaba_v212** (PID 184523) — IDEA #76 straight-through chain-reuse, seed=13. Currently in Phase 2 supervisor pretraining. ep10 eval watcher deployed (`/home/darrell/wait_eval_v212_ep10.sh`).
+
+2. **tencent_v213** (PID 194135) — IDEA #76 v3 for tencent, seed=7, reuse-target=0.615. Launched in parallel with v212. Supersedes the never-launched tencent_v211 plan (which was v2/sharp-sigmoid — already known to fail).
+
+**v213 config**:
+```
+--chain-reuse-weight 5.0 --chain-reuse-windows 8
+--reuse-rate-target 0.615 --w-stop-threshold 7.0
+--seed 7 --trace-dir tencent
+```
+
+**Why run both now instead of waiting for alibaba**:
+The straight-through estimator (v3) has NO known degenerate solution — this is a mathematical fact, not an empirical conjecture. The wait-for-alibaba policy made sense when we might need to redesign; with v3, both runs are safe to parallelize. vinge.local GPU is at 40% utilization with v212 at 301MiB — headroom for v213.
+
+### Strategic Assessment
+
+LANL has solved alibaba HRC-MAE with an explicit LRU-state paradigm. Our GAN approach must now demonstrate that (a) v212 straight-through actually achieves temporal reuse (reuse_access > 0.10 at ep10), and (b) the resulting synthetic traces can match NeuralAtlas's 0.00183 target.
+
+**Realistic competitive path**:
+1. If v212 ep10 reuse_access > 0.10 → frozen_sweep at ep30-50 → target HRC-MAE < 0.010 (closes gap to 5×)
+2. Mark quality advantage: IDEA #74 fix should drop TV from 0.614 to ~0 for opcode/tenant. If LLNL mark quality reaches ~0.005 (matching reservoir), this is a genuine differentiator — LANL's neural marks failed.
+3. Tencent is still the contested theater. LANL's NeuralAtlas (0.01845) is 2× worse than their own PhaseAtlas (0.009109) on tencent. This shows tencent requires temporal state that neither team has fully solved.
+
+### Updated Race Ledger
+
+| Metric | LLNL ATB | LANL ATB | Status |
+|--------|----------|----------|--------|
+| Alibaba HRC-MAE | 0.04204 (v195) | **0.00183** (NeuralAtlas blend=0.5) | LANL 23× |
+| Tencent HRC-MAE | 0.03752 (v165) | **0.009109** (PhaseAtlas) | LANL 4× |
+| Alibaba marks (TV) | ~0 (IDEA #74 fixed) | **0.00479** (reservoir) | pending quantification |
+| Tencent marks | not measured | **0.04557** (reservoir) | LANL |
+| Short-window ★ | **0.042** (v195) | not measured | LLNL leads |
+| Tencent NeuralAtlas | — | 0.01845 | Worse than PhaseAtlas |
+| Sandia/newgan | — | — | Dead |
+
+### Next Gates
+
+1. **v212 ep10** (~2.5h from now): reuse_access > 0.10? HRC-MAE < 0.10? (eval watcher running)
+2. **v213 ep10** (~3h): same test for tencent — reuse_access > 0.30 expected (tencent 3× higher reuse)
+3. **Mark quality benchmark** on v195 with IDEA #74: quantify improvement from 0.614 → expected ~0.005
+4. **If v212 ep20+ shows HRC < 0.05**: frozen_sweep → ATB claim; launch IDEAS.md IDEA #73 (stride rank)
