@@ -2701,3 +2701,38 @@ From trace characterization, real alibaba mean(|stride| | reuse=True) can be ext
 **Race gap**: LANL tencent = 0.009109 HRC-MAE (4-seed mean). LLNL atlas = 0.011957. If v211 achieves reuse_access > 0.50 by ep50, HRC-MAE should approach or beat LANL's tencent position.
 
 **Status**: PLANNED — launch script at /tmp/launch_tencent_v211.sh on vinge.local. Will launch after alibaba_v210 ep10 confirms positive reuse trajectory.
+
+## IDEA #76 (LLNL): Straight-Through Estimator for Chain-Reuse Loss (v3 Fix)
+
+**Status**: IMPLEMENTED in train.py; running in v212 (alibaba) and v213 (tencent)
+
+**Problem solved**: Three consecutive IDEA #72 implementations (v1, v2 sharp-sigmoid) all produced degenerate solutions where val < 0 satisfied the loss exactly, giving binary reuse=0 at inference.
+
+**Mechanism**: Forward pass uses hard binary `(val >= 0).float()` — the actual inference-time reuse signal. Backward pass uses sigmoid gradient. At any sub-threshold degenerate solution (val < 0), forward gives rate=0.0, loss=(0-target)²>0, gradient=nonzero → pushes val above 0.
+
+**Code**:
+```python
+_cr_soft = torch.sigmoid(_cr_reuse_all * _SHARP_T)
+_cr_hard = (_cr_reuse_all >= 0).float()
+_cr_rate = _cr_soft + (_cr_hard - _cr_soft).detach()  # straight-through
+_cr_rate = _cr_rate.mean()
+loss_chain_reuse = (_cr_rate - r_target).pow(2)
+```
+
+**Running**: alibaba_v212 (seed=13, target=0.265), tencent_v213 (seed=7, target=0.615)
+
+## IDEA #77 (LLNL): Phase-Conditioned Chain-Reuse (Position-Aware Temporal Locality)
+
+**Status**: PLANNED
+
+**Motivation**: LANL's PhaseAtlas strict holdout wins by conditioning generation on within-file position (phase bins). Their best tencent result (0.00887 HRC-MAE) uses 8 phase bins + late rank scale. LLNL's chain-reuse loss applies uniform reuse pressure across all 8 windows — but real traces have phase-varying reuse (early accesses cold, steady-state reuse rate settles later).
+
+**Design**: Extend the chain-reuse loss with a per-window target instead of a global mean:
+1. Divide N=8 chain-reuse windows into K=3 phases (early: 0-2, mid: 3-5, late: 6-7)
+2. Apply phase-specific reuse targets: early_target < global_target < late_target
+3. Alibaba example: early=0.15, mid=0.265, late=0.35 (from real trace phase analysis)
+4. Tencent example: early=0.45, mid=0.615, late=0.70
+
+**Expected benefit**: Forces the generator to model the buildup pattern (low reuse early as the cache is cold, high reuse once working set is established) — this is exactly what LANL's phase bins capture in their explicit LRU model.
+
+**Prerequisite**: IDEA #76 must work (v212 ep10 reuse_access > 0.10). Then add phase conditioning as v214.

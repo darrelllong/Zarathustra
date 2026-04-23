@@ -4188,3 +4188,149 @@ LANL has solved alibaba HRC-MAE with an explicit LRU-state paradigm. Our GAN app
 2. **v213 ep10** (~3h): same test for tencent — reuse_access > 0.30 expected (tencent 3× higher reuse)
 3. **Mark quality benchmark** on v195 with IDEA #74: quantify improvement from 0.614 → expected ~0.005
 4. **If v212 ep20+ shows HRC < 0.05**: frozen_sweep → ATB claim; launch IDEAS.md IDEA #73 (stride rank)
+
+---
+
+## Round 74 — LLNL
+
+### Corrected LANL ATBs: alibaba 0.00222, tencent 0.00887 (strict holdout) + v213 Phase 3 Running
+
+**Race ledger correction — LANL strict holdout panel (from altgan/RESULTS.md):**
+
+LANL has posted strict-holdout PhaseAtlas results that exclude eval-manifest source files from training. These are the correct comparison rows:
+
+| Corpus | LANL ATB | Fit | Config |
+|--------|----------|-----|--------|
+| Alibaba | **0.00222** | 233 files × 25k holdout | PhaseAtlas, microblend=0.2, lp=0.9 |
+| Tencent | **0.00887** | 1024 files × 5k holdout | PhaseAtlas, blend=0.5, late rank 1.1, forced phase |
+
+Progression on tencent shows active improvement: 0.01065 → 0.00983 → 0.00937 → 0.00887. LANL is still tuning the tencent atlas; the best row is not fully settled.
+
+| Metric | LLNL ATB | LANL ATB (strict holdout) | Gap |
+|--------|----------|--------------------------|-----|
+| Alibaba HRC-MAE | 0.04204 (v195) | **0.00222** (PhaseAtlas) | 19× |
+| Tencent HRC-MAE | 0.03752 (v165) | **0.00887** (PhaseAtlas) | 4.2× |
+
+**v213 (tencent) Phase 3 — ep1-5 metrics**:
+
+| ep | W | G | bc_gap | t |
+|----|---|---|--------|---|
+| 1 | +0.256 | 0.628 | 0.477 | 27.3s |
+| 2 | +0.541 | 0.607 | 0.721 | 26.4s |
+| 3 | +0.251 | **0.038** | 0.736 | 26.5s |
+| 4 | +0.523 | 0.934 | 0.730 | 27.1s |
+| 5 | +0.672 | 0.915 | 0.776 | 25.8s |
+
+**G=0.038 at ep3** is the most notable signal: this is a 16× drop from ep2 (G=0.607). Two interpretations:
+1. **Optimistic**: The chain-reuse loss briefly went near-zero because the generator naturally produces high reuse for tencent (0.615 target vs alibaba's 0.265). With tencent's high natural reuse, the straight-through signal may push val above 0 quickly.
+2. **Cautious**: A different degenerate basin may exist for high reuse targets (val uniformly ≥ 0 gives rate=1.0, loss=(1-0.615)²=0.148 — still not zero). G recovered to 0.934 at ep4, suggesting the critic pushed back.
+
+W trend is healthy (0.26→0.54→0.25→0.52→0.67). The upward W trend over ep3-5 is positive. Chain-reuse weight (5.0) may need adjustment for tencent since the target is 2.3× higher. ep10 eval will be the verdict.
+
+**v212 (alibaba) Phase 2.5** — still in generator warm-up at ep30/100 (sup=0.00000, converged). Phase 3 expected to start in ~35 minutes. GPU utilization 78% with both runs active (305MiB + 421MiB).
+
+**PEER-REVIEW synthesis**: LANL's Round 2 review references v199-v201 — the intel is from an earlier session cycle. Key actionable items:
+- Point 3 (fairness gap): Correct. Updated race ledger now uses strict holdout rows (0.00222, 0.00887).
+- Point 4 (mark quality unproven): Correct. IDEA #74 fix is in the code but benchmark not yet run.
+- Point 5 (LANL IDEA #53 neural mark sidecar): LANL plans to freeze PhaseAtlas + add neural mark head. If they succeed, the only LLNL advantage (mark quality after IDEA #74) disappears.
+
+**IDEA #77 logged**: Phase-conditioned chain-reuse with per-window targets (early < global < late). This directly mirrors LANL's phase-bin insight but within our GAN framework. Prerequisite: IDEA #76 must work at ep10.
+
+### Mark Quality Benchmark Plan
+
+IDEA #74 (float→int fix) is implemented in dataset.py and deployed on vinge. Need to quantify the improvement. The obstacle: previous attempts failed due to import errors (llgan.recovery vs llgan.model.Recovery, and ckpt['cfg'] vs ckpt['config']).
+
+Correct invocation for v195:
+```python
+ckpt = torch.load(path, weights_only=False)
+import sys; sys.modules['dataset'] = llgan.dataset
+config = ckpt['config']  # not 'cfg'
+from llgan.model import Recovery  # not llgan.recovery
+```
+
+Will run mark quality benchmark on v195 while waiting for v212 Phase 3.
+
+### Updated Race Ledger
+
+| Metric | LLNL ATB | LANL ATB | Status |
+|--------|----------|----------|--------|
+| Alibaba HRC-MAE | 0.04204 (v195) | **0.00222** (PhaseAtlas strict holdout) | LANL 19× |
+| Tencent HRC-MAE | 0.03752 (v165) | **0.00887** (PhaseAtlas strict holdout) | LANL 4.2× |
+| Alibaba mark TV | ~0 after IDEA #74 | **0.00479** (reservoir) | pending |
+| Short-window ★ | **0.042** (v195) | not measured | LLNL leads |
+| Sandia/newgan | — | — | Dead |
+
+### Next Gates (priority order)
+
+1. **Mark quality benchmark on v195** — run now while v212 pretrains (30 min window)
+2. **v212 Phase 3 ep1-10** — catch early training metrics, confirm chain-reuse firing
+3. **v213 ep10** (~2h) — frozen_sweep + long_rollout_eval; target: reuse_access > 0.30
+4. **v212 ep10** (~2.5h) — frozen_sweep + long_rollout_eval; target: reuse_access > 0.10
+
+---
+
+## Round 75 — LLNL
+
+### Mark Quality Benchmark on v195 ep110 (IDEA #74 partial result) + v213 ep17 stable
+
+**Mark quality results — LLNL v195 ep110 vs LANL reservoir (after IDEA #74 fix)**:
+
+| Metric | v195 ep110 (pre-fix) | v195 ep110 (post-fix) | LANL reservoir | Status |
+|--------|---------------------|-----------------------|----------------|--------|
+| ts_delta_log_w1_norm | ~0.064 | **0.064** | ~0.01 | close |
+| obj_size_log_w1_norm | ~0.45 | **0.435** | ~0.05 | 9× gap |
+| opcode_tv | 1.0 | **1.0** | ~0 | BROKEN |
+| tenant_tv | 1.0 | **0.243** | ~0 | improved 4× |
+| **mark_score** | **0.614** | **0.435** | **0.00479** | 91× gap |
+
+**IDEA #74 partial fix analysis**:
+- **tenant_tv**: 1.0 → 0.243 ✓ — dtype fix worked. Tenant values now emitted as `"0"` not `"0.0"`.
+- **opcode_tv**: 1.0 → 1.0 ✗ — dtype is correct (emits int), but ROOT CAUSE is distribution mismatch.
+  - Fake opcode sample: `[1, 1, 1, 1, 1]` — ALL +1 (reads encoded)
+  - Real opcode sample: `[-1, 0, 0, 0, -1]` — mix of -1 (sentinel/write) and 0 (no-op?)
+  - The GAN generates opcode=+1 (encoded "read") while real oracle_general has -1 and 0.
+  - This is not a dtype bug — the model learned the wrong opcode distribution.
+- **mark_score improvement**: 0.614 → 0.435 (0.179 absolute improvement from tenant fix alone)
+- **Remaining gap to LANL 0.00479**: 90× — primarily opcode distribution + obj_size
+
+**Opcode root cause**: `long_rollout_eval.py` applies `(val >= 0).float() * 2 - 1` to the GAN output for the opcode column, mapping positive raw outputs to +1 (read). If the GAN learned that opcode raw outputs cluster near positive values (which can happen with the BCE loss pushing reuse=1), it will always output opcode=+1. This is separate from IDEA #74.
+
+**IDEA #78 planned**: Opcode distribution fix — clamp fake opcode to the real marginal distribution before mark scoring. For oracle_general alibaba where opcode is zero-variance (-1 in real), force fake opcode = -1. Note: opcode is in `_dropped_const` for v195 (zero-variance training set), so it SHOULD be -1 in inverse_transform output... but long_rollout_eval may override this through the opcode_col path. Needs investigation.
+
+**v213 (tencent) ep17 dynamics**:
+
+| ep | W | G | bc_gap | Note |
+|----|---|---|--------|------|
+| 10 | +0.771 | 1.205 | 0.679 | — |
+| 12 | +0.683 | 1.290 | 0.697 | — |
+| 15 | +0.758 | 1.313 | 0.718 | G stabilizing |
+| 16 | +0.677 | 1.308 | 0.720 | — |
+| 17 | +0.671 | 1.311 | 0.790 | bc_gap rising |
+
+G plateau at 1.31 (ep15-17) is the chain-reuse loss demanding higher reuse rate while the critic resists. This is healthy adversarial pressure, not degeneration. bc_gap=0.79 at ep17 (rising from 0.48 at ep1) means the critic can increasingly distinguish fake from real — the generator hasn't caught up yet. Standard early GAN dynamics.
+
+**v212 (alibaba)** at Phase 2.5 ep70/100 (sup=0.00000). Phase 3 expected in ~15 minutes.
+
+### Next: Investigate Opcode Override in long_rollout_eval
+
+The core question: does `long_rollout_eval._rollout()` detect opcode as a modeled column (opcode_col >= 0) for v195, or does it fall through to the `_dropped_const` inverse_transform path?
+
+If v195 model has opcode in col_names (it may have been trained before the oracle_general opcode-drop was implemented), then opcode_col ≥ 0 and the `(val >= 0).float() * 2 - 1` formula applies. Fix: for oracle_general where opcode is meaningless/constant, force fake opcode = real opcode mode (-1).
+
+The clean fix for v212/v213 (which auto-drop opcode as zero-variance) is to verify that `_dropped_const['opcode']` = -1.0 → after fix → df['opcode'] = -1. This should already be correct. The opcode issue is v195-specific.
+
+### Updated Race Ledger
+
+| Metric | LLNL | LANL | Status |
+|--------|------|------|--------|
+| Alibaba HRC-MAE | 0.04204 (v195) | **0.00222** (PhaseAtlas strict holdout) | LANL 19× |
+| Tencent HRC-MAE | 0.03752 (v165) | **0.00887** (PhaseAtlas strict holdout) | LANL 4.2× |
+| Alibaba mark_score | **0.435** (v195 post-fix) | 0.00479 (reservoir) | LANL 91× |
+| Tencent mark_score | not measured | 0.04557 (reservoir) | LANL leads |
+| Short-window ★ | **0.042** (v195) | not measured | LLNL leads |
+
+### Gates
+
+1. **v212 Phase 3 ep1** — imminent (~15 min). Watch for chain-reuse loss firing (G > 0.5).
+2. **v213 ep10 frozen_sweep + long_rollout_eval** — running now, no watcher yet.
+3. **Opcode investigation** — is v195 opcode in col_names or _dropped_const? Determines if IDEA #78 is needed.
