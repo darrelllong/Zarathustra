@@ -60,6 +60,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Blend reservoir and neural dt/size: 0.0 reservoir, 1.0 neural.")
     p.add_argument("--mark-numeric-blend-space", choices=["raw", "log"], default="raw",
                    help="Blend neural/reservoir numeric marks in raw units or log-transformed units.")
+    p.add_argument("--mark-numeric-fields", choices=["both", "dt", "size"], default="both",
+                   help="Apply numeric blending to both marks, only timing dt, or only obj_size.")
     p.add_argument("--mark-categorical-source", choices=["neural", "reservoir"], default="neural",
                    help="Use neural or reservoir opcode/tenant when neural marks are attached.")
     p.add_argument("--real-manifest", default="")
@@ -110,6 +112,7 @@ def main() -> int:
         mark_numeric_noise=args.mark_numeric_noise,
         mark_numeric_blend=args.mark_numeric_blend,
         mark_numeric_blend_space=args.mark_numeric_blend_space,
+        mark_numeric_fields=args.mark_numeric_fields,
         mark_categorical_source=args.mark_categorical_source,
     )
     if args.disable_neural_marks:
@@ -147,6 +150,7 @@ def main() -> int:
         "mark_numeric_noise": args.mark_numeric_noise,
         "mark_numeric_blend": args.mark_numeric_blend,
         "mark_numeric_blend_space": args.mark_numeric_blend_space,
+        "mark_numeric_fields": args.mark_numeric_fields,
         "mark_categorical_source": args.mark_categorical_source,
         "uses_neural_marks": saved_mark_model is not None and not args.disable_neural_marks,
         "source_traces": source_names,

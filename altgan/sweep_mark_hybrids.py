@@ -42,6 +42,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--mark-numeric-blends", default="0.0,0.25,0.5,0.75,1.0")
     p.add_argument("--mark-numeric-blend-spaces", default="raw",
                    help="Comma-separated numeric blend spaces: raw, log.")
+    p.add_argument("--mark-numeric-fields", default="both",
+                   help="Comma-separated numeric field sets: both, dt, size.")
     p.add_argument("--categorical-sources", default="reservoir,neural")
     p.add_argument("--include-reservoir-control", action="store_true")
     p.add_argument("--skip-existing", action="store_true",
@@ -96,52 +98,57 @@ def main() -> int:
                         "",
                         "",
                         "",
+                        "",
                     ))
 
     for source in _split_str(args.categorical_sources):
         for transition_blend in transition_blends:
             for local_prob_power in local_prob_powers:
                 for blend_space in _split_blend_spaces(args.mark_numeric_blend_spaces):
-                    for blend in _split_float(args.mark_numeric_blends):
-                        for temp in _split_float(args.mark_temperatures):
-                            for noise in _split_float(args.mark_numeric_noises):
-                                for seed in seeds:
-                                    suffix = _transition_suffix(
-                                        (
-                                            f"cat-{source}_blend-{_slug(blend)}"
-                                            f"_space-{blend_space}_temp-{_slug(temp)}"
-                                            f"_noise-{_slug(noise)}_eval_100k.json"
-                                        ),
-                                        transition_blend,
-                                        local_prob_power,
-                                        include=include_transition_label,
-                                    )
-                                    path = out_dir / _label(args.prefix, seed, suffix, include_seed=len(seeds) > 1)
-                                    _run_eval(
-                                        args,
-                                        path,
-                                        seed=seed,
-                                        transition_blend=transition_blend,
-                                        local_prob_power=local_prob_power,
-                                        extra=[
-                                            "--mark-categorical-source", source,
-                                            "--mark-numeric-blend", str(blend),
-                                            "--mark-numeric-blend-space", blend_space,
-                                            "--mark-temperature", str(temp),
-                                            "--mark-numeric-noise", str(noise),
-                                        ],
-                                    )
-                                    rows.append(_summarize(
-                                        path,
-                                        seed,
-                                        transition_blend,
-                                        local_prob_power,
-                                        source,
-                                        blend,
-                                        blend_space,
-                                        temp,
-                                        noise,
-                                    ))
+                    for fields in _split_numeric_fields(args.mark_numeric_fields):
+                        for blend in _split_float(args.mark_numeric_blends):
+                            for temp in _split_float(args.mark_temperatures):
+                                for noise in _split_float(args.mark_numeric_noises):
+                                    for seed in seeds:
+                                        suffix = _transition_suffix(
+                                            (
+                                                f"cat-{source}_blend-{_slug(blend)}"
+                                                f"_space-{blend_space}_fields-{fields}"
+                                                f"_temp-{_slug(temp)}_noise-{_slug(noise)}"
+                                                "_eval_100k.json"
+                                            ),
+                                            transition_blend,
+                                            local_prob_power,
+                                            include=include_transition_label,
+                                        )
+                                        path = out_dir / _label(args.prefix, seed, suffix, include_seed=len(seeds) > 1)
+                                        _run_eval(
+                                            args,
+                                            path,
+                                            seed=seed,
+                                            transition_blend=transition_blend,
+                                            local_prob_power=local_prob_power,
+                                            extra=[
+                                                "--mark-categorical-source", source,
+                                                "--mark-numeric-blend", str(blend),
+                                                "--mark-numeric-blend-space", blend_space,
+                                                "--mark-numeric-fields", fields,
+                                                "--mark-temperature", str(temp),
+                                                "--mark-numeric-noise", str(noise),
+                                            ],
+                                        )
+                                        rows.append(_summarize(
+                                            path,
+                                            seed,
+                                            transition_blend,
+                                            local_prob_power,
+                                            source,
+                                            blend,
+                                            blend_space,
+                                            fields,
+                                            temp,
+                                            noise,
+                                        ))
 
     summary_path = Path(args.summary_csv) if args.summary_csv else out_dir / f"{args.prefix}_summary.csv"
     _write_summary(summary_path, rows)
@@ -194,6 +201,7 @@ def _summarize(
     source: object,
     blend: object,
     blend_space: object,
+    fields: object,
     temp: object,
     noise: object,
 ) -> dict:
@@ -210,6 +218,7 @@ def _summarize(
         "categorical_source": source,
         "mark_numeric_blend": blend,
         "mark_numeric_blend_space": blend_space,
+        "mark_numeric_fields": fields,
         "mark_temperature": temp,
         "mark_numeric_noise": noise,
         "uses_neural_marks": data.get("uses_neural_marks"),
@@ -272,6 +281,14 @@ def _split_blend_spaces(text: str) -> list[str]:
     return values
 
 
+def _split_numeric_fields(text: str) -> list[str]:
+    values = _split_str(text)
+    invalid = [v for v in values if v not in {"both", "dt", "size"}]
+    if invalid:
+        raise ValueError(f"invalid mark numeric fields: {', '.join(invalid)}")
+    return values
+
+
 def _split_int(text: str) -> list[int]:
     return [int(x.strip()) for x in text.split(",") if x.strip()]
 
@@ -293,7 +310,7 @@ def _transition_suffix(suffix: str, transition_blend: float, local_prob_power: f
 
 
 def _candidate_means(rows: list[dict]) -> list[dict]:
-    grouped: dict[tuple[object, object, object, object, object, object, object], list[dict]] = {}
+    grouped: dict[tuple[object, object, object, object, object, object, object, object], list[dict]] = {}
     for row in rows:
         key = (
             row["transition_blend"],
@@ -301,19 +318,21 @@ def _candidate_means(rows: list[dict]) -> list[dict]:
             row["categorical_source"],
             row["mark_numeric_blend"],
             row["mark_numeric_blend_space"],
+            row.get("mark_numeric_fields", "both"),
             row["mark_temperature"],
             row["mark_numeric_noise"],
         )
         grouped.setdefault(key, []).append(row)
 
     summary = []
-    for (transition_blend, local_prob_power, source, blend, blend_space, temp, noise), group in grouped.items():
+    for (transition_blend, local_prob_power, source, blend, blend_space, fields, temp, noise), group in grouped.items():
         summary.append({
             "transition_blend": transition_blend,
             "local_prob_power": local_prob_power,
             "categorical_source": source,
             "mark_numeric_blend": blend,
             "mark_numeric_blend_space": blend_space,
+            "mark_numeric_fields": fields,
             "mark_temperature": temp,
             "mark_numeric_noise": noise,
             "n_seeds": len(group),

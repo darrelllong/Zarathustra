@@ -95,12 +95,12 @@ def _render_markdown(
         "",
         f"Recorded: {date.today().isoformat()}. Source: `{source}`.",
         "",
-        "| rank | seed | transition blend | local power | source | numeric blend | space | temp | noise | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | reuse drift delta | timing drift ratio | size drift ratio | mark score | timing norm | size norm | opcode TV | tenant TV |",
-        "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| rank | seed | transition blend | local power | source | numeric blend | space | fields | temp | noise | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | reuse drift delta | timing drift ratio | size drift ratio | mark score | timing norm | size norm | opcode TV | tenant TV |",
+        "|---:|---:|---:|---:|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for idx, row in enumerate(top, start=1):
         lines.append(
-            "| {rank} | {seed} | {tb} | {lp} | {source} | {blend} | {space} | {temp} | {noise} | "
+            "| {rank} | {seed} | {tb} | {lp} | {source} | {blend} | {space} | {fields} | {temp} | {noise} | "
             "**{hrc}** | {fake_reuse} | {real_reuse} | {fake_med} | {real_med} | "
             "{fake_p90} | {real_p90} | {reuse_drift} | {ts_drift} | {size_drift} | "
             "{mark} | {ts} | {size} | {opcode} | {tenant} |".format(
@@ -111,6 +111,7 @@ def _render_markdown(
                 source=row["categorical_source"],
                 blend=_fmt(row["mark_numeric_blend"]),
                 space=row["mark_numeric_blend_space"] or "-",
+                fields=row.get("mark_numeric_fields", "both") or "-",
                 temp=_fmt(row["mark_temperature"]),
                 noise=_fmt(row["mark_numeric_noise"]),
                 hrc=_fmt(row["hrc_mae"]),
@@ -136,12 +137,12 @@ def _render_markdown(
             "",
             "Seed-mean ranking:",
             "",
-            "| rank | seeds | transition blend | local power | source | numeric blend | space | temp | noise | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |",
-            "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---:|---:|---:|",
+            "| rank | seeds | transition blend | local power | source | numeric blend | space | fields | temp | noise | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |",
+            "|---:|---:|---:|---:|---|---:|---|---|---:|---:|---:|---:|---:|---:|",
         ])
         for idx, row in enumerate(means[: max(int(mean_top_n), 1)], start=1):
             lines.append(
-                "| {rank} | {seeds} | {tb} | {lp} | {source} | {blend} | {space} | {temp} | {noise} | "
+                "| {rank} | {seeds} | {tb} | {lp} | {source} | {blend} | {space} | {fields} | {temp} | {noise} | "
                 "**{hrc}** | {mark} | {ts_drift} | {size_drift} |".format(
                     rank=idx,
                     seeds=row["n_seeds"],
@@ -150,6 +151,7 @@ def _render_markdown(
                     source=row["categorical_source"],
                     blend=_fmt(row["mark_numeric_blend"]),
                     space=row["mark_numeric_blend_space"] or "-",
+                    fields=row.get("mark_numeric_fields", "both") or "-",
                     temp=_fmt(row["mark_temperature"]),
                     noise=_fmt(row["mark_numeric_noise"]),
                     hrc=_fmt(row["mean_hrc_mae"]),
@@ -207,6 +209,7 @@ def _augment_means_from_rows(means: list[dict[str, Any]], rows: list[dict[str, s
             row["categorical_source"],
             row["mark_numeric_blend"],
             row["mark_numeric_blend_space"],
+            row.get("mark_numeric_fields", "both"),
             row["mark_temperature"],
             row["mark_numeric_noise"],
         )
@@ -221,6 +224,7 @@ def _augment_means_from_rows(means: list[dict[str, Any]], rows: list[dict[str, s
             str(mean["categorical_source"]),
             str(mean["mark_numeric_blend"]),
             str(mean["mark_numeric_blend_space"]),
+            str(mean.get("mark_numeric_fields", "both")),
             str(mean["mark_temperature"]),
             str(mean["mark_numeric_noise"]),
         )
