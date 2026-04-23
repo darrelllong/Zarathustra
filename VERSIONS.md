@@ -6433,3 +6433,14 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.89→0.76→0.69) is healthy. ep5 ★=0.186 and recall=0.405 both already exceed v208 ep10 frozen ★=0.151 in training metrics.
 
 **Wait: ep10 long_rollout_eval running via wait_eval_v210_ep10.sh** (target: reuse_access > 0.10)
+
+---
+
+### tencent_v211 (seed=7, IDEA #72 v2: sharp-sigmoid chain-reuse for tencent, PLANNED)
+- Recipe: Same as alibaba_v210 but `--trace-dir tencent`, `--reuse-rate-target 0.615`
+- Tencent real reuse rate: ~0.615 (from LANL PhaseAtlas long-rollout panel: fake 0.61451, real 0.61493)
+- Config: `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.615 --w-stop-threshold 7.0 --seed 7`
+- Will launch after v210 ep10 confirms positive reuse trajectory
+- Expected: tencent long-rollout reuse_access > 0.30 by ep10 (tencent has 3× higher baseline reuse than alibaba)
+- Goal: sub-0.009 HRC-MAE to beat LANL tencent (0.009109 stable 4-seed mean)
+- Launch script: /tmp/launch_tencent_v211.sh on vinge.local
