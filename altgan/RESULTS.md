@@ -163,6 +163,25 @@ the reuse decision. The next runnable probe should add caps around the late
 `1.1` schedule to stop seed-42 p90 overshoot while preserving the two-seed
 mean gain.
 
+The late-rank cap probe closed negative. It kept the same late `1.1` schedule
+and tried caps on the late phases. Caps reduced p90, but every capped setting
+gave back HRC; the uncapped schedule remained best. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_late_rankcap_confirm_summary.csv`
+and `_best.json`.
+
+| transition_blend | late phase maxes | seeds | mean HRC-MAE | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | none | 2 | **0.009645** | 52.0 | 60 | 174.0 | 174 | 0.04800 |
+| 0.50 | 176,176 | 2 | 0.011655 | 52.0 | 60 | 173.0 | 174 | 0.04800 |
+| 0.50 | 160,160 | 2 | 0.013744 | 52.0 | 60 | 160.0 | 174 | 0.04800 |
+| 0.65 | none | 2 | **0.009634** | 54.5 | 60 | 174.0 | 174 | 0.04729 |
+| 0.65 | 176,176 | 2 | 0.012361 | 54.5 | 60 | 170.0 | 174 | 0.04729 |
+| 0.65 | 160,160 | 2 | 0.014576 | 54.5 | 60 | 160.0 | 174 | 0.04729 |
+
+Treat caps as closed for this Tencent branch. The useful hypothesis is now
+uncapped late-phase rank expansion, which needs a four-seed confirmation before
+promotion.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
