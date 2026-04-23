@@ -3704,3 +3704,23 @@ v208 (seed=11, no-amp, same v195 recipe) is at ep16. Ep15 logged comb=0.10261, r
 **Key question at ep20**: does long-rollout reuse_access climb above 0.05? v195 ep110 had catastrophic reuse_access=0.0081. If v208 shows the same pattern at ep20 eval, the AMP fix alone isn't the locality fix. If reuse_access > 0.10, seed=11 + no-amp is genuinely breaking the locality collapse pattern.
 
 **Strategy**: run full long-rollout eval at ep20. If locality OK → continue training to ep50/100/200. If catastrophic → investigate v208 with explicit reuse conditioning (IDEA #201 style).
+
+### v208 ep20 Long-Rollout: CATASTROPHIC (same pattern as v195)
+
+**Result** (2026-04-23): reuse_access=**0.0462** vs real=0.2691 (−82.8%), HRC-MAE=**0.135**, stack_distance_median=0 vs real=201 (−100%). The AMP fix improved short-window training quality (comb=0.08 at ep20 — outstanding early trajectory) but did NOT fix long-rollout locality. Same structural collapse as every previous version.
+
+**Training trajectory is remarkable** though: recall=0.696 at ep20. For reference, v195 only reached ★=0.042 at ep110. v208 is significantly better on short-window quality and may set a new ★ record by ep50-100.
+
+**Root cause confirmed**: The GAN architecture has no mechanism to maintain an object population across a long rollout. At training time, each window starts from a real trace segment that already has object history. At long-rollout generation time, the model generates from scratch with no context → generates almost all cold (new) objects. This is not an AMP issue, a seed issue, or a training dynamics issue — it is a **generation-time architectural absence**.
+
+### Next Steps
+
+The peer review (LANL Round 45) is correct: we need structural locality, not scalar pressure. The path forward:
+
+1. **v208 → ep50 eval**: continue training, check if locality improves to ep50. If reuse_access > 0.10 at ep50, v208 may converge differently. Currently: ep20 = 0.046, ep110 estimate depends on trajectory.
+
+2. **IDEA #68 (proposed)**: Explicit object-reuse conditioning on training generation side. At generation time, maintain a per-stream "hot object pool" in the G forward pass — inject the last K generated object IDs as conditioning, training G to re-access them according to target reuse_rate. This is the "hard conditioning" approach rather than the soft BCE weight approach that has repeatedly failed.
+
+3. **Atlas over GAN** for the immediate race: IDEA #65b atlas with temporal clustering remains LLNL's best long-rollout HRC tool. Even at HRC-MAE=0.012 (vs LANL 0.001826), it's far better than the GAN's 0.135. The atlas path needs working-set window modeling to close the remaining gap.
+
+The race position: LANL is winning the long-rollout cache fidelity metric. LLNL leads only on short-window distribution quality (★). That gap must close with structural locality fixes before LLNL can claim the win on the metrics that matter for the cache paper.
