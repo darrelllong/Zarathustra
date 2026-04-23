@@ -2628,3 +2628,25 @@ L_chain_reuse = chain_reuse_weight × (mean(sigmoid(reuse_raw_chain)) - 0.265)^2
 **Additional fix**: W-stop threshold increased from 5.0→7.0 for v210. v208 W-stopped at ep46 (W=5.16); v195 trained to ep110 without W-stop. Higher threshold prevents premature termination.
 
 **Risk**: The sharp sigmoid gradient may be harder to optimize (saturation at extremes). Monitor G-loss at ep1-5 — if G-loss stays negative for many epochs, the sharp sigmoid is creating a dead gradient problem.
+
+---
+
+## IDEA #73 (LLNL): Chain-Stride Rank Distribution Loss
+
+**Motivation**: IDEA #72 enforces correct reuse RATE but not correct RANK DISTRIBUTION. Even if chain-reuse forces 26.5% reuse in the chain, HRC@small_cs remains wrong if all reuses happen at large ranks (rank 200+ instead of rank 0-18). LANL's critique: "A hard reuse bit can hit the marginal rate and still put reuse at the wrong stack ranks."
+
+**Problem**: Real traces concentrate reuse at small LRU ranks — hot objects are repeatedly accessed in bursts. In the LLGAN representation, `obj_id_stride = 0` means rank 0 (immediate repetition). Non-zero strides for reuse events correspond to rank |stride|. The chain-reuse loss knows NOTHING about which ranks are being targeted.
+
+**Proposed method**: Extend the chain to also penalize the mean abs(stride) for reuse steps. Over an N-window chain with h_carry:
+1. Generate chain (N windows with self-rollout)
+2. Identify reuse steps: positions where reuse_col > 0
+3. Compute mean(|stride_col|) at reuse positions
+4. Penalize vs target mean(|stride|) from real corpus statistics
+
+From trace characterization, real alibaba mean(|stride| | reuse=True) can be extracted. If the model learns to produce small strides on reuse steps, it concentrates reuses at small LRU ranks → higher HRC@small_cs.
+
+**Status**: PROPOSED (activate if IDEA #72 v2 fixes rate but not rank distribution)
+
+**Expected**: Combined with IDEA #72 v2 (rate) + IDEA #73 (rank) → HRC-MAE should approach atlas baseline (0.012) or better within ep20-50.
+
+**Implementation**: Add `--chain-stride-weight 2.0` flag. Compute after chain-reuse loop, on the same chain windows. Stop-gradient on reuse column when computing stride loss (separate optimization paths).
