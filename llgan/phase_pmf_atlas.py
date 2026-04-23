@@ -453,40 +453,6 @@ class PhasePMFAtlas:
                 pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
                 pb = min(pb, self.n_phase_bins - 1)
 
-                # IDEA #67: burst injection — force a hot-object replay with prob burst_prob.
-                # This replicates short-window working-set autocorrelation without training.
-                if burst_prob > 0.0 and stack and rng.random() < burst_prob:
-                    pool_sz = min(burst_pool_size, len(stack))
-                    rank = int(rng.integers(0, pool_sz))
-                    obj_id = stack[rank]
-                    del stack[rank]
-                    stack.insert(0, obj_id)
-                    # Mark sampling (same as reuse path below)
-                    marks = self.mark_reservoir.get(pb) or self.global_marks
-                    if marks:
-                        dt_ev, sz_ev = marks[int(rng.integers(0, len(marks)))]
-                    else:
-                        dt_ev, sz_ev = 1.0, 4096.0
-                    ts += max(float(dt_ev), 0.0)
-                    rows.append({
-                        "stream_id": stream_id,
-                        "ts": ts,
-                        "obj_id": int(obj_id),
-                        "obj_size": max(int(round(sz_ev)), 1),
-                        "opcode": 1,
-                        "tenant": 0,
-                    })
-                    # Update phase window
-                    win_seen.add(int(obj_id))
-                    win_count += 1
-                    if win_count >= phase_window:
-                        current_rate = len(win_seen) / phase_window
-                        win_seen = set()
-                        win_count = 0
-                    if len(stack) > max_stack_depth:
-                        stack.pop()
-                    continue
-
                 # Reuse decision: prefer eval_phase_rr (from actual eval streams)
                 # over coarse reuse_adj (BIT training ratios).
                 if reuse_rate_override >= 0.0:
@@ -535,14 +501,21 @@ class PhasePMFAtlas:
                         fine_pmf = fine_pmf / fine_pmf.sum()
                     else:
                         fine_pmf = effective_fine_pmf / effective_fine_pmf.sum()
-                    # Sample fine bin → uniform rank within it
-                    fine_i = int(rng.choice(len(effective_fine_pmf), p=fine_pmf))
-                    lo = int(effective_fine_edges[fine_i])
-                    hi = int(effective_fine_edges[fine_i + 1]) - 1 if fine_i + 1 < len(effective_fine_edges) else int(effective_fine_edges[-1])
-                    stack_sz = len(stack)
-                    lo_eff = min(lo, stack_sz - 1)
-                    hi_eff = min(hi, stack_sz - 1)
-                    rank = int(rng.integers(lo_eff, hi_eff + 1))
+                    # IDEA #67: burst injection — redirect a reuse to the hot pool
+                    # instead of sampling from the fine PMF. Preserves total reuse rate;
+                    # shifts HRC mass from large ranks to small ranks to match working-set bursts.
+                    if burst_prob > 0.0 and rng.random() < burst_prob:
+                        pool_sz = min(burst_pool_size, len(stack))
+                        rank = int(rng.integers(0, pool_sz))
+                    else:
+                        # Sample fine bin → uniform rank within it
+                        fine_i = int(rng.choice(len(effective_fine_pmf), p=fine_pmf))
+                        lo = int(effective_fine_edges[fine_i])
+                        hi = int(effective_fine_edges[fine_i + 1]) - 1 if fine_i + 1 < len(effective_fine_edges) else int(effective_fine_edges[-1])
+                        stack_sz = len(stack)
+                        lo_eff = min(lo, stack_sz - 1)
+                        hi_eff = min(hi, stack_sz - 1)
+                        rank = int(rng.integers(lo_eff, hi_eff + 1))
                     obj_id = stack[rank]
                     del stack[rank]
                     stack.insert(0, obj_id)
