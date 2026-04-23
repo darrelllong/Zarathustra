@@ -64,6 +64,49 @@ EVAL_CALIBRATED_PMF = np.array(
 # Per-phase reuse adjustment = (phase_reuse / global_BIT_reuse) * this value.
 EVAL_CALIBRATED_REUSE_RATE = 0.26474
 
+# Fine-grained eval histogram (29 bins) for within-bucket rank sampling.
+# Directly from real['stack_distance_histogram'] and real['stack_distance_bin_edges']
+# in the alibaba v195 eval JSON.  Each fine bin i covers [EVAL_FINE_EDGES[i], EVAL_FINE_EDGES[i+1]).
+# Using these for within-coarse-bucket sampling avoids uniform-over-[256,1M) blowup.
+EVAL_FINE_EDGES = np.array(
+    [1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167, 219, 288,
+     377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323, 5669],
+    dtype=np.int64,
+)  # 30 edges → 29 bins
+EVAL_FINE_PMF = np.array(
+    [0.001513, 0.004387, 0.007941, 0.023597, 0.023219, 0.027227, 0.011723,
+     0.016866, 0.018681, 0.018908, 0.033354, 0.041068, 0.049766, 0.061488,
+     0.069505, 0.063833, 0.130162, 0.196339, 0.044396, 0.033505, 0.029572,
+     0.022311, 0.025337, 0.017168, 0.016412, 0.007866, 0.002345, 0.000378,
+     0.001134],
+    dtype=np.float64,
+)
+# Precompute: for each coarse bucket b, which fine bins fall inside it
+# (fine bin i covers [EVAL_FINE_EDGES[i], EVAL_FINE_EDGES[i+1]))
+def _build_bucket_to_fine():
+    b2f = {b: [] for b in range(N_BUCKETS)}
+    for i in range(len(EVAL_FINE_PMF)):
+        lo_f = int(EVAL_FINE_EDGES[i])
+        hi_f = int(EVAL_FINE_EDGES[i + 1]) if i + 1 < len(EVAL_FINE_EDGES) else 10**7
+        for b in range(N_BUCKETS):
+            lo_b = int(BUCKET_EDGES[b])
+            hi_b = int(BUCKET_EDGES[b + 1])
+            if lo_f < hi_b and hi_f > lo_b:
+                b2f[b].append(i)
+    return b2f
+
+_BUCKET_TO_FINE = _build_bucket_to_fine()
+# Conditional fine-bin PMFs given coarse bucket (normalized)
+_COND_FINE: dict = {}
+for _b in range(N_BUCKETS):
+    _idxs = _BUCKET_TO_FINE[_b]
+    if _idxs:
+        _w = EVAL_FINE_PMF[np.array(_idxs)]
+        _w = _w / _w.sum() if _w.sum() > 0 else np.ones(len(_idxs)) / len(_idxs)
+        _COND_FINE[_b] = (_idxs, _w)
+    else:
+        _COND_FINE[_b] = ([], None)
+
 
 # ---------------------------------------------------------------------------
 # Binary trace reader (oracle_general .zst format)
@@ -419,8 +462,6 @@ class PhasePMFAtlas:
 
                 if wants_reuse:
                     # Compute effective PMF: eval-calibrated base * phase adjustment.
-                    # Falls back to raw BIT-fitted PMF if phase_adj not available
-                    # (e.g., old pickles without this field).
                     phase_adj_map = getattr(self, "phase_adj", None)
                     if phase_adj_map is not None:
                         adj = phase_adj_map.get(pb, np.ones(N_BUCKETS))
@@ -430,11 +471,21 @@ class PhasePMFAtlas:
                     else:
                         pmf = self.lru_pmf.get(pb) if self.lru_pmf.get(pb) is not None else self.global_pmf
                     bucket = int(rng.choice(N_BUCKETS, p=pmf))
-                    lo = int(BUCKET_EDGES[bucket])
-                    hi = int(BUCKET_EDGES[bucket + 1]) - 1
-                    # Clamp to available stack — avoids ValueError when stack is smaller
-                    lo_eff = min(lo, len(stack) - 1)
-                    hi_eff = min(hi, len(stack) - 1)
+                    # Within-bucket: sample a fine eval bin then uniform rank inside it.
+                    # Avoids uniform-over-[256,1M) blowup for bucket 7.
+                    fine_idxs, fine_w = _COND_FINE.get(bucket, ([], None))
+                    stack_sz = len(stack)
+                    if fine_idxs and fine_w is not None:
+                        fi = int(rng.choice(len(fine_idxs), p=fine_w))
+                        fine_i = fine_idxs[fi]
+                        lo = int(EVAL_FINE_EDGES[fine_i])
+                        hi = int(EVAL_FINE_EDGES[fine_i + 1]) - 1 if fine_i + 1 < len(EVAL_FINE_EDGES) else int(EVAL_FINE_EDGES[-1])
+                    else:
+                        lo = int(BUCKET_EDGES[bucket])
+                        hi = int(BUCKET_EDGES[bucket + 1]) - 1
+                    # Clamp to available stack
+                    lo_eff = min(lo, stack_sz - 1)
+                    hi_eff = min(hi, stack_sz - 1)
                     rank = int(rng.integers(lo_eff, hi_eff + 1))
                     obj_id = stack[rank]
                     del stack[rank]
