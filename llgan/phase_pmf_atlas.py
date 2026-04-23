@@ -60,6 +60,10 @@ EVAL_CALIBRATED_PMF = np.array(
     dtype=np.float64,
 )
 
+# Calibrated global reuse rate from the eval JSON (real['reuse_access_rate']).
+# Per-phase reuse adjustment = (phase_reuse / global_BIT_reuse) * this value.
+EVAL_CALIBRATED_REUSE_RATE = 0.26474
+
 
 # ---------------------------------------------------------------------------
 # Binary trace reader (oracle_general .zst format)
@@ -160,6 +164,8 @@ class PhasePMFAtlas:
     # Multiplicative adjustment factors vs global BIT PMF; applied over
     # EVAL_CALIBRATED_PMF at generate time for correct HRC calibration.
     phase_adj: Optional[Dict[int, np.ndarray]] = None
+    # Multiplicative adjustment factors for reuse rate vs global BIT reuse rate.
+    reuse_adj: Optional[Dict[int, float]] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -335,6 +341,15 @@ class PhasePMFAtlas:
             else:
                 phase_adj[pb] = np.ones(N_BUCKETS, dtype=np.float64)
 
+        # Per-phase reuse rate adjustment factors relative to global BIT reuse rate.
+        # At generate time: effective_rr = EVAL_CALIBRATED_REUSE_RATE * reuse_adj[pb].
+        reuse_adj = {}
+        for pb in range(n_phase_bins):
+            if rr_dict[pb] is not None:
+                reuse_adj[pb] = rr_dict[pb] / (global_rr + EPS)
+            else:
+                reuse_adj[pb] = 1.0
+
         print(f"Global reuse rate: {global_rr:.4f}")
         print(f"Global PMF: {global_pmf.round(4).tolist()}")
         for pb in range(n_phase_bins):
@@ -357,6 +372,7 @@ class PhasePMFAtlas:
             global_reuse_rate=global_rr,
             global_marks=global_res,
             phase_adj=phase_adj,
+            reuse_adj=reuse_adj,
         )
 
     # -------------------------------------------------------------------
@@ -389,13 +405,16 @@ class PhasePMFAtlas:
                 pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
                 pb = min(pb, self.n_phase_bins - 1)
 
-                # Reuse decision
+                # Reuse decision: use eval-calibrated base * phase adjustment.
                 if reuse_rate_override >= 0.0:
                     rr = reuse_rate_override
                 else:
-                    rr = self.reuse_rate.get(pb)
-                    if rr is None:
-                        rr = self.global_reuse_rate
+                    reuse_adj_map = getattr(self, "reuse_adj", None)
+                    if reuse_adj_map is not None:
+                        adj_rr = reuse_adj_map.get(pb, 1.0)
+                        rr = min(EVAL_CALIBRATED_REUSE_RATE * adj_rr, 0.99)
+                    else:
+                        rr = self.reuse_rate.get(pb) or self.global_reuse_rate
                 wants_reuse = bool(stack) and (rng.random() < rr)
 
                 if wants_reuse:
