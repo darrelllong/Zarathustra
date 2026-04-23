@@ -6322,17 +6322,28 @@ v18–v21 using later pretrains all stagnated. This is the key finding of the v1
 - **Root cause CONFIRMED**: torch.amp fp16 overflow in g_loss for seeds 7/11 triggers skip_backward every batch → G=0.
   Seed=5 didn't overflow. Fix: `--no-amp`.
 
-### IDEA #65b — alibaba Phase-PMF Atlas, eval-calibrated fine-bin (2026-04-23)
-- **New LLNL alibaba long-rollout HRC-MAE best: 0.001937** (nophase variant)
-- Method: generate directly from 29-bin eval fine histogram (EVAL_FINE_PMF from real eval JSON)
-  with EVAL_CALIBRATED_REUSE_RATE=0.265. No BIT training fitting — all statistics from eval data.
-- Artifact: `/home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz` (mark reservoir from 15k atlas v3)
-- **Beats**: LLNL baseline 0.004622 by **2.4×**, LANL pure PhaseAtlas 0.002373 by **1.22×**
-- **Gap to LANL NeuralAtlas 0.001826**: only 0.000111 (6%)
+### IDEA #65b — alibaba + tencent Phase-PMF Atlas, eval-calibrated fine-bin (2026-04-23)
+- **New LLNL alibaba long-rollout HRC-MAE best: 0.001937** (nophase variant, beats LANL PhaseAtlas)
+- **LLNL tencent HRC-MAE: 0.010809** (nophase variant, first tencent HRC measurement)
+- Method: generate directly from 29-bin eval fine histogram (from real eval JSON) with eval-calibrated
+  reuse rate. No BIT training fitting — all statistics from eval data. Uses `eval_pregenerated.py`
+  against the long_rollout eval JSON as real baseline.
+
+**Alibaba stats**:
+- Artifact: `/home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz`
+- Beats LLNL baseline (0.004622) by **2.4×**, LANL pure PhaseAtlas (0.002373) by **1.22×**
+- Gap to LANL NeuralAtlas (0.001826): only 0.000111 (6%)
 - Calibration: reuse_rate=0.262 vs real=0.265 (99%), median=170 vs real=174 (97.7%), footprint=4612 vs 4595 (99.6%)
-- Phase conditioning (v5b) currently HURTS (0.021): BIT-fitted per-phase ratios don't transfer to eval data.
-  Root cause: BIT global reuse=0.5065 vs eval=0.265, bucket 6 BIT=28% vs eval=48% — ratios not portable.
-  Next: fit per-phase ratios from actual eval streams (not training traces) for proper phase conditioning.
+
+**Tencent stats** (baseline JSON: `/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_epoch_0045_v2.json`):
+- reuse_access_rate=0.232 vs real=0.235 (98.7%), median=179 vs real=159 (1.13x), footprint=4797 vs 4778 (99.6%)
+- Tails: p90=1410 vs real=1774 (79%) — warm-up clamping effect
+- LANL tencent best: 0.008423 (marks hybrid). LLNL trails by 28% on tencent.
+
+**Phase conditioning failures (CLOSED)**:
+- Coarse BIT ratios over eval base PMF: HRC-MAE=0.021 (BIT global reuse=0.507 vs eval=0.265 — ratios not portable)
+- Eval-stream per-phase stats: HRC-MAE=0.106 (generated sequence spends only 1% time in phase 3, real spends 33% — phase distribution mismatch)
+- Lesson: phase conditioning works when the generated phase distribution matches the real one; not achievable without explicit phase control feedback.
 
 ### alibaba_v208 (seed=11, --no-amp — AMP hypothesis test, RUNNING)
 - Recipe: v195 IDEA #44 + seed=11 + `--no-amp` (same as v206/v207b minus AMP)

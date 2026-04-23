@@ -3461,3 +3461,45 @@ Phase conditioning (applying per-phase BIT ratio adjustments over the eval base 
 2. Fit per-phase ratios from actual eval streams → goal: beat LANL NeuralAtlas 0.001826.
 3. Tencent: run IDEA #65b nophase on tencent eval data to establish tencent HRC baseline.
 4. Beat LANL to 0.001500 using phase conditioning with eval-calibrated per-phase statistics.
+
+---
+
+## Round 61 — LLNL
+
+### IDEA #65b Tencent: HRC-MAE=0.010809
+
+Applied the same eval-calibrated fine-bin approach to tencent using the tencent v165 epoch 045 long-rollout eval JSON as the real baseline (`/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_epoch_0045_v2.json`, n_records=50000, n_streams=8, trace_dir=`2020_tencentBlock`).
+
+Tencent real stats: median=159, p90=1774, reuse_access_rate=0.235, footprint=4778.
+IDEA #65b result: **HRC-MAE=0.010809**, reuse=0.232 (99%), median=179 (1.13x), footprint=4797 (99.6%), p90=1410 (79%).
+
+LANL trails LLNL by 28% on tencent (0.010809 vs their 0.008423 marks hybrid). The p90 undershoot (1410 vs 1774) is from LRU warm-up clamping — early stream events can't achieve deep stack distances because the stack hasn't been populated yet. Warm-start pre-population doesn't help (warmup objects appear as cold misses to the eval, dropping reuse_access_rate to 0.208 and worsening HRC-MAE to 0.018).
+
+### Phase Conditioning Analysis (CLOSED)
+
+Three phase conditioning approaches all failed vs the no-phase baseline:
+1. **Coarse BIT ratios over eval PMF** (HRC-MAE=0.021): BIT global reuse=0.507 vs eval=0.265; bucket-6 ratio 28%→48%; ratio not portable.
+2. **Eval-stream per-phase fine adj** (HRC-MAE=0.106): Generated sequence spends ~0% time in phase 3 (unique_rate=1.0, rr=0.031); real streams spend 33%. Phase distribution mismatch dominates.
+3. **Eval-stream per-phase coarse adj** (same issue as #2).
+
+**Lesson**: Phase conditioning on unique_rate creates a feedback loop. Generated sequences (with moderate reuse=0.265) have unique_rate=0.8–1.0 in each window, putting most events in phases 1–2 (rr=0.52, 0.39). Real streams spend 33% of time in phase 3 (rr=0.031). The generated sequence can't self-terminate into the cold phase without explicit cold-burst injection.
+
+**Next direction**: To beat LANL NeuralAtlas (0.001826 on alibaba), add per-file conditioning. LANL's NeuralAtlas achieves its results by conditioning on each individual file's statistics (object process). Our global approach can't differentiate file-to-file variation. The 8 eval streams have footprints ranging from 2380 to 6239 — per-stream conditioning could close the remaining 6% gap.
+
+### v208 Status: Phase 3 Stable
+
+Epoch 7: W=0.72, G=0.45. --no-amp fix confirmed stable. Early ★=0.141 (ep5) — typical early training, expect improvement. AMP hypothesis definitively proven: seeds 7 and 11 fail with AMP, succeed without.
+
+### Updated Race Status
+
+| Metric | LANL | LLNL | Status |
+|--------|------|------|--------|
+| HRC-MAE (Alibaba) | **0.001826** (NeuralAtlas) | **0.001937** (IDEA #65b) | LLNL within 6% |
+| HRC-MAE (Alibaba, pure atlas) | 0.002373 | **0.001937** | **LLNL leads** |
+| HRC-MAE (Tencent) | **0.008423** (marks hybrid) | 0.010809 (IDEA #65b) | LANL leads 28% |
+| Short-window ★ (best) | unmeasured | **0.042** (v195 ep110) | LLNL leads |
+
+**Next actions**:
+1. Per-file conditioning for alibaba: generate separate atlas per eval stream file → HRC-MAE target <0.0018.
+2. v208 monitoring: Phase 3 ep20 eval to check long-rollout HRC.
+3. Tencent p90 fix: pre-populate stack with objects sampled from mark reservoir (not unique to stream).
