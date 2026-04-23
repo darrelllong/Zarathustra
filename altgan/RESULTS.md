@@ -306,6 +306,27 @@ reservoir timing shape and slightly improves size drift in some paired rows, so
 the next viable size path is rank/quantile-aware correction or gated residuals,
 not uniform numeric interpolation.
 
+The complementary `dt`-only probe confirms that the timing field is the source
+of the drift collapse. It used the same four seeds and low log-space blends,
+but held `obj_size` at the reservoir sample while blending only `dt`. The full
+artifacts are
+`/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_dtonly_lowblend_log_confirm_summary.csv`
+and `_best.json`.
+
+| Candidate | Seeds | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |
+|---|---:|---:|---:|---:|---:|
+| control, blend 0.0/local power 1.0 | 4 | 0.008698 | **0.00895** | 1.175 | 1.416 |
+| dt-only 0.05 log, blend 0.0/local power 1.0 | 4 | 0.008698 | 0.01003 | 0.000 | 1.416 |
+| dt-only 0.10 log, blend 0.0/local power 1.0 | 4 | 0.008698 | 0.01110 | 0.000 | 1.416 |
+| control, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01117 | 1.307 | 0.931 |
+| dt-only 0.05 log, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01222 | 0.000 | 0.931 |
+
+Together with the size-only run, this closes uniform direct numeric blending:
+`obj_size` blending can improve size drift without changing timing, but `dt`
+blending immediately destroys timing drift shape. Mark work should now move to
+rank/quantile-conditioned reservoir corrections or mixture/gating parameters
+that preserve temporal drift, not replacement of sampled `dt`.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real
