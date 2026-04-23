@@ -1838,14 +1838,23 @@ def train(cfg: Config) -> None:
                     loss_reuse_rate = (_fake_rate - _r_target) ** 2
                     g_loss = g_loss + _rrw * loss_reuse_rate
 
-                # IDEA #72: long-chain reuse-rate loss.
+                # IDEA #72: long-chain reuse-rate loss (v2: sharp-sigmoid fix).
                 # Generate chain_reuse_windows windows with carried LSTM hidden
                 # state (self-rollout, matching inference) and penalise the mean
                 # reuse rate over the full chain vs the target.  Directly attacks
                 # the cascade locality collapse seen at long rollout (ep20/30: 4.5%
                 # reuse vs real 26.9%) where single-window reuse BCE is ineffective.
+                #
+                # FIX (v2): v209 used (val+1)/2 linear mapping which allowed G to
+                # satisfy the mean constraint at val≈-0.47 (prob=0.265) without
+                # any value exceeding the inference threshold at 0.  At inference,
+                # all -0.47 values → reuse=False → 0% actual reuse.
+                # v2 uses sigmoid(val * _SHARP_T) which approximates the hard
+                # threshold at 0: negative → ~0, positive → ~1.  G must now produce
+                # values that EXCEED 0 to contribute to the rate.
                 _crw = getattr(cfg, 'chain_reuse_weight', 0.0)
                 _cr_windows = int(getattr(cfg, 'chain_reuse_windows', 8))
+                _SHARP_T = 10.0  # temperature: sigmoid(x*10) ≈ step(x)
                 if _crw > 0.0 and obj_id_col >= 0:
                     _z_gc_cr, _ = _make_z_global(B, cfg, device,
                                                   real_features=real_batch,
@@ -1861,7 +1870,9 @@ def train(cfg: Config) -> None:
                                              hidden=_h_cr, return_hidden=True)
                         _cr_reuse_chunks.append(_H_cr[:, :, obj_id_col])
                     _cr_reuse_all = torch.cat(_cr_reuse_chunks, dim=1)  # (B, T*N)
-                    _cr_rate = ((_cr_reuse_all + 1.0) / 2.0).mean()
+                    # Sharp sigmoid approximates hard threshold at 0 (inference).
+                    # G must produce values > 0 to contribute to the mean rate.
+                    _cr_rate = torch.sigmoid(_cr_reuse_all * _SHARP_T).mean()
                     _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)
                     g_loss = g_loss + _crw * loss_chain_reuse
