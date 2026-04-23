@@ -37,6 +37,16 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated transition blends. Overrides --transition-blend when set.")
     p.add_argument("--local-prob-powers", default="1.0",
                    help="Comma-separated empirical local probability powers.")
+    p.add_argument("--force-phase-schedule", action="store_true",
+                   help="Force phase from synthetic stream position during evaluation.")
+    p.add_argument("--stack-rank-scale", type=float, default=1.0,
+                   help="Global reuse stack-rank scale passed to altgan.evaluate_neural_atlas.")
+    p.add_argument("--stack-rank-max", type=int, default=-1,
+                   help="Optional global reuse stack-rank cap; negative disables.")
+    p.add_argument("--stack-rank-phase-scales", default="",
+                   help="Comma-separated per-phase reuse stack-rank scales.")
+    p.add_argument("--stack-rank-phase-maxes", default="",
+                   help="Comma-separated per-phase reuse stack-rank caps; negative disables a phase cap.")
     p.add_argument("--mark-temperatures", default="1.0,0.5,0.25,0.05")
     p.add_argument("--mark-numeric-noises", default="0.0")
     p.add_argument("--mark-numeric-blends", default="0.0,0.25,0.5,0.75,1.0")
@@ -182,6 +192,8 @@ def _run_eval(
         "--transition-blend", str(transition_blend),
         "--local-prob-power", str(local_prob_power),
         "--temperature", str(args.temperature),
+        "--stack-rank-scale", str(args.stack_rank_scale),
+        "--stack-rank-max", str(args.stack_rank_max),
         "--n-records", str(args.n_records),
         "--n-streams", str(args.n_streams),
         "--seed", str(seed),
@@ -189,6 +201,12 @@ def _run_eval(
         "--output", str(output),
         *extra,
     ]
+    if args.force_phase_schedule:
+        cmd.append("--force-phase-schedule")
+    if args.stack_rank_phase_scales:
+        cmd.extend(["--stack-rank-phase-scales", args.stack_rank_phase_scales])
+    if args.stack_rank_phase_maxes:
+        cmd.extend(["--stack-rank-phase-maxes", args.stack_rank_phase_maxes])
     print(f"[altgan.sweep_mark_hybrids] running {' '.join(cmd)}", flush=True)
     subprocess.run(cmd, check=True)
 
@@ -215,6 +233,11 @@ def _summarize(
         "seed": seed,
         "transition_blend": transition_blend,
         "local_prob_power": local_prob_power,
+        "force_phase_schedule": data.get("force_phase_schedule"),
+        "stack_rank_scale": data.get("stack_rank_scale"),
+        "stack_rank_max": data.get("stack_rank_max"),
+        "stack_rank_phase_scales": ",".join(str(x) for x in data.get("stack_rank_phase_scales", [])),
+        "stack_rank_phase_maxes": ",".join(str(x) for x in data.get("stack_rank_phase_maxes", [])),
         "categorical_source": source,
         "mark_numeric_blend": blend,
         "mark_numeric_blend_space": blend_space,
