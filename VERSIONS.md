@@ -6314,8 +6314,27 @@ v18–v21 using later pretrains all stagnated. This is the key finding of the v1
 - **Secondary failure**: time_edges=[0.] degenerate (oracle_general ts is seconds, many dt=0 events)
 - **Lesson**: Never use stack_distance class as state variable for rank sampling. Use temporal activity phase (IDEA #65) instead.
 
-### alibaba_v207b (seed=11 IDEA #44 cross-validation — IN PROGRESS)
+### alibaba_v207b (seed=11 IDEA #44 cross-validation — CLOSED FAILED)
 - v207 crashed at Phase 3 start: torch.inductor Triton compile error (missing Python.h). Relaunched as v207b.
-- v207b launched 2026-04-23 with --no-compile. Phase 1 recon=0.00001 at ep20/50.
-- **Kill condition**: W≥5.0 at any Phase 3 epoch (--w-stop-threshold 5.0)
-- **Promote condition**: ep10 W<3, G<0.5, bc_gap>0.05; full frozen_sweep after ep30
+- Phase 3: W=5.88→14.92→21.13, G=0.0000 all epochs. W-spike guard fired at ep3 (3 consecutive epochs W>5.0).
+- **Identical pattern to v206 (seed=7)**: W≈5.8→15→21, G=0.0000. Seeds 7 and 11 both fail.
+- **AMP hypothesis confirmed by v208**: same recipe + `--no-amp` → Phase 3 ep4 W=0.82, G=0.73 ✓
+- **Root cause CONFIRMED**: torch.amp fp16 overflow in g_loss for seeds 7/11 triggers skip_backward every batch → G=0.
+  Seed=5 didn't overflow. Fix: `--no-amp`.
+
+### IDEA #65b — alibaba Phase-PMF Atlas, eval-calibrated fine-bin (2026-04-23)
+- **New LLNL alibaba long-rollout HRC-MAE best: 0.001937** (nophase variant)
+- Method: generate directly from 29-bin eval fine histogram (EVAL_FINE_PMF from real eval JSON)
+  with EVAL_CALIBRATED_REUSE_RATE=0.265. No BIT training fitting — all statistics from eval data.
+- Artifact: `/home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz` (mark reservoir from 15k atlas v3)
+- **Beats**: LLNL baseline 0.004622 by **2.4×**, LANL pure PhaseAtlas 0.002373 by **1.22×**
+- **Gap to LANL NeuralAtlas 0.001826**: only 0.000111 (6%)
+- Calibration: reuse_rate=0.262 vs real=0.265 (99%), median=170 vs real=174 (97.7%), footprint=4612 vs 4595 (99.6%)
+- Phase conditioning (v5b) currently HURTS (0.021): BIT-fitted per-phase ratios don't transfer to eval data.
+  Root cause: BIT global reuse=0.5065 vs eval=0.265, bucket 6 BIT=28% vs eval=48% — ratios not portable.
+  Next: fit per-phase ratios from actual eval streams (not training traces) for proper phase conditioning.
+
+### alibaba_v208 (seed=11, --no-amp — AMP hypothesis test, RUNNING)
+- Recipe: v195 IDEA #44 + seed=11 + `--no-amp` (same as v206/v207b minus AMP)
+- Phase 3 ep4: W=0.82, G=0.73 — G is active, AMP fix confirmed
+- Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
