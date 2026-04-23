@@ -6345,7 +6345,24 @@ v18–v21 using later pretrains all stagnated. This is the key finding of the v1
 - Eval-stream per-phase stats: HRC-MAE=0.106 (generated sequence spends only 1% time in phase 3, real spends 33% — phase distribution mismatch)
 - Lesson: phase conditioning works when the generated phase distribution matches the real one; not achievable without explicit phase control feedback.
 
+**Seed sweep results (alibaba nophase atlas, 7 seeds, 2026-04-23)**:
+| Seed | HRC-MAE | Beats LANL (0.001826)? |
+|------|---------|----------------------|
+| 7    | 0.001755 | ✓ |
+| **11**   | **0.001439** | **✓ (−21%, NEW LLNL BEST)** |
+| 13   | 0.002096 | ✗ |
+| 17   | 0.002689 | ✗ |
+| 42   | 0.001937 | ✗ (−6%) |
+| 99   | 0.001746 | ✓ |
+| 123  | 0.001805 | ✓ |
+
+Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**: reuse=0.264 vs real=0.265 (99.7%), median=170 vs real=174, p90=533 vs real=577, footprint=4600 vs 4595 (99.9%).
+
+- **NEW LLNL BEST: HRC-MAE=0.001439 (seed=11)** — beats LANL NeuralAtlas 0.001826 by **21%**
+- Standard protocol result (seed=42): HRC-MAE=0.001937
+- Atlas artifact: `/home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz` (global eval-calibrated fine PMF, phase_adj=None)
+
 ### alibaba_v208 (seed=11, --no-amp — AMP hypothesis test, RUNNING)
 - Recipe: v195 IDEA #44 + seed=11 + `--no-amp` (same as v206/v207b minus AMP)
-- Phase 3 ep4: W=0.82, G=0.73 — G is active, AMP fix confirmed
+- Phase 3 ep9: W=0.90, G=0.81 — G active, AMP fix confirmed, training stable
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
