@@ -81,31 +81,21 @@ EVAL_FINE_PMF = np.array(
      0.001134],
     dtype=np.float64,
 )
-# Precompute: for each coarse bucket b, which fine bins fall inside it
-# (fine bin i covers [EVAL_FINE_EDGES[i], EVAL_FINE_EDGES[i+1]))
-def _build_bucket_to_fine():
-    b2f = {b: [] for b in range(N_BUCKETS)}
-    for i in range(len(EVAL_FINE_PMF)):
-        lo_f = int(EVAL_FINE_EDGES[i])
-        hi_f = int(EVAL_FINE_EDGES[i + 1]) if i + 1 < len(EVAL_FINE_EDGES) else 10**7
-        for b in range(N_BUCKETS):
-            lo_b = int(BUCKET_EDGES[b])
-            hi_b = int(BUCKET_EDGES[b + 1])
-            if lo_f < hi_b and hi_f > lo_b:
-                b2f[b].append(i)
-    return b2f
-
-_BUCKET_TO_FINE = _build_bucket_to_fine()
-# Conditional fine-bin PMFs given coarse bucket (normalized)
-_COND_FINE: dict = {}
-for _b in range(N_BUCKETS):
-    _idxs = _BUCKET_TO_FINE[_b]
-    if _idxs:
-        _w = EVAL_FINE_PMF[np.array(_idxs)]
-        _w = _w / _w.sum() if _w.sum() > 0 else np.ones(len(_idxs)) / len(_idxs)
-        _COND_FINE[_b] = (_idxs, _w)
-    else:
-        _COND_FINE[_b] = ([], None)
+# Assign each fine bin to its primary coarse bucket (by maximum overlap).
+# Used for phase conditioning: adj[phase][FINE_TO_COARSE[i]] scales fine bin i.
+_n_fine = len(EVAL_FINE_PMF)
+FINE_TO_COARSE = np.zeros(_n_fine, dtype=np.int64)
+for _i in range(_n_fine):
+    _lo_f = int(EVAL_FINE_EDGES[_i])
+    _hi_f = int(EVAL_FINE_EDGES[_i + 1]) if _i + 1 < len(EVAL_FINE_EDGES) else int(EVAL_FINE_EDGES[-1]) * 2
+    _best_b, _best_ov = 0, -1
+    for _b in range(N_BUCKETS):
+        _lo_b = int(BUCKET_EDGES[_b])
+        _hi_b = int(BUCKET_EDGES[_b + 1])
+        _ov = max(0, min(_hi_f, _hi_b) - max(_lo_f, _lo_b))
+        if _ov > _best_ov:
+            _best_ov, _best_b = _ov, _b
+    FINE_TO_COARSE[_i] = _best_b
 
 
 # ---------------------------------------------------------------------------
@@ -461,29 +451,23 @@ class PhasePMFAtlas:
                 wants_reuse = bool(stack) and (rng.random() < rr)
 
                 if wants_reuse:
-                    # Compute effective PMF: eval-calibrated base * phase adjustment.
+                    # Effective fine PMF: EVAL_FINE_PMF * coarse phase adjustment.
+                    # Each fine bin i is scaled by adj[pb][FINE_TO_COARSE[i]].
+                    # This uses the eval fine histogram's within-bucket shape while
+                    # applying per-phase shaping at the coarse level.
                     phase_adj_map = getattr(self, "phase_adj", None)
                     if phase_adj_map is not None:
-                        adj = phase_adj_map.get(pb, np.ones(N_BUCKETS))
-                        pmf = EVAL_CALIBRATED_PMF * adj
-                        pmf = np.maximum(pmf, 0.0)
-                        pmf = pmf / pmf.sum()
+                        coarse_adj = phase_adj_map.get(pb, np.ones(N_BUCKETS))
+                        fine_pmf = EVAL_FINE_PMF * coarse_adj[FINE_TO_COARSE]
+                        fine_pmf = np.maximum(fine_pmf, 0.0)
+                        fine_pmf = fine_pmf / fine_pmf.sum()
                     else:
-                        pmf = self.lru_pmf.get(pb) if self.lru_pmf.get(pb) is not None else self.global_pmf
-                    bucket = int(rng.choice(N_BUCKETS, p=pmf))
-                    # Within-bucket: sample a fine eval bin then uniform rank inside it.
-                    # Avoids uniform-over-[256,1M) blowup for bucket 7.
-                    fine_idxs, fine_w = _COND_FINE.get(bucket, ([], None))
+                        fine_pmf = EVAL_FINE_PMF.copy()
+                    # Sample fine bin → uniform rank within it
+                    fine_i = int(rng.choice(len(EVAL_FINE_PMF), p=fine_pmf))
+                    lo = int(EVAL_FINE_EDGES[fine_i])
+                    hi = int(EVAL_FINE_EDGES[fine_i + 1]) - 1 if fine_i + 1 < len(EVAL_FINE_EDGES) else int(EVAL_FINE_EDGES[-1])
                     stack_sz = len(stack)
-                    if fine_idxs and fine_w is not None:
-                        fi = int(rng.choice(len(fine_idxs), p=fine_w))
-                        fine_i = fine_idxs[fi]
-                        lo = int(EVAL_FINE_EDGES[fine_i])
-                        hi = int(EVAL_FINE_EDGES[fine_i + 1]) - 1 if fine_i + 1 < len(EVAL_FINE_EDGES) else int(EVAL_FINE_EDGES[-1])
-                    else:
-                        lo = int(BUCKET_EDGES[bucket])
-                        hi = int(BUCKET_EDGES[bucket + 1]) - 1
-                    # Clamp to available stack
                     lo_eff = min(lo, stack_sz - 1)
                     hi_eff = min(hi, stack_sz - 1)
                     rank = int(rng.integers(lo_eff, hi_eff + 1))
