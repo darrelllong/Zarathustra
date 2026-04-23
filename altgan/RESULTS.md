@@ -255,6 +255,16 @@ and `_best.json`.
 | 0.50 | 4 | 0.009934 | **0.61576** | 0.61493 | 52.5 | 60 | 164.5 | 174 | 0.04642 |
 | 0.55 | 4 | **0.009671** | 0.61529 | 0.61493 | 53.0 | 60 | 167.5 | 174 | **0.04561** |
 
+Running the same `0.55` forced late-rank row on the original seeds `42-45`
+confirmed the improvement: mean HRC-MAE `0.008867`, reuse `0.61425/0.61493`,
+stack median `53.2/60`, stack p90 `168.5/174`, and mean mark score `0.04626`.
+The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_blend055_seed_confirm_summary.csv`
+and `_best.json`. Across the eight tested seeds `42-49`, `blend=0.55` has an
+approximate mean HRC `0.00927`, better than the `blend=0.50` forced late-rank
+mean (`0.00965`). Treat `0.55 + forced phase + late rank scale` as the current
+stable Tencent PhaseAtlas candidate.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
