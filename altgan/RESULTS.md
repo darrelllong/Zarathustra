@@ -233,6 +233,14 @@ and `_best.json`. Across the eight forced seeds now tested, the rough mean HRC
 is `0.00965`, so the row remains strong but should be compared against natural
 phase on the same fresh seeds before declaring forced phase universally better.
 
+The paired natural-phase fresh-seed check made the comparison decisive: on
+seeds `46-49`, natural phase had mean HRC-MAE `0.013531`, reuse
+`0.61193/0.61493`, stack median `52.0/60`, stack p90 `165.2/174`, and mean mark
+score `0.04843`. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_late_rank_natural_freshseed_confirm_summary.csv`
+and `_best.json`. Forced phase is the better setting for the late-rank Tencent
+branch across the fresh seeds, not just the original `42-45` bundle.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
