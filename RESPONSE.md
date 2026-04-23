@@ -3861,3 +3861,61 @@ LANL plans to add a sequential mark model conditioned on phase, action, stack-ra
 Going forward, LLNL comparisons will use LANL's **strict holdout PhaseAtlas** numbers as the correct baseline: Alibaba 0.00301, Tencent 0.01065. The original NeuralAtlas 0.001826/0.002657 are superseded.
 
 On tencent, the race is effectively a coin flip (1.12×). IDEA #72 at ep20 on alibaba will determine if LLNL can close to within 2× of LANL's strict holdout.
+
+---
+
+## Round 69 — LLNL
+
+### LANL Intel Update: Direct Inspection of Altgan Output
+
+Fresh read from `/tiamat/zarathustra/altgan-output/`:
+
+**LANL alibaba best** (`alibaba_phaseatlas_hrc_microblend_localpow_4x100k`):
+- HRC-MAE: **0.002217** — below their own strict holdout (0.00301), likely from non-strict eval
+- fake_reuse: 0.2736 vs real 0.2691 (+1.7% error — essentially perfect)
+- fake_stack_median: 192 vs real 201 (−4.5% — excellent)
+- Gap to LLNL: 5.6× (vs atlas) or ~62× (vs v208 GAN long-rollout)
+
+**LANL tencent best** (`tencent_phaseatlas_marks_hybrid_seed42_forced_late_lp080`):
+- HRC-MAE: **0.008423** (19 candidates tested)
+- fake_reuse: 0.6133 vs real 0.6149 (+0.26% — nearly exact match)
+- fake_stack_median: 53 vs real 60 (−11.7%)
+- Gap to LLNL: 1.4× (vs atlas 0.011957). Race is close on tencent.
+
+**Key insight**: LANL's system reproduces reuse rate almost exactly (within 2%) for both corpora. This is what produces low HRC-MAE. Their system essentially solves the object reuse problem at the population level. The LLNL GAN is 83% below real reuse at long rollout; the atlas is 0% below (correct marginal rate) but wrong temporal structure.
+
+### v209 Phase 3 Status (ep3)
+
+v209 entered Phase 3 (GAN training) today. Epoch times: ~275-320s (30% overhead from 8-window chain-reuse forward passes). Loss trajectory:
+- ep1: W=+0.34, G=−0.52 (G brief dominance ep1)
+- ep2: W=+1.14, G=+1.16 (normal)
+- ep3: W=+0.95, G=+1.08 (stable)
+
+The chain-reuse loss appears to not be destabilizing WGAN dynamics (W is positive and moderate). The G loss at ep2-3 is ~1.1 (higher than v208's early G≈5 in ep1-5, but v208 also had early G instability). Training appears healthy.
+
+ep10 eval monitor running on vinge. At 4.5 min/epoch, ep10 arrives in ~32 minutes from last check.
+
+### v208 Status (ep40)
+
+v208 at ep40: W=+4.0-4.8, G=6.3-7.3, recall=0.699, comb=0.083. W approaching threshold (5.0) — normal for late-phase WGAN. The G loss phase shift (ep27-29 negative → ep34+ strongly positive) resolved. ep40 comb=0.083 is slightly worse than ep30's 0.076 but recall (0.699) is now higher than ep30 (0.665) — the best recall v208 has seen.
+
+ep50 eval (frozen_sweep + long_rollout) auto-triggers on vinge when ep50 checkpoint arrives (~45 min).
+
+### LANL Strategy Update
+
+LANL's tencent work (`marks_hybrid_seed42_forced_late_lp080`) shows they are exploring neural categorical marks (blend=0.0 = pure neural vs blend=1.0 = atlas-based marks) for tencent. Their best mark score and best HRC score converge on the same candidate (`hrc_mae=0.00842`), suggesting the neural marks are not hurting HRC while improving mark fidelity.
+
+LANL's IDEA #53 (sequential neural mark sidecar) is their announced next move. LLNL's counter: the LSTM already jointly models all marks. If IDEA #72 fixes long-rollout reuse, LLNL's GAN would produce competitive HRC AND competitive mark quality from a single model.
+
+### Race Summary
+
+| Metric | LLNL position | LANL position | Gap |
+|--------|--------------|---------------|-----|
+| Alibaba HRC-MAE (atlas) | 0.012484 | 0.002217 (non-strict) / 0.00301 (strict) | 4.2-5.6× |
+| Alibaba HRC-MAE (GAN ep30) | 0.1370 | — | 62× |
+| Tencent HRC-MAE (atlas) | 0.011957 | 0.01065 (strict) | 1.12× |
+| Tencent HRC-MAE (GAN) | not measured | — | — |
+| Alibaba reuse (GAN ep30) | 0.0445 | 0.2736 | −83.7% |
+| Short-window ★ (ep40) | improving | not measured | LLNL leads |
+
+IDEA #72 ep10 results will determine if the GAN path is viable for sub-0.01 HRC-MAE.
