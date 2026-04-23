@@ -273,6 +273,20 @@ artifacts are
 and `_best.json`. Across seeds `42-57`, the approximate mean HRC is now
 `0.00941`, making this the best stable Tencent object-process row found so far.
 
+A local-power refinement on seeds `50-53` found a small HRC tradeoff around
+that Tencent candidate. With forced phase, `transition_blend=0.55`, and late
+rank scales `1.0,1.0,1.1,1.1`, local power `0.85` produced the best mean HRC
+(`0.009692`) while `0.9` produced slightly better mark score (`0.04584` vs
+`0.04635`). `0.95` was worse on both HRC and reuse. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_localpow_refine_summary.csv`
+and `_best.json`.
+
+| local_prob_power | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.85 | 4 | **0.009692** | 0.61614 | 0.61493 | 53.2 | 60 | 167.8 | 174 | 0.04635 |
+| 0.90 | 4 | 0.009739 | 0.61602 | 0.61493 | 53.2 | 60 | 169.2 | 174 | **0.04584** |
+| 0.95 | 4 | 0.010273 | 0.61728 | 0.61493 | 53.2 | 60 | 167.5 | 174 | 0.04634 |
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
