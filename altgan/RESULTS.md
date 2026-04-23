@@ -265,6 +265,14 @@ approximate mean HRC `0.00927`, better than the `blend=0.50` forced late-rank
 mean (`0.00965`). Treat `0.55 + forced phase + late rank scale` as the current
 stable Tencent PhaseAtlas candidate.
 
+An additional eight-seed stability run on seeds `50-57` stayed in the same
+band: mean HRC-MAE `0.009541`, reuse `0.61567/0.61493`, stack median
+`53.2/60`, stack p90 `168.5/174`, and mean mark score `0.04595`. The full
+artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_blend055_moreseeds_summary.csv`
+and `_best.json`. Across seeds `42-57`, the approximate mean HRC is now
+`0.00941`, making this the best stable Tencent object-process row found so far.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
