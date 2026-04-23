@@ -6402,7 +6402,9 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 - **Long-rollout ep20 (CATASTROPHIC)**: reuse_access=0.0462 vs real=0.2691 (−82.8%), HRC-MAE=0.1353, stack_distance_median=0 vs real=201
 - **Diagnosis**: AMP fix did NOT fix locality collapse. Same pattern as v195 (ep110: reuse_access=0.0081). v208 ep20 is 5.7× better than v195 ep110 reuse_access, but still catastrophic.
 - Training comb trajectory is excellent (0.08 at ep20 vs v195 achieving 0.042 at ep110), suggesting seed=11+no-amp recipe is genuinely stronger on short-window quality.
+- **Frozen sweep (ep10, ep20, 2026-04-23)**: ep10 frozen=0.15081 (MMD²=0.033, recall=0.414, prec=0.921), ep20 frozen=0.2101 (MMD²=0.020, recall=**0.052**, prec=0.965). **TRAIN/FROZEN COLLAPSE at ep20**: training-log showed recall=0.696, frozen eval gives 0.052 (13× gap). ep10 is the current best frozen. Both far from v195 ATB (0.042) — standard early-epoch behavior.
 - Long-rollout locality collapse is a structural problem independent of AMP/seed — the GAN has no explicit object memory mechanism for long rollout generation.
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
 - JSON: /home/darrell/checkpoints/alibaba_v208/long_rollout_epoch_0020.json
 - **Continuing training** — monitoring if locality improves by ep50 (vs v195 which stayed catastrophic)
+- Next eval: ep50 (frozen_sweep + long_rollout)
