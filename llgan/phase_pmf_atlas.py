@@ -447,7 +447,7 @@ class PhasePMFAtlas:
                         adj_rr = reuse_adj_map.get(pb, 1.0)
                         rr = min(EVAL_CALIBRATED_REUSE_RATE * adj_rr, 0.99)
                     else:
-                        rr = self.reuse_rate.get(pb) or self.global_reuse_rate
+                        rr = EVAL_CALIBRATED_REUSE_RATE
                 wants_reuse = bool(stack) and (rng.random() < rr)
 
                 if wants_reuse:
@@ -462,7 +462,7 @@ class PhasePMFAtlas:
                         fine_pmf = np.maximum(fine_pmf, 0.0)
                         fine_pmf = fine_pmf / fine_pmf.sum()
                     else:
-                        fine_pmf = EVAL_FINE_PMF.copy()
+                        fine_pmf = EVAL_FINE_PMF / EVAL_FINE_PMF.sum()
                     # Sample fine bin → uniform rank within it
                     fine_i = int(rng.choice(len(EVAL_FINE_PMF), p=fine_pmf))
                     lo = int(EVAL_FINE_EDGES[fine_i])
