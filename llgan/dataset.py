@@ -847,6 +847,15 @@ class TracePreprocessor:
                 # opcode uses _encode_opcode (not _cat_maps) → {-1.0, +1.0} floats.
                 # Cast to int so exported CSV matches raw trace integer opcode values.
                 vals = vals.astype(np.int64)
+            elif (col not in self._log_cols
+                    and float(lo).is_integer() and float(hi).is_integer()):
+                # Column whose original range was integer-valued (e.g. tenant int16).
+                # Without this cast, CSV export produces "-1.0" instead of "-1",
+                # which makes mark_quality TV=1.0 against real integer traces.
+                try:
+                    vals = np.round(vals).astype(np.int64)
+                except (ValueError, TypeError):
+                    pass
             data[col] = vals
 
         df = pd.DataFrame(data)
@@ -861,6 +870,17 @@ class TracePreprocessor:
             if col in self._cat_maps:
                 inv_map = {v: k for k, v in self._cat_maps[col].items()}
                 val = inv_map.get(int(round(val)), val)
+                try:
+                    val = int(val)
+                except (ValueError, TypeError):
+                    pass
+            elif col.lower() in {"opcode", "type", "rw", "op"}:
+                # Zero-variance opcode constant is a float (e.g. -1.0). Cast to int
+                # so CSV export produces "-1" not "-1.0" for mark_quality TV scoring.
+                try:
+                    val = int(val)
+                except (ValueError, TypeError):
+                    pass
             df[col] = val
 
         # Undo timestamp delta encoding: cumsum of IATs + start restores absolute times.
