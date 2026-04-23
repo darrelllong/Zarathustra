@@ -256,6 +256,26 @@ post-hoc numeric blending as closed negative; the next mark-side attempt
 should be a residual or quantile-conditioned reservoir correction, not direct
 interpolation with the autoregressive mark head.
 
+A low-blend log-space follow-up tested whether the previous failure was simply
+using too much neural numeric signal. It swept numeric blends `0.05,0.10,0.15`
+with the same four seeds and object-process settings. The answer is still
+negative: the smallest blend is less damaging, but it does not beat its paired
+reservoir control and still erases timing-drift shape.
+
+| Candidate | Seeds | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |
+|---|---:|---:|---:|---:|---:|
+| control, blend 0.0/local power 1.0 | 4 | 0.008698 | **0.00895** | 1.175 | 1.416 |
+| numeric 0.05 log, blend 0.0/local power 1.0 | 4 | 0.008698 | 0.01072 | 0.000 | 1.363 |
+| control, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01117 | 1.307 | 0.931 |
+| numeric 0.05 log, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01296 | 0.000 | 0.899 |
+| control, blend 0.2/local power 0.9 | 4 | 0.008501 | 0.01215 | 0.825 | 0.712 |
+| numeric 0.05 log, blend 0.2/local power 0.9 | 4 | 0.008501 | 0.01330 | 0.015 | 0.694 |
+
+This closes direct interpolation, including tiny log-space residual-style
+blends. Any future mark model must preserve the reservoir sampler's temporal
+drift explicitly, for example by predicting corrections to reservoir quantiles
+or mixture weights instead of replacing sampled timing/size values.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real
