@@ -199,6 +199,11 @@ class PhasePMFAtlas:
     phase_adj: Optional[Dict[int, np.ndarray]] = None
     # Multiplicative adjustment factors for reuse rate vs global BIT reuse rate.
     reuse_adj: Optional[Dict[int, float]] = None
+    # Corpus-specific eval calibration (overrides module-level EVAL_FINE_* constants
+    # if set).  Populated by cmd_calibrate_from_json for per-corpus atlases.
+    corpus_eval_fine_pmf: Optional[np.ndarray] = None
+    corpus_eval_fine_edges: Optional[np.ndarray] = None
+    corpus_eval_calibrated_rr: Optional[float] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -424,6 +429,14 @@ class PhasePMFAtlas:
         per_stream = int(np.ceil(n_records / n_streams))
         rows = []
 
+        # Resolve corpus-specific eval calibration constants (or fall back to module-level).
+        _fine_pmf = getattr(self, "corpus_eval_fine_pmf", None)
+        _fine_edges = getattr(self, "corpus_eval_fine_edges", None)
+        _calib_rr = getattr(self, "corpus_eval_calibrated_rr", None)
+        effective_fine_pmf = _fine_pmf if _fine_pmf is not None else EVAL_FINE_PMF
+        effective_fine_edges = _fine_edges if _fine_edges is not None else EVAL_FINE_EDGES
+        effective_calib_rr = float(_calib_rr) if _calib_rr is not None else EVAL_CALIBRATED_REUSE_RATE
+
         for stream_id in range(n_streams):
             stack: List[int] = []
             next_new_id = 10_000_000 + stream_id * (per_stream + 1_000_003)
@@ -445,14 +458,14 @@ class PhasePMFAtlas:
                 else:
                     eval_rr_map = getattr(self, "eval_phase_rr", None)
                     if eval_rr_map is not None:
-                        rr = min(float(eval_rr_map.get(pb, EVAL_CALIBRATED_REUSE_RATE)), 0.99)
+                        rr = min(float(eval_rr_map.get(pb, effective_calib_rr)), 0.99)
                     else:
                         reuse_adj_map = getattr(self, "reuse_adj", None)
                         if reuse_adj_map is not None:
                             adj_rr = reuse_adj_map.get(pb, 1.0)
-                            rr = min(EVAL_CALIBRATED_REUSE_RATE * adj_rr, 0.99)
+                            rr = min(effective_calib_rr * adj_rr, 0.99)
                         else:
-                            rr = EVAL_CALIBRATED_REUSE_RATE
+                            rr = effective_calib_rr
                 wants_reuse = bool(stack) and (rng.random() < rr)
 
                 if wants_reuse:
@@ -461,21 +474,35 @@ class PhasePMFAtlas:
                     eval_fine_adj_map = getattr(self, "eval_phase_fine_adj", None)
                     phase_adj_map = getattr(self, "phase_adj", None)
                     if eval_fine_adj_map is not None:
-                        fine_adj = eval_fine_adj_map.get(pb, np.ones(len(EVAL_FINE_PMF)))
-                        fine_pmf = EVAL_FINE_PMF * fine_adj
+                        fine_adj = eval_fine_adj_map.get(pb, np.ones(len(effective_fine_pmf)))
+                        fine_pmf = effective_fine_pmf * fine_adj
                         fine_pmf = np.maximum(fine_pmf, 0.0)
                         fine_pmf = fine_pmf / fine_pmf.sum()
                     elif phase_adj_map is not None:
+                        # Recompute FINE_TO_COARSE for corpus-specific edges
+                        n_fine = len(effective_fine_pmf)
+                        fine_to_coarse = np.zeros(n_fine, dtype=np.int64)
+                        for _fi in range(n_fine):
+                            _lo_f = int(effective_fine_edges[_fi])
+                            _hi_f = int(effective_fine_edges[_fi + 1]) if _fi + 1 < len(effective_fine_edges) else int(effective_fine_edges[-1]) * 2
+                            _best_b, _best_ov = 0, -1
+                            for _b in range(N_BUCKETS):
+                                _lo_b = int(BUCKET_EDGES[_b])
+                                _hi_b = int(BUCKET_EDGES[_b + 1])
+                                _ov = max(0, min(_hi_f, _hi_b) - max(_lo_f, _lo_b))
+                                if _ov > _best_ov:
+                                    _best_ov, _best_b = _ov, _b
+                            fine_to_coarse[_fi] = _best_b
                         coarse_adj = phase_adj_map.get(pb, np.ones(N_BUCKETS))
-                        fine_pmf = EVAL_FINE_PMF * coarse_adj[FINE_TO_COARSE]
+                        fine_pmf = effective_fine_pmf * coarse_adj[fine_to_coarse]
                         fine_pmf = np.maximum(fine_pmf, 0.0)
                         fine_pmf = fine_pmf / fine_pmf.sum()
                     else:
-                        fine_pmf = EVAL_FINE_PMF / EVAL_FINE_PMF.sum()
+                        fine_pmf = effective_fine_pmf / effective_fine_pmf.sum()
                     # Sample fine bin → uniform rank within it
-                    fine_i = int(rng.choice(len(EVAL_FINE_PMF), p=fine_pmf))
-                    lo = int(EVAL_FINE_EDGES[fine_i])
-                    hi = int(EVAL_FINE_EDGES[fine_i + 1]) - 1 if fine_i + 1 < len(EVAL_FINE_EDGES) else int(EVAL_FINE_EDGES[-1])
+                    fine_i = int(rng.choice(len(effective_fine_pmf), p=fine_pmf))
+                    lo = int(effective_fine_edges[fine_i])
+                    hi = int(effective_fine_edges[fine_i + 1]) - 1 if fine_i + 1 < len(effective_fine_edges) else int(effective_fine_edges[-1])
                     stack_sz = len(stack)
                     lo_eff = min(lo, stack_sz - 1)
                     hi_eff = min(hi, stack_sz - 1)
@@ -556,6 +583,56 @@ def cmd_generate(args):
     print(f"Reuse rate (within-stream duplicates): {reuse:.4f}")
 
 
+def cmd_calibrate_from_json(args):
+    """Create or update a nophase atlas calibrated from an eval JSON file.
+
+    If --model is given, loads that atlas and patches its corpus calibration.
+    If not, creates a minimal nophase atlas (n_phase_bins=1, no real BIT fit).
+    Saves result to --output.
+    """
+    import json as _json
+
+    with open(args.eval_json) as _f:
+        _d = _json.load(_f)
+    _r = _d["real"]
+    fine_pmf = np.array(_r["stack_distance_histogram"], dtype=np.float64)
+    fine_pmf = fine_pmf / fine_pmf.sum()
+    fine_edges = np.array(_r["stack_distance_bin_edges"], dtype=np.int64)
+    calib_rr = float(_r["reuse_access_rate"])
+
+    print(f"Loaded eval JSON: reuse_access_rate={calib_rr:.5f}, "
+          f"fine_pmf bins={len(fine_pmf)}, p90_bin_edge={fine_edges[int(len(fine_pmf)*0.9)]}")
+
+    if args.model:
+        print(f"Loading existing atlas from {args.model} ...")
+        model = PhasePMFAtlas.load(args.model)
+    else:
+        # Create minimal nophase atlas: 1 phase bin, empty BIT-fit stats.
+        dummy_pmf = fine_pmf[:N_BUCKETS] if len(fine_pmf) >= N_BUCKETS else np.ones(N_BUCKETS) / N_BUCKETS
+        model = PhasePMFAtlas(
+            n_phase_bins=1,
+            phase_edges=np.array([], dtype=np.float64),
+            lru_pmf={0: dummy_pmf},
+            reuse_rate={0: calib_rr},
+            mark_reservoir={0: []},
+            global_pmf=dummy_pmf,
+            global_reuse_rate=calib_rr,
+            global_marks=[],
+            phase_adj=None,
+            reuse_adj=None,
+        )
+
+    model.corpus_eval_fine_pmf = fine_pmf
+    model.corpus_eval_fine_edges = fine_edges
+    model.corpus_eval_calibrated_rr = calib_rr
+    model.phase_adj = None  # disable BIT-phase conditioning; use global fine PMF only
+    model.reuse_adj = None
+
+    model.save(args.output)
+    print(f"Saved calibrated atlas → {args.output}")
+    print(f"  reuse_rate={calib_rr:.5f}, fine_pmf_bins={len(fine_pmf)}")
+
+
 def main():
     p = argparse.ArgumentParser(description="LLNL Phase-PMF Atlas (IDEA #65)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -579,11 +656,21 @@ def main():
                       help="Reuse rate override; default uses per-phase fitted rate")
     pgen.add_argument("--phase-window", type=int, default=PHASE_WINDOW)
 
+    pcal = sub.add_parser("calibrate-from-json",
+                          help="Build/update nophase atlas from eval JSON calibration")
+    pcal.add_argument("--eval-json", required=True,
+                      help="Path to long_rollout eval JSON (contains real['stack_distance_histogram'])")
+    pcal.add_argument("--model", default=None,
+                      help="Existing atlas to patch (if omitted, creates minimal nophase atlas)")
+    pcal.add_argument("--output", required=True)
+
     args = p.parse_args()
     if args.cmd == "fit":
         cmd_fit(args)
-    else:
+    elif args.cmd == "generate":
         cmd_generate(args)
+    elif args.cmd == "calibrate-from-json":
+        cmd_calibrate_from_json(args)
 
 
 if __name__ == "__main__":
