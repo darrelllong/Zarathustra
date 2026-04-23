@@ -3761,3 +3761,44 @@ v208 is training well on short-window quality (ep20: comb=0.08, recall=0.696). I
 1. **v208**: run frozen_sweep at ep20 to get clean ★ score; continue to ep50; run long-rollout at ep50 to verify locality persists below 0.046
 2. **IDEA #69 prototype**: design the object pool conditioning module (low training overhead vs #68); target launch as v209 at end of v208 training
 3. **Atlas working-set windows** (IDEA #67's real successor): fit actual working-set parameters from the LANL eval JSON's temporal statistics if available
+
+---
+
+## Round 67 — LLNL
+
+### IDEA #70 Tested and Closed: Global Markov Atlas Fails
+
+**Hypothesis** (motivated by LANL StackAtlas intel): Fit 8×8 Markov transition matrix P(LRU_rank_bucket_i → LRU_rank_bucket_j) over consecutive reuse events from the LANL eval traces. When hot objects stay hot (P(bucket_0 → bucket_0) = high), HRC@small_cs should automatically be reproduced.
+
+**Results** (4 alibaba streams, 25k events each, Fenwick-tree BIT for stack distances):
+
+| Method | HRC-MAE | HRC@cs=18 | Direction |
+|--------|---------|-----------|-----------|
+| Real | — | 0.0563 | — |
+| LANL NeuralAtlas | **0.001826** | ~0.0563 | exact |
+| LLNL global atlas | 0.012484 | 0.0007 | under |
+| IDEA #70 Markov | **0.055731** | **0.1932** | 3.4× over |
+
+**Status: CLOSED-WORSE**. The Markov atlas is 4.5× worse than the global atlas and 30× worse than LANL.
+
+**Diagnosis — per-stream heterogeneity defeats global Markov**:
+
+The 4 eval streams span two regimes: stream 0 (reuse_rate=0.757, contributing 15,487 transitions = 74% of total) and streams 1+3 (reuse_rate≈0.003, ~57 transitions each). The global Markov matrix is overwhelmingly shaped by stream 0's hot-heavy dynamics. Applying those transitions at global_reuse_rate=0.285 generates all four streams with high-reuse LRU patterns → HRC@18=0.193, far above real=0.056.
+
+The marginal atlas fails because it discards temporal structure. The Markov atlas fails because it discards per-stream heterogeneity. Both are global approximations applied to a heterogeneous workload. LANL NeuralAtlas wins by conditioning on each stream individually via a learned sequence model.
+
+**Key implication for LLNL strategy**: The atlas ceiling (0.012 HRC-MAE) cannot be broken with any global statistical approach. The GAN is the right architecture — it can learn per-stream conditioning — but is currently failing at long rollout due to the Bengio exposure bias (IDEA #68/69). Fixing the GAN is now the only credible path to sub-0.005 MAE.
+
+### v208 Training Status (ep29)
+
+Training log shows three consecutive negative-G epochs (ep27: G=-4.32, ep28: G=-3.29, ep29: G=-3.83). This is unusual but within W-stop threshold. W scores remain positive (0.9–2.5), indicating WGAN-SN is still functional. Most likely explanation: Generator temporarily overpowered critic (diversity pressure from `--diversity-loss-weight 2.0` too high), then critic stabilized. No intervention at this time.
+
+v208 ep50 eval monitor is still running on vinge (wait_eval_v208_ep50.sh).
+
+### Atlas Ceilings — Final Accounting
+
+After testing burst injection (IDEA #67), Markov chains (IDEA #70), and the per-file atlas (#65b): no global statistical atlas approach can reproduce per-stream temporal heterogeneity. Atlas-based approaches are closed for the HRC-MAE race. The path forward:
+
+1. **GAN fix** (IDEA #68 scheduled sampling + IDEA #69 pool injection) — v209 target
+2. **LANL beat**: Need sub-0.002 MAE on their eval. Requires a working seq-to-seq model with proper long-rollout training. The scheduled sampling fix is load-bearing.
+3. **Short-window ★**: v208 continues — likely new LLNL record (> v195's 0.042) when ep50 eval arrives.

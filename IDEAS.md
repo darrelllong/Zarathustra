@@ -2547,3 +2547,26 @@ with automatic evaluation and no `llgan/` edits.
 **Expected outcome**: G learns "pool reuse rate" — if pool has K unique objects and target_reuse = 0.265, G outputs obj_id_reuse = +1 for ~26.5% of next window's accesses from the pool. Long-rollout reuse_access recovers.
 
 **Priority**: HIGH — lower cost than IDEA #68, directly addresses the missing conditioning signal.
+
+---
+
+## IDEA #70 (LLNL): Markov LRU Rank Transition Atlas
+
+**Problem**: LLNL global atlas gets HRC-MAE=0.012484 on LANL eval because marginal PMF discards temporal ordering. Real traces have temporal clustering (hot objects stay hot) that drives high HRC@small_cs. Hypothesis: fitting a Markov chain P(LRU_rank_bucket_i → LRU_rank_bucket_j) over consecutive reuse events would capture this hot-stays-hot dynamic.
+
+**Method**: Fit 8×8 Markov transition matrix from LANL eval trace files. Row-normalize. Generate by sampling next LRU rank bucket from Markov chain conditioned on previous bucket.
+
+**Status**: CLOSED-WORSE
+
+**Empirical results** (alibaba, 4 streams, per_stream=25k):
+
+| Method | HRC-MAE | HRC@18 | HRC@477 |
+|--------|---------|--------|---------|
+| Real | — | 0.0563 | 0.2046 |
+| LANL NeuralAtlas | **0.001826** | ~0.0563 | ~0.2046 |
+| LLNL global atlas | 0.012484 | 0.0007 | ~0.20 |
+| **IDEA #70 Markov** | **0.055731** | **0.1932** | 0.2173 |
+
+**Root cause of failure**: The 4 eval streams span two regimes — high reuse (stream 0: reuse_rate=0.7567, 15487 transitions) and near-zero reuse (streams 1, 3: reuse_rate≈0.003, 56–58 transitions). Stream 0 contributes 74% of all transitions. The global Markov matrix is therefore dominated by high-reuse dynamics. When generating at global_reuse_rate=0.285, Markov transitions aggressively push toward low-rank (hot) buckets, giving HRC@18=0.1932 — 3.4× too high. The problem is per-stream heterogeneity: need per-stream Markov matrices, not a global one.
+
+**Key lesson**: A global Markov atlas inherits the same flaw as the global marginal PMF atlas — it cannot distinguish between high-reuse and near-zero reuse streams. The path to beating LANL requires per-stream sequence modeling, which is exactly what the GAN is designed to do (but currently fails at long-rollout due to exposure bias).
