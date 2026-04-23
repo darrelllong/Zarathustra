@@ -1838,6 +1838,34 @@ def train(cfg: Config) -> None:
                     loss_reuse_rate = (_fake_rate - _r_target) ** 2
                     g_loss = g_loss + _rrw * loss_reuse_rate
 
+                # IDEA #72: long-chain reuse-rate loss.
+                # Generate chain_reuse_windows windows with carried LSTM hidden
+                # state (self-rollout, matching inference) and penalise the mean
+                # reuse rate over the full chain vs the target.  Directly attacks
+                # the cascade locality collapse seen at long rollout (ep20/30: 4.5%
+                # reuse vs real 26.9%) where single-window reuse BCE is ineffective.
+                _crw = getattr(cfg, 'chain_reuse_weight', 0.0)
+                _cr_windows = int(getattr(cfg, 'chain_reuse_windows', 8))
+                if _crw > 0.0 and obj_id_col >= 0:
+                    _z_gc_cr, _ = _make_z_global(B, cfg, device,
+                                                  real_features=real_batch,
+                                                  file_cond=file_cond_batch, G=G)
+                    _h_cr = None
+                    _cr_reuse_chunks = []
+                    for _wci in range(_cr_windows):
+                        _z_lc_cr = G.sample_z_local(B, cfg.timestep, device)
+                        if _h_cr is None:
+                            _H_cr, _h_cr = G(_z_gc_cr, _z_lc_cr, return_hidden=True)
+                        else:
+                            _H_cr, _h_cr = G(_z_gc_cr, _z_lc_cr,
+                                             hidden=_h_cr, return_hidden=True)
+                        _cr_reuse_chunks.append(_H_cr[:, :, obj_id_col])
+                    _cr_reuse_all = torch.cat(_cr_reuse_chunks, dim=1)  # (B, T*N)
+                    _cr_rate = ((_cr_reuse_all + 1.0) / 2.0).mean()
+                    _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
+                    loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)
+                    g_loss = g_loss + _crw * loss_chain_reuse
+
                 # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
                 # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
                 # that the LSTM is reusing a prior object.  Train it to match
@@ -2641,6 +2669,14 @@ def parse_args() -> Config:
     p.add_argument("--reuse-rate-target", type=float, default=0.265,
                    help="IDEA #51: target reuse rate for --reuse-rate-loss-weight. "
                         "alibaba=0.265, tencent=0.621 (from real corpus statistics).")
+    p.add_argument("--chain-reuse-weight", type=float, default=0.0,
+                   help="IDEA #72: long-chain reuse-rate loss weight. Generates "
+                        "--chain-reuse-windows windows with carried LSTM hidden state "
+                        "(self-rollout) and penalises mean reuse rate vs target. "
+                        "Directly fixes cascade locality collapse at long rollout. Try 5.0.")
+    p.add_argument("--chain-reuse-windows", type=int, default=8,
+                   help="IDEA #72: number of windows to chain for the chain-reuse loss "
+                        "(default 8, matching ~96 steps of long rollout).")
     p.add_argument("--gumbel-reuse", action="store_true", default=False,
                    help="IDEA #54: replace scalar obj_id_reuse with Gumbel-Softmax hard "
                         "binary decision + BCE-logit supervision. Straight-through gradient "
@@ -2954,6 +2990,8 @@ def parse_args() -> Config:
     cfg.reuse_bce_weight            = args.reuse_bce_weight
     cfg.reuse_rate_loss_weight      = args.reuse_rate_loss_weight
     cfg.reuse_rate_target           = args.reuse_rate_target
+    cfg.chain_reuse_weight          = args.chain_reuse_weight
+    cfg.chain_reuse_windows         = args.chain_reuse_windows
     cfg.gumbel_reuse                = args.gumbel_reuse
     cfg.gumbel_reuse_weight         = args.gumbel_reuse_weight
     cfg.gumbel_tau_start            = args.gumbel_tau_start

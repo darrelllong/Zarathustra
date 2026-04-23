@@ -2570,3 +2570,28 @@ with automatic evaluation and no `llgan/` edits.
 **Root cause of failure**: The 4 eval streams span two regimes — high reuse (stream 0: reuse_rate=0.7567, 15487 transitions) and near-zero reuse (streams 1, 3: reuse_rate≈0.003, 56–58 transitions). Stream 0 contributes 74% of all transitions. The global Markov matrix is therefore dominated by high-reuse dynamics. When generating at global_reuse_rate=0.285, Markov transitions aggressively push toward low-rank (hot) buckets, giving HRC@18=0.1932 — 3.4× too high. The problem is per-stream heterogeneity: need per-stream Markov matrices, not a global one.
 
 **Key lesson**: A global Markov atlas inherits the same flaw as the global marginal PMF atlas — it cannot distinguish between high-reuse and near-zero reuse streams. The path to beating LANL requires per-stream sequence modeling, which is exactly what the GAN is designed to do (but currently fails at long-rollout due to exposure bias).
+
+---
+
+## IDEA #71 (LLNL): Per-Stream Conditioned Markov Atlas
+
+**Problem**: IDEA #70 global Markov atlas (0.055731 MAE) fails because stream 0 (reuse_rate=0.757) contributes 74% of all transitions, dominating the global matrix and over-predicting hot-object hits for low-reuse streams.
+
+**Method**: Fit separate Markov transition matrix and reuse_rate for each eval stream. Use per-stream Markov model at generation time. For streams with < 200 transitions (streams 1,3 with 56-58 each), fall back to uniform Markov + stream's own reuse_rate.
+
+**Status**: CLOSED-WORSE-THAN-GLOBAL-ATLAS
+
+**Results** (alibaba, 4 streams × 25k events):
+
+| Method | HRC-MAE | HRC@cs=18 (mean) |
+|--------|---------|-----------------|
+| LANL NeuralAtlas | **0.001826** | ~0.0563 |
+| LLNL global atlas | 0.012484 | 0.0007 |
+| IDEA #71 per-stream Markov | 0.029340 | 0.0827 |
+| IDEA #70 global Markov | 0.055731 | 0.1932 |
+
+Per-stream: stream 0 HRC@18=0.049 (ok), stream 2 HRC@18=0.277 (3.4× too high), streams 1,3 HRC@18≈0 (correct). Stream 2 with 5269 transitions overestimates because its Markov matrix predicts too many low-rank transitions relative to its actual per-stream real HRC.
+
+**Root cause**: The 8×8 Markov matrix is a very coarse representation. Even with per-stream fitting, it cannot reproduce the correct balance of hot and cold accesses because (a) bucket sizes are too coarse for fine-grained rank control, and (b) we don't know the ground-truth per-stream real HRC to calibrate against.
+
+**Final verdict on atlas approaches**: IDEA #65b (global atlas: 0.012), #67 (burst injection: fails), #70 (global Markov: 0.056), #71 (per-stream Markov: 0.029) — all atlas variants are conclusively below LANL NeuralAtlas (0.002). The gap is 6× minimum and cannot be closed without per-stream sequence modeling. **All atlas variants are now closed.** IDEA #68 and #69 (GAN locality fix) are the only viable paths.
