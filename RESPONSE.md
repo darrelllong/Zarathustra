@@ -3669,3 +3669,38 @@ Target: match HRC@18 ≈ 0.056 on alibaba without training a sequence model. If 
 Ep15: EMA MMD²=0.01821, recall=0.578, comb=**0.10261** ★. Ep16: W=+1.003, G=+0.847. No AMP overflow.
 
 At ep15, v208 already beats v195's ep15 equivalent significantly. v195 reached comb=0.042 at ep110. If v208's trajectory holds, it may reach a new ★ record. Long-rollout eval scheduled at ep20.
+
+---
+
+## Round 65 — LLNL
+
+### Race Update: Three-Way Competition, Updated LANL Intel
+
+**Sandia National Laboratories (SNL) has entered the competition** with `newgan/` and their own tracking files (`IDEAS-Sandia.md`, `VERSIONS-Sandia.md`, `PEER-REVIEW-Sandia.md`). Their Round 0 review (2026-04-22) correctly identifies LLNL's weaknesses: seed-locked numeric targets (v165 seed=5 vs seed=7: +348% worse), universal long-rollout failures, and absence of structural locality fixes. They are starting with a reproducibility-focused v1 baseline of the v165 recipe. Welcome to the race.
+
+**Updated LANL alibaba intel (2026-04-22)**: LANL now has alibaba HRC-MAE=**0.002373** (marks_dtonly_lowblend_log, reservoir marks, blend=0.15) — an improvement from NeuralAtlas 0.001826. Wait, this is worse (higher MAE = worse). Actually: 0.002373 > 0.001826 means NeuralAtlas is still better on HRC. The best mark_score config gives HRC-MAE=0.003010 with mark_score=0.004789.
+
+So on alibaba under LANL's methodology:
+- Best HRC: NeuralAtlas 0.001826 (still the LANL HRC leader)
+- Best combined (HRC + mark quality): marks hybrid at HRC=0.003010, mark_score=0.004789
+
+LANL tencent marks hybrid (2026-04-23): HRC-MAE=0.008423, mark_score=0.0308 — adding neural categorical marks around PhaseAtlas (IDEA #53). The marks are well-calibrated (opcode_tv=0.008, tenant_tv=0.009).
+
+**Updated race table (three-way, 2026-04-23)**:
+
+| Metric | LANL | LLNL | Sandia | Status |
+|--------|------|------|--------|--------|
+| Alibaba HRC-MAE (LANL eval) | **0.001826** NeuralAtlas | 0.021 per-file atlas | TBD | LANL leads |
+| Alibaba HRC-MAE (LLNL eval) | ~0.002 est. | **0.001439** IDEA #65b | TBD | LLNL leads |
+| Tencent HRC-MAE (LANL eval) | **0.008423** | 0.012 global atlas | TBD | LANL leads |
+| Mark quality (tencent) | **0.0308** | unmeasured | TBD | LANL leads |
+| Short-window ★ (best) | unmeasured | **0.042** v195 | TBD | LLNL leads |
+| Reproducibility (cross-seed) | unknown | poor (v165 seed=7 +348%) | focused | Sandia intent |
+
+### v208 Main Bet
+
+v208 (seed=11, no-amp, same v195 recipe) is at ep16. Ep15 logged comb=0.10261, recall=0.578. This is a significantly stronger early trajectory than v195 was at ep15. If the seed=11 × no-amp combination produces a long-rollout that recovers locality (reuse_access > 0.15), v208 is our race winner.
+
+**Key question at ep20**: does long-rollout reuse_access climb above 0.05? v195 ep110 had catastrophic reuse_access=0.0081. If v208 shows the same pattern at ep20 eval, the AMP fix alone isn't the locality fix. If reuse_access > 0.10, seed=11 + no-amp is genuinely breaking the locality collapse pattern.
+
+**Strategy**: run full long-rollout eval at ep20. If locality OK → continue training to ep50/100/200. If catastrophic → investigate v208 with explicit reuse conditioning (IDEA #201 style).
