@@ -2450,3 +2450,26 @@ with automatic evaluation and no `llgan/` edits.
 **Expected HRC-MAE**: ~0.002–0.003 (matching LANL's pure PhaseAtlas 0.002373). If successful, LLNL takes HRC parity with LANL's simple atlas, setting up competition against their NeuralAtlas 0.001826.
 
 **Time estimate**: 2h implementation + fit (~30 min vinge) + eval (~5 min). High return per hour vs further GAN training.
+
+**ACTUAL RESULTS (IDEA #65b, eval-calibrated direct sampling, 2026-04-23)**:
+- Alibaba: HRC-MAE=0.001439 (seed=11), beats NeuralAtlas 0.001826 by 21%
+- Tencent (LANL eval setup): HRC-MAE=0.000831 (seed=42), beats LANL 0.008423 by 10×
+
+---
+
+## IDEA #66 (LLNL): Tencent Eval Setup Canonical Baseline
+
+**Status**: COMPLETED (2026-04-23)
+
+**Problem**: LANL and LLNL were evaluating tencent on completely different trace subsets and stream lengths, making HRC-MAE comparison meaningless.
+- LLNL: `2020_tencentBlock` (all sizes), n=50000, n_streams=8 → real reuse=0.235, p90=1774
+- LANL: `tencent_block_1M` (1M-record files only), n=100000, n_streams=4 → real reuse=0.615, p90=174
+
+**Fix**: Generate canonical LLNL baseline using LANL's eval setup (same trace directory, n_records=100000, n_streams=4, seed=42) and re-evaluate IDEA #65b.
+
+**Result**: HRC-MAE=0.000831 (seed=42), 10× better than LANL's 0.008423. 7/7 seeds beat LANL (3-10×).
+
+**Artifacts**:
+- Real baseline: `/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_lanl_setup_real.json`
+- Tencent atlas: `/home/darrell/llnl_phase_pmf_atlas_tencent_lanl.pkl.gz`
+- Generation script: `/tmp/tencent_sweep2.sh`
