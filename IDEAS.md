@@ -2680,3 +2680,24 @@ From trace characterization, real alibaba mean(|stride| | reuse=True) can be ext
 **Status**: IMPLEMENTED (2026-04-23, dataset.py), not yet benchmarked in full long-rollout.
 
 **Note**: This is a pure export fix — no model changes. The LSTM already generates correct temporal structure; only the CSV representation was wrong. Run full long_rollout_eval + mark_quality on v195 to quantify improvement.
+
+---
+
+## IDEA #75 (LLNL): Tencent Chain-Reuse Adaptation (reuse-rate-target=0.615)
+
+**Motivation**: IDEA #72 v2 (chain-reuse loss) was designed for alibaba (reuse_rate_target=0.265). Tencent has fundamentally different reuse statistics: real reuse_access=0.615 (2.3× higher than alibaba). The LSTM trained on tencent exhibits the same Bengio exposure bias but at a different operating point.
+
+**Key difference from alibaba**: Tencent has much higher baseline reuse. The LANL PhaseAtlas long-rollout achieves reuse 0.61451 vs real 0.61493. LLNL's tencent GAN (v165) hasn't been evaluated on long-rollout reuse — this is an unknown.
+
+**Proposed tencent_v211**: Same IDEA #72 v2 recipe as alibaba_v210 but adapted:
+- `--trace-dir /tiamat/zarathustra/traces/tencent`
+- `--reuse-rate-target 0.615` (tencent real reuse rate)
+- `--fmt oracle_general`
+- `--seed 7` (different from v165 seed=5)
+- All other params same: chain-reuse-weight=5.0, chain-reuse-windows=8, w-stop=7.0
+
+**Expected**: If IDEA #72 v2 fixes the cascade locality collapse, tencent should be able to reach reuse_access > 0.35 by ep10 (vs real 0.615). The higher baseline makes tencent potentially easier to fix (less of a jump from 0 to target).
+
+**Race gap**: LANL tencent = 0.009109 HRC-MAE (4-seed mean). LLNL atlas = 0.011957. If v211 achieves reuse_access > 0.50 by ep50, HRC-MAE should approach or beat LANL's tencent position.
+
+**Status**: PLANNED — launch script at /tmp/launch_tencent_v211.sh on vinge.local. Will launch after alibaba_v210 ep10 confirms positive reuse trajectory.
