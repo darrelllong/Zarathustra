@@ -424,6 +424,8 @@ class PhasePMFAtlas:
         reuse_rate_override: float = -1.0,
         max_stack_depth: int = 8192,
         phase_window: int = PHASE_WINDOW,
+        burst_prob: float = 0.0,
+        burst_pool_size: int = 20,
     ) -> "list[dict]":
         rng = np.random.default_rng(seed)
         per_stream = int(np.ceil(n_records / n_streams))
@@ -450,6 +452,40 @@ class PhasePMFAtlas:
                 # Determine current phase
                 pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
                 pb = min(pb, self.n_phase_bins - 1)
+
+                # IDEA #67: burst injection — force a hot-object replay with prob burst_prob.
+                # This replicates short-window working-set autocorrelation without training.
+                if burst_prob > 0.0 and stack and rng.random() < burst_prob:
+                    pool_sz = min(burst_pool_size, len(stack))
+                    rank = int(rng.integers(0, pool_sz))
+                    obj_id = stack[rank]
+                    del stack[rank]
+                    stack.insert(0, obj_id)
+                    # Mark sampling (same as reuse path below)
+                    marks = self.mark_reservoir.get(pb) or self.global_marks
+                    if marks:
+                        dt_ev, sz_ev = marks[int(rng.integers(0, len(marks)))]
+                    else:
+                        dt_ev, sz_ev = 1.0, 4096.0
+                    ts += max(float(dt_ev), 0.0)
+                    rows.append({
+                        "stream_id": stream_id,
+                        "ts": ts,
+                        "obj_id": int(obj_id),
+                        "obj_size": max(int(round(sz_ev)), 1),
+                        "opcode": 1,
+                        "tenant": 0,
+                    })
+                    # Update phase window
+                    win_seen.add(int(obj_id))
+                    win_count += 1
+                    if win_count >= phase_window:
+                        current_rate = len(win_seen) / phase_window
+                        win_seen = set()
+                        win_count = 0
+                    if len(stack) > max_stack_depth:
+                        stack.pop()
+                    continue
 
                 # Reuse decision: prefer eval_phase_rr (from actual eval streams)
                 # over coarse reuse_adj (BIT training ratios).
@@ -573,6 +609,8 @@ def cmd_generate(args):
         seed=args.seed,
         reuse_rate_override=args.reuse_rate,
         phase_window=args.phase_window,
+        burst_prob=getattr(args, "burst_prob", 0.0),
+        burst_pool_size=getattr(args, "burst_pool_size", 20),
     )
     df = pd.DataFrame(rows)
     df.to_csv(args.output, index=False)
@@ -655,6 +693,10 @@ def main():
     pgen.add_argument("--reuse-rate", type=float, default=-1.0,
                       help="Reuse rate override; default uses per-phase fitted rate")
     pgen.add_argument("--phase-window", type=int, default=PHASE_WINDOW)
+    pgen.add_argument("--burst-prob", type=float, default=0.0,
+                      help="IDEA #67: probability of hot-pool burst replay per step")
+    pgen.add_argument("--burst-pool-size", type=int, default=20,
+                      help="IDEA #67: working-set pool size for burst injection")
 
     pcal = sub.add_parser("calibrate-from-json",
                           help="Build/update nophase atlas from eval JSON calibration")
