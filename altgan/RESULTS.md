@@ -116,6 +116,28 @@ ratio `0.014`. Forced phase raises timing drift to `0.085` and size drift to
 p90 falls from `171` to `163` vs real `174`. Keep natural phase as the promoted
 cache row; forced phase is a drift diagnostic, not the benchmark setting.
 
+A rank-scale microprobe then tested whether Tencent's too-shallow stack median
+could be fixed by expanding sampled reuse ranks after the object process chose
+an event. The sweep used seeds `42,43`, natural phase, local power `0.9`,
+transition blends `0.5,0.65`, and rank scales `1.0,1.1,1.2`. The full
+artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_rankscale_micro_confirm_summary.csv`
+and `_best.json`.
+
+| transition_blend | rank scale | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | 1.0 | 2 | 0.010309 | 0.61200 | 0.61493 | 48.5 | 60 | 163.5 | 174 | 0.04800 |
+| 0.50 | 1.1 | 2 | **0.010176** | 0.61200 | 0.61493 | 53.5 | 60 | 180.0 | 174 | 0.04800 |
+| 0.50 | 1.2 | 2 | 0.012966 | 0.61200 | 0.61493 | 58.0 | 60 | 195.5 | 174 | 0.04800 |
+| 0.65 | 1.0 | 2 | 0.010549 | 0.61522 | 0.61493 | 50.5 | 60 | 162.0 | 174 | **0.04729** |
+| 0.65 | 1.1 | 2 | **0.010040** | 0.61522 | 0.61493 | 55.5 | 60 | 178.0 | 174 | **0.04729** |
+| 0.65 | 1.2 | 2 | 0.013191 | 0.61522 | 0.61493 | 60.5 | 60 | 194.5 | 174 | **0.04729** |
+
+Rank expansion is useful only in a narrow band: scale `1.1` improves the
+two-seed mean HRC and moves the median/p90 closer to real, while `1.2`
+over-expands the tail and loses badly. The next Tencent HRC probe should test
+phase-specific or capped `1.1` schedules, not global scale escalation.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
