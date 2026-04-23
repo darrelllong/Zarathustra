@@ -241,6 +241,20 @@ score `0.04843`. The full artifacts are
 and `_best.json`. Forced phase is the better setting for the late-rank Tencent
 branch across the fresh seeds, not just the original `42-45` bundle.
 
+A forced-phase blend refinement on fresh seeds `46-49` then tested
+`transition_blend` values `0.45,0.50,0.55` with the same late-rank schedule.
+Blend `0.55` was best on mean HRC and mark score: mean HRC-MAE `0.009671`,
+reuse `0.61529/0.61493`, stack median `53.0/60`, stack p90 `167.5/174`, and
+mean mark score `0.04561`. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_blend_refine_summary.csv`
+and `_best.json`.
+
+| transition_blend | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.45 | 4 | 0.010181 | 0.61527 | 0.61493 | 51.8 | 60 | 161.8 | 174 | 0.04678 |
+| 0.50 | 4 | 0.009934 | **0.61576** | 0.61493 | 52.5 | 60 | 164.5 | 174 | 0.04642 |
+| 0.55 | 4 | **0.009671** | 0.61529 | 0.61493 | 53.0 | 60 | 167.5 | 174 | **0.04561** |
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
