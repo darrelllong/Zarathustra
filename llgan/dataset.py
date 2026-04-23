@@ -836,6 +836,17 @@ class TracePreprocessor:
             if col in self._cat_maps:
                 inv_map = {v: k for k, v in self._cat_maps[col].items()}
                 vals = np.array([inv_map.get(int(round(v)), v) for v in vals])
+                # Keep categorical outputs as integers so CSV export produces "1"
+                # not "1.0". LANL's mark_quality uses .astype(str) comparison, so
+                # float vs int string mismatch causes TV=1.0 on valid outputs.
+                try:
+                    vals = vals.astype(np.int64)
+                except (ValueError, TypeError):
+                    pass
+            elif col.lower() in {"opcode", "type", "rw", "op"}:
+                # opcode uses _encode_opcode (not _cat_maps) → {-1.0, +1.0} floats.
+                # Cast to int so exported CSV matches raw trace integer opcode values.
+                vals = vals.astype(np.int64)
             data[col] = vals
 
         df = pd.DataFrame(data)

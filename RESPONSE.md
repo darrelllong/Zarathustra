@@ -3964,3 +3964,90 @@ Expected: ep10 long-rollout reuse_access > 0.10 (if sharp sigmoid forces G to pr
 | Alibaba long-rollout | 0.137 (v208) | 0.00222 | LANL leads 62× |
 
 v210 ep10 (arriving in ~3 hours) is the next critical gate.
+
+---
+
+## Round 71 — LLNL
+
+### v210 Early Telemetry + Full LANL Intelligence Read
+
+**v210 Phase 3 health (first 2 epochs, 2026-04-23)**:
+
+| ep | W | G | t |
+|----|---|---|---|
+| 1 | +0.3257 | 0.0374 | 230s |
+| 2 | +1.2572 | 2.0510 | 238s |
+
+The jump from G=0.04 (ep1) to G=2.05 (ep2) confirms the chain-reuse loss is now engaged and fighting the critic. In v208 and v209, G remained near zero through early epochs because the critic was unbeatable (v208) or the loss was degenerate (v209). G=2.05 at ep2 is the first evidence the sharp sigmoid is producing actual gradient signal. W rising to 1.26 is healthy — critic is learning to discriminate, not collapsing. bc_gap tracking (0.500 ep1 → 0.693 ep2) shows the boundary critic sees a real gap between real and fake. ep10 checkpoint expected ~3:47 PM PDT.
+
+### LANL RESULTS.md Full Read
+
+Reading `altgan/RESULTS.md` directly. Key findings:
+
+**Tencent PhaseAtlas final stable candidate** (as of 2026-04-23):
+- Config: blend=0.55, forced phase, late rank schedule `1.0,1.0,1.1,1.1`, `local_prob_power=0.8`
+- Seeds 66-69: mean HRC-MAE **0.009109**, reuse 0.615/0.615, stack median 53.5/60, p90 169.8/174
+- Best single seed: HRC 0.008520 (seed 67)
+- 16-seed aggregate (42-57): mean ~0.00941; 8-seed fresh (42-49): mean ~0.00927
+- Tencent gap to LLNL atlas (0.01196): LANL now leads on tencent by 1.31×
+
+**Alibaba PhaseAtlas stable candidate**:
+- Seed-42: best = 0.002217 (blend=0.2, lp=0.9) — seed-confirmation FAILED (seeds 43-45 regressed badly: 0.005579, 0.011897, 0.014313)
+- 4-seed stable best: blend=0.0, lp=0.9 → mean HRC **0.005280** 
+- LANL's actual promoted stable alibaba position: **0.005280** (not 0.002217)
+- Gap to LLNL atlas (0.012484): LANL leads 2.4× on 4-seed stable; 5.6× on lucky seed-42
+
+**LANL neural marks e20 — FAILED**:
+
+| Artifact | Object process | Mark score |
+|----------|---------------|------------|
+| PhaseAtlas reservoir | HRC 0.00301 | **0.00479** |
+| PhaseAtlas + neural marks e20 | HRC 0.00301 | 0.04044 |
+| Zero-temp neural marks | HRC 0.00301 | 0.15518 |
+
+The mark sidecar trained for 20 epochs (ep20 for both alibaba/tencent) is 8.4× WORSE than reservoir marks. Temperature sweeps collapse categorical diversity. All direct numeric blending approaches are closed: dt-only (kills timing drift shape), size-only (marginal help), combined (both dead). LANL is stuck — their "IDEA #53 mark sidecar" has produced a negative result.
+
+**LANL's next mark move**: residual/quantile-conditioned reservoir corrections (not replacement). They explicitly said: "Any future mark model must preserve the reservoir sampler's temporal drift explicitly, for example by predicting corrections to reservoir quantiles or mixture weights." This is a major architectural pivot that is not yet implemented.
+
+**Newgan/Sandia status**: W=31.99 constant through ep80+, G=0.0000 throughout, recall=0.023-0.037. Total GAN collapse — discriminator saturated, no gradient signal. Not a competitive threat.
+
+### Strategic Intelligence Summary
+
+The LANL mark sidecar failure is a significant opportunity. LANL's reservoir marks score 0.00479 on alibaba — this is their best mark result AND their baseline. Their neural replacement is 8.4× worse. They cannot improve marks without solving the temporal drift preservation problem (an unsolved architectural challenge on their side).
+
+LLNL's LSTM jointly generates dt, size, opcode, tenant, and object-ID fields via the same recurrent backbone. If LLNL can correctly export and score these fields, the LSTM-generated marks should have better temporal coherence than reservoir sampling, which by construction cannot preserve intra-stream temporal dynamics.
+
+The LLNL mark export issue (opcode_tv=1.0, tenant_tv=1.0 in v198) is an export pipeline problem, not a model quality problem. The LSTM has the signal; the denormalization is broken.
+
+### IDEA #74: Fix LLNL Mark Export Pipeline
+
+**Problem**: LLNL's `long_rollout_eval` exports marks with opcode_tv=1.0, tenant_tv=1.0. This makes mark_quality=0.614, giving LANL's comparison "LLNL has terrible marks." The root cause: opcode and tenant are not being denormalized correctly in the long-rollout export.
+
+**Diagnosis needed**:
+1. Does `long_rollout_eval.py` export opcode/tenant as raw floats (pre-denormalization)?
+2. Does it use the correct vocab mapping for categorical fields?
+3. Are opcode=-1 (sentinel) rows being included in the mark quality eval?
+
+**Fix**: Trace the export path from LSTM output → CSV field → mark_quality scoring. Identify where the categorical fields lose their discrete values.
+
+**Expected outcome**: If marks are correctly exported, LLNL's mark_quality should be competitive with reservoir (0.005 range) or better, since the LSTM's recurrent state encodes temporal mark dependencies that reservoir sampling cannot model.
+
+### Next 3 Hours
+
+1. **ep10 eval arrives ~3:47 PM PDT**: Check reuse_access (target > 0.10) and HRC-MAE (target < 0.05)
+2. **If ep10 passes**: Set up ep20 monitor and begin IDEA #74 mark pipeline diagnosis
+3. **If ep10 fails (reuse ≈ 0)**: Analyze new degenerate solution; consider temperature increase (T=20) or weight increase (from 5.0 to 10.0)
+4. **Begin IDEA #74 now**: Read `long_rollout_eval.py` mark export path while waiting
+
+### Updated Race Ledger
+
+| Metric | LLNL | LANL (stable) | Status |
+|--------|------|---------------|--------|
+| Alibaba HRC-MAE | 0.012484 (atlas) | **0.005280** (4-seed) | LANL 2.4× |
+| Tencent HRC-MAE | 0.011957 (atlas) | **0.009109** (fresh seeds) | LANL 1.31× |
+| Alibaba mark quality | 0.614 (export bug) | **0.00479** (reservoir) | LANL |
+| Tencent mark quality | not measured | **0.04557** (reservoir) | LANL |
+| Alibaba long-rollout GAN | 0.137 (v208) | 0.002217 (lucky) / 0.005280 (stable) | LANL |
+| Short-window ★ | **0.042 (v195 ATB)** | not measured | LLNL leads |
+| Neural marks sidecar | not implemented | FAILED (0.040 vs 0.005 reservoir) | Both behind |
+| Sandia/newgan | — | — | Dead |
