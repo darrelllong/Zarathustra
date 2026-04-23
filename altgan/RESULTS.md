@@ -295,6 +295,29 @@ and `_best.json`. Across seeds `50-65`, the approximate mean HRC for
 `local_prob_power=0.85` is now about `0.00942`, slightly ahead of the earlier
 `0.9` branch while staying in the same reuse/mark regime.
 
+A fresh micro-refinement on seeds `66-69` then widened the local-power grid to
+`0.8,0.85,0.9`. On those fresh seeds, `local_prob_power=0.8` was clearly best:
+mean HRC-MAE `0.009109`, reuse `0.61512/0.61493`, stack median `53.5/60`,
+stack p90 `169.8/174`, and mean mark score `0.04636`. The best single row in
+the sweep was seed `67` at HRC-MAE `0.008520`, reuse `0.61366/0.61493`, stack
+median `54/60`, stack p90 `168/174`, and mark score `0.04646`. The full
+artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_localpow_micro_refine_summary.csv`
+and `_best.json`.
+
+| local_prob_power | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.80 | 4 | **0.009109** | 0.61512 | 0.61493 | 53.5 | 60 | 169.8 | 174 | 0.04636 |
+| 0.85 | 4 | 0.009790 | 0.61656 | 0.61493 | 53.2 | 60 | 168.2 | 174 | 0.04614 |
+| 0.90 | 4 | 0.009969 | 0.61658 | 0.61493 | 53.2 | 60 | 167.2 | 174 | **0.04568** |
+
+This overturns the earlier narrow `0.85` lead from seeds `50-53`: the Tencent
+forced-phase late-rank branch still looks strong at blend `0.55`, but fresh
+seeds now point to `local_prob_power=0.8` as the better HRC candidate. The
+next LANL move is no longer another object-process scalar sweep. Tencent now
+moves to IDEA #53 sidecar mark training around this strict-holdout PhaseAtlas
+winner.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used

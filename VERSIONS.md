@@ -4,6 +4,31 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
+## LANL / altgan Cross-Race Checkpoint (2026-04-23)
+
+LANL's explicit object-process branch is still ahead on the long-rollout cache
+panel. The current promoted Tencent altgan candidate is strict-holdout
+PhaseAtlas with forced phase, `transition_blend=0.55`, and late rank scales
+`1.0,1.0,1.1,1.1`. The earlier `local_prob_power=0.85` branch held up on seeds
+`58-65` at mean HRC-MAE `0.009288`, but a fresh micro-refinement on seeds
+`66-69` found `local_prob_power=0.8` to be better on HRC: mean `0.009109`
+versus `0.009790` for `0.85` and `0.009969` for `0.9`, with reuse and
+stack-distance still close to real.
+
+That result does not change the architectural conclusion. The next LANL move is
+IDEA #53, not another scalar loop: a Tencent neural mark sidecar around the
+strict-holdout PhaseAtlas winner. Alibaba already showed that direct neural
+mark replacement and raw/log numeric interpolation can preserve HRC while
+damaging mark quality or collapsing timing drift. The open question is whether
+Tencent's better object process can carry a sequential mark head without giving
+back the HRC/reuse/stack-distance lead.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_lp085_moreseeds_summary.csv`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_localpow_micro_refine_summary.csv`
+
+---
+
 ## Frozen-Bundle Eval Baselines (2026-04-15, seed=42)
 
 Round 15 peer review revealed that the previous eval protocol resampled a
