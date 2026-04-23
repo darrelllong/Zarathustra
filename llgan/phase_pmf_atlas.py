@@ -438,25 +438,34 @@ class PhasePMFAtlas:
                 pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
                 pb = min(pb, self.n_phase_bins - 1)
 
-                # Reuse decision: use eval-calibrated base * phase adjustment.
+                # Reuse decision: prefer eval_phase_rr (from actual eval streams)
+                # over coarse reuse_adj (BIT training ratios).
                 if reuse_rate_override >= 0.0:
                     rr = reuse_rate_override
                 else:
-                    reuse_adj_map = getattr(self, "reuse_adj", None)
-                    if reuse_adj_map is not None:
-                        adj_rr = reuse_adj_map.get(pb, 1.0)
-                        rr = min(EVAL_CALIBRATED_REUSE_RATE * adj_rr, 0.99)
+                    eval_rr_map = getattr(self, "eval_phase_rr", None)
+                    if eval_rr_map is not None:
+                        rr = min(float(eval_rr_map.get(pb, EVAL_CALIBRATED_REUSE_RATE)), 0.99)
                     else:
-                        rr = EVAL_CALIBRATED_REUSE_RATE
+                        reuse_adj_map = getattr(self, "reuse_adj", None)
+                        if reuse_adj_map is not None:
+                            adj_rr = reuse_adj_map.get(pb, 1.0)
+                            rr = min(EVAL_CALIBRATED_REUSE_RATE * adj_rr, 0.99)
+                        else:
+                            rr = EVAL_CALIBRATED_REUSE_RATE
                 wants_reuse = bool(stack) and (rng.random() < rr)
 
                 if wants_reuse:
-                    # Effective fine PMF: EVAL_FINE_PMF * coarse phase adjustment.
-                    # Each fine bin i is scaled by adj[pb][FINE_TO_COARSE[i]].
-                    # This uses the eval fine histogram's within-bucket shape while
-                    # applying per-phase shaping at the coarse level.
+                    # Effective fine PMF: prefer eval_phase_fine_adj (fitted from actual
+                    # eval streams) over coarse phase_adj (BIT training ratios).
+                    eval_fine_adj_map = getattr(self, "eval_phase_fine_adj", None)
                     phase_adj_map = getattr(self, "phase_adj", None)
-                    if phase_adj_map is not None:
+                    if eval_fine_adj_map is not None:
+                        fine_adj = eval_fine_adj_map.get(pb, np.ones(len(EVAL_FINE_PMF)))
+                        fine_pmf = EVAL_FINE_PMF * fine_adj
+                        fine_pmf = np.maximum(fine_pmf, 0.0)
+                        fine_pmf = fine_pmf / fine_pmf.sum()
+                    elif phase_adj_map is not None:
                         coarse_adj = phase_adj_map.get(pb, np.ones(N_BUCKETS))
                         fine_pmf = EVAL_FINE_PMF * coarse_adj[FINE_TO_COARSE]
                         fine_pmf = np.maximum(fine_pmf, 0.0)
