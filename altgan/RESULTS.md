@@ -43,7 +43,7 @@ pool. The holdout models exclude those files.
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Tencent | NeuralAtlas | 1024 files x 5k, holdout | 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 | 0.0199 | 0.0096 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.0579 | 0.0293 |
-| Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend | 0.65 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | pending | pending |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend | 0.65 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | 0.0164 | 0.0144 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 1.0 | 0.01982 | 0.63573 | 0.61493 | 60 | 60 | 186 | 174 | 0.0497 | 0.0390 |
 | Alibaba | NeuralAtlas | 233 files x 25k, holdout | 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 | 0.3251 | 1.1296 |
 | Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | 0.00301 | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
@@ -106,6 +106,15 @@ from seed 45.
 The practical Tencent setting remains the smoothed local-power row
 (`blend=0.5, local_prob_power=0.9`) until a new mechanism moves stack p90
 toward 174 without giving back HRC.
+
+A drift confirmation on the same seed-42 panel filled the earlier pending
+columns. Natural phase at `blend=0.65, local_prob_power=0.9` remains the HRC
+leader (`0.009831`) and keeps reuse/stack p90 closest to real, but it still
+under-expresses temporal mark drift: timing drift ratio `0.016` and size drift
+ratio `0.014`. Forced phase raises timing drift to `0.085` and size drift to
+`0.050` at the same blend/local power, but HRC worsens to `0.010641` and stack
+p90 falls from `171` to `163` vs real `174`. Keep natural phase as the promoted
+cache row; forced phase is a drift diagnostic, not the benchmark setting.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 
