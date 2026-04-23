@@ -285,6 +285,27 @@ blends. Any future mark model must preserve the reservoir sampler's temporal
 drift explicitly, for example by predicting corrections to reservoir quantiles
 or mixture weights instead of replacing sampled timing/size values.
 
+A field-selective size-only probe then held `dt` at the reservoir sample and
+blended only `obj_size`, using the same low log-space blends. This isolates the
+failure mode: timing drift survives when `dt` is untouched, but uniform size
+interpolation still worsens aggregate mark score versus the paired reservoir
+controls. The full artifacts are
+`/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_sizeonly_lowblend_log_confirm_summary.csv`
+and `_best.json`.
+
+| Candidate | Seeds | mean HRC-MAE | mean mark score | mean timing drift ratio | mean size drift ratio |
+|---|---:|---:|---:|---:|---:|
+| control, blend 0.0/local power 1.0 | 4 | 0.008698 | **0.00895** | 1.175 | 1.416 |
+| size-only 0.05 log, blend 0.0/local power 1.0 | 4 | 0.008698 | 0.00964 | 1.175 | 1.363 |
+| size-only 0.10 log, blend 0.0/local power 1.0 | 4 | 0.008698 | 0.01040 | 1.175 | 1.315 |
+| control, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01117 | 1.307 | 0.931 |
+| size-only 0.05 log, blend 0.0/local power 0.9 | 4 | **0.005280** | 0.01190 | 1.307 | 0.899 |
+
+Size-only blending is a useful diagnostic but not a champion. It preserves the
+reservoir timing shape and slightly improves size drift in some paired rows, so
+the next viable size path is rank/quantile-aware correction or gated residuals,
+not uniform numeric interpolation.
+
 ## StackAtlas 100k Long-Rollout Panel
 
 All runs used `n_records=100000`, `n_streams=4`, `seed=42`, and the same real
