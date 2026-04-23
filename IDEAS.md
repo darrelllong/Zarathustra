@@ -2594,4 +2594,31 @@ Per-stream: stream 0 HRC@18=0.049 (ok), stream 2 HRC@18=0.277 (3.4× too high), 
 
 **Root cause**: The 8×8 Markov matrix is a very coarse representation. Even with per-stream fitting, it cannot reproduce the correct balance of hot and cold accesses because (a) bucket sizes are too coarse for fine-grained rank control, and (b) we don't know the ground-truth per-stream real HRC to calibrate against.
 
-**Final verdict on atlas approaches**: IDEA #65b (global atlas: 0.012), #67 (burst injection: fails), #70 (global Markov: 0.056), #71 (per-stream Markov: 0.029) — all atlas variants are conclusively below LANL NeuralAtlas (0.002). The gap is 6× minimum and cannot be closed without per-stream sequence modeling. **All atlas variants are now closed.** IDEA #68 and #69 (GAN locality fix) are the only viable paths.
+**Final verdict on atlas approaches** (updated with LANL strict holdout baseline): IDEA #65b (global atlas: 0.012), #67 (burst injection: fails), #70 (global Markov: 0.056), #71 (per-stream Markov: 0.029) — all atlas variants are conclusively below LANL PhaseAtlas strict holdout (alibaba: 0.00301, tencent: 0.01065). Gap is 4.2× on alibaba; tencent is effectively parity (1.12×). **All atlas variants are now closed.** IDEA #72 (GAN chain-reuse loss) is the primary path forward.
+
+---
+
+## IDEA #72 (LLNL): Long-Chain Reuse-Rate Loss for Cascade Locality Fix
+
+**Problem**: v208 ep20/ep30 long-rollout reuse stuck at 4.4-4.6% vs real 26.9% (-83%). Single-window reuse BCE (--reuse-bce-weight 2.0) and IDEA #51 (single-window rate loss) don't fix the cascade collapse. The LSTM generates correct reuse in short teacher-forced windows but reverts to near-zero reuse in self-rollout chains.
+
+**Root cause** (Bengio 2015 exposure bias): G is trained with real input context (teacher forcing) but evaluated with its own outputs. The LSTM hidden state h_carry from a low-reuse window encodes "low-reuse mode," causing the next window to also generate low reuse → cascade.
+
+**Method**: In the G-step, generate `chain_reuse_windows` (default 8) windows with carried LSTM hidden state (self-rollout), concatenate the reuse column from all windows, and penalise mean reuse rate vs target (0.265 for alibaba). Backprop flows through h_carry across all windows, training the LSTM to maintain reuse in the exact multi-window condition that breaks at inference.
+
+```
+L_chain_reuse = chain_reuse_weight × (mean(sigmoid(reuse_raw_chain)) - 0.265)^2
+```
+
+**Flag**: `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.265`
+
+**Differentiation from v199/v200 (failed single-window scalar losses)**:
+- v199: single-window rate loss, weight=10 → too weak against critic
+- v200: single-window per-event BCE, weight=50 → samples trivially discriminable
+- IDEA #72: 8-WINDOW SELF-ROLLOUT chain → trains G on the exact self-rollout distribution that causes collapse; backprop through h_carry trains temporal coherence explicitly
+
+**Status**: RUNNING (v209, 2026-04-23)
+
+**Expected**: long-rollout reuse_access > 0.15 by ep20 (current v208: 0.044)
+
+**Risk**: if weight=5.0 is too strong, W-loss may degrade (G collapses to satisfy chain rate while being trivially discriminable). Monitor W-score and recall at ep5/ep10.
