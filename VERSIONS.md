@@ -6337,8 +6337,28 @@ v18–v21 using later pretrains all stagnated. This is the key finding of the v1
 
 **Tencent stats** (baseline JSON: `/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_epoch_0045_v2.json`):
 - reuse_access_rate=0.232 vs real=0.235 (98.7%), median=179 vs real=159 (1.13x), footprint=4797 vs 4778 (99.6%)
-- Tails: p90=1410 vs real=1774 (79%) — warm-up clamping effect
-- LANL tencent best: 0.008423 (marks hybrid). LLNL trails by 28% on tencent.
+- Tails: p90=1410 vs real=1774 (79%) — warm-up clamping effect on 2020_tencentBlock eval
+- **NOTE: this was the wrong eval setup for tencent.** LANL uses `/home/darrell/traces/tencent_block_1M/`, n_records=100000, n_streams=4. Our v2 eval used 2020_tencentBlock with n=50000, n_streams=8. The numbers are NOT comparable.
+
+**Tencent LANL eval setup (correct comparison, 2026-04-23)**:
+- Atlas: `/home/darrell/llnl_phase_pmf_atlas_tencent_lanl.pkl.gz` (calibrated from tencent_block_1M real stats)
+- Real baseline: `/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_lanl_setup_real.json`
+  - reuse=0.627, median=64, p90=138, footprint=9316
+
+**Seed sweep results (tencent LANL-setup, 7 seeds, 2026-04-23)**:
+| Seed | HRC-MAE | Beats LANL (0.008423)? |
+|------|---------|----------------------|
+| 7    | 0.001381 | ✓ (6.1×) |
+| 11   | 0.001615 | ✓ (5.2×) |
+| 13   | 0.001211 | ✓ (7.0×) |
+| 17   | 0.002614 | ✓ (3.2×) |
+| **42**   | **0.000831** | **✓ (10.1×, NEW LLNL BEST)** |
+| 99   | 0.001014 | ✓ (8.3×) |
+| 123  | 0.000925 | ✓ (9.1×) |
+
+Mean=0.001370, Std=0.000567. **7/7 seeds beat LANL tencent NeuralAtlas (0.008423) by 3–10×.**
+Calibration (seed=42): reuse=0.627 vs real=0.627 (99.9%), median=56 vs real=64 (87.5%), p90=167 vs real=138 (1.21×), footprint=9330 vs 9316 (99.9%).
+- **NEW LLNL TENCENT BEST: HRC-MAE=0.000831 (seed=42)** — beats LANL by **10.1×**
 
 **Phase conditioning failures (CLOSED)**:
 - Coarse BIT ratios over eval base PMF: HRC-MAE=0.021 (BIT global reuse=0.507 vs eval=0.265 — ratios not portable)
