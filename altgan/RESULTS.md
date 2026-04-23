@@ -13,7 +13,7 @@ manifest per corpus.
 
 | Corpus | Model | Fit | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.65 + local power 0.9 + late rank scale 1.1 | **0.00937** | 0.61415 | 0.61493 | 54 | 60 | 184 | 174 |
+| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.5 + local power 0.9 + late rank scale 1.1 + forced phase | **0.00887** | 0.61451 | 0.61493 | 53 | 60 | 166 | 174 |
 | Alibaba | PhaseAtlas | 233 files x 25k holdout, blend 0.2 + local power 0.9 | **0.00222** | 0.27363 | 0.26909 | 192 | 201 | 1508 | 1452 |
 | Tencent | NeuralAtlas | 1024 files x 5k holdout, blend 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 |
 | Alibaba | NeuralAtlas | 233 files x 25k holdout, blend 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 |
@@ -45,6 +45,7 @@ pool. The holdout models exclude those files.
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.0579 | 0.0293 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend | 0.65 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | 0.0164 | 0.0144 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend + late rank scale | 0.65 | **0.00937** | 0.61415 | 0.61493 | 54 | 60 | 184 | 174 | pending | pending |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout + late rank scale + forced phase | 0.5 | **0.00887** | 0.61451 | 0.61493 | 53 | 60 | 166 | 174 | pending | pending |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 1.0 | 0.01982 | 0.63573 | 0.61493 | 60 | 60 | 186 | 174 | 0.0497 | 0.0390 |
 | Alibaba | NeuralAtlas | 233 files x 25k, holdout | 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 | 0.3251 | 1.1296 |
 | Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | 0.00301 | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
@@ -201,6 +202,27 @@ This shifts Tencent's promoted stable HRC candidate from the seed-42
 microblend row to a four-seed late-rank schedule at blend `0.5`. The next
 robustness check is an `8x50k` panel using the same baseline-versus-late
 schedule comparison.
+
+The `8x50k` panel check could not run against the fixed Tencent real manifest:
+`llgan.long_rollout_eval` rejects `n_records=50000` when the manifest was built
+for `100000` records. A valid forced-vs-natural check on the same `4x100k`
+panel instead found another improvement. With blend `0.5`, local power `0.9`,
+and late rank scales `1.0,1.0,1.1,1.1`, forced phase improved mean HRC from
+`0.009575` to `0.009371`, improved mean reuse from `0.61184` to `0.61528`
+against real `0.61493`, and improved mean mark score from `0.04823` to
+`0.04669`. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_late_rank_forced_confirm_summary.csv`
+and `_best.json`.
+
+| phase mode | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| natural | 4 | 0.009575 | 0.61184 | 0.61493 | 52.0 | 60 | 170.0 | 174 | 0.04823 |
+| forced | 4 | **0.009371** | **0.61528** | 0.61493 | 52.2 | 60 | 165.5 | 174 | **0.04669** |
+
+This is the current Tencent HRC champion on the LANL side. The next useful
+run is a small drift-focused check for this forced-phase late-rank row, because
+forced phase previously improved drift while sometimes hurting HRC; the new
+rank schedule appears to remove most of that HRC cost.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 
