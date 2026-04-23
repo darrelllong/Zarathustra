@@ -2206,21 +2206,17 @@ Key finding: PMF optimization must target HRC-MAE directly, not sd_p90 indirectl
 
 ## IDEA #64: LLNL StackAtlas — Per-Object Markov State Generator
 
-**Status**: Implemented (2026-04-22) — TESTING IN PROGRESS on vinge
+**Status**: CLOSED FAILED (2026-04-23). HRC-MAE=0.062688 with reuse_rate=0.265 — 13.6× worse than baseline 0.004622.
 
-**Motivation**: IDEA #62/63 failed because they use inter-event IAT (wrong signal). LANL's PhaseAtlas (0.003010) and NeuralAtlas (0.001826) use exact per-object LRU stack distances + per-state reservoir sampling via BIT algorithm.
+**Root cause — circular conditioning**: Action_class ∈ {NEW, NEAR, MID, FAR} is defined by stack_distance: NEAR=sd≤4, MID=sd≤64. The Markov chain's stationary distribution is heavily NEAR/MID-biased (reuse events cluster temporally). Sampling raw ev.stack_distance from NEAR-biased reservoirs gives tiny ranks. Result: fake_stack_median=9 vs real=174. Reuse rate was correctly calibrated at 0.263 via Bernoulli override; the rank distribution was completely wrong.
 
-**Architecture** (independently reimplemented from LANL's altgan/model.py):
-- State = (time_bin, size_bin, action_class): 4×4×4 = 64 states
-- time_bin = quantile of log(dt+1) (inter-event IAT); size_bin = quantile of log(obj_size); action_class: NEW/NEAR/MID/FAR
-- Transition matrix T[state_i][state_j] from real traces; reservoir of EventSamples per state
-- Generation: step Markov chain → sample EventSample → use ev.stack_distance for LRU lookup
+**Secondary failure**: time_edges=[0.] degenerate — oracle_general timestamps are integer seconds, many events per second means dt=0, collapsing all quantile edges to [0.]. Only 12 active states instead of 64.
 
-**Key distinction**: NOT a post-hoc GAN decoder — standalone model that bypasses GAN entirely. Same architecture as LANL's PhaseAtlas.
+**Lesson**: Never use stack_distance class as the conditioning variable for rank sampling. The state for rank conditioning must be derived from a signal INDEPENDENT of stack_distance (e.g., temporal activity phase, object size). See IDEA #65.
 
-**Implementation**: `llgan/stack_atlas.py` (~300 lines).
+**Implementation**: `llgan/stack_atlas.py` — code retained but approach abandoned.
 
-**Expected HRC-MAE**: ~0.003010 (match LANL PhaseAtlas).
+**Previous motivation**: IDEA #62/63 failed because they use inter-event IAT (wrong signal). LANL's PhaseAtlas (0.003010) and NeuralAtlas (0.001826) use exact per-object LRU stack distances + per-state reservoir sampling via BIT algorithm.
 
 ## IDEA #63: Time-Conditioned Stack Distance Decoder (StackAtlas Lite)
 
@@ -2419,3 +2415,38 @@ residual marks or multi-reservoir interpolation.
 
 **Priority**: HIGH for the current vinge slot. It is a narrow `altgan/` change
 with automatic evaluation and no `llgan/` edits.
+
+---
+
+## IDEA #65 (LLNL): Phase-Conditioned PMF Atlas
+
+**Status**: Proposed (2026-04-23) — HIGH PRIORITY
+
+**Motivation**: IDEA #64 failed because action_class (derived from stack_distance) creates circular conditioning for rank sampling. The fix: use a state variable that is INDEPENDENT of stack_distance. LANL's PhaseAtlas uses temporal activity phase (sliding-window access density) for this purpose, achieving HRC-MAE=0.002373 on alibaba with perfectly calibrated stack distances (fake_median=203 vs real=201).
+
+**Architecture**:
+- State = (phase_bin, size_bin): 4 activity phases × 4 size bins = 16 states
+- phase_bin = sliding-window unique-objects-per-N-events quantile bucket — measures working set churn rate. High phase_bin = high churn (cold misses dominant, large stack distances). Low phase_bin = warm/stable working set (small stack distances).
+- size_bin = log(obj_size) quantile bucket
+- **NEW vs REUSE decision**: per-state empirical reuse_rate (fraction of events that are reuse in training data at that state)
+- **RANK sampling (reuse events)**: per-state 8-bucket LRU PMF using `_EDGES = [0,1,2,4,8,16,64,256,1<<20]`, same as `lru_stack_decoder.py`
+- **dt and size marks**: per-state reservoir sampling of (dt, obj_size) pairs
+
+**Why this works** (unlike IDEA #64):
+- phase_bin is derived from activity density (unique_obj_rate), NOT from stack_distance → no circular conditioning
+- The per-state PMF for rank sampling will correctly show: low phase = mass on small buckets (recent objects); high phase = mass on large buckets (cold misses, deep stack)
+- LANL achieves this exact result with local_prob_power=0.9 and natural phases
+
+**Key difference from IDEA #64**:
+- Remove action_class from state; replace time_bin (degenerate, dt=0 issue) with phase_bin
+- Sample rank from per-state 8-bucket PMF (not raw ev.stack_distance)
+- Use `LRUStackDecoder`-style bucket sampling: sample bucket_i → uniform rank in [_EDGES[i], min(_EDGES[i+1]-1, stack_size-1)]
+
+**Implementation**: `llgan/phase_pmf_atlas.py` (~150 lines)
+- `fit(trace_dir)`: BIT-based LRU distances, sliding window for phase detection, per-state PMF histograms
+- `generate(n_records, n_streams, seed)`: phase-conditioned generation with bucket PMF sampling
+- CLI: `fit` and `generate` subcommands (same as stack_atlas.py)
+
+**Expected HRC-MAE**: ~0.002–0.003 (matching LANL's pure PhaseAtlas 0.002373). If successful, LLNL takes HRC parity with LANL's simple atlas, setting up competition against their NeuralAtlas 0.001826.
+
+**Time estimate**: 2h implementation + fit (~30 min vinge) + eval (~5 min). High return per hour vs further GAN training.

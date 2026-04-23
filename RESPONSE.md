@@ -3323,4 +3323,92 @@ LANL's most recent output files (as of 00:56 today) are all `phaseatlas_marks_*`
 
 LANL's NeuralAtlas also failed on tencent (HRC-MAE=0.018 at blend=0.0 vs 0.001826 on alibaba). The per-file conditioning that makes NeuralAtlas work on alibaba does not transfer to tencent. LANL is as stuck on tencent as LLNL.
 
+---
+
+## Round 59
+
+**Date**: 2026-04-23
+**Responding to**: IDEA #64 StackAtlas evaluation results; v207 crash; LANL tencent marks sweep
+
+### IDEA #64 CLOSED FAILED: Circular Action-Class Conditioning
+
+Result: HRC-MAE=0.062688 (reuse_rate=0.265 Bernoulli override). Reuse rate correct at 0.263. But `stack_distance_median=9` vs `real=174`. 13.6× worse than LLNL baseline 0.004622.
+
+**Root cause — circular conditioning**: The StackAtlas state includes `action_class ∈ {NEW, NEAR, MID, FAR}` where:
+- NEAR = stack_distance ≤ 4
+- MID = stack_distance ≤ 64
+- FAR = stack_distance > 64
+
+The Markov chain's stationary distribution is heavily biased toward NEAR and MID states because reuse events cluster temporally. When we then sample `ev.stack_distance` from the NEAR-biased reservoir, we get mostly sd∈[0,4]. Even with `--reuse-rate 0.265` Bernoulli override (correct reuse fraction), the sampled ranks are all tiny. Result: stack_distance_median=9, hit-rate curve entirely wrong shape.
+
+The action_class is derived FROM stack_distance, so conditioning rank sampling on action_class is circular. Any reservoir that records raw stack_distance values will always be biased toward the class boundaries.
+
+**Secondary failure mode**: Only 12 active states (out of expected 64) because `time_edges=[0.]` degenerated — oracle_general timestamps are uint32 seconds, and many events per second means dt=0, collapsing quantile edges. Only 2 effective time bins, not 4.
+
+**IDEA #64 post-mortem**: The Markov chain design is correct for capturing temporal structure. The mistake was using action_class in the state definition for a model whose generate path samples rank from that state's reservoir. The class and the rank are not independent.
+
+### LANL Intelligence Update
+
+**Alibaba**:
+- NeuralAtlas 0.001826: still their best overall result
+- New run `marks_dtonly_lowblend_log_confirm`: best=0.002373 (pure PhaseAtlas, transition_blend=0.0, reservoir marks, no neural conditioning)
+- Correctly calibrated: fake_stack_median=203 vs real=201, fake_stack_p90=1481 vs real=1452
+
+The 0.002373 result confirms LANL's pure PhaseAtlas (no MLP conditioning) achieves near-perfect stack distance calibration with local_prob_power=0.9. This is the direct comparison target for any LLNL atlas attempt.
+
+**Tencent**:
+- `tencent_phaseatlas_marks_hybrid_seed42_forced_late_lp080`: best=0.008423 (neural marks, blend=0.55, local_power=0.8)
+- `tencent_phaseatlas_rankscale_phase_confirm`: best=0.009274 (blend=0.5, natural phases, lp=0.9)
+- LANL is actively sweeping rank-scale and phase-schedule parameters for tencent; making progress (was ~0.011 in Round 58)
+
+**LANL tencent still worse than alibaba** (0.008423 vs 0.001826) — tencent's higher reuse rate (61.5% vs 26.5%) and shorter stack distances make it harder to calibrate.
+
+### v207 Crash and Relaunch
+
+v207 crashed at Phase 3 start with `torch._inductor.exc.InductorError: fatal error: Python.h: No such file or directory`. The Triton JIT compilation triggered by `torch.compile()` requires Python dev headers that are not installed on vinge's GB10. This error is documented in VERSIONS.md (`torch.compile: Broken on vinge's GB10`), but v207 was launched without `--no-compile`.
+
+**Relaunched** as v207b with `--no-compile`, PID=20382. Phase 1 recon=0.00001 at ep20/50 — same fast convergence as previous runs. Phase 2 + 2.5 expected in ~45 minutes, Phase 3 in ~90 minutes.
+
+Seed=11 selection rationale: seeds 5, 7 were tried for IDEA #44 cross-validation. Seed 5 succeeded (v195 ★=0.042 ATB). Seed 7 failed (W-spike at Phase 3 ep3). Seed=11 is from the v167 basin survey — showed stable G-loss dynamics during brief Phase 3 probe. If seed=11 also fails Phase 3, the W-spike is structural (WGAN-SN incompatibility with the new loss terms) and IDEA #44 remains single-seed-only.
+
+### IDEA #65: Phase-Conditioned PMF Atlas (No Action-Class)
+
+The correct fix for IDEA #64's circular conditioning is to remove action_class from the state definition entirely and use a different conditioning variable.
+
+**Design**:
+- State = (phase_bin, size_bin): 4 activity phases × 4 size bins = 16 states
+- phase_bin = sliding-window unique-objects-per-100-events quantile bucket (captures working set churn rate)
+- size_bin = log(obj_size) quantile bucket
+- NEW vs REUSE decision: separate Bernoulli(reuse_rate) where reuse_rate is fitted per-state empirically
+- RANK sampling (for reuse events): per-state 8-bucket LRU PMF fitted from training data using `_EDGES = [0,1,2,4,8,16,64,256,1<<20]`
+- dt and obj_size marks: per-state reservoir sampling (as in IDEA #64)
+
+**Why this avoids the circular problem**: phase_bin is derived from the density of unique objects in a sliding window, not from individual stack_distance values. A high-phase-bin state = high working set churn (many cold misses) → naturally larger stack distances. A low-phase-bin state = warm, stable working set → smaller stack distances. The per-state PMF will correctly reflect the rank distribution for each phase without circular conditioning.
+
+**Expected outcome**: If LANL's pure PhaseAtlas (which uses a similar phase-based state) achieves 0.002373, IDEA #65 should reach the same range if fitted correctly. The core algorithm is identical; the only difference is LLNL's implementation vs LANL's.
+
+**Implementation plan**:
+1. `llgan/phase_pmf_atlas.py`: new file (~150 lines)
+   - `fit(trace_dir, n_phase_bins=4, n_size_bins=4)`: read .zst traces, BIT-based LRU, compute per-state 8-bucket PMF
+   - `generate(n_records, n_streams, seed, reuse_rate_per_state)`: phase-conditioned generation
+2. Fit from training traces (~30 min on vinge)
+3. Eval: compare to LLNL baseline 0.004622 and LANL pure PhaseAtlas 0.002373
+
+**Relationship to existing code**: `LRUStackDecoder` already implements bucket PMF sampling. `phase_pmf_atlas.py` would use the same `_EDGES` and sampling logic from `lru_stack_decoder.py`, but with 16 per-state PMFs instead of 1 global PMF.
+
+### Race Status
+
+| Metric | LANL | LLNL | Status |
+|--------|------|------|--------|
+| HRC-MAE (Alibaba, best) | **0.001826** (NeuralAtlas, blend=0.5) | 0.004622 (i.i.d. PMF) | LANL +153% |
+| HRC-MAE (Alibaba, pure atlas) | **0.002373** (PhaseAtlas) | 0.004622 | LANL +95% |
+| HRC-MAE (Tencent, best) | **0.008423** (marks hybrid) | not measured | LANL leads |
+| Short-window ★ (best) | unmeasured | **0.042** (v195 ep110) | LLNL leads |
+| Active training | tencent rank-scale sweep | v207b Phase 1 | both active |
+
+**Next actions**:
+1. Monitor v207b Phase 3 (ETA ~90 min). Kill at ep3 if W≥5.0; promote at ep10 if W<3 and G<0.5.
+2. Implement IDEA #65 (`phase_pmf_atlas.py`). Expected 2h to fit + eval. Direct competition with LANL's 0.002373 pure PhaseAtlas.
+3. Tencent HRC baseline: run v158 final.pt through `lru_stack_decoder.py` Bernoulli injection to establish LLNL tencent HRC-MAE. If below LANL's 0.009274 we have a tencent lead too.
+
 **LLNL's tencent path**: LLNL has not run HRC evaluation on tencent. v158 final.pt (tencent ATB ★=0.039) should be evaluated with the Bernoulli LRU decoder to establish tencent HRC-MAE baseline. If it matches LANL's ~0.018 or beats it, LLNL leads on tencent.

@@ -6304,3 +6304,18 @@ v18–v21 using later pretrains all stagnated. This is the key finding of the v1
 - **pretrain_complete.pt**: State dict keys have no `_orig_mod.` prefix (saved without compile).
   Load into non-compiled models only (`--no-compile`). Avoids 35-min pretrain on restart.
 - **SSH to vinge**: `ssh vinge.local` (RSA key, no passphrase). `-A` flag for git pull on GitHub.
+- **torch.compile on v207**: Was launched without `--no-compile`; crashed at Phase 3 start. Relaunched as v207b with `--no-compile`.
+
+### atlas_v1 (IDEA #64 CLOSED FAILED — StackAtlas raw stack_distance)
+- **Model**: LLNLStackAtlas, state=(time_bin, size_bin, action_class), Markov chain + reservoir EventSamples
+- **Fit**: /home/darrell/llnl_stack_atlas.pkl.gz; 12 states (degenerate time_edges=[0.]); 71.1M events
+- **HRC-MAE**: 0.062688 with reuse_rate=0.265 (Bernoulli override)
+- **Root cause**: action_class ∈ {NEW,NEAR,MID,FAR} derived FROM stack_distance → circular conditioning. Markov chain spends most time in NEAR/MID states (sd≤64), so reservoir samples have tiny stack_distances. Result: fake_stack_median=9 vs real=174.
+- **Secondary failure**: time_edges=[0.] degenerate (oracle_general ts is seconds, many dt=0 events)
+- **Lesson**: Never use stack_distance class as state variable for rank sampling. Use temporal activity phase (IDEA #65) instead.
+
+### alibaba_v207b (seed=11 IDEA #44 cross-validation — IN PROGRESS)
+- v207 crashed at Phase 3 start: torch.inductor Triton compile error (missing Python.h). Relaunched as v207b.
+- v207b launched 2026-04-23 with --no-compile. Phase 1 recon=0.00001 at ep20/50.
+- **Kill condition**: W≥5.0 at any Phase 3 epoch (--w-stop-threshold 5.0)
+- **Promote condition**: ep10 W<3, G<0.5, bc_gap>0.05; full frozen_sweep after ep30
