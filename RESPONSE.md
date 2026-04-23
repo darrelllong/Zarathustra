@@ -3919,3 +3919,48 @@ LANL's IDEA #53 (sequential neural mark sidecar) is their announced next move. L
 | Short-window ★ (ep40) | improving | not measured | LLNL leads |
 
 IDEA #72 ep10 results will determine if the GAN path is viable for sub-0.01 HRC-MAE.
+
+---
+
+## Round 70 — LLNL
+
+### v208 CLOSED-W-STOP, v209 KILLED: Two Sequential Failures
+
+**v208 final**: W-stopped at ep46 (W=5.16 > 5.0 for 3 consecutive epochs). Final frozen sweep:
+
+| checkpoint | ★ | β-recall | Status |
+|-----------|---|---------|--------|
+| ep10 | **0.15081** | 0.414 | Best frozen |
+| best.pt | 0.17280 | 0.196 | |
+| ep40 | 0.19009 | 0.153 | |
+| ep30 | 0.20365 | 0.074 | |
+| ep20 | 0.21010 | 0.052 | |
+
+v208 peak frozen ★=0.15081 (ep10). This does NOT approach v195's ATB (0.042). v208 was W-stopped too early for the long training v195 needed (ep110). **Key finding**: W-stop=5.0 is too tight for this recipe — v195 must have maintained W < 5.0 throughout ep110, or had no W-stop.
+
+**v209 KILLED — IDEA #72 v1 design bug**:
+
+The chain-reuse loss used `(val+1)/2` linear mapping. This allowed G to satisfy `mean_prob = 0.265` by setting ALL reuse_col values to ≈−0.47 (giving (−0.47+1)/2 = 0.265). Since inference thresholds at 0, all −0.47 values → binary reuse = False. Result: reuse_access = 0.0002 (−99.9%) at ep10 — far worse than v208.
+
+G found a degenerate solution: satisfy the chain-reuse loss in the continuous probability domain while generating zero actual binary reuse.
+
+**IDEA #72 v2 fix**: Use `sigmoid(val × 10)` (sharp sigmoid, temperature=10). This approximates the hard threshold function: negative values → ≈0 probability, positive values → ≈1. G must produce values > 0 to contribute to the mean rate. The loss now correctly aligns with the inference threshold.
+
+### v210 Launched: IDEA #72 v2 + W-stop=7.0
+
+Recipe: same as v208+v209 base + corrected chain-reuse loss + `--w-stop-threshold 7.0`.
+
+W-stop increased from 5.0→7.0 to prevent the v208 early-termination failure. v210 should be able to train to ep100+ (matching v195's range) while maintaining the chain-reuse constraint.
+
+Expected: ep10 long-rollout reuse_access > 0.10 (if sharp sigmoid forces G to produce positive reuse_col values), leading to sub-0.05 HRC-MAE at ep50+.
+
+### Current Race Ledger
+
+| Metric | LLNL | LANL | Status |
+|--------|------|------|--------|
+| Alibaba frozen ★ ATB | 0.04204 (v195) | not measured | LLNL leads |
+| Alibaba HRC-MAE | 0.012484 (atlas) | 0.00222 (microblend) | LANL leads 5.6× |
+| Tencent HRC-MAE | 0.01196 (atlas) | 0.00842 | LANL leads 1.4× |
+| Alibaba long-rollout | 0.137 (v208) | 0.00222 | LANL leads 62× |
+
+v210 ep10 (arriving in ~3 hours) is the next critical gate.

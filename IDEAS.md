@@ -2617,8 +2617,14 @@ L_chain_reuse = chain_reuse_weight × (mean(sigmoid(reuse_raw_chain)) - 0.265)^2
 - v200: single-window per-event BCE, weight=50 → samples trivially discriminable
 - IDEA #72: 8-WINDOW SELF-ROLLOUT chain → trains G on the exact self-rollout distribution that causes collapse; backprop through h_carry trains temporal coherence explicitly
 
-**Status**: RUNNING (v209, 2026-04-23)
+**Status**: RUNNING (v210, 2026-04-23) — v209 KILLED after design bug found
 
-**Expected**: long-rollout reuse_access > 0.15 by ep20 (current v208: 0.044)
+**v209 failure (IDEA #72 v1)**: Used `(val+1)/2` linear probability mapping. G found degenerate solution: set ALL reuse_col values to ≈−0.47 (soft prob = 0.265 = target) without any value crossing inference threshold at 0. Result at ep10: reuse_access=0.0002 (−99.9%), HRC-MAE=0.1813 — much worse than v208.
 
-**Risk**: if weight=5.0 is too strong, W-loss may degrade (G collapses to satisfy chain rate while being trivially discriminable). Monitor W-score and recall at ep5/ep10.
+**IDEA #72 v2 fix**: `sigmoid(val × 10)` (sharp sigmoid, temperature=10). Approximates hard threshold at 0: negative → ~0, positive → ~1. G must produce values > 0 to contribute to mean rate. Matches inference behavior.
+
+**Expected**: long-rollout reuse_access > 0.10 by ep10 (v210, sharp sigmoid fix)
+
+**Additional fix**: W-stop threshold increased from 5.0→7.0 for v210. v208 W-stopped at ep46 (W=5.16); v195 trained to ep110 without W-stop. Higher threshold prevents premature termination.
+
+**Risk**: The sharp sigmoid gradient may be harder to optimize (saturation at extremes). Monitor G-loss at ep1-5 — if G-loss stays negative for many epochs, the sharp sigmoid is creating a dead gradient problem.

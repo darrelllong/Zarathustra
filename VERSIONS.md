@@ -6396,23 +6396,27 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 - At generation step: with p_burst sample from hot pool (same object or near-duplicate), else sample normal LRU PMF
 - p_burst ≈ 0.05, burst length ~ Geom(0.9) → target HRC@18 ≈ 0.05
 
-### alibaba_v208 (seed=11, --no-amp — AMP hypothesis test, RUNNING)
+### alibaba_v208 (seed=11, --no-amp — CLOSED-W-STOP ep46)
 - Recipe: v195 IDEA #44 + seed=11 + `--no-amp` (same as v206/v207b minus AMP)
-- Phase 3 training trajectory: ep5 comb=0.14101★, ep10 comb=0.15077, ep15 comb=0.10261★ (recall=0.578), ep20 comb=0.08064★ (recall=0.696)
-- **Long-rollout ep20 (CATASTROPHIC)**: reuse_access=0.0462 vs real=0.2691 (−82.8%), HRC-MAE=0.1353, stack_distance_median=0 vs real=201
-- **Diagnosis**: AMP fix did NOT fix locality collapse. Same pattern as v195 (ep110: reuse_access=0.0081). v208 ep20 is 5.7× better than v195 ep110 reuse_access, but still catastrophic.
-- Training comb trajectory is excellent (0.08 at ep20 vs v195 achieving 0.042 at ep110), suggesting seed=11+no-amp recipe is genuinely stronger on short-window quality.
-- **Frozen sweep (ep10, ep20, 2026-04-23)**: ep10 frozen=0.15081 (MMD²=0.033, recall=0.414, prec=0.921), ep20 frozen=0.2101 (MMD²=0.020, recall=**0.052**, prec=0.965). **TRAIN/FROZEN COLLAPSE at ep20**: training-log showed recall=0.696, frozen eval gives 0.052 (13× gap). ep10 is the current best frozen. Both far from v195 ATB (0.042) — standard early-epoch behavior.
-- Long-rollout locality collapse is a structural problem independent of AMP/seed — the GAN has no explicit object memory mechanism for long rollout generation.
+- Phase 3 training trajectory: ep5 comb=0.14101★, ep10 comb=0.15077, ep15 comb=0.10261★ (recall=0.578), ep20 comb=0.08064★ (recall=0.696), ep30 comb=0.076 (recall=0.665), ep35 comb=0.119 (regression), ep40 comb=0.083 (recall=0.699)
+- **Long-rollout ep20/ep30 (CATASTROPHIC)**: reuse_access=0.044-0.046 vs real=0.2691 (−83%), HRC-MAE=0.135-0.137. No improvement ep20→ep30. Structural collapse confirmed.
+- **W-STOP TRIGGERED ep46**: W=5.16 > 5.0 for 3 consecutive epochs. Training terminated early. final.pt saved.
+- **Final frozen sweep (all checkpoints, 2026-04-23)**: ep10=0.15081★ (best), ep20=0.2101, ep30=0.2037, ep40=0.1901, best.pt=0.1728, final.pt=0.2009. PEAK=0.15081 at ep10. Far from v195 ATB (0.042).
+- **Verdict**: CLOSED-FAILED. W-stop at ep46 cut training short; W-stop=5.0 is too tight for this recipe. v195 trained to ep110 without W-stop (presumably had higher effective threshold or lower W trajectory). Key learning: increase W-stop to 7.0 for future runs.
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
-- JSON: /home/darrell/checkpoints/alibaba_v208/long_rollout_epoch_0020.json
-- **Long-rollout ep30**: reuse_access=0.0445 vs real=0.2691 (−83.5%), HRC-MAE=0.1370. No improvement from ep20 → ep30. Collapse is structural (Bengio exposure bias) — teacher forcing won't fix it.
-- **Continuing training** — monitoring if locality improves by ep50. v209 launched concurrently with IDEA #72 fix.
-- Next eval: ep50 (frozen_sweep + long_rollout, via wait_eval_v208_ep50.sh monitor)
 
-### alibaba_v209 (seed=11, IDEA #72: chain-reuse-weight=5.0, RUNNING)
+### alibaba_v209 (seed=11, IDEA #72 v1: soft chain-reuse — KILLED)
 - Recipe: v208 base + `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.265`
-- Motivation: v208 ep20/ep30 long-rollout reuse stuck at 0.044-0.046 (real=0.269, -83%). IDEA #72 adds G-step loss that generates 8 windows with carried LSTM hidden state and penalises mean reuse rate vs target 0.265. This forces G to maintain correct reuse across multi-window self-rollout chains.
-- Expected: long-rollout reuse_access > 0.15 by ep20 (vs v208's 0.044)
+- **DESIGN BUG FOUND**: chain-reuse loss used `(val+1)/2` linear probability mapping, allowing G to satisfy mean_prob=0.265 by setting ALL reuse_col values to ≈−0.47 — below the inference threshold of 0. At long rollout, binary reuse ≈ 0% even though soft probability mean = 0.265.
+- **ep10 long-rollout (CATASTROPHIC)**: reuse_access=0.0002 (−99.9%), HRC-MAE=0.1813. Much worse than v208. Chain-reuse loss INCREASED collapse severity.
+- KILLED at ep10. v210 launched with fix.
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v209/
+
+### alibaba_v210 (seed=11, IDEA #72 v2: sharp-sigmoid chain-reuse, W-stop=7.0, RUNNING)
+- Recipe: v208/v209 base + IDEA #72 fix: `sigmoid(val * 10)` instead of `(val+1)/2`
+- Fix explanation: sharp sigmoid (temp=10) approximates hard threshold at 0. G must produce values > 0 to contribute to mean reuse rate. Matches inference threshold behavior.
+- Config: `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.265 --w-stop-threshold 7.0`
+- W-stop increased from 5.0→7.0 to prevent early termination seen in v208 (W-stopped ep46)
+- Expected: long-rollout reuse_access > 0.15 by ep20 if sharp sigmoid forces correct binary behavior
+- Checkpoint dir: /home/darrell/checkpoints/alibaba_v210/
 - Launched: 2026-04-23
