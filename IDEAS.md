@@ -2650,3 +2650,33 @@ From trace characterization, real alibaba mean(|stride| | reuse=True) can be ext
 **Expected**: Combined with IDEA #72 v2 (rate) + IDEA #73 (rank) → HRC-MAE should approach atlas baseline (0.012) or better within ep20-50.
 
 **Implementation**: Add `--chain-stride-weight 2.0` flag. Compute after chain-reuse loop, on the same chain windows. Stop-gradient on reuse column when computing stride loss (separate optimization paths).
+
+---
+
+## IDEA #74 (LLNL): Fix Mark Export Pipeline (opcode/tenant TV Mismatch)
+
+**Problem**: LANL's mark_quality panel scored LLNL v198 at mark_score=0.614 with opcode_tv=1.0, tenant_tv=1.0 — claiming LLNL's generated traces have completely mismatched opcode and tenant distributions. Root cause: type mismatch in CSV export, not model quality.
+
+**Root cause analysis**:
+1. `dataset.py inverse_transform` returns opcode as float64 (`-1.0`, `1.0`) because `_encode_opcode` stores ±1.0 floats and no cat_map exists for opcode
+2. For oracle_general (alibaba), opcode is zero-variance (all -1 = sentinel) → stored in `_dropped_const` as float -1.0 → re-inserted as float → CSV has "-1.0"
+3. Real oracle_general opcode in raw traces: int16 -1 → CSV via LANL reader: "-1"
+4. `mark_quality._categorical_tv` compares `.astype(str)`: "-1.0" ≠ "-1" → TV=1.0
+5. Same issue for tenant: int16 values normalized as continuous → float in output → "0.0" ≠ "0"
+
+**Fix** (IMPLEMENTED in `dataset.py`, commit 515b194):
+1. `_cat_maps` columns: try to cast reconstructed array to int64 after lookup
+2. Opcode-like columns (not in _cat_maps): explicitly cast to int64 via `.astype(np.int64)`  
+3. `_dropped_const` opcode: cast constant to int before inserting
+4. `_dropped_const` cat_map columns: cast to int
+5. Integer-lo/hi heuristic: if lo and hi are both whole numbers and column not log-transformed → cast to int64 (catches tenant int16)
+
+**Validation**: v195 checkpoint (oracle_general/alibaba) inverse_transform output:
+- opcode dtype: int64, values as str: ["-1", "1"] ✓
+- tenant dtype: int64, values as str: ["0", "-1"] ✓
+
+**Expected mark quality improvement**: opcode_tv → ~0 (both fake and real are -1 for oracle_general); tenant_tv → ~0 (same integer distribution). Overall mark_score should drop from 0.614 toward the LANL reservoir baseline (0.005 range).
+
+**Status**: IMPLEMENTED (2026-04-23, dataset.py), not yet benchmarked in full long-rollout.
+
+**Note**: This is a pure export fix — no model changes. The LSTM already generates correct temporal structure; only the CSV representation was wrong. Run full long_rollout_eval + mark_quality on v195 to quantify improvement.
