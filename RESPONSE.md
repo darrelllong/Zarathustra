@@ -3789,16 +3789,33 @@ The marginal atlas fails because it discards temporal structure. The Markov atla
 
 **Key implication for LLNL strategy**: The atlas ceiling (0.012 HRC-MAE) cannot be broken with any global statistical approach. The GAN is the right architecture — it can learn per-stream conditioning — but is currently failing at long rollout due to the Bengio exposure bias (IDEA #68/69). Fixing the GAN is now the only credible path to sub-0.005 MAE.
 
-### v208 Training Status (ep29)
+### IDEA #71: Per-Stream Markov Atlas — Also Closed
 
-Training log shows three consecutive negative-G epochs (ep27: G=-4.32, ep28: G=-3.29, ep29: G=-3.83). This is unusual but within W-stop threshold. W scores remain positive (0.9–2.5), indicating WGAN-SN is still functional. Most likely explanation: Generator temporarily overpowered critic (diversity pressure from `--diversity-loss-weight 2.0` too high), then critic stabilized. No intervention at this time.
+Also tested IDEA #71 (per-stream Markov matrices, separate per eval stream):
+- Stream 0 (reuse=0.757, 15487 trans): per-stream fit; HRC@18=0.049 (real=0.056, close)
+- Stream 2 (reuse=0.377, 5269 trans): per-stream fit; HRC@18=0.277 (3.4× too high)
+- Streams 1,3 (reuse=0.003, 56-58 trans): uniform fallback; HRC@18≈0.002 (correct for low-reuse)
+- **IDEA #71 MAE: 0.029340** — better than #70 (0.056) but still 2.3× worse than global atlas (0.012484)
 
-v208 ep50 eval monitor is still running on vinge (wait_eval_v208_ep50.sh).
+**All atlas variants are now closed**: #65b global (0.012) ← ceiling, #67 burst (fails), #70 global Markov (0.056), #71 per-stream Markov (0.029). None can approach LANL NeuralAtlas (0.002).
 
-### Atlas Ceilings — Final Accounting
+### v208 ep30: Locality Collapse Confirmed Structural
 
-After testing burst injection (IDEA #67), Markov chains (IDEA #70), and the per-file atlas (#65b): no global statistical atlas approach can reproduce per-stream temporal heterogeneity. Atlas-based approaches are closed for the HRC-MAE race. The path forward:
+ep30 long-rollout eval:
+- reuse_access: 0.0445 vs real 0.2691 (-83.5%) — **unchanged from ep20 (0.0462)**
+- HRC-MAE: 0.1370 (ep20: 0.1353) — effectively unchanged
+- Training quality (ep30): recall=0.665, comb=0.076 — short-window still improving
 
-1. **GAN fix** (IDEA #68 scheduled sampling + IDEA #69 pool injection) — v209 target
-2. **LANL beat**: Need sub-0.002 MAE on their eval. Requires a working seq-to-seq model with proper long-rollout training. The scheduled sampling fix is load-bearing.
-3. **Short-window ★**: v208 continues — likely new LLNL record (> v195's 0.042) when ep50 eval arrives.
+10 epochs of additional teacher-forcing training did not move the locality needle at all. The collapse is confirmed structural (Bengio exposure bias): G learns per-window reuse from teacher-forced real inputs, but has no mechanism to maintain reuse across 8+ window self-rollout chains.
+
+### v209 Launched: IDEA #72 Chain-Reuse Loss
+
+v209 adds `--chain-reuse-weight 5.0 --chain-reuse-windows 8`:
+- In the G-step, generates 8 windows with carried LSTM hidden state (self-rollout)
+- Penalises mean reuse rate over the 8-window chain vs target (0.265)
+- Backprop through the chain trains LSTM to maintain reuse across window boundaries
+- This is targeted directly at the cascade collapse pattern
+
+Expected: long-rollout reuse_access > 0.15 by ep20 (current v208 baseline: 0.044)
+
+v208 and v209 running concurrently on vinge (750 MiB GPU combined — well within capacity).

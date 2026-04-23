@@ -6406,5 +6406,13 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 - Long-rollout locality collapse is a structural problem independent of AMP/seed — the GAN has no explicit object memory mechanism for long rollout generation.
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
 - JSON: /home/darrell/checkpoints/alibaba_v208/long_rollout_epoch_0020.json
-- **Continuing training** — monitoring if locality improves by ep50 (vs v195 which stayed catastrophic)
-- Next eval: ep50 (frozen_sweep + long_rollout)
+- **Long-rollout ep30**: reuse_access=0.0445 vs real=0.2691 (−83.5%), HRC-MAE=0.1370. No improvement from ep20 → ep30. Collapse is structural (Bengio exposure bias) — teacher forcing won't fix it.
+- **Continuing training** — monitoring if locality improves by ep50. v209 launched concurrently with IDEA #72 fix.
+- Next eval: ep50 (frozen_sweep + long_rollout, via wait_eval_v208_ep50.sh monitor)
+
+### alibaba_v209 (seed=11, IDEA #72: chain-reuse-weight=5.0, RUNNING)
+- Recipe: v208 base + `--chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.265`
+- Motivation: v208 ep20/ep30 long-rollout reuse stuck at 0.044-0.046 (real=0.269, -83%). IDEA #72 adds G-step loss that generates 8 windows with carried LSTM hidden state and penalises mean reuse rate vs target 0.265. This forces G to maintain correct reuse across multi-window self-rollout chains.
+- Expected: long-rollout reuse_access > 0.15 by ep20 (vs v208's 0.044)
+- Checkpoint dir: /home/darrell/checkpoints/alibaba_v209/
+- Launched: 2026-04-23
