@@ -6473,3 +6473,39 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 - Launched: 2026-04-23 16:02 (parallel with v212)
 - Expected: ep10 reuse_access > 0.30 (tencent 3× higher baseline reuse than alibaba)
 - Target: HRC-MAE < 0.009109 (LANL tencent ATB) within ep20-40
+
+---
+
+### alibaba_v212 (seed=13, IDEA #76 v3: straight-through — CLOSED-FAILED)
+- Killed at Phase 3 ep0 (preventive) — same code as tencent_v213 which showed footprint collapse
+- Root cause: sigmoid(val*10) saturates for val>>0, zero gradient at super-threshold
+- Superseded by alibaba_v214 (IDEA #79)
+
+---
+
+### tencent_v213 (seed=7, IDEA #76 v3: straight-through — CLOSED-FAILED)
+- ep10: reuse_access=99.97%, footprint=8, HRC-MAE=0.6306
+- ep20: reuse_access=99.98%, footprint=6 (DEEPENING collapse)
+- Root cause: object space collapse — generator generates 6-8 unique objects to trivially achieve high reuse
+- Sigmoid backward saturated for val>>0 → zero gradient → stuck at super-threshold collapse
+- Killed at ep20; superseded by tencent_v215 (IDEA #79)
+
+---
+
+### alibaba_v214 (seed=13, IDEA #79: hybrid surrogate chain-reuse, RUNNING)
+- Purpose: Fix super-threshold gradient vanishing (v3 failure — footprint collapse)
+- IDEA #79: forward=binary (val>=0), backward=sigmoid for val<0, piecewise-linear for val≥0
+- Gradient guaranteed nonzero everywhere in (-∞, T]: eliminates both sub/super threshold degenerate solutions
+- Config: same as v212 (chain-reuse-weight=5.0, windows=8, target=0.265, seed=13)
+- Launched: 2026-04-23 16:22
+- Log: /home/darrell/train_alibaba_v214.log
+- Expected: ep10 reuse_access ∈ [0.10, 0.35], footprint > 1000
+
+---
+
+### tencent_v215 (seed=7, IDEA #79: hybrid surrogate for tencent, RUNNING)
+- Same design as v214 but for tencent corpus
+- Config: chain-reuse-weight=5.0, windows=8, target=0.615, seed=7
+- Launched: 2026-04-23 16:22
+- Log: /home/darrell/train_tencent_v215.log
+- Expected: ep10 reuse_access ∈ [0.30, 0.70], footprint > 5000

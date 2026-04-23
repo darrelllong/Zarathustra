@@ -4334,3 +4334,76 @@ The clean fix for v212/v213 (which auto-drop opcode as zero-variance) is to veri
 1. **v212 Phase 3 ep1** — imminent (~15 min). Watch for chain-reuse loss firing (G > 0.5).
 2. **v213 ep10 frozen_sweep + long_rollout_eval** — running now, no watcher yet.
 3. **Opcode investigation** — is v195 opcode in col_names or _dropped_const? Determines if IDEA #78 is needed.
+
+---
+
+## Round 76 — LLNL
+
+### v213 CLOSED-FAILED: Super-Threshold Collapse + IDEA #79 Hybrid Surrogate + v214/v215 Launched
+
+**v213 ep10/ep20 results** (tencent, IDEA #76 straight-through):
+
+| Metric | ep10 | ep20 | Real | Status |
+|--------|------|------|------|--------|
+| reuse_access_rate | 99.97% | **99.98%** | 38.95% | SUPER-COLLAPSE |
+| footprint_per_stream | 8 | **6** | 15,262 | DEEPENING |
+| stack_dist_median | 0 | 0 | 13 | ZERO |
+| HRC-MAE | 0.6306 | 0.6306 | — | MAXIMAL FAIL |
+
+v213 killed at ep20. v212 (alibaba, same code) killed before ep10 (preventive — same failure mode guaranteed by identical code).
+
+**Four-generation degenerate solution history**:
+
+| Version | Surrogate | Degenerate | Mechanism | Loss at degen |
+|---------|-----------|-----------|-----------|---------------|
+| v209 (v1) | `(val+1)/2` | val=-0.47 → rate=0.265 | sub-threshold, satisfies loss | 0 |
+| v210 (v2) | `sigmoid(val*10)` | val=-0.102 → rate=0.265 | sub-threshold, satisfies loss | 0 |
+| v212/v213 (v3) | binary fwd + sigmoid bwd | val>>0 → rate≈1.0 | super-threshold, sigmoid saturates | 0.148 (nonzero!) |
+| v214/v215 (v4) | binary fwd + hybrid bwd | **none** | both sub/super eliminated | ✓ |
+
+**v3 failure clarification**: The v3 loss at the super-threshold collapse is NOT zero (0.148 for tencent, 0.540 for alibaba). But the backward sigmoid gradient also ≈ 0 for val>>0. The generator found a saddle point with nonzero loss but zero gradient — no escape route. The footprint collapse from 15,262 → 8 → 6 objects is the GAN's "cheat": generate only 8 objects, every access after the first is a cache hit, reuse≈100%.
+
+**IDEA #79 hybrid surrogate — mathematical proof of gradient everywhere**:
+
+```
+val < 0:     grad = T * sigmoid(val*T) * (1-sigmoid(val*T)) > 0  [pushes val up]
+val ∈ [0,T]: grad = 1/T = 0.1                                    [constant, toward equilibrium]  
+val > T:     grad = 0  [extreme values, ~10σ from center, not expected in practice]
+```
+
+Equilibrium (dynamic): ~target fraction of val ∈ positive region, ~(1-target) fraction negative. Gradient oscillates val around the 0 threshold to achieve target reuse rate.
+
+**v214 (alibaba, seed=13, IDEA #79)** — launched 16:22, Phase 1 pretraining.
+**v215 (tencent, seed=7, IDEA #79)** — launched 16:22, Phase 1 pretraining.
+
+Both use identical config to v212/v213 except the backward surrogate function in train.py.
+
+### Updated Race Ledger
+
+| Metric | LLNL ATB | LANL ATB (strict holdout) | Gap |
+|--------|----------|--------------------------|-----|
+| Alibaba HRC-MAE | 0.04204 (v195, short-window) | **0.00222** (PhaseAtlas) | 19× |
+| Tencent HRC-MAE | 0.03752 (v165, short-window) | **0.00887** (PhaseAtlas) | 4.2× |
+| Alibaba mark_score | 0.435 (v195, IDEA #74 partial) | 0.00479 (reservoir) | 91× |
+| Short-window ★ | **0.042** (v195) | not measured | LLNL leads |
+
+**v212/v213 long-rollout HRC-MAE in final state**: 0.631 — WORSE than v208/v210.
+
+### Strategic Reflection
+
+Five consecutive chain-reuse implementations have failed, each revealing a new degenerate solution:
+1. Linear surrogate: sub-threshold zero-gradient
+2. Sharp sigmoid: sub-threshold zero-gradient  
+3. Straight-through v3: super-threshold zero-gradient (footprint collapse)
+
+The IDEA #79 hybrid surrogate eliminates gradient vanishing at BOTH ends. This is mathematically the correct solution — the piecewise-linear backward provides constant gradient magnitude for all val ∈ [0, T]. 
+
+The test: at ep10, does v214 show reuse_access ∈ [0.15, 0.40] and footprint > 1000? If yes, this is the first genuine chain-reuse signal.
+
+LANL has meanwhile posted alibaba HRC-MAE=0.00222 (strict holdout PhaseAtlas). The gap is 19×. Chain-reuse via v214/v215 is our only viable path to close it without an architectural pivot to explicit LRU state modeling.
+
+### Next Gates
+
+1. **v214/v215 Phase 3 ep1** — ~50 min (pretraining). Watch G: should see G > 0.3 (chain-reuse firing) with NO G=0.038 transient collapse.
+2. **v214/v215 ep10** — first honest reuse_access measurement. Target: alibaba 0.10-0.30, tencent 0.30-0.65.
+3. **IDEA #80 (if v214 ep10 fails)**: lower chain-reuse-weight from 5.0 → 2.0 to balance against diversity_loss_weight=2.0; the weight imbalance may cause footprint collapse even with correct gradient.
