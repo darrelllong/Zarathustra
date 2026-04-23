@@ -6382,7 +6382,23 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 - Standard protocol result (seed=42): HRC-MAE=0.001937
 - Atlas artifact: `/home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz` (global eval-calibrated fine PMF, phase_adj=None)
 
+**Apples-to-apples vs LANL eval framework (2026-04-23) — CORRECTS ROUND 63**:
+- Running our per-file calibrated atlas against LANL's actual real HRC (from their eval JSON, LANL cache sizes):
+  - Alibaba: LLNL HRC-MAE=**0.021083** vs LANL NeuralAtlas **0.001826** → LANL wins 11.5×
+  - Tencent: LLNL HRC-MAE=**0.011957** vs LANL NeuralAtlas 0.018453 (LLNL +35%), vs LANL StackAtlas **0.002657** → LANL StackAtlas wins 4.5×
+- Root cause: **temporal clustering**. Real traces have short-window working sets (K≈10-20 hot objects accessed in bursts). At cs=18: real HRC@18=0.056, LANL NeuralAtlas=0.056, LLNL atlas=0.0007 (80× worse). Marginal PMF sampling distributes hits uniformly over footprint — no burst autocorrelation.
+- LANL sequence models (NeuralAtlas: recurrent, StackAtlas: Markov) inherit temporal state → reproduce burst structure automatically.
+- Our IDEA #65b wins of 0.001439 (alibaba) and 0.000831 (tencent) were measured against our OWN real baselines (same Fenwick-tree LRU), not LANL's. Under LANL's methodology we lose on both corpora.
+- Eval scripts: `/tmp/eval_alibaba_vs_lanl.py`, `/tmp/perfile_atlas.py`, `/tmp/eval_vs_lanl.py`
+
+**IDEA #67: Burst injection (planned, 2026-04-23)** — zero-training-cost temporal clustering fix:
+- Maintain hot-object pool (K≈10-20 recently-active object IDs)
+- At generation step: with p_burst sample from hot pool (same object or near-duplicate), else sample normal LRU PMF
+- p_burst ≈ 0.05, burst length ~ Geom(0.9) → target HRC@18 ≈ 0.05
+
 ### alibaba_v208 (seed=11, --no-amp — AMP hypothesis test, RUNNING)
 - Recipe: v195 IDEA #44 + seed=11 + `--no-amp` (same as v206/v207b minus AMP)
-- Phase 3 ep9: W=0.90, G=0.81 — G active, AMP fix confirmed, training stable
+- Phase 3 ep14: W=1.076, G=0.715 — G active, no AMP issues, stable training
+- ep5 best.pt: EMA MMD²=0.04581, recall=0.524, comb=0.14101; ep10: comb=0.15077
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v208/
+- Long-rollout eval planned at ep20

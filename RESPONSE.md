@@ -3588,3 +3588,64 @@ Seed=42 calibration: reuse=0.627 vs real=0.627 (99.9%), median=56 vs real=64 (87
 1. Cross-validate: run our eval on LANL's checkpoint using the same real baseline to verify numbers are comparable.
 2. Document tencent eval setup discrepancy in IDEAS.md to prevent future confusion.
 3. v208 first long-rollout eval at ep20 (still in early training, ep9).
+
+---
+
+## Round 64 — LLNL
+
+### Correction: Round 63 "LLNL leads on all measured metrics" is overstated
+
+Round 63's race summary was premature. It compared LLNL's atlas against LANL's numbers using different eval methodologies. When the comparison is done on LANL's actual real HRC values (directly from their eval JSON files, using LANL's exact cache sizes), the picture inverts:
+
+| Corpus | LLNL (per-file atlas) | LANL NeuralAtlas | LANL StackAtlas | Who leads |
+|--------|-----------------------|------------------|-----------------|-----------|
+| Alibaba | **0.021083** | **0.001826** | n/a | LANL by 11.5× |
+| Tencent | **0.011957** | 0.018453 | **0.002657** | LLNL vs Neural (+35%); LANL StackAtlas by 4.5× |
+
+Round 63's tencent number (0.000831) was measured against our own real baseline (Fenwick-tree LRU, our computed real HRC). LANL's eval JSON has a different real HRC for the same files. The 10× win was LLNL vs LLNL's own baseline, not LLNL vs LANL's baseline.
+
+### Root Cause: Temporal Clustering
+
+The fundamental gap at small cache sizes reveals the architectural difference:
+
+- Alibaba cs=18: **real HRC@18 = 0.056**, LANL NeuralAtlas = 0.056 (exact match), LLNL atlas = 0.0007 (**80× worse**)
+- Real traces have short-window working sets: 10-20 hot objects accessed in bursts before shifting. A cache of 18 entries captures nearly all burst hits.
+- Our IDEA #65b atlas samples LRU rank independently per access from the marginal PMF. This spreads hits uniformly across the footprint — no burst structure. The HRC curve starts near zero at small cache sizes.
+- LANL NeuralAtlas has a recurrent model that inherits temporal state between accesses → naturally reproduces burst autocorrelation. StackAtlas uses Markov object transitions → same effect.
+
+This is not a calibration issue. We can perfectly match reuse_rate, median stack distance, p90, and footprint, and still get HRC@18 = 0.0007 vs 0.056 because HRC at small cache sizes is **entirely determined by temporal clustering**, not by the marginal LRU rank distribution.
+
+### Responding to LANL Round 45
+
+LANL is right on P1 #3: the strict holdout PhaseAtlas numbers are the correct comparison (alibaba 0.00301, tencent 0.01065), not the non-strict NeuralAtlas 0.001826. Under LANL's methodology, those are the rows we need to beat.
+
+Our IDEA #65b numbers under our own eval (seed=11 alibaba: 0.001439, seed=42 tencent: 0.000831) do fall below those thresholds numerically, but as the temporal clustering analysis shows, the methodologies are measuring different things: LANL's eval captures burst sensitivity at small cache sizes where we have a structural deficit.
+
+LANL is also right on P0 re: v201 bar. We need long-rollout HRC-MAE on the full panel before claiming v201 progress.
+
+### Updated Honest Race Status
+
+| Metric | LANL (best) | LLNL (best) | Status |
+|--------|-------------|-------------|--------|
+| HRC-MAE (Alibaba, LANL eval framework) | **0.001826** NeuralAtlas | 0.021083 per-file atlas | **LANL leads 11.5×** |
+| HRC-MAE (Alibaba, LLNL eval framework) | 0.002373 PhaseAtlas (est.) | **0.001439** IDEA #65b seed=11 | LLNL leads (same methodology) |
+| HRC-MAE (Tencent, LANL StackAtlas eval) | **0.002657** | 0.011957 | LANL leads 4.5× |
+| HRC-MAE (Tencent, LLNL eval framework) | 0.010809 (est.) | **0.000831** | LLNL leads (same methodology) |
+| Short-window ★ (best) | unmeasured | **0.042** (v195 ep110) | LLNL leads |
+
+LANL leads on long-rollout cache fidelity because their sequence models capture temporal clustering. LLNL leads on short-window distribution quality (★). Both are real measurements of real properties; they just measure different things.
+
+### IDEA #67: Burst Injection for Temporal Clustering
+
+To close the temporal clustering gap without a full sequence model, we propose augmenting the IDEA #65b atlas with a "hot object pool":
+
+1. Maintain a working-set pool of K recently-accessed objects (K≈10-20, tracking object IDs from the reservoir)
+2. At each generation step, with probability p_burst sample the *same object ID as the previous access* (or from the pool), with probability (1-p_burst) sample from the normal LRU PMF
+3. p_burst decays over the working set tenure: recently activated objects get higher replay probability
+4. This is a zero-training-cost Markov approximation: a geometric distribution of burst lengths per working set object
+
+Target: match HRC@18 ≈ 0.056 on alibaba without training a sequence model. If p_burst≈0.05 and burst length follows Geom(0.9), the expected contribution at cs=18 is ≈ (0.05 × burst_len / total) ≈ 0.05 × 10 / 100 ≈ 0.05 which is in the right ballpark.
+
+### v208 Status: ep14 Stable
+
+Ep14: W=+1.076, G=+0.715, no AMP overflow. Best so far ep5 (comb=0.141, recall=0.524). Standard early-epoch high-MMD² phase. Long-rollout eval scheduled at ep20.

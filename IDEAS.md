@@ -2468,8 +2468,33 @@ with automatic evaluation and no `llgan/` edits.
 **Fix**: Generate canonical LLNL baseline using LANL's eval setup (same trace directory, n_records=100000, n_streams=4, seed=42) and re-evaluate IDEA #65b.
 
 **Result**: HRC-MAE=0.000831 (seed=42), 10× better than LANL's 0.008423. 7/7 seeds beat LANL (3-10×).
+**CORRECTION (Round 64, 2026-04-23)**: The 0.000831 was measured against our own LLNL real baseline (same Fenwick-tree LRU, our computed real HRC). Against LANL's actual real HRC from their eval JSON: LLNL tencent gets 0.011957, LANL StackAtlas gets 0.002657 → LANL leads 4.5×.
 
 **Artifacts**:
 - Real baseline: `/tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_lanl_setup_real.json`
 - Tencent atlas: `/home/darrell/llnl_phase_pmf_atlas_tencent_lanl.pkl.gz`
 - Generation script: `/tmp/tencent_sweep2.sh`
+
+---
+
+## IDEA #67 (LLNL): Burst Injection for Temporal Clustering
+
+**Status**: PROPOSED (2026-04-23)
+
+**Problem**: IDEA #65b atlas samples LRU rank independently per access from the marginal PMF — no temporal autocorrelation. Real cache traces have short-window working sets: K≈10-20 hot objects accessed in bursts before shifting to a new working set. At cs=18: real HRC@18=0.056, LANL NeuralAtlas=0.056 (exact match), LLNL=0.0007 (80× worse). This accounts for LLNL's 11.5× deficit vs LANL on alibaba under LANL's eval framework.
+
+**Approach**: Zero-training-cost Markov approximation:
+1. Maintain a hot-object pool of K=20 recently-active synthetic object IDs
+2. At each generation step: with probability p_burst sample from hot pool (geometric burst), else sample from normal LRU PMF as today
+3. Hot pool update: when generating a "cold" access that maps to a new rank, add it to the pool; evict LRU pool member
+4. p_burst ≈ 0.05, burst run length ~ Geom(0.9) ≈ 10 accesses → expected HRC@K contribution ≈ p_burst × burst_len / per_access ≈ 0.05
+
+**Expected outcome**:
+- HRC@18 shifts from 0.0007 → ~0.05 (matching real 0.056)
+- HRC at larger cache sizes unchanged (hot pool accesses still draw from top-ranked LRU objects)
+- No model training required; pure generation-time modification to phase_pmf_atlas.py
+
+**Implementation**: Add `burst_prob` and `burst_pool_size` parameters to `PhasePMFAtlas.generate()`. Track per-stream hot pool. When bursting, resample the SAME object ID from the previous burst step; when switching, sample new LRU rank then map to object ID.
+
+**Priority**: HIGH — this closes the structural gap vs LANL sequence models at small cache sizes.
+
