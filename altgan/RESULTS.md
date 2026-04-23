@@ -224,6 +224,15 @@ run is a small drift-focused check for this forced-phase late-rank row, because
 forced phase previously improved drift while sometimes hurting HRC; the new
 rank schedule appears to remove most of that HRC cost.
 
+A fresh-seed forced-phase confirmation on seeds `46-49` stayed competitive but
+regressed from the first four seeds: mean HRC-MAE `0.009934`, reuse
+`0.61576/0.61493`, stack median `52.5/60`, stack p90 `164.5/174`, and mean mark
+score `0.04642`. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_late_rank_forced_freshseed_confirm_summary.csv`
+and `_best.json`. Across the eight forced seeds now tested, the rough mean HRC
+is `0.00965`, so the row remains strong but should be compared against natural
+phase on the same fresh seeds before declaring forced phase universally better.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
