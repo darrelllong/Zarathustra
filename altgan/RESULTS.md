@@ -182,6 +182,26 @@ Treat caps as closed for this Tencent branch. The useful hypothesis is now
 uncapped late-phase rank expansion, which needs a four-seed confirmation before
 promotion.
 
+The four-seed confirmation promoted uncapped late-phase rank expansion. It
+improved the mean HRC for both tested transition blends without changing reuse
+or marks, and the stronger stable row is now `blend=0.5`, local power `0.9`,
+phase rank scales `1.0,1.0,1.1,1.1`: mean HRC-MAE `0.009575` versus
+`0.010428` for the paired baseline. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_late_rank_seed_confirm_summary.csv`
+and `_best.json`.
+
+| transition_blend | phase rank-scale schedule | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | baseline | 4 | 0.010428 | 0.61184 | 0.61493 | 48.5 | 60 | 158.2 | 174 | 0.04823 |
+| 0.50 | 1.0,1.0,1.1,1.1 | 4 | **0.009575** | 0.61184 | 0.61493 | 52.0 | 60 | 170.0 | 174 | 0.04823 |
+| 0.65 | baseline | 4 | 0.011051 | 0.61194 | 0.61493 | 50.5 | 60 | 155.5 | 174 | **0.04741** |
+| 0.65 | 1.0,1.0,1.1,1.1 | 4 | **0.010287** | 0.61194 | 0.61493 | 54.5 | 60 | 168.2 | 174 | **0.04741** |
+
+This shifts Tencent's promoted stable HRC candidate from the seed-42
+microblend row to a four-seed late-rank schedule at blend `0.5`. The next
+robustness check is an `8x50k` panel using the same baseline-versus-late
+schedule comparison.
+
 ## Alibaba PhaseAtlas Calibration Ablations
 
 Recorded 2026-04-22. These 4-stream x 100k Alibaba sweeps used
