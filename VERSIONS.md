@@ -6420,3 +6420,16 @@ Mean=0.001924, Std=0.000393. 4/7 seeds beat LANL NeuralAtlas. **Seed=11 stats**:
 - Expected: long-rollout reuse_access > 0.15 by ep20 if sharp sigmoid forces correct binary behavior
 - Checkpoint dir: /home/darrell/checkpoints/alibaba_v210/
 - Launched: 2026-04-23
+
+**Early Phase 3 training dynamics (ep1-5)**:
+| ep | W | G | EMA MMD² | recall | ★ (training) |
+|----|---|---|----------|--------|--------------|
+| 1 | +0.3257 | 0.0374 | — | — | — |
+| 2 | +1.2572 | 2.0510 | — | — | — |
+| 3 | +0.8853 | 1.3688 | — | — | — |
+| 4 | +0.7603 | 1.1144 | — | — | — |
+| 5 | +0.6893 | 0.7751 | 0.06724 | 0.405 | **0.18624** |
+
+G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.89→0.76→0.69) is healthy. ep5 ★=0.186 and recall=0.405 both already exceed v208 ep10 frozen ★=0.151 in training metrics.
+
+**Wait: ep10 long_rollout_eval running via wait_eval_v210_ep10.sh** (target: reuse_access > 0.10)
