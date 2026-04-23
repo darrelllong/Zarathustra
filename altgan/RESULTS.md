@@ -13,7 +13,7 @@ manifest per corpus.
 
 | Corpus | Model | Fit | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.65 + local power 0.9 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 |
+| Tencent | PhaseAtlas | 1024 files x 5k holdout, blend 0.65 + local power 0.9 + late rank scale 1.1 | **0.00937** | 0.61415 | 0.61493 | 54 | 60 | 184 | 174 |
 | Alibaba | PhaseAtlas | 233 files x 25k holdout, blend 0.2 + local power 0.9 | **0.00222** | 0.27363 | 0.26909 | 192 | 201 | 1508 | 1452 |
 | Tencent | NeuralAtlas | 1024 files x 5k holdout, blend 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 |
 | Alibaba | NeuralAtlas | 233 files x 25k holdout, blend 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 |
@@ -44,6 +44,7 @@ pool. The holdout models exclude those files.
 | Tencent | NeuralAtlas | 1024 files x 5k, holdout | 0.25 | 0.01853 | 0.62066 | 0.61493 | 45 | 60 | 144 | 174 | 0.0199 | 0.0096 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 0.5 | **0.01065** | 0.60947 | 0.61493 | 48 | 60 | 159 | 174 | 0.0579 | 0.0293 |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend | 0.65 | **0.00983** | 0.61415 | 0.61493 | 50 | 60 | 171 | 174 | 0.0164 | 0.0144 |
+| Tencent | PhaseAtlas | 1024 files x 5k, holdout + microblend + late rank scale | 0.65 | **0.00937** | 0.61415 | 0.61493 | 54 | 60 | 184 | 174 | pending | pending |
 | Tencent | PhaseAtlas | 1024 files x 5k, holdout | 1.0 | 0.01982 | 0.63573 | 0.61493 | 60 | 60 | 186 | 174 | 0.0497 | 0.0390 |
 | Alibaba | NeuralAtlas | 233 files x 25k, holdout | 0.75 | 0.00349 | 0.26730 | 0.26909 | 183 | 201 | 1264 | 1452 | 0.3251 | 1.1296 |
 | Alibaba | PhaseAtlas | 233 files x 25k, holdout | 0.0 | 0.00301 | 0.27125 | 0.26909 | 205 | 201 | 1380 | 1452 | 1.2015 | 0.7529 |
@@ -137,6 +138,30 @@ Rank expansion is useful only in a narrow band: scale `1.1` improves the
 two-seed mean HRC and moves the median/p90 closer to real, while `1.2`
 over-expands the tail and loses badly. The next Tencent HRC probe should test
 phase-specific or capped `1.1` schedules, not global scale escalation.
+
+The phase-specific follow-up found a better Tencent HRC setting. Expanding
+only late phases with schedule `1.0,1.0,1.1,1.1` beat both the baseline and
+global scale on the two-seed mean. It also promoted a new seed-42 holdout row:
+`blend=0.65`, local power `0.9`, late rank scale `1.1`, HRC-MAE `0.009367`,
+reuse `0.61415/0.61493`, stack median `54/60`, and stack p90 `184/174`. The
+full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_rankscale_phase_confirm_summary.csv`
+and `_best.json`.
+
+| transition_blend | phase rank-scale schedule | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.50 | baseline | 2 | 0.010309 | 0.61200 | 0.61493 | 48.5 | 60 | 163.5 | 174 | 0.04800 |
+| 0.50 | 1.0,1.0,1.1,1.1 | 2 | **0.009645** | 0.61200 | 0.61493 | 52.0 | 60 | 174.0 | 174 | 0.04800 |
+| 0.50 | 1.0,1.1,1.1,1.0 | 2 | 0.009789 | 0.61200 | 0.61493 | 50.0 | 60 | 167.0 | 174 | 0.04800 |
+| 0.65 | baseline | 2 | 0.010549 | 0.61522 | 0.61493 | 50.5 | 60 | 162.0 | 174 | **0.04729** |
+| 0.65 | 1.0,1.0,1.1,1.1 | 2 | **0.009634** | 0.61522 | 0.61493 | 54.5 | 60 | 174.0 | 174 | **0.04729** |
+| 0.65 | 1.0,1.1,1.1,1.0 | 2 | 0.009902 | 0.61522 | 0.61493 | 52.0 | 60 | 165.0 | 174 | **0.04729** |
+
+This keeps Tencent's best next HRC move squarely in the explicit stack decoder:
+phase-aware rank calibration improves cache behavior without changing marks or
+the reuse decision. The next runnable probe should add caps around the late
+`1.1` schedule to stop seed-42 p90 overshoot while preserving the two-seed
+mean gain.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 
