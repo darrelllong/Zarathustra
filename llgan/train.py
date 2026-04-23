@@ -1838,7 +1838,7 @@ def train(cfg: Config) -> None:
                     loss_reuse_rate = (_fake_rate - _r_target) ** 2
                     g_loss = g_loss + _rrw * loss_reuse_rate
 
-                # IDEA #72 / #76: long-chain reuse-rate loss (v3: straight-through fix).
+                # IDEA #72 / #76 / #79: long-chain reuse-rate loss (v4: hybrid surrogate).
                 # Generate chain_reuse_windows windows with carried LSTM hidden
                 # state (self-rollout, matching inference) and penalise the mean
                 # reuse rate over the full chain vs the target.  Directly attacks
@@ -1847,17 +1847,20 @@ def train(cfg: Config) -> None:
                 #
                 # v1 failure: (val+1)/2 — G set val≈-0.47 (prob=0.265) below threshold
                 # v2 failure: sigmoid(val*10) — G set val≈-0.102 (sigmoid=0.265) below threshold
-                # Both allow zero-gradient degenerate solutions below inference threshold.
+                # v3 failure (IDEA #76): sigmoid saturates for val>>0 (gradient≈0 at +∞)
+                #   → tencent v213 collapsed to footprint=6, reuse=99.97% at ep20
                 #
-                # v3 FIX (IDEA #76): Straight-through estimator.
-                # forward = actual hard binary reuse (val>=0).float() — loss is non-zero
-                # at the degenerate solution (binary reuse=0 → loss=(0-target)²>0)
-                # backward = sigmoid gradient flows through — no zero-gradient trap
-                # This matches inference exactly in the forward pass, breaking all
-                # sub-threshold degenerate solutions.
+                # v4 FIX (IDEA #79): Hybrid surrogate.
+                # forward = hard binary (val>=0).float()  — eliminates sub-threshold solutions
+                # backward = sigmoid(val*T) for val<0    — nonzero gradient to push val above 0
+                #            piecewise-linear val/T for val≥0 — constant gradient 1/T, no saturation
+                # At the super-threshold collapse (val>>0 → rate≈1.0):
+                #   gradient = 1/T = 0.1 (constant), pushes val back toward 0
+                # At the sub-threshold collapse (val<0 → rate=0):
+                #   gradient = T*sigmoid*(1-sigmoid) > 0, pushes val above 0
                 _crw = getattr(cfg, 'chain_reuse_weight', 0.0)
                 _cr_windows = int(getattr(cfg, 'chain_reuse_windows', 8))
-                _SHARP_T = 10.0  # temperature for straight-through backward gradient
+                _SHARP_T = 10.0  # temperature for sigmoid portion (val < 0)
                 if _crw > 0.0 and obj_id_col >= 0:
                     _z_gc_cr, _ = _make_z_global(B, cfg, device,
                                                   real_features=real_batch,
@@ -1873,12 +1876,13 @@ def train(cfg: Config) -> None:
                                              hidden=_h_cr, return_hidden=True)
                         _cr_reuse_chunks.append(_H_cr[:, :, obj_id_col])
                     _cr_reuse_all = torch.cat(_cr_reuse_chunks, dim=1)  # (B, T*N)
-                    # Straight-through estimator: hard binary in forward, sigmoid grad in back.
-                    # Degenerate solution (all val<0): binary rate=0 → loss=(0-target)²>0.
-                    # Gradient at val<0: d/d_val[sigmoid(val*T)] ≠ 0 → pushes val above 0.
-                    _cr_soft = torch.sigmoid(_cr_reuse_all * _SHARP_T)
+                    # Hybrid surrogate: sigmoid for val<0, piecewise-linear for val≥0.
+                    # Gradient is nonzero everywhere in (-∞, T], ensuring equilibrium.
+                    _cr_neg_surr = torch.sigmoid(_cr_reuse_all * _SHARP_T)  # gradient for val<0
+                    _cr_pos_surr = torch.clamp(_cr_reuse_all / _SHARP_T, 0.0, 1.0)  # gradient for val≥0
+                    _cr_surrogate = torch.where(_cr_reuse_all < 0, _cr_neg_surr, _cr_pos_surr)
                     _cr_hard = (_cr_reuse_all >= 0).float()
-                    _cr_rate = _cr_soft + (_cr_hard - _cr_soft).detach()
+                    _cr_rate = _cr_surrogate + (_cr_hard - _cr_surrogate).detach()
                     _cr_rate = _cr_rate.mean()
                     _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)

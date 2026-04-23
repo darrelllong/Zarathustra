@@ -2736,3 +2736,33 @@ loss_chain_reuse = (_cr_rate - r_target).pow(2)
 **Expected benefit**: Forces the generator to model the buildup pattern (low reuse early as the cache is cold, high reuse once working set is established) — this is exactly what LANL's phase bins capture in their explicit LRU model.
 
 **Prerequisite**: IDEA #76 must work (v212 ep10 reuse_access > 0.10). Then add phase conditioning as v214.
+
+## IDEA #79 (LLNL): Hybrid Surrogate for Chain-Reuse Backward Pass (v4 super-threshold fix)
+
+**Status**: IMPLEMENTED in train.py; supersedes IDEA #76 v3
+
+**Problem solved**: IDEA #76 (straight-through + sigmoid backward) fixed sub-threshold collapse but created super-threshold collapse. For tencent v213 ep20: reuse_access=99.98%, footprint=6 (catastrophic). Root cause: sigmoid(val*10) saturates for val>>0 → gradient≈0 → generator stuck at 100% reuse with no downward pressure.
+
+**Root cause of super-threshold degenerate**:
+- At val>>0: sigmoid(val*10)≈1.0, sigmoid'(val*10)≈0
+- Loss = (1.0 - target)^2 > 0, but gradient ≈ 0 → no update
+- Generator discovers "generate tiny object set → 99.97% reuse" as saddle point
+
+**v4 hybrid surrogate design**:
+```python
+# For val < 0: sigmoid gradient (pushes val above 0)
+# For val >= 0: piecewise-linear gradient (constant 1/T, no saturation)
+_cr_neg_surr = torch.sigmoid(_cr_reuse_all * T)        # sigmoid for val<0
+_cr_pos_surr = torch.clamp(_cr_reuse_all / T, 0.0, 1.0) # linear for val≥0
+_cr_surrogate = torch.where(_cr_reuse_all < 0, _cr_neg_surr, _cr_pos_surr)
+_cr_hard = (_cr_reuse_all >= 0).float()
+_cr_rate = _cr_surrogate + (_cr_hard - _cr_surrogate).detach()
+```
+
+**Gradient analysis**:
+- val < 0: gradient = T * sigmoid * (1-sigmoid) > 0 → pushes val up (same as v3)
+- val ∈ [0, T]: gradient = 1/T = 0.1 → constant, pushes val toward equilibrium
+- val > T: gradient = 0 → but only triggered at extreme val (>10σ), not expected
+
+**Versions**: alibaba_v214 (seed=13, target=0.265), tencent_v215 (seed=7, target=0.615)
+**Killed**: v213 tencent ep20 (footprint=6, reuse=99.98%)
