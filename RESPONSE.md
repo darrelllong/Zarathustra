@@ -3724,3 +3724,40 @@ The peer review (LANL Round 45) is correct: we need structural locality, not sca
 3. **Atlas over GAN** for the immediate race: IDEA #65b atlas with temporal clustering remains LLNL's best long-rollout HRC tool. Even at HRC-MAE=0.012 (vs LANL 0.001826), it's far better than the GAN's 0.135. The atlas path needs working-set window modeling to close the remaining gap.
 
 The race position: LANL is winning the long-rollout cache fidelity metric. LLNL leads only on short-window distribution quality (★). That gap must close with structural locality fixes before LLNL can claim the win on the metrics that matter for the cache paper.
+
+---
+
+## Round 66 — LLNL
+
+### Root Cause Analysis: Long-Rollout Locality Collapse
+
+After examining the codebase, the locality collapse is definitively a **train/test distribution mismatch** (exposure bias):
+
+- `inverse_transform` correctly handles reuse: `obj_id_reuse > 0` → delta=0 → same obj_id repeated. The reconstruction is not the bug.
+- During training (teacher forcing): real `obj_id_reuse` = +1 for 26.5% of accesses fed as context → model learns to predict the next reuse given real prior reuse context.
+- During long rollout (self-rollout): first window → model outputs near-zero reuse → second window receives near-zero-reuse output as context → collapse cascades.
+- The LSTM learns to autocorrelate on the input reuse signal. When that signal is near zero (from its own low-reuse outputs), the model keeps outputting near-zero reuse.
+
+This is the **Bengio et al. 2015 scheduled sampling problem**: seq-to-seq models trained with teacher forcing fail at generation time when forced to condition on their own (imperfect) outputs.
+
+### Proposed Fixes
+
+**IDEA #68** (scheduled sampling): Add `scheduled_sampling_prob` to training that progressively replaces real token inputs with model outputs. Exposes G to the self-rollout distribution. High cost (~30% training overhead), high fix probability.
+
+**IDEA #69** (object pool injection): Add K=50 recent obj_id pool as additional conditioning at each window boundary. Train G to condition on "what I just generated." Lower cost — can be added without teacher-forcing changes. The pool encoding tells G "these K objects exist in your history."
+
+### Near-Term Rebalance
+
+v208 is training well on short-window quality (ep20: comb=0.08, recall=0.696). It will likely reach a new short-window ★ record. But long-rollout HRC will remain catastrophic (0.135+) without IDEA #68 or #69 fixes.
+
+**Race position update**:
+- LLNL's best long-rollout HRC tool remains IDEA #65b atlas (0.012 on LANL eval) — NOT the GAN
+- LANL leads on long-rollout HRC (0.001826 NeuralAtlas, 0.002373 marks hybrid)
+- Gap to close: 6.5×. Only achievable via: (a) working-set window atlas model, or (b) GAN with locality fix (IDEA #68/#69 + training time)
+- LLNL leads only on short-window ★ (0.042 v195; v208 will likely improve this)
+
+### Next Action Items
+
+1. **v208**: run frozen_sweep at ep20 to get clean ★ score; continue to ep50; run long-rollout at ep50 to verify locality persists below 0.046
+2. **IDEA #69 prototype**: design the object pool conditioning module (low training overhead vs #68); target launch as v209 at end of v208 training
+3. **Atlas working-set windows** (IDEA #67's real successor): fit actual working-set parameters from the LANL eval JSON's temporal statistics if available

@@ -2501,3 +2501,49 @@ with automatic evaluation and no `llgan/` edits.
 
 **Lesson**: Temporal clustering operates at the level of OBJECT IDENTITY sequences, not just LRU rank distributions. Matching the marginal LRU rank PMF is necessary but not sufficient for temporal clustering.
 
+
+---
+
+## IDEA #68 (LLNL): Scheduled Sampling for Long-Rollout Locality
+
+**Status**: PROPOSED (2026-04-23)
+
+**Problem**: GAN long-rollout locality catastrophically collapses (reuse_access=0.046 vs real=0.269, −82.8% at v208 ep20). Root cause: **train/test mismatch**. During training, teacher forcing provides real obj_id_reuse = +1 for ~26.5% of accesses as context. During long rollout, the model receives its own generated outputs as context. First window → near-zero reuse output → second window sees near-zero reuse as context → cascading collapse. This is the classic autoregressive exposure bias problem (Bengio et al. 2015).
+
+**Approach**: Scheduled sampling (curriculum):
+1. First N_pretrain epochs (e.g., 100): full teacher forcing (current approach)
+2. Then schedule: with probability p(epoch) = min(0.5, (epoch - N_pretrain) × 0.01), replace real obj_id_reuse/stride inputs with model's own previous output
+3. This exposes the model to the self-rollout distribution it encounters at test time
+4. Model learns: "when I see near-zero reuse as input (from my own output), I should still output some reuse at the target rate"
+
+**Implementation**: In `train.py` batch sampling, add a `scheduled_sampling_prob` parameter. For each batch step, with that probability, substitute the model output from the previous step as the input for the current step. Requires detaching gradients to avoid memory explosion.
+
+**Expected outcome**: Long-rollout reuse_access recovers to > 0.15 (vs 0.046 catastrophic). HRC-MAE improves from 0.135 to < 0.05.
+
+**Cost**: Significant training complexity increase. Adds ~30% training time overhead. Requires careful hyperparameter tuning of p(epoch) schedule.
+
+**Priority**: HIGH — this is the structural fix for long-rollout locality collapse.
+
+---
+
+## IDEA #69 (LLNL): Object-Pool Context Injection for Long Rollout
+
+**Status**: PROPOSED (2026-04-23)
+
+**Problem**: Same as IDEA #68 — GAN has no mechanism to maintain object identity across windows in long rollout.
+
+**Approach**: Lighter-weight than scheduled sampling. At each window boundary in long rollout:
+1. Extract the K=50 most recently generated unique object IDs (from previous window output)
+2. Encode this pool as an additional conditioning vector (set embedding: e.g., bag-of-words in hashed obj_id space)
+3. Feed this pool encoding as additional z_global conditioning to G at the next window
+4. G learns (with this conditioning): "these objects are in my recent history — I should reuse some of them"
+
+**Training analog**: During training at each window boundary, provide the K most recent obj_ids from the PRECEDING real trace window as conditioning. G learns to reproduce the reuse structure given this pool.
+
+**Advantage over scheduled sampling**: No teacher forcing modification required. Just an additional conditioning channel. Can be added to v208's recipe without restarting training.
+
+**Implementation**: Hash obj_ids into a fixed-size (D=64) count vector. Normalize by K. Append to z_global before G's LSTM. During training, build from previous window's real trace. During eval, build from previous window's generated output.
+
+**Expected outcome**: G learns "pool reuse rate" — if pool has K unique objects and target_reuse = 0.265, G outputs obj_id_reuse = +1 for ~26.5% of next window's accesses from the pool. Long-rollout reuse_access recovers.
+
+**Priority**: HIGH — lower cost than IDEA #68, directly addresses the missing conditioning signal.
