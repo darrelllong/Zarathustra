@@ -5746,3 +5746,45 @@ Phase 2 (Supervisor pretraining, 50 epochs). Phase 3 GAN training starts in ~150
 - Previous understanding "LLNL tencent ATB ★=0.03752" was wrong metric (short-window, not HRC-MAE)
 - Real tencent gap: LANL 2.6× ahead (not 4.9× as previously believed — actually worse: our GAN alone was 45×)
 - LRU stack decoder (IDEA #48) recovers to 2.6×; further improvement requires Markov atlas or per-stream calibration
+
+---
+
+## Round 98 — LRU Decoder Tuning: 0.018 HRC-MAE; Calibration Plateau Analysis
+
+**Date**: 2026-04-23
+**Reporting**: PMF tuning experiments push HRC-MAE from 0.0229 → 0.018. Plateau identified.
+
+### PMF Tuning Results
+
+| PMF Configuration | HRC-MAE | Stack Median | Stack P90 |
+|------------------|---------|-------------|-----------|
+| Default tencent PMF (25k total) | 0.0535 | 101 | 564 |
+| Calibrated histogram PMF (100k) | 0.0229 | 47 | 232 |
+| Oracle per-stream PMF (100k) | 0.0231 | 51 | 230 |
+| Per-stream reuse rates | 0.0238 | 47 | 234 |
+| Markov atlas, blend=1.0 | 0.0830 | 130 | 1804 |
+| **Truncated [256+)=0, max_depth=500** | **0.0180** | **47** | **206** |
+| **LANL PhaseAtlas** | **0.00887** | — | — |
+| Real data | — | 60 | 174 |
+
+Best result: **HRC-MAE=0.018** by eliminating the [256+) bucket (no ultra-deep stack reuses). Markov atlas (oracle calibration) gives 0.083 due to heavy-tail stationary distribution.
+
+### Plateau Analysis
+
+The i.i.d. uniform-within-bucket PMF approach has a theoretical floor: with 8 buckets and uniform sampling within each, we cannot simultaneously achieve median=60 AND P90=174. The bucket [16,64) mean is 40 (too low for median=60) and [64,256) mean is 160 (gives P90≈207 regardless of [256+) mass).
+
+**Remaining gap at 0.018**: stack_distance_median=47 vs real 60 (21% too shallow). This is because [16,64) uniform(16,63) averages to 40, not 60. A finer bucket resolution between 16-64 would help but requires modifying lru_stack_decoder.py.
+
+**Why LANL achieves 0.00887**: Phase-conditioned stack distances with per-phase calibration from holdout files. Different workload phases have fundamentally different stack-distance distributions; a global i.i.d. PMF averages across phases. LANL's "forced phase" categorizes each eval window into a workload regime and applies regime-specific parameters.
+
+### Legitimate vs Oracle Distinction
+
+All calibrations above use eval file statistics (circular). For a legitimate score comparable to LANL:
+- Need holdout training files for calibration (not the eval files themselves)
+- From training file sample (IDEA #83): HRC-MAE was 0.04375 → this is the legitimate LRU-decoder baseline
+- With LRU decoder + training-file calibration, likely achievable: 0.020-0.030 (estimate)
+- Still would not beat LANL 0.00887
+
+### v225 Status
+
+Phase 2.5 Generator warm-up (100 epochs). Phase 3 GAN training starts after ~100 more epochs. Gate: frozen_sweep at Phase 3 ep10 — expect ★≤0.15 if in the seed=5 quality basin.
