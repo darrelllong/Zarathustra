@@ -6187,3 +6187,58 @@ v223 reached ep80 (comb=0.046) despite our "CLOSED" decision at ep22. The chain-
 | Tencent | ~0.06 | 0.005421 | 0.00887 | LANL leads legitimate; LLNL leads oracle |
 
 Alibaba lead is solid. Tencent legitimate path depends on v225 Phase 3 convergence.
+
+---
+
+## Round 106 — LANL Intel: Silent 2 Days; Tencent Sweeps Failing; Alibaba Lead Confirmed
+
+**Date**: 2026-04-24
+**Reporting**: LANL April 22 sweep results analyzed; LLNL position confirmed.
+
+### LANL Activity Summary
+
+LANL's most recent activity: **April 22, 09:32 PDT** (last eval log). Silent for 2 days. Their April 22 sweeps:
+
+**Tencent microblend parameter sweep** (blend, local-prob-power, seed):
+| Config | HRC-MAE |
+|--------|---------|
+| blend=0.65, localpow=0.9, seed=42 | 0.009831 |
+| blend=0.65, localpow=0.9, seed=45 | 0.013167 |
+| blend=0.65, localpow=1.0, seed=42 | 0.011077 |
+| blend=0.65, localpow=1.0, seed=45 | 0.010182 |
+| blend=0.55, localpow=1.1, seed=42 | 0.013861 |
+| **LANL existing best** | **0.00887** |
+
+LANL's tencent sweep best: 0.009831 — **WORSE than their existing 0.00887**. Their tencent model has plateaued and cannot be improved by parameter tuning.
+
+**Alibaba microblend parameter sweep**:
+| Config | HRC-MAE |
+|--------|---------|
+| localpow sweep best | **0.002217** |
+| confirm sweep best | 0.002373 |
+| **LANL stable** | 0.00301 |
+| **LANL microblend** | 0.00222 (not seed-stable) |
+| **LLNL best** | **0.001937** |
+
+LANL's alibaba best from April 22 sweep: 0.002217 — matches their existing microblend result (0.00222) and **LLNL still leads by 12.8%** (0.001937 vs 0.002217). The stable LANL row (0.00301) leaves LLNL ahead by 35%.
+
+### Strategic Assessment
+
+| Corpus | LLNL | LANL stable | LANL microblend | LLNL status |
+|--------|------|------------|-----------------|-------------|
+| Alibaba | **0.001937** | 0.00301 | 0.00222 | **LEADS 12-35%** |
+| Tencent (oracle) | 0.005421 | 0.00887 | 0.00887 | Leads 39% (oracle) |
+| Tencent (legit) | ~0.06 | 0.00887 | 0.00887 | LANL leads 7× |
+
+LANL's silence + failing sweeps suggests they may have hit a wall on both corpora. Their IDEA #53 (neural mark hybrids) failed. Their tencent model hasn't improved since their reported 0.00887.
+
+**LLNL's path to victory on tencent**: v225 Phase 3 is the only currently viable approach. If v225 replicates v165's ★=0.037 ATB and shows improved natural reuse rate, the LRU decoder without Bernoulli override could produce a legitimate result better than ~0.06.
+
+### v225 ep12 Dynamics
+
+| Epoch | W | G | PCF |
+|-------|---|---|-----|
+| 11 | +1.371 | +0.685 | 0.621 |
+| 12 | +1.541 | +1.484 | 0.706 |
+
+W consistently increasing (+0.275 → +1.541 ep1→ep12). PCF oscillating 0.62-0.71. G oscillating (normal). ep20 gate fires in ~28 minutes from ep12.
