@@ -3255,3 +3255,50 @@ loss_G += lambda_lru * lru_loss  # lambda_lru = 0.5 suggested
 
 **Status**: OPEN — awaiting v225 ep45 natural rate measurement.
 
+
+---
+
+## IDEA #97 (LLNL): LRU Hit Indicator as Training Feature
+
+**Filed**: Round 111 (2026-04-24)
+
+**Root cause**: `obj_id_reuse` encodes consecutive same-object (±1, ~3% positive for tencent). LRU cache hit rate (61.5%) requires objects to repeat within K=15,000 accesses — invisible in consecutive ±1 feature. v225 ep50 natural: reuse=0.0002, HRC-MAE=0.582. No amount of training can fix this.
+
+**Fix**: Replace `obj_id_reuse` with `obj_id_lru_hit_K` (K=15,000) in training feature set. The GAN directly learns to generate LRU-hit patterns.
+
+**Implementation** — `dataset.py` `_apply_obj_locality()`:
+```python
+from collections import OrderedDict
+
+def _compute_lru_hits(vals, K):
+    cache = OrderedDict()
+    hits = np.zeros(len(vals))
+    for t, v in enumerate(vals):
+        if v in cache:
+            hits[t] = 1.0
+            cache.move_to_end(v)
+        else:
+            hits[t] = -1.0
+            cache[v] = True
+            if len(cache) > K:
+                cache.popitem(last=False)
+    return hits
+
+# In _apply_obj_locality:
+K = getattr(self, '_lru_cache_depth', 15000)
+lru_hits = _compute_lru_hits(vals, K)
+df[f"{col}_lru_hit"] = lru_hits   # replaces obj_id_reuse
+# Keep stride as-is for spatial locality
+```
+
+**Training impact**:
+- Target distribution for `obj_id_lru_hit`: ~61.5% positive (tencent), ~26.5% positive (alibaba)
+- GAN learns temporal locality at cache scale, not just consecutive
+- LRU decoder: no Bernoulli override → fully legitimate HRC-MAE
+
+**CLI**: `--lru-cache-depth 15000` (tencent), `--lru-cache-depth 512` (alibaba)
+
+**Deployment**: v226 (tencent, seed=5, full recipe + IDEA #97 feature)
+
+**Status**: OPEN — HIGH PRIORITY. Implement before launching v226.
+

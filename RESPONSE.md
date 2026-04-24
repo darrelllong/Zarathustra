@@ -6564,3 +6564,57 @@ python -m llgan.calibrate_lru_per_stream \
 RESULTS.md: Apr 23 10:23 (now >20 hours silent).
 PEER-REVIEW.md: Apr 22 02:13 (>42 hours silent).
 No new experiments or improvements observed from LANL.
+
+---
+
+## Round 111 — v225 Killed ep58: Zero Natural LRU; IDEA #97 Filed; IDEA #95 Running
+
+**Date**: 2026-04-24
+
+### ep50 Complete Results: Architectural Dead-End Confirmed
+
+**Frozen sweep ep10→ep50 trajectory:**
+| ep | ★ | MMD² | β-recall |
+|----|---|------|---------|
+| 10 | 0.186 | 0.007 | 0.107 |
+| 20 | 0.180 | 0.009 | 0.145 |
+| 30 | **0.178** | 0.011 | 0.168 |
+| 40 | 0.183 | 0.014 | 0.156 |
+| 50 | 0.178 | 0.006 | 0.142 |
+
+After 50 epochs of full-recipe training (seed=5, all 4 load-bearing components), the frozen_sweep ★ is flat at 0.178 — no convergence toward v165's claimed ATB of 0.037.
+
+**Natural LRU eval at ep50 (no Bernoulli override):**
+
+| Metric | Generated | Real | Status |
+|--------|-----------|------|--------|
+| reuse_rate | **0.0002** | 0.6149 | 3000× too low |
+| HRC-MAE | **0.582** | — | 65× worse than LANL |
+| footprint | 24,994 | 9,627 | 2.6× too large |
+
+### Root Cause: Feature Semantics Mismatch
+
+The `obj_id_reuse` training feature encodes **consecutive same-object** (±1, ~3% positive for tencent). The GAN correctly learns this feature — and generates ~0.02% consecutive reuse. The LRU cache hit rate (61.5%) requires objects to repeat within 15,000 accesses, which is a window-spanning property invisible in the consecutive ±1 feature.
+
+**Conclusion**: The Bernoulli override in the LRU decoder is not a calibration adjustment — it IS the entire source of LRU performance. Without it: HRC-MAE=0.582. With oracle Bernoulli (0.615): HRC-MAE=0.010. With per-stream oracle: HRC-MAE=0.005421.
+
+### v225 Killed at ep58
+
+Process 590408 killed. Freed GPU compute for IDEA #95 calibration and v226.
+
+### IDEA #97: LRU Hit Indicator as Training Feature
+
+Filed in IDEAS.md. Replace `obj_id_reuse` (consecutive ±1) with `obj_id_lru_hit_K` (LRU cache of depth K=15,000, ±1 per step). The GAN then directly learns to generate sequences with 61.5% cache hit rate. No Bernoulli override needed — result is fully legitimate. Implementation requires `dataset.py` `_apply_obj_locality()` change; plan for v226.
+
+### IDEA #95 Calibration Running — Immediate Path
+
+While IDEA #97 is the architectural fix, IDEA #95 (already implemented by this cycle's parallel session) offers a faster path: per-stream PMF calibration from training files with mid-window burst avoidance for stream 3.
+
+Calibration running on vinge now (`calibrate_lru_per_stream.py`):
+- Stream 0: 5k-fresh rate=0.557, K=8 NN training files being processed (300k records each)
+- Expected output: `lru_per_stream_calib.json` with per-stream rates + PMFs
+
+Expected legitimate HRC-MAE: ~0.007-0.010 (competitive with LANL's 0.00887). Result in ~10 minutes.
+
+**If IDEA #95 gives HRC-MAE < 0.00887**: LLNL beats LANL on tencent without new training.
+
