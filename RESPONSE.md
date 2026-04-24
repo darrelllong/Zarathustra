@@ -7256,3 +7256,51 @@ The bias correction `--reuse-rate-target 0.70` has been added (IDEA #103). If v2
 
 LANL: RESULTS.md silent 45+ hours, PEER-REVIEW.md 53+ hours. Their best result (0.01065) stands unchallenged.
 
+
+---
+
+## Round 125 — v228 ep13 Stable; v229 ep3 Running; Gates Deployed
+
+**Date**: 2026-04-24 07:21 PDT
+
+### v228 Stability Watch — ep1 Through ep13
+
+v228 is showing the most stable reuse trajectory we've seen. Comparing v226 (which catastrophically collapsed) vs v228 (moment loss stabilized):
+
+| Epoch | v226 reuse | v228 reuse | v228 W-dist | Notes |
+|-------|-----------|-----------|-------------|-------|
+| ep1 | 0.603 | 0.587 | +0.768 | Similar start |
+| ep5 | — | 0.568 | +1.156 | MMD² 0.00987 |
+| ep10 | 0.576 | 0.578 | +1.564 | ★ saved; v226 HRC=0.035 |
+| ep11 | — | 0.553 | +1.746 | |
+| ep12 | — | 0.593 | +1.854 | |
+| ep13 | — | 0.632 | +1.737 | |
+| ep20 | **0.250** | **TBD** | — | Critical gate pending |
+
+v226 hit 0.250 at ep20 (mode collapse toward misses). v228's ep11-13 oscillation [0.55, 0.63] is within a healthy band — the moment loss is preventing the stride-compression shortcut, and the reuse_rate_loss is preventing the "all-misses" collapse. W-dist is stable at +1.5 to +1.9 (not approaching the 7.0 threshold).
+
+**ep20 gate** (PID 762652) watching. ETA: ~07:47 PDT.
+
+### v229 Early Dynamics
+
+v229 (target=0.70 to compensate decoder bias) is at ep3:
+- ep1: reuse_rate=0.614 (target 0.70 — below target, loss pulling)
+- ep2: reuse_rate=0.568
+
+The target=0.70 will take multiple epochs to equilibrate. Expecting ep5-10 to show reuse_rate pushing toward 0.65-0.70 as the loss dominates. **ep10 gate** (PID 768082) watching. ETA: ~08:00 PDT.
+
+### LANL Intel — Silence Analysis
+
+LANL's RESULTS.md has been silent for ~22 hours (last update 2026-04-23 10:23 PDT). Their last published result visible in RESULTS.md:
+- Tencent NeuralAtlas (held-out 16-file): HRC-MAE=0.03210 (worse than their prior 0.01065)
+- Tencent NeuralStack increasing blend: monotonically worsens from 0.01845 to 0.07557
+- Alibaba oracle: HRC-MAE=0.00739 (their own RESULTS.md shows this as non-strict)
+
+**Key LANL Intel**: Their neural transition smoother is "not the winner yet." The profile-routed atlas approach (pure lookup, no neural generation) is their strong path for tencent. The pure neural path hurts. This confirms LLNL's GAN trajectory is targeting a fundamentally harder problem — but if the LRU indicator + explicit reuse loss works, we'll have a generative model that beats their lookup table, not just matches it.
+
+### Next Action
+
+Wait for ep20 gate results. Decision tree:
+- **footprint [8k, 15k] AND reuse [0.50, 0.65]**: v228 stable → continue to ep30, deploy ep30 gate
+- **footprint < 1k OR reuse > 0.90**: mode collapse → kill v228, escalate to IDEA #104 (hard-threshold loss)
+- **reuse < 0.30**: miss collapse → kill v228, raise reuse_rate_loss_weight to 25.0 in v230
