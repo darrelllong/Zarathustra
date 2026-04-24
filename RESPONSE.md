@@ -5932,3 +5932,69 @@ The 0.01019 result uses eval file stack distances for PMF fitting. It is NOT a l
 
 ### v225 Status
 Phase 2.5 generator warm-up, ep20/100. Phase 3 GAN expected in ~80 more warm-up epochs (~80-130 minutes).
+
+---
+
+## Round 102 — Calibration Dead-End Analysis; v225 Phase 3 Is the Only Legitimate Path
+
+**Date**: 2026-04-23
+**Reporting**: Characterization data analysis rules out NN calibration; Markov reuse model proposed.
+
+### Characterization Data Analysis: NN Calibration Not Feasible from Current Data
+
+Analyzed the 9,987 tencent characterization entries in `trace_characterizations.jsonl`. The `reuse_ratio` field in characterization records consecutive same-object accesses (mean=0.029, consistent with our Round 94 discovery that tencent consecutive reuse ~3%). It is **not** the LRU cache hit rate (0.61 for eval files).
+
+**Consequence**: The existing characterization data cannot distinguish training files by LRU hit rate. A nearest-neighbor search over characterization features (IDEA #94) cannot reliably find training files with stack distance PMFs similar to the eval files without computing LRU hit rates for all 3234 training files from scratch (expensive, ~20-30 min on vinge).
+
+**Current legitimate calibration ceiling**: ~0.06 HRC-MAE. LANL leads 6.7× on tencent.
+
+### Path Analysis: What Can Close the Tencent Gap?
+
+Three legitimate paths remain:
+
+| Path | Expected result | Effort |
+|------|----------------|--------|
+| v225 Phase 3 natural reuse rate → decoder without override | ~0.05-0.10? (unknown) | Already running |
+| IDEA #93 Markov reuse model (fit from training files) | 0.010 → 0.009 (marginal) | ~2 hours |
+| IDEA #94 NN training file calibration by fingerprint | 0.06 → 0.02-0.03 (speculative) | ~3 hours |
+
+**Key question for v225**: At Phase 3 ep1, what is the natural `obj_id_reuse` rate from the TimeGAN generator? 
+
+- v165 ep45 natural rate: **5.84%** (catastrophic — far from real 61.5%)
+- v225 restores all 4 load-bearing components: retrieval-memory, multi-scale-critic, PCF-loss, mixed-type-recovery
+- PCF loss in particular measures power correlation structure — it should push the generator toward replicating temporal locality patterns including the reuse structure
+
+**Critical hypothesis**: If PCF loss + retrieval-memory together push the natural reuse rate toward 30%+, the LRU decoder without Bernoulli override could achieve a legitimate sub-0.06 result. This is untested — v165 was the only long-rollout test, and v165's PCF contributed (component audit shows 5.11× degradation without it), yet the natural rate was still only 5.84%.
+
+**Alternative hypothesis**: The TimeGAN's `obj_id_reuse` output ∈ (-1,+1) is supervised by BCE loss toward the real binary reuse signal in training windows. The training windows have consecutive same-object reuse ~3%. So the model learns to predict ~3% rate — not the 61.5% LRU hit rate. The two metrics are fundamentally different and the model can't naturally generate 61.5%.
+
+If the alternative hypothesis is correct, the LRU decoder will always require a Bernoulli rate override (making it oracle), and no GAN training will fix this.
+
+### Markov Reuse Model (IDEA #93)
+
+The 15% gap from oracle (0.01019) to LANL (0.00887) may be partly from temporal correlation structure. The current Bernoulli reuse model is i.i.d., while real cache workloads have working-set phases (burst reuse) and rotation phases (new objects). 
+
+Proposed: 2-state Markov chain for the reuse decision:
+- P(reuse | prev was reuse) = p_HH (high)
+- P(reuse | prev was miss) = p_LH (low)
+- Stationary: π(reuse) = p_LH / (1 - p_HH + p_LH) = 0.615
+
+Even as oracle calibration, fitting p_HH and p_LH from eval traces might reduce HRC-MAE from 0.01019 toward 0.009.
+
+### v225 Phase 3 Gate Protocol
+
+When v225 enters Phase 3 (expected ~2 hours):
+
+1. **ep1 natural reuse rate check**: `grep "pcf=" /home/darrell/train_tencent_v225.log | head -5` — also look for any reuse diagnostics. If natural rate printed: record it.
+2. **ep10 frozen_sweep gate**: Run `python -m llgan.frozen_sweep --checkpoint-dir /home/darrell/checkpoints/tencent_v225/ --trace-dir /home/darrell/traces/tencent_block_1M --fmt oracle_general --eval-real-seed 42`. Expect ★ < 0.15 to confirm seed=5 basin.
+3. **ep45 long-rollout eval**: Run with AND without `--lru-stack-reuse-rate 0.615`. If natural rate >0.15 → the override version is the legitimate score. Compare both.
+
+### Race Position (unchanged)
+
+| Corpus | LLNL | LANL | Status |
+|--------|------|------|--------|
+| Alibaba | **0.001937** (legitimate) | 0.00301 | **LLNL leads 35%** |
+| Tencent | ~0.06 (legitimate) | **0.00887** | LANL leads 6.7× |
+| Tencent (oracle) | 0.01019 (NOT valid) | 0.00887 | Oracle only |
+
+Alibaba lead is solid and legitimate. Tencent outcome depends entirely on v225 Phase 3 dynamics.

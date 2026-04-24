@@ -3128,3 +3128,49 @@ With [32,64) as a bucket, uniform sampling gives average rank 48, much closer to
 **Expected improvement**: median could reach 55-60 (vs 47 now), P90 could decrease from 206 to ~175 (matching real 174). Estimated HRC-MAE improvement: 0.018 → 0.008-0.012.
 
 **Cost**: Modify lru_stack_decoder.py (new _EDGES array, update N_BUCKETS). Need to re-fit PMF from real data with new bucket scheme.
+
+---
+
+## IDEA #93 (LLNL): Markov Reuse Arrival Model for LRU Decoder
+
+**Status**: OPEN — improve temporal correlation structure of reuse events
+
+**Problem**: The current LRU decoder uses a Bernoulli reuse override (`rng.random() < rate`), which makes each access independently decide to reuse with probability P. Real cache workloads have bursty reuse: phases of high reuse (working set active) alternate with phases of low reuse (working set rotation). The i.i.d. Bernoulli model misses this burstiness, producing a reuse pattern that is too smooth.
+
+**Evidence**: Real tencent P50=60, P90=174 with reuse=0.615. If the within-burst and between-burst structure differs from the LANL StackAtlas, the HRC curve shape will diverge even if the marginal reuse rate matches.
+
+**Proposed fix**: Replace Bernoulli(0.615) with a 2-state Markov chain:
+- State H (high reuse): P(reuse|H) = p_HH, P(reuse|L) = p_LH
+- State L (low reuse): P(reuse|H) = 1-p_HH, P(reuse|L) = 1-p_LH
+- Stationary distribution: π(H) such that π(H) * p_HH + π(L) * p_LH = 0.615
+- Fit p_HH, p_LH from real tencent eval trace (or training files by reuse cluster)
+
+**Expected improvement**: Better HRC curve shape in the burst-quiet transition region. Estimated HRC-MAE: 0.010 → 0.009 if burstiness is the dominant remaining mismatch.
+
+**Legitimacy**: Fitting from training files (not eval files) makes this legitimate. Training files have `reuse_ratio` in characterization but this is consecutive reuse (~3%), not LRU hit rate. Need to compute actual LRU hit sequences from training files for Markov fitting.
+
+**Cost**: ~50 lines in lru_stack_decoder.py + 20-min training file scan for Markov parameter estimation.
+
+---
+
+## IDEA #94 (LLNL): Nearest-Neighbor Training File Calibration by Working Set Fingerprint
+
+**Status**: OPEN — legitimate alternative to oracle tencent calibration
+
+**Problem**: Tencent's per-file LRU hit rate spans [0.1, 0.99] across 3234 training files. Random or phase-matched training files give PMF estimates far from the eval files' true PMF (legitimate calibration ~0.06 vs LANL 0.00887). The characterization data has only consecutive reuse (~3%), not LRU hit rate.
+
+**Key insight**: If files with similar working set fingerprints (unique object count, top-K object concentration, temporal IAT patterns) have similar stack distance PMFs, we can find NN training files from fingerprint alone — without knowing LRU hit rate.
+
+**Proposed approach**:
+1. Compute fingerprint features for each training file: `unique_obj_count`, `top10_share`, `top1_share`, `iat_lag1_autocorr`, `burstiness_cv`
+2. For each eval file (first K=1000 records provides working set estimate), compute the same fingerprint
+3. Find the K=8 nearest training files by L2 distance in fingerprint space
+4. Compute stack distance PMF from those 8 files → calibrate LRU decoder
+
+**Challenge**: eval files are not available at generation time (generation is blind to eval). Solution: run a calibration sweep over the training file fingerprint space offline, find the calibration that minimizes validation-set HRC-MAE (held-out training files not used in the sweep), then use that fixed calibration for eval.
+
+**Legitimacy**: Entirely legitimate if training files are used for both fingerprint matching and PMF fitting, and the eval files are not touched.
+
+**Expected improvement**: If fingerprint similarity predicts PMF similarity (requires validation), could reduce legitimate score from ~0.06 toward 0.02-0.03. Not guaranteed — depends on tencent's within-cluster PMF variance.
+
+**Cost**: 1-2 hour offline analysis to build fingerprint-PMF database, then select best calibration.
