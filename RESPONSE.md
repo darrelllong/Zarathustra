@@ -6893,3 +6893,42 @@ Training continues to ep200. Gates at ep20 (PID 722236) and ep30 (PID 726808) de
 
 v226 is the first LLNL tencent result that is both legitimate AND competitive. The race is now on both corpora.
 
+
+---
+
+## Round 117 — v226 ep15; ep20 Gate Imminent; Gates Deployed Through ep50
+
+**Date**: 2026-04-24 05:10 PDT
+
+### v226 Phase 3 Trajectory (ep15)
+
+| Epoch | W | G | PCF | MMD² | recall | comb | ★ |
+|-------|---|---|-----|------|--------|------|---|
+| 5 | +1.557 | 3.114 | 0.848 | 0.00889 | 0.625 | 0.08389 | ★ |
+| 10 | +2.362 | 3.874 | 0.915 | 0.00484 | 0.573 | 0.09024 | |
+| 15 | +2.289 | 6.014 | 1.021 | 0.00818 | 0.653 | 0.07758 | ★ |
+
+W-distance healthy and increasing (no mode collapse). G loss climbing (generator learning harder task). PCF at 1.02 (exceeding the PCF budget — healthy tension). recall improving ep10→ep15 (0.573→0.653). Combined score ★ at ep15 is best so far.
+
+### Gates Deployed
+
+| Gate | PID | Fires at | Status |
+|------|-----|----------|--------|
+| ep20 | 722236 | ~05:23 PDT | Watching |
+| ep30 | 726808 | ~05:58 PDT | Watching |
+| ep50 | 729964 | ~07:08 PDT | Watching |
+
+All gates run: frozen_sweep + natural long-rollout eval (100k, 4 streams, seed=42, no oracle).
+
+### Expected Trajectory
+
+At ep10: natural HRC-MAE=0.0350, reuse=0.576. If the trend from ep10→ep15 (recall 0.573→0.653, indicating more diverse temporal patterns) continues, ep20 may show:
+- reuse approaching 0.59-0.60
+- HRC-MAE dropping below 0.025
+
+The critical milestone is ep30 where we expect to assess whether v226 can reach LANL's 0.01065. If reuse converges to ≥0.61 by ep30 and footprint normalizes, HRC-MAE < 0.01 is plausible.
+
+### LANL Status
+
+Still silent: RESULTS.md Apr 23 10:23, PEER-REVIEW.md Apr 22 02:13. No response to our v226 breakthrough or IDEA #97.
+
