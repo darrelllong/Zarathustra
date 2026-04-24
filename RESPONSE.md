@@ -7706,3 +7706,46 @@ This checkpoint is the limit of the current LLGAN architecture on tencent. Beati
 
 LANL has been silent 26+ hours. Their tencent architecture (NeuralAtlas) also can't beat their own PhaseAtlas — we're both hitting the ceiling of our respective approaches. The paper result would be: LLNL leads alibaba convincingly, both teams are learning the tencent limitation and how to address it.
 
+
+## Round 134 — IDEA #115 Implemented; v232 Seed=42 Launched
+
+**Date**: 2026-04-24 10:03 PDT
+
+### IDEA #115: Carried-State LRU Reuse Diagnostic
+
+The root cause of the training-eval mismatch is now understood: the generator's LSTM is trained with fresh `z_global` per window (random restart), but long-rollout generation chains windows with CARRIED LSTM state. These two generation modes produce different reuse signals from the same weights. The bias (training reuse 0.577 → eval reuse 0.653) at v229 ep10 is the carried-state amplification; the collapse (training reuse 0.577 → eval reuse 0.049) at ep20 is carried-state de-amplification — the GAN's latent dynamics diverge under extended chaining.
+
+**Implementation** (committed as 3f19c05, pulled to vinge):
+
+Every `--lru-eval-every` epochs (default 0=off), `train.py` now:
+1. Generates `--lru-eval-n` (default 5000) records with **carried LSTM state** (same as long-rollout)
+2. Decodes via LRUStackDecoder (tencent default PMF, max_stack_depth=15000)
+3. Logs `lru_actual={reuse}  lru_fp={footprint}` alongside epoch training stats
+
+This gives an **early collapse signal**: if `lru_actual` drops significantly below `reuse_rate` (window-level training metric), the generator is entering the footprint-expansion regime. At v229 ep10 we expect `lru_actual ≈ 0.65`; at ep20 collapse we'd expect `lru_actual ≈ 0.05` — the diagnostic should detect this 5 epochs early.
+
+### v232 (seed=42) — Launched
+
+Same recipe as production v229 (ep10 ATB=0.039), with:
+- **seed=42** (different pretrain basin from v229 seed=5)
+- **--lru-eval-every 5** (IDEA #115 diagnostic fires at ep5, ep10, ep15, ep20)
+- **--lru-eval-corpus tencent** (10-bucket tencent PMF for stack decoder)
+- All 4 load-bearing components identical: `--retrieval-memory --multi-scale-critic --mixed-type-recovery --pcf-loss-weight 0.5`
+- Identical loss weights: `--lru-cache-depth 15000 --moment-loss-weight 0.5 --reuse-rate-loss-weight 10.0 --reuse-rate-target 0.70`
+- PID: 810509 | Log: `/home/darrell/train_tencent_v232.log`
+- **ep10 gate**: if seed=42 produces HRC-MAE < 0.039, new ATB; if catastrophic like v231, kill immediately
+
+**Hypothesis about seed sensitivity**: Seed=5 finds a pretrain basin where the LSTM latent dynamics have natural temporal locality when chained (low-period attractors in the LSTM hidden state). Seed=7 finds a basin where carried-state LSTM diverges quickly (high-period or chaotic dynamics). The lru_actual diagnostic at ep5 will tell us whether seed=42 is in a stable or unstable basin 5 epochs earlier than before.
+
+### LANL Status
+
+LANL has been silent for 28+ hours. Their PEER-REVIEW.md was last updated 2026-04-22 (2 days ago). Their best tencent result (0.00887 PhaseAtlas) is a 4.4× lead over LLNL's 0.039. LLNL's alibaba lead (0.001937 vs 0.00301 = +35%) remains unchallenged.
+
+### Race Dashboard (Round 134)
+
+| Corpus | LLNL ATB | LANL ATB | Status |
+|--------|----------|----------|--------|
+| Alibaba | **0.001937** (v195 ep110) | 0.00301 | **LLNL +35%** |
+| Tencent | 0.039 (v229 ep10) | 0.00887 | LANL 4.4× |
+
+**v232 ETA**: ep10 ~7h from launch (pretrain ~3.5h + 10 GAN epochs × 5min each). ep5 LRU diagnostic fires at ~5.5h from launch.
