@@ -6992,3 +6992,49 @@ Our tencent ep10 raw result (0.038) is the best fully legitimate LLNL result. Ga
 
 The GAN needs a direct gradient signal to maintain LRU hit rate throughout training, not just encode it in training data. v227 will add IDEA #100 (explicit reuse rate matching loss). Let ep30 gate confirm trajectory, then launch v227.
 
+
+---
+
+## Round 119 — v227 Launched; reuse_rate=0.603 at ep1; v226 ep30 Pending
+
+**Date**: 2026-04-24 06:00 PDT
+
+### v227 Launch — IDEA #51 + IDEA #97 Combined
+
+v226's ep20 regression (reuse 0.576→0.250) confirmed that IDEA #97 alone (LRU feature in training data) is insufficient — the adversarial dynamics erase the learned LRU rate after ep10.
+
+**v227** adds IDEA #51 (`--reuse-rate-loss-weight 10.0 --reuse-rate-target 0.615`) on top of the same recipe. This loss penalizes the generator whenever its batch-level reuse rate deviates from 0.615:
+
+```
+L_reuse = 10.0 × (mean(fake_reuse_prob) - 0.615)²
+```
+
+The loss is already implemented at line ~1840 of train.py (IDEA #51 infrastructure). v227 simply activates it with a non-zero weight.
+
+v227 resumes from v226's `pretrain_complete.pt` (skipping ~40 min of Phase 1/2/2.5) and starts Phase 3 fresh.
+
+**ep1 result** (Phase 3 start):
+```
+W=+0.859  G=3.099  reuse_rate=0.6026  PCF=0.720  t=291.9s
+```
+
+The `reuse_rate=0.6026` appears in the training log (the code logs it when `reuse_rate_loss_weight > 0`). At ep1, the GAN is already maintaining 60.26% LRU hits — up from ~57.6% at v226 ep1 and compared to the target 0.615. The explicit loss is working immediately.
+
+The 291.9s/epoch (vs 207.6s for v226 solo) reflects ~40% overhead from two parallel runs on the GB10 GPU (currently at ~42% utilization each).
+
+### v226 ep30 Gate Pending
+
+v226 ep30 should fire at ~05:58 PDT (Phase 3 started 04:13 + 30×210s = 105min). Gate results expected by ~06:15. These will either:
+- Confirm continued regression (reuse still <0.3, HRC-MAE >0.2) — kill v226
+- Show recovery (reuse approaching 0.5+) — let v226 continue as diversity baseline
+
+### Gates Active
+
+| Version | Checkpoint | Gate PID | Expected |
+|---------|-----------|----------|---------|
+| v226 ep30 | in ~12 min | 737318 | 05:58 PDT |
+| v226 ep50 | in ~80 min | 737319 | 07:08 PDT |
+| v227 ep10 | in ~49 min | 742267 | 06:38 PDT |
+
+v227 ep10 is the critical diagnostic for whether the explicit reuse rate loss prevents the ep10→ep20 regression seen in v226.
+
