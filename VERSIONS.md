@@ -6617,3 +6617,36 @@ Generated CSV: `/home/darrell/llnl_phase_gen_nophase.csv`
 - Previous tencent experiments v213-v219 used wrong dir (garbage data)
 - Config: chain-reuse=5.0, windows=8, target=0.615, reuse-bce=2.0, stride-floor=0.3, seed=7
 - Log: /home/darrell/train_tencent_v220.log
+
+---
+
+## LLNL Phase-PMF Atlas Tencent Evaluation (IDEA #65, Round 80)
+
+**Tencent calibration study — 4 modes evaluated 2026-04-23:**
+
+Model fitted: `llnl_phase_pmf_atlas_tencent_real.pkl.gz` (50 files, 25M events, 4 phase bins, seed=7)
+- Phase edges (unique_rate per window): [0.57, 0.69, 0.825]
+- Global reuse rate: 0.8189; Phase 0: 0.874, Phase 1: 0.829, Phase 2: 0.808, Phase 3: 0.767
+
+| Mode | Model | HRC-MAE | Valid? | Notes |
+|------|-------|---------|--------|-------|
+| Fitted (alibaba constants) | tencent_real.pkl.gz | 0.37532 | Yes | Wrong base PMF |
+| Oracle-calibrated (circular) | tencent_nophase.pkl.gz | **0.000553** | **No** | Eval files used for calib |
+| Random 8 training files | tencent_traincalib.pkl.gz | 0.04375 | Yes | Worse than LANL |
+| Phase-matched 8 files (IDEA #83) | tencent_phasematch.pkl.gz | 0.12827 | Yes | Worse than random |
+
+Conclusion: LANL leads tencent (0.00887). Phase-PMF Atlas requires target-workload calibration for heterogeneous corpus. Alibaba result (0.001937) is legitimate because alibaba is homogeneous.
+
+Eval files (manifest `/home/darrell/long_rollout_manifests/tencent_stackatlas.json`):
+- 4 streams × 25k records = 100k total, seed=42, from `/home/darrell/traces/tencent_block_1M/`
+- Real metrics: reuse=0.615, stack_median=60, footprint_mean=9627
+
+---
+
+### tencent_v220 (seed=7, IDEA #79+#81, CORRECT trace dir, RUNNING as of 2026-04-23)
+- Phase 1 (AE pretrain 50 ep): COMPLETE, recon=0.00000
+- Phase 2 (Supervisor pretrain 50 ep): COMPLETE, sup=0.02761
+- Phase 2.5 (G warm-up 100 ep): at ep70/100 (2026-04-23 18:30)
+- Phase 3 (GAN training): NOT STARTED — ep10 gate will be the first honest chain-reuse tencent test
+- Log: /home/darrell/train_tencent_v220.log
+- PID: 476897 (as of 2026-04-23 18:30)

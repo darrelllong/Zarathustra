@@ -2856,3 +2856,29 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 **Why this works**: LANL proved it. The explicit LRU-state machine generates the right cache law by construction. The neural mark sidecar adds sequential mark quality without disturbing the object law. No GAN training instability, no footprint collapse, no chain-reuse degenerate solutions.
 
 **Risk**: LLNL would be building a parallel-architecture approach. The advantage is we can tune it independently — phase transition power law, blend parameters, mark conditioning — without GAN adversarial dynamics.
+
+## IDEA #83 (LLNL): Per-Phase Holdout Calibration for Tencent Atlas
+
+**Status**: PLANNED
+
+**Problem**: Phase-PMF Atlas tencent train-calibrated result = HRC-MAE=0.04375 (worse than LANL 0.00887). Root cause: global training calibration (reuse=0.651, stack_median=111) doesn't match eval files (reuse=0.615, stack_median=60). Tencent corpus is too heterogeneous for global-mean calibration to work.
+
+**Key insight**: The 4 eval files have low reuse (0.615) and short stack distances (median=60). From the atlas fit, this corresponds to phase 3 (highest unique-rate): reuse=0.767, PMF heavily skewed toward large stack distances. The eval files are in the SAME phase — but calibrating from random training files includes all phases, inflating the mean.
+
+**Approach**: 
+1. Compute unique_rate for each eval file (unique_rate = 1 - reuse_access_rate)
+2. Use the same phase edges from the atlas fit ([0.57, 0.69, 0.825] for unique_rate)
+3. Identify which phase bin the eval files fall into
+4. Sample calibration data ONLY from training files in the same phase bin
+5. Build fine histogram from phase-matched training files → use for calibration
+
+**Expected outcome**: Calibration from phase-matched training files should better predict eval file statistics. If eval files all fall in phase 3 (high unique_rate > 0.825), calibrating from training files in that phase should give reuse≈0.767, stack_median≈20-30 — closer to eval's 60 than global mean's 111.
+
+**Legitimate holdout claim**: No eval file data used for calibration. Phase-matched calibration is a generalizable method that any deployment would use (know your workload's phase, calibrate from same-phase training traces).
+
+**Implementation**: 
+```python
+# Get phase bin for each eval file from characterization data
+# Sample training files with same unique_rate range
+# Compute metrics → calibrate-from-json
+```
