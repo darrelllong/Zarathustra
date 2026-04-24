@@ -4407,3 +4407,64 @@ LANL has meanwhile posted alibaba HRC-MAE=0.00222 (strict holdout PhaseAtlas). T
 1. **v214/v215 Phase 3 ep1** — ~50 min (pretraining). Watch G: should see G > 0.3 (chain-reuse firing) with NO G=0.038 transient collapse.
 2. **v214/v215 ep10** — first honest reuse_access measurement. Target: alibaba 0.10-0.30, tencent 0.30-0.65.
 3. **IDEA #80 (if v214 ep10 fails)**: lower chain-reuse-weight from 5.0 → 2.0 to balance against diversity_loss_weight=2.0; the weight imbalance may cause footprint collapse even with correct gradient.
+
+---
+
+## Round 77 — LLNL
+
+### v215 ep50 Deepening Collapse + Weight Rebalancing + v216/v217 Launched (IDEA #80)
+
+**v215 ep10 vs ep50 trajectory** (tencent, IDEA #79 hybrid surrogate):
+
+| Epoch | reuse_access | footprint | HRC-MAE | Status |
+|-------|-------------|-----------|---------|--------|
+| ep10 | 97.14% | **716** | 0.602 | Hybrid gradient worked initially |
+| ep50 | 99.97% | **7** | 0.631 | Collapsed back — adversarial overwhelmed gradient |
+
+v213 (v3) ep10: footprint=8. v215 (v4) ep10: footprint=716. **IDEA #79 hybrid surrogate IS working** — it recovered footprint from 8 to 716 at ep10, confirming the gradient is nonzero. But by ep50, adversarial training gradually reversed the progress.
+
+**Root cause — weight imbalance (IDEA #80)**:
+
+| Force | Weight | Direction | Net |
+|-------|--------|-----------|-----|
+| chain-reuse loss | 5.0 | → high reuse | +5.0 reuse |
+| reuse-BCE loss | 2.0 | → high reuse | +2.0 reuse |
+| diversity loss (MMD) | 2.0 | → high diversity | +2.0 diversity |
+| **Ratio** | — | — | **3.5:1 reuse:diversity** |
+
+Diversity can't overcome 3.5× combined reuse pressure over 50 epochs of adversarial training.
+
+**IDEA #80 fix — rebalance to 1.8:1**:
+- reuse-bce-weight: 2.0 → **0.5** (less within-window reuse pressure)
+- diversity-loss-weight: 2.0 → **3.0** (more footprint diversity pressure)
+- chain-reuse-weight: 5.0 (unchanged — this is the signal we need)
+
+New effective ratio: (5.0 + 0.5):(3.0) = **1.83:1** — diversity can now compete.
+
+**Why this should work**: IDEA #79 proved the gradient IS nonzero and IS working (716 footprint at ep10 vs 8 without it). The gradient magnitude is correct but insufficient against 3.5× reuse pressure. Reducing reuse-bce from 2.0 → 0.5 removes 1.5 units of competing reuse pressure; increasing diversity from 2.0 → 3.0 adds 1.0 unit of diversity defense.
+
+**v216 (alibaba, IDEA #79+#80)** — launched 16:58, seed=13, reuse-bce=0.5, diversity=3.0.
+**v217 (tencent, IDEA #79+#80)** — launched 16:58, seed=7, reuse-bce=0.5, diversity=3.0.
+
+### Updated Failure Taxonomy
+
+| Version | Design | Failure | Footprint ep10 |
+|---------|--------|---------|----------------|
+| v209 (v1) | linear surrogate | sub-threshold loss=0 | N/A |
+| v210 (v2) | sigmoid surrogate | sub-threshold loss=0 | ~0 |
+| v212/v213 (v3) | binary fwd + sigmoid bwd | super-threshold saturation | 8 |
+| v214/v215 (v4) | binary fwd + hybrid bwd | weight imbalance (3.5:1 reuse:diversity) | 716 |
+| v216/v217 (v5) | v4 + rebalanced weights | ? (ep10 ~1.5h from now) | expected >2000 |
+
+The footprint progression 8 → 716 is evidence that each fix is correct — the gradient IS moving in the right direction, but each time adversarial dynamics find a new failure mode. v216/v217 is the most complete fix yet.
+
+### Race Position
+
+LANL holds alibaba 0.00222 and tencent 0.00887 (strict holdout PhaseAtlas). LLNL has no competitive long-rollout result yet. The chain-reuse approach has consumed 7 versions; if v216/v217 ep10 footprint < 2000, IDEA #81 must add an explicit footprint floor constraint.
+
+### Next Gates
+
+1. **v217 ep10** — tencent is faster (~50min from now). Target: footprint > 5000, reuse_access < 0.80.
+2. **v216 ep10** — alibaba ~1h from now. Same targets.
+3. **If ep10 passes**: ep20 + frozen_sweep → first honest ATB claim with chain-reuse.
+4. **If ep10 fails**: IDEA #81 explicit footprint floor loss (count distinct "new object" events per chain = T * new_rate = T * (1 - reuse_rate)).

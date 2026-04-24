@@ -6509,3 +6509,37 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 - Launched: 2026-04-23 16:22
 - Log: /home/darrell/train_tencent_v215.log
 - Expected: ep10 reuse_access ∈ [0.30, 0.70], footprint > 5000
+
+---
+
+### tencent_v215 (seed=7, IDEA #79+weight-5.0 — CLOSED-FAILED ep57)
+- ep10: footprint=716, reuse=97.14%, HRC-MAE=0.602 (partial improvement from v4 gradient)
+- ep50: footprint=7, reuse=99.97%, HRC-MAE=0.631 (collapse deepened — adversarial overwhelmed)
+- Root cause: reuse:diversity pressure ratio = 3.5:1; diversity cannot compete over 50 epochs
+- Superseded by tencent_v217 (IDEA #79+#80: rebalanced weights)
+
+---
+
+### alibaba_v214 (seed=13, IDEA #79 — KILLED ep0 preventive)
+- Killed before Phase 3 ep1; same design as v215, same failure guaranteed
+- Superseded by alibaba_v216
+
+---
+
+### alibaba_v216 (seed=13, IDEA #79+#80: hybrid surrogate + rebalanced weights, RUNNING)
+- IDEA #79: binary fwd + hybrid bwd surrogate (eliminates both degenerate basins)
+- IDEA #80: reuse-bce-weight=0.5 (↓ from 2.0), diversity-loss-weight=3.0 (↑ from 2.0)
+- Reuse:diversity ratio: 3.5:1 → 1.83:1 (diversity can now compete)
+- Config: chain-reuse-weight=5.0, windows=8, target=0.265, seed=13
+- Launched: 2026-04-23 16:58
+- Log: /home/darrell/train_alibaba_v216.log
+- Expected ep10: footprint > 2000, reuse_access < 0.80
+
+---
+
+### tencent_v217 (seed=7, IDEA #79+#80: hybrid surrogate + rebalanced weights, RUNNING)
+- Same as v216 but for tencent
+- Config: chain-reuse-weight=5.0, windows=8, target=0.615, seed=7
+- Launched: 2026-04-23 16:58
+- Log: /home/darrell/train_tencent_v217.log
+- Expected ep10: footprint > 5000, reuse_access < 0.80

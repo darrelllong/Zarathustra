@@ -2766,3 +2766,24 @@ _cr_rate = _cr_surrogate + (_cr_hard - _cr_surrogate).detach()
 
 **Versions**: alibaba_v214 (seed=13, target=0.265), tencent_v215 (seed=7, target=0.615)
 **Killed**: v213 tencent ep20 (footprint=6, reuse=99.98%)
+
+## IDEA #80 (LLNL): Reuse/Diversity Weight Rebalancing (v216/v217 fix)
+
+**Status**: RUNNING in v216 (alibaba) and v217 (tencent)
+
+**Problem**: v214/v215 (IDEA #79) showed hybrid gradient works initially (v215 ep10: footprint=716 vs v213 ep10: footprint=8) but adversarial + BCE reuse dynamics overwhelm it by ep50 (footprint collapses to 7).
+
+**Root cause**: Reuse pressure ratio 3.5:1 over diversity:
+- chain-reuse-weight = 5.0 (pushes toward target reuse)
+- reuse-bce-weight = 2.0 (pushes within-window reuse toward 0.615)
+- diversity-loss-weight = 2.0 (pushes for diverse fake distribution)
+- Effective reuse:diversity = 7.0:2.0 = 3.5:1 — diversity always loses
+
+**Fix**: Rebalance to 1.8:1 ratio:
+- chain-reuse-weight = 5.0 (unchanged)
+- reuse-bce-weight = **0.5** (reduced from 2.0 — less within-window reuse pressure)
+- diversity-loss-weight = **3.0** (increased from 2.0 — more footprint diversity pressure)
+
+**Expected**: ep10 footprint > 2000 (alibaba) or > 5000 (tencent), reuse_access < 0.80
+
+**Killed**: v214 (ep0 preventive), v215 ep57 (footprint=7 confirmed deepening collapse)
