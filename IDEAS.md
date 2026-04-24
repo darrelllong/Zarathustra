@@ -3358,3 +3358,50 @@ This adds a per-step gradient that pulls the batch-level LRU rate toward 0.615 r
 **CLI**: `--lru-rate-loss-weight 10.0 --lru-target-rate 0.615`
 
 **Status**: OPEN — HIGH PRIORITY. Implement in v227 if v226 ep30 confirms regression.
+
+## IDEA #101 (LLNL): Stream-Aware Generation with Persistent LRU State
+
+**Motivation**: The core failure mode of v226-v227 is that the GAN generates fixed-length windows independently, concatenated into long rollouts. LRU cache hit rate at K=15,000 is a property that spans ~15,000 accesses (many windows). The GAN can only learn within-window reuse patterns (timestep=12), not across-window LRU state. The reuse rate loss (IDEA #51) helps but cannot fully substitute for actual window-to-window LRU state.
+
+**Approach**: At inference time, maintain a persistent LRU cache across windows. The GAN generates window t conditioned on the LRU state from window t-1:
+- LRU state summary: top-K object frequency vector (compressed), or just the hit/miss rate of last N accesses
+- Conditioning: append LRU state summary to the existing z_global conditioning vector
+- The GAN then generates reuse decisions that respect the actual LRU state
+
+**Training**: During training, run windows in sequence with LRU state carry-over (similar to how `--continuity-loss-weight` handles LSTM state). Each batch of files provides their LRU state prefix; the GAN's reuse decisions are conditioned on actual LRU cache state rather than just the feature distribution.
+
+**Why this is different from IDEA #97**: IDEA #97 changes what the training data encodes (LRU hits vs consecutive hits). IDEA #101 changes how the generator CONDITIONS on LRU state across window boundaries. Both are needed for full temporal coherence.
+
+**Implementation**: 
+1. Add `lru_state_dim: int = 0` config (0=off)
+2. At training time: track LRU cache state across windows within each file segment
+3. Append compressed LRU state to z_global
+4. At inference: maintain LRU cache across windows in generate.py
+
+**Risk**: Requires architectural change (conditioning dimension), needs fresh pretrain.
+
+**Status**: OPEN — implement in v229 if v227 ep10 shows stable but insufficient HRC-MAE.
+
+## IDEA #102 (LLNL): Direct HRC-MAE Optimization via Differentiable Approximation
+
+**Motivation**: The GAN optimizes W-distance + auxiliary losses. HRC-MAE is only indirectly influenced. At ep10, HRC-MAE=0.035; after further training the GAN improves ★ but worsens HRC-MAE. The training objective is misaligned with the race metric.
+
+**Approach**: Add a differentiable approximation of HRC-MAE directly to the generator loss:
+1. From generated windows, reconstruct approximate object ID sequences via the LRU stack
+2. Simulate cache at sizes [1, 2, 4, 8, ..., K] using a soft approximation (sigmoid threshold on LRU stack position)
+3. Compute differentiable hit rate at each cache size
+4. Compare to real HRC (precomputed from training files) using L1 loss
+
+**Key challenge**: The object ID reconstruction (LRU stack) is non-differentiable. Workaround: use the GAN's `obj_id_reuse` probability directly as a surrogate for hit rate at cache depth K=15,000. Then HRC at size K = mean(hit_prob) — exactly what IDEA #51 does!
+
+**Conclusion**: IDEA #51 is a special case of this for a single cache size. IDEA #102 would extend to match the full curve shape by computing hit rates at multiple cache depths and matching them all. This would prevent the footprint collapse (ep30: 902 unique objects) by requiring HRC to be correct at small cache sizes too.
+
+**Implementation**: After recovery decodes GAN output, compute:
+```
+for cache_size in [100, 500, 1000, 5000, 15000]:
+    synthetic_hr = approximate_hit_rate(fake_decoded, cache_size)
+    real_hr = precomputed_hrc[cache_size]  # from training file stats
+    loss += weight * |synthetic_hr - real_hr|
+```
+
+**Status**: OPEN — adds on top of IDEA #51; try in v229 alongside IDEA #101.
