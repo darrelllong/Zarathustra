@@ -7173,3 +7173,47 @@ Reducing `pcf_loss_weight` from 1.0 to 0.5 makes the generator's task easier (PC
 | v227 ep10 | reuse=0.995, footprint=115 | Stride compression shortcut (exploits reuse loss without stride constraint) |
 | **v228** | TBD | Moment loss prevents stride compression |
 
+
+---
+
+## Round 123 — v228 ep10: Footprint Fixed (12,438); HRC-MAE=0.105; Trajectory TBD
+
+**Date**: 2026-04-24 07:25 PDT
+
+### v228 ep10 — Moment Loss Fixed the Footprint Collapse
+
+```
+HRC-MAE  : 0.104832        ← better than v227's 0.394
+reuse    : 0.5025 (real 0.6149)   ← undershoot (18% below target)
+P50      : 59     (real 60)       ← near-perfect!
+P90      : 169    (real 174)      ← near-perfect!
+footprint: 12438  (real 9627)     ← 29% inflated (but FIXED from 115!)
+```
+
+**The moment loss fixed the stride compression collapse**. v227 ep10 had footprint=115 (99.5% LRU hits). v228 ep10 has footprint=12,438 (50.2% LRU hits). The `--moment-loss-weight 0.5` enforces stride distribution variance, preventing the GAN from collapsing to a tiny object pool.
+
+### Evolution of ep10 Results Across Versions
+
+| Version | reuse | footprint | P50 | P90 | HRC-MAE | Failure |
+|---------|-------|-----------|-----|-----|---------|---------|
+| v226 ep10 | 0.576 | 10,604 | 58 | 167 | **0.035** | Collapsed at ep20 |
+| v227 ep10 | 0.995 | 115 | 27 | 80 | 0.394 | Stride compression |
+| **v228 ep10** | 0.503 | 12,438 | **59** | **169** | **0.105** | reuse undershoot |
+
+v228's P50/P90 are the best we've seen — almost exactly matching real data. The issue is now purely the reuse rate (50.2% vs 61.5% target).
+
+### Root Cause: Training vs Eval Reuse Discrepancy
+
+Training-time `reuse_rate=0.578` (ep10) but eval `reuse=0.5025`. The 13% gap suggests the recovery network's output is not binary — many values near 0 (intermediate), where the `reuse >= 0` threshold in the LRU decoder misclassifies more as misses than the soft probability suggests.
+
+To close this gap in v229: use `--reuse-rate-target 0.70` (set higher than actual target 0.615) to compensate for decoder bias.
+
+### ep20 Gate Deployed
+
+PID 762652 watching for `epoch_0020.pt` (~35 min). Key diagnostics at ep20:
+- Is footprint still ~10k-15k (moment loss maintaining)? 
+- Is reuse improving toward 0.60+ (loss converging)?
+- Is HRC-MAE improving from 0.105?
+
+If v228 ep20 shows stability (footprint in [8k, 15k], reuse in [0.50, 0.65], HRC-MAE < 0.08), it is the most stable tencent run we've achieved. We then target HRC-MAE < 0.01065 by ep50-100.
+
