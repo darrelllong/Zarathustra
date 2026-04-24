@@ -3331,3 +3331,30 @@ df[f"{col}_lru_hit"] = lru_hits   # replaces obj_id_reuse
 **Tradeoff**: Adds complexity. The fixed K=15,000 already gives 93.6% of target at ep10 — this may not be worth the added code complexity unless v226 plateaus significantly below 0.615.
 
 **Status**: OPEN — low priority given v226 ep10 results.
+
+## IDEA #100 (LLNL): Explicit LRU Hit Rate Matching Loss
+
+**Motivation**: v226 ep10→ep20 regression: reuse dropped 0.576→0.250 as GAN optimized for MMD²/recall at the expense of temporal locality. Training data encodes LRU hits (IDEA #97) but the adversarial dynamics fight it after ep10. Need a direct loss that penalizes deviation from the target LRU hit rate throughout training.
+
+**Approach**: After recovery decodes generator output into feature space, compute the LRU hit rate over the batch:
+
+```python
+def lru_hit_loss(generated_reuse_col, target_rate=0.615):
+    # generated_reuse_col: [B, T] tensor in [-1, 1] from recovery
+    # Map from [-1,1] to hit probability: p = (x + 1) / 2
+    hit_prob = (generated_reuse_col + 1) / 2  # [B, T], in [0, 1]
+    batch_rate = hit_prob.mean()
+    return F.mse_loss(batch_rate, torch.tensor(target_rate))
+```
+
+This adds a per-step gradient that pulls the batch-level LRU rate toward 0.615 regardless of what the adversarial dynamics want.
+
+**Integration**: Add as `lru_rate_loss_weight` config parameter (try 5.0-20.0). Add in generator loss alongside PCF, moment, quantile losses. Target rate = `lru_target_rate` config (default 0.615 for tencent).
+
+**Why better than IDEA #97 alone**: IDEA #97 encodes the correct label in training data (one-time signal at fit time). IDEA #100 adds a continuous gradient throughout training that prevents adversarial dynamics from erasing the learned LRU rate.
+
+**Tencent target**: 0.615. Alibaba target: 0.265.
+
+**CLI**: `--lru-rate-loss-weight 10.0 --lru-target-rate 0.615`
+
+**Status**: OPEN — HIGH PRIORITY. Implement in v227 if v226 ep30 confirms regression.

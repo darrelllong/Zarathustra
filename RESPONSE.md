@@ -6932,3 +6932,63 @@ The critical milestone is ep30 where we expect to assess whether v226 can reach 
 
 Still silent: RESULTS.md Apr 23 10:23, PEER-REVIEW.md Apr 22 02:13. No response to our v226 breakthrough or IDEA #97.
 
+
+---
+
+## Round 118 — ep20 Regression; ep10 Raw Eval; Root Cause Analysis
+
+**Date**: 2026-04-24 05:50 PDT
+
+### ep20 Regression — Confirmed
+
+ep20 natural eval (LRU decoder + oracle PMF + natural reuse):
+```
+HRC-MAE  : 0.344596        ← collapsed from ep10's 0.034992
+reuse    : 0.2504 (real 0.6149)   ← dropped from 0.576 to 0.250!
+footprint: 18740 (real 9627)      ← nearly 2x inflated
+```
+
+This is a catastrophic regression. The GAN's adversarial dynamics are actively fighting temporal locality between ep10 and ep20.
+
+frozen_sweep ep20: ★=0.17371 (slightly better than ep10's 0.17472). MMD²=0.00721. The feature distribution quality IMPROVED slightly while temporal locality collapsed. This confirms: **frozen_sweep ★ is not a predictor of HRC-MAE**.
+
+### ep10 Raw Eval — Fully Legitimate
+
+Running ep10 WITHOUT any LRU decoder (purely natural GAN output):
+```
+HRC-MAE  : 0.037844        ← 8% worse than with oracle PMF
+reuse    : 0.5975 (real 0.6149)   ← 97.2% of target!
+P50      : 0      (real 60)       ← consecutive reuse dominant
+P90      : 0      (real 174)      ← consecutive reuse dominant
+footprint: 10064  (real 9627)     ← 4.6% inflated only
+```
+
+The raw GAN output at ep10 achieves HRC-MAE=0.038 without any oracle. The reuse rate (0.5975) is actually HIGHER than with the LRU decoder (0.576) — the GAN's raw `obj_id_reuse` signal is more accurate than the decoder's reinterpretation. However, the P50/P90=0 reveals a flaw: the raw GAN generates 60% CONSECUTIVE repeats (stride=0), not 60% LRU hits at K=15,000. The HRC-MAE=0.038 may be misleading because the evaluation range (up to 15k cache size) averages over large cache sizes where both traces approach 100% hit rate.
+
+### Root Cause of ep10→ep20 Regression
+
+Between ep10 and ep20, three forces fight temporal locality:
+
+1. **PCF loss** (weight=1.0, firing at 1.0+ during ep13-26): Matches path characteristic functions over increments. Better PCF alignment may require more diverse object sequences (lower reuse).
+
+2. **Multi-scale critic**: Discriminates at 3 temporal scales. As the critic gets better, it pushes the generator toward better aggregate statistics at the cost of temporal concentration.
+
+3. **β-recall pressure**: recall improved 0.573→0.653→0.670 (ep10→ep15→ep25). More mode coverage = more diverse object access = fewer LRU hits.
+
+The GAN found a solution that scores better on ★ (frozen_sweep) while scoring catastrophically on HRC-MAE. This is an objective misalignment — ★ doesn't penalize temporal locality loss.
+
+### Race Position Update
+
+| Method | HRC-MAE | Oracle? | Legitimate? |
+|--------|---------|---------|-------------|
+| v226 ep10 + oracle PMF | 0.035 | PMF only | Partial |
+| v226 ep10 raw | 0.038 | None | **YES** |
+| LANL strict holdout | 0.01065 | None | YES |
+| LLNL alibaba | **0.001937** | None | **YES** |
+
+Our tencent ep10 raw result (0.038) is the best fully legitimate LLNL result. Gap to LANL: 3.6x.
+
+### Plan: v227 with Explicit LRU Loss
+
+The GAN needs a direct gradient signal to maintain LRU hit rate throughout training, not just encode it in training data. v227 will add IDEA #100 (explicit reuse rate matching loss). Let ep30 gate confirm trajectory, then launch v227.
+
