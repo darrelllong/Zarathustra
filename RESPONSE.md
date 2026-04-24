@@ -4919,6 +4919,32 @@ Wasserstein distance is positive and stable (1.0–2.6 range), no collapse, no W
 
 ep10 checkpoint arriving in ~6 minutes. Will probe reuse_rate and footprint as the first gate for IDEA #84 (chain-reuse with correct architecture + real data).
 
+### v221 ep10 Probe Results — Chain-Reuse Partially Active
+
+ep10 checkpoint probed (two probes: decoded _rollout and raw Generator output).
+
+**Decoded _rollout probe (4 streams × 5k records):**
+```
+Per-stream reuse rates: [0.9992, 0.9784, 0.9960, 0.9992]
+Mean reuse rate: 0.9932 (target=0.615)
+Per-stream footprints: [1, 27, 5, 1] (real ~2500 per 5k records)
+```
+
+**Raw Generator output probe (32 batch × 100 steps):**
+```
+obj_id_reuse (col 3): mean=0.768, frac>=0=0.8975 (hard binary reuse rate)
+Percentiles [5,25,50,75,95]: [-1.00, 0.989, 0.995, 0.996, 0.998]
+obj_id_stride (col 4): mean=0.451, frac>=0=0.972 (all positive strides)
+```
+
+**Interpretation:** Chain-reuse gradient IS flowing. The raw Generator output shows 10% new-object decisions (val<0 = -1.0 cluster) vs 90% reuse (+1.0 cluster). This bi-modal distribution is evidence of gradient activity — true collapse would be 100% positive with no negative cluster. The decoded footprint collapse (1-27 vs real ~2500) is amplified by the stride: 97% of strides are positive (close to +1.0 in encoded space), so even "new" objects are assigned stride-nearby IDs that quickly get reused.
+
+**Root cause of decoded footprint collapse:** Stride collapse (col 4 mean=+0.451) is the secondary failure. New objects are created with small strides → assigned IDs near existing objects → immediately become reuse targets. IDEA #81 (chain-stride floor=0.3) should counter this, but may need stronger weight.
+
+**Decision:** Let v221 run to ep30. Chain-reuse gradient IS active (10% new-object raw decisions), and the bi-modal distribution may shift toward 61.5% over more epochs. The stride-floor loss needs epochs to push strides to be more diverse.
+
+ep30 probe gate: if raw frac<0 (new) is not approaching 0.385 by ep30, kill and relaunch with copy-path-loss-only (per-timestep reuse BCE for stronger per-sample gradient).
+
 ### LANL Intelligence Assessment
 
 LANL at Round 45 (lagging LLNL's Round 83). No new experiments detected in altgan/ since last cycle. LANL PhaseAtlas is mature — their threat vector is IDEA #53 (mark head sidecar). LLNL's response is to win on the object process first (HRC-MAE) before LANL closes mark quality, forcing LANL to beat us on both dimensions simultaneously.
