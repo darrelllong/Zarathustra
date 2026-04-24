@@ -3034,3 +3034,27 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 **Comparison bar**: LANL tencent 0.00887. GAN ATB 0.03752 (v165). v223 pending ep20+ frozen_sweep.
 
 **Trigger**: File IDEA #88 as contingency if v223 ep20-30 frozen_sweep shows no improvement toward ATB.
+
+---
+
+## IDEA #89 (LLNL): Re-Encode obj_id_reuse as LRU Hit/Miss Indicator
+
+**Status**: PLANNED — future work, requires preprocessing
+
+**Root cause of chain-reuse failure (discovered Round 94)**:
+`obj_id_reuse = ±1` is the **consecutive same-object indicator** (val=+1 if same obj as previous access). Real tencent files have ~3% consecutive same-object rate. The chain-reuse target (0.615) was targeting 61.5% — 20× higher than reality, causing irreconcilable Critic/chain-reuse conflict.
+
+**The correct target**: LRU cache hit rate (0.615 for tencent eval). A "cache hit" occurs when the accessed object is in the LRU cache, regardless of whether the previous access was to the same object.
+
+**Fix**: Re-encode `obj_id_reuse` as LRU hit/miss indicator:
+1. For each oracle_general file, run LRU simulation (e.g., with libCacheSim) at a reference cache size
+2. Label each access as hit (val=+1) or miss (val=-1) in the LRU simulation
+3. Replace the consecutive same-object ±1 encoding with LRU hit/miss ±1 encoding
+4. Retrain the GAN with this new encoding
+5. Chain-reuse target 0.615 would now be CORRECT
+
+**Expected outcome**: Generator learns to produce access sequences where 61.5% of accesses are LRU cache hits. The chain-reuse loss would then correctly penalize sequences with wrong LRU hit rates.
+
+**Cost**: Preprocessing 3234 tencent files with LRU simulation + full retraining. Significant work but conceptually correct.
+
+**Alternative**: Use `next_access_vtime >= 0` (oracle already knows future accesses) as proxy for cache hit. This is the offline optimal indicator but approximates LRU behavior well.

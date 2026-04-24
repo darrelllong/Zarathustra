@@ -5503,3 +5503,55 @@ IDEA #88 target: add the actual file LRU reuse rate as an EXPLICIT feature in th
 - Include as conditioning dimension → Generator at test time can condition directly on the eval file's LRU reuse rate
 
 This would close the training/test conditioning gap definitively.
+
+## Round 94 — Fundamental Chain-Reuse Post-Mortem: Wrong Metric, Seed Basin Analysis
+
+**Date**: 2026-04-23
+**Reporting**: Discovered root cause of ALL chain-reuse failures; launching v224 seed=5 clean GAN.
+
+### FUNDAMENTAL DISCOVERY: obj_id_reuse ≠ LRU Cache Hit Rate
+
+Empirical measurement of 20 tencent training files (oracle_general binary format):
+
+| Metric | Value |
+|--------|-------|
+| Consecutive same-object access rate (obj_id_reuse=+1) | **mean=3.3%, median=0.9%** |
+| Range | 0.07% – 27.2% |
+| Chain-reuse target (all experiments) | **61.5%** |
+| Long-rollout LRU hit rate (target) | **61.5%** |
+
+**`obj_id_reuse = ±1` is the consecutive same-object indicator**, NOT the LRU cache hit rate. Real tencent oracle_general files have ~3% consecutive same-object accesses. The chain-reuse target of 0.615 (61.5%) was asking the Generator to produce 61.5% consecutive same-object accesses — 20× higher than reality.
+
+**Why this caused every chain-reuse failure**:
+- Real data: ~3% consecutive same-object → Critic correctly penalizes higher rates
+- Chain-reuse loss: pushes Generator toward 61.5% consecutive same-object
+- Result: irreconcilable conflict → GAN oscillation/collapse at all weights (5.0-20.0)
+
+**The 61.5% "reuse rate" in the long-rollout eval** is the LRU cache hit rate — a different quantity. High LRU hit rate comes from temporal locality (objects re-accessed within the LRU cache window), NOT from consecutive same-object repetition. The Generator must produce the right STRIDE DISTRIBUTION, not high consecutive repetition.
+
+### Chain-Reuse Experiments: Complete Post-Mortem
+
+**All 10+ chain-reuse experiments (v209-v223) failed for the same root cause**: targeting 61.5% consecutive same-object rate in a corpus where the real rate is ~3%. The "adaptive target" in v223 (IDEA #87) converged to the real ~3% rate, making chain-reuse effectively inactive. This explains v223's excellent GAN dynamics (G loss ≈ 0 at ep9, clean training) — it's essentially running WITHOUT chain-reuse.
+
+### Seed Basin Analysis
+
+From VERSIONS.md:
+- **v165 (seed=5)**: ★=0.03752, β-recall=0.822 at ep45 — **ATB**
+- **v177 (seed=7, same recipe as v165)**: ★=0.168, β-recall=0.06-0.19 — mode collapse
+- **v223 ep20 (seed=7)**: ★=0.133 — consistent with seed=7 basin
+
+Seed=7 is in a different quality basin from seed=5 for tencent. The ATB basin requires seed=5. v223 (seed=7) cannot reach ★≤0.038 regardless of chain-reuse experiments.
+
+### v224 Plan: Seed=5, Clean GAN, No Chain-Reuse
+
+Kill v223 (chain-reuse effectively inactive, seed=7 basin), launch v224:
+- **seed=5** (ATB basin)
+- **No chain-reuse** (it was never helping)
+- Same architecture: --latent-dim 0, --var-cond, --boundary-critic-real-reconstruct
+- Same hyperparams: --lr-g 8e-5, --lr-d 4e-5, --files-per-epoch 12
+
+**Goal**: replicate v165 quality basin at seed=5 with current (improved) architecture. If the current architecture is better than v158 recipe + IDEA #17, we should beat ★=0.03752.
+
+### IDEA #89: Re-encode obj_id_reuse as LRU Hit/Miss Indicator
+
+For future work: change the encoding so `obj_id_reuse` = "LRU cache hit" (not "consecutive same-object"). This would make chain-reuse correctly target the LRU hit rate. Would require preprocessing oracle_general files with LRU simulation. Significant preprocessing work but would fix the fundamental mismatch.
