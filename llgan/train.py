@@ -203,6 +203,7 @@ def _fit_prep_on_files(
     fmt: str,
     records_per_file: int,
     obj_size_granularity: int = 0,
+    lru_cache_depth: int = 0,
 ) -> TracePreprocessor:
     """Fit a TracePreprocessor on a sample of files."""
     import pandas as pd
@@ -217,7 +218,8 @@ def _fit_prep_on_files(
     if not dfs:
         raise RuntimeError("No files could be loaded for fitting preprocessor.")
     combined = pd.concat(dfs, ignore_index=True)
-    prep = TracePreprocessor(obj_size_granularity=obj_size_granularity)
+    prep = TracePreprocessor(obj_size_granularity=obj_size_granularity,
+                             lru_cache_depth=lru_cache_depth)
     prep.fit(combined)
     return prep
 
@@ -385,7 +387,8 @@ def train(cfg: Config) -> None:
         seed_files = _prep_rng.sample(sorted(all_files), n_seed)
         print(f"Fitting preprocessor on {n_seed} seed files …")
         prep = _fit_prep_on_files(seed_files, cfg.trace_format, cfg.records_per_file,
-                                   obj_size_granularity=cfg.obj_size_granularity)
+                                   obj_size_granularity=cfg.obj_size_granularity,
+                                   lru_cache_depth=getattr(cfg, 'lru_cache_depth', 0))
         print(f"  columns ({prep.num_cols}): {prep.col_names}")
         print(f"  delta-encoded: {prep._delta_cols}")
         print(f"  locality-split: {prep._obj_locality_cols}")
@@ -2993,6 +2996,10 @@ def parse_args() -> Config:
     p.add_argument("--acf-chain-n-lags", type=int, default=10,
                    help="Number of ACF lags to match in the chained-window ACF "
                         "loss (default 10; lags 1..n_lags).")
+    p.add_argument("--lru-cache-depth", type=int, default=0,
+                   help="IDEA #97: replace consecutive obj_id_reuse with LRU hit "
+                        "indicator at this cache depth (0=legacy consecutive). "
+                        "Use 15000 for tencent, 512 for alibaba.")
     args = p.parse_args()
 
     cfg = Config()
@@ -3124,6 +3131,7 @@ def parse_args() -> Config:
     cfg.acf_chain_weight             = args.acf_chain_weight
     cfg.acf_chain_windows            = args.acf_chain_windows
     cfg.acf_chain_n_lags             = args.acf_chain_n_lags
+    cfg.lru_cache_depth              = args.lru_cache_depth
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

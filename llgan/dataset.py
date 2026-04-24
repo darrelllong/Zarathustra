@@ -740,7 +740,7 @@ class TracePreprocessor:
         approximately Gaussianises these distributions.
     """
 
-    def __init__(self, obj_size_granularity: int = 0):
+    def __init__(self, obj_size_granularity: int = 0, lru_cache_depth: int = 0):
         """
         obj_size_granularity: snap obj_size to this multiple before encoding
             (0 = off, 4096 = page-aligned, 512 = sector-aligned).
@@ -748,6 +748,10 @@ class TracePreprocessor:
             (powers of 2 × sector size); quantizing before log-transform
             concentrates the distribution onto the real support and helps
             the generator learn the correct size distribution.
+        lru_cache_depth: if > 0, replace consecutive same-object reuse flag
+            with LRU cache hit indicator at this depth (IDEA #97). The GAN
+            then learns to generate the correct cache hit rate directly.
+            0 (default) = legacy consecutive same-object semantics.
         """
         self.col_names: List[str] = []
         self.num_cols: int = 0
@@ -760,6 +764,7 @@ class TracePreprocessor:
         self._obj_locality_cols: List[str] = []    # obj_id cols → reuse + stride split
         self._obj_locality_first: Dict[str, float] = {}  # first abs value for cumsum
         self._obj_size_granularity: int = obj_size_granularity
+        self._lru_cache_depth: int = lru_cache_depth  # IDEA #97: 0 = consecutive (legacy)
         self._dropped_cols: List[str] = []         # zero-variance cols auto-dropped
 
     # ------------------------------------------------------------------
@@ -929,14 +934,14 @@ class TracePreprocessor:
     def _apply_obj_locality(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
         """Replace each obj_id column with a (reuse, stride) pair.
 
-        obj_id_reuse  : ±1 binary — +1 if delta==0 (same object), -1 otherwise.
+        obj_id_reuse  : ±1 binary — +1 if in-cache (LRU depth K or consecutive),
+                        -1 otherwise.
         obj_id_stride : signed-log delta for seeks; 0 when reuse=+1.
 
-        This replaces the old signed-log delta single-feature approach.  The
-        old approach required the generator to output exactly 0 in continuous
-        space to produce a reuse — a zero-measure event it never learned.
-        With a binary reuse feature the generator can classify reuse vs seek,
-        which is a learnable sigmoid output in [-1, 1].
+        When lru_cache_depth > 0 (IDEA #97): obj_id_reuse encodes LRU cache hit
+        at depth K=lru_cache_depth. The GAN learns to generate the correct
+        cache hit rate (e.g. 61.5% for tencent). Default (lru_cache_depth=0):
+        legacy consecutive same-object semantics (~3% for tencent).
         """
         df = df.copy()
         for col in self._obj_locality_cols:
@@ -946,9 +951,32 @@ class TracePreprocessor:
             if fit:
                 self._obj_locality_first[col] = float(vals[0])
             deltas = np.diff(vals, prepend=vals[0])   # first delta = 0
-            reuse  = np.where(deltas == 0, 1.0, -1.0)
-            stride = np.sign(deltas) * np.log1p(np.abs(deltas))
-            stride[deltas == 0] = 0.0  # reuse: stride undefined → 0
+
+            if self._lru_cache_depth > 0:
+                # IDEA #97: LRU cache hit indicator at depth K.
+                from collections import OrderedDict
+                K = self._lru_cache_depth
+                cache: OrderedDict = OrderedDict()
+                reuse = np.empty(len(vals), dtype=np.float64)
+                for t in range(len(vals)):
+                    v = vals[t]
+                    if v in cache:
+                        reuse[t] = 1.0
+                        cache.move_to_end(v)
+                    else:
+                        reuse[t] = -1.0
+                        cache[v] = None
+                        if len(cache) > K:
+                            cache.popitem(last=False)
+                # stride: 0 on hits (object "nearby" in cache), consecutive delta on misses
+                stride = np.sign(deltas) * np.log1p(np.abs(deltas))
+                stride[reuse > 0] = 0.0
+            else:
+                # Legacy: consecutive same-object indicator
+                reuse  = np.where(deltas == 0, 1.0, -1.0)
+                stride = np.sign(deltas) * np.log1p(np.abs(deltas))
+                stride[deltas == 0] = 0.0
+
             df.drop(columns=[col], inplace=True)
             df[f"{col}_reuse"]  = reuse
             df[f"{col}_stride"] = stride

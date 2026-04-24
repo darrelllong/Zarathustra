@@ -138,6 +138,12 @@ class Config:
                                       # (0 = off; 4096 = page-aligned; matches real block traces
                                       # where sizes are multiples of 4KB)
 
+    # IDEA #97: LRU hit indicator as training feature
+    lru_cache_depth: int = 0          # if > 0, replace consecutive reuse flag with LRU hit
+                                      # indicator at this cache depth. GAN learns correct
+                                      # LRU cache hit rate directly. 0 = legacy (consecutive).
+                                      # Use 15000 for tencent, 512 for alibaba.
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):
