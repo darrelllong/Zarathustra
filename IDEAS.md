@@ -3300,5 +3300,5 @@ df[f"{col}_lru_hit"] = lru_hits   # replaces obj_id_reuse
 
 **Deployment**: v226 (tencent, seed=5, full recipe + IDEA #97 feature)
 
-**Status**: OPEN — HIGH PRIORITY. Implement before launching v226.
+**Status**: IMPLEMENTED — v226 active, Phase 3 running (ep4 done, 2026-04-24). ep10 diagnostic pending.
 
