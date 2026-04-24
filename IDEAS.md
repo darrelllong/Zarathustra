@@ -3491,3 +3491,34 @@ G_loss += long_rollout_weight * (
 **Advantage**: Footprint and reuse rate are directly controllable through the generated probabilities. No training-eval mismatch.
 
 **Status**: OPEN — significant architecture change; consider after v230 results.
+
+## IDEA #113 (LLNL): Multi-Window LRU Training (Long-Rollout Consistency Fix)
+
+**Motivation**: Training-eval mismatch is the root cause of all ep10→ep20 failures. Training computes reuse_rate over short 12-step windows (768 records/batch), but eval measures LRU hits over 25k-record rollouts. The GAN learns to fool the critic in short-window terms while its footprint expands over long rollouts.
+
+**Approach**: In Phase 3 training, modify the generator loss computation:
+```python
+# Generate K=10 consecutive windows with carried LSTM state
+z_local = sample_noise(batch_size=B)  
+h_state = None  # fresh LSTM state at start of rollout
+long_windows = []
+for _ in range(K):
+    fake_window, h_state = generator(z_local, h_state=h_state)  # carry state
+    long_windows.append(fake_window)
+fake_long = torch.cat(long_windows, dim=1)  # [B, K*T, features]
+
+# Compute LRU hit rate across K*T = 120 timesteps
+# (approximate via sliding window with persistent cache state)
+lru_reuse_long = compute_lru_reuse(fake_long, depth=15000)  # differentiable approx
+G_loss += long_rollout_weight * (lru_reuse_long - 0.615)**2
+```
+
+**Why this helps**: Forces the GAN to maintain footprint stability over K=10 window spans. The 120-step LRU window is still shorter than the 25k eval, but it's 10× more context than current 12-step windows.
+
+**Implementation notes**: 
+- Requires carry-state generation (LSTM hidden state passed between windows)
+- LRU computation can be approximated with a differentiable hash-based counter
+- K=10 adds 10× compute to G loss step (from ~0.1s → ~1s per step)
+- Only compute every 5 epochs to limit overhead: `if epoch % 5 == 0: add_long_rollout_loss()`
+
+**Status**: OPEN — implement in v232 if v231 ep10 doesn't beat 0.030.
