@@ -2434,6 +2434,60 @@ def train(cfg: Config) -> None:
             if LD is not None:
                 LD.train()
 
+        # IDEA #115: periodic carried-state LRU reuse diagnostic.
+        # Generates lru_eval_n records with carried LSTM state (same as long-rollout),
+        # decodes via LRUStackDecoder, logs actual reuse_rate and footprint proxy.
+        # Early warning: if lru_actual drops while training reuse_rate is stable,
+        # the GAN is entering the footprint-expansion regime.
+        _lru_eval_every = getattr(cfg, 'lru_eval_every', 0)
+        if _lru_eval_every > 0 and (epoch + 1) % _lru_eval_every == 0 and obj_id_col >= 0:
+            _lru_live = None
+            try:
+                from llgan.lru_stack_decoder import LRUStackDecoder as _LRUDec
+                _lru_live = copy.deepcopy(G.state_dict())
+                G.load_state_dict({k: v.to(device) for k, v in ema_G_state.items()})
+                G.eval()
+                _lru_n = int(getattr(cfg, 'lru_eval_n', 5000))
+                _n_win = max(1, _lru_n // cfg.timestep)
+                _reuse_chunks: list = []
+                with torch.no_grad():
+                    _zg_lr, _ = _make_z_global(1, cfg, device, training=False, G=G)
+                    _h_lr = None
+                    for _wi in range(_n_win):
+                        _zl_lr = G.sample_z_local(1, cfg.timestep, device)
+                        try:
+                            _H_lr, _h_lr = G(_zg_lr, _zl_lr,
+                                             hidden=_h_lr, return_hidden=True)
+                        except TypeError:
+                            _H_lr = G(_zg_lr, _zl_lr)
+                            _h_lr = None
+                        if latent_ae:
+                            _H_lr = R(_H_lr)
+                        _reuse_chunks.append(
+                            _H_lr[0, :, obj_id_col].cpu().numpy())
+                _reuse_signal = np.concatenate(_reuse_chunks)
+                _actual_reuse = float((_reuse_signal > 0).mean())
+                _lru_depth = cfg.lru_cache_depth if cfg.lru_cache_depth > 0 else 15000
+                _lru_corpus = getattr(cfg, 'lru_eval_corpus', 'tencent')
+                _dec = _LRUDec.from_default(_lru_corpus,
+                                            max_stack_depth=_lru_depth, seed=42)
+                _obj_ids = _dec.decode_stream(_reuse_signal)
+                _footprint = len(np.unique(_obj_ids))
+                log += (f"  lru_actual={_actual_reuse:.3f}"
+                        f"  lru_fp={_footprint:,}")
+                G.load_state_dict(_lru_live)
+                G.train()
+                if latent_ae:
+                    E.train(); R.train(); S.train()
+            except Exception as _exc:
+                log += f"  lru_eval=ERR({type(_exc).__name__})"
+                if _lru_live is not None:
+                    try:
+                        G.load_state_dict(_lru_live)
+                    except Exception:
+                        pass
+                G.train()
+
         print(log, flush=True)
 
         # Early stopping: halt when combined score has not improved for
@@ -3000,6 +3054,14 @@ def parse_args() -> Config:
                    help="IDEA #97: replace consecutive obj_id_reuse with LRU hit "
                         "indicator at this cache depth (0=legacy consecutive). "
                         "Use 15000 for tencent, 512 for alibaba.")
+    p.add_argument("--lru-eval-every", type=int, default=0,
+                   help="IDEA #115: run carried-state LRU reuse diagnostic every N epochs "
+                        "(0=off). Generates lru_eval_n records with carried LSTM state "
+                        "and logs lru_actual reuse_rate + footprint. Early collapse warning.")
+    p.add_argument("--lru-eval-n", type=int, default=5000,
+                   help="IDEA #115: records to generate per LRU diagnostic eval (default 5000).")
+    p.add_argument("--lru-eval-corpus", type=str, default="tencent",
+                   help="IDEA #115: corpus for default stack-distance PMF (tencent or alibaba).")
     args = p.parse_args()
 
     cfg = Config()
@@ -3132,6 +3194,9 @@ def parse_args() -> Config:
     cfg.acf_chain_windows            = args.acf_chain_windows
     cfg.acf_chain_n_lags             = args.acf_chain_n_lags
     cfg.lru_cache_depth              = args.lru_cache_depth
+    cfg.lru_eval_every               = args.lru_eval_every
+    cfg.lru_eval_n                   = args.lru_eval_n
+    cfg.lru_eval_corpus              = args.lru_eval_corpus
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

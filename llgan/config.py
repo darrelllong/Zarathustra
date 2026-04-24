@@ -144,6 +144,11 @@ class Config:
                                       # LRU cache hit rate directly. 0 = legacy (consecutive).
                                       # Use 15000 for tencent, 512 for alibaba.
 
+    # IDEA #115: non-differentiable long-rollout LRU diagnostic (carried LSTM state)
+    lru_eval_every: int = 0           # run LRU reuse diagnostic every N epochs (0=off)
+    lru_eval_n: int = 5000            # records to generate for LRU diagnostic rollout
+    lru_eval_corpus: str = "tencent"  # corpus for default stack-distance PMF
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):
