@@ -3058,3 +3058,55 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 **Cost**: Preprocessing 3234 tencent files with LRU simulation + full retraining. Significant work but conceptually correct.
 
 **Alternative**: Use `next_access_vtime >= 0` (oracle already knows future accesses) as proxy for cache hit. This is the offline optimal indicator but approximates LRU behavior well.
+
+---
+
+## IDEA #90 (LLNL): Cross-Window Object Identity for Long-Rollout Locality
+
+**Status**: OPEN — structural fix for GAN long-rollout failure
+
+**The problem** (discovered Round 96, 2026-04-23):
+Long-rollout eval of v165 ep45 (frozen_sweep ATB ★=0.03752):
+- HRC-MAE = **0.4047** (45× worse than LANL 0.00887)
+- reuse_access_rate: 0.058 fake vs 0.615 real (−90.5%)
+- stack_distance_median: 0 (zero intervening objects between reuse — only consecutive same-object)
+- footprint_per_stream: 23,541 fake vs 9,627 real (+144.5%)
+
+**Root cause**: The GAN generates sequences in fixed-length windows (timestep T). Within each window, object IDs are generated independently. Object IDs generated in window 1 never reappear in window 2. This means:
+- Zero cross-window object reuse → LRU miss rate ≈ 94%
+- The 5.8% "reuse" is only from consecutive same-object accesses within a window
+- Real traces have 61.5% LRU hit rate from temporal locality spanning many windows
+
+**Why frozen_sweep misses this**: The frozen_sweep metric evaluates short-window distributional statistics. Within-window statistics (object size distribution, inter-arrival times, consecutive reuse) are captured well. Cross-window object identity is NOT captured. So frozen_sweep ★=0.03752 looks good while long-rollout HRC-MAE=0.4047 is catastrophic.
+
+**The fix**: Cross-window object identity mechanism. Options:
+
+1. **Object pool carry-over**: After generating window k, sample the top-N most-frequent object IDs → inject into the next window's conditioning. The Generator can condition on "these objects exist in cache" and re-use them.
+
+2. **Stateful object register**: Maintain a register of active objects across windows. Each window starts with a sampling from the register, generates new accesses, and updates the register. Object IDs are global, not window-local.
+
+3. **Stack-distance conditioning**: Provide the Generator with a target stack-distance PMF (from file characterization). Train a reuse-distance auxiliary loss to match the real stack-distance histogram. This doesn't fix identity directly but penalizes the pathological stack_distance=0 behavior.
+
+4. **Phase-Atlas with per-file calibration**: Abandon the GAN for long-rollout; use Phase-PMF Atlas calibrated to each eval file's stack-distance PMF (from characterization). This is the LANL approach.
+
+**Cost**: Options 1-3 require architectural changes to train.py. Option 4 is a calibration study.
+
+**Why LANL beats us**: PhaseAtlas has an explicit object process that generates object IDs with the right stack-distance distribution from the start. The GAN's implicit distribution over object IDs has no mechanism for cross-window identity.
+
+---
+
+## IDEA #91 (LLNL): Per-Stream LRU Reuse Rate Calibration
+
+**Status**: OPEN — next step after IDEA #48 calibration study
+
+**Context**: Tencent eval files have different per-stream reuse rates:
+- Stream 0 (tencentBlock_19784): 9,852 unique / 25,000 = 0.606 reuse
+- Stream 1 (tencentBlock_2893): 7,399 unique / 25,000 = 0.704 reuse
+- Stream 2 (tencentBlock_20249): 10,240 unique / 25,000 = 0.590 reuse
+- Stream 3 (tencentBlock_22882): 11,016 unique / 25,000 = 0.559 reuse
+
+Using a single global rate 0.615 averages across these. Per-stream calibration could improve HRC-MAE.
+
+**Limitation**: Per-stream rates from eval files are circular (we know the eval files). Legitimate approach: find training file clusters with similar reuse rates and use those for calibration.
+
+**Trigger**: File IDEA #91 as next step if Markov atlas (IDEA #62) doesn't close the 2.6× gap to LANL.

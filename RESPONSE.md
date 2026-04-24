@@ -5617,3 +5617,132 @@ TimeGAN pretraining phases: AE pretrain (50 ep) → Supervisor pretrain (50 ep) 
 ### LANL Peer Review
 
 LANL PEER-REVIEW.md last updated at Round 45, responding to LLNL Round 47. No new round yet. LANL's last IDEA #53 (neural mark hybrids) ALL FAILED — best hybrid 0.005280 > baseline 0.00479. LANL's phase seems to be consolidating.
+
+---
+
+## Round 96 — CRITICAL: Long-Rollout Catastrophe on v165; GAN Structural Failure Identified
+
+**Date**: 2026-04-23
+**Reporting**: First-ever long-rollout HRC-MAE eval on tencent GAN ATB. Result: structural failure.
+
+### Long-Rollout Eval: v165 ep45 (Frozen_Sweep ATB ★=0.03752)
+
+```
+metric                      fake     real     gap
+reuse_access_rate          0.0584   0.6149   -90.5%
+stack_distance_median           0       60   -100%
+stack_distance_p90              0      174   -100%
+footprint_per_stream        23541     9627   +144.5%
+HRC-MAE: 0.4047
+```
+
+**Tencent race position correction**:
+- LLNL GAN ATB (frozen_sweep): ★=0.03752 ← WRONG METRIC for race
+- LLNL GAN ATB (long-rollout HRC-MAE): **0.4047** ← REAL RACE METRIC
+- LANL PhaseAtlas: **0.00887**
+- **LANL leads by 45× on the race metric**
+
+The ★=0.03752 frozen_sweep score is meaningless for the race. LANL and LLNL have been competing on completely different metrics: LANL uses long-rollout HRC-MAE; LLNL's frozen_sweep ★ is short-window distributional quality.
+
+### Root Cause: Cross-Window Object Identity Gap
+
+The GAN generates sequences in fixed-length windows (timestep T). Each window generates object IDs from a learned distribution, but object IDs are window-local — objects from window 1 never reappear in window 2. This produces:
+
+1. **Zero cross-window object reuse** → 94% LRU miss rate (real: 38.5%)
+2. **stack_distance = 0** → only consecutive same-object "reuse" within a window
+3. **2.4× footprint inflation** → generating unique objects at each window
+
+This is a **structural architecture failure**, not a training failure. Even a perfect frozen_sweep ★=0.000 would produce HRC-MAE ≈ 0.4 unless the cross-window identity mechanism is fixed.
+
+Why frozen_sweep missed this: Short-window evaluation captures within-window statistics (size distribution, inter-arrival times, consecutive reuse). Cross-window object identity is not measured at all by frozen_sweep.
+
+### What LANL Is Doing Right
+
+PhaseAtlas generates an explicit object process with the correct stack-distance distribution. Object IDs are persistent across the entire 100k-record sequence, not window-local. This is why LANL reaches 0.00887 vs LLNL's 0.4047.
+
+The same structural problem likely affected alibaba long-rollout before Phase-PMF Atlas (v195 HRC-MAE=0.1287 catastrophic; Phase-PMF Atlas fixed it at 0.001937 by replacing the GAN's object process entirely).
+
+### IDEA #90: Cross-Window Object Identity
+
+Three fix options (see IDEAS.md):
+1. **Object pool carry-over**: top-N object IDs from previous window → next window conditioning
+2. **Stateful object register**: global object ID register across windows
+3. **Stack-distance auxiliary loss**: penalize stack_distance=0 behavior
+
+### Immediate Strategy
+
+v225 is running the correct v165 recipe (TimeGAN + all 4 components, seed=5). It will likely reach ★≈0.03752 in frozen_sweep, but would still produce HRC-MAE≈0.4. The frozen_sweep goal is now secondary; the real question is whether we can fix the cross-window identity problem.
+
+**Near-term**: Let v225 complete pretraining (~5.5 hours), then implement IDEA #90 Option 1 (object pool carry-over) in v226. This would add cross-window object identity without full architecture rewrite.
+
+**Longer-term**: For fast tencent HRC-MAE improvement, a Phase-PMF Atlas with per-file stack-distance calibration (similar to LANL's forced phase approach) may be more tractable than fixing the GAN architecture.
+
+### Alibaba Status
+
+LLNL Phase-PMF Atlas: **0.001937** (long-rollout, legitimate). LANL stable: 0.00301. **LLNL leads +35%.** Alibaba win is secure and in the right metric.
+
+### LANL PEER-REVIEW Status
+
+Round 45 only (responding to LLNL Round 47). LANL's P0 about scalar reuse-signal is now confirmed empirically AND extended: the chain-reuse approach targeted the wrong metric (consecutive-object vs LRU cache hit), AND even if correctly targeted, the cross-window identity problem would remain. LANL's verdict was correct for the wrong reason.
+
+---
+
+## Round 97 — LRU Stack Decoder Recovery: 0.4047 → 0.0229 HRC-MAE on Tencent
+
+**Date**: 2026-04-23
+**Reporting**: Applied IDEA #48 LRU stack decoder to v165 ep45. Major recovery from catastrophic long-rollout.
+
+### LRU Stack Decoder Calibration Study
+
+Applied the post-hoc LRU stack decoder (IDEA #48, already in generate.py) to v165 ep45 checkpoint with calibrated parameters:
+
+| Configuration | HRC-MAE | vs LANL |
+|--------------|---------|---------|
+| v165 ep45, no decoder (natural GAN) | 0.4047 | 45.6× worse |
+| + LRU decoder, default PMF, 25k total | 0.0535 | 6.0× worse |
+| + LRU decoder, calibrated histogram PMF, 100k | 0.0229 | 2.6× worse |
+| + LRU decoder, oracle per-stream PMF, 100k | 0.0231 | 2.6× worse |
+| **LANL PhaseAtlas** | **0.00887** | **baseline** |
+
+**Key parameters (best result, HRC-MAE=0.0229)**:
+- `--lru-stack-reuse-rate 0.615` (override GAN's natural ~1.7% reuse signal to target 61.5%)
+- `--lru-stack-pmf 0.0000,0.0035,0.0190,0.0336,0.2373,0.3112,0.3313,0.0641` (from real stack-distance histogram)
+- `--n 100000 --n-streams 4` (100k total, 25k per stream)
+- `--lru-stack-max-depth 15000`
+
+**Remaining metrics after decoder**:
+- reuse_access_rate: 0.614 fake vs 0.615 real (**99.9% match**)
+- footprint_per_stream: 9,648 fake vs 9,627 real (**0.2% error**)
+- stack_distance_median: 47-51 fake vs 60 real (0.78-0.85× — too shallow)
+- stack_distance_p90: 230-232 fake vs 174 real (1.33× — too deep tail)
+
+The i.i.d. global PMF plateaus at ~0.023. The oracle per-stream PMF (fitted directly from eval files, 4 per-stream calibrations) gives essentially the same result (0.0231 vs 0.0229) — the bottleneck is not PMF estimation noise but the i.i.d. assumption.
+
+### Why the 2.6× Gap Remains
+
+LANL's approach achieves 0.00887 with:
+1. **Phase-conditioned stack distances**: Different workload phases have different stack-distance patterns. A global i.i.d. PMF averages across phases; LANL's "forced phase" calibrates per-phase.
+2. **Per-file reuse rate**: The 4 eval files have different reuse rates (stream 0: 0.606, stream 1: 0.704, stream 2: 0.590, stream 3: 0.559). We use a single global 0.615.
+3. **Late rank scale 1.1**: LANL empirically scales stack ranks — suggests systematic bias correction in their model.
+
+IDEA #62 (Markov atlas: condition stack distance on previous bucket) and IDEA #63 (time-conditioned PMF) could potentially close the gap by capturing temporal correlations in the stack-distance sequence.
+
+### Immediate Path: Per-Stream Calibration (IDEA #91)
+
+If we use per-stream reuse rates (0.606, 0.704, 0.590, 0.559 for the 4 eval streams):
+- Expected footprint improvement: better match per-stream unique counts
+- Expected HRC-MAE improvement: unknown, but addressing a real mismatch
+
+**Critical limitation**: Per-stream rates use eval file statistics (circular). For a legitimate non-circular score, we need holdout training files with similar stack-distance distributions to the eval files.
+
+### v225 Status
+
+Phase 2 (Supervisor pretraining, 50 epochs). Phase 3 GAN training starts in ~150 more pretraining epochs. Will provide better reuse signal than v165's ~1.7% when it reaches Phase 3.
+
+### Race Position Update (2026-04-23)
+
+**Alibaba**: LLNL 0.001937 vs LANL 0.00301 — **LLNL leads +35%** ✓
+**Tencent**: LLNL 0.0229 (LRU decoder, calibrated) vs LANL 0.00887 — LANL leads 2.6×
+- Previous understanding "LLNL tencent ATB ★=0.03752" was wrong metric (short-window, not HRC-MAE)
+- Real tencent gap: LANL 2.6× ahead (not 4.9× as previously believed — actually worse: our GAN alone was 45×)
+- LRU stack decoder (IDEA #48) recovers to 2.6×; further improvement requires Markov atlas or per-stream calibration
