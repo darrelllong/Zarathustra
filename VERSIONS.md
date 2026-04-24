@@ -6561,8 +6561,19 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 
 ---
 
-### tencent_v219 (seed=7, IDEA #79+#81: hybrid surrogate + chain-stride floor, LAUNCHING)
-- Same as v218 but for tencent
-- Config: chain-reuse-weight=5.0, windows=8, target=0.615, seed=7, chain-stride-floor=0.3
-- Log: /home/darrell/train_tencent_v219.log
-- Expected ep10: footprint > 5000, mean|stride| ≈ 0.3–0.5
+### tencent_v219 (seed=7, IDEA #79+#81: hybrid surrogate + chain-stride floor, CLOSED-FAILED ep10)
+- ep10 probe: reuse_rate=1.0000, new_events=0/6144 — TOTAL COLLAPSE, zero new objects generated
+- Stride floor SATISFIED (mean|stride|=0.44 all tokens) but trivially: model outputs stride>0 for ALL tokens
+- Root cause: stride floor operates on ALL token stride values, not new-object events; model satisfies
+  floor by outputting stride>0 for reuse tokens while never generating new objects
+- Degenerate solution: reuse_col ∈ [0, 0.87] ALL POSITIVE → binary threshold always "reuse"
+  Stride column: [0, 0.96] → mean=0.44 satisfies floor → zero gradient from stride floor
+- Chain-reuse rate loss (residual 0.148 * 5.0 = 0.74) overpowered by adversarial G-loss (~1.7)
+- IDEA #81 failure mode: new degenerate solution family — satisfy stride floor via reuse-token strides
+- Superseded by IDEA #82 (explicit LRU-state generator)
+
+---
+
+### alibaba_v218 (seed=13, IDEA #79+#81: hybrid surrogate + chain-stride floor, KILLED ep1)
+- Same code as v219; killed preventively after v219 ep10 probe confirmed IDEA #81 failure
+- Superseded by IDEA #82

@@ -2814,7 +2814,13 @@ Applied only when stride_col ≥ 0 and chain_stride_floor > 0. Uses same _crw (c
 
 **Code**: Implemented in `llgan/train.py` chain-reuse block. CLI: `--chain-stride-floor FLOAT` (default=0.0, disabled).
 
-**Versions**: alibaba_v218 (seed=13, --chain-stride-floor 0.3, reuse-bce=2.0, diversity=2.0), tencent_v219 (seed=7, same)
+**Status**: CLOSED-FAILED. New degenerate solution: model outputs stride > 0.3 for reuse tokens, satisfying
+floor without ever generating new objects. reuse_rate=1.0000, new_events=0 from ep10 through ep60.
+
+**Failure mode**: stride floor applies to ALL token stride values, not new-object-only events. Generator
+trivially satisfies floor: output high stride for reuse=1 tokens (majority), zero new objects generated.
+
+**Versions**: alibaba_v218 (KILLED ep1 preventive), tencent_v219 (CLOSED-FAILED ep10, probe confirmed)
 
 ## IDEA #82 (LLNL): Explicit LRU-State Object Generator + Neural Mark Sidecar
 
@@ -2839,10 +2845,13 @@ Applied only when stride_col ≥ 0 and chain_stride_floor > 0. Uses same _crw (c
 
 3. **Existing GAN role** (reduced): Can be retained for generating the non-object-ID continuous marks (ts_delta, obj_size) as a second opinion or for conditioning the LSTM sidecar.
 
-**Implementation path** (if IDEA #81 fails):
-- Week 1: Port existing trace characterization to build phase transition matrices and rank distributions
-- Week 2: Implement explicit object sampler; verify HRC-MAE approaches PhaseAtlas baseline
-- Week 3: Train LSTM mark sidecar; verify mark_score < 0.05
+**Status**: ACTIVE — beginning implementation after IDEA #81 failure confirmed.
+
+**Implementation path**:
+- Phase 1: Build explicit object sampler from `trace_characterizations.jsonl` (rank distributions + LRU stack)
+- Phase 2: Fit phase-transition Markov matrix from consecutive window characterizations
+- Phase 3: Train LSTM mark sidecar (dt, size, opcode, tenant) conditioned on phase + action + stack rank
+- Milestone: HRC-MAE < 0.01 on tencent (approaching LANL's 0.00842)
 
 **Why this works**: LANL proved it. The explicit LRU-state machine generates the right cache law by construction. The neural mark sidecar adds sequential mark quality without disturbing the object law. No GAN training instability, no footprint collapse, no chain-reuse degenerate solutions.
 

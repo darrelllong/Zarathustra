@@ -4563,3 +4563,77 @@ If ep10 gates fail, retire chain-reuse and build IDEA #82:
 2. **v218 ep10** — alibaba ~1h. Same gates.
 3. **If passes**: ep20/ep30 stability check → frozen_sweep → ATB claim.
 4. **If fails**: IDEA #82 — retire GAN, build explicit LRU-state object generator + neural mark sidecar.
+
+---
+
+## Round 79 — LLNL
+
+### IDEA #81 Post-Mortem: New Degenerate Solution Family
+
+v219 ep10 probe (64 chains × 8 windows, 6144 total token slots):
+
+| Metric | v219 ep10 | v219 ep30 | v219 ep60 |
+|--------|-----------|-----------|-----------|
+| reuse_rate | **1.0000** | **1.0000** | **1.0000** |
+| new_events | **0/6144** | **0/6144** | **0/6144** |
+| mean\|stride\| (all) | 0.4454 | 0.4061 | 0.3692 |
+| stride floor satisfied | YES | YES | YES (barely) |
+
+Total collapse: zero new objects from ep10 through ep60. The stride floor (target: mean\|stride\| > 0.3) is satisfied, but trivially — the model outputs stride > 0.3 for ALL tokens including reuse tokens, so the stride floor loss is zero. The model found a new degenerate solution: satisfy the stride floor via reuse-event stride values while generating zero new objects.
+
+**Why IDEA #81 fails**:
+The stride diversity floor applies to `_cr_stride_all.abs().mean()` = mean absolute stride across ALL chain-window tokens. But the collapse mechanism is: new objects (reuse=0) have stride≈0. The generator can avoid the floor by outputting high stride for reuse=1 tokens (the majority) while NEVER generating reuse=0 tokens at all.
+
+Specifically:
+- Generator learns: output reuse_col ∈ [0, 0.87] (always positive → always "reuse")
+- Generator also learns: output stride_col ∈ [0, 0.96] with mean ≈ 0.4 (satisfies floor)
+- These are orthogonal outputs — no constraint prevents high stride with 100% reuse
+- Chain-reuse rate loss contributes residual 5.0 × (1.0 − 0.615)² = 0.74 gradient
+- Adversarial G-loss ≈ 1.7 dominates → generator ignores the 0.74 reuse correction
+
+**Complete Chain-Reuse Failure Taxonomy (v1-v6)**:
+
+| Version | Design | Degenerate path | ep10 state |
+|---------|--------|-----------------|------------|
+| v209 (v1) | linear surrogate | sub-threshold constant loss | Stuck at loss=0 |
+| v210 (v2) | sigmoid surrogate | sub-threshold saturates | ~0 footprint |
+| v212/v213 (v3) | binary+sigmoid bwd | super-threshold saturation | footprint=8 |
+| v214/v215 (v4) | binary+hybrid bwd | ep10 ok, ep50 collapse | footprint=716→7 |
+| v216/v217 (v5) | v4+rebalanced | removed diversity signal | footprint=23 |
+| v218/v219 (v6) | v4+stride floor | stride floor via reuse tokens | footprint=0 |
+
+**Architectural conclusion**: The WGAN-SN critic gradient and the chain-reuse loss gradient operate in latent output space. The generator can satisfy the critic AND maintain a degenerate reuse structure because the critic discriminates decoded samples (not latent values), while chain-reuse loss operates on latent values directly. This disconnect is unresolvable by adding more loss terms — each new loss term creates a new degenerate solution that satisfies it while preserving collapse.
+
+### Pivot: IDEA #82 — Explicit LRU-State Object Generator
+
+The GAN approach to object process generation is retired. Six chain-reuse variants have confirmed that loss-pressure locality cannot compete with adversarial dynamics. This mirrors exactly what LANL discovered earlier and solved with PhaseAtlas.
+
+**IDEA #82 design (implementation starting):**
+
+LLNL's version of the explicit object-process generator, built from our existing characterization data:
+
+1. **Phase classifier from characterization** (`trace_characterizations.jsonl` has per-file stats):
+   - Compute stack-rank percentile distribution from characterization data
+   - Define phases: {cold: stack_rank > 0.9, warm: 0.5-0.9, hot: 0.1-0.5, random: uniform}
+   - Fit Markov phase-transition matrix from consecutive access windows
+   
+2. **Object ID sampler per phase** (power-law rank selection):
+   - Maintain LRU stack; sample rank from power-law distribution with exponent α
+   - α_hot ≈ 0.8 (similar to LANL's `local_prob_power=0.8`), α_cold ≈ 2.0
+   - New objects: sample from the "tail" of the distribution
+   
+3. **LSTM mark sidecar** (sequential: dt, size, opcode, tenant):
+   - Input: phase embedding + action type (new/reuse) + stack rank bucket + recent marks
+   - Output: next mark distribution
+   - Trained supervised on real traces with teacher forcing
+   - This is the piece that gives us HRC-accurate timing and size distributions
+
+**Key difference from naive reuse**: The object-process generator operates in actual object-ID space with a maintained LRU stack. No GAN, no loss pressure. The HRC-MAE follows from correct object ID generation, not from training a latent representation.
+
+**Implementation path**: 
+- Phase 1: Build the explicit object sampler from `trace_characterizations.jsonl` — should reproduce LANL-class HRC-MAE within 2-3 days
+- Phase 2: Train LSTM mark sidecar — 1 week
+
+### Race Position
+
+LANL has achieved compound: HRC-MAE=0.00842, mark_score=0.031. LLNL's v219 total collapse confirms the GAN approach cannot close this gap. IDEA #82 is the structural response. The race is still winnable — LANL's explicit object process is NOT secret; it can be independently designed from the same trace characterization data we already have.
