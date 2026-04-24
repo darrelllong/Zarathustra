@@ -4947,4 +4947,57 @@ ep30 probe gate: if raw frac<0 (new) is not approaching 0.385 by ep30, kill and 
 
 ### LANL Intelligence Assessment
 
-LANL at Round 45 (lagging LLNL's Round 83). No new experiments detected in altgan/ since last cycle. LANL PhaseAtlas is mature — their threat vector is IDEA #53 (mark head sidecar). LLNL's response is to win on the object process first (HRC-MAE) before LANL closes mark quality, forcing LANL to beat us on both dimensions simultaneously.
+LANL at Round 45 (lagging LLNL's Round 83). **RESULTS.md updated today (Apr 23 10:23)** — new PhaseAtlas sweeps completed. See Round 84 below for full intel.
+
+## Round 84 — LANL New Scores (RESULTS.md), Alibaba Lead Update
+
+**Date**: 2026-04-23
+**Reporting**: LANL RESULTS.md updated today with new PhaseAtlas sweeps. LLNL lead narrowed on alibaba.
+
+### LANL New PhaseAtlas Results (RESULTS.md, 2026-04-23 10:23)
+
+LANL completed extensive PhaseAtlas microblend sweeps (mark hybrids, late rank scale, forced phase). New best results:
+
+**Tencent PhaseAtlas (new):**
+
+| Config | HRC-MAE | Reuse | Stack med | Seed stable? |
+|--------|---------|-------|-----------|-------------|
+| 1024×5k holdout, blend=0.5 | 0.01065 | 0.609 | 48 | YES |
+| + microblend blend=0.65 | 0.00983 | 0.614 | 50 | Partial |
+| + late rank scale | 0.00937 | 0.614 | 54 | — |
+| + forced phase | **0.00887** | 0.615 | 53 | — |
+
+**Alibaba PhaseAtlas (new):**
+
+| Config | HRC-MAE | Mark score | Seed stable? |
+|--------|---------|-----------|-------------|
+| 233×25k holdout, blend=0.0 | 0.00301 | 0.00479 | YES |
+| + microblend blend=0.2 | **0.00222** | 0.00479 | **NO** (seed-42 only) |
+
+LANL explicitly notes the alibaba 0.00222 microblend "is not stable enough yet to replace the conservative baseline." Seed confirmation across seeds 43-45 shows regression. The PROMOTED stable bar for alibaba is still **0.00301**.
+
+**LANL Mark Hybrid Experiments (IDEA #53 implementation — FAILED):**
+All neural-mark hybrids tested worsen mark score vs the baseline 0.00479. Best hybrid tested: 0.005280 (blend=0.0, local power=0.9) — 10% worse than baseline. LANL has NOT improved mark quality beyond 0.00479. IDEA #53 is stalled.
+
+### Updated Race Position
+
+| Metric | LLNL | LANL stable | LANL seed-42 | LLNL leads? |
+|--------|------|-------------|--------------|-------------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | 0.00222 | **YES: 35% vs stable, 12.7% vs seed-42** |
+| Tencent HRC-MAE | 0.04375 | 0.00887 | 0.00887 | No (LANL 4.9×) |
+| Mark quality (alibaba) | ~0.614 | **0.00479** | 0.00479 | **No (LANL dominant)** |
+
+**LLNL status on alibaba**: Still leading on the promoted stable bar (0.00301), but LANL's unstable seed-42 microblend (0.00222) is approaching our 0.001937. The lead is real but narrowing.
+
+**LANL threat assessment**: Mark hybrids are failing. Their Phase #53 (neural mark sidecar) is not improving mark quality. However, PhaseAtlas parameter sweeps keep improving HRC-MAE incrementally — tencent went from 0.01065 → 0.00887 (17% improvement) through calibration alone.
+
+### Strategic Implication
+
+LANL is squeezing HRC gains through atlas calibration parameter sweeps — no new architecture. This is a diminishing returns strategy. Their tencent path (0.00887) is approaching a floor. LLNL's v221 chain-reuse approach is still the only path to a genuine GAN tencent win.
+
+However, LLNL's alibaba Phase-PMF lead (0.001937 vs LANL stable 0.00301) is now clearly under threat. If LANL stabilizes the microblend alibaba result to 0.00222 across seeds, LLNL's lead shrinks from 35% to 12.7%. LLNL needs to either:
+1. Improve the alibaba Phase-PMF result further (re-calibrate with more training files)
+2. Win tencent GAN (v221 on track, ep10 probe shows gradient active)
+3. Improve mark quality on alibaba (requires export denormalization fix — structural work)
+
+Priority remains tencent GAN (v221) and monitoring LANL's alibaba seed stabilization.
