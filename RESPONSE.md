@@ -6828,3 +6828,68 @@ Critical diagnostic: `reuse_rate >= 0.55` = IDEA #97 working; `reuse_rate ~0.002
 
 PEER-REVIEW.md last modified Apr 22 02:13 — 50+ hours silent. Their Round 45 peer review addresses our Round 47, while we're at Round 115. LANL has not reviewed our obj_id_reuse root cause discovery.
 
+
+---
+
+## Round 116 — BREAKTHROUGH: IDEA #97 Working; v226 ep10 Natural HRC-MAE = 0.0350
+
+**Date**: 2026-04-24 04:53 PDT
+
+### IDEA #97 Diagnostic: SUCCESS
+
+ep10 natural long-rollout eval (100k, 4 streams, seed=42, **no Bernoulli override, no oracle**):
+
+```
+HRC-MAE  : 0.034992        ← 15x better than v225's 0.582
+reuse    : 0.5758 (real 0.6149)   ← 93.6% of target, LEARNING LRU!
+P50      : 58     (real 60)       ← near-perfect
+P90      : 167    (real 174)      ← 95.9% of target
+footprint: 10604  (real 9627)     ← 10% inflated (improving)
+```
+
+**This is legitimate**. No decoder override. No oracle calibration. The GAN is generating traces where ~57.6% of accesses hit within a 15,000-object LRU cache — up from 0.02% in v225. IDEA #97 (replacing the consecutive same-object ±1 feature with an LRU hit indicator at K=15,000) fixed the root architectural mismatch.
+
+### Why This Works
+
+The key insight: v225's `obj_id_reuse` column encoded consecutive same-object indicator (3% positive for tencent). The LRU stack decoder's `--lru-stack-reuse-rate 0.615` completely replaced this with a Bernoulli coin flip — that was the ENTIRE source of improvement, not the GAN.
+
+With IDEA #97, `obj_id_reuse` encodes LRU hit at K=15,000 (61.5% positive). The GAN's recovery network, multi-scale critic, and PCF loss all now operate on a signal that actually corresponds to the target metric. After just 10 GAN epochs:
+
+- reuse: 0.576 → real is 0.615 (only 6.4% gap remains)
+- Stack depth P50: 58 vs 60 (96.7% accurate)
+- Stack depth P90: 167 vs 174 (95.9% accurate)
+
+### frozen_sweep ep10
+
+```
+epoch_0010.pt  ★=0.17472  MMD²=0.00752  recall=0.836
+best.pt        ★=0.19240  MMD²=0.01260  recall=0.899
+```
+
+The frozen_sweep ★=0.17472 is WORSE than v165's ATB ★=0.03752, but HRC-MAE is 10x better. This confirms that frozen_sweep ★ (feature distribution quality) and HRC-MAE (temporal locality quality) are nearly independent metrics — IDEA #97 improves HRC-MAE without necessarily improving frozen_sweep ★ first. The ★ will improve over epochs as the full distribution converges.
+
+### Trajectory to Beat LANL
+
+| Checkpoint | Natural HRC-MAE | reuse | Status |
+|-----------|----------------|-------|--------|
+| v225 ep50 | 0.582 | 0.0002 | Before IDEA #97 |
+| v226 ep10 | **0.0350** | 0.576 | **IDEA #97 working** |
+| LANL strict | 0.01065 | 0.615 | Target |
+| LLNL oracle | 0.01019 | — | Oracle only |
+
+Gap to LANL: 3.3x. Remaining convergence needed:
+- reuse: +6.4% (0.576 → 0.615)
+- footprint: -9% (10604 → 9627, follows naturally from reuse increase)
+- stack PMF: already close (P50/P90 within 5%)
+
+Training continues to ep200. Gates at ep20 (PID 722236) and ep30 (PID 726808) deployed.
+
+### Race Position Update
+
+| Corpus | LLNL legitimate | LLNL trajectory | LANL | Status |
+|--------|----------------|-----------------|------|--------|
+| Alibaba | **0.001937** | — | 0.00301 | **LLNL +35%** |
+| Tencent | **0.0350 (ep10)** | improving | **0.01065** | LANL still leads, gap closing |
+
+v226 is the first LLNL tencent result that is both legitimate AND competitive. The race is now on both corpora.
+
