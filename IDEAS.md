@@ -3405,3 +3405,34 @@ for cache_size in [100, 500, 1000, 5000, 15000]:
 ```
 
 **Status**: OPEN — adds on top of IDEA #51; try in v229 alongside IDEA #101.
+
+## IDEA #103 (LLNL): Calibrated Reuse Rate Target (Decoder Bias Correction)
+
+**Motivation**: v228 ep10 shows training reuse_rate=0.578 → eval reuse=0.5025 (13% downward bias). The LRU stack decoder converts the GAN's soft `obj_id_reuse` column into binary hit/miss decisions using a `>= 0` threshold. If the recovery network outputs non-binary intermediate values (common with mixed-type recovery when early in training), the effective hit rate in the generated trace is lower than the soft training metric suggests.
+
+**Empirical calibration**: v226 ep10 training=0.576 → eval=0.576 (no bias — recovery outputs were binary). v228 ep10 training=0.578 → eval=0.503 (13% bias — moment loss changed recovery network dynamics).
+
+**Fix**: Set `--reuse-rate-target 0.70` instead of 0.615 to compensate. Predicted eval reuse = 0.70 × (1 - 0.13) = 0.609 ≈ 0.615.
+
+**Implementation**: Already done in v229 (`--reuse-rate-target 0.70`).
+
+**Limitation**: The bias factor (0.87) may change across training and across versions. A better fix would be to compute the actual binary fraction `mean(sigmoid(decoded_reuse * large_scale))` in the training loss, rather than the soft probability. This would eliminate the bias entirely.
+
+**Status**: IMPLEMENTED in v229. Monitor v229 ep10 eval reuse to verify correction.
+
+## IDEA #104 (LLNL): Hard-Threshold Reuse Rate Loss
+
+**Motivation**: The soft reuse rate `mean((x+1)/2)` != actual hit fraction in decoder (IDEA #103 bias). A hard-threshold loss would eliminate this bias.
+
+**Approach**: Use a temperature-scaled sigmoid as a differentiable approximation of the hard threshold:
+```python
+# Hard-threshold approximation: step(x) ≈ sigmoid(T*x) for large T
+T = 10.0  # temperature: higher = sharper threshold
+reuse_hard_approx = torch.sigmoid(fake_reuse * T)  # approximates step function
+fake_rate_hard = reuse_hard_approx.mean()
+loss = (fake_rate_hard - 0.615) ** 2
+```
+
+This approximates the actual fraction of `x >= 0` rather than the soft mean. For T=10, sigmoid(0)=0.5, sigmoid(0.5)=0.98, sigmoid(-0.5)=0.02 — effectively binary.
+
+**Status**: OPEN — try in v230 if v229 ep10 still shows eval reuse undershoot.

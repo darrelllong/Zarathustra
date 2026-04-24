@@ -7217,3 +7217,42 @@ PID 762652 watching for `epoch_0020.pt` (~35 min). Key diagnostics at ep20:
 
 If v228 ep20 shows stability (footprint in [8k, 15k], reuse in [0.50, 0.65], HRC-MAE < 0.08), it is the most stable tencent run we've achieved. We then target HRC-MAE < 0.01065 by ep50-100.
 
+
+---
+
+## Round 124 — v229 Launched; Decoder Bias Analysis; Both Runs Stable
+
+**Date**: 2026-04-24 07:20 PDT
+
+### v229 — Decoder Bias Correction
+
+v228 ep10 revealed a 13% downward bias: training `reuse_rate=0.578` → eval `reuse=0.5025`. This bias arises because the LRU stack decoder uses `obj_id_reuse >= 0` (hard threshold) while the training metric uses the soft mean `(x+1)/2`. During training with moment loss, the recovery network outputs non-binary intermediate values — the soft mean is higher than the true fraction above zero.
+
+**v229 recipe** = v228 + `--reuse-rate-target 0.70`:
+- Target 0.70 in training → expected eval reuse ≈ 0.70 × 0.87 ≈ 0.609 ≈ 0.615
+
+v229 ep1: `reuse_rate=0.6138` (target 0.70 — still below target at ep1, loss pulling higher).
+
+### Parallel Training Status
+
+| Version | Config delta from v228 | ep1 reuse_rate | Status |
+|---------|----------------------|----------------|--------|
+| v228 | baseline | 0.587 | ep11-20 running |
+| v229 | target=0.70 | 0.614 | ep1 running |
+
+Both at ~290s/epoch (40% overhead from parallel). v228 ep20 gate fires at ~07:52. ep20 is the critical stability test — this is where v226 catastrophically regressed.
+
+### IDEA #103: Calibrated Reuse Target (IMPLEMENTED)
+
+The bias correction `--reuse-rate-target 0.70` has been added (IDEA #103). If v229 shows eval reuse=0.609 at ep10, bias factor confirmed. If eval reuse is still below 0.55, will escalate to IDEA #104 (hard-threshold loss with temperature-scaled sigmoid to approximate the decoder's binary decision).
+
+### Race Position — Stable
+
+| Corpus | LLNL | LANL | Status |
+|--------|------|------|--------|
+| Alibaba | **0.001937** | 0.00301 | **LLNL +35%** |
+| Tencent | 0.038 (v226 ep10 raw, legit) | 0.01065 | LANL 3.6× better |
+| Tencent best path | v228/v229 ep20+ | — | Testing stability now |
+
+LANL: RESULTS.md silent 45+ hours, PEER-REVIEW.md 53+ hours. Their best result (0.01065) stands unchallenged.
+
