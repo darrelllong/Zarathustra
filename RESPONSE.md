@@ -6128,3 +6128,62 @@ Complete oracle vs legitimate calibration comparison:
 ### Next: v225 ep10 Gate
 
 At ep10 (30 min from now): run frozen_sweep to verify seed=5 basin. Expect ★ < 0.15. If confirmed, continue to ep45 for long-rollout eval and natural reuse rate measurement.
+
+---
+
+## Round 105 — v225 Phase 3 ep10 Gate: ★=0.186, Recipe Not Yet Expressed
+
+**Date**: 2026-04-24
+**Reporting**: v225 Phase 3 ep10 frozen_sweep; PCF trajectory analysis; decision to continue.
+
+### v225 Phase 3 ep10 Dynamics
+
+| Epoch | W | G | PCF | EMA ★ |
+|-------|---|---|-----|-------|
+| 1 | +0.275 | +1.155 | 0.237 | — |
+| 2 | +0.622 | -0.181 | 0.323 | — |
+| 3 | +1.034 | +0.570 | 0.404 | — |
+| 4 | +0.837 | -0.784 | 0.464 | — |
+| 5 | +0.923 | +0.753 | 0.503 | 0.07019 ★ |
+| 6 | +1.079 | +1.543 | 0.560 | — |
+| 7 | +1.064 | +1.247 | 0.628 | — |
+| 8 | +1.113 | +1.521 | 0.634 | — |
+| 9 | +1.103 | +0.936 | 0.675 | — |
+| 10 | +1.262 | +1.141 | 0.672 | 0.08929 |
+
+**ep10 frozen_sweep ★ = 0.18631** (best is epoch_0010.pt)
+
+**vs. baseline**:
+- v224 wrong-recipe ep10: ★ = 0.190 (nearly identical)
+- v165 ATB target: ★ = 0.037 at ep45
+
+**Interpretation**: ep10 ★=0.186 does NOT yet distinguish v225 from v224. The 4 load-bearing components take time to establish their advantage. At v165's rate, the recipe advantage would appear by ep20-30.
+
+### PCF Loss Rising: Concern or Normal?
+
+PCF loss increasing from 0.237 (ep1) to 0.672 (ep10). Two interpretations:
+
+1. **Normal (critic pressure)**: The critic is learning temporal correlation features and applying pressure. The generator initially passes coarse temporal checks (low PCF) but as the critic gets stronger, it detects finer mismatches → PCF appears to rise. This is expected: the critic first matches marginal distributions, then temporal structure.
+
+2. **Concerning (catastrophic forgetting)**: The generator, under GAN pressure, is sacrificing its temporal correlation structure to optimize the Wasserstein loss. This would be bad — the retrieval-memory and PCF-loss components should prevent this.
+
+The rising W (0.275 → 1.262) confirms the critic is getting stronger, consistent with interpretation 1. Watch for PCF to peak and then decrease as the generator adapts.
+
+**Kill threshold**: 30 epochs stale. Currently ★=0.186 (ep10). Kill at ep40 if ★ hasn't improved beyond 0.186.
+
+### ep20 Gate Scheduled
+
+Automated ep20 frozen_sweep gate running (`run_v225_ep20_gate.sh`). At 212s/epoch, ep20 fires in ~35 minutes. If ★ < 0.15 at ep20 → strong basin signal. If ★ still ≥ 0.186 at ep20 → early convergence issue.
+
+### v223 Post-Mortem (ep80)
+
+v223 reached ep80 (comb=0.046) despite our "CLOSED" decision at ep22. The chain-reuse loss was targeting consecutive same-object rate (~3% real) with a 61.5% global target — fundamentally wrong metric. Even with 80 epochs, this cannot produce correct LRU temporal structure. Killing it was the right call.
+
+### Race Position
+
+| Corpus | LLNL legitimate | LLNL oracle | LANL | Status |
+|--------|----------------|-------------|------|--------|
+| Alibaba | **0.001937** | 0.001937 | 0.00301 | **LLNL leads 35%** |
+| Tencent | ~0.06 | 0.005421 | 0.00887 | LANL leads legitimate; LLNL leads oracle |
+
+Alibaba lead is solid. Tencent legitimate path depends on v225 Phase 3 convergence.
