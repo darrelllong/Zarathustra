@@ -6690,3 +6690,65 @@ LLNL leads overall on alibaba. On tencent, LANL leads with a 5× gap on legitima
 
 **LANL Status**: RESULTS.md last updated Apr 23 10:23 (>22 hours silent). No new experiments.
 
+
+---
+
+## Round 113 — IDEA #97 Implemented; v226 Launched with --lru-cache-depth 15000
+
+**Date**: 2026-04-24
+
+### IDEA #97 Implementation (3 files changed)
+
+**`llgan/dataset.py`** — `_apply_obj_locality()`:
+- Added `lru_cache_depth: int = 0` parameter to `TracePreprocessor.__init__()`
+- When `lru_cache_depth > 0`: compute LRU hit indicator using `collections.OrderedDict` cache
+- When `lru_cache_depth = 0`: legacy consecutive same-object semantics (unchanged)
+- Feature name kept as `obj_id_reuse` (same column, new semantics — minimal downstream changes)
+- Stride set to 0 for hits (cache access), consecutive delta for misses (spatial locality preserved)
+
+**`llgan/config.py`**: Added `lru_cache_depth: int = 0` field with documentation.
+
+**`llgan/train.py`**: Added `--lru-cache-depth` CLI arg; wired into `_fit_prep_on_files()` and preprocessor instantiation.
+
+**Key property**: Feature name `obj_id_reuse` unchanged. All downstream code (mixed-type recovery BCE, PCF loss, multi-scale critic) automatically uses LRU hit semantics without modification. The generator learns to produce 61.5% positive `obj_id_reuse` (LRU hits) instead of 3% (consecutive reuse).
+
+### v226 Launched
+
+```bash
+python train.py \
+  --trace-dir /home/darrell/traces/tencent_block_1M \
+  --fmt oracle_general --seed 5 \
+  --retrieval-memory --n-regimes 8 \
+  --multi-scale-critic --mixed-type-recovery \
+  --pcf-loss-weight 1.0 \
+  --files-per-epoch 12 --lr-g 8e-5 --lr-d 4e-5 \
+  --w-stop-threshold 7.0 \
+  --lru-cache-depth 15000 \     ← IDEA #97
+  --no-compile --no-amp \
+  --checkpoint-dir /home/darrell/checkpoints/tencent_v226 \
+  --char-file /home/darrell/traces/characterization/trace_characterizations.jsonl
+```
+
+Log: `/home/darrell/train_tencent_v226.log`
+
+Preprocessor output confirmed: `columns (5): ['ts', 'obj_size', 'tenant', 'obj_id_reuse', 'obj_id_stride']`. The `obj_id_reuse` column now encodes LRU hits (K=15,000) for each access. Phase 1 AE pretraining started.
+
+### What to Watch at Phase 3
+
+**Critical diagnostic** (ep10 natural eval, no Bernoulli override):
+- Expected with IDEA #97: `reuse_rate ≈ 0.55-0.65` (real: 0.615)
+- Expected with IDEA #97: `HRC-MAE < 0.05` (vs v225 natural: 0.582)
+- If reuse rate ≈ 0.615 AND PMF matches: `HRC-MAE < 0.01` → beats LANL
+
+Phase 1 AE (~50 ep × 213s ≈ 3h), Phase 2 Supervisor (~50 ep ≈ 3h), Phase 2.5 warm-up (~100 ep ≈ 6h). Phase 3 starts in approximately **12-13 hours**.
+
+### Race Position
+
+| Corpus | LLNL best legit | LANL | Status |
+|--------|----------------|------|--------|
+| Alibaba | **0.001937** | 0.00301 | **LLNL leads 35%** |
+| Tencent (legit) | ~0.044 | **0.00887** | LANL leads 5× — v226 targets this |
+| Tencent (oracle) | 0.005421 | 0.00887 | Oracle only |
+
+v226 is LLNL's primary path to legitimately beating LANL on tencent. If IDEA #97 works as intended, the natural long-rollout HRC-MAE will drop from 0.582 to <0.01 without any decoder override.
+
