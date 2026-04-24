@@ -7078,3 +7078,48 @@ v227 ep10 gate (PID 742267) watching. At ~290s/epoch (was slower when parallel w
 - Tencent: best legitimate = v226 ep10 raw **0.038** (LLNL) vs LANL **0.01065** — LANL leads 3.6×
 - v227 active: targeting HRC-MAE < 0.01065 at ep10 if reuse stabilizes at ≥0.60
 
+
+---
+
+## Round 121 — v227 ep5; Reuse Stabilizing at ~0.57; ep10 Gate in 17 min
+
+**Date**: 2026-04-24 06:15 PDT
+
+### v227 ep5 Trajectory
+
+| Epoch | reuse_rate | t | MMD² | recall | comb |
+|-------|-----------|---|------|--------|------|
+| 1 | 0.603 | 292s | — | — | — |
+| 2 | 0.531 | 292s | — | — | — |
+| 3 | 0.591 | 308s | — | — | — |
+| 4 | 0.559 | 210s | — | — | — |
+| 5 | 0.569 | 210s | 0.00798 | 0.672 | 0.07358 ★ |
+
+The reuse rate is oscillating in [0.53, 0.60] — much more stable than v226's catastrophic oscillation (ep20: 0.25, ep30: 0.96). The explicit loss (weight=10) is acting as a floor preventing collapse, but the adversarial dynamics still pull below the target 0.615.
+
+The GAN's adversarial dynamics (PCF, multi-scale critic, recall) produce a gradient that competes with the reuse rate loss. At weight=10, the loss provides a gradient of `20 × (reuse - 0.615) ≈ -0.92` when reuse=0.569. This stabilizes around 0.57 rather than enforcing exact convergence to 0.615.
+
+**Epochs back to 210s**: v226 fully cleared, v227 has full GPU.
+
+### ep10 Gate Imminent
+
+ep10 fires at ~06:32 PDT. Gate (PID 742267) then runs frozen_sweep + natural eval (~15 min).
+
+**Key diagnostic**: is HRC-MAE < 0.01065 at reuse≈0.57?
+
+Comparison points:
+- v226 ep10 (reuse=0.576): HRC-MAE=0.035 (oracle PMF), 0.038 (raw)
+- v227 ep10 (reuse≈0.57): should be similar if stable
+
+If the HRC-MAE at ep20 is also ~0.035 (not the catastrophic 0.345 seen in v226), v227's explicit loss is working as intended.
+
+### Strategic Assessment
+
+| Loss configuration | ep10 reuse | ep10 HRC | ep20 stability |
+|-------------------|-----------|----------|----------------|
+| v226: IDEA #97 only | 0.576 | 0.035 | COLLAPSED (0.25) |
+| v227: IDEA #97 + IDEA #51 (w=10) | ~0.57 | TBD | TBD (stable so far) |
+| v228 (if needed): IDEA #97 + IDEA #51 (w=50) | ~0.60? | TBD | TBD |
+
+If v227 also collapses at ep20, raise to w=50 for v228.
+
