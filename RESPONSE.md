@@ -4825,3 +4825,55 @@ v220 entered Phase 3 GAN training at 18:36 on 2026-04-23. Config:
 Pretrain checkpoint saved: `/home/darrell/checkpoints/tencent_v220/pretrain_complete.pt`
 
 ep10 footprint gate pending — will determine if chain-reuse succeeds with real data vs garbage.
+
+---
+
+## Round 82 — v220 Architectural Failure (TimeGAN+Chain-Reuse Incompatibility), v221 Launch
+
+**Date**: 2026-04-23
+**Reporting**: v220 CLOSED-FAILED (new architectural failure mode), v221 launched (non-TimeGAN)
+
+### v220 CLOSED-FAILED: New Chain-Reuse Failure Mode (v7) — TimeGAN Architecture Incompatibility
+
+v220 killed at ep8 (Phase 3 ep8/200) after structural analysis confirmed chain-reuse is fundamentally broken in TimeGAN mode.
+
+**Root cause**: The chain-reuse loss in `train.py` line 1878 uses `_H_cr[:, :, obj_id_col]` where `obj_id_col=3` (feature-space index for `obj_id_reuse`). But `_H_cr` is the Generator's output AFTER Sigmoid activation, with shape (B, T, latent_dim=24). So:
+- Indexing latent[3] = arbitrary 4th latent coordinate, NOT feature-space reuse
+- Generator output ∈ (0, 1) due to Sigmoid — ALL VALUES ≥ 0 always
+- Hard binary STE: `val ≥ 0 → binary = 1` → ALWAYS 1
+- Chain-reuse rate = 1.0 forever, gradient pushes toward 0 but can NEVER cross below 0
+- Gradient dies at Sigmoid saturation: sigmoid(x) ≈ 1 → d/dx ≈ 0
+
+**Why non-TimeGAN works**: With `--latent-dim 0`, Generator outputs Tanh(·) ∈ (-1, 1) DIRECTLY in feature space. Latent[3] IS feature[3] = obj_id_reuse. Values CAN be negative (= new object). Hard binary threshold at 0 can be crossed. Chain-reuse equilibrium at rate=0.615 is achievable.
+
+**Historical evidence**: v214/v215 (IDEA #79, non-TimeGAN with garbage data) showed footprint=716 at ep10 — proof that the hybrid surrogate works in non-TimeGAN mode. Chain-reuse was never tested with: (a) non-TimeGAN + (b) real tencent data. v221 is that experiment.
+
+**Complete chain-reuse failure taxonomy (v1-v7)**:
+
+| Version | Architecture | Failure | Root cause |
+|---------|-------------|---------|-----------|
+| v209 (v1) | Non-TimeGAN | sub-threshold stuck | linear surrogate |
+| v210 (v2) | Non-TimeGAN | sigmoid saturates | sigmoid surrogate |
+| v212/v213 (v3) | Non-TimeGAN | super-threshold saturation | one-sided sigmoid |
+| v214/v215 (v4) | Non-TimeGAN | ep10 ok, ep50 collapse | hybrid surrogate but wrong data |
+| v216/v217 (v5) | Non-TimeGAN | removed diversity signal | weights + wrong data |
+| v218/v219 (v6) | Non-TimeGAN | stride floor via reuse tokens | stride loss + wrong data |
+| **v220 (v7)** | **TimeGAN** | **Sigmoid output ∈(0,1), latent[3]≠reuse** | **Architecture mismatch** |
+
+**v221 (LAUNCHING NOW)**: Non-TimeGAN (`--latent-dim 0`) + correct real tencent data + IDEA #79 hybrid surrogate. First clean test of chain-reuse on real data with correct architecture.
+
+### v221 Launch Confirmed
+
+PID: 516348, log: `/home/darrell/train_tencent_v221.log`
+
+Key confirmation from log:
+- `3234 files found` — correct trace dir confirmed
+- No pretraining phase (non-TimeGAN, no AE/Supervisor)
+- Phase 3 ep1: W=+1.1258, G=-0.2351, t=77.2s (much faster than v220's 230s/epoch)
+- Columns: ['ts', 'obj_size', 'tenant', 'obj_id_reuse', 'obj_id_stride']
+
+Config: `--latent-dim 0 --chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse-rate-target 0.615 --chain-stride-floor 0.3 --reuse-bce-weight 2.0 --seed 7 --files-per-epoch 12`
+
+ep10 gate (~12 minutes): probe reuse_rate. If < 0.95, chain-reuse is having some effect.
+ep10 target: footprint > 0 (any new objects generated)
+ep30 target: reuse_rate approaching 0.615

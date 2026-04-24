@@ -2882,3 +2882,39 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 # Sample training files with same unique_rate range
 # Compute metrics → calibrate-from-json
 ```
+
+## IDEA #84 (LLNL): Non-TimeGAN Chain-Reuse (v221) — Correct Architecture for IDEA #79
+
+**Status**: PLANNED — launch immediately after v220 kill
+
+**Why v220 fails (new finding, Round 82)**: v220 uses TimeGAN (latent_dim=24). Chain-reuse loss indexes `latent[3]` as "reuse proxy". But in TimeGAN, Generator outputs Sigmoid(·) ∈ (0,1), so latent[3] ≥ 0 ALWAYS, and the hard-binary STE (`val≥0 → 1`) is ALWAYS 1.0. Chain-reuse rate = 1.0 forever. Gradient can push pre-sigmoid values down, but Sigmoid output can never cross below 0. The chain-reuse loss is structurally incapable of reducing reuse in TimeGAN mode.
+
+**Why non-TimeGAN works (IDEA #79 architecture)**: With `--latent-dim 0`, Generator outputs Tanh(·) ∈ (-1,1) directly in feature space. Latent[3] IS feature[3] = obj_id_reuse. Values CAN be negative (= new object). The hybrid surrogate can achieve equilibrium at reuse_rate = 0.615.
+
+**Historical evidence for non-TimeGAN success**: v214/v215 (IDEA #79 hybrid surrogate, non-TimeGAN) showed footprint=716 at ep10 even with GARBAGE tencent data. With REAL tencent data (3234 files), IDEA #79 chain-reuse should work even better.
+
+**v221 config** (exact):
+```
+--trace-dir /home/darrell/traces/tencent_block_1M
+--fmt oracle_general --seed 7 
+--latent-dim 0          # NON-TimeGAN — Tanh output in feature space
+--cond-dim 10 --var-cond --var-cond-kl-weight 0.01
+--diversity-loss-weight 2.0 --w-stop-threshold 7.0
+--boundary-critic-weight 0.1 --boundary-critic-k 4 --boundary-critic-real-reconstruct
+--files-per-epoch 12 --lr-g 8e-5 --lr-d 4e-5
+--reuse-bce-weight 2.0 --chain-reuse-weight 5.0 --chain-reuse-windows 8
+--reuse-rate-target 0.615 --chain-stride-floor 0.3
+--no-compile --no-amp
+--checkpoint-dir /home/darrell/checkpoints/tencent_v221
+--char-file /home/darrell/traces/characterization/trace_characterizations.jsonl
+```
+
+**Key difference from v220**: `--latent-dim 0` (was 24 default). Everything else identical.
+
+**ep10 gate**: check reuse_rate < 1.0 and footprint > 0. If reuse_rate < 0.95 at ep10, continue.
+
+**Expected behavior**: With non-TimeGAN + real tencent data + IDEA #79 hybrid surrogate:
+1. ep1-5: GAN dynamics normal, chain-reuse applies gradient to feature[3] (actual reuse column)
+2. ep5-15: reuse_rate should start moving toward 0.615 as chain-reuse loss applies pressure
+3. ep15-30: if reuse equilibrium achieved, footprint grows (new objects generated)
+4. ep30+: frozen sweep for ATB claim
