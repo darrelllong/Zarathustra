@@ -2815,3 +2815,35 @@ Applied only when stride_col ≥ 0 and chain_stride_floor > 0. Uses same _crw (c
 **Code**: Implemented in `llgan/train.py` chain-reuse block. CLI: `--chain-stride-floor FLOAT` (default=0.0, disabled).
 
 **Versions**: alibaba_v218 (seed=13, --chain-stride-floor 0.3, reuse-bce=2.0, diversity=2.0), tencent_v219 (seed=7, same)
+
+## IDEA #82 (LLNL): Explicit LRU-State Object Generator + Neural Mark Sidecar
+
+**Status**: DESIGN PHASE — activate if v218/v219 ep10 gate fails
+
+**Strategic context**: LANL's PhaseAtlas + neural marks hybrid achieved HRC-MAE=0.00842 and mark_score=0.031 on tencent (Apr 23 2026). The architectural reason: PhaseAtlas generates locality by design (explicit LRU-state machine), not by loss pressure. LLNL's GAN approach has consumed 9+ chain-reuse versions trying to teach something that a state machine encodes structurally.
+
+**Design**:
+
+1. **Phase-Conditioned Object Process** (replaces GAN generator for the object ID column):
+   - Phase set: {cold, warm, hot, random} — derived from stack-rank percentile during trace characterization
+   - Phase transition matrix: learned from trace characterization data (existing `trace_characterizations.jsonl`)
+   - Object ID sampling: empirical rank distribution per phase (rank-1 objects more likely in hot phase)
+   - `local_prob_power` hyperparameter controls rank-selection steepness (LANL found 0.8 optimal for tencent)
+   - LRU stack maintained in-memory during generation; new objects enter stack, accessed objects promoted
+
+2. **Neural Mark Sidecar** (LSTM conditioned on phase + action + recent marks):
+   - Inputs: current phase embedding, action type (new/reuse), stack rank bucket, recent (dt, size, opcode, tenant)
+   - Outputs: next (dt, size, opcode, tenant) as continuous/categorical distributions
+   - Training: supervised on real traces with teacher forcing; small model (1-2 LSTM layers, hidden=128)
+   - Key from LANL intel: categorical_source="neural" beats reservoir sampling (0.031 vs 0.047 mark_score)
+
+3. **Existing GAN role** (reduced): Can be retained for generating the non-object-ID continuous marks (ts_delta, obj_size) as a second opinion or for conditioning the LSTM sidecar.
+
+**Implementation path** (if IDEA #81 fails):
+- Week 1: Port existing trace characterization to build phase transition matrices and rank distributions
+- Week 2: Implement explicit object sampler; verify HRC-MAE approaches PhaseAtlas baseline
+- Week 3: Train LSTM mark sidecar; verify mark_score < 0.05
+
+**Why this works**: LANL proved it. The explicit LRU-state machine generates the right cache law by construction. The neural mark sidecar adds sequential mark quality without disturbing the object law. No GAN training instability, no footprint collapse, no chain-reuse degenerate solutions.
+
+**Risk**: LLNL would be building a parallel-architecture approach. The advantage is we can tune it independently — phase transition power law, blend parameters, mark conditioning — without GAN adversarial dynamics.

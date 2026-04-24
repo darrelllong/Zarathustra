@@ -4526,13 +4526,40 @@ One-sided: zero loss when mean|stride| ≥ floor. Gradient nonzero only when str
 | v216/v217 (v5) | v4 + rebalanced weights | removed diversity signal, worse collapse | 23 |
 | v218/v219 (v6) | v4 + stride floor | ? (ep10 gate) | expected >5000 |
 
+### LANL Intel: Neural Marks Hybrid — Compound Result Achieved (Apr 23 09:44)
+
+LANL has executed IDEA #53 (neural mark sidecar around PhaseAtlas). Today's result:
+
+| Metric | LANL NeuralMarks | LANL PhaseAtlas (prev) | LLNL v195/v165 | LLNL gap |
+|--------|-----------------|------------------------|----------------|----------|
+| HRC-MAE | **0.00842** | 0.00887 | 0.1287 (long) | **15×** |
+| mark_score | **0.031** | ~0.047 (reservoir) | 0.435 | **14×** |
+| opcode_tv | **0.0079** | ~0.047 | 1.0 | **127×** |
+| tenant_tv | **0.0089** | ~0.047 | 0.243 | **27×** |
+| reuse_access | 0.613 vs 0.615 real | — | ~0 (long-rollout) | — |
+| stack p90 | 170 vs 174 real | — | unknown | — |
+
+The neural marks sidecar adds zero HRC-MAE cost (stable at 0.008423 across all mark variants). The cache law is entirely from the PhaseAtlas object process; marks ride on top without disturbing it. Neural marks (LSTM conditioned on phase/action/stack-rank) beats reservoir sampling: 0.031 vs 0.047 mark_score.
+
+**LLNL structural diagnosis**: The GAN approach generates locality through loss pressure. PhaseAtlas generates locality by architectural design — an explicit LRU-state machine tracks phase (cold/warm/hot/random) and samples object IDs from the empirical rank distribution conditioned on phase. No gradient, no training, no collapse. Our 9 chain-reuse versions are fighting to teach a GAN something that PhaseAtlas encodes structurally.
+
 ### Race Position
 
-LANL holds alibaba 0.00222 and tencent 0.00887 (strict holdout PhaseAtlas). LLNL has no competitive long-rollout result after 9 chain-reuse versions. v218/v219 is the last architectural variant before pivoting to a fundamentally different approach.
+LANL now holds a compound result: HRC-MAE=0.00842 + mark_score=0.031 (both corpora approaching, tencent confirmed). LLNL has no competitive long-rollout result after 9 chain-reuse versions. The gap is structural, not hyperparameter.
+
+**IDEA #82 — Explicit LRU-State Object Generator** (design-time architecture change):
+
+If v218/v219 ep10 gates pass, continue with chain-reuse path.
+If ep10 gates fail, retire chain-reuse and build IDEA #82:
+- Replace the GAN generator with an explicit phase-conditioned LRU-state sampler
+- Phase transitions learned from trace characterization data (existing `trace_characterizations.jsonl`)
+- Object IDs sampled from empirical rank distributions per phase (from characterization)
+- LSTM neural mark sidecar (dt, size, opcode, tenant) conditioned on phase + action + recent marks
+- This matches LANL's architectural design without copying their implementation
 
 ### Next Gates
 
 1. **v219 ep10** — tencent first (~50min). Gate: mean|stride| > 0.2, footprint > 5000.
 2. **v218 ep10** — alibaba ~1h. Same gates.
-3. **If passes**: ep20/ep30 stability check → frozen_sweep → first honest chain-reuse ATB claim.
-4. **If fails**: retire chain-reuse; pivot to explicit phase conditioning or object-pool atlas (closer to LANL's PhaseAtlas design).
+3. **If passes**: ep20/ep30 stability check → frozen_sweep → ATB claim.
+4. **If fails**: IDEA #82 — retire GAN, build explicit LRU-state object generator + neural mark sidecar.
