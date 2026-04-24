@@ -7304,3 +7304,42 @@ Wait for ep20 gate results. Decision tree:
 - **footprint [8k, 15k] AND reuse [0.50, 0.65]**: v228 stable → continue to ep30, deploy ep30 gate
 - **footprint < 1k OR reuse > 0.90**: mode collapse → kill v228, escalate to IDEA #104 (hard-threshold loss)
 - **reuse < 0.30**: miss collapse → kill v228, raise reuse_rate_loss_weight to 25.0 in v230
+
+---
+
+## Round 126 — v228 ep19 Strong; MMD² Improving; ep20 Gate Imminent
+
+**Date**: 2026-04-24 07:48 PDT
+
+### v228 ep10→ep19 — Clear Convergence Signal
+
+v228 is exhibiting genuine convergence for the first time in tencent Phase 3:
+
+| Epoch | reuse_rate | W-dist | MMD² | recall | Notes |
+|-------|-----------|--------|------|--------|-------|
+| ep5 | 0.568 | +1.156 | 0.00987 | 0.568 | ★ |
+| ep10 | 0.578 | +1.564 | 0.00863 | 0.595 | ★ (saved) |
+| ep15 | 0.594 | +1.801 | **0.00557** | **0.659** | ★ (best!) |
+| ep16 | 0.635 | +1.675 | — | — | |
+| ep17 | 0.655 | +1.752 | — | — | |
+| ep18 | 0.586 | +1.980 | — | — | |
+| ep19 | 0.556 | +1.964 | — | — | ep20 pending |
+
+MMD² dropped 43% from ep5→ep15 (0.00987→0.00557). Recall increased 16% (0.568→0.659). Reuse oscillating in [0.55, 0.66] — healthy range, no collapse. W-dist stable [1.6, 2.0] — well below 7.0 kill threshold.
+
+This is in stark contrast to v226 which had reuse=0.576 at ep10 and then catastrophically regressed to 0.250 at ep20. v228's ep19 reuse=0.556 is similar to v226's ep10 but the W-dist pattern is different — v228's W-dist is trending up gradually (normal GAN training) while v226's W-dist preceded a phase flip.
+
+**ep20 checkpoint ETA**: ~07:53 PDT. Gate (PID 762652) will immediately: run frozen_sweep + generate 100k + eval HRC-MAE.
+
+### v229 ep7 — Decoder Bias Test Underway
+
+v229 (target=0.70, same architecture) at ep7, reuse oscillating [0.55, 0.61] — same band as v228 despite higher target. This suggests the reuse_rate_loss (weight=10.0) is not dominating over GAN dynamics. The target=0.70 experiment is tracking, but early convergence appears similar to v228. **ep10 gate** (PID 768082) ETA ~08:00.
+
+### LANL — 22+ Hours Silent
+
+No updates to RESULTS.md or PEER-REVIEW.md. Their best tencent result (0.01065) remains the target. Their last RESULTS.md entry noted:
+- NeuralStack blend monotonically worsens tencent HRC-MAE (pure atlas better)
+- Neural transition smoother is "not the winner yet"
+
+LANL appears to be at an architectural dead end on tencent: their profile-routed atlas is 0.03210 at new holdout (worse than their own 0.01065 from prior). Meanwhile LLNL's v228 ep15 shows MMD²=0.00557 with recall=0.659 — genuine convergence that should translate to HRC improvement.
+
