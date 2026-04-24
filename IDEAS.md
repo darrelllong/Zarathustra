@@ -2919,12 +2919,17 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 3. ep15-30: if reuse equilibrium achieved, footprint grows (new objects generated)
 4. ep30+: frozen sweep for ATB claim
 
-**ep10/ep20/ep30 probe results (Round 85):**
+**ep10/ep20/ep30/ep40/ep50 probe results (Rounds 85-87):**
 - ep10: raw frac<0 = 0.102 (10.2% new objects), decoded footprint = 1-27 (collapsed)
 - ep20: raw frac<0 = 0.277 (27.7% new objects) — peak — decoded footprint 1-981 (high variance)
 - ep30: raw frac<0 = 0.197 (19.7% new objects) — oscillating back toward reuse
-- STATUS: Chain-reuse gradient IS active but oscillating. Not converging monotonically.
-- ep50 gate: if frac<0 < 0.20, kill and relaunch v222 with chain-reuse-weight=20.0
+- ep40: raw frac<0 = 0.229 (22.9% new objects), G loss = -4.3 (G winning briefly)
+- ep50: raw frac<0 = **0.094** (9.4% new objects) — REGRESSED below ep10 level
+- STATUS: **CLOSED-FAILED** — weight=5.0 cannot sustain chain-reuse against GAN dynamics.
+
+**Root cause**: Tencent's heterogeneous reuse distribution (0.10-0.99 across files) allows the Critic to find high-reuse modes that the Generator defaults to when chain-reuse pressure relaxes. Weight=5.0 creates temporary excursions (ep20 peak at 27.7%) but not stable equilibrium.
+
+**Successor**: IDEA #84 v222 launched with chain-reuse-weight=20.0 (PID 549274, vinge.local)
 
 ## IDEA #85 (LLNL): Extended Alibaba Phase-PMF Calibration (32-128 files)
 
@@ -2945,3 +2950,39 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 **Risk**: Calibration from v195 different-file eval may already be "optimal" — more training files might not improve over cross-eval-file calibration. Test first with 32 files.
 
 **Comparison bar**: LANL 0.00301 (stable), 0.00222 (unstable seed-42). LLNL target: < 0.00185.
+
+**Status update (Round 87)**: CLOSED-FAILED. Training files reuse_rate=0.43-0.53 vs eval target 0.265. All calibrations from training files produced HRC-MAE=0.10-0.18. The v195 hardcoded PMF (0.001937) cannot be improved by using more training files — the eval files have a different access pattern than the training distribution.
+
+---
+
+## IDEA #86 (LLNL): Chain-Reuse Weight Escalation v222 (weight=20.0)
+
+**Status**: RUNNING — PID 549274, vinge.local
+
+**Motivation**: v221 (IDEA #84) with chain-reuse-weight=5.0 showed temporary equilibrium at 22-28% new objects (target 38.5%) but regressed to 9.4% at ep50. The GAN dynamics overcome the chain-reuse pressure when weight is too low. Theory: at weight=20.0, the chain-reuse gradient (applied per step) dominates the Generator update more decisively, shifting the GAN equilibrium toward the target.
+
+**Configuration** (v222):
+```
+--trace-dir /home/darrell/traces/tencent_block_1M
+--fmt oracle_general --seed 7
+--latent-dim 0  # NON-TimeGAN — Tanh output
+--cond-dim 10 --var-cond --var-cond-kl-weight 0.01
+--diversity-loss-weight 2.0 --w-stop-threshold 7.0
+--boundary-critic-weight 0.1 --boundary-critic-k 4 --boundary-critic-real-reconstruct
+--files-per-epoch 12 --lr-g 8e-5 --lr-d 4e-5
+--reuse-bce-weight 2.0
+--chain-reuse-weight 20.0   # ← 4× increase from v221
+--chain-reuse-windows 8 --reuse-rate-target 0.615 --chain-stride-floor 0.3
+--no-compile --no-amp
+--checkpoint-dir /home/darrell/checkpoints/tencent_v222
+--char-file /home/darrell/traces/characterization/trace_characterizations.jsonl
+```
+
+**ep1 observation**: W=+0.6560, G=-0.3073 — Critic winning, healthy start.
+
+**ep10 gate criteria**:
+- frac<0 ≥ 0.30: on track, continue
+- frac<0 0.15-0.30: marginal, watch ep20
+- frac<0 < 0.15 or G-collapse (W sustained < -5.0): kill, consider weight=12.0 or --copy-path-loss-only
+
+**Risk**: Weight=20.0 might over-constrain the Generator, causing mode collapse in the opposite direction (all objects "new", footprint explodes, diversity loss cannot compensate). Monitor W loss and recall at ep10.

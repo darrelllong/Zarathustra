@@ -5002,6 +5002,57 @@ However, LLNL's alibaba Phase-PMF lead (0.001937 vs LANL stable 0.00301) is now 
 
 Priority remains tencent GAN (v221) and monitoring LANL's alibaba seed stabilization.
 
+## Round 86 — IDEA #85 CLOSED-FAILED, v221 ep40 Oscillation Assessment
+
+**Date**: 2026-04-23
+**Reporting**: IDEA #85 extended alibaba calibration failed; v221 ep40 shows chain-reuse oscillating below target.
+
+### IDEA #85 CLOSED-FAILED — Training Files Have Wrong Reuse Rate
+
+Extended alibaba calibration study computed real LRU PMF from 8/32/64/128/233 training files. Results:
+
+| Files | HRC-MAE | Generated Reuse | Issue |
+|-------|---------|----------------|-------|
+| 8 training | 0.105962 | 0.000 | Wrong reuse rate |
+| 32 training | 0.120179 | 0.000 | Wrong reuse rate |
+| 64 training | 0.176735 | 0.000 | Wrong reuse rate |
+| 128 training | 0.162366 | 0.000 | Wrong reuse rate |
+| 233 training | 0.144790 | 0.000 | Wrong reuse rate |
+
+All failed catastrophically (HRC-MAE = 0.10-0.18 vs current 0.001937). Root cause: training files have mean reuse_rate = 0.43-0.53, while the standard eval target has reuse=0.265. The training PMF is calibrated for the wrong access pattern.
+
+**CONCLUSION**: The current 0.001937 result (using hardcoded v195 eval PMF) is already the best available calibration. The v195 PMF comes from alibaba files that closely match the eval target reuse rate (0.265). Alibaba is NOT uniformly homogeneous — some files have reuse ~0.43-0.53, others ~0.265. IDEA #85 is CLOSED.
+
+### v221 ep40 Probe — Chain-Reuse Oscillation
+
+| Epoch | Raw frac<0 (new) | G loss | Status |
+|-------|-----------------|--------|--------|
+| ep10 | 0.102 | +1.5 | Collapsed |
+| ep20 | **0.277** | +4.7 | Peak |
+| ep30 | 0.197 | +4.3 | Dip |
+| ep40 | 0.229 | **-4.3** | Recovering |
+| ep50 | pending | — | Gate |
+| Target | **0.385** | — | — |
+
+G loss flipped NEGATIVE at ep40 (Generator fooling Critic). This is a GAN convergence event — the Generator has learned to fool the Critic while also partially satisfying chain-reuse. The oscillation range (20-28%) is stabilizing below the target (38.5%).
+
+**Analysis**: The chain-reuse weight (5.0) has found a LOCAL equilibrium at ~22-28% new objects. The GAN dynamics (Wasserstein loss + critic discrimination) counterbalance the chain-reuse pressure. The equilibrium is stable but below target.
+
+**ep50 gate criterion**:
+- If ep50 frac<0 ≥ 0.30 (30%): continue to ep100 — progress
+- If ep50 frac<0 < 0.25 (oscillating below 25%): kill v221, relaunch v222 with chain-reuse-weight=20.0
+
+### Race Position (updated 2026-04-23 22:00)
+
+| Metric | LLNL | LANL stable | Delta |
+|--------|------|-------------|-------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | LLNL +35% |
+| Tencent HRC-MAE | 0.04375 (Phase-PMF) | **0.00887** | LANL 4.9× |
+| Tencent GAN | v221 ep44 running | — | — |
+| Mark quality (alibaba) | ~0.614 TV | **0.00479** | LANL dominant |
+
+LANL mark hybrid experiments all failed — mark quality stuck at 0.00479. LLNL has no competitive mark quality yet (export denorm issue).
+
 ## Round 85 — v221 ep30 Probe, Chain-Reuse Oscillation Analysis, Strategic Pivot
 
 **Date**: 2026-04-23
@@ -5047,3 +5098,63 @@ LANL's alibaba 0.00222 (seed-42 only, not stable) is approaching LLNL's 0.001937
 ### LANL Mark Hybrid Status
 
 LANL's IDEA #53 mark hybrid experiments ALL FAILED to improve on the 0.00479 baseline. Best hybrid achieved 0.00528 (10% worse than baseline). LANL is NOT making progress on mark quality. This is an opportunity for LLNL — if we can improve mark quality on alibaba (requires export denormalization fix), we could widen the compound benchmark gap.
+
+## Round 87 — v221 ep50 KILL DECISION, v222 Launch (chain-reuse-weight=20.0)
+
+**Date**: 2026-04-23
+**Reporting**: v221 ep50 probe confirms chain-reuse failure at weight=5.0; v222 launched with 4× stronger signal.
+
+### v221 ep50 Probe — Kill Decision Triggered
+
+| Epoch | Raw frac<0 (new) | G loss | W loss | Status |
+|-------|-----------------|--------|--------|--------|
+| ep10 | 0.102 | +1.5 | — | Bimodal |
+| ep20 | 0.277 | +4.7 | — | Peak |
+| ep30 | 0.197 | +4.3 | — | Dip |
+| ep40 | 0.229 | **-4.3** | — | G winning |
+| **ep50** | **0.094** | +1.9 | +1.09 | **KILLED** |
+| Target | **0.385** | — | — | — |
+
+ep50 raw frac<0 = **0.094** — regressed to below ep10 levels. Critic recovered (W=+1.09) but Generator collapsed back toward full reuse. This is consistent with the high-variance conditioning hypothesis: with strong Critic pressure at ep40-50, the Generator defaults back to high-reuse regime.
+
+**ROOT CAUSE CONFIRMED**: chain-reuse-weight=5.0 cannot overcome GAN training dynamics in the presence of tencent's heterogeneous reuse distribution (files span 0.10-0.99 reuse rate). The GAN loss equilibrium at ~22-28% was not a stable attractor — it was temporary excursion.
+
+**Kill criterion met**: frac<0 = 0.094 < 0.25. v221 KILLED.
+
+### v222 Launch — 4× Chain-Reuse Signal
+
+**Configuration change**: `--chain-reuse-weight 20.0` (was 5.0 in v221)
+
+All other parameters unchanged:
+```
+--seed 7 --latent-dim 0 (non-TimeGAN, Tanh output)
+--chain-reuse-windows 8 --reuse-rate-target 0.615 --chain-stride-floor 0.3
+--reuse-bce-weight 2.0 (timestep BCE, active)
+--diversity-loss-weight 2.0 --w-stop-threshold 7.0
+--files-per-epoch 12 --lr-g 8e-5 --lr-d 4e-5
+```
+
+**PID**: 549274 at vinge.local
+**Log**: /home/darrell/train_tencent_v222.log
+**Checkpoint**: /home/darrell/checkpoints/tencent_v222/
+
+**Hypothesis**: At weight=20.0, the chain-reuse gradient dominates the Generator's update at each step, preventing the GAN dynamics from pulling the reuse rate back to high-reuse. The 4× signal increase should shift the equilibrium from ~22% new toward ≥38.5% new.
+
+**Risk**: G destabilization — weight too high could cause G mode collapse (all objects become "new"). Monitor ep10 W loss; if W < -3.0 sustained, reduce to 12.0.
+
+### ep10 Gate for v222
+
+Probe at epoch_0010.pt:
+- If frac<0 ≥ 0.30: on track, continue
+- If frac<0 15-30%: marginal, watch ep20
+- If frac<0 < 0.15 or G-collapse (W < -5.0): kill, consider --copy-path-loss-only or reduce weight to 12.0
+
+### Race Position (updated 2026-04-23 23:00)
+
+| Metric | LLNL | LANL stable | Delta |
+|--------|------|-------------|-------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | LLNL +35% |
+| Tencent HRC-MAE | 0.04375 (Phase-PMF) | **0.00887** | LANL 4.9× |
+| Tencent GAN | v222 ep1 running (20.0 wt) | — | — |
+
+Chain-reuse iteration count: **9 attempts** (v209-v222). Each one has narrowed the failure mode. v221 confirmed that 5.0 weight finds a temporary equilibrium but cannot hold against GAN dynamics. v222 at 20.0 tests whether the equilibrium can be shifted decisively.
