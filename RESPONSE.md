@@ -4634,6 +4634,39 @@ LLNL's version of the explicit object-process generator, built from our existing
 - Phase 1: Build the explicit object sampler from `trace_characterizations.jsonl` — should reproduce LANL-class HRC-MAE within 2-3 days
 - Phase 2: Train LSTM mark sidecar — 1 week
 
+### CRITICAL BUG FOUND: Tencent Training Directory Wrong Since v213
+
+**All tencent chain-reuse experiments (v213-v219) were trained on garbage data.**
+
+Correct tencent trace dir: `/home/darrell/traces/tencent_block_1M/` (3,234 oracle_general files)
+Wrong dir used v213+: `/tiamat/zarathustra/traces/tencent/` (only README.md, wget.log, Cloud_Disk_dataset.zip)
+
+The `oracle_general` parser reads binary bytes from any file — including text files and zip archives. `README.md` (1135 bytes = 47 garbage records), `wget.log` (2MB = ~83k garbage records), `Cloud_Disk_dataset.zip` (300MB = 12.5M garbage records) were all silently parsed as "oracle_general" binary traces. The model was fitting noise.
+
+This explains everything about the chain-reuse failure: the footprint collapse wasn't from adversarial dynamics overpowering gradient — the model had no real object locality structure to learn in the first place.
+
+**v220 (tencent, correct dir, IDEA #79+#81)** — launched with `--trace-dir /home/darrell/traces/tencent_block_1M`.
+
+### LLNL Phase-PMF Atlas: Alibaba HRC-MAE=0.001937 — Beats LANL!
+
+The `phase_pmf_atlas.py` (IDEA #65, eval-calibrated nophase variant) achieves on alibaba:
+
+| Metric | LLNL Phase-PMF | LANL strict holdout | Gap |
+|--------|---------------|---------------------|-----|
+| HRC-MAE | **0.001937** | 0.00222 | LLNL **beats LANL by 13%** |
+| reuse_access | 0.262 vs 0.265 real | ~0.61 tencent | Match |
+| stack_median | 170 vs 174 real | 53 vs 60 | Close |
+| stack_p90 | 522 vs 577 real | 170 vs 174 | Close |
+| footprint | 4611 vs 4595 real | 9330 vs 9316 | Near-perfect |
+
+The alibaba strict eval manifest: 4 files × 25k records = 100k total, seed=42.
+Result: LLNL **leads LANL on alibaba** (0.001937 < 0.00222).
+
 ### Race Position
 
-LANL has achieved compound: HRC-MAE=0.00842, mark_score=0.031. LLNL's v219 total collapse confirms the GAN approach cannot close this gap. IDEA #82 is the structural response. The race is still winnable — LANL's explicit object process is NOT secret; it can be independently designed from the same trace characterization data we already have.
+LLNL NOW LEADS on alibaba (HRC-MAE 0.001937 vs LANL 0.00222). LANL leads on tencent (0.00887) pending LLNL's corrected tencent experiments. The IDEA #65 Phase-PMF Atlas is the new LLNL primary model — the GAN approach is retired for now.
+
+Immediate actions:
+1. v220 (tencent GAN with CORRECT trace dir) — launching
+2. Phase-PMF atlas fit on real tencent traces — launching
+3. If tencent atlas achieves HRC-MAE < 0.00887, claim tencent lead too

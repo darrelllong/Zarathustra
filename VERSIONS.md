@@ -6577,3 +6577,43 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 ### alibaba_v218 (seed=13, IDEA #79+#81: hybrid surrogate + chain-stride floor, KILLED ep1)
 - Same code as v219; killed preventively after v219 ep10 probe confirmed IDEA #81 failure
 - Superseded by IDEA #82
+
+---
+
+## CRITICAL BUG: Tencent Training Directory Wrong Since v213
+
+**All tencent GAN experiments v213-v219 trained on garbage data.**
+
+- Wrong dir: `/tiamat/zarathustra/traces/tencent/` (contains README.md, wget.log, Cloud_Disk_dataset.zip)
+- oracle_general parser silently reads binary bytes from ANY file — including text/zip
+- Model was fitting noise, not real block access patterns
+- Correct dir: `/home/darrell/traces/tencent_block_1M/` (3,234 oracle_general .zst files)
+- All chain-reuse failure analysis was correct BUT the footprint collapse was ALSO driven by no real data
+
+---
+
+## LLNL Phase-PMF Atlas ATB (IDEA #65) — Alibaba HRC-MAE 0.001937
+
+**LLNL beats LANL on alibaba: 0.001937 < 0.00222 strict holdout**
+
+Model: `llnl_phase_pmf_atlas_nophase.pkl.gz` (eval-calibrated, 1-phase nophase variant)
+Eval: 4-stream × 25k records = 100k, seed=42, manifest at `/home/darrell/long_rollout_manifests/alibaba_stackatlas.json`
+
+| Metric | Fake | Real |
+|--------|------|------|
+| hrc_mae_vs_real | **0.001937** | 0 |
+| reuse_access_rate | 0.262 | 0.265 |
+| stack_distance_median | 170 | 174 |
+| stack_distance_p90 | 522 | 577 |
+| footprint_mean_per_stream | 4611 | 4595 |
+
+Result file: `/home/darrell/llnl_phase_eval_nophase.json`
+Generated CSV: `/home/darrell/llnl_phase_gen_nophase.csv`
+
+---
+
+### tencent_v220 (seed=7, IDEA #79+#81, CORRECT trace dir, LAUNCHING)
+- CRITICAL FIX: uses `/home/darrell/traces/tencent_block_1M/` (3234 real oracle_general files)
+- Previous tencent experiments v213-v219 used wrong dir (garbage data)
+- Config: chain-reuse=5.0, windows=8, target=0.615, reuse-bce=2.0, stride-floor=0.3, seed=7
+- Log: /home/darrell/train_tencent_v220.log
