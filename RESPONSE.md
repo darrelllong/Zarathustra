@@ -7608,3 +7608,49 @@ The training-eval mismatch is fundamental: training uses 12-step windows, eval u
 
 LANL's NeuralAtlas is also struggling with the same training-eval mismatch — their best neural result (0.01845) is 2× worse than their best atlas result (0.00887). The neural+atlas hybrid is the right architecture for both teams.
 
+
+---
+
+## Round 132 — Architecture Analysis; v231 seed=7 Early Dynamics; Footprint Decoder Design
+
+**Date**: 2026-04-24 09:15 PDT
+
+### v231 seed=7 — Early Dynamics Differ from v229
+
+v231 (seed=7, same recipe as v229) shows gentler adversarial dynamics at ep1-2:
+
+| Metric | v229 ep1 | v231 ep1 | v231 ep2 |
+|--------|---------|---------|---------|
+| W-dist | +0.724 | **+0.459** | +0.940 |
+| G loss | 2.732 | **0.898** | 1.251 |
+| reuse_rate | 0.614 | 0.604 | 0.548 |
+
+Lower W-dist and G-loss in v231 suggest seed=7 starts from a basin where the critic finds it harder to distinguish real from fake (= generator already closer to real distribution). This COULD mean better long-rollout quality at ep10, or it could mean the generator hasn't been trained enough.
+
+ep10 ETA: ~09:43 PDT. Gate (PID 795485) watching.
+
+### Decode-Time Footprint Constraint (IDEA #114) — Design Analysis
+
+After studying `lru_stack_decoder.py`, the cold-object recycling approach requires care:
+- Cold misses assign `self._next_id++` from an ever-growing pool
+- Capping at max_footprint=9,627 requires recycling old cold objects
+- Naive recycling risks inserting objects already in the LRU stack (false hits)
+
+The correct design: maintain a "cold pool" ordered set. When `next_id >= max_footprint`, sample from the cold pool (objects not currently in the LRU stack). With `max_stack_depth=15,000 > max_footprint=9,627`, the stack can hold ALL objects — so ANY recycled cold object is a hit. This would artificially inflate reuse to ~100%.
+
+**Insight**: The footprint cap is only useful when `max_footprint >> max_stack_depth`. For tencent (depth=15,000, real footprint=9,627), capping at 9,627 would make everything a hit. The real 61.5% reuse rate emerges from temporal mixing (objects cycle in and out of popularity), not from footprint-to-depth ratio.
+
+**Therefore IDEA #114 is NOT applicable to the tencent eval**. The footprint expansion at ep20 is a symptom, not the cause. The cause is: the GAN learns to generate sequences with uniform object distribution (many cold accesses evenly spread) rather than the real bursty access pattern (some objects accessed many times, others rarely).
+
+### True Root Cause: Working Set Distribution
+
+Real tencent: power-law object popularity. ~10% of objects account for ~60%+ of accesses (temporal locality). The GAN at ep10 approximates this. At ep20, the GAN's object generation becomes more uniform → footprint expands → LRU misses increase.
+
+**Fix (IDEA #113)**: Multi-window LRU training forces the GAN to maintain temporal locality across multiple windows. This directly addresses the uniformity problem.
+
+### v231 ep10 Decision Tree
+
+- **HRC-MAE < 0.035**: New ATB → commit, launch v232 seed=42 in parallel
+- **HRC-MAE 0.035–0.039**: Similar to v229 → v229 ep10 remains ATB (0.039)
+- **HRC-MAE > 0.039**: Seed=7 worse → accept 0.039, implement IDEA #113
+
