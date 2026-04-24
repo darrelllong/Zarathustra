@@ -5001,3 +5001,49 @@ However, LLNL's alibaba Phase-PMF lead (0.001937 vs LANL stable 0.00301) is now 
 3. Improve mark quality on alibaba (requires export denormalization fix — structural work)
 
 Priority remains tencent GAN (v221) and monitoring LANL's alibaba seed stabilization.
+
+## Round 85 — v221 ep30 Probe, Chain-Reuse Oscillation Analysis, Strategic Pivot
+
+**Date**: 2026-04-23
+**Reporting**: v221 ep30 probe shows oscillating chain-reuse, not monotonic convergence. Strategic assessment.
+
+### v221 ep30 Probe — Chain-Reuse Raw Progression
+
+| Epoch | Raw frac<0 (new objects) | Raw reuse rate | MMD² | recall | G loss |
+|-------|--------------------------|----------------|------|--------|--------|
+| ep10 | 0.102 | 0.898 | 0.00857 | 0.706 | ~1.2 |
+| ep20 | 0.277 | 0.723 | 0.00646 | 0.770 | ~4.7 |
+| ep25 | — | — | 0.00646 | 0.770 | ~4.7 ★ |
+| ep30 | **0.197** | **0.803** | 0.00460 | 0.747 | ~4.3 |
+
+**Target: frac<0 = 0.385** (38.5% new objects for 61.5% reuse rate)
+
+**Observation:** Chain-reuse is NOT monotonically converging. ep20 peaked at 27.7% new objects, ep30 regressed to 19.7%. The model is oscillating around an unstable equilibrium between the critic's realism pressure (which rewards high reuse, as real tencent files have up to 99% reuse in some file subsets) and the chain-reuse loss pushing toward 38.5% new.
+
+**Decoded probe diagnostic (ep20, 2 streams × 1000 records):**
+- Stream 0: 981 unique obj_ids / 1000 records (98% unique — near-zero reuse in decoded space!)
+- Stream 1: 59 unique obj_ids / 1000 records
+
+The decoded output is highly variable across random conditioning samples (some produce near-zero reuse, others near-perfect reuse). The Generator has NOT learned a stable, consistent reuse rate — it depends heavily on which region of conditioning space is sampled. This is a fundamentally different failure from "total collapse" — it's "high variance" around an intermediate mean.
+
+**Assessment of v221 chain-reuse v8:** Not catastrophically failed, but oscillating. The chain-reuse gradient IS affecting the Generator (ep20 showed 27.7% vs ep10's 10.2%), but cannot stabilize against GAN training dynamics.
+
+### Decision: Let v221 Run to ep50
+
+Continue v221 without intervention. Criteria:
+- ep50 gate: if mean raw frac<0 ≥ 0.30 (30% new objects), continue to ep100
+- ep50 gate: if mean raw frac<0 < 0.20 (not improving over ep10), kill and relaunch v222 with chain-reuse-weight=20.0
+
+### Strategic Assessment — Alibaba Lead Consolidation
+
+LANL's alibaba 0.00222 (seed-42 only, not stable) is approaching LLNL's 0.001937. Priority: defend and extend the alibaba lead.
+
+**LLNL alibaba Phase-PMF current calibration:** v195 8-stream eval (50k records, different files from 4-stream atlas eval). Cross-file calibration works because alibaba is homogeneous.
+
+**Potential improvement path:** Recalibrate with more training files. The current calibration uses 8 files from v195. If we use 32 or 64 files for calibration, the PMF estimation is more robust. This could push HRC-MAE below 0.001937 without changing the model architecture.
+
+**IDEA #85 (FILED):** Extended calibration sweep for alibaba Phase-PMF. Use 32/64/128 training files for calibration instead of 8, targeting HRC-MAE < 0.001500.
+
+### LANL Mark Hybrid Status
+
+LANL's IDEA #53 mark hybrid experiments ALL FAILED to improve on the 0.00479 baseline. Best hybrid achieved 0.00528 (10% worse than baseline). LANL is NOT making progress on mark quality. This is an opportunity for LLNL — if we can improve mark quality on alibaba (requires export denormalization fix), we could widen the compound benchmark gap.

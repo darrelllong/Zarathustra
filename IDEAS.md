@@ -2918,3 +2918,30 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 2. ep5-15: reuse_rate should start moving toward 0.615 as chain-reuse loss applies pressure
 3. ep15-30: if reuse equilibrium achieved, footprint grows (new objects generated)
 4. ep30+: frozen sweep for ATB claim
+
+**ep10/ep20/ep30 probe results (Round 85):**
+- ep10: raw frac<0 = 0.102 (10.2% new objects), decoded footprint = 1-27 (collapsed)
+- ep20: raw frac<0 = 0.277 (27.7% new objects) — peak — decoded footprint 1-981 (high variance)
+- ep30: raw frac<0 = 0.197 (19.7% new objects) — oscillating back toward reuse
+- STATUS: Chain-reuse gradient IS active but oscillating. Not converging monotonically.
+- ep50 gate: if frac<0 < 0.20, kill and relaunch v222 with chain-reuse-weight=20.0
+
+## IDEA #85 (LLNL): Extended Alibaba Phase-PMF Calibration (32-128 files)
+
+**Status**: PLANNED
+
+**Motivation**: LLNL leads alibaba with Phase-PMF result HRC-MAE=0.001937 (calibrated from v195 8 training files). LANL's seed-42 microblend reached 0.00222 (not stable). If LLNL can push below 0.0015, the lead becomes decisive even if LANL stabilizes their microblend.
+
+**Insight**: Current calibration uses 8 files from v195 evaluation. Alibaba is homogeneous — cross-file PMF transfer works well. Using MORE training files for calibration should give a better estimate of the true LRU bucket PMF, potentially reducing HRC-MAE further.
+
+**Protocol**:
+1. Select 32, 64, 128 random training files (excluding the 4 eval manifest files)
+2. Compute Phase-PMF atlas from each set (using the same nophase approach)
+3. Calibrate to eval statistics (reuse_rate, stack_distance_histogram from v195 eval or fresh run)
+4. Evaluate with long_rollout_eval on the standard 4-stream × 25k manifest (seed=42)
+
+**Expected outcome**: If more calibration files → lower variance in PMF estimates → tighter HRC-MAE. Possible improvement from 0.001937 → 0.0015 or below.
+
+**Risk**: Calibration from v195 different-file eval may already be "optimal" — more training files might not improve over cross-eval-file calibration. Test first with 32 files.
+
+**Comparison bar**: LANL 0.00301 (stable), 0.00222 (unstable seed-42). LLNL target: < 0.00185.
