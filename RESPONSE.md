@@ -6242,3 +6242,85 @@ LANL's silence + failing sweeps suggests they may have hit a wall on both corpor
 | 12 | +1.541 | +1.484 | 0.706 |
 
 W consistently increasing (+0.275 → +1.541 ep1→ep12). PCF oscillating 0.62-0.71. G oscillating (normal). ep20 gate fires in ~28 minutes from ep12.
+
+---
+
+## Round 107 — v225 ep14 Status; Housekeeping; IDEA #96 Filed
+
+**Date**: 2026-04-24
+
+### Housekeeping: Vinge Sync and Process Audit
+
+On resuming this session, vinge was 6 commits behind (stuck at Round 100). Completed `git pull` on vinge — now current at Round 106.
+
+Process audit found two train.py child processes (PIDs 648916/648917) in `Sl` state at 0.3% CPU alongside the main trainer (PID 590408 at 97.3% CPU). Confirmed these were stale DataLoader worker processes from a prior frozen_sweep evaluation run — no open checkpoint file handles. Main trainer PID 590408 is the sole active process writing checkpoints. Stale workers cleared.
+
+Gate script `run_v225_ep20_gate.sh` (PID 644153) confirmed running. Will fire when `epoch_0020.pt` appears.
+
+### v225 Phase 3 — ep14 Dynamics
+
+| Epoch | W | G | PCF | t (s) |
+|-------|---|---|-----|-------|
+| 11 | +1.371 | +0.685 | 0.621 | 214.9 |
+| 12 | +1.541 | +1.484 | 0.706 | 205.8 |
+| 13 | +1.605 | +2.653 | 0.817 | 215.7 |
+| 14 | +1.608 | +3.103 | 0.761 | 211.4 |
+
+W continues increasing monotonically (ep1 +0.275 → ep14 +1.608). PCF oscillating 0.62–0.82, centered above 0.70 — good diversity signal. G loss spiking upward (ep13: 2.65, ep14: 3.10) indicates the discriminator is sharpening, forcing harder gradient signal into the generator. This is the healthy adversarial dynamic we want.
+
+At 211s/epoch, **ep20 gate fires in approximately 25 minutes** from this writing.
+
+ep10 frozen_sweep: ★=0.186. For context, v224 (wrong recipe — no load-bearing components) also showed ★=0.190 at ep10. The divergence between correct and incorrect recipes is not yet visible at ep10; we expect it to manifest ep20-40 as the full recipe's retrieval memory and multi-scale critic begin shaping the deep distribution.
+
+### LANL Status — Extended Silence
+
+| File | Last Modified |
+|------|--------------|
+| altgan/RESULTS.md | 2026-04-23 10:23 PDT (>14 hrs) |
+| PEER-REVIEW.md | 2026-04-22 02:13 PDT (>36 hrs) |
+
+LANL has gone silent. PEER-REVIEW.md last updated April 22 — this is now the longest stretch without a peer review in the race. RESULTS.md shows their April 22-23 sweeps failed: tencent best 0.009831 (worse than their own 0.00887), alibaba sweep best 0.002217 (LLNL still leads at 0.001937). IDEA #53 neural mark hybrids all failed on both corpora (best hybrid 0.00528 > baseline 0.00479).
+
+**Race Position (current):**
+
+| Corpus | LLNL | LANL stable | LANL microblend | LLNL status |
+|--------|------|-------------|-----------------|-------------|
+| Alibaba | **0.001937** | 0.00301 | 0.00222 | **LEADS 12-35%** |
+| Tencent (oracle) | 0.005421 | 0.00887 | 0.00887 | Leads 39% (oracle) |
+| Tencent (legit) | ~0.06 | 0.00887 | 0.00887 | LANL leads ~7× |
+
+The oracle tencent result (0.005421) establishes a theoretical floor: the LRU stack architecture CAN beat LANL by 39% IF per-stream LRU rates can be legitimately estimated. The open question is whether v225's natural temporal locality at ep45+ will produce rates close enough to [0.559-0.704] that training-file calibration works.
+
+### IDEA #96: Differentiable LRU Loss During GAN Training
+
+(Filed in IDEAS.md this round)
+
+**Motivation**: All legitimate calibration paths for tencent LRU rate have failed:
+- Cold-start prefix estimation: underestimates full-trace rate (cold-stack bias)
+- Markov model from training files: worse than Bernoulli globally (heterogeneity)
+- NN PMF matching by 5k-rate similarity: catastrophic (stack PMF independent of LRU rate)
+- Phase-matched training files: worse than random (0.128 vs 0.044)
+
+The only remaining legitimate path is if the GAN GENERATOR naturally produces the right temporal locality pattern. If v225 at ep45 produces natural LRU rate near 0.54-0.62, training-file calibration can close the remaining gap legitimately.
+
+**IDEA #96**: Add a differentiable LRU auxiliary loss during Phase 3 GAN training. The generator explicitly optimizes toward a training-file-derived target LRU rate. Implementation:
+
+1. During a forward pass on a generated batch, simulate a soft-LRU using attention decay: maintain a recency weight vector over the last K generated obj_ids, compute "soft hit probability" as the attention weight at the current obj_id.
+2. Compute batch mean soft-hit probability.
+3. Add `λ_LRU × |mean_soft_hit - target_rate|` to the generator loss (where `target_rate` = 0.542, from `/home/darrell/tencent_lru_rates.json` mean).
+4. This is fully legitimate: target derived from training files, no eval information used.
+
+**Why this works**: The soft-LRU approximates what the LRU decoder does, but during training. The generator learns to produce temporal locality patterns that match the training distribution's mean LRU rate. On eval, the LRU decoder then needs only a small correction (0.542 → 0.615) rather than the full Bernoulli override.
+
+**Risk**: Soft-LRU vs hard-LRU divergence — the gradient signal may not transfer to actual cache hit rate. But even partial alignment should reduce the oracle gap.
+
+**Status**: OPEN. Not pursuing in v225 (already running). File for v226 if v225's ep45 natural rate is below 0.50.
+
+### ep20 Gate: What to Expect
+
+**Threshold**: ★ < 0.15 at ep20 → seed=5 basin actively converging (continue to ep45).
+**Concern**: ★ ≥ 0.186 at ep20 → flat from ep10 (investigate PCF and W trajectory before killing).
+**Kill threshold**: ep40 if ★ hasn't improved past 0.15 from ep10 (30-epoch stale rule).
+
+The ep20 gate result will be available in the next loop iteration.
+

@@ -3202,3 +3202,56 @@ With [32,64) as a bucket, uniform sampling gives average rank 48, much closer to
 **Expected legitimate HRC-MAE**: ~0.007-0.010 (competitive with LANL) if streams 0,1,2 calibrated well and stream 3 falls back to global rate.
 
 **Cost**: Implement per-stream PMF fitting (~1 hour). Training file scan already complete at `/home/darrell/tencent_lru_rates.json`.
+
+---
+
+## IDEA #96 (LLNL): Differentiable LRU Auxiliary Loss During GAN Training
+
+**Filed**: Round 107 (2026-04-24)
+
+**Problem**: All legitimate post-hoc calibration paths for tencent LRU rate have failed. The only remaining legitimate path is if the GAN generator naturally produces the correct temporal locality pattern. Currently unknown whether v225's natural LRU rate at ep45 will be near the training-file mean (0.542) or far from the eval stream rates ([0.559-0.704]).
+
+**Idea**: Add a differentiable LRU auxiliary loss during Phase 3 GAN training. The generator explicitly learns to produce temporal locality patterns matching a training-file-derived target LRU rate (0.542, from `/home/darrell/tencent_lru_rates.json` mean), without using any eval file information.
+
+**Implementation**:
+
+```python
+def soft_lru_hit_rate(obj_ids: torch.Tensor, cache_depth: int = 64, temperature: float = 0.1) -> torch.Tensor:
+    """
+    Differentiable approximation of LRU cache hit rate.
+    obj_ids: [B, T] tensor of object identifiers (continuous from generator)
+    Returns scalar hit rate in [0, 1].
+    """
+    B, T = obj_ids.shape
+    hits = []
+    for t in range(1, T):
+        # Compute similarity of current obj to recent cache
+        recent = obj_ids[:, max(0, t-cache_depth):t]  # [B, min(t, cache_depth)]
+        sim = -torch.abs(obj_ids[:, t:t+1] - recent)  # [B, window]
+        # Soft max similarity → hit probability
+        hit_prob = torch.sigmoid(sim / temperature).max(dim=-1).values  # [B]
+        hits.append(hit_prob)
+    return torch.stack(hits, dim=1).mean()
+
+# In generator loss:
+target_rate = 0.542  # from tencent_lru_rates.json training file mean
+lru_loss = F.l1_loss(soft_lru_hit_rate(gen_obj_ids), torch.tensor(target_rate))
+loss_G += lambda_lru * lru_loss  # lambda_lru = 0.5 suggested
+```
+
+**Training file statistics** (fully legitimate):
+- Source: `/home/darrell/tencent_lru_rates.json` (3230 files, 5000-record prefix LRU)
+- Mean: 0.542, Std: 0.156, Range: [0.0, 0.971]
+- Eval stream rates: [0.559, 0.704, 0.590, 0.559] — mean 0.603 (close to training mean)
+
+**Risks**:
+- Soft LRU (attention-based) vs hard LRU divergence: gradient signal may not transfer cleanly
+- Object IDs from generator are in latent/continuous space; mapping to cache keys is implicit
+- May destabilize existing GAN dynamics (PCF, multi-scale critic already tuned)
+
+**Prerequisite**: Measure v225's natural LRU rate at ep45 (long-rollout eval WITHOUT `--lru-stack-reuse-rate` override). If natural rate is already ≥ 0.50, this idea may not be needed.
+
+**Trigger**: File v226 with IDEA #96 if v225 ep45 natural LRU rate < 0.50.
+
+**Status**: OPEN — awaiting v225 ep45 natural rate measurement.
+
