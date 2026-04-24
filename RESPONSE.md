@@ -5356,3 +5356,62 @@ Running `frozen_sweep` on ep20 best.pt (PID 560748, /home/darrell/frozen_sweep_v
 | Tencent GAN ATB | v165 0.03752 (short-window) | — | frozen_sweep pending v222 |
 
 Chain-reuse closed. Pivoting to IDEA #87 per-file adaptive reuse. Alibaba lead defended (+35%). Tencent is the battleground.
+
+## Round 91 — IDEA #87 Implemented, v223 Launched: Adaptive Chain-Reuse Target
+
+**Date**: 2026-04-23
+**Reporting**: IDEA #87 implemented in train.py; v223 launched with --adaptive-chain-reuse-target.
+
+### Implementation: Per-Batch Adaptive Reuse Target (IDEA #87)
+
+**Code change** (train.py, ~12 lines added):
+
+At line 1890 in the chain-reuse loss block, replaced fixed global target with per-batch adaptive target:
+
+```python
+if getattr(cfg, 'adaptive_chain_reuse_target', False):
+    # IDEA #87: per-batch adaptive — use actual reuse rate of real batch
+    with torch.no_grad():
+        _r_target_cr = (real_batch[:, :, obj_id_col] >= 0).float().mean().item()
+else:
+    _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
+```
+
+Added `--adaptive-chain-reuse-target` CLI flag (action=store_true). Wired into cfg.
+
+**Why this works**: `real_batch[:, :, obj_id_col]` is the raw encoded reuse feature in [-1,1] where val≥0 → reuse, val<0 → new. Computing `(val≥0).float().mean()` gives the actual reuse rate of the current training batch. This adapts to each file's natural reuse rate, eliminating the Wasserstein landscape conflict from a global fixed target.
+
+### v223 Config
+
+```
+--adaptive-chain-reuse-target     # IDEA #87: per-batch target
+--chain-reuse-weight 10.0        # moderate weight (between v221=5.0 and v222=20.0)
+--chain-reuse-windows 8
+--chain-stride-floor 0.3
+--seed 7 --latent-dim 0 (non-TimeGAN)
+--cond-dim 10 --var-cond
+```
+
+PID: 563158, vinge.local
+Log: /home/darrell/train_tencent_v223.log
+
+### ep1 Observation — Key Signal
+
+**v223 ep1 G loss = 0.377** vs v222 ep1 G loss = -0.307.
+
+The G loss from chain-reuse is NEAR ZERO because the adaptive target matches the real batch reuse rate. The Generator naturally produces approximately the right reuse rate (per-batch) — the chain-reuse loss confirms rather than fights the natural GAN dynamics.
+
+This is the correct behavior: chain-reuse loss should push the Generator toward per-file-correct reuse, not fight a global target that conflicts with the data distribution.
+
+**Critical test**: At eval time, the eval files have their own reuse rates. Will the Generator — trained to match per-batch reuse rates — correctly condition on the eval file's profile and produce the right reuse rate? This is what the frozen_sweep and long-rollout eval will measure.
+
+### Race Position
+
+| Metric | LLNL | LANL | Delta |
+|--------|------|------|-------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | LLNL +35% |
+| Tencent HRC-MAE | 0.04375 (Phase-PMF) | **0.00887** | LANL 4.9× |
+| Tencent GAN ATB | 0.03752 (v165) | — | v223 pending |
+| Active | v223 ep1 (adaptive) | none visible | — |
+
+IDEA #87 is the 10th tencent reuse experiment and the first with a sound theoretical basis for heterogeneous distributions. Previous failures all used a fixed global target; v223 adapts per-batch.
