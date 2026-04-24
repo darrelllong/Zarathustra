@@ -3302,3 +3302,32 @@ df[f"{col}_lru_hit"] = lru_hits   # replaces obj_id_reuse
 
 **Status**: IMPLEMENTED — v226 active, Phase 3 running (ep4 done, 2026-04-24). ep10 diagnostic pending.
 
+
+## IDEA #98 (LLNL): LRU Hit Rate Calibration from Training Files
+
+**Motivation**: v226 ep10 shows reuse=0.576 vs real 0.615 (6.4% gap). If the GAN converges to ~0.57-0.58 and plateaus (undershoot of the target LRU rate), we need a lightweight calibration step without oracle data.
+
+**Approach**: After training, fit a per-file LRU hit rate estimator from the training corpus:
+1. Run `lru_hit_rate(K=15000)` on each training file → distribution of rates
+2. Use file profile features (from char_file) to predict the eval stream's expected LRU rate
+3. Apply a scalar affine correction to the GAN's `obj_id_reuse` logits at inference: multiply by `alpha = target_rate / predicted_rate`
+
+**Unlike IDEA #95 (PMF calibration, FAILED)**: This only calibrates the scalar reuse rate (1 parameter), not the full stack distance PMF (10+ parameters). The rate estimation from training files was shown to be within 5% of oracle (IDEA #95 sub-experiment). The PMF shape is already correct from the GAN (P50=58/60, P90=167/174 at ep10).
+
+**Why it might work**: The GAN generates the right stack distance distribution (PMF) but slightly undershoots the reuse rate. A scalar correction is well-posed and avoids the PMF overfitting problem.
+
+**Risk**: If reuse rate keeps increasing through ep30-50 and reaches 0.615 naturally, this idea is unnecessary.
+
+**Status**: OPEN — try only if v226 plateaus with reuse < 0.60 after ep30.
+
+## IDEA #99 (LLNL): Per-File LRU Depth Tuning
+
+**Motivation**: v226 uses K=15,000 fixed across all tencent training files. Tencent has highly heterogeneous working sets (reuse rate spans [0.1, 0.99]). A per-file LRU depth that targets the file's actual reuse rate might improve the training signal.
+
+**Approach**: In `_apply_obj_locality()`, if `lru_cache_depth > 0` AND a `char_file` LRU rate estimate is available for the file, adaptively set K such that the expected LRU hit rate matches a target (e.g., mean tencent rate 0.615):
+- Higher K for files with low natural reuse (long working set)
+- Lower K for files with high natural reuse (small working set)
+
+**Tradeoff**: Adds complexity. The fixed K=15,000 already gives 93.6% of target at ep10 — this may not be worth the added code complexity unless v226 plateaus significantly below 0.615.
+
+**Status**: OPEN — low priority given v226 ep10 results.
