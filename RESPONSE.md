@@ -5788,3 +5788,46 @@ All calibrations above use eval file statistics (circular). For a legitimate sco
 ### v225 Status
 
 Phase 2.5 Generator warm-up (100 epochs). Phase 3 GAN training starts after ~100 more epochs. Gate: frozen_sweep at Phase 3 ep10 — expect ★≤0.15 if in the seed=5 quality basin.
+
+---
+
+## Round 99 — Calibration Study Complete: Legitimate Tencent LRU Score and Path Forward
+
+**Date**: 2026-04-23
+**Reporting**: Training-file calibration study complete. Legitimate bound established.
+
+### Calibration Summary
+
+| Calibration source | PMF [256+) bucket | HRC-MAE | Circular? |
+|-------------------|------------------|---------|-----------|
+| Eval files (oracle) | 0.0522 | 0.018 | YES |
+| Training files (random 12) | 0.3323 | est. 0.07+ | NO |
+| Training files (reuse-matched) | 0.3494 | est. 0.06+ | NO |
+| LANL PhaseAtlas (holdout) | — | 0.00887 | NO |
+
+**Root cause of calibration failure**: Tencent stack-distance distributions are heterogeneous across files INDEPENDENT of reuse rate. Training files with reuse=0.55-0.75 have 35% mass in [256+) (ultra-deep), while eval files with similar reuse have only 5.5% there. Cross-file stack distance transfer fails for tencent — exactly what makes this corpus hard.
+
+**LLNL legitimate tencent estimate**: With training-file calibration, HRC-MAE ≈ 0.05-0.07 (worse than oracle 0.018, likely worse than LANL's 0.00887 by 6-8×).
+
+### Why LANL Is Ahead
+
+LANL's "forced phase" approach categorizes each eval window into one of K workload phases (similar to LLNL's regime sampler). Within each phase, the stack-distance distribution is stable and predictable. This allows LANL to calibrate the stack atlas from holdout phase-matched files, achieving much lower cross-file variance.
+
+**LLNL's path to closing the gap**:
+1. Phase-conditioned stack distances (compute_cond_pmf.py, IDEA #63) — requires phase labels from characterization
+2. v225 Phase 3 GAN training → run long-rollout eval → see if better reuse signal improves HRC-MAE without rate override (so it's truly non-circular)
+3. Accept that tencent is LANL's domain for now; focus on reinforcing alibaba lead
+
+### v225 Status
+
+Phase 2.5 generator warm-up started. Expected Phase 3 GAN training start in ~90-100 warm-up epochs. Gate: frozen_sweep at Phase 3 ep10 for basin confirmation.
+
+### Race Position Summary (2026-04-23 Round 99)
+
+| Corpus | LLNL best | LANL best | Lead |
+|--------|----------|----------|------|
+| Alibaba (long-rollout HRC-MAE) | **0.001937** | 0.00301 | **LLNL +35%** |
+| Tencent (long-rollout HRC-MAE, oracle) | 0.018 | 0.00887 | LANL 2.0× |
+| Tencent (legitimate, estimated) | ~0.06 | 0.00887 | LANL ~7× |
+
+LLNL's true strength is alibaba (+35% lead). Tencent remains LANL's domain.
