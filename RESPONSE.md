@@ -5415,3 +5415,39 @@ This is the correct behavior: chain-reuse loss should push the Generator toward 
 | Active | v223 ep1 (adaptive) | none visible | — |
 
 IDEA #87 is the 10th tencent reuse experiment and the first with a sound theoretical basis for heterogeneous distributions. Previous failures all used a fixed global target; v223 adapts per-batch.
+
+## Round 92 — v223 Early Dynamics: Adaptive Target Working as Designed
+
+**Date**: 2026-04-23
+**Reporting**: v223 ep1-ep4 G-loss pattern confirms adaptive chain-reuse target is functioning correctly.
+
+### v223 ep1-ep4 G-Loss Pattern
+
+| Epoch | W loss | G loss | Interpretation |
+|-------|--------|--------|----------------|
+| ep1 | +0.569 | **0.377** | Adaptive target ≈ natural reuse rate |
+| ep2 | +1.634 | 2.698 | Critic learning; chain-reuse activating |
+| ep3 | +2.128 | 2.546 | Generator adapting |
+| ep4 | +1.648 | **2.020** | **G loss declining — adaptive target being met** |
+
+**Contrast with v222 (fixed target 0.615)**:
+- v222 ep4: G=7.077 (stable at high penalty — Generator cannot satisfy fixed target vs GAN dynamics)
+- v223 ep4: G=2.020 and DECLINING — Generator finding equilibrium with adaptive target
+
+The G loss decline at ep4 is the critical signal: the Generator is learning to match per-batch reuse rates rather than fighting a fixed global target. This is the correct equilibrium — the chain-reuse loss should converge toward zero as the Generator learns conditional reuse control, leaving only the GAN training signal to shape the distribution.
+
+### Theoretical Prediction for ep10+
+
+With adaptive target:
+1. G chain-reuse loss → small (Generator matches real batch reuse rates per-batch)
+2. GAN dynamics dominate training, improving distributional fidelity
+3. comb score should improve rapidly (no chain-reuse conflict with Wasserstein dynamics)
+4. Conditioning signal (var-cond) should learn: high-reuse conditioning → high-reuse generation
+
+**Critical eval test**: The frozen_sweep uses 12 held-out files with their own reuse rates. If the Generator has learned to condition on file profile → reuse rate, and if the held-out file profiles are within the training distribution, it should produce approximately correct reuse for those files.
+
+### Risk
+
+If the conditioning (cond_dim=10) doesn't include strong LRU-reuse information (the characterization `reuse_ratio` is short-window object re-access, NOT LRU stack reuse rate), the Generator may learn to match per-batch reuse during training but fail to generalize to eval files that have different reuse rates from the training distribution.
+
+**ep10 gate**: run frozen_sweep on best.pt. If ★ ≤ 0.03752 (v165 ATB): new ATB, run full long-rollout. If ★ > 0.03752: adaptive target improves dynamics but doesn't close the conditioning gap.
