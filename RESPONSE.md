@@ -7429,3 +7429,60 @@ Slight dip from ep10's training 0.577 → ep11's 0.564. Both well below the targ
 
 Key stability indicator: v229's reuse_rate_loss with target=0.70 creates less pressure on the footprint than v228's target=0.615. At v228 ep20, the higher eval reuse (0.75) was driven by footprint shrinkage — the model found it easier to shrink the pool than to improve temporal locality. With v229's target giving eval reuse=0.653 already above real 0.615, there's less incentive for the footprint-shrink shortcut.
 
+
+---
+
+## Round 129 — Strategic Analysis: LANL's Architecture Dead End; v229 Path to Victory
+
+**Date**: 2026-04-24 08:10 PDT
+
+### LANL's Current Architecture Analysis
+
+LANL's RESULTS.md (last update 2026-04-23 10:23, 22h silent) reveals their architectural trajectory:
+
+| LANL Approach | Tencent HRC-MAE | Trend |
+|--------------|----------------|-------|
+| PhaseAtlas (holdout) | **0.00887** | ATB — still standing |
+| NeuralStack (64 files × 25k) | 0.04351 | Worse |
+| NeuralAtlas blend=0.0 (64 × 25k) | 0.01845 | 2× worse than ATB |
+| NeuralAtlas blend=0.0 (holdout) | 0.03210 | 3.6× worse on holdout |
+
+**Key finding**: Every LANL attempt to add neural components to their atlas framework makes tencent worse. Their own interpretation: "The trained pure neural transition smoother is not the winner yet." LANL is at a local maximum with PhaseAtlas 0.00887 and all neural extensions regress.
+
+For alibaba, their NeuralAtlas blend=0.5 achieves 0.00183 — better than LLNL's 0.001937 — but this is likely not seed-stable (their own notes flagged blend=0.2 at 0.00222 as "NOT seed-stable"). Their strict seed-stable alibaba best is 0.00301 vs LLNL's 0.001937 (**LLNL still leading 35%**).
+
+### Why LANL's Architecture Hits a Wall on Tencent
+
+LANL's approach: profile-conditioned state-transition matrices built from training data. Core limitation: the atlas captures the empirical distribution of object behaviors, but tencent's heterogeneous reuse distribution (LRU rates spanning [0.1, 0.99] across 3234 files) means a single atlas can't generalize. Adding neural smoothing helps slightly but the transition dynamics require actual temporal memory — not just state distributions.
+
+This is exactly why LLNL's TimeGAN + LRU indicator approach is the right architecture: the LSTM maintains temporal state across the generation window, learning the within-stream correlations that produce LRU locality organically.
+
+### LLNL Convergence Path — v229 ep10 → ep∞
+
+v229 ep10 shows:
+- reuse=0.653 (target 0.615, 6% overshoot) → expect convergence toward 0.63-0.64 as training refines
+- footprint=8,686 (real 9,627, 10% below) → should stabilize as object diversity is maintained
+- P50=58 (real 60), P90=169 (real 174) — near-perfect at ep10
+
+The gap from 0.039 to 0.00887:
+1. reuse correction 6% → 0% (as training converges) → ~50% HRC-MAE improvement
+2. footprint correction 10% → 0% → ~20% improvement  
+3. P90 correction 3% → 0% → ~10% improvement
+
+Compounded: 0.039 × 0.5 × 0.8 × 0.9 ≈ **0.014** by ep30-50 (still 57% above LANL's 0.00887).
+
+Further improvement requires the LSTM to learn the actual stack-distance distribution, not just the mean. This is where longer training (ep50-100) should pay off — the PCF loss provides the distributional pressure for multi-scale stack structure.
+
+### Added IDEA #105 (Footprint Constraint) and #106 (Skip-5 Eval)
+
+IDEA #105 triggers only if v229 ep20 shows footprint < 7,000. IDEA #106 (5-epoch granularity evals) activates after ep20 stability is confirmed.
+
+### v229 ep20 ETA: 08:38 PDT
+
+Watching for the critical stability result. v229 is the first run with all three defenses:
+1. Moment loss (stride variance)
+2. Bias-corrected target (footprint preservation)
+3. LRU indicator (correct training signal)
+
+If it's stable at ep20: we have a genuine path to sub-0.01 HRC-MAE on tencent.
+

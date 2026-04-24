@@ -3436,3 +3436,29 @@ loss = (fake_rate_hard - 0.615) ** 2
 This approximates the actual fraction of `x >= 0` rather than the soft mean. For T=10, sigmoid(0)=0.5, sigmoid(0.5)=0.98, sigmoid(-0.5)=0.02 — effectively binary.
 
 **Status**: OPEN — try in v230 if v229 ep10 still shows eval reuse undershoot.
+
+## IDEA #105 (LLNL): Explicit Footprint Constraint
+
+**Motivation**: v228 ep20 showed footprint collapsing from 12,438 (ep10) to 6,261 (ep20). The GAN found a shortcut: shrink the object pool so everything stays within the LRU depth, artificially inflating the hit rate without learning true temporal locality. v229 ep10 footprint=8,686 (close to real 9,627) but may shrink at ep20 if similar dynamics emerge.
+
+**Approach**: Add a footprint matching loss. At each training step, compute the number of unique `obj_id` values in the generated batch and penalize deviation from the target (estimated from training file statistics):
+```python
+# Footprint loss: match expected unique-object count per window
+generated_obj_ids = fake[:, :, obj_id_col]  # [B, T]
+# Approximate unique count via collision-resistant hashing
+unique_fraction = generated_obj_ids.std(dim=1).mean()  # proxy for diversity
+target_fraction = real[:, :, obj_id_col].std(dim=1).mean().detach()
+footprint_loss = (unique_fraction - target_fraction) ** 2
+```
+
+**Better approach**: Track running unique-object count in the generator and compare to EMA of real batch unique counts. This doesn't require ground truth knowledge of global footprint.
+
+**Status**: OPEN — activate in v230 if v229 ep20 shows footprint < 7,000.
+
+## IDEA #106 (LLNL): Incremental Checkpoint Eval (Skip-10 Gates)
+
+**Motivation**: Eval gates (100k generate + eval_csv_hrc) take ~7 min each. If we eval only at ep10/20/30, we miss the exact epoch where HRC-MAE is minimized between gates.
+
+**Approach**: After ep20 gate confirms stability, switch to ep30 gate. But also run a quick eval every 5 epochs using 25k records (1 stream) instead of 100k (4 streams). This 4× reduction cuts eval time to ~2 min, allowing 5-epoch granularity at low cost.
+
+**Status**: OPEN — activate once v229 is confirmed stable at ep20 and improving toward 0.01065.
