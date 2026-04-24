@@ -5240,3 +5240,52 @@ ep10 gate: frac<0 ≥ 0.30 → on track; < 0.15 → kill, reassess architecture.
 | Active experiments | v222 ep4 (wt=20.0) | none visible | — |
 
 LLNL has won alibaba on the long-rollout panel. Tencent remains the frontier. v222 is attempt #9 with the strongest chain-reuse signal yet.
+
+## Round 89 — v222 ep10 Probe: frac<0=16.3%, Marginal Zone
+
+**Date**: 2026-04-23
+**Reporting**: v222 ep10 raw probe complete; chain-reuse weight=20.0 showing improvement vs v221 but still marginal.
+
+### v222 ep10 Probe Results
+
+| Metric | Value |
+|--------|-------|
+| Raw frac<0 (new objects) | **0.163** (16.3%) |
+| Target | 0.385 (38.5%) |
+| Gap | 0.222 |
+| G loss ep10 | 7.30 |
+| W loss ep10 | +1.31 (Critic winning) |
+| EMA MMD² ep10 | 0.00992 ★ (new best) |
+| recall ep10 | 0.558 ★ (new best) |
+| comb ep10 | 0.09832 ★ |
+
+**Comparison with v221**: v221 ep10 was 0.102. v222 ep10 is 0.163 — **+60% improvement from 4× weight increase**. The signal is working, but the bimodal distribution persists: median raw output = 0.994, meaning most tokens strongly clustered near +1.0 (reuse), with 16.3% negative (new).
+
+**Training trajectory ep1-18**:
+- ep1: W=+0.66, G=-0.31 (baseline)
+- ep5: W=+1.12, G=5.50, recall=0.545, comb=0.09934 ★
+- ep10: W=+1.31, G=7.30, recall=0.558, comb=0.09832 ★
+- ep15: W=+0.81, G=5.92, recall=0.388, comb=0.13786 (recall dropped — may be transient)
+- ep17: W=+0.985, G=4.42 (G loss declining → Generator adapting)
+- ep18: W=+0.919, G=5.53
+
+G loss declining from 7.30 (ep10) to 4.4-5.5 (ep15-18) suggests the Generator is finding a partial equilibrium — satisfying enough of the chain-reuse constraint to reduce the loss, while keeping GAN dynamics stable.
+
+### Decision: Continue to ep20
+
+Gate criterion:
+- frac<0 = 0.163 falls in marginal zone (0.15-0.30): **continue to ep20**
+- If ep20 frac<0 ≥ 0.25: trending toward target, continue to ep30
+- If ep20 frac<0 < 0.15: chain-reuse signal insufficient even at 20.0 — reassess architecture
+
+The ep15 recall drop (0.558→0.388) is worth monitoring but may be a transient GAN oscillation (Critic regaining power after G struggled against chain-reuse at ep10-13). ep17-18 G loss declining suggests the model is stabilizing.
+
+### Version Comparison: Chain-Reuse Weight Escalation
+
+| Version | Weight | ep10 frac<0 | ep20 frac<0 | ep50 frac<0 | Outcome |
+|---------|--------|-------------|-------------|-------------|---------|
+| v221 | 5.0 | 0.102 | 0.277 | 0.094 | KILLED |
+| **v222** | **20.0** | **0.163** | pending | — | running |
+| Target | — | — | ≥0.30 → continue | ≥0.385 → claim | — |
+
+v221 ep20 peaked at 0.277 before regressing. If v222 ep20 reaches ≥ 0.30 (which is plausible given the 16.3% vs 10.2% ep10 lead), it may be trending toward target.
