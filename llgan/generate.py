@@ -41,11 +41,14 @@ def generate(
     lru_stack_exact_fit: bool = False,
     lru_stack_pmf: str = "",
     lru_stack_reuse_rate: float = -1.0,
+    lru_stack_per_stream_rates: str = "",
     lru_stack_max_depth: int = 2048,
     lru_markov_atlas: str = "",
     lru_markov_blend: float = 1.0,
     lru_cond_pmf: str = "",
     lru_cond_pmf_edges: str = "",
+    lru_markov_p_rr: float = -1.0,
+    lru_markov_p_mr: float = -1.0,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -249,7 +252,9 @@ def generate(
             elif lru_stack_pmf:
                 pmf_vals = np.array([float(x) for x in lru_stack_pmf.split(",")])
                 print(f"[lru-stack] Using explicit PMF: {np.round(pmf_vals, 4)}")
-                lru_decoder_proto = LRUStackDecoder(pmf_vals, max_stack_depth=lru_stack_max_depth)
+                lru_decoder_proto = LRUStackDecoder(
+                    pmf_vals, max_stack_depth=lru_stack_max_depth,
+                    markov_p_rr=lru_markov_p_rr, markov_p_mr=lru_markov_p_mr)
             elif lru_stack_real_csv:
                 import pandas as _pd
                 real_df = _pd.read_csv(lru_stack_real_csv)
@@ -269,7 +274,19 @@ def generate(
                 print(f"[lru-stack] Using default PMF for corpus={lru_stack_corpus!r}")
                 lru_decoder_proto = LRUStackDecoder.from_default(lru_stack_corpus,
                                                                   max_stack_depth=lru_stack_max_depth)
+            # IDEA #93: propagate Markov parameters to prototype (non-explicit-PMF paths)
+            if lru_markov_p_rr >= 0.0 and lru_markov_p_mr >= 0.0:
+                lru_decoder_proto.markov_p_rr = lru_markov_p_rr
+                lru_decoder_proto.markov_p_mr = lru_markov_p_mr
             lru_decoder_proto.print_pmf()
+
+    # IDEA #91: per-stream Bernoulli reuse rates.
+    # --lru-stack-per-stream-rates "r0,r1,r2,r3" gives each stream its own rate.
+    _lru_per_stream_rates: list = []
+    if lru_stack_per_stream_rates:
+        _lru_per_stream_rates = [float(x) for x in lru_stack_per_stream_rates.split(",")]
+        if _lru_per_stream_rates:
+            print(f"[lru-stack] IDEA #91 per-stream rates: {_lru_per_stream_rates}")
 
     # Inverse-transform each stream independently (cumsum stays within stream),
     # then label and concatenate for a single output file.
@@ -294,17 +311,34 @@ def generate(
                 transition_matrix=T_copy,
                 cond_pmf=C_copy,
                 dt_edges=E_copy,
+                markov_p_rr=lru_decoder_proto.markov_p_rr,
+                markov_p_mr=lru_decoder_proto.markov_p_mr,
             )
             dec.markov_blend = lru_decoder_proto.markov_blend
             reuse_signal = arr_s[:, reuse_col_idx]
+            # IDEA #93: Markov reuse model overrides is_reuse signal inside decoder.
+            # When --lru-stack-markov-prr and --lru-stack-markov-pmr are set,
+            # the decoder's step() uses its internal Markov chain; reuse_signal
+            # is passed but ignored. Bernoulli override also disabled when Markov active.
+            if lru_markov_p_rr >= 0.0:
+                if s == 0:
+                    pi = lru_markov_p_mr / max(1e-9, 1 - lru_markov_p_rr + lru_markov_p_mr)
+                    print(f"[lru-stack] IDEA #93 Markov reuse: p_rr={lru_markov_p_rr:.4f}, "
+                          f"p_mr={lru_markov_p_mr:.4f}, π_reuse={pi:.4f}")
             # Override reuse signal with Bernoulli(p) if --lru-stack-reuse-rate
-            # is set. This ablates the generator's broken reuse signal to test
-            # whether the stack decoder alone can produce correct HRC when given
-            # the correct reuse rate.
-            if lru_stack_reuse_rate >= 0.0:
+            # is set and Markov model is not active.
+            # Supports comma-separated per-stream rates (IDEA #91): "r0,r1,r2,r3"
+            if lru_stack_reuse_rate >= 0.0 and lru_markov_p_rr < 0.0:
                 ruse_rng = np.random.default_rng(42 + s)
                 reuse_signal = np.where(
                     ruse_rng.random(len(reuse_signal)) < lru_stack_reuse_rate,
+                    1.0, -1.0
+                )
+            elif _lru_per_stream_rates and lru_markov_p_rr < 0.0:
+                rate_s = _lru_per_stream_rates[s % len(_lru_per_stream_rates)]
+                ruse_rng = np.random.default_rng(42 + s)
+                reuse_signal = np.where(
+                    ruse_rng.random(len(reuse_signal)) < rate_s,
                     1.0, -1.0
                 )
             # IDEA #63: extract log1p(ts_delta) from normalized ts column
@@ -423,6 +457,20 @@ def parse_args():
                    metavar="NPY",
                    help="IDEA #63: path to (N-1,) dt bin edges array "
                         "from compute_cond_pmf.py.")
+    p.add_argument("--lru-stack-per-stream-rates", default="",
+                   metavar="R0,R1,...",
+                   help="IDEA #91: comma-separated Bernoulli reuse rates per stream. "
+                        "e.g. '0.606,0.704,0.590,0.559' for 4 streams. "
+                        "Overrides --lru-stack-reuse-rate when provided.")
+    p.add_argument("--lru-stack-markov-prr", type=float, default=-1.0,
+                   metavar="P",
+                   help="IDEA #93: P(reuse | prev was reuse) for 2-state Markov reuse chain. "
+                        "Set with --lru-stack-markov-pmr to enable Markov reuse model. "
+                        "Replaces i.i.d. Bernoulli override. -1 (default) = disabled.")
+    p.add_argument("--lru-stack-markov-pmr", type=float, default=-1.0,
+                   metavar="P",
+                   help="IDEA #93: P(reuse | prev was miss) for 2-state Markov reuse chain. "
+                        "Stationary rate: pi=pmr/(1-prr+pmr). -1 (default) = disabled.")
     return p.parse_args()
 
 
@@ -444,9 +492,12 @@ if __name__ == "__main__":
         lru_stack_exact_fit=args.lru_stack_exact_fit,
         lru_stack_pmf=args.lru_stack_pmf,
         lru_stack_reuse_rate=args.lru_stack_reuse_rate,
+        lru_stack_per_stream_rates=args.lru_stack_per_stream_rates,
         lru_stack_max_depth=args.lru_stack_max_depth,
         lru_markov_atlas=args.lru_markov_atlas,
         lru_markov_blend=args.lru_markov_blend,
         lru_cond_pmf=args.lru_cond_pmf,
         lru_cond_pmf_edges=args.lru_cond_pmf_edges,
+        lru_markov_p_rr=args.lru_stack_markov_prr,
+        lru_markov_p_mr=args.lru_stack_markov_pmr,
     )

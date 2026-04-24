@@ -3133,7 +3133,7 @@ With [32,64) as a bucket, uniform sampling gives average rank 48, much closer to
 
 ## IDEA #93 (LLNL): Markov Reuse Arrival Model for LRU Decoder
 
-**Status**: OPEN — improve temporal correlation structure of reuse events
+**Status**: CLOSED-FAILED at global level (HRC-MAE 0.01275 vs Bernoulli 0.01019). Per-stream implementation possible but not yet tested.
 
 **Problem**: The current LRU decoder uses a Bernoulli reuse override (`rng.random() < rate`), which makes each access independently decide to reuse with probability P. Real cache workloads have bursty reuse: phases of high reuse (working set active) alternate with phases of low reuse (working set rotation). The i.i.d. Bernoulli model misses this burstiness, producing a reuse pattern that is too smooth.
 
@@ -3174,3 +3174,31 @@ With [32,64) as a bucket, uniform sampling gives average rank 48, much closer to
 **Expected improvement**: If fingerprint similarity predicts PMF similarity (requires validation), could reduce legitimate score from ~0.06 toward 0.02-0.03. Not guaranteed — depends on tencent's within-cluster PMF variance.
 
 **Cost**: 1-2 hour offline analysis to build fingerprint-PMF database, then select best calibration.
+
+---
+
+## IDEA #95 (LLNL): Training File LRU Rate Database + Per-Stream NN Calibration
+
+**Status**: OPEN — partial success (streams 0,1,2 feasible; stream 3 problematic)
+
+**Discovery**: Training files span LRU hit rates [0.0, 0.971] with mean=0.542, std=0.156. Hundreds of training files exist near each eval file's target rate. `scan_tencent_reuse_rates.py` (5 seconds for 3230 files) provides the precomputed rate database.
+
+**Oracle per-stream result**: Using exact eval file rates [0.606, 0.704, 0.590, 0.559] → HRC-MAE=0.005421 (39% better than LANL 0.00887). This is the target we're trying to reach legitimately.
+
+**NN matching approach**:
+1. Read eval manifest to get the 4 eval file paths
+2. For each eval file, scan first 5000 records to get "5k-rate" estimate
+3. Find K=8 nearest training files by 5k-rate distance  
+4. Compute per-stream stack distance PMF from those 8 training files
+5. Run generate.py with `--lru-stack-per-stream-rates` = per-stream 5k-rates
+
+**Problem**: Stream 3 (tencentBlock_22882) has a two-phase distribution — early burst (5k-rate=0.869) vs full-trace rate (0.559). 5k-rate estimate diverges by 0.31, making NN matching find the wrong training files.
+
+**Fix for stream 3**: 
+- Use median window (records 5000-10000) for rate estimation — avoids both cold start and early burst
+- Or: compute rate from training files at the same median window, then match in comparable space
+- Or: use global rate (0.615) as fallback when stream 3's 5k estimate is very high (>0.75)
+
+**Expected legitimate HRC-MAE**: ~0.007-0.010 (competitive with LANL) if streams 0,1,2 calibrated well and stream 3 falls back to global rate.
+
+**Cost**: Implement per-stream PMF fitting (~1 hour). Training file scan already complete at `/home/darrell/tencent_lru_rates.json`.

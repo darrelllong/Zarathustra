@@ -103,6 +103,8 @@ class LRUStackDecoder:
         transition_matrix: Optional[np.ndarray] = None,
         cond_pmf: Optional[np.ndarray] = None,
         dt_edges: Optional[np.ndarray] = None,
+        markov_p_rr: float = -1.0,
+        markov_p_mr: float = -1.0,
     ):
         self.bucket_pmf = np.asarray(bucket_pmf, dtype=np.float64)
         self.bucket_pmf /= self.bucket_pmf.sum()
@@ -128,14 +130,38 @@ class LRUStackDecoder:
         else:
             self.cond_pmf = None
             self.dt_edges = None
+        # IDEA #93: 2-state Markov chain for reuse arrival (replaces i.i.d. Bernoulli override).
+        # p_rr = P(reuse | prev was reuse), p_mr = P(reuse | prev was miss).
+        # Stationary reuse rate: pi = p_mr / (1 - p_rr + p_mr).
+        # Set both >= 0 to enable; -1.0 means disabled (use is_reuse signal as-is).
+        if markov_p_rr >= 0.0 and markov_p_mr >= 0.0:
+            self.markov_p_rr: float = float(markov_p_rr)
+            self.markov_p_mr: float = float(markov_p_mr)
+        else:
+            self.markov_p_rr = -1.0
+            self.markov_p_mr = -1.0
+        self._markov_state: int = 0  # 0=miss, 1=reuse; cold-start in miss state
 
     def reset(self) -> None:
         self._stack = []
         self._next_id = 0
         self._prev_bucket = -1
+        self._markov_state = 0
+
+    def _markov_reuse(self) -> bool:
+        """Sample next reuse decision from 2-state Markov chain (IDEA #93)."""
+        if self._markov_state == 1:
+            decision = bool(self.rng.random() < self.markov_p_rr)
+        else:
+            decision = bool(self.rng.random() < self.markov_p_mr)
+        self._markov_state = 1 if decision else 0
+        return decision
 
     def step(self, is_reuse: bool) -> int:
         """Process one event. Returns assigned obj_id."""
+        # IDEA #93: Markov chain overrides is_reuse when enabled.
+        if self.markov_p_rr >= 0.0:
+            is_reuse = self._markov_reuse()
         if is_reuse and self._stack:
             # IDEA #62: Markov atlas — condition on previous bucket when available.
             if self.transition_matrix is not None and self._prev_bucket >= 0:
@@ -166,6 +192,8 @@ class LRUStackDecoder:
 
     def step_dt(self, is_reuse: bool, dt_log1p: float) -> int:
         """Like step() but uses conditional PMF P(bucket | dt_bin) if set."""
+        if self.markov_p_rr >= 0.0:
+            is_reuse = self._markov_reuse()
         if is_reuse and self._stack:
             if self.cond_pmf is not None and self.dt_edges is not None:
                 dt_bin = int(np.searchsorted(self.dt_edges, dt_log1p, side="right"))
