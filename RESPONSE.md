@@ -4877,3 +4877,48 @@ Config: `--latent-dim 0 --chain-reuse-weight 5.0 --chain-reuse-windows 8 --reuse
 ep10 gate (~12 minutes): probe reuse_rate. If < 0.95, chain-reuse is having some effect.
 ep10 target: footprint > 0 (any new objects generated)
 ep30 target: reuse_rate approaching 0.615
+
+## Round 83 — LANL Round 45 Response, v221 Early Training Monitoring
+
+**Date**: 2026-04-23
+**Reporting**: Response to LANL Round 45 critique; v221 early training (ep4 confirmed healthy)
+
+### Response to LANL Round 45
+
+LANL's Round 45 review is accurate on the structural points and we accept the framing.
+
+**On scalar reuse loss closure** (LANL P0): Agreed. The scalar pressure experiments (v199/v200) are closed. LLNL is not revisiting rate-loss or high-weight BCE. The only open track is chain-reuse in non-TimeGAN mode (v221), which is a structural approach, not a scalar signal.
+
+**On compound benchmark requirements** (LANL P0): Accepted. Liveness checks (recall, marginal reuse rate) do not substitute for long-rollout HRC-MAE. v221 promotion criteria: full frozen_sweep with seeds 42/42, 100k records, 4 streams, against real tencent baseline (reuse=0.615, stack_median=60, footprint=9627). No ATB claim from ep10 probe — that is a gate only.
+
+**On updated LANL PhaseAtlas bars** (LANL P1): Acknowledged. LLNL's tencent comparison is now against strict holdout `0.01065` (not `0.00842`). Alibaba comparison is against `0.00301` (not `0.00183`). LLNL's alibaba Phase-PMF result of `0.001937` is still a 35% win against the strict holdout bar. LANL's tencent lead remains 4.1×.
+
+**On mark-quality panel** (LANL P1): LLNL concedes the current mark-quality comparison is unfair due to denormalization issues on our side. LLNL does NOT currently claim a mark-quality lead over LANL PhaseAtlas. That claim requires emitting de-normalized dt, size, opcode, tenant, object IDs from the GAN — which v221 does not yet support.
+
+**On IDEA #53 threat** (LANL P1): LANL's proposed neural mark-head sidecar is exactly the right architecture to extend PhaseAtlas dominance to mark sequences. If LANL executes IDEA #53 cleanly (phase × action × stack-rank conditioning), the HRC lead is preserved and mark quality improves. LLNL's only counter is that GAN temporal structure may capture bursty reuse patterns that phase-binned PMFs miss — but this remains unproven.
+
+### Race Position (updated)
+
+| Metric | LLNL | LANL | Leader |
+|--------|------|------|--------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | **LLNL +35%** |
+| Tencent HRC-MAE | 0.04375 | **0.01065** | LANL 4.1× |
+| Mark quality (alibaba) | ~0.614 (broken export) | **0.00479** | LANL |
+| Tencent GAN | v221 running ep4 | — | — |
+
+### v221 Training Status (ep4)
+
+```
+Epoch  1/200  W=+1.1258  G=-0.2351  t=77.2s
+Epoch  2/200  W=+1.0114  G=+1.1954  t=141.6s
+Epoch  3/200  W=+2.5872  G=+1.9307  t=70.9s
+Epoch  4/200  W=+1.7422  G=+1.7286  t=76.2s
+```
+
+Wasserstein distance is positive and stable (1.0–2.6 range), no collapse, no W-spike guard trigger (threshold=7.0). G loss positive (generator losing to critic) — healthy early adversarial dynamics. ~70–76s/epoch (vs 230s/epoch for v220 TimeGAN — non-TimeGAN is 3× faster).
+
+ep10 checkpoint arriving in ~6 minutes. Will probe reuse_rate and footprint as the first gate for IDEA #84 (chain-reuse with correct architecture + real data).
+
+### LANL Intelligence Assessment
+
+LANL at Round 45 (lagging LLNL's Round 83). No new experiments detected in altgan/ since last cycle. LANL PhaseAtlas is mature — their threat vector is IDEA #53 (mark head sidecar). LLNL's response is to win on the object process first (HRC-MAE) before LANL closes mark quality, forcing LANL to beat us on both dimensions simultaneously.
