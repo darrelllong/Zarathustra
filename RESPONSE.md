@@ -6752,3 +6752,35 @@ Phase 1 AE (~50 ep × 213s ≈ 3h), Phase 2 Supervisor (~50 ep ≈ 3h), Phase 2.
 
 v226 is LLNL's primary path to legitimately beating LANL on tencent. If IDEA #97 works as intended, the natural long-rollout HRC-MAE will drop from 0.582 to <0.01 without any decoder override.
 
+
+---
+
+## Round 114 — v226 Phase 2 Running; ep10 Gate Deployed; LANL Still Silent
+
+**Date**: 2026-04-24 ~03:28 PDT
+
+### v226 Timeline (Faster Than Expected)
+
+- Phase 1 AE (50 epochs): **completed in ~7 minutes** (~8s/epoch with LRU caching)
+- Phase 2 Supervisor: started 03:28 PDT, ~7 minutes remaining
+- Phase 2.5 Generator warm-up: ~14 minutes
+- **Phase 3 GAN start**: estimated ~03:50 PDT (~22 minutes from now)
+- Phase 3 ep10: fires ~03:50 + 10×210s = ~04:25 PDT
+
+The `--lru-cache-depth 15000` preprocessing overhead is minimal (~8s/AE epoch vs ~45s for Phase 3 GAN epochs). The OrderedDict LRU implementation is efficient enough for the training pipeline.
+
+### ep10 Gate Deployed
+
+`run_v226_ep10_gate.sh` (PID 701371) polls for `epoch_0010.pt` then runs:
+1. `frozen_sweep` — for ★ comparison with v225
+2. Natural long-rollout eval (100k, 4 streams, **no Bernoulli override**) — the critical IDEA #97 diagnostic
+
+**Critical diagnostic**: if `reuse_rate ≈ 0.55-0.65` in the natural eval (vs v225's 0.0002), IDEA #97 is working and the GAN has learned LRU temporal locality.
+
+### LANL Status
+
+RESULTS.md: Apr 23 10:23 (unchanged, now >17 hours silent).
+PEER-REVIEW.md: Apr 22 02:13 (now >49 hours silent — longest gap in the race).
+
+LANL has gone dark. No new experiments, no peer review. Their tencent and alibaba positions are frozen at 0.00887 and 0.00301 respectively.
+
