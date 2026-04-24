@@ -3522,3 +3522,33 @@ G_loss += long_rollout_weight * (lru_reuse_long - 0.615)**2
 - Only compute every 5 epochs to limit overhead: `if epoch % 5 == 0: add_long_rollout_loss()`
 
 **Status**: OPEN — implement in v232 if v231 ep10 doesn't beat 0.030.
+
+## IDEA #115 (LLNL): Differentiable Object-Identity Training (Close the Feature-Space Gap)
+
+**Motivation**: The fundamental architecture limitation discovered 2026-04-24: LLGAN generates obj_id_reuse as an independent normalized feature, but actual object identities are reconstructed POST-TRAINING via lru_stack_decoder.py. The training loop has no feedback on actual long-rollout LRU behavior. This makes ep10 quality seed-dependent and impossible to reliably improve.
+
+**Root cause**: Training signal = mean(obj_id_reuse) over 12-step windows. LRU hit rate at eval = f(actual_obj_ids over 25k steps). These are decoupled.
+
+**Fix**: During Phase 3 training, every N epochs, run a differentiable soft-LRU decoder on the generated sequences to compute actual LRU hit rate. Add this as a training signal.
+
+**Soft-LRU decoder**: Implement an approximate differentiable LRU using a learned hash map:
+```python
+# Soft LRU hit detection via inner product similarity
+def soft_lru_hit(obj_id_delta, cache_state, depth):
+    # Approximate: object recently seen ≈ small cumulative delta
+    cumulative_delta = torch.cumsum(obj_id_delta.abs(), dim=1)
+    recency = torch.exp(-cumulative_delta / depth)  # high if recently accessed
+    return recency  # soft "hit probability" at each timestep
+```
+
+This is a differentiable proxy that penalizes sequences with large accumulated stride (= objects accessed far apart = likely cache misses).
+
+**Alternative**: Non-differentiable version as auxiliary signal (stop_gradient). Run actual lru_stack_decoder every 5 epochs, compute reuse_rate and footprint, add soft penalty:
+```python
+if epoch % 5 == 0:
+    with torch.no_grad():
+        long_reuse = eval_lru_reuse(G, n=5000, depth=15000)
+        G_loss += long_rollout_weight * (long_reuse - 0.615)**2
+```
+
+**Status**: OPEN — major architecture change (~400 lines). Implement as v232 experiment after LANL resumes.

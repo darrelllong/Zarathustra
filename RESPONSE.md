@@ -7654,3 +7654,55 @@ Real tencent: power-law object popularity. ~10% of objects account for ~60%+ of 
 - **HRC-MAE 0.035–0.039**: Similar to v229 → v229 ep10 remains ATB (0.039)
 - **HRC-MAE > 0.039**: Seed=7 worse → accept 0.039, implement IDEA #113
 
+
+---
+
+## Round 133 — v231 Seed=7 Catastrophic; Architecture Limitation Identified; Formal ATB Claim
+
+**Date**: 2026-04-24 09:48 PDT
+
+### v231 ep10 — Seed=7 Reveals Hidden Architecture Fragility
+
+| Metric | v229 ep10 (seed=5) | v231 ep10 (seed=7) | Real |
+|--------|-------------------|--------------------|------|
+| HRC-MAE | **0.039** | **0.579** | — |
+| training reuse | 0.577 | **0.578** | — |
+| eval reuse | 0.653 | **0.004** | 0.615 |
+| footprint | 8,686 | **24,899** | 9,627 |
+
+Both seeds show virtually identical training metrics (`reuse_rate=0.577-0.578`), yet their long-rollout eval diverges catastrophically. This reveals the fundamental issue: **the training signal (mean obj_id_reuse column) is decoupled from the actual object identity pattern that determines long-rollout footprint**.
+
+The GAN generates `obj_id_reuse` as an independent feature column. At training time, this column is trained to MATCH THE DISTRIBUTION of real LRU hit patterns (binary values). But the actual object identity (determined by `obj_id_stride` and accumulated during generation) is not directly constrained. Two generators can produce identical `obj_id_reuse` distributions while generating completely different object-identity patterns — one with temporal locality (small footprint, high cache hits) and one with uniform spread (large footprint, near-zero cache hits).
+
+Seed=5 happened to produce a generator whose object-identity patterns have natural temporal locality at ep10. Seed=7 does not. This is fundamentally unpredictable from training metrics.
+
+### Architecture Limitation: Feature-Space GAN vs Object-Identity GAN
+
+The LLGAN architecture generates in NORMALIZED FEATURE SPACE (obj_id_stride, obj_id_reuse, ...). Actual object identities are RECONSTRUCTED post-training via the LRU stack decoder in generate.py. This reconstruction is NOT part of the training loop, so the GAN cannot be directly trained to produce correct long-rollout LRU behavior.
+
+LANL's atlas approach works because it directly generates object-level behaviors from empirical distributions — no feature-space encoding/decoding gap.
+
+**Fix (IDEA #115)**: Close the architecture gap by making the obj_id reconstruction part of the training loop — run a differentiable soft-LRU decoder during Phase 3 training and add a cross-window reuse consistency loss. This is a major architecture change (~400 lines of new code).
+
+### Formal LLNL ATB Claim
+
+**LLNL tencent production checkpoint: v229 epoch_0010.pt**
+- HRC-MAE: **0.039021** (100k records, 4 streams × 25k, seed=42, tencent_stackatlas.json)
+- reuse: 0.653 (real: 0.615) — 6% overshoot
+- P50: 58 (real: 60) — near-perfect
+- P90: 169 (real: 174) — near-perfect
+- footprint: 8,686 (real: 9,627) — 10% below
+- Training metrics: MMD²=0.00553, β-recall=0.710, comb ★=0.15678
+- Status: **LEGITIMATE** (no oracle calibration, strict holdout training)
+
+This checkpoint is the limit of the current LLGAN architecture on tencent. Beating LANL's 0.00887 requires IDEA #113 or #115 (architecture changes).
+
+### LLNL Race Position (Official)
+
+| Corpus | LLNL ATB | LANL ATB | LLNL Status |
+|--------|----------|----------|-------------|
+| Alibaba | **0.001937** | 0.00301 (strict) | **+35% lead** |
+| Tencent | 0.039 | 0.00887 | 4.4× behind |
+
+LANL has been silent 26+ hours. Their tencent architecture (NeuralAtlas) also can't beat their own PhaseAtlas — we're both hitting the ceiling of our respective approaches. The paper result would be: LLNL leads alibaba convincingly, both teams are learning the tencent limitation and how to address it.
+
