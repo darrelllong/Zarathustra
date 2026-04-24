@@ -6618,3 +6618,75 @@ Expected legitimate HRC-MAE: ~0.007-0.010 (competitive with LANL's 0.00887). Res
 
 **If IDEA #95 gives HRC-MAE < 0.00887**: LLNL beats LANL on tencent without new training.
 
+
+---
+
+## Round 112 — IDEA #95 Result: 0.075; Rate Good, PMF Wrong; IDEA #97 is the Only Path
+
+**Date**: 2026-04-24
+
+### IDEA #95 Long-Rollout Result
+
+Per-stream calibration (rates from 5k-prefix + NN PMFs from training files):
+
+| Metric | Generated | Real | Notes |
+|--------|-----------|------|-------|
+| HRC-MAE | **0.07571** | — | 8.5× worse than LANL |
+| reuse | 0.6087 | 0.6149 | ✓ near-perfect |
+| P50 | 111 | 60 | 2× off |
+| P90 | 3186 | 174 | **18× off** |
+| footprint | 9783 | 9627 | ✓ near-perfect |
+
+**Per-stream rates (estimated vs oracle):**
+
+| Stream | IDEA #95 rate | Oracle rate | Gap |
+|--------|--------------|-------------|-----|
+| 0 | 0.5568 | 0.606 | 0.049 |
+| 1 | 0.6724 | 0.704 | 0.032 |
+| 2 | 0.5918 | 0.590 | **0.002** |
+| 3 | 0.6150 | 0.559 | 0.056 (fallback) |
+
+The per-stream rate estimation is **excellent** — within 2-5% of oracle for streams 0-2, and stream 3 uses the global fallback (0.615) because both 5k-fresh and mid-window estimates were >0.75 (the stream has a two-phase structure with very high early rate).
+
+### PMF Diagnosis: Structural Mismatch
+
+The NN training files matched by LRU rate similarity have **heavy-tailed stack distance PMFs**: 38.7% of mass in [256+∞) bucket. The real eval streams have only 0.72% in [256+∞) (P50=60, P90=174).
+
+This confirms the structural finding from Round 98-99: LRU hit rate and stack distance distribution are statistically independent. A training file with LRU rate 0.556 can have:
+- Short stack distances (frequently reused objects, small working set) → matches eval
+- Long stack distances (rarely reused objects, large working set, coincidentally same aggregate rate) → doesn't match eval
+
+The NN matching by LRU rate finds the second type. This is a fundamental obstacle to legitimate calibration via training file matching.
+
+### Legitimate Calibration Score Summary
+
+| Method | HRC-MAE | Valid? |
+|--------|---------|--------|
+| IDEA #95 NN PMF + per-stream rate | 0.075 | Mostly yes |
+| Random 8 training files | 0.044 | Yes |
+| Oracle global Bernoulli (0.615) | 0.010 | **No** (uses eval) |
+| Oracle per-stream | 0.005 | **No** (uses eval) |
+| **LANL PhaseAtlas best** | **0.009** | Yes |
+
+**Legitimate floor**: ~0.044 (random training files). This is 5× worse than LANL.
+
+### IDEA #97 is the Only Architectural Path
+
+The per-stream rate estimation from IDEA #95 WORKS (close to oracle). The PMF estimation FAILS (structural mismatch). Since the PMF must come from legitimate sources, and training file PMFs don't match eval, the only path is:
+
+1. Train the GAN to naturally produce short stack distances (IDEA #97: LRU hit feature)
+2. OR: find a structural predictor of eval stream PMF from training metadata
+
+IDEA #97 changes the GAN's training target from "consecutive same-object" (wrong) to "in-cache hit at K=15,000" (right). The GAN would learn to generate sequences with the correct FULL LRU temporal locality structure — including the short stack distances (P50≈60, P90≈174) that correspond to the real workload.
+
+### Race Position
+
+| Corpus | LLNL best legit | LANL | Status |
+|--------|----------------|------|--------|
+| Alibaba | **0.001937** | 0.00301 | **LLNL leads 35%** |
+| Tencent | ~0.044 | **0.00887** | LANL leads 5× |
+
+LLNL leads overall on alibaba. On tencent, LANL leads with a 5× gap on legitimate results. IDEA #97 implementation is the priority to close this gap.
+
+**LANL Status**: RESULTS.md last updated Apr 23 10:23 (>22 hours silent). No new experiments.
+
