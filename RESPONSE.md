@@ -5289,3 +5289,70 @@ The ep15 recall drop (0.558→0.388) is worth monitoring but may be a transient 
 | Target | — | — | ≥0.30 → continue | ≥0.385 → claim | — |
 
 v221 ep20 peaked at 0.277 before regressing. If v222 ep20 reaches ≥ 0.30 (which is plausible given the 16.3% vs 10.2% ep10 lead), it may be trending toward target.
+
+## Round 90 — v222 CLOSED-FAILED: Chain-Reuse STE Exhausted, frozen_sweep Filed, IDEA #87
+
+**Date**: 2026-04-23
+**Reporting**: v222 ep20/ep30 both stuck at frac<0=14.3% — stable attractor below kill threshold. Chain-reuse STE definitively exhausted across all weights. frozen_sweep filed on ep20 best (comb=0.06621 ★).
+
+### v222 Complete Probe History
+
+| Epoch | frac<0 | G loss | W loss | comb | recall | Status |
+|-------|--------|--------|--------|------|--------|--------|
+| ep10 | 0.163 | 7.30 | +1.31 | 0.09832 ★ | 0.558 | Marginal |
+| ep20 | **0.143** | 7.06 | +1.66 | **0.06621 ★** | **0.701** | Below threshold |
+| ep30 | **0.143** | 6.98 | +1.48 | 0.10256 | 0.524 | Stable attractor |
+| Target | 0.385 | — | — | — | — | — |
+
+ep20 and ep30 frac<0 = 0.1432 (to 4 decimal places) — fully stabilized. The Generator found a stable attractor at 14.3% new objects (85.7% reuse), perfectly stable against further training.
+
+### Chain-Reuse STE: Complete Failure Taxonomy
+
+| Version | Weight | ep10 frac<0 | Peak frac<0 | Stable? | Killed at |
+|---------|--------|-------------|-------------|---------|-----------|
+| v221 | 5.0 | 0.102 | **0.277** (ep20) | No (oscillates then regresses) | ep50 (9.4%) |
+| v222 | 20.0 | 0.163 | 0.163 (ep10) | **Yes (14.3%, ep20=ep30)** | ep30 |
+| Target | — | — | **0.385** | — | — |
+
+**Paradox**: Higher weight (20.0) produced LOWER peak frac<0 (16.3% ep10 vs 27.7% ep20 for weight 5.0). The higher weight created a tighter constraint that locked the Generator into a stable local minimum BELOW where weight 5.0 could temporarily reach.
+
+**Root cause confirmed**: The bimodal tencent reuse distribution (files span 0.10-0.99 reuse rate) creates a Wasserstein landscape where the optimal Generator produces high reuse (since most tencent files have reuse > 0.6). The chain-reuse STE gradient fights this landscape, but:
+- At weight=5.0: temporary excursion to 27.7% before GAN dynamics pull back
+- At weight=20.0: Generator finds equilibrium at 14.3% (lower) by satisfying just enough chain-reuse loss to avoid extreme penalty while maintaining high-reuse GAN performance
+
+Chain-reuse STE cannot solve the tencent reuse problem. **Closing IDEA #84/86 (chain-reuse experiments, 9 total attempts) as FAILED.**
+
+### frozen_sweep on v222 ep20 — Value Extraction
+
+Despite chain-reuse failure, v222 ep20 has the **best tencent GAN training metrics ever recorded**:
+- comb = 0.06621 ★ (new tencent GAN all-time low)
+- recall = 0.701 (new tencent GAN all-time high at ep20)
+- MMD² = 0.00641
+
+Running `frozen_sweep` on ep20 best.pt (PID 560748, /home/darrell/frozen_sweep_v222_ep20.log). If this beats the frozen ATB (v165 ep045 = 0.03752), it claims a new tencent GAN short-window ATB even without correct reuse rate — because frozen_sweep measures short-window distributional fidelity, not long-rollout cache law.
+
+### IDEA #87: Per-File Adaptive Reuse Target (Code Change Required)
+
+**Root cause of chain-reuse failure**: Fixed global target (0.615) is wrong for tencent's heterogeneous distribution. Files span 0.10-0.99 reuse rate. The Generator correctly learns high-reuse because the training file distribution is high-reuse on average.
+
+**Fix**: Make the chain-reuse target per-file, sourced from the trace characterization:
+1. During training, for each file batch, read `reuse_rate` from characterization
+2. Use that file's actual reuse rate as the chain-reuse target for that batch
+3. Chain-reuse loss penalizes per-file deviation, not global deviation
+4. Generator conditioning already includes characterization — it will learn to modulate reuse based on the file's expected rate
+
+**Expected outcome**: Generator learns to produce reuse rate matching whatever the conditioning file specifies. At eval time, eval file characterizations dictate the reuse rate. For tencent eval files with diverse reuse rates, the Generator adapts per-file.
+
+**Code change**: `train.py` — replace scalar `cfg.reuse_rate_target` with per-batch `batch_reuse_target` from characterization lookup. ~20 lines.
+
+**Status**: FILED. This is a code-change sprint. Implementing next.
+
+### Race Position
+
+| Metric | LLNL | LANL stable | Delta |
+|--------|------|-------------|-------|
+| Alibaba HRC-MAE | **0.001937** | 0.00301 | LLNL +35% |
+| Tencent HRC-MAE | 0.04375 (Phase-PMF) | **0.00887** | LANL 4.9× |
+| Tencent GAN ATB | v165 0.03752 (short-window) | — | frozen_sweep pending v222 |
+
+Chain-reuse closed. Pivoting to IDEA #87 per-file adaptive reuse. Alibaba lead defended (+35%). Tencent is the battleground.

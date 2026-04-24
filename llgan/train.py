@@ -1887,7 +1887,19 @@ def train(cfg: Config) -> None:
                     _cr_hard = (_cr_reuse_all >= 0).float()
                     _cr_rate = _cr_surrogate + (_cr_hard - _cr_surrogate).detach()
                     _cr_rate = _cr_rate.mean()
-                    _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
+                    if getattr(cfg, 'adaptive_chain_reuse_target', False):
+                        # IDEA #87: per-batch adaptive reuse target from real data.
+                        # Tencent files span reuse 0.10-0.99; a fixed global target
+                        # creates Wasserstein landscape conflicts.  Use the actual
+                        # reuse rate of the current real batch so the Generator
+                        # learns to condition reuse on the file profile rather than
+                        # fight a global constant.
+                        with torch.no_grad():
+                            _r_target_cr = (
+                                real_batch[:, :, obj_id_col] >= 0
+                            ).float().mean().item()
+                    else:
+                        _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)
                     g_loss = g_loss + _crw * loss_chain_reuse
                     # IDEA #81: chain-stride diversity floor.
@@ -2717,6 +2729,12 @@ def parse_args() -> Config:
                    help="IDEA #81: chain-stride diversity floor. One-sided loss penalizing "
                         "mean|stride| < floor across chain windows. Prevents footprint collapse "
                         "where new objects stay near old objects (stride≈0). Try 0.3.")
+    p.add_argument("--adaptive-chain-reuse-target", action="store_true", default=False,
+                   help="IDEA #87: per-batch adaptive chain-reuse target. Instead of a fixed "
+                        "--reuse-rate-target, uses the actual reuse rate of the current real "
+                        "training batch as the target. Helps heterogeneous corpora (tencent) "
+                        "where files span 0.10-0.99 reuse rate and a global target creates "
+                        "Wasserstein landscape conflicts.")
     p.add_argument("--gumbel-reuse", action="store_true", default=False,
                    help="IDEA #54: replace scalar obj_id_reuse with Gumbel-Softmax hard "
                         "binary decision + BCE-logit supervision. Straight-through gradient "
@@ -3033,6 +3051,7 @@ def parse_args() -> Config:
     cfg.chain_reuse_weight          = args.chain_reuse_weight
     cfg.chain_reuse_windows         = args.chain_reuse_windows
     cfg.chain_stride_floor          = args.chain_stride_floor
+    cfg.adaptive_chain_reuse_target = args.adaptive_chain_reuse_target
     cfg.gumbel_reuse                = args.gumbel_reuse
     cfg.gumbel_reuse_weight         = args.gumbel_reuse_weight
     cfg.gumbel_tau_start            = args.gumbel_tau_start

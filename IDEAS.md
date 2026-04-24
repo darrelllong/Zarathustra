@@ -2986,3 +2986,30 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 - frac<0 < 0.15 or G-collapse (W sustained < -5.0): kill, consider weight=12.0 or --copy-path-loss-only
 
 **Risk**: Weight=20.0 might over-constrain the Generator, causing mode collapse in the opposite direction (all objects "new", footprint explodes, diversity loss cannot compensate). Monitor W loss and recall at ep10.
+
+**v222 CLOSED-FAILED (Round 90)**: ep20=ep30=0.143 — stable attractor below kill threshold. Paradox: higher weight (20.0) produced lower peak frac<0 (16.3%) than v221 weight=5.0 (27.7%). Generator found tighter local minimum. Chain-reuse STE exhausted across all weights.
+
+---
+
+## IDEA #87 (LLNL): Per-File Adaptive Reuse Target for Chain-Reuse
+
+**Status**: PLANNED — code change required
+
+**Motivation**: All 9 chain-reuse STE attempts (v209-v222) failed because the global fixed target (0.615) is wrong for tencent's heterogeneous distribution (files span 0.10-0.99 reuse rate). The Generator correctly learns high-reuse since the training distribution is dominated by high-reuse files. A fixed global target creates a Wasserstein landscape conflict.
+
+**Core insight**: The characterization file already contains per-file `reuse_access_rate`. The Generator conditioning already includes characterization data. If the chain-reuse target is per-file (matching the actual reuse rate of the training file being processed), the Generator learns to condition reuse output on the file profile — not fight a fixed global target.
+
+**Implementation** (train.py changes ~20 lines):
+1. In the training loop, for each file batch: extract `reuse_access_rate` from the file's characterization record
+2. Replace `cfg.reuse_rate_target` with `batch_reuse_target = char_record['reuse_access_rate']`
+3. Pass `batch_reuse_target` to the chain-reuse loss function (instead of the global config scalar)
+4. Chain-reuse loss: penalize when window mean binary reuse deviates from `batch_reuse_target`
+5. At eval time: the eval file characterization provides the reuse target — Generator adapts per-file
+
+**Expected outcome**: Generator learns a conditional mapping: conditioning vector (which includes file reuse rate) → produced reuse rate. At eval time, each eval file's characterization specifies its reuse rate, and the Generator produces matching reuse. For tencent's diverse eval files (some with 0.15 reuse, some with 0.90 reuse), the Generator adapts instead of collapsing to a fixed point.
+
+**Code files**: `llgan/train.py` (chain-reuse loss block, ~lines 1840-1900) and `llgan/dataset.py` (characterization lookup per file).
+
+**Risk**: Per-file targets create a very noisy loss signal — the reuse target changes each batch. Could destabilize GAN training. Mitigate by smoothing the per-file target: `target = 0.8 * global_mean + 0.2 * file_target` initially.
+
+**Comparison bar**: LANL tencent 0.00887. LLNL Phase-PMF 0.04375. GAN ATB 0.03752 (v165).
