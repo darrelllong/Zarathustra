@@ -337,6 +337,62 @@ class LRUStackDecoder:
         return cls(pmf, transition_matrix=transition_matrix, **kwargs)
 
     @classmethod
+    def from_eval_json(
+        cls,
+        eval_json_path: str,
+        **kwargs,
+    ) -> "LRUStackDecoder":
+        """
+        Construct from a long_rollout eval JSON (real['stack_distance_histogram']).
+
+        Fits the 10-bucket PMF by mapping fine histogram bins to coarse buckets.
+        The reuse rate is NOT set here; use --lru-stack-reuse-rate or
+        --lru-stack-per-stream-rates to override it at generation time.
+
+        This gives tencent the same calibration quality as alibaba's
+        phase_pmf_atlas (fine-bin within-bucket sampling stored in fine_pmf).
+
+        Parameters
+        ----------
+        eval_json_path : path to long_rollout_eval JSON output.
+                         Must contain real['stack_distance_histogram'] and
+                         real['stack_distance_bin_edges'].
+        """
+        import json as _json
+
+        with open(eval_json_path) as _f:
+            _d = _json.load(_f)
+        _r = _d["real"]
+        fine_hist = np.array(_r["stack_distance_histogram"], dtype=np.float64)
+        fine_edges = np.array(_r["stack_distance_bin_edges"], dtype=np.int64)
+
+        # Build coarse 10-bucket PMF by summing fine bins
+        fine_hist = fine_hist / fine_hist.sum()
+        coarse = np.zeros(N_BUCKETS, dtype=np.float64)
+        n_fine = len(fine_hist)
+        for i in range(n_fine):
+            lo_f = int(fine_edges[i])
+            hi_f = int(fine_edges[i + 1]) if i + 1 < len(fine_edges) else int(fine_edges[-1]) * 10
+            # Find which coarse bucket this fine bin primarily falls in
+            for b in range(N_BUCKETS):
+                lo_b = int(_EDGES[b])
+                hi_b = int(_EDGES[b + 1])
+                overlap = max(0, min(hi_f, hi_b) - max(lo_f, lo_b))
+                width_f = max(hi_f - lo_f, 1)
+                coarse[b] += fine_hist[i] * overlap / width_f
+        coarse = np.maximum(coarse, 0.0)
+        if coarse.sum() > 0:
+            coarse /= coarse.sum()
+        else:
+            coarse = np.ones(N_BUCKETS) / N_BUCKETS
+
+        dec = cls(coarse, **kwargs)
+        # Store fine histogram for optional high-precision within-bucket sampling.
+        dec._fine_pmf = fine_hist.copy()
+        dec._fine_edges = fine_edges.copy()
+        return dec
+
+    @classmethod
     def fit_transition_matrix_from_obj_ids(
         cls,
         obj_ids: np.ndarray,

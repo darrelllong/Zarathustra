@@ -42,6 +42,7 @@ def generate(
     lru_stack_pmf: str = "",
     lru_stack_reuse_rate: float = -1.0,
     lru_stack_per_stream_rates: str = "",
+    lru_stack_per_stream_pmfs: str = "",
     lru_stack_max_depth: int = 2048,
     lru_markov_atlas: str = "",
     lru_markov_blend: float = 1.0,
@@ -288,6 +289,24 @@ def generate(
         if _lru_per_stream_rates:
             print(f"[lru-stack] IDEA #91 per-stream rates: {_lru_per_stream_rates}")
 
+    # IDEA #95: per-stream stack distance PMFs (semicolon-separated; one per stream).
+    # Each token is a comma-separated PMF; empty token means "use prototype PMF".
+    _lru_per_stream_pmfs: list = []
+    if lru_stack_per_stream_pmfs:
+        for _pmf_tok in lru_stack_per_stream_pmfs.split(";"):
+            _pmf_tok = _pmf_tok.strip()
+            if _pmf_tok:
+                _pv = np.array([float(x) for x in _pmf_tok.split(",")], dtype=np.float64)
+                _pv = np.maximum(_pv, 0.0)
+                _pv /= _pv.sum()
+                _lru_per_stream_pmfs.append(_pv)
+            else:
+                _lru_per_stream_pmfs.append(None)
+        if any(p is not None for p in _lru_per_stream_pmfs):
+            n_custom = sum(1 for p in _lru_per_stream_pmfs if p is not None)
+            print(f"[lru-stack] IDEA #95 per-stream PMFs: "
+                  f"{n_custom}/{len(_lru_per_stream_pmfs)} streams have custom PMF")
+
     # Inverse-transform each stream independently (cumsum stays within stream),
     # then label and concatenate for a single output file.
     import pandas as pd
@@ -305,8 +324,16 @@ def generate(
                       if lru_decoder_proto.cond_pmf is not None else None)
             E_copy = (lru_decoder_proto.dt_edges.copy()
                       if lru_decoder_proto.dt_edges is not None else None)
+            # IDEA #95: use per-stream PMF if available, else prototype PMF.
+            _stream_pmf = None
+            if _lru_per_stream_pmfs:
+                _ps_entry = _lru_per_stream_pmfs[s % len(_lru_per_stream_pmfs)]
+                if _ps_entry is not None:
+                    _stream_pmf = _ps_entry
+            pmf_for_stream = (_stream_pmf if _stream_pmf is not None
+                              else lru_decoder_proto.bucket_pmf.copy())
             dec = type(lru_decoder_proto)(
-                lru_decoder_proto.bucket_pmf.copy(),
+                pmf_for_stream,
                 lru_decoder_proto.max_stack_depth,
                 transition_matrix=T_copy,
                 cond_pmf=C_copy,
@@ -423,9 +450,9 @@ def parse_args():
                    help="Use BIT-based exact stack distances for PMF fitting (slower, "
                         "more accurate). Default: IRD approximation.")
     p.add_argument("--lru-stack-pmf", default="",
-                   metavar="P0,P1,...,P7",
-                   help="Explicit 8-value comma-separated PMF for stack-distance buckets "
-                        "[0,1),[1,2),[2,4),[4,8),[8,16),[16,64),[64,256),[256+). "
+                   metavar="P0,P1,...,P9",
+                   help="Explicit 10-value comma-separated PMF for stack-distance buckets "
+                        "[0,1),[1,2),[2,4),[4,8),[8,16),[16,32),[32,64),[64,128),[128,256),[256+). "
                         "Overrides --lru-stack-corpus and --lru-stack-real-csv.")
     p.add_argument("--lru-stack-reuse-rate", type=float, default=-1.0,
                    metavar="P",
@@ -462,6 +489,13 @@ def parse_args():
                    help="IDEA #91: comma-separated Bernoulli reuse rates per stream. "
                         "e.g. '0.606,0.704,0.590,0.559' for 4 streams. "
                         "Overrides --lru-stack-reuse-rate when provided.")
+    p.add_argument("--lru-stack-per-stream-pmfs", default="",
+                   metavar="PMF0;PMF1;...",
+                   help="IDEA #95: semicolon-separated stack distance PMFs, one per stream. "
+                        "Each PMF is comma-separated bucket probabilities "
+                        "(10 values: [0,1),[1,2),[2,4),[4,8),[8,16),[16,32),[32,64),[64,128),[128,256),[256+)). "
+                        "Empty entry uses the global --lru-stack-pmf or corpus default. "
+                        "Use calibrate_lru_per_stream.py to compute from training files.")
     p.add_argument("--lru-stack-markov-prr", type=float, default=-1.0,
                    metavar="P",
                    help="IDEA #93: P(reuse | prev was reuse) for 2-state Markov reuse chain. "
@@ -493,6 +527,7 @@ if __name__ == "__main__":
         lru_stack_pmf=args.lru_stack_pmf,
         lru_stack_reuse_rate=args.lru_stack_reuse_rate,
         lru_stack_per_stream_rates=args.lru_stack_per_stream_rates,
+        lru_stack_per_stream_pmfs=args.lru_stack_per_stream_pmfs,
         lru_stack_max_depth=args.lru_stack_max_depth,
         lru_markov_atlas=args.lru_markov_atlas,
         lru_markov_blend=args.lru_markov_blend,
