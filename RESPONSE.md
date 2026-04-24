@@ -6086,3 +6086,45 @@ For stream 3, legitimate options:
 | Tencent (oracle) | — | 0.005421 | 0.00887 | **LLNL oracle leads 39%** |
 
 **v225 status**: Phase 2.5 ep80/100. Phase 3 GAN in ~20 minutes. The key test: does v225's natural temporal locality improve the LRU decoder without rate override?
+
+---
+
+## Round 104 — v225 Phase 3 Launched; Calibration Study Complete
+
+**Date**: 2026-04-23
+**Reporting**: v225 Phase 3 started; calibration dead-end reached; oracle bound established.
+
+### v225 Phase 3 Entry Dynamics
+
+Phase 3 GAN training began at 23:32 PDT. Early epochs:
+
+| Epoch | W | G | pcf | t/epoch |
+|-------|---|---|-----|---------|
+| 1 | +0.275 | +1.155 | 0.237 | 212s |
+| 2 | +0.622 | -0.181 | 0.323 | 212s |
+
+W remains positive (critic maintaining separation). G oscillating — normal for early WGAN Phase 3. PCF=0.237-0.323 indicates significant power correlation mismatch. At 212s/epoch, ep10 gate will fire in ~30 minutes. ep45 checkpoint (ATB target) in ~2.3 hours.
+
+**v223 killed at ep80**: v223 had been running undetected for 138 minutes (we thought it was closed at ep22). Its ep80 showed comb=0.046 but the chain-reuse target remains wrong (consecutive ~3% vs LRU 61.5%). Killed to free GPU resources for v225.
+
+### Calibration Study Summary
+
+Complete oracle vs legitimate calibration comparison:
+
+| Calibration | HRC-MAE | Validity |
+|-------------|---------|---------|
+| No decoder (natural GAN) | 0.4047 | Not useful |
+| Global Bernoulli oracle (0.615) | 0.01019 | Oracle |
+| Markov global oracle (p_rr=0.810) | 0.01275 | Oracle, WORSE |
+| Oracle PMF + 5k-rate prefix | 0.01067 | Semi-legitimate, WORSE |
+| NN training PMF + 5k-rate prefix | 0.189 | Legitimate, catastrophic |
+| **Per-stream oracle [0.606,0.704,0.590,0.559]** | **0.005421** | **Oracle, 39% better than LANL** |
+| LANL PhaseAtlas | 0.00887 | Legitimate |
+
+**Key finding**: Per-stream calibration is the dominant factor (88% improvement over global). The per-stream rates cannot be estimated legitimately from prefixes (cold-start bias) or NN training files (stack distance PMF is independent of LRU hit rate). The oracle per-stream result is the theoretical floor for our approach.
+
+**Training file LRU rates precomputed** (`/home/darrell/tencent_lru_rates.json`): 3230 files, mean=0.542, std=0.156, range=[0.0, 0.971]. This data is available for future use but cannot close the stream 3 gap (two-phase temporal structure).
+
+### Next: v225 ep10 Gate
+
+At ep10 (30 min from now): run frozen_sweep to verify seed=5 basin. Expect ★ < 0.15. If confirmed, continue to ep45 for long-rollout eval and natural reuse rate measurement.
