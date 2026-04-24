@@ -3462,3 +3462,32 @@ footprint_loss = (unique_fraction - target_fraction) ** 2
 **Approach**: After ep20 gate confirms stability, switch to ep30 gate. But also run a quick eval every 5 epochs using 25k records (1 stream) instead of 100k (4 streams). This 4× reduction cuts eval time to ~2 min, allowing 5-epoch granularity at low cost.
 
 **Status**: OPEN — activate once v229 is confirmed stable at ep20 and improving toward 0.01065.
+
+## IDEA #107 (LLNL): Long-Rollout Training Signal
+
+**Motivation**: Training-eval distribution mismatch is the root cause of every ep10→ep20 collapse (v225-v229). Training measures short-window (12-step) reuse; eval measures 25k-record LRU performance. The GAN finds shortcuts that satisfy training metrics but destroy long-rollout quality.
+
+**Approach**: Every N epochs, generate a medium-length trace (5k records, 1 stream) using the current generator. Compute LRU reuse rate and unique-object count from this trace. Add soft penalties if they deviate from targets:
+```python
+# Every 5 epochs, add long-rollout signal
+long_reuse = eval_lru_reuse(generator, n=5000, lru_depth=15000)
+long_footprint = eval_unique_objects(generator, n=5000)
+G_loss += long_rollout_weight * (
+    (long_reuse - 0.615)**2 + 
+    (long_footprint - 9627)**2 / 9627**2
+)
+```
+
+**Cost**: ~10s/eval for 5k records (acceptable overhead). Adds long-rollout context to every 5th epoch.
+
+**Status**: OPEN — implement in v231 if v230 also shows ep10→ep20 instability.
+
+## IDEA #108 (LLNL): GAN → Profile → LRU Hybrid Architecture
+
+**Motivation**: LANL's StackAtlas approach (sample from empirical profile) is stable but can't generalize. LLNL's GAN approach (end-to-end generation) is unstable. A hybrid could get the best of both: use the GAN to learn a PROFILE (footprint, reuse rate distribution, temporal structure) and decode through an explicit LRU stack.
+
+**Approach**: Instead of generating raw obj_ids, train the GAN to generate a sequence of {new_object_probability, reuse_distance_bucket} pairs. Then decode through an explicit LRU stack using these probabilities. The GAN's loss is computed on the distribution of these probabilities, not on raw obj_ids.
+
+**Advantage**: Footprint and reuse rate are directly controllable through the generated probabilities. No training-eval mismatch.
+
+**Status**: OPEN — significant architecture change; consider after v230 results.

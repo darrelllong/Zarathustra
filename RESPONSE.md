@@ -7486,3 +7486,64 @@ Watching for the critical stability result. v229 is the first run with all three
 
 If it's stable at ep20: we have a genuine path to sub-0.01 HRC-MAE on tencent.
 
+
+---
+
+## Round 130 — v229 ep20 Collapse Diagnosis; v230 Launched (Slow-LR Stability Test)
+
+**Date**: 2026-04-24 08:45 PDT
+
+### v229 ep20 — Collapse Pattern Confirmed (5th Time)
+
+| Metric | ep10 | ep20 | Direction | Real |
+|--------|------|------|-----------|------|
+| HRC-MAE | 0.039 | **0.536** | ×13.7 worse | — |
+| reuse | 0.653 | **0.049** | −94% | 0.615 |
+| footprint | 8,686 | **23,772** | +174% | 9,627 |
+| P50 | 58 | 54 | −7% | 60 |
+| training reuse | 0.577 | 0.602 | +4% | — |
+
+The training metric *improved* (0.577→0.602) while the eval metric catastrophically degraded (0.653→0.049). This is the **training-eval distribution mismatch** in its clearest form:
+
+Training reuse_rate = mean over short windows (12 timesteps, batch of 64, file-local LRU). The GAN learns to produce high reuse in 768-record micro-batches, but the eval measures reuse over 25,000 records continuously per stream. At ep20, the generated trace's footprint expanded to 23,772 unique objects — exceeding the LRU depth of 15,000, causing cascading misses and reuse=0.049.
+
+The training metric cannot detect this collapse because it doesn't measure long-rollout behavior.
+
+### Root Cause: ep10 Sweet Spot vs Adversarial Drift
+
+This is the **5th consecutive run** with the identical pattern:
+
+| Version | ep10 HRC-MAE | ep20 outcome | Collapse mode |
+|---------|-------------|-------------|--------------|
+| v226 | 0.035 | reuse 0.250, footprint 18,740 | reuse undershoot |
+| v227 | 0.394 | footprint 115 | stride compression |
+| v228 | 0.105 | reuse 0.7495, footprint 6,261 | footprint shrink |
+| **v229** | **0.039** | reuse 0.049, footprint 23,772 | footprint expand |
+
+Each run finds a different collapse mode, but they all share:
+- ep10 = good (model has not yet drifted far from pretrain)
+- ep20 = collapsed (adversarial dynamics found a new shortcut)
+
+The pretrained weights (TimeGAN ep150 + supervisor) constrain the model at ep10. By ep20, the critic has been trained sufficiently to identify and punish the current generator mode, and the generator responds by finding a new shortcut that satisfies the training metrics but not the actual objective.
+
+### v230: Slow-LR Stability Experiment
+
+**Hypothesis**: The ep10→ep20 instability is caused by LR (lr_g=8e-5, lr_d=4e-5) being too large for the post-ep10 fine-tuning phase. 10× reduction (lr_g=8e-6, lr_d=4e-6) with n_critic=1 should make adversarial updates tiny — the model can refine without being driven into a new mode.
+
+| Parameter | v229 | v230 |
+|-----------|------|------|
+| Warm start | pretrain only | **v229 ep10** |
+| lr_g | 8e-5 | **8e-6** (10×) |
+| lr_d | 4e-5 | **4e-6** (10×) |
+| n_critic | 3 | **1** |
+| reset_optimizer | No | **Yes** (fresh Adam) |
+| Everything else | same | same |
+
+v230 starts Phase 3 at the v229 ep10 state — the best LLNL checkpoint (HRC-MAE=0.039). Slow LRs should preserve quality while allowing marginal improvement. **ep10 gate** (PID 787157) watching for v230 epoch_0010.pt (~35 min).
+
+If v230 ep10 shows HRC-MAE ≤ 0.039 (maintained or improved), slow-LR stabilization is confirmed. Target: HRC-MAE < 0.020 by v230 ep20-50.
+
+### IDEA #107: Long-Rollout Training Signal (Added to IDEAS.md)
+
+The training-eval mismatch is fundamental: training uses 12-timestep windows, eval uses 25k-record rollouts. Adding a periodic long-rollout eval signal to the generator loss (e.g., every 5 epochs: generate 5k records, compute LRU metrics, add soft penalty) would force the GAN to maintain long-horizon quality. Expensive but directly addresses the root cause.
+
