@@ -60,21 +60,21 @@ import numpy as np
 
 
 # Stack-distance bucket edges: [EDGES[k], EDGES[k+1]) for bucket k.
-_EDGES = np.array([0, 1, 2, 4, 8, 16, 64, 256, 1 << 20], dtype=np.int64)
-N_BUCKETS = len(_EDGES) - 1  # 8 buckets
+# IDEA #92: 10-bucket scheme splits [16,64) and [64,256) for finer median/P90 control.
+# [16,32) avg=23, [32,64) avg=48 → target median=60 falls in [32,64) ✓
+# [64,128) avg=96, [128,256) avg=192 → target P90=174 falls in [128,256) ✓
+_EDGES = np.array([0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 1 << 20], dtype=np.int64)
+N_BUCKETS = len(_EDGES) - 1  # 10 buckets
 
 # Default PMFs fitted from real corpus long-rollout eval
 # (aggregated from stack_distance_histogram/bin_edges in long_rollout JSON).
+# 10-bucket scheme: [0,1),[1,2),[2,4),[4,8),[8,16),[16,32),[32,64),[64,128),[128,256),[256+)
 #
-# Alibaba (source: alibaba_v195/long_rollout_epoch_0110.json real section,
-# stack_distance_median=174, p90=577): distribution concentrated in
-# [64,256) and [256+) buckets — matches heavy-tailed LRU stack law.
-#
-# Tencent (source: v165 long-rollout real section, stack_distance_median~60):
-# slightly shorter-range, more mass in mid-range buckets.
+# Alibaba (stack_distance_median=174, p90=577): heavy-tailed.
+# Tencent (stack_distance_median=60, p90=174): fitted for median≈60, P90≈174.
 _DEFAULT_PMFS = {
-    "alibaba": np.array([0.0000, 0.0015, 0.0123, 0.0468, 0.0474, 0.1470, 0.4842, 0.2608]),
-    "tencent": np.array([0.0000, 0.0050, 0.0200, 0.0600, 0.0850, 0.2200, 0.4100, 0.2000]),
+    "alibaba": np.array([0.0000, 0.0010, 0.0080, 0.0300, 0.0300, 0.0500, 0.1000, 0.3000, 0.2200, 0.2610]),
+    "tencent": np.array([0.0000, 0.0040, 0.0200, 0.0300, 0.2400, 0.0500, 0.1800, 0.3200, 0.1560, 0.0000]),
 }
 
 
