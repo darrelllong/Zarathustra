@@ -6392,3 +6392,80 @@ RESULTS.md: unchanged since Apr 23 10:23 (now >16 hours silent). PEER-REVIEW.md:
 
 **LLNL holds all positions**: alibaba 0.001937 (35% ahead of LANL stable), oracle tencent 0.005421 (39% ahead oracle-only).
 
+
+---
+
+## Round 109 — ep30 Gate: ★=0.178; ep35 In-Training Breakthrough; ep45 Gate Deployed
+
+**Date**: 2026-04-24
+
+### ep30 Frozen Sweep Gate Result
+
+```
+checkpoint                     ★       MMD²   β-recall
+────────────────────────────────────────────────────────────
+ ★epoch_0030.pt          0.17767    0.01127     0.1680
+  epoch_0020.pt          0.18031    0.00921     0.1445
+  best.pt                0.18513    0.00963     0.1225
+  epoch_0010.pt          0.18631    0.00771     0.1070
+```
+
+ep30 ★=0.17767. Improvement: ep10→ep20→ep30 = 0.186→0.180→0.178. The frozen_sweep ★ trajectory is improving but slowly — total improvement over 20 epochs is only 0.009.
+
+Component decomposition reveals a structural tension:
+
+| Metric | ep10 | ep20 | ep30 | Trend |
+|--------|------|------|------|-------|
+| MMD² | 0.00771 | 0.00921 | 0.01127 | **DEGRADING** |
+| β-recall | 0.1070 | 0.1445 | 0.1680 | **IMPROVING** |
+| ★ | 0.186 | 0.180 | 0.178 | slow improvement |
+
+The frozen_sweep MMD² is monotonically worsening while β-recall monotonically improves. The ★ metric is the combined score, so these opposing trends nearly cancel. This pattern suggests the model is trading global distribution coverage (MMD²) for local sample realism (β-recall) as training progresses.
+
+### ep35 In-Training Breakthrough
+
+| Epoch | W | G | PCF | EMA MMD² | comb |
+|-------|---|---|-----|----------|------|
+| 31 | +1.274 | 2.479 | 0.912 | — | — |
+| 32 | +1.624 | 3.082 | 0.869 | — | — |
+| 33 | +1.786 | 2.344 | 0.880 | — | — |
+| 34 | +2.113 | 3.408 | 0.894 | — | — |
+| 35 | +1.553 | 2.196 | **0.892** | **0.00407** ★ | **0.05707** ★ |
+
+ep35 sets new records: EMA MMD²=0.00407 (previous best: ep25 0.00546), comb=0.05707 (previous best: ep25 0.06186). W=+2.113 at ep34 — strongest discriminator signal yet.
+
+The EMA MMD² at ep35 (0.00407) is approaching the frozen_sweep MMD² territory (ep10: 0.00771). The in-training and frozen_sweep metrics have been diverging, but the in-training trajectory shows the model genuinely improving its distribution match internally.
+
+**Critical discrepancy**: In-training MMD² improving (0.01111 ep20 → 0.00407 ep35) while frozen_sweep MMD² degrading (0.00771 ep10 → 0.01127 ep30). This divergence may reflect: (1) the frozen eval bundle uses fixed seeds targeting different aspects of the distribution than the random training mini-batches, or (2) the model has overfit the in-training distribution while losing generalization to the fixed holdout bundle. The ep45 frozen_sweep will be the diagnostic.
+
+### Kill Threshold — Continue With Caution
+
+From Round 108 protocol:
+- Kill at ep40 if ★ ≥ 0.180 at ep30 → NOT triggered (★=0.178 < 0.180)
+- Continue with caution if 0.165 ≤ ★ < 0.180 → **APPLIES**
+- Reassess at ep45
+
+The in-training comb improvement (15% over ep20→ep35) and sustained PCF=0.892 suggest genuine model improvement is occurring. The decision is deferred to ep45 where we have both frozen_sweep ★ AND natural LRU rate measurement.
+
+### ep45 Gate Deployed
+
+Gate script `run_v225_ep45_gate.sh` (PID 665365) deployed. On ep45 checkpoint creation:
+1. Runs frozen_sweep (official ★ score)
+2. Generates 100k records natural (no Bernoulli override) with LRU decoder
+3. Evaluates against tencent manifest → HRC-MAE
+
+This gives us: (a) whether the ATB basin is activating, and (b) what the legitimate LRU rate is at ep45 (critical for whether decoder override is needed).
+
+At 208s/epoch, ep45 fires in approximately **35 minutes** (10 more epochs from ep35).
+
+**If ep45 shows natural LRU ≥ 0.54**: training-file calibration is viable for a legitimate tencent result.
+**If ep45 frozen_sweep ★ < 0.15**: model converging to seed=5 basin — continue to ep60/ep165.
+**Kill signal**: ★ ≥ 0.178 at ep45 AND in-training comb > 0.055 (stagnant in both metrics).
+
+### LANL Status
+
+RESULTS.md: Apr 23 10:23 (unchanged, now >17 hours silent).
+PEER-REVIEW.md: Apr 22 02:13 (>39 hours silent).
+
+LANL's extended silence following their failed IDEA #53 sweeps suggests they may be regrouping for a new architecture direction. No threat to current standings.
+
