@@ -5451,3 +5451,55 @@ With adaptive target:
 If the conditioning (cond_dim=10) doesn't include strong LRU-reuse information (the characterization `reuse_ratio` is short-window object re-access, NOT LRU stack reuse rate), the Generator may learn to match per-batch reuse during training but fail to generalize to eval files that have different reuse rates from the training distribution.
 
 **ep10 gate**: run frozen_sweep on best.pt. If ★ ≤ 0.03752 (v165 ATB): new ATB, run full long-rollout. If ★ > 0.03752: adaptive target improves dynamics but doesn't close the conditioning gap.
+
+## Round 93 — v223 ep10: Training Metrics Record, Frozen_Sweep Diagnostic
+
+**Date**: 2026-04-23
+**Reporting**: v223 ep10 sets all-time tencent GAN training records but frozen_sweep shows test-time gap.
+
+### v223 ep10 Training Metrics — All-Time Records
+
+| Metric | v223 ep10 | Previous best | Improvement |
+|--------|-----------|---------------|-------------|
+| comb | **0.05240** ★ | 0.06621 (v222 ep20) | +21% better |
+| recall | **0.775** ★ | 0.701 (v222 ep20) | +10% better |
+| MMD² | 0.00740 | 0.00641 (v222 ep20) | slightly worse |
+| G loss at ep10 | -2.49 | +7.30 (v222) | 4× better dynamics |
+
+The adaptive chain-reuse target dramatically improved GAN training dynamics. G loss hit -2.49 at ep10 (Generator beating Critic) vs v222's sustained G=7+ (Generator penalized but unable to satisfy constraint). The adaptive approach removes the Wasserstein landscape conflict, allowing the GAN to train more cleanly.
+
+### frozen_sweep ep10: ★=0.16270 (vs ATB 0.03752)
+
+The exceptional training metrics do NOT translate to frozen_sweep performance at ep10. ★=0.16270 is 4.3× worse than the v165 ATB (0.03752).
+
+**Diagnosis**: The frozen_sweep evaluates on held-out files without access to real trace data. The adaptive chain-reuse mechanism teaches the Generator to match real batch reuse rates — but at test time, only the conditioning vector (cond_dim=10, from characterization) is available. If the conditioning doesn't adequately encode the LRU reuse rate, the Generator defaults to its natural behavior (high reuse) regardless of what the eval files actually have.
+
+The training-time conditioning loop:
+- Training: real_batch present → adaptive target = actual LRU rate → Generator penalized to match
+- Test: only conditioning → Generator must infer target from conditioning alone
+
+**Key question**: Does the conditioning (extracted from characterization `profile` via var-cond) carry the LRU reuse rate signal? Analysis shows characterization `reuse_ratio` = short-window object re-access rate (0.001-0.01), NOT LRU stack reuse rate (0.10-0.99). If this feature doesn't encode LRU reuse behavior, the Generator cannot infer the correct reuse rate from conditioning alone.
+
+### G Loss Oscillation at ep13-14
+
+After ep10 G=-2.49 (Generator winning), chain-reuse pressure returns:
+- ep11: W=+2.55, G=-1.45 (Critic recovering)
+- ep13: W=+1.09, G=+5.17 (chain-reuse penalizing again)
+- ep14: W=+1.64, G=+5.30
+
+This oscillation (G win → Critic recovers → chain-reuse pressure → repeat) is different from v222's monotonic stable attractor. The adaptive target is creating a more dynamic equilibrium. Whether this helps at ep20+ is the key question.
+
+### Decision: Continue to ep20 Frozen Sweep
+
+Training metrics are exceptional and the dynamic equilibrium is fundamentally different from v221/v222. Running frozen_sweep continuously as checkpoints are saved. Gate at ep20:
+- If ★ improves toward 0.08 or below: IDEA #87 is working but needs more epochs
+- If ★ stays at 0.14-0.17: test-time conditioning gap is the binding constraint — file IDEA #88 (explicit LRU reuse rate in conditioning)
+
+### What IDEA #88 Would Fix
+
+IDEA #88 target: add the actual file LRU reuse rate as an EXPLICIT feature in the conditioning vector. Currently the characterization's `reuse_ratio` is the short-window re-access rate. We need:
+- Compute the LRU `obj_id_reuse` column mean for each training file (from the oracle data)
+- Store as `lru_reuse_rate` in the characterization
+- Include as conditioning dimension → Generator at test time can condition directly on the eval file's LRU reuse rate
+
+This would close the training/test conditioning gap definitively.

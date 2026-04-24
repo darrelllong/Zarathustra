@@ -3013,3 +3013,24 @@ trivially satisfies floor: output high stride for reuse=1 tokens (majority), zer
 **Risk**: Per-file targets create a very noisy loss signal — the reuse target changes each batch. Could destabilize GAN training. Mitigate by smoothing the per-file target: `target = 0.8 * global_mean + 0.2 * file_target` initially.
 
 **Comparison bar**: LANL tencent 0.00887. LLNL Phase-PMF 0.04375. GAN ATB 0.03752 (v165).
+
+---
+
+## IDEA #88 (LLNL): Explicit LRU Reuse Rate in Conditioning Vector
+
+**Status**: PLANNED — contingency if v223 frozen_sweep stays above ATB
+
+**Problem**: IDEA #87 (adaptive chain-reuse target) improves training dynamics (comb=0.05240 ★, recall=0.775 ★ at ep10) but shows test-time conditioning gap: frozen_sweep ★=0.16270 vs ATB 0.03752. Root cause: the characterization `reuse_ratio` field is the short-window object re-access rate (0.001-0.01), NOT the LRU stack reuse rate (0.10-0.99). The Generator cannot infer the correct LRU reuse rate from the conditioning vector at test time.
+
+**Fix**: Compute the true LRU reuse rate (fraction of `obj_id_reuse >= 0` in the oracle trace) for each training file and add it explicitly to the characterization used by `--var-cond`. Three steps:
+1. Scan all 3234 tencent oracle_general files, compute per-file `lru_reuse_rate = mean(obj_id_reuse >= 0)`, write to a supplementary JSON
+2. Modify `dataset.py` (or a preprocessing script) to load the supplementary JSON and inject `lru_reuse_rate` into the conditioning feature vector
+3. Retrain from scratch with this new conditioning dimension — Generator gets explicit LRU reuse rate signal at both train and test time
+
+**Expected outcome**: Generator learns: "when conditioning says lru_reuse_rate=0.9, produce 90% reuse; when it says 0.2, produce 20%." At eval time, the eval file's oracle data provides the ground-truth LRU reuse rate as conditioning → Generator adapts per-file.
+
+**Cost**: One-time scan of 3234 files (~10-20 min), then retrain (same cost as any v22x experiment).
+
+**Comparison bar**: LANL tencent 0.00887. GAN ATB 0.03752 (v165). v223 pending ep20+ frozen_sweep.
+
+**Trigger**: File IDEA #88 as contingency if v223 ep20-30 frozen_sweep shows no improvement toward ATB.
