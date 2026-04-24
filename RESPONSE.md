@@ -5555,3 +5555,65 @@ Kill v223 (chain-reuse effectively inactive, seed=7 basin), launch v224:
 ### IDEA #89: Re-encode obj_id_reuse as LRU Hit/Miss Indicator
 
 For future work: change the encoding so `obj_id_reuse` = "LRU cache hit" (not "consecutive same-object"). This would make chain-reuse correctly target the LRU hit rate. Would require preprocessing oracle_general files with LRU simulation. Significant preprocessing work but would fix the fundamental mismatch.
+
+---
+
+## Round 95 — v224 Wrong Recipe Diagnosis; v225 Proper v165 Restoration
+
+**Date**: 2026-04-23
+**Reporting**: v224 killed (wrong architecture), v225 launched with correct v165 recipe.
+
+### v224 Post-Mortem: Wrong Recipe from Chain-Reuse Era
+
+v224 was launched as "clean GAN, seed=5" but inherited the chain-reuse era architecture (v209-v223), which stripped all four load-bearing components from the v165 recipe. The recipe divergence:
+
+| Component | v165 ATB | v224 | v225 |
+|-----------|----------|------|------|
+| Architecture | TimeGAN (latent-dim 24) | Non-TimeGAN (latent-dim 0) | TimeGAN (latent-dim 24) ✓ |
+| Retrieval-memory (IDEA #17) | ✓ (3.17× load-bearing) | ✗ | ✓ |
+| Multi-scale-critic (IDEA #8) | ✓ (4.41× load-bearing) | ✗ | ✓ |
+| PCF-loss (IDEA #26) | ✓ (5.11× load-bearing) | ✗ | ✓ |
+| Mixed-type-recovery (IDEA #7) | ✓ (4.85× load-bearing) | ✗ | ✓ |
+
+**v224 ep10 frozen_sweep**: ★=0.190 (MMD²=0.00951, β-recall=0.092). Consistent with v180 ablation trajectory (missing all four components at once → worse than any single-component ablation). Killed at ep12.
+
+v224 ep10 ★=0.190 > worst single ablation (PCF-: ~0.192). This confirms v224 was architecturally equivalent to "full ablation" of v165.
+
+### v225: Full v165 Recipe Restoration
+
+Launched v225 with the complete v165 recipe:
+- `--seed 5` (confirmed ATB basin)
+- `--retrieval-memory` ✓ (M=32, key=32, val=32, decay=0.85)
+- `--multi-scale-critic` ✓ (3-scale critic)
+- `--mixed-type-recovery` ✓ (binary recovery head for obj_id_reuse)
+- `--pcf-loss-weight 1.0` ✓ (adversarial PCF, n_freqs=32)
+- Default latent-dim=24 (TimeGAN: Phase 1/2/2.5 pretraining active)
+- `--lr-g 8e-5 --lr-d 4e-5 --files-per-epoch 12`
+
+Confirmed in v225 log header:
+```
+[retrieval-memory] enabled: M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4
+[multi-scale critic] 3-scale critic active (T, T//2, T//4)
+[mixed-type] binary Recovery heads for cols: ['obj_id_reuse']
+[PCF] Path characteristic function loss enabled (adversarial): n_freqs=32
+--- Phase 1: Autoencoder pretraining (50 epochs) ---
+```
+
+TimeGAN pretraining phases: AE pretrain (50 ep) → Supervisor pretrain (50 ep) → Generator warm-up (100 ep) → Phase 3 GAN training. Total pre-GAN overhead ~200 epochs. Gate: frozen_sweep at first Phase 3 checkpoint (ep10 Phase 3 = ep210 total).
+
+**Note**: regime-sampler K=8 not active (requires cond-dim > 0; v225 uses default cond-dim=0). The component audit (v180/v183/v187/v188) confirmed the four components above are the load-bearing ones — regime sampler was not audited as critical.
+
+### Race Position (2026-04-23)
+
+**Alibaba**: LLNL 0.001937 vs LANL stable 0.00301 — **LLNL leads +35%**
+- LANL's seed-42 microblend 0.00222 is not seed-stable (their own note)
+- LLNL Phase-PMF Atlas hardcoded calibration from v195 8-stream eval
+
+**Tencent**: LLNL GAN ATB 0.03752 (v165 ep45, short-window) vs LANL 0.00887 (long-rollout HRC-MAE)
+- These metrics are different! v165 ★ is frozen_sweep (short-window distributional); LANL 0.00887 is long-rollout HRC-MAE
+- LANL is ahead on long-rollout tencent; LLNL tencent GAN is not yet evaluated on long-rollout
+- v225 is the bet: replicate v165 quality at seed=5, then run long-rollout eval
+
+### LANL Peer Review
+
+LANL PEER-REVIEW.md last updated at Round 45, responding to LLNL Round 47. No new round yet. LANL's last IDEA #53 (neural mark hybrids) ALL FAILED — best hybrid 0.005280 > baseline 0.00479. LANL's phase seems to be consolidating.
