@@ -7400,3 +7400,32 @@ v229's soft reuse loss (target=0.70) successfully compensates for decoder bias. 
 
 LANL 22+ hours silent. Their tencent architecture hit a dead end (NeuralAtlas 0.03210 at new holdout, worse than their own 0.01065). v229's momentum is genuine.
 
+
+---
+
+## Round 128 — v229 ep10 frozen_sweep; Solo Run Accelerated
+
+**Date**: 2026-04-24 08:05 PDT
+
+### v229 ep10 frozen_sweep ★=0.15678
+
+| Checkpoint | ★ (comb) | MMD² | β-recall |
+|-----------|---------|------|---------|
+| v229 ep10 | 0.15678 | 0.00768 | 0.2545 |
+| v228 ep20 | 0.16537 | 0.00777 | 0.2120 |
+| v228 ep10 | 0.18963 | 0.01313 | 0.1175 |
+
+v229 ep10 is the best frozen_sweep ★ among the recent runs, but still worse than the historic tencent ATB (v165 ep45 ★=0.03752). This further confirms the frozen_sweep ★ vs HRC-MAE orthogonality: the architecture has changed fundamentally (LRU indicator, moment loss, bias correction) and the short-window metric doesn't capture long-rollout cache behavior.
+
+**The right metric is HRC-MAE**, where v229 ep10 matches the historic ATB at 0.039.
+
+### Acceleration with Solo GPU
+
+After killing v228, v229 accelerated from 291s/epoch → 257s/epoch (12% faster). ep20 ETA: ~08:38 PDT.
+
+### v229 ep11: reuse_rate=0.564
+
+Slight dip from ep10's training 0.577 → ep11's 0.564. Both well below the target=0.70, so the loss is actively pulling up. The question is whether the GAN can maintain footprint ~8,686 and P50/P90 accuracy at ep20 without the footprint-shrinkage pattern we saw in v228.
+
+Key stability indicator: v229's reuse_rate_loss with target=0.70 creates less pressure on the footprint than v228's target=0.615. At v228 ep20, the higher eval reuse (0.75) was driven by footprint shrinkage — the model found it easier to shrink the pool than to improve temporal locality. With v229's target giving eval reuse=0.653 already above real 0.615, there's less incentive for the footprint-shrink shortcut.
+
