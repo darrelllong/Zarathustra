@@ -6784,3 +6784,47 @@ PEER-REVIEW.md: Apr 22 02:13 (now >49 hours silent — longest gap in the race).
 
 LANL has gone dark. No new experiments, no peer review. Their tencent and alibaba positions are frozen at 0.00887 and 0.00301 respectively.
 
+
+---
+
+## Round 115 — LANL NeuralAtlas Intelligence; v226 Phase 3 ep4; ep10 Gate at 04:48 PDT
+
+**Date**: 2026-04-24 04:30 PDT
+
+### LANL Intelligence Audit
+
+RESULTS.md (last modified Apr 23 10:23 — now **26 hours silent**) reveals the NeuralAtlas panel:
+
+- Alibaba NeuralAtlas blend=0.5 (64x25k, 900ep): HRC-MAE **0.00183** — non-strict holdout
+- Alibaba PhaseAtlas strict holdout: **0.00301** — LANL's promoted claim
+- Tencent NeuralAtlas blend=0.0 (64x25k, 900ep): **0.01845** — LANL best legitimate
+
+**Critical finding from PEER-REVIEW.md (Apr 22)**: LANL's own peer reviewer discounted the 0.00183 NeuralAtlas result:
+
+> "The non-strict `0.00183` NeuralAtlas row can stay in the history table but should not be the main claim. LANL's promoted cache benchmarks: Tencent `0.01065`, Alibaba `0.00301`."
+
+**Race position (strict holdout only)**:
+- Alibaba: LLNL **0.001937** vs LANL 0.00301 → **LLNL +35%**
+- Tencent: LLNL ~0.044 (legit) vs LANL **0.01065** → LANL leads ~4x
+- v226 with IDEA #97 targets the tencent gap
+
+### NeuralAtlas Architecture Analysis
+
+LANL's NeuralAtlas insight: replace implicit temporal locality with explicit object-state transitions through a learned atlas. The finding that `transition_blend=0.0` (pure atlas, no neural smoothing) wins for tencent confirms the heterogeneity problem — no single learned transition model spans tencent's [0.1, 0.99] reuse range.
+
+This is philosophically aligned with IDEA #97: make temporal locality explicit. Where LANL made it explicit in an atlas state machine, we make it explicit as a training feature (LRU hit indicator at K=15,000). Both approaches should produce the correct 61.5% cache hit rate without oracle calibration.
+
+### v226 Phase 3 Status
+
+Phase 3 GAN started 04:13 PDT. ep4 complete (W=+1.33, G=3.16, PCF=0.82, 209s/ep). W-distance healthy. PCF increasing — GAN is learning path characteristic functions. ep10 fires at **~04:48 PDT** (~18 min).
+
+ep10 gate (PID 701371) fires:
+1. frozen_sweep -> frozen_sweep_v226_ep10.log
+2. Natural long-rollout eval (no Bernoulli override) -> v226_ep10_natural_eval.log
+
+Critical diagnostic: `reuse_rate >= 0.55` = IDEA #97 working; `reuse_rate ~0.002` = bug or failure.
+
+### LANL Documentation Gap
+
+PEER-REVIEW.md last modified Apr 22 02:13 — 50+ hours silent. Their Round 45 peer review addresses our Round 47, while we're at Round 115. LANL has not reviewed our obj_id_reuse root cause discovery.
+
