@@ -6324,3 +6324,71 @@ The only remaining legitimate path is if the GAN GENERATOR naturally produces th
 
 The ep20 gate result will be available in the next loop iteration.
 
+
+---
+
+## Round 108 — ep20 Gate: ★=0.180; PCF Phase Transition; ep30 Gate Deployed
+
+**Date**: 2026-04-24
+
+### ep20 Frozen Sweep Gate Result
+
+```
+checkpoint                     ★       MMD²   β-recall
+────────────────────────────────────────────────────────────
+ ★epoch_0020.pt          0.18031    0.00921     0.1445
+  epoch_0010.pt          0.18631    0.00771     0.1070
+  best.pt                0.18977    0.01177     0.1100
+```
+
+ep20 ★=0.18031. Improvement from ep10: 0.186 → 0.180 = **3.2% over 10 epochs**. This is marginal — not the strong <0.15 basin signal we were targeting.
+
+Component breakdown:
+- **MMD²**: 0.00771 → 0.00921 — distribution matching **degraded** by 19%
+- **β-recall**: 0.1070 → 0.1445 — sample realism **improved** by 35%
+
+The opposing trends are interesting: the model is generating more realistic-looking individual sequences (higher recall) while the global distribution match is getting slightly worse. This is consistent with the GAN entering a regime where the generator is learning fine-grained patterns but hasn't yet imposed the correct global marginals.
+
+### Phase Transition Signal: PCF=0.919 at ep19
+
+Ep19-21 training dynamics:
+
+| Epoch | W | G | PCF | t (s) |
+|-------|---|---|-----|-------|
+| 18 | +1.845 | +4.634 | 0.798 | 198.9 |
+| 19 | +1.603 | +3.164 | **0.919** | 194.4 |
+| 20 | +1.467 | +2.673 | 0.819 | 199.4 |
+| 21 | +1.646 | +2.426 | 0.837 | 210.1 |
+
+PCF=0.919 at ep19 is the highest recorded value in v225 Phase 3 (previous peak: 0.817 at ep13). This represents a generator diversity breakthrough — the model is producing genuinely diverse sequences that cover the training distribution well in the point cloud sense.
+
+The G loss remained elevated (ep18: 4.634 → ep20: 2.673) before settling, indicating the discriminator continued to provide strong gradient signal even as PCF rose. W loss oscillating 1.4-1.8 — healthy adversarial balance.
+
+### Trajectory Assessment
+
+At the observed improvement rate of ~0.003 per 10 epochs:
+
+| Epoch | Projected ★ (linear) | v165 ATB target |
+|-------|----------------------|-----------------|
+| 20 | 0.180 (measured) | 0.037 |
+| 30 | ~0.177 | 0.037 |
+| 45 | ~0.173 | 0.037 |
+
+Linear extrapolation cannot reach the ATB target. However, linear extrapolation is the wrong model — the seed=5 basin is an attractor, not a gradual slope. v165 reached ★=0.037 at ep45 from the same seed and same architecture, suggesting a non-linear phase transition somewhere in the ep20-45 range.
+
+The PCF=0.919 spike is consistent with a precursor to rapid convergence: the generator has found diverse coverage, which should drive MMD² down sharply once the discriminator can no longer distinguish fine-grained differences.
+
+### Kill Threshold Update
+
+- **Kill at ep40** if ★ ≥ 0.180 at ep30 (flat or negligible improvement from ep20)
+- **Continue to ep45** if ★ < 0.165 at ep30 (clear convergence trajectory)
+- **Continue with caution** if 0.165 ≤ ★ < 0.180 at ep30 (marginal improvement — reassess at ep40)
+
+ep30 gate deployed (PID 657286 on vinge, writes to `/home/darrell/frozen_sweep_v225_ep30.log`). At 200s/epoch, ep30 fires in approximately 30 minutes.
+
+### LANL Status
+
+RESULTS.md: unchanged since Apr 23 10:23 (now >16 hours silent). PEER-REVIEW.md: Apr 22 02:13 (>38 hours silent). No new experiments or results observed.
+
+**LLNL holds all positions**: alibaba 0.001937 (35% ahead of LANL stable), oracle tencent 0.005421 (39% ahead oracle-only).
+
