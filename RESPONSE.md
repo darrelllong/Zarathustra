@@ -7123,3 +7123,53 @@ If the HRC-MAE at ep20 is also ~0.035 (not the catastrophic 0.345 seen in v226),
 
 If v227 also collapses at ep20, raise to w=50 for v228.
 
+
+---
+
+## Round 122 — v227 KILLED (ep10 footprint collapse); v228 Launched
+
+**Date**: 2026-04-24 06:48 PDT
+
+### v227 ep10 — New Failure Mode
+
+```
+HRC-MAE  : 0.394382
+reuse    : 0.9954 (real 0.6149)   ← OVERSHOOT despite training reuse_rate=0.566!
+footprint: 115    (real 9627)     ← CATASTROPHIC: only 115 unique objects
+P50      : 27     (real 60)
+```
+
+frozen_sweep ep10: **★=0.15109** (best result yet on feature distribution!) — confirming once again that frozen_sweep ★ is orthogonal to HRC-MAE.
+
+**Root cause** (different from v226's oscillation): The `reuse_rate_loss_weight=10` forces the `obj_id_reuse` column toward 0.615, but the GAN finds a shortcut: **compress all strides to a tiny range** (mostly zero or near-zero deltas) → only 115 unique object IDs exist in the entire trace → even when `obj_id_reuse=-1` (miss), the LRU decoder samples from the same tiny pool → 99.5% of accesses hit in any cache > 115 objects.
+
+The reuse rate loss constrains the MEAN of the reuse column but not the VARIANCE of the stride column. The GAN exploits this to achieve good `obj_id_reuse` statistics while collapsing the stride diversity.
+
+**v227 killed** (all processes).
+
+### v228 Recipe
+
+| Parameter | v226 | v227 | **v228** |
+|-----------|------|------|---------|
+| lru-cache-depth | 15000 | 15000 | 15000 |
+| reuse-rate-loss-weight | 0 | 10.0 | **10.0** |
+| reuse-rate-target | — | 0.615 | **0.615** |
+| pcf-loss-weight | 1.0 | 1.0 | **0.5** |
+| moment-loss-weight | 0 | 0 | **0.5** |
+
+The `moment_loss_weight=0.5` matches per-feature mean+std including `obj_id_stride`. This directly penalizes stride variance collapse — if the GAN outputs near-zero strides, the moment loss detects the low std and forces it back to match real stride statistics.
+
+Reducing `pcf_loss_weight` from 1.0 to 0.5 makes the generator's task easier (PCF at 1.0+ was causing generator loss gradient conflicts with the new auxiliary losses).
+
+**v228 ep1**: reuse_rate=0.587, G=2.043 (much lower than v227 ep1's G=3.099), t=210.5s. The lower G loss confirms the recipe is more stable.
+
+### Failure Taxonomy
+
+| Version | Failure | Root cause |
+|---------|---------|-----------|
+| v225 | reuse=0.0002 (obj_id_reuse=consecutive 3%) | Wrong feature semantics |
+| v226 ep20 | reuse=0.250 (undershoot) | No explicit loss, adversarial dynamics |
+| v226 ep30 | reuse=0.964, footprint=902 (overshoot/collapse) | Mode collapse without constraint |
+| v227 ep10 | reuse=0.995, footprint=115 | Stride compression shortcut (exploits reuse loss without stride constraint) |
+| **v228** | TBD | Moment loss prevents stride compression |
+
