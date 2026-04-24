@@ -2787,3 +2787,31 @@ _cr_rate = _cr_surrogate + (_cr_hard - _cr_surrogate).detach()
 **Expected**: ep10 footprint > 2000 (alibaba) or > 5000 (tencent), reuse_access < 0.80
 
 **Killed**: v214 (ep0 preventive), v215 ep57 (footprint=7 confirmed deepening collapse)
+
+## IDEA #81 (LLNL): Chain-Stride Diversity Floor (v218/v219 fix)
+
+**Status**: IMPLEMENTED, launching in v218 (alibaba) and v219 (tencent)
+
+**Problem**: v217 (IDEA #80, tencent) ep10 footprint=23 — WORSE than v215 (IDEA #79 only) ep10 footprint=716. Root cause: lowering reuse-bce from 2.0 → 0.5 removed a diversity signal that was incidentally preventing collapse. But the deeper root cause of ALL chain-reuse collapse versions (v1–v5) is the same:
+
+**obj_id_stride ≈ 0 for "new" objects** = footprint collapse. When the GAN generates a "new" object (reuse=0), it places it at stride≈0, i.e., near-identical object ID to the previous object. Over 8 windows of self-rollout, this creates a tiny pool of object IDs that endlessly cycle — high reuse rate achieved trivially without any real locality structure.
+
+The chain-reuse loss only penalizes the reuse RATE (% of windows with reuse=1). It does NOT penalize what happens when reuse=0: those "new" objects can be arbitrarily close to the previous object pool.
+
+**Fix**: One-sided chain-stride diversity floor. Collect obj_id_stride across all N chain windows. Penalize if mean|stride| < floor:
+
+```
+loss_chain_stride = max(0, floor - mean|stride|)²
+```
+
+Applied only when stride_col ≥ 0 and chain_stride_floor > 0. Uses same _crw (chain_reuse_weight) coefficient.
+
+**Why one-sided**: We want stride ≥ floor (diverse new objects). We do NOT penalize stride >> floor (very diverse is fine). `torch.clamp(floor - mean|stride|, min=0).pow(2)` is zero when |stride| ≥ floor, nonzero and gradient-bearing when |stride| < floor.
+
+**Floor value rationale**: Real alibaba: mean|stride| ≈ 0.3–0.5 in logspace (substantial new-object spread). Target floor = 0.3 to allow gradient to push away from the collapse basin (stride≈0) without over-constraining.
+
+**Weight reversion**: Restore v215-style weights (reuse-bce=2.0, diversity=2.0) to recover the within-window locality signal that IDEA #80 incorrectly removed.
+
+**Code**: Implemented in `llgan/train.py` chain-reuse block. CLI: `--chain-stride-floor FLOAT` (default=0.0, disabled).
+
+**Versions**: alibaba_v218 (seed=13, --chain-stride-floor 0.3, reuse-bce=2.0, diversity=2.0), tencent_v219 (seed=7, same)

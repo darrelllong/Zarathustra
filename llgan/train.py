@@ -1867,6 +1867,7 @@ def train(cfg: Config) -> None:
                                                   file_cond=file_cond_batch, G=G)
                     _h_cr = None
                     _cr_reuse_chunks = []
+                    _cr_stride_chunks = []
                     for _wci in range(_cr_windows):
                         _z_lc_cr = G.sample_z_local(B, cfg.timestep, device)
                         if _h_cr is None:
@@ -1875,8 +1876,10 @@ def train(cfg: Config) -> None:
                             _H_cr, _h_cr = G(_z_gc_cr, _z_lc_cr,
                                              hidden=_h_cr, return_hidden=True)
                         _cr_reuse_chunks.append(_H_cr[:, :, obj_id_col])
+                        if stride_col >= 0:
+                            _cr_stride_chunks.append(_H_cr[:, :, stride_col])
                     _cr_reuse_all = torch.cat(_cr_reuse_chunks, dim=1)  # (B, T*N)
-                    # Hybrid surrogate: sigmoid for val<0, piecewise-linear for val≥0.
+                    # Hybrid surrogate (IDEA #79): sigmoid for val<0, piecewise-linear for val≥0.
                     # Gradient is nonzero everywhere in (-∞, T], ensuring equilibrium.
                     _cr_neg_surr = torch.sigmoid(_cr_reuse_all * _SHARP_T)  # gradient for val<0
                     _cr_pos_surr = torch.clamp(_cr_reuse_all / _SHARP_T, 0.0, 1.0)  # gradient for val≥0
@@ -1887,6 +1890,17 @@ def train(cfg: Config) -> None:
                     _r_target_cr = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_chain_reuse = (_cr_rate - _r_target_cr).pow(2)
                     g_loss = g_loss + _crw * loss_chain_reuse
+                    # IDEA #81: chain-stride diversity floor.
+                    # Footprint collapse = new objects have stride ≈ 0 (staying near old objects).
+                    # Fix: one-sided loss — penalize if mean|stride| < floor across the chain.
+                    # Mean abs encoded stride < floor → collapse. Does NOT push stride too high.
+                    _cr_sfloor = getattr(cfg, 'chain_stride_floor', 0.0)
+                    if _cr_sfloor > 0.0 and stride_col >= 0 and _cr_stride_chunks:
+                        _cr_stride_all = torch.cat(_cr_stride_chunks, dim=1)  # (B, T*N)
+                        _cr_stride_spread = _cr_stride_all.abs().mean()
+                        loss_chain_stride = torch.clamp(
+                            _cr_sfloor - _cr_stride_spread, min=0.0).pow(2)
+                        g_loss = g_loss + _crw * loss_chain_stride
 
                 # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
                 # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
@@ -2699,6 +2713,10 @@ def parse_args() -> Config:
     p.add_argument("--chain-reuse-windows", type=int, default=8,
                    help="IDEA #72: number of windows to chain for the chain-reuse loss "
                         "(default 8, matching ~96 steps of long rollout).")
+    p.add_argument("--chain-stride-floor", type=float, default=0.0,
+                   help="IDEA #81: chain-stride diversity floor. One-sided loss penalizing "
+                        "mean|stride| < floor across chain windows. Prevents footprint collapse "
+                        "where new objects stay near old objects (stride≈0). Try 0.3.")
     p.add_argument("--gumbel-reuse", action="store_true", default=False,
                    help="IDEA #54: replace scalar obj_id_reuse with Gumbel-Softmax hard "
                         "binary decision + BCE-logit supervision. Straight-through gradient "
@@ -3014,6 +3032,7 @@ def parse_args() -> Config:
     cfg.reuse_rate_target           = args.reuse_rate_target
     cfg.chain_reuse_weight          = args.chain_reuse_weight
     cfg.chain_reuse_windows         = args.chain_reuse_windows
+    cfg.chain_stride_floor          = args.chain_stride_floor
     cfg.gumbel_reuse                = args.gumbel_reuse
     cfg.gumbel_reuse_weight         = args.gumbel_reuse_weight
     cfg.gumbel_tau_start            = args.gumbel_tau_start

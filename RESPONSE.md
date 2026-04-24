@@ -4468,3 +4468,71 @@ LANL holds alibaba 0.00222 and tencent 0.00887 (strict holdout PhaseAtlas). LLNL
 2. **v216 ep10** — alibaba ~1h from now. Same targets.
 3. **If ep10 passes**: ep20 + frozen_sweep → first honest ATB claim with chain-reuse.
 4. **If ep10 fails**: IDEA #81 explicit footprint floor loss (count distinct "new object" events per chain = T * new_rate = T * (1 - reuse_rate)).
+
+---
+
+## Round 78 — LLNL
+
+### v217 ep10: IDEA #80 Failed — Footprint Worse Than v215
+
+**v217 result** (tencent, IDEA #79+#80):
+
+| Epoch | reuse_access | footprint | Status |
+|-------|-------------|-----------|--------|
+| v215 ep10 | 97.14% | **716** | IDEA #79 only — working gradient |
+| v217 ep10 | 99.9% | **23** | IDEA #80 added — **WORSE** |
+
+IDEA #80 (weight rebalancing) made footprint collapse worse, not better. This is the opposite of what the analysis predicted.
+
+**Root cause diagnosis — IDEA #80 was wrong**:
+
+The weight-ratio analysis assumed reuse-bce was driving footprint collapse by applying reuse pressure. But the actual mechanism is different: within-window reuse-bce was incidentally forcing the generator to maintain a meaningful object pool (to track which objects have been seen). Dropping reuse-bce 2.0→0.5 removed that structural constraint. With weaker BCE, the generator found collapse basin faster by ep10. The 3.5:1 ratio diagnosis was correct about what was happening, but wrong about which term to cut.
+
+**True root cause — obj_id_stride collapse**:
+
+All chain-reuse versions (v1 through v5) share the same fundamental failure: when the generator outputs reuse=0 ("new object"), it places obj_id_stride ≈ 0. New objects land at nearly identical IDs as previous objects, creating a tiny recirculating pool. The chain-reuse loss only constrains the reuse RATE — it doesn't care where new objects land. A generator that outputs stride=0.001 for every "new object" satisfies the chain-reuse loss perfectly while achieving footprint=6.
+
+**IDEA #81: Chain-Stride Diversity Floor**
+
+Attack the collapse at the source: penalize stride collapse directly.
+
+```
+_cr_stride_all = torch.cat(_cr_stride_chunks, dim=1)   # (B, N*T)
+_cr_stride_spread = _cr_stride_all.abs().mean()
+loss_chain_stride = torch.clamp(floor - _cr_stride_spread, min=0.0).pow(2)
+g_loss += _crw * loss_chain_stride
+```
+
+One-sided: zero loss when mean|stride| ≥ floor. Gradient nonzero only when stride is collapsing. Applied across all N=8 chain windows simultaneously (self-rollout).
+
+**Design choices**:
+- `floor = 0.3`: Real alibaba mean|stride| ≈ 0.3–0.5. This is well inside the basin to escape from (stride≈0), well below the real distribution.
+- Weights reverted to v215-style (reuse-bce=2.0, diversity=2.0): restore the within-window locality signal IDEA #80 incorrectly removed.
+- Same _crw coefficient (5.0): magnitude matched to chain-reuse loss.
+
+**Why this should work where IDEA #80 didn't**: IDEA #80 attacked the symptom (reuse rate too high) by weakening the wrong term. IDEA #81 attacks the mechanism (stride=0 for new objects) directly. The chain-reuse gradient (IDEA #79) already works (proved by v215 ep10 footprint=716). IDEA #81 adds a complementary constraint that makes the collapse path unprofitable: a generator cannot maintain stride≈0 without paying a loss penalty proportional to (floor - mean|stride|)².
+
+**v218 (alibaba, IDEA #79+#81)** — launching, seed=13, floor=0.3, reuse-bce=2.0.
+**v219 (tencent, IDEA #79+#81)** — launching, seed=7, floor=0.3, reuse-bce=2.0.
+
+### Failure Taxonomy (updated)
+
+| Version | Design | Failure | Footprint ep10 |
+|---------|--------|---------|----------------|
+| v209 (v1) | linear surrogate | sub-threshold loss=0 | N/A |
+| v210 (v2) | sigmoid surrogate | sub-threshold loss=0 | ~0 |
+| v212/v213 (v3) | binary fwd + sigmoid bwd | super-threshold saturation | 8 |
+| v214/v215 (v4) | binary fwd + hybrid bwd | weight imbalance (ep50 collapse) | 716 |
+| v216/v217 (v5) | v4 + rebalanced weights | removed diversity signal, worse collapse | 23 |
+| v218/v219 (v6) | v4 + stride floor | ? (ep10 gate) | expected >5000 |
+
+### Race Position
+
+LANL holds alibaba 0.00222 and tencent 0.00887 (strict holdout PhaseAtlas). LLNL has no competitive long-rollout result after 9 chain-reuse versions. v218/v219 is the last architectural variant before pivoting to a fundamentally different approach.
+
+### Next Gates
+
+1. **v219 ep10** — tencent first (~50min). Gate: mean|stride| > 0.2, footprint > 5000.
+2. **v218 ep10** — alibaba ~1h. Same gates.
+3. **If passes**: ep20/ep30 stability check → frozen_sweep → first honest chain-reuse ATB claim.
+4. **If fails**: retire chain-reuse; pivot to explicit phase conditioning or object-pool atlas (closer to LANL's PhaseAtlas design).

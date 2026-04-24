@@ -6537,9 +6537,32 @@ G=2.05 at ep2 confirms chain-reuse loss firing. W oscillation (0.33→1.26→0.8
 
 ---
 
-### tencent_v217 (seed=7, IDEA #79+#80: hybrid surrogate + rebalanced weights, RUNNING)
-- Same as v216 but for tencent
-- Config: chain-reuse-weight=5.0, windows=8, target=0.615, seed=7
-- Launched: 2026-04-23 16:58
-- Log: /home/darrell/train_tencent_v217.log
-- Expected ep10: footprint > 5000, reuse_access < 0.80
+### tencent_v217 (seed=7, IDEA #79+#80: hybrid surrogate + rebalanced weights, CLOSED-FAILED ep10)
+- ep10: footprint=23, reuse=99.9%, HRC-MAE≈0.63 (WORSE than v215 ep10 footprint=716)
+- Root cause: lowering reuse-bce 2.0→0.5 removed diversity signal incidentally preventing collapse
+- True root cause: obj_id_stride ≈ 0 for new objects; chain-reuse loss doesn't penalize stride
+- Superseded by tencent_v219 (IDEA #81: chain-stride diversity floor)
+
+---
+
+### alibaba_v216 (seed=13, IDEA #79+#80: hybrid surrogate + rebalanced weights, CLOSED-FAILED ep0)
+- Killed during warmup (PID 418541); same code failure as v217 guaranteed
+- Superseded by alibaba_v218 (IDEA #81: chain-stride diversity floor)
+
+---
+
+### alibaba_v218 (seed=13, IDEA #79+#81: hybrid surrogate + chain-stride floor, LAUNCHING)
+- IDEA #79: binary fwd + hybrid bwd surrogate
+- IDEA #81: chain-stride-floor=0.3 — penalizes mean|stride| < 0.3 across 8 chain windows
+- Weights reverted to v215-style: reuse-bce=2.0, diversity=2.0 (restores within-window locality signal)
+- Config: chain-reuse-weight=5.0, windows=8, target=0.265, seed=13, chain-stride-floor=0.3
+- Log: /home/darrell/train_alibaba_v218.log
+- Expected ep10: footprint > 5000, mean|stride| ≈ 0.3–0.5
+
+---
+
+### tencent_v219 (seed=7, IDEA #79+#81: hybrid surrogate + chain-stride floor, LAUNCHING)
+- Same as v218 but for tencent
+- Config: chain-reuse-weight=5.0, windows=8, target=0.615, seed=7, chain-stride-floor=0.3
+- Log: /home/darrell/train_tencent_v219.log
+- Expected ep10: footprint > 5000, mean|stride| ≈ 0.3–0.5
