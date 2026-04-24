@@ -7038,3 +7038,43 @@ v226 ep30 should fire at ~05:58 PDT (Phase 3 started 04:13 + 30×210s = 105min).
 
 v227 ep10 is the critical diagnostic for whether the explicit reuse rate loss prevents the ep10→ep20 regression seen in v226.
 
+
+---
+
+## Round 120 — v226 KILLED (ep30 Collapse); v227 Reuse Stabilizing
+
+**Date**: 2026-04-24 06:05 PDT
+
+### v226 ep30 — Mode Collapse Confirmed
+
+```
+HRC-MAE  : 0.336684
+reuse    : 0.9639 (real 0.6149)   ← COLLAPSE: 96% hits, near-infinite reuse
+footprint: 902    (real 9627)     ← COLLAPSE: only 902 unique objects
+P50      : 58     (real 60)       ← P50 still reasonable (artifact)
+```
+
+The trajectory: ep10→ep20→ep30 = 0.576 → 0.250 → 0.964 in reuse rate. The GAN oscillated from undershoot (ep20: too few hits, too many unique objects) to total collapse (ep30: repeats only 902 objects infinitely). The ep10 checkpoint remains the only useful output of v226.
+
+frozen_sweep ep30: ★=0.17072 (best so far — feature distribution IMPROVED while temporal locality collapsed). This is the clearest evidence yet that the ★ metric is orthogonal to HRC-MAE. The GAN is good at making the marginal feature distributions look right while failing at temporal structure.
+
+**v226 killed** (PID 695880) at ep30.
+
+### v227 Reuse Rate Trajectory
+
+| Epoch | reuse_rate | Comment |
+|-------|-----------|---------|
+| 1 | 0.603 | Near-target immediately (loss active) |
+| 2 | 0.531 | Adversarial dip |
+| 3 | 0.591 | Recovering toward 0.615 |
+
+The oscillation is much smaller than v226's (which dropped from ~0.58 to 0.25). The explicit loss (weight=10.0) is acting as a restoring force. Whether it converges to a stable 0.59-0.62 range or escapes toward collapse (like v226) will be clear at ep5 (first MMD eval).
+
+v227 ep10 gate (PID 742267) watching. At ~290s/epoch (was slower when parallel with v226, now full GPU expected to return to ~210s/ep), ep10 fires at ~06:38 PDT.
+
+### Race Position
+
+- Alibaba: LLNL **0.001937** vs LANL 0.00301 — LLNL leads 35%, stable
+- Tencent: best legitimate = v226 ep10 raw **0.038** (LLNL) vs LANL **0.01065** — LANL leads 3.6×
+- v227 active: targeting HRC-MAE < 0.01065 at ep10 if reuse stabilizes at ≥0.60
+
