@@ -3110,3 +3110,21 @@ Using a single global rate 0.615 averages across these. Per-stream calibration c
 **Limitation**: Per-stream rates from eval files are circular (we know the eval files). Legitimate approach: find training file clusters with similar reuse rates and use those for calibration.
 
 **Trigger**: File IDEA #91 as next step if Markov atlas (IDEA #62) doesn't close the 2.6× gap to LANL.
+
+---
+
+## IDEA #92 (LLNL): Finer-Grained LRU Stack Distance Buckets
+
+**Status**: OPEN — fix for i.i.d. PMF median undershoot
+
+**Problem**: The 8-bucket PMF in lru_stack_decoder.py uses [16,64) and [64,256) as the critical mid-range buckets. Uniform sampling within [16,64) gives average rank 40 (target: 60). This causes stack_distance_median=47 when real is 60 — a systematic undershoot.
+
+**Fix**: Add finer buckets in the [16,64) and [64,256) range. Suggested new edges:
+- `[0,1), [1,2), [2,4), [4,8), [8,16), [16,32), [32,64), [64,128), [128,256), [256,+∞)`
+  (10 buckets instead of 8)
+
+With [32,64) as a bucket, uniform sampling gives average rank 48, much closer to the target 60. Combined with [64,128) (average 96) and [128,256) (average 192), the P90 can be better controlled.
+
+**Expected improvement**: median could reach 55-60 (vs 47 now), P90 could decrease from 206 to ~175 (matching real 174). Estimated HRC-MAE improvement: 0.018 → 0.008-0.012.
+
+**Cost**: Modify lru_stack_decoder.py (new _EDGES array, update N_BUCKETS). Need to re-fit PMF from real data with new bucket scheme.

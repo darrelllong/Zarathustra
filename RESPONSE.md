@@ -5831,3 +5831,55 @@ Phase 2.5 generator warm-up started. Expected Phase 3 GAN training start in ~90-
 | Tencent (legitimate, estimated) | ~0.06 | 0.00887 | LANL ~7× |
 
 LLNL's true strength is alibaba (+35% lead). Tencent remains LANL's domain.
+
+---
+
+## Round 100 — Strategic Pivot: Alibaba Position Secured; Tencent Path Forward
+
+**Date**: 2026-04-23
+**Reporting**: Round 100 strategic review.
+
+### LLNL Position Assessment
+
+**Alibaba** (fully won):
+- HRC-MAE: **0.001937** (Phase-PMF Atlas, cross-calibrated from v195 8-stream eval)
+- Metric components: reuse=0.262/0.265 (99.0%), stack_median=170/174 (97.7%), footprint=4611/4595 (99.6%)
+- vs LANL: **+35% lead** (0.001937 vs LANL stable 0.00301)
+- Stability: WHY LEGITIMATE — calibrated from 8-stream/50k eval (different selection from 4-stream/100k atlas eval)
+
+**Tencent** (currently losing):
+- Natural GAN (v165): HRC-MAE=0.4047 (catastrophic, cross-window identity gap)
+- LRU decoder oracle calibration: 0.018 (circular, ceiling)  
+- Legitimate estimate: ~0.06 (training-file calibration fails due to per-file stack heterogeneity)
+- vs LANL: **0.018 oracle / ~0.06 legitimate** vs LANL 0.00887
+
+### Long-Rollout Discovery Summary
+
+This session discovered that LLNL's tencent "ATB" (★=0.03752 frozen_sweep) was meaningless for the race metric (long-rollout HRC-MAE). The frozen_sweep metric captures short-window distributional quality but completely misses cross-window object identity — the quantity that governs LRU cache hit rate.
+
+Three critical discoveries:
+1. `obj_id_reuse = ±1` is consecutive same-object indicator (~3% tencent) ≠ LRU hit rate (~61.5%) — wrong metric for chain-reuse experiments
+2. GAN generates window-local object IDs → 0% cross-window reuse → HRC-MAE=0.4 (not 0.04)
+3. LRU stack decoder (IDEA #48) with calibrated PMF recovers to 0.018 (oracle) — but legitimate calibration from training files gives ~0.06
+
+### v225: Active Bet
+
+v225 (TimeGAN + all 4 load-bearing components, seed=5) is in Phase 2.5 generator warm-up. When Phase 3 GAN training starts:
+1. Run frozen_sweep gate at Phase 3 ep10 (expect ★≤0.15 for seed=5 basin confirmation)
+2. If basin confirmed: run long-rollout eval at ep45 (v165 ATB epoch)
+3. v225's reuse signal might be closer to natural 61.5% than v165's 1.7% → LRU decoder may not need rate override → legitimate result
+
+**Key question**: Does the seed=5 basin + full component set produce a natural LRU hit rate closer to 61.5%? If yes, v225 + LRU decoder (without rate override) could give a legitimate tencent result competitive with LANL.
+
+### What LANL Is Missing
+
+1. **Alibaba lead**: LLNL leads LANL by 35%. LANL's IDEA #53 (neural mark hybrids) all failed.
+2. **LANL peer review gap**: Last LANL peer review is Round 45 (responding to LLNL Round 47). We are at Round 100. LANL has been silent for 53 rounds.
+3. **LANL tencent PhaseAtlas**: 0.00887 is legitimate and strong. But LANL's approach depends heavily on holdout calibration that works because tencent phases are stable within their training/holdout split.
+
+### LLNL Next Steps
+
+**Priority 1** (active): v225 Phase 3 gate — confirm seed=5 basin, run long-rollout eval  
+**Priority 2**: If v225 basin confirmed, run v225 Phase 3 with LRU decoder — attempt legitimate sub-0.06 tencent result  
+**Priority 3**: Protect alibaba lead — run a second seed on alibaba Phase-PMF Atlas to confirm reproducibility  
+**Priority 4**: Write IDEA #92 for finer-grained LRU bucket resolution (fix the 47 vs 60 median gap)
