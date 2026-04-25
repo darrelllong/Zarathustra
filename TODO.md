@@ -288,6 +288,35 @@ Items marked ✓ are done and in the repo.
 
 ---
 
+## Rust cache simulator (tools/cachesim/) — picking up when home
+
+- [ ] `[P0]` **Fetch one real file per corpus from public sources** before resuming the Rust build. No traces are local; the simulator cannot be validated until at least one Tencent `.zst` and one Alibaba `.zst` are staged in `tools/cachesim/testdata/` (gitignored).
+  - Alibaba block traces — https://github.com/alibaba/block-traces (181 GB gzip-compressed block traces; grab the smallest shard).
+  - Alibaba cluster traces — https://github.com/alibaba/clusterdata (v2017 1,300-machine/12-hr, v2018 4,000-machine/8-day; for reference — block-traces repo is the match for our oracleGeneral pipeline).
+  - Tencent Cloud Volume Workload Traces — https://github.com/Tencent/Cloud-Volume-Workload-Traces (≈16,000 CVDs with I/O + subscription info; used in S3-FIFO SOSP'23 evaluation).
+  - SNIA IOTTA mirror — http://iotta.snia.org/traces/27917 (alternate access route if GitHub release assets are slow).
+  - Must match a filename in `/home/darrell/long_rollout_manifests/{tencent,alibaba}_stackatlas.json` on vinge so the simulator's HRC-MAE can be compared apples-to-apples to LANL's 0.00887 (tencent) and LLNL's 0.001937 (alibaba). If we can't match manifest filenames, downgrade validation to real-vs-real sanity (HRC-MAE ≈ 0) until a matched pair is available.
+  - Reference: S3-FIFO uses these same traces — https://jasony.me/slides/sosp23-s3fifo.pdf (arXiv 2203.10766). S3/COS/OSS APIs are S3-compatible if we need bulk access later.
+
+- [ ] `[P0]` **Build the simulator per locked plan** (first Rust in the repo):
+  - Location: `tools/cachesim/` (used by both llgan and altgan).
+  - v1 policies: LRU + ARC (classic Megiddo–Modha). `Policy` trait so 2Q/LIRS/TinyLFU/S3-FIFO drop in later.
+  - Stores only `obj_id` set membership + recency metadata — no payload bytes.
+  - CLI: `--cache-size N` or `--cache-sizes N1,N2,...` or `--grid lanl-tencent|lanl-alibaba`.
+  - Readers: oracleGeneral `.zst` (real) + synthetic CSV from llgan/altgan `generate.py`; `--format auto|oracle|csv`.
+  - Single-pass Mattson stack-distance for LRU HRC across all cache sizes; rayon per-size for ARC.
+  - JSON output schema byte-identical to `llgan/long_rollout_eval.py` sidecar (`hrc_mae_vs_real`, `reuse_access_rate`, `stack_distance_{median,p90}`, `footprint_mean_per_stream`, `per_cache_size[]`).
+  - `rust-toolchain.toml` pinned to stable; `tools/cachesim/testdata/` in `.gitignore`.
+
+- [ ] `[P1]` **Validation gates before calling v1 done**:
+  - Unit: LRU on Mattson textbook example, ARC on 5-request Megiddo–Modha example.
+  - Real-vs-real: HRC-MAE(real, real) ≈ 0 on the fetched Tencent and Alibaba files.
+  - Real-vs-fake: reproduce LANL tencent 0.00887 within 1e-4 on a paired altgan CSV (deferred until a synthetic CSV is available locally).
+
+- [ ] `[P2]` **Follow-on policies once v1 lands**: 2Q, LIRS, TinyLFU, and **S3-FIFO** (SOSP'23, arXiv 2203.10766). S3-FIFO is the natural next addition because both Tencent and Alibaba traces were the original evaluation workloads for that policy.
+
+---
+
 ## Longer-term (architecture)
 
 - [ ] **Build hierarchical two-level generator**
