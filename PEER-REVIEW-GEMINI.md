@@ -55,3 +55,19 @@ After reviewing the newest inference features and core metrics, here is the next
 **Issue:** When using the legacy `--overlap-consistency-mode boundary`, the `train.py` script mistakenly invokes `boundary_latent_smoothness` to compute feature-space MSE.
 - **Effect:** This applies the exact same palindrome-forcing zero-velocity boundary conditions to the feature space (`feat_c1`, `feat_c2`). The WaveStitch-style `overlap` mode (the new default) correctly uses the time-aligned `overlap_consistency` and is unaffected.
 - **Fix:** If the legacy boundary mode is to be preserved for provenance, write a dedicated continuous feature MSE loss rather than reusing `boundary_latent_smoothness`'s flipped logic.
+
+## Round 4
+
+1. `[Resolved]` **Evaluator Padding & Conditioning Bugs Fixed**: The critical evaluation bugs highlighted in earlier Gemini rounds have been successfully addressed. `eval.py` now correctly avoids artificial padding in `_per_window_hrc`, dynamically resolves `obj_id_reuse` via `prep.col_names`, and properly routes `cond` through `G.cond_encoder` and `G.regime_sampler` instead of bypassing them. The evaluation framework is now trustworthy enough to evaluate the newest structural bets.
+
+2. `[Resolved]` **CFG Info Leakage Fixed**: The CFG information leakage bug (where `noise` retained condition signatures) has been correctly resolved in `train.py`. The `cond_drop_prob` mask is now applied *before* any downstream components, successfully enforcing a true unconditional prior.
+
+3. `[Resolved]` **Optimizer Initialization Bug Fixed**: The previously dormant `opt_ER` is now properly zeroed and stepped within the training loop, closing the gap in the latent-AE training pathway.
+
+4. `[Resolved]` **MMD Bias & DMD-GEN Stability**: `mmd.py` correctly uses an unbiased multi-scale RBF MMD² estimator by excluding the diagonal terms, removing the systematic scaling bias. The zero-division instability in `DMD-GEN` has also been patched by substituting the pseudo-inverse (`np.linalg.pinv(np.diag(S_r))`) to handle rank-deficient singular values cleanly.
+
+5. `[P1]` **altgan/ Parity & Integration**: The new `altgan/` directory introduces `StackAtlasModel`, a cache-native generative mechanism independent of the primary `llgan` pipeline. `altgan/generate.py` correctly implements generation logic from fitted models. However, it operates fundamentally as a separate structural framework. While `llgan/generate.py` properly integrates `LRUStackDecoder` for post-hoc corrections, the structural divergence between `altgan` and `llgan` means the project is bifurcated. To avoid technical debt, findings from `StackAtlasModel` should eventually inform generator-side mechanisms in the mainline `llgan` to prevent duplicating the evaluation/integration effort.
+
+6. `[P2]` **Boundary Critic (`D_bc`) Deployment**: The boundary critic is correctly instantiated, optimized, and serialized inside `train.py`. However, its adversarial loss contribution `loss_bc = -D_bc(_bc_tail_g, _bc_head_g).mean()` relies purely on the standard WGAN-SN loss shape without gradient clipping natively on the generator-side of the boundary loss. While stable today, long-horizon WGAN training can occasionally destabilize if `D_bc` becomes an overpowered discriminator relative to the single-window `C` and `C_feat` critics. Monitor the relative loss values; you may need to reduce `_bc_w` over time.
+
+The project has commendably cleared its most significant codebase and mathematical "debt," fully resolving the CFG leakage, evaluation metrics hardcoding, and mathematical instability in the MMD estimators. With these foundational fixes in place and the successful deployment of the `LRUStackDecoder` and `BoundaryCritic`, the codebase is robust enough to fully shift focus from scalar tuning to architectural/structural innovations.
