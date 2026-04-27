@@ -149,6 +149,17 @@ class Config:
     lru_eval_n: int = 5000            # records to generate for LRU diagnostic rollout
     lru_eval_corpus: str = "tencent"  # corpus for default stack-distance PMF
 
+    # IDEA #116: long-chain decoded reuse rate loss (carried LSTM state, decoded features)
+    # Directly addresses the training-eval mismatch: per-window reuse_rate_loss constrains
+    # single-window means but the LSTM hidden state can still diverge when chained across
+    # windows at eval time (seed=7 collapse: training 0.578 → eval 0.004 reuse).
+    # This loss generates K windows with carried LSTM state, decodes each through R(),
+    # and constrains the soft reuse rate across the full K*T horizon to match the target.
+    # Unlike chain_reuse (latent space), operates on decoded features — same representation
+    # as reuse_rate_loss, but with the CARRIED-STATE temporal context that eval uses.
+    long_chain_weight: float = 0.0    # loss weight (0=off; try 1.0–5.0; add alongside reuse_rate_loss)
+    long_chain_windows: int = 10      # K = number of windows to chain (10 → 120-step horizon)
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):

@@ -3552,3 +3552,39 @@ if epoch % 5 == 0:
 ```
 
 **Status**: OPEN — major architecture change (~400 lines). Implement as v232 experiment after LANL resumes.
+
+---
+
+## IDEA #116 (LLNL): Long-Chain Decoded Reuse Rate Loss
+
+**Motivation**: Implemented 2026-04-27 to directly address the training-eval mismatch identified in Rounds 131-133.
+
+**Root cause confirmed**: Per-window `reuse_rate_loss` constrains single-window means but the LSTM hidden state diverges when chained at eval time. Seed=5 (v229): training reuse=0.578 → eval reuse=0.653 ✓. Seed=7 (v231): training reuse=0.578 → eval reuse=0.004 ✗. Both seeds show IDENTICAL training metrics but opposite eval outcomes. The training signal (per-window) cannot constrain the LSTM's carried-state dynamics.
+
+**Fix**: Generate K=10 windows with carried LSTM state (same as long-rollout eval), decode each through R() (decoded feature space, same as reuse_rate_loss), constrain soft reuse rate over the full K×T=120 step horizon to match the target. This trains the LSTM's temporal hidden state dynamics directly for the chained-window condition.
+
+**Why different from chain_reuse (v4, IDEA #79)**:
+- chain_reuse (v4): operates on LATENT space (before R()); suffered footprint collapse in v220 on correct tencent data
+- long_chain (v116): operates on DECODED feature space (after R()); same representation as reuse_rate_loss which successfully trains per-window behavior
+- Combined with reuse_rate_loss (which targets per-window): the two losses constrain both short-range (12-step) and long-range (120-step) reuse distributions simultaneously
+
+**Implementation** (train.py, config.py):
+- `--long-chain-weight` (float, default=0.0): loss weight; try 1.0–5.0
+- `--long-chain-windows` (int, default=10): K windows to chain (120-step horizon)
+- Uses hybrid surrogate (IDEA #79 v4) for gradient: constant grad for val≥0 (prevents saturation), sigmoid for val<0 (pushes above threshold)
+- Requires `latent_ae=True` (R() decoder must be available)
+
+**Expected recipe for v233**:
+```bash
+python -m llgan.train --trace-dir /home/darrell/traces/tencent_block_1M/ \
+  --retrieval-memory --multi-scale-critic --mixed-type-recovery \
+  --pcf-loss-weight 0.5 --moment-loss-weight 0.5 \
+  --reuse-rate-loss-weight 10.0 --reuse-rate-target 0.70 \
+  --lru-cache-depth 15000 --lru-eval-every 5 --lru-eval-corpus tencent \
+  --long-chain-weight 2.0 --long-chain-windows 10 \
+  --seed 5 --w-stop-threshold 7.0
+```
+
+**Gate**: ep5 lru_actual diagnostic should show ≥ 0.50 reuse (vs v229 ep5 ~0.60 and v231 ep5 ~0.004 catastrophic). If seed=5 with long_chain_weight=2.0 shows ep10 HRC-MAE < 0.039, confirmed ATB improvement. If seed=7 with this loss shows ep10 HRC-MAE < 0.579 (v231 catastrophic), the loss is preventing seed collapse.
+
+**Status**: IMPLEMENTED — `--long-chain-weight`, `--long-chain-windows` flags added to train.py and config.py (2026-04-27). Ready for v233 experiment.
