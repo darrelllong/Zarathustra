@@ -1917,6 +1917,54 @@ def train(cfg: Config) -> None:
                             _cr_sfloor - _cr_stride_spread, min=0.0).pow(2)
                         g_loss = g_loss + _crw * loss_chain_stride
 
+                # IDEA #116: long-chain decoded reuse rate loss.
+                # Root cause of ep10→ep20 collapse: per-window reuse_rate_loss constrains
+                # each window independently, but at eval the LSTM state is CARRIED across
+                # ~2083 windows (25k records / 12 per window). The carried hidden state
+                # dynamics can diverge (seed=7: training 0.578 → eval 0.004 reuse, ep10),
+                # producing footprint explosion and HRC-MAE collapse.
+                #
+                # Fix: generate K=long_chain_windows windows with carried LSTM state,
+                # decode each through R() (same as inference), then penalise the mean
+                # soft reuse rate over the full K*T horizon.  This trains the LSTM's
+                # temporal dynamics to maintain correct reuse when chained — the exact
+                # condition that fails at eval time.
+                #
+                # Uses hybrid surrogate (IDEA #79 v4) for gradients:
+                #   val ≥ 0: forward=1 (reuse), grad=1/T_sr (constant; no saturation)
+                #   val < 0: forward=0 (new),   grad=T_sr*σ(1-σ) (sigmoid, pushes above 0)
+                # Prevents both degenerate solutions:
+                #   all-reuse (val→+∞): constant grad pushes rate down
+                #   all-new  (val→-∞): sigmoid grad pushes rate up
+                _lcw = getattr(cfg, 'long_chain_weight', 0.0)
+                _lc_K = int(getattr(cfg, 'long_chain_windows', 10))
+                if _lcw > 0.0 and obj_id_col >= 0 and latent_ae:
+                    _T_sr = 10.0  # surrogate temperature (same as chain_reuse v4)
+                    _z_lc_g, _ = _make_z_global(B, cfg, device,
+                                                 real_features=real_batch,
+                                                 file_cond=file_cond_batch, G=G)
+                    _h_lc = None
+                    _lc_reuse_chunks = []
+                    for _lci in range(_lc_K):
+                        _z_ll = G.sample_z_local(B, cfg.timestep, device)
+                        if _h_lc is None:
+                            _H_lc, _h_lc = G(_z_lc_g, _z_ll, return_hidden=True)
+                        else:
+                            _H_lc, _h_lc = G(_z_lc_g, _z_ll,
+                                              hidden=_h_lc, return_hidden=True)
+                        _feat_lc = R(_H_lc)                       # decode to feature space
+                        _lc_reuse_chunks.append(_feat_lc[:, :, obj_id_col])  # (B, T)
+                    _lc_reuse_all = torch.cat(_lc_reuse_chunks, dim=1)       # (B, K*T)
+                    # Hybrid surrogate: correct gradient everywhere in (-∞, +∞)
+                    _lc_neg = torch.sigmoid(_lc_reuse_all * _T_sr)
+                    _lc_pos = torch.clamp(_lc_reuse_all / _T_sr, 0.0, 1.0)
+                    _lc_surr = torch.where(_lc_reuse_all < 0, _lc_neg, _lc_pos)
+                    _lc_hard = (_lc_reuse_all >= 0).float()
+                    _lc_rate = (_lc_surr + (_lc_hard - _lc_surr).detach()).mean()
+                    _lc_target = getattr(cfg, 'reuse_rate_target', 0.265)
+                    loss_long_chain = (_lc_rate - _lc_target) ** 2
+                    g_loss = g_loss + _lcw * loss_long_chain
+
                 # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
                 # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
                 # that the LSTM is reusing a prior object.  Train it to match
@@ -3062,6 +3110,16 @@ def parse_args() -> Config:
                    help="IDEA #115: records to generate per LRU diagnostic eval (default 5000).")
     p.add_argument("--lru-eval-corpus", type=str, default="tencent",
                    help="IDEA #115: corpus for default stack-distance PMF (tencent or alibaba).")
+    p.add_argument("--long-chain-weight", type=float, default=0.0,
+                   help="IDEA #116: weight for long-chain decoded reuse rate loss (0=off). "
+                        "Generates long_chain_windows windows with carried LSTM state, decodes "
+                        "each through R(), constrains soft reuse rate over K*T horizon vs target. "
+                        "Directly trains for reuse stability when LSTM state is carried — the "
+                        "exact condition that breaks at eval (ep20 collapse). Try 1.0–5.0 "
+                        "combined with --reuse-rate-loss-weight and --reuse-rate-target.")
+    p.add_argument("--long-chain-windows", type=int, default=10,
+                   help="IDEA #116: K = number of windows to chain for long-chain loss "
+                        "(default 10 → 120-step horizon; 10x the training window size).")
     args = p.parse_args()
 
     cfg = Config()
@@ -3197,6 +3255,8 @@ def parse_args() -> Config:
     cfg.lru_eval_every               = args.lru_eval_every
     cfg.lru_eval_n                   = args.lru_eval_n
     cfg.lru_eval_corpus              = args.lru_eval_corpus
+    cfg.long_chain_weight            = args.long_chain_weight
+    cfg.long_chain_windows           = args.long_chain_windows
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
