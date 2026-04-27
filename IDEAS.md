@@ -478,6 +478,36 @@ The common thread across these papers is clear:
 
 What follows is not a random literature dump. It is a proposed next architectural queue.
 
+---
+## Critical Analysis and New Directions
+
+Based on the analysis of collapse patterns in VERSIONS.md, several key insights emerge:
+
+### 1. Seed-Lottery Problem (Critical Bottleneck)
+The data shows that v164 and v165 ATBs were achieved via seed-locked configurations that can't be reproduced with patched code. This indicates:
+- The "buggy palindrome BS" was essential to achieving those scores
+- The model is highly unstable across different seeds
+- This instability is the fundamental source of train→eval gap
+- Current approaches to stability are missing the underlying root cause
+
+### 2. Reuse Rate is the Primary Bottleneck
+The repeated failures to break the 10% reuse rate ceiling (real traces are 10%+) indicates:
+- Current modeling is missing explicit reuse decision mechanism
+- The generator lacks a clear way to decide "reuse an object vs. access a fresh one"
+- The model is failing to preserve the long-term object access patterns that define cache behavior
+
+### 3. Training-Evaluation Discrepancy
+Critical issue identified:
+- Eval variance is massive (recall 0.398–0.639) - this is the real problem, not conditioning leakage
+- Lower learning rate fixes the train→eval gap but doesn't improve base quality
+- This suggests architectural instability in how the model learns to make consistent decisions
+
+### 4. Path-Dependency and Long-Term Memory Failure
+Analysis shows:
+- Multi-scale critics show improvement but only on evaluation not on training quality
+- Long rollout behavior still collapses into "random" pattern
+- State-space models or temporal memory might be necessary
+
 ### 17. Retrieval memory for locality: explicit reuse/new decision + object pointer
 
 **Core claim:** locality should become a structural decision, not a scalar penalty. Copy-path losses gave
@@ -722,6 +752,58 @@ inference" mismatch.
 
 **Primary sources:**
 - Aditya Shankar et al., [WaveStitch: Flexible and Fast Conditional Time Series Generation with Diffusion Models](pubs/WaveStitch_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2503.06231)
+
+---
+## New Concrete Directions from Collapse Analysis
+
+Based on the collapse pattern analysis, several critical new approaches should be pursued:
+
+### 22. Explicit Reuse Decision Architecture (Core Problem)
+**Problem**: The fundamental issue is that the model lacks explicit object reuse decisions - it's trying to smuggle reuse behavior through generic hidden states and continuous outputs.
+
+**Solution**: Implement an explicit reuse gate and memory architecture:
+- Add a per-stream memory table of recent object embeddings
+- At each timestep, output a reuse probability gate
+- If reuse=1, use retrieval/pointer selection over memory table
+- If reuse=0, emit new object embedding and store it
+- Condition size/opcode/timestamp on selected object state
+- Implement with minimal modification to existing architecture
+
+**Why it matters**: This directly addresses the fundamental issue that competitors like 2DIO and DiffGen identified - lack of proper reuse rate leads to zero cache hit ratio at any size.
+
+### 23. Stable Seed Learning Framework
+**Problem**: Massive eval variance (recall 0.398–0.639) shows model instability and seed lottery effect.
+
+**Solution**: Develop a robust learning framework that:
+- Identifies and stabilizes the critical decision-making points where seeds cause instability
+- Implements consistent decision boundaries across all runs
+- Adds variance-aware training that prevents extreme outliers
+- Focuses on the 10-20% of training that actually improves performance (not just the 80% that shows no effect)
+
+**Why it matters**: Without stable learning, all other improvements are irrelevant - you can't build on unstable foundations.
+
+### 24. Cache-Behavior First Training
+**Problem**: Current training focuses on distributional metrics while cache behavior (HRC) is the practical downstream target.
+
+**Solution**: Prioritize cache-native information in training:
+- Add cache-descriptor reconstruction losses during training
+- Implement a descriptor encoder that learns to preserve cache-relevant properties
+- Make HRC fidelity a primary optimization target, not afterthought
+- Use cache-native metrics (footprint, reuse-distance, working-set summaries) for conditional training
+
+**Why it matters**: This directly addresses what competitors proved matters - cache fidelity cannot be optimized while hoping it comes along for free.
+
+### 25. State-Space Model for Long-Term Memory
+**Problem**: Continuity loss failed and long-rollout coherence problems persist, indicating the model cannot maintain structure over longer horizons.
+
+**Solution**: Replace LSTM generator with a State-Space Model (SSM):
+- Preserve the current backbone architecture
+- Replace LSTM with SSM block sequence
+- Maintain z_global, mixed-type outputs, current critic
+- Focus on preserving long-horizon state without collapse
+- Experiment with different SSM architectures
+
+**Why it matters**: This directly targets the long-horizon state issue that is causing the "chunk boundary drift" and long-rollout collapse problems.
 - Xuan Hou et al., [Stage-Diff: Stage-wise Long-Term Time Series Generation Based on Diffusion Models](pubs/StageDiff_LongTS_2025.pdf), arXiv 2025. [arXiv](https://arxiv.org/abs/2508.21330)
 
 ### 22. Full hybrid pivot: diffusion + autoregressive supervisor + critic
