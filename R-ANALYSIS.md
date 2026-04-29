@@ -523,7 +523,7 @@ $$
 \sum_{j=1}^{q}
 \left(
 \dfrac{s_{ij} - \overline{s}_{\cdot j}}
-\mathrm{sd}(s_{\cdot j})}
+{\mathrm{sd}(s_{\cdot j})}
 \right)^2
 $$
 
@@ -597,7 +597,7 @@ Relative shift:
 $$
 \mathrm{relative\_shift}_{j,N} =
 \dfrac{m_{j,N}^{\mathrm{trim}} - m_j^{\mathrm{base}}}
-\max\left( \left| m_j^{\mathrm{base}} \right|, 10^{-9} \right)}
+{\max\left( \left| m_j^{\mathrm{base}} \right|, 10^{-9} \right)}
 $$
 
 Rows are ranked by \( |\mathrm{relative\_shift}_{j,N}| \).
@@ -1072,8 +1072,8 @@ Regime advice is
 $$
 \mathrm{regime\_recommendation} =
 \begin{cases}
-\text{K≈8}, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} \geq 6 \\
-\text{K≈4}, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} < 6 \\
+K \approx 8, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} \geq 6 \\
+K \approx 4, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} < 6 \\
 \text{single}, & \text{otherwise}
 \end{cases}
 $$
