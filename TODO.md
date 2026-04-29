@@ -298,6 +298,36 @@ Items marked ✓ are done and in the repo.
   - Must match a filename in `/home/darrell/long_rollout_manifests/{tencent,alibaba}_stackatlas.json` on vinge so the simulator's HRC-MAE can be compared apples-to-apples to LANL's 0.00887 (tencent) and LLNL's 0.001937 (alibaba). If we can't match manifest filenames, downgrade validation to real-vs-real sanity (HRC-MAE ≈ 0) until a matched pair is available.
   - Reference: S3-FIFO uses these same traces — https://jasony.me/slides/sosp23-s3fifo.pdf (arXiv 2203.10766). S3/COS/OSS APIs are S3-compatible if we need bulk access later.
 
+- [ ] `[P0]` **Manifest-fetch specifics** (resolves the "which file" question once `vinge` is reachable):
+  - Manifest schema is documented in `llgan/long_rollout_eval.py:359-371`:
+    ```json
+    {
+      "trace_dir": "...",
+      "fmt": "...",
+      "n_records": 100000,
+      "n_streams": 4,
+      "seed": 42,
+      "streams": [
+        [{"path": "...", "records_taken": int}, ...],
+        [{"path": "...", "records_taken": int}, ...],
+        [{"path": "...", "records_taken": int}, ...],
+        [{"path": "...", "records_taken": int}, ...]
+      ]
+    }
+    ```
+    `n_records=100000`, `n_streams=4`, `seed=42` ⇒ ~25k records per stream.
+  - Source dirs (canonical):
+    - Tencent: `/home/darrell/traces/tencent_block_1M/` (3,234 oracleGeneral `.zst` files; cited in `llgan/calibrate_lru_per_stream.py:31` and `llgan/precompute_descriptors.py:16`).
+    - Alibaba: `/tiamat/zarathustra/traces/alibaba/` (244 oracleGeneral `.zst` files; cited in `llgan/stack_atlas.py:20`, `llgan/phase_pmf_atlas.py:20`, etc.).
+  - One-liner to extract the validation filenames on `vinge`:
+    ```sh
+    jq -r '.streams[][].path' /home/darrell/long_rollout_manifests/tencent_stackatlas.json | sort -u
+    jq -r '.streams[][].path' /home/darrell/long_rollout_manifests/alibaba_stackatlas.json | sort -u
+    ```
+    For v1 simulator validation, **one** path from each list is sufficient — pick the smallest `.zst` so transfer is fast. Use `du -b` on the candidates.
+  - Sanity check before fetching: each chosen file must contain ≥ 25,000 oracleGeneral records (one stream's worth). The manifest `records_taken` per entry confirms this.
+  - Fallback if `vinge` is unreachable for the manifests: grab any one Tencent `.zst` from the GitHub Tencent Cloud-Volume-Workload-Traces repo and any one Alibaba `.zst` from `alibaba/block-traces`. Validation downgrades to real-vs-real (HRC-MAE ≈ 0) until matched files are available; the published 0.00887 / 0.001937 numbers cannot be reproduced without the exact manifest filenames.
+
 - [ ] `[P0]` **Build the simulator per locked plan** (first Rust in the repo):
   - Location: `tools/cachesim/` (used by both llgan and altgan).
   - v1 policies: LRU + ARC (classic Megiddo–Modha). `Policy` trait so 2Q/LIRS/TinyLFU/S3-FIFO drop in later.

@@ -1,0 +1,33 @@
+[package]
+name = "cachesim"
+version = "0.1.0"
+edition = "2021"
+description = "Cache simulator (LRU, ARC) for real and synthetic I/O traces from llgan/altgan"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "cachesim"
+path = "src/main.rs"
+
+[lib]
+name = "cachesim"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zstd = "0.13"
+csv = "1"
+rayon = "1"
+anyhow = "1"
+thiserror = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

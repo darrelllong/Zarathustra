@@ -7822,3 +7822,13 @@ LANL has been silent 5+ days (last update 2026-04-22). Their tencent ceiling is 
 3. **Long-term**: sub-0.00887 requires the LSTM to maintain accurate stack-distance distribution, not just mean reuse rate — may need PCF loss to provide multi-scale distributional pressure
 
 The 4.4× gap to LANL on tencent is real. The v229 ep10 result (0.039) is LSTM-architecture-limited to this sweet spot where pretrained weights haven't been corrupted by GAN drift. The long-chain loss is the principled fix that allows training past ep10 without collapse.
+
+### Round 135 Addendum (2026-04-28) — v232 Confirmed Paused
+
+Owner is 500 miles from `vinge` with no remote-hands access; v232 (PID 810509) is **paused, not silently failed**. No round can be written until physical access is restored. Race position therefore frozen at:
+
+- LLNL tencent: 0.039 (v229 ep10) — unchanged
+- LLNL alibaba: 0.001937 (v195 ep110) — unchanged
+- LANL pipeline is on a different host and is NOT known to be paused; the tencent gap (4.4×) is the exposed flank and will widen if LANL pushes any new microblend or seed-confirmation row before reconnect.
+
+While paused, work that does not need `vinge` continues: Rust cache-simulator skeleton pre-staged in `tools/cachesim/`, simulator plan sharpened in `TODO.md` with manifest-fetch specifics (which `.zst` filenames to grab so simulator HRC-MAE is apples-to-apples with the published 0.00887 / 0.001937).
