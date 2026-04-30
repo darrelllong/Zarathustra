@@ -1841,6 +1841,27 @@ def train(cfg: Config) -> None:
                     loss_reuse_rate = (_fake_rate - _r_target) ** 2
                     g_loss = g_loss + _rrw * loss_reuse_rate
 
+                # IDEA #119: per-window stride diversity hinge.
+                # Where IDEA #118 penalised low stride variance over the K*T-step
+                # CHAIN (long-rollout carried-state diversity), IDEA #119 penalises
+                # low stride variance WITHIN each per-window decoded output. This
+                # attacks the frozen-bundle recall axis: the eval scores T=12 fake
+                # windows against held-out T=12 real windows, and frozen recall
+                # measures how many real-window modes are covered by fakes.
+                # v237 ep10 frozen recall = 0.052 (severe undercoverage despite
+                # carried-state lru_fp = 1,137 — the two metrics decoupled).
+                # Hinge: per-example variance of obj_id_stride across T positions
+                # below target → penalty. Free-rides on the existing fake_decoded
+                # tensor; no extra forward pass.
+                _pwd_w = float(getattr(cfg, "perwin_diversity_weight", 0.0))
+                if _pwd_w > 0.0 and stride_col >= 0:
+                    _pwd_target = float(getattr(cfg, "perwin_diversity_target", 0.5))
+                    # Per-example variance over T positions: (B,)
+                    _pw_stride_var = fake_decoded[:, :, stride_col].var(dim=1)
+                    loss_perwin_div = torch.clamp(_pwd_target - _pw_stride_var,
+                                                  min=0.0).mean()
+                    g_loss = g_loss + _pwd_w * loss_perwin_div
+
                 # IDEA #72 / #76 / #79: long-chain reuse-rate loss (v4: hybrid surrogate).
                 # Generate chain_reuse_windows windows with carried LSTM hidden
                 # state (self-rollout, matching inference) and penalise the mean
@@ -3205,6 +3226,15 @@ def parse_args() -> Config:
                    help="IDEA #118: target variance floor for obj_id_stride across the "
                         "long-chain output. Real tencent signed-log strides have var "
                         "~0.5-1.5; 1.0 is a sane starting target.")
+    p.add_argument("--perwin-diversity-weight", type=float, default=0.0,
+                   help="IDEA #119: weight for per-window stride variance hinge in the "
+                        "main G update (0=off; try 0.5-2.0). Targets frozen-bundle "
+                        "recall directly — short-window mode coverage. Free-rides on "
+                        "the existing fake_decoded tensor; no extra forward pass.")
+    p.add_argument("--perwin-diversity-target", type=float, default=0.5,
+                   help="IDEA #119: target variance floor for obj_id_stride within "
+                        "each T=12 window. Lower than --chain-diversity-target (real "
+                        "tencent per-window stride var ~0.3-0.8).")
     args = p.parse_args()
 
     cfg = Config()
@@ -3345,6 +3375,8 @@ def parse_args() -> Config:
     cfg.retrieval_train_carry        = args.retrieval_train_carry
     cfg.chain_diversity_weight       = args.chain_diversity_weight
     cfg.chain_diversity_target       = args.chain_diversity_target
+    cfg.perwin_diversity_weight      = args.perwin_diversity_weight
+    cfg.perwin_diversity_target      = args.perwin_diversity_target
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2

@@ -181,6 +181,18 @@ class Config:
                                              # signed-log strides have var ~0.5-1.5;
                                              # 1.0 is a sane starting target.
 
+    # IDEA #119: per-window stride diversity hinge in the main G update.
+    # Where IDEA #118 attacks long-rollout carried-state diversity (lru_fp), IDEA #119
+    # attacks short-window mode coverage (frozen recall). v237 confirmed the two
+    # metrics decouple: lru_fp 51→1450 (good) but frozen recall 0.075→0.052 (worse).
+    # The race-relevant ★=MMD²+0.2·(1-recall) is dominated by recall; this loss
+    # adds gradient pressure on per-window stride diversity directly.
+    # Operates on fake_decoded[:, :, stride_col] in the G update; no extra forward.
+    perwin_diversity_weight: float = 0.0     # 0=off; try 0.5–2.0
+    perwin_diversity_target: float = 0.5     # variance floor per T=12 window. Lower
+                                             # than chain target (real tencent
+                                             # per-window stride var ~0.3-0.8).
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):
