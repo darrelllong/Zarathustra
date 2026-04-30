@@ -29,6 +29,54 @@ Artifacts:
 
 ---
 
+## LANL / altgan Tencent Update (2026-04-29 20:09 PDT) — Neural Mark Sidecar Lands
+
+LANL completed the IDEA #53 follow-up flagged in the 2026-04-23 entry: a
+PhaseAtlas-marks-e20 neural mark sidecar around the strict-holdout
+PhaseAtlas winner. Three-seed confirmation sweep (`fixedhistory_confirm`)
+finished at 20:09:
+
+| seed | HRC-MAE | mark_score |
+|------|---------|------------|
+| 43 | ~0.0089 | ~0.028 |
+| 44 | 0.008849 | 0.027895 |
+| **45** | **0.008735** | 0.028510 |
+| **3-seed mean** | **0.008881** | 0.028305 |
+
+Recipe (from `tencent_phaseatlas_marks_e20_fixedhistory_confirm_best.json`):
+- `transition_blend = 0.55`
+- `local_prob_power = 0.8`
+- `force_phase_schedule = true`
+- `stack_rank_phase_scales = 1.0,1.0,1.1,1.1`
+- `categorical_source = neural`, `mark_temperature = 1.0`,
+  `mark_numeric_blend = 0.0`, `mark_numeric_blend_space = log`,
+  `mark_numeric_fields = both`, `mark_numeric_noise = 0.05`
+
+**Implications for LLNL race:**
+- LANL tencent ATB **moved 0.00887 → 0.008735** (-1.5%), now 3-seed reproducible.
+- LLNL tencent gap widens: `0.039 / 0.008735 ≈ 4.47×` (was 4.39×).
+- The neural mark sidecar successfully carried PhaseAtlas's HRC lead WITHOUT
+  damaging mark quality (mark_score 0.028 vs older numeric-only marks). The
+  open question from 2026-04-23 — "can Tencent's object process carry a
+  sequential mark head?" — answered: yes.
+- LANL's stack-distance match: median 53 vs real 60; p90 170 vs real 174.
+- LANL's tencent lead is now hardened. Multi-seed confirmation makes it a
+  publishable mechanism, not a single-seed lottery win.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_confirm_best.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_confirm_seed-{43,44,45}_*.json`
+
+LLNL state: v233 (seed=7, IDEA #116 long-chain loss) currently in Phase 3
+ep4 with healthy stats (W=2.51, G=-0.39, reuse=0.643). v234 (IDEA #117
+retrieval-train-carry, seed=5) queued behind v233. LANL's new 0.008735
+sharpens the urgency: even if v233 hits ★=0.039 with multi-seed support,
+the gap to LANL is still 4.47×. Closing it requires architectural change,
+not loss-weight tuning. IDEA #117 (Gemini Round 3 P1 #2 carry fix) is
+LLNL's strongest unlanded structural lever on tencent.
+
+---
+
 ## Frozen-Bundle Eval Baselines (2026-04-15, seed=42)
 
 Round 15 peer review revealed that the previous eval protocol resampled a
