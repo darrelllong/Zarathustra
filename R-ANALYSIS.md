@@ -1197,17 +1197,17 @@ The previous pass left 7 of 30 families with `analysis.json` and 23 with `featur
 
 ### Amenability Score
 
-For each logical family $f$ with $n_f$ files, sample-median per-file reuse fraction $\widetilde{r}_f$, and sample-median burstiness coefficient of variation $\widetilde{b}_f$:
+For each logical family $f$ with $n\_f$ files, sample-median per-file reuse fraction $\widetilde{r}\_f$, and sample-median burstiness coefficient of variation $\widetilde{b}\_f$:
 
 $$
-A(f) = 10 \cdot \widetilde{r}_f - \log_{10} \max(\widetilde{b}_f, 0.5) + 0.3 \cdot \log_{10} \max(n_f, 1)
+A(f) = 10 \cdot \widetilde{r}\_f - \log\_{10} \max(\widetilde{b}\_f, 0.5) + 0.3 \cdot \log\_{10} \max(n\_f, 1)
 $$
 
 Higher $A(f)$ predicts easier synthetic generation. The three components correspond to:
 
-- $10 \cdot \widetilde{r}_f$ — locality reward. High median reuse means the trace has a hot working set the generator can latch onto.
-- $-\log_{10} \widetilde{b}_f$ — burst penalty. High burstiness CV means inter-arrival distributions are heavy-tailed and short-window mode coverage is hard.
-- $0.3 \cdot \log_{10} n_f$ — sample-size bonus. More files give the GAN/atlas richer training data and smoother per-family conditioning.
+- $10 \cdot \widetilde{r}\_f$ — locality reward. High median reuse means the trace has a hot working set the generator can latch onto.
+- $-\log\_{10} \widetilde{b}\_f$ — burst penalty. High burstiness CV means inter-arrival distributions are heavy-tailed and short-window mode coverage is hard.
+- $0.3 \cdot \log\_{10} n\_f$ — sample-size bonus. More files give the GAN/atlas richer training data and smoother per-family conditioning.
 
 The weighting is heuristic. The reuse term dominates because every long-rollout cache benchmark reduces to "did the model put the right object in the right cache slot." If a corpus has weak reuse, the metric is dominated by random-access performance, which the generator cannot meaningfully outperform.
 
@@ -1222,7 +1222,7 @@ Five tiers emerge naturally from the full sweep:
 | `s3-cache-datasets__2022_metaKV` | 28 | 0.894 | 21.3 | reuse/locality is a major axis; locality-aware losses and conditioning matter |
 | `s3-cache-datasets__metaKV` | 11 | 0.755 | 10.1 | spans multiple encodings; keep format-aware preprocessing |
 
-These are key-value caches with Zipfian access. Median reuse $\widetilde{r} \approx 0.75-0.89$ means roughly 80% of accesses re-fetch a recent key. A YCSB-style synthetic generator already approximates this well; the LLNL/LANL infrastructure should beat YCSB without difficulty. Both families are small ($n_f \in \{11, 28\}$), so cross-seed validation matters more than data volume.
+These are key-value caches with Zipfian access. Median reuse $\widetilde{r} \approx 0.75-0.89$ means roughly 80% of accesses re-fetch a recent key. A YCSB-style synthetic generator already approximates this well; the LLNL/LANL infrastructure should beat YCSB without difficulty. Both families are small ($n\_f \in \{11, 28\}$), so cross-seed validation matters more than data volume.
 
 #### Tier 2 — Steady storage (easy)
 
@@ -1262,7 +1262,7 @@ Burstiness $\widetilde{b} > 16$ means inter-arrival distributions have heavy tai
 
 #### Tier 5 — Tiny / heterogeneous (data-limited)
 
-Twelve more families with $n_f \le 14$, no Hurst available, mixed encodings: `2022_metaCDN` (3), `2022_metaStorage` (5), `2023_metaCDN` (3), `2023_metaStorage` (6), `2017_docker` (7), `2017_systor` (6), `2007_msr` (14), `2007_wiki` (4), `2016_wiki` (2), `2024_google` (192 but het=0.064 — homogeneous), `other` (2), `2020_twr_cdn` (2). Suggested modes is uniformly 1 — a single GAN suffices, but the file count is too small for cross-seed validation. These are usable for sanity checks but not for race claims.
+Twelve more families with $n\_f \le 14$, no Hurst available, mixed encodings: `2022_metaCDN` (3), `2022_metaStorage` (5), `2023_metaCDN` (3), `2023_metaStorage` (6), `2017_docker` (7), `2017_systor` (6), `2007_msr` (14), `2007_wiki` (4), `2016_wiki` (2), `2024_google` (192 but het=0.064 — homogeneous), `other` (2), `2020_twr_cdn` (2). Suggested modes is uniformly 1 — a single GAN suffices, but the file count is too small for cross-seed validation. These are usable for sanity checks but not for race claims.
 
 ### Implications For The Three-Way Race
 
