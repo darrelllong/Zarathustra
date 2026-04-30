@@ -135,6 +135,10 @@ class NeuralAtlas:
     rank_edges: np.ndarray
     opcode_pmf: Optional[Dict[int, float]] = None
     metadata: dict = field(default_factory=dict)
+    # Round 171: cond normalization stats (mean, std per feature). Applied at
+    # both fit and generate time so the net sees zero-mean unit-variance cond.
+    cond_mean: Optional[np.ndarray] = None
+    cond_std: Optional[np.ndarray] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -243,6 +247,20 @@ def fit(
     print(f"Total: {len(transitions):,} transitions, {len(initial_states):,} initial states")
     print(f"Per-state rank counts: {[len(v) for v in rank_observations.values()]}")
 
+    # Round 171: normalize cond features (zero-mean, unit-variance per feature)
+    # so each dim contributes equally and the MLP doesn't have to learn rescaling.
+    cond_arr = np.stack(list(file_conds.values())).astype(np.float64)
+    cond_mean = cond_arr.mean(axis=0).astype(np.float32)
+    cond_std = cond_arr.std(axis=0).astype(np.float32)
+    cond_std[cond_std < 1e-6] = 1.0
+    print(f"Cond mean: {cond_mean.round(3).tolist()}")
+    print(f"Cond std:  {cond_std.round(3).tolist()}")
+    # Normalize all stored conds in-place
+    for nm in list(file_conds.keys()):
+        file_conds[nm] = ((file_conds[nm] - cond_mean) / cond_std).astype(np.float32)
+    transitions = [(((c - cond_mean) / cond_std).astype(np.float32), p, n) for c, p, n in transitions]
+    initial_states = [(((c - cond_mean) / cond_std).astype(np.float32), s) for c, s in initial_states]
+
     # Build per-state fine-bin rank PMF (29 bins, matches existing PhaseAtlas eval edges)
     fine_edges = np.array([
         1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167, 219, 288,
@@ -294,6 +312,8 @@ def fit(
         file_index=file_conds,
         rank_pmf_per_state=rank_pmf_per_state,
         rank_edges=fine_edges,
+        cond_mean=cond_mean,
+        cond_std=cond_std,
         metadata={
             "trace_dir": trace_dir,
             "char_file": char_file,
@@ -346,6 +366,9 @@ def generate(
             nm = os.path.basename(segs[0]["path"])
             cond = chars.get(nm, {})
             cond_vec = cond_from_profile(cond)
+            # Round 171: apply training-time normalization at generate
+            if m.cond_mean is not None and m.cond_std is not None:
+                cond_vec = (cond_vec - m.cond_mean) / m.cond_std
             cond_t = torch.tensor(cond_vec, dtype=torch.float32, device=device).unsqueeze(0)
 
             # Initial state
