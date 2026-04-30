@@ -8025,3 +8025,45 @@ LANL's `temp_micro_seed42` sweep ran temp ∈ {0.5, 0.75, 1.25, 1.5} at seed=42 
 | Tencent | 0.039 (v229 ep10) — **reproducibility unconfirmed pending v234b** | 0.008735 (3-seed) / 0.008424 (4-seed best) | not yet | LANL ~4.6× |
 
 Active LLNL run: **none** (v234 W-stopped). v234b queued behind frozen_sweep.
+
+
+## Round 139 — v234b W-blowup; --lru-cache-depth schema-mismatch diagnosis; v234c launched
+
+**Date**: 2026-04-29 21:33
+
+### Diagnosis: schema mismatch between v229 pretrain and v234* launcher
+
+v234b's W trajectory (1.26 → 2.40 → 3.31 by ep3, vs v229's 0.72/1.40/1.14) confirms `--files-per-epoch` was NOT the delta. The actual delta is the `--lru-cache-depth 15000` flag in v234/v234b launchers.
+
+**v229** was trained on code state pre-88b8f69 (Apr 23, before IDEA #97 landed). The TracePreprocessor in that code state had no `lru_cache_depth` option — `obj_id_reuse` was always **consecutive same-object** semantics (`+1` if delta==0 else `-1`), producing reuse rate ~3% for tencent.
+
+**v234/v234b** launchers passed `--lru-cache-depth 15000` (added by 88b8f69 on Apr 24). That switches the preprocessor to **LRU-hit-at-depth-15000** semantics, producing reuse rate ~61.5%.
+
+Same column name (`obj_id_reuse`), same value range (±1), but **wildly different distribution**. v229's pretrain weights learned to reconstruct, supervise, and warm-up against the ~3% positive-class signal. v234/v234b feed the model the ~61.5% positive-class signal — instant out-of-distribution at the input feature level. The critic sees this divergence as easy real-vs-fake separation; G can't keep up; W blows up by ep3.
+
+This explains why both v234 and v234b failed identically despite the file-count fix.
+
+### v234c launched
+
+Pure v229 recipe with v229 pretrain — no `--lru-cache-depth`, no `--lru-eval-*`. Started 2026-04-29 21:33. Gate: ep1-3 W ≤ 1.5 to confirm the schema diagnosis. ep10 frozen ★ ≤ 0.045 to confirm the v229 ATB is reproducible.
+
+### Implication for IDEA #117 path
+
+If v234c reproduces, the next move (v235 IDEA #117) needs a fresh pretrain under IDEA #97 semantics — we cannot cheaply reuse v229's pretrain for any IDEA #97-using recipe. The 3.5h pretrain cost has to be paid once for the IDEA #97 track. Plan: after v234c clears the gate, kick off a parallel pretrain-only run on v235's recipe to amortize.
+
+### LANL update — scaling mark sidecar training data
+
+Two new LANL artifacts since Round 138:
+- `tencent_phaseatlas_marks_e20_512files_h128.pkl.gz` — neural mark sidecar trained on 512 files, hidden=128. Eval result `cachedinputs_speedcheck_seed42_eval_100k.json` produced HRC-MAE=**0.008423** and mark_score=0.02876 — both bit-identical to the original e20 marks model at seed=42/temp=1.0. **The 4× increase in mark-training data did not move HRC-MAE or mark_score.** This corroborates `REBUTTAL-LANL.md` §2 — LANL's HRC-MAE is dominated by the deterministic PhaseAtlas object process, not the neural mark sidecar.
+- `tencent_phaseatlas_marks_e20_128files_h128.pkl.gz` — currently TRAINING (PID 2033802 on vinge GPU). 128 files this time — they're sweeping training-set sizes {128, 512, original} at fixed hidden=128.
+
+Their lever for further HRC gains is on the object-process side (PhaseAtlas internals), not the mark head — exactly what `REBUTTAL-LANL.md` §2 predicted.
+
+### Race Dashboard (Round 139)
+
+| Corpus | LLNL ATB | LANL ATB | Sandia | Status |
+|--------|----------|----------|--------|--------|
+| Alibaba | **0.001937** (v195 ep110) | 0.00301 | not yet | **LLNL +35%** |
+| Tencent | 0.039 (v229 ep10) — **reproducibility test in progress (v234c)** | 0.008424–0.008900 (4-seed) | not yet | LANL ~4.6× |
+
+Active LLNL run: v234c (Phase 3 starting). Sandia: idle (newgan/{train,run}.py blocked on LANL Round 4/5 fixes). LANL: training a third mark-sidecar size variant.

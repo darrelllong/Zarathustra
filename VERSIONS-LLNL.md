@@ -6681,3 +6681,38 @@ Eval files (manifest `/home/darrell/long_rollout_manifests/tencent_stackatlas.js
 **v234b queued** (PID written to `/home/darrell/launch_v234b.sh`): same recipe with `--files-per-epoch 12` explicit, waiting for frozen_sweep to release GPU. If v234b also fails to reproduce v229 ★=0.039 within 2× tolerance, the ATB itself is reproducibility-limited to its specific historical run state, and IDEA #117 should not be attempted until the reproducibility hole is plugged.
 
 **Process:** PID 2006337, terminated by W-stop at ep6. Log /home/darrell/train_tencent_v234.log.
+
+---
+
+### tencent_v234b — CLOSED-FAILED (2026-04-29 21:32) — same W-blowup pattern, --files-per-epoch hypothesis rejected
+
+**Recipe:** v234 + `--files-per-epoch 12` explicit (only delta from v234). Otherwise: seed=5, retrieval-mem + multi-scale + mixed-type + PCF 0.5 + reuse-rate 10.0 + LRU diagnostic + `--lru-cache-depth 15000`, pretrain reused from v229.
+
+**Result:** ep1-3 W trajectory 1.26 → 2.40 → 3.31 — already over W-stop=3.0 at ep3. Killed manually before W-stop fired.
+
+| ep | v229 W | v234b W |
+|---|---|---|
+| 1 | 0.72 | 1.26 |
+| 2 | 1.40 | 2.40 |
+| 3 | 1.14 | 3.31 |
+
+**Round 138's hypothesis (files-per-epoch was the culprit) is REJECTED.** Both v234 (default 8) and v234b (explicit 12) blow up; the flag isn't the actual delta.
+
+**Real diagnosis (v234c launching):** the `--lru-cache-depth 15000` flag was added to v234/v234b launchers but **v229 was code state pre-88b8f69 (Apr 23, before IDEA #97 landed)**. v229's pretrain was trained on the legacy `obj_id_reuse` semantics (consecutive same-object → ~3% reuse rate). v234/v234b launched with `--lru-cache-depth 15000` invokes the IDEA #97 path → `obj_id_reuse` becomes LRU-hit-at-depth-15000 → ~61.5% reuse rate. Same column name, completely different value distribution. Pretrain weights expect ~3% reuse signal, training feeds ~61.5% reuse signal — feature-distribution mismatch → critic exploits it instantly → W blows up.
+
+**v234c (launched 2026-04-29 21:33)**: drops `--lru-cache-depth`, `--lru-eval-every`, `--lru-eval-corpus`. Pure v229 recipe with v229 pretrain. PID will be in /home/darrell/launch_v234c.out. If v234c matches v229 ep1-3 W trajectory (≤1.5), the diagnosis is confirmed and the v229 ATB is reproducible.
+
+**Process:** v234b PID 2022695, killed manually 21:32. Log /home/darrell/train_tencent_v234b.log.
+
+---
+
+### tencent_v234c — RUNNING (2026-04-29 21:33) — pure v229 repro, no IDEA #97
+
+**Recipe:** v229 base (retrieval-mem + multi-scale + mixed-type + PCF 0.5 + reuse-rate 10.0, w-stop 3.0, files-per-epoch 12, seed=5), pretrain reused. NO `--lru-cache-depth`, NO `--lru-eval-*` flags. This isolates the IDEA #97 schema mismatch from any other effect.
+
+**Gates:**
+- ep1-3 W trajectory ≤ 1.5 (v229 was 0.72/1.40/1.14) → diagnosis confirmed; let it run
+- ep10 frozen ★ ≤ 0.045 → v229 ATB reproducible; queue v235 (IDEA #117 retrieval-train-carry — but on a fresh pretrain trained under IDEA #97 semantics)
+- W>3 in first 5 ep → preprocessor schema isn't the only blocker; deeper code drift
+
+PID logged in /home/darrell/train_tencent_v234c.log header.
