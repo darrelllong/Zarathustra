@@ -6828,3 +6828,80 @@ LANL R10's methodology concern is now empirically validated: building IDEA #117 
 4. **What does NOT fix it**: IDEA #117 (bank carry) + IDEA #116 (long-chain reuse-rate target) on v234d's pretrain.
 
 **Process:** v235 PID 2144635, killed manually 01:33. Log /home/darrell/train_tencent_v235.log. Frozen sweep at /home/darrell/checkpoints/tencent_v235/frozen_sweep.json.
+
+---
+
+## Round 143 — 2026-04-30 — Race Status Assessment + IDEA #67 burst_probe landing
+
+### Race standings (honest, as of Round 143)
+
+| Track | Metric | LLNL | LANL | Gap |
+|---|---|---|---|---|
+| Alibaba long-rollout HRC-MAE | (LLNL methodology) | **0.001937** | 0.00183 | LLNL behind by 6% |
+| Alibaba long-rollout HRC-MAE | (LANL strict-holdout) | ~0.021 (no burst) | 0.00183 | LLNL **11× worse** |
+| Tencent long-rollout HRC-MAE | (all methodologies) | unknown / bad | **0.008735** | LANL leads |
+| Tencent frozen ★ | from-scratch | 0.197 (v234d/v235) | unknown | LLNL bad |
+| Tencent frozen ★ | historical (non-repro) | 0.039 (v229) | unknown | single-run lottery |
+
+**Critical gap:** Under LANL's evaluation methodology (strict holdout, no calibration), LLNL's alibaba atlas HRC-MAE is ~0.021 vs LANL's 0.00183. Root cause: temporal burst clustering — LLNL's marginal PMF sampling has no working-set autocorrelation. At cs=18: real HRC@18=0.056, LLNL atlas (no burst)=0.0007 (80× worse). This is the **decisive race gap on the faster-track evaluation axis**.
+
+### What IDEA #67 burst injection fixes (theoretical)
+
+Burst injection (`burst_prob` ∈ [0, 1]): within reuse events, sample uniformly from the top-K LRU stack (hot pool) instead of the fine PMF. This adds working-set autocorrelation that mirrors real burst patterns. Estimated optimal: burst_prob≈0.2–0.3 for alibaba (reuse_rate≈0.265, pool_size=20).
+
+Expected trajectory (alibaba, estimated):
+| burst_prob | HRC-MAE est. | status |
+|---|---|---|
+| 0.0 | ~0.021 | baseline (measured, no burst) |
+| 0.1 | ~0.008 | approaching LANL |
+| 0.2 | ~0.003 | competitive |
+| 0.3 | ~0.002 | may beat LANL 0.00183 |
+
+**IDEA #67 is implemented** (lines 504-518 of `llgan/phase_pmf_atlas.py`, `--burst-prob` and `--burst-pool-size` CLI flags) but **has NEVER been evaluated**. The alibi for not evaluating: burst probe infrastructure didn't exist.
+
+### IDEA #67 burst_probe.py — landed this round
+
+`llgan/burst_probe.py` is a self-contained sweep script that:
+1. Loads a nophase atlas (`PhasePMFAtlas.load(...)`)
+2. Loads real eval JSON (HRC + cache_sizes + reuse_access_rate)
+3. Sweeps `burst_prob` × `burst_pool_size` × seeds
+4. Computes inline LRU HRC-MAE (no external dependencies beyond numpy/pandas)
+5. Prints summary table with best cell flagged; optionally saves JSON
+
+**To run on vinge.local — alibaba:**
+```
+python -m llgan.burst_probe \
+    --atlas /home/darrell/llnl_phase_pmf_atlas_nophase.pkl.gz \
+    --real-json /home/darrell/llnl_phase_eval_nophase.json \
+    --corpus alibaba \
+    --burst-probs 0.0 0.05 0.10 0.15 0.20 0.30 0.40 0.50 \
+    --burst-pool-sizes 20 \
+    --seeds 42 43 44 \
+    --output /home/darrell/burst_probe_alibaba.json
+```
+
+**To run on vinge.local — tencent** (requires calibrated tencent atlas):
+```
+python -m llgan.burst_probe \
+    --atlas /home/darrell/llnl_phase_pmf_atlas_tencent_lanl.pkl.gz \
+    --real-json /tiamat/zarathustra/checkpoints/tencent_v165/long_rollout_lanl_setup_real.json \
+    --corpus tencent \
+    --burst-probs 0.0 0.1 0.2 0.3 \
+    --n-records 100000 --n-streams 4 \
+    --output /home/darrell/burst_probe_tencent.json
+```
+
+**Expected outcome:** burst_prob=0.2–0.3 closes the LANL gap on alibaba. If verified, LLNL can claim alibaba HRC-MAE < LANL's 0.00183 under both methodologies — the first genuine cross-methodology win.
+
+### GAN track status
+
+v235 is closed-inconclusive. The carried-state mode collapse (lru_fp 51→33 over ep5→ep10) is structurally understood but not fixed by IDEA #117 on v234d's pretrain. The GAN track has no path to a tencent HRC-MAE competitive with LANL's 0.008735 without solving the pretrain quality issue.
+
+**Next rational step for GAN track:** PhaseAtlas-style generation for tencent (port alibaba atlas pipeline to tencent, calibrate from `tencent_v165/` long-rollout eval JSON). This is a 2–4h engineering task vs another 3.5h fresh-pretrain lottery. Queue after burst probe results confirm whether atlas-track is the right investment.
+
+### Priority order (Round 143 → next)
+
+1. **P0: Run burst_probe on alibaba.** Immediate ROI — could close the LANL gap without training. No GPU required. 30-60 min runtime on vinge.local.
+2. **P1: If burst_probe optimal burst_prob found, publish updated alibaba HRC-MAE in RESULTS.md and peer-review.** Race claim depends on vinge.local execution and result confirmation.
+3. **P2: Calibrate tencent nophase atlas.** Use `phase_pmf_atlas.py calibrate_from_json` subcommand on tencent long-rollout eval JSON. Then run burst_probe on tencent.
+4. **P3: GAN track.** Either fresh-pretrain IDEA #117 (3.5h) or concede GAN track and redirect effort to atlas track for both corpora.
