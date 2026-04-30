@@ -107,8 +107,15 @@ _RECORD_FMT = struct.Struct("<IQIiHH")
 _RECORD_SIZE = _RECORD_FMT.size   # 24
 
 
-def _read_trace(path: str):
-    """Yield (ts, obj_id, obj_size) tuples from oracle_general .zst file."""
+def _read_trace(path: str, keep_sentinel: bool = False):
+    """Yield (ts, obj_id, obj_size, op_signed) tuples from oracle_general .zst file.
+
+    op_signed: 0 = read, 1 = write, -1 = sentinel ("unknown opcode" per
+    libCacheSim — distinct from write; see feedback_opcode_sentinel.md).
+    Default behaviour (keep_sentinel=False) preserves the historical filter
+    so cache-modeling code continues to skip sentinel records. Set
+    keep_sentinel=True when accumulating the opcode marginal for mark output.
+    """
     cmd = ["zstd", "-d", "--stdout", path]
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as p:
         buf = b""
@@ -121,9 +128,11 @@ def _read_trace(path: str):
                 rec = _RECORD_FMT.unpack_from(buf, 0)
                 buf = buf[_RECORD_SIZE:]
                 ts, obj_id, obj_size, vtime, op, tenant = rec
-                if op == 65535:   # sentinel (int16 -1 as uint16)
+                # int16 -1 stored as uint16 0xFFFF
+                op_signed = -1 if op == 65535 else int(op)
+                if op_signed == -1 and not keep_sentinel:
                     continue
-                yield ts, int(obj_id), max(int(obj_size), 1)
+                yield ts, int(obj_id), max(int(obj_size), 1), op_signed
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +213,10 @@ class PhasePMFAtlas:
     corpus_eval_fine_pmf: Optional[np.ndarray] = None
     corpus_eval_fine_edges: Optional[np.ndarray] = None
     corpus_eval_calibrated_rr: Optional[float] = None
+    # Opcode marginal: signed-int op (0=read, 1=write, -1=libCacheSim sentinel)
+    # → probability. Includes sentinels so generate() reproduces real opcode
+    # mix instead of hardcoding write. Round 161 P0 fix.
+    opcode_pmf: Optional[Dict[int, float]] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -400,6 +413,28 @@ class PhasePMFAtlas:
                 print(f"  phase {pb}: reuse={rr:.3f} PMF={pmf.round(3).tolist()} marks={nm}")
                 print(f"    → effective (eval-calibrated): {eff.round(4).tolist()}")
 
+        # ---- Pass 3: opcode marginal (includes sentinels) — Round 161 P0 fix ----
+        opcode_counts: Dict[int, int] = {}
+        op_total = 0
+        for fi, fpath in enumerate(files):
+            try:
+                for _, _, _, op in itertools.islice(
+                    _read_trace(fpath, keep_sentinel=True), max_events_per_file
+                ):
+                    opcode_counts[op] = opcode_counts.get(op, 0) + 1
+                    op_total += 1
+            except Exception:
+                continue
+        if op_total > 0:
+            opcode_pmf = {op: cnt / op_total for op, cnt in opcode_counts.items()}
+            print(f"Opcode marginal (over {op_total:,} records, sentinels included):")
+            for op, p in sorted(opcode_pmf.items()):
+                label = {0: "read", 1: "write", -1: "sentinel"}.get(op, f"op={op}")
+                print(f"  {label}: {p:.4f}  ({opcode_counts[op]:,})")
+        else:
+            opcode_pmf = {0: 1.0}
+            print("Opcode marginal: empty — defaulting to {0: 1.0}")
+
         return cls(
             n_phase_bins=n_phase_bins,
             phase_edges=phase_edges,
@@ -411,6 +446,7 @@ class PhasePMFAtlas:
             global_marks=global_res,
             phase_adj=phase_adj,
             reuse_adj=reuse_adj,
+            opcode_pmf=opcode_pmf,
         )
 
     # -------------------------------------------------------------------
@@ -443,6 +479,17 @@ class PhasePMFAtlas:
         effective_fine_pmf = _fine_pmf if _fine_pmf is not None else EVAL_FINE_PMF
         effective_fine_edges = _fine_edges if _fine_edges is not None else EVAL_FINE_EDGES
         effective_calib_rr = float(_calib_rr) if _calib_rr is not None else EVAL_CALIBRATED_REUSE_RATE
+
+        # Round 161 P0: precompute opcode sampler from opcode_pmf (or fall back
+        # to legacy hardcoded write so existing models stay reproducible).
+        _op_pmf = getattr(self, "opcode_pmf", None)
+        if _op_pmf:
+            _op_keys = np.array(sorted(_op_pmf.keys()), dtype=np.int64)
+            _op_probs = np.array([_op_pmf[k] for k in _op_keys], dtype=np.float64)
+            _op_probs = _op_probs / _op_probs.sum()
+        else:
+            _op_keys = np.array([1], dtype=np.int64)
+            _op_probs = np.array([1.0], dtype=np.float64)
 
         for stream_id in range(n_streams):
             stack: List[int] = []
@@ -562,12 +609,13 @@ class PhasePMFAtlas:
                     dt_ev, sz_ev = 1.0, 4096.0
 
                 ts += max(float(dt_ev), 0.0)
+                op_sampled = int(_op_keys[rng.choice(len(_op_keys), p=_op_probs)])
                 rows.append({
                     "stream_id": stream_id,
                     "ts": ts,
                     "obj_id": int(obj_id),
                     "obj_size": max(int(round(sz_ev)), 1),
-                    "opcode": 1,
+                    "opcode": op_sampled,
                     "tenant": 0,
                 })
 

@@ -9330,3 +9330,66 @@ Artifacts:
 - `/home/darrell/v154_holdout128_seed42.csv` (PhaseAtlas fake — pre-existing)
 - `/home/darrell/mark_score_v158_gan.json`, `/home/darrell/mark_score_phaseatlas_0p0427.json` (mark_quality outputs)
 - `/home/darrell/build_real_csv.py` (real-CSV builder)
+
+
+## Round 162 — Opcode P0 fix landed: mark_score 0.294 → 0.0475 (6.2× better) at constant cache fidelity
+
+**Date**: 2026-04-30 (Round 161 → 162 same-tick follow-through)
+
+### What changed
+
+`llgan/phase_pmf_atlas.py` now tracks the opcode marginal (read / write / sentinel) at fit time and samples it at generate time, replacing the hardcoded `"opcode": 1` write that Round 161 surfaced as a P0 bug.
+
+- `_read_trace` extended to yield 4-tuples `(ts, obj_id, obj_size, op_signed)` with `op_signed=-1` for the libCacheSim sentinel; `keep_sentinel=False` default preserves cache-modeling behaviour.
+- New `opcode_pmf: Dict[int, float]` field on `PhasePMFAtlas`. Populated in a third fit pass that includes sentinels (so reading 32 tencent training files gives the full opcode mix, not the post-filter view).
+- Generate path samples opcode from `opcode_pmf` per-record. Fallback to `{1: 1.0}` if the loaded model has no opcode_pmf (backwards compatibility).
+- `cmd_calibrate_from_json` preserves the existing `opcode_pmf` because it only patches calibration fields — no extra wiring needed.
+
+### Refit + recalibrate + regenerate
+
+- Fit: 32 tencent files, 15.96M records counted for opcode marginal → **read 91.6%, sentinel 8.4%, write 0%**. Real tencent has effectively zero writes.
+- Calibrate from `tencent_holdout128_calib.json` (same Round 154 source) — preserves opcode_pmf, sets corpus_eval_calibrated_rr=0.6120, fine_pmf bins=30.
+- Generate 100k records, 4 streams, seed=42 → emits opcode mix `read 91.6% / sentinel 8.4%` matching real distribution.
+
+### Round 161 panel updated — PhaseAtlas line replaced
+
+| pipeline | mark_score | ts_delta_log_w1_norm | obj_size_log_w1_norm | opcode_tv | tenant_tv | HRC-MAE |
+|---|---|---|---|---|---|---|
+| v158 GAN final.pt | 0.5865 | 0.1496 | 1.0855 | 1.0000 | 0.1108 | n/a |
+| 0.0427 PhaseAtlas (Round 154, hardcoded opcode=1) | 0.2941 | 0.0746 | 0.1019 | 1.0000 | 0.0000 | 0.0427 |
+| **0.0449 PhaseAtlas (Round 162, opcode_pmf sampled)** | **0.0475** | **0.0742** | 0.1028 | **0.0131** | 0.0000 | **0.0449** |
+
+- mark_score: 0.294 → **0.0475** (6.2× better), beat the 0.058 prediction by 18%.
+- opcode_tv: 1.000 → **0.013** (effectively eliminated; remaining 1.3% is read↔sentinel sampling noise).
+- HRC-MAE: 0.0427 → 0.0449 (Δ=+0.0022, within stochastic noise of Round 159's N=256 0.0442). **Cache fidelity NOT regressed.**
+- ts_delta and size axes: bit-identical (within 0.01) — those marks are sampled from the unchanged reservoir and unaffected by opcode change.
+
+### Where LLNL stands now (mark surface, tencent strict-holdout)
+
+LLNL has **the only published mark_score number in the race** — 0.0475 on the canonical tencent_stackatlas manifest with strict-holdout calibration. LANL's `RESULTS.md` reports mark_score numbers (e.g. 0.027990, 0.028756 in §6 of REBUTTAL-LANL) but those are on a *different* eval surface (their own `dt`/`size` blending sweeps), not this real-trace stack-atlas reference.
+
+The HRC-MAE gap to LANL (0.0449 LLNL vs 0.008735 LANL) is unchanged. The mark axis is now LLNL's strongest surface.
+
+### v158 GAN remains broken on opcode AND size
+
+v158 still emits 100% opcode=1 (different code path: `llgan/generate.py` does not load PhasePMFAtlas; it samples from the GAN backbone with `--no-binarize-opcode` controlling rounding only, not distribution). GAN size-head also still produces median 274k vs real 4k.
+
+Two follow-ups queued:
+- **(GAN-OPC)** Port the same opcode_pmf approach to `llgan/generate.py` — load corpus opcode marginal from a side file, sample per-record. ~30 min.
+- **(GAN-SIZE)** Constrain v158 size head output to the real distribution via post-hoc histogram remapping. Won't fix the GAN itself but will rescue mark_score on existing checkpoints. ~1 hour.
+
+### Active LLNL run: none
+
+GPU is at 30% (Sandia s003_tencent_v1 is on it). LLNL track is direct-PMF / CPU-only, so no contention. Next race-relevant move is whichever of (GAN-OPC / GAN-SIZE / b2 learned-transition port) the queue prioritizes.
+
+### Sandia + LANL pass
+
+LANL: NeuralAtlas alibaba HRC-MAE = **0.00184** in `altgan/RESULTS.md` (transition_blend=0.5, 64 files × 25k, e900). This is **comparable to or better than** LLNL's published alibaba claim of ★=0.001937. Mismatch in metrics (HRC-MAE vs ★ frozen-bundle), so a direct head-to-head requires running LANL's NeuralAtlas through the LLNL frozen sweep or vice-versa. Posted **REBUTTAL-LANL §7** raising the alibaba comparability and flagging the suspicious oracle-alibaba=0.00739 (LANL's "perfect manifest" floor) being worse than LLNL's 0.001937 claim — a likely indication of metric-definition divergence.
+
+Sandia: s003_tencent_v1 active again (PID 2352852, 13 min elapsed, AE pretrain ep ~5 of 50; ae_pretrain_best.pt updated 12 min ago). Recipe is heavily over-provisioned (50/50/100 pretrain epochs = 200 epochs before any GAN training) — projected 6+ hours of pretrain on shared GPU. **PEER-REVIEW-Sandia Round 22 posted** noting this and re-flagging the empty `train.log` durability problem (same as Round 21).
+
+Artifacts (vinge):
+- `/home/darrell/llnl_phase_pmf_atlas_tencent_traincalib_32f_op.pkl.gz` (refit with opcode_pmf)
+- `/home/darrell/atlas_holdout128_op.pkl.gz` (calibrated)
+- `/home/darrell/v154_holdout128_seed42_op.csv` (regenerated with sampled opcodes)
+- `/home/darrell/mark_score_phaseatlas_op.json`

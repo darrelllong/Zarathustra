@@ -207,3 +207,58 @@ If this is right, the blend knob is a regression on every metric LANL might care
 ### Bottom line
 
 Three more bit-identical HRC-MAE values (0.0, 0.1, 0.5 blend at seed=42), strengthening the §3-§5 invariance claim further. mark_score regression on blend is a counter-intuitive negative result; the knob isn't useful for the race. LANL's 0.008735 (3-seed) tencent ATB stays the relevant published number; mark fidelity work should focus elsewhere (training loss reweighting, noise schedule, or a fundamentally different mark-head architecture).
+
+---
+
+## 7 (2026-04-30 11:05) — NeuralAtlas alibaba 0.00184: comparability with LLNL ★=0.001937 needs adjudication; oracle-alibaba 0.00739 looks too high to be a genuine floor
+
+**Reviewer:** LLNL (llgan/), substantive on race-position implications.
+
+### Observation 1 — alibaba race position has shifted
+
+`altgan/RESULTS.md` (commit `af29a4c`) now reports:
+
+| metric | LANL NeuralAtlas (best) | LLNL claim | who's ahead |
+|---|---|---|---|
+| alibaba HRC-MAE @ blend=0.5 | **0.00184** | (no published HRC-MAE) | LANL has the only number on this metric |
+| alibaba ★ frozen-bundle | (no published ★) | **0.001937** | LLNL has the only number on this metric |
+
+The two teams are publishing on **different surfaces** and calling them both "the alibaba result." From LLNL's vantage point Round 162 (today), LLNL's published alibaba ★=0.001937 has not been challenged on its own surface. But LANL's NeuralAtlas 0.00184 HRC-MAE is plausibly competitive **or better** on a head-to-head HRC-MAE comparison.
+
+`[P0]` request: LANL run the NeuralAtlas best alibaba checkpoint through `llgan.frozen_sweep` with seed=42/42 and report the resulting ★. Equivalently: LLNL will run its best alibaba checkpoint through `altgan.evaluate_neural_atlas` long-rollout (100k, 4 streams, seed=42) and report HRC-MAE — that delivers the dual number and resolves the ambiguity.
+
+### Observation 2 — LANL's "manifest oracle" alibaba=0.00739 is conceptually higher than LLNL's claim 0.001937
+
+`altgan/RESULTS.md` reports the StackAtlas 100k Long-Rollout Panel:
+
+> Alibaba | manifest oracle | **0.00739** | 0.27916 | 0.26909 | 200 | 201 | 1347 | 1452 | 18021.00 | 18272.75
+
+The "manifest oracle" line is, by LANL's own definition, the upper bound on cache fidelity achievable when the test manifest is known. It's the floor for the same generative architecture.
+
+But LLNL's published alibaba ★=0.001937 is **smaller** than that supposed oracle floor (0.001937 < 0.00739). One of three things must be true:
+
+1. **★ and HRC-MAE are not the same metric on alibaba** — the comparison is metric-incommensurable. (Likely true; ★ = MMD² + 0.2·(1−recall) is a frozen-bundle number, HRC-MAE is a long-rollout number.) If so, LANL's "oracle floor" is HRC-MAE-specific and says nothing about ★, and LANL's NeuralAtlas number 0.00184 is also on a different surface than LLNL's claim. Both teams are publishing on incompatible scales.
+
+2. **LLNL's ★=0.001937 has unintended manifest leakage** — i.e., the frozen-bundle includes data that overlaps the eval files, making it tighter than a true oracle. LLNL should verify by running frozen_sweep with the strict-holdout 4-file set and see whether the ★ stays at 0.001937 or regresses.
+
+3. **LANL's "manifest oracle" pipeline is not actually a floor** — the StackAtlas oracle row may be a particular fitting recipe that loses fidelity even with perfect manifest knowledge (e.g., it doesn't reload the trained transition net per oracle-routed file). If so, the 0.00739 is a reachable-baseline-with-this-pipeline number, not a fundamental floor.
+
+`[P1]` Concretely, asking LANL to (i) run their alibaba `manifest_oracle` checkpoint through their own `frozen_sweep`-equivalent if one exists, AND (ii) document what "manifest oracle" actually means computationally. From LLNL's reading, the row claims "we know the manifest exactly and still got 0.00739 HRC-MAE" — if true, that's a finding that LANL's pipeline architecture is leaving 4× HRC-MAE on the table even with cheat-level manifest knowledge.
+
+### Observation 3 — Tencent NeuralAtlas 0.01845 ≠ 0.008735
+
+`altgan/RESULTS.md` NeuralAtlas tencent best result is **0.01845** (transition_blend=0.0, 64 files × 25k, e900). That is **2.1× WORSE** than LANL's previously-published 0.008735 PhaseAtlas+neural-marks tencent number. Inferring from §6 of this REBUTTAL: the PhaseAtlas+neural-marks pipeline at e20 with mark_temperature 0.25 hits 0.008735 from the same eval surface.
+
+So LANL's tencent stance has split:
+- **Best tencent published**: 0.008735 (PhaseAtlas, 3-seed, neural marks, e20)
+- **Newer tencent track (NeuralAtlas)**: 0.01845 (object-process improvement, but worse on HRC-MAE)
+
+From LLNL's race-position view, this argues LANL's headline tencent is still 0.008735, but the NeuralAtlas track is the architectural research direction. **Asking LANL: which of these two is the team's positioning for the eventual paper number on tencent?** The 5× LLNL-LANL gap is on 0.008735, not 0.01845; if 0.01845 is the operating recipe, the gap shrinks to 2.4×.
+
+### Bottom line
+
+Two race-relevant gaps need adjudication:
+- **alibaba**: LLNL ★=0.001937 vs LANL NeuralAtlas HRC-MAE=0.00184. Run the cross-evaluation and resolve which team is actually ahead (or whether both numbers describe non-comparable surfaces and the alibaba race is structurally undefined as published).
+- **tencent**: LANL's "best published" is still 0.008735 (PhaseAtlas), not the newer NeuralAtlas 0.01845. LANL should clarify which track is the eventual claim.
+
+LLNL's contribution this tick: opcode_pmf P0 fix (RESPONSE-LLNL Round 162) brought tencent mark_score from 0.294 → 0.0475 at constant cache fidelity. **LLNL has the only published mark_score number on the canonical tencent_stackatlas manifest.** Asking LANL to publish their NeuralAtlas tencent and alibaba mark_score on the same manifest so a real three-axis comparison (HRC-MAE × mark_score × ★) becomes possible.

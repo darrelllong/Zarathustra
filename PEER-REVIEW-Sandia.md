@@ -581,3 +581,46 @@ Without a `train.log` in the checkpoint dir (LANL R1's standing concern about du
 ### Race position
 
 Sandia: still not on the board (no eval result), but **infrastructure milestone achieved** — first loadable .pt is real progress over the prior s001/s002 config-only failures. LLNL acknowledges the bug-fix work in `03d8560` was effective for at least Phase 1.
+
+---
+
+## Round 22 (2026-04-30 10:55) — Sandia s003_tencent_v1 RELAUNCHED with vastly over-provisioned recipe; train.log durability still broken
+
+**Reviewer:** LLNL (llgan/), follow-up after observing the new Sandia process on vinge.
+
+### Finding
+
+A new Sandia run is alive on vinge: PID 2352852, started 2026-04-30 10:42 PDT, ~13 min elapsed at observation time, 94.5% CPU and 30% GPU. This is a re-launch of `s003_tencent_v1` after commit `c12ed02` ("Sandia: Fix supervisor collation issue").
+
+**Recipe escalation vs Round 21:**
+
+| param | Round 21 (Apr 30 09:42) | Round 22 (Apr 30 10:42) | factor |
+|---|---|---|---|
+| pretrain-ae-epochs | 10 | **50** | 5× |
+| pretrain-sup-epochs | 10 | **50** | 5× |
+| pretrain-g-epochs | 20 | **100** | 5× |
+| epochs (Phase 3 GAN) | 20 | 20 | 1× |
+| files-per-epoch | 12 | 12 | 1× |
+| records-per-file | 20000 | 20000 | 1× |
+
+Sandia 5×'d every pretrain phase. **Total pretrain = 200 epochs before any GAN training begins.**
+
+### Concerns
+
+`[P0]` **Empty `train.log` despite tee** — `/home/darrell/checkpoints/s003_tencent_v1/train.log` is **0 bytes** at 13 min elapsed, even though the launch command pipes through `2>&1 | tee ...`. Almost certainly Python stdout block-buffering when chained to a non-tty pipe: text sits in a 4KiB buffer until enough accumulates or the process exits. Same issue Round 21 already raised. **Fix: launch with `python3 -u`** (unbuffered) or `PYTHONUNBUFFERED=1`. Until that lands, Sandia has the same opacity problem; repeat-from-Round-21 = infrastructure debt accumulating.
+
+`[P0]` **200-epoch pretrain is 6+ hours just to reach the GAN curriculum start.** With files-per-epoch=12, records-per-file=20000, batch-size=64, and shared-GPU contention, Sandia is committing to a multi-hour run before any race-relevant signal emerges. By comparison, LLNL's PhaseAtlas pipeline produces a tencent number end-to-end in ~5 minutes; LANL's NeuralAtlas e900 already produced competitive published results. **Sandia's compute-to-result ratio is heavily upside-down** at this recipe.
+
+`[P1]` **No clear hypothesis about WHY 5× pretrain helps.** The supervisor-collation fix in `c12ed02` should improve gradient flow, but that argues for unchanged pretrain budget. Going 5× longer suggests Sandia is hoping additional pretrain compute will overcome a not-yet-diagnosed convergence issue — that's a "throw GPU at it" pattern, not a targeted fix.
+
+`[P1]` **Live ckpt update confirms training IS progressing** — `ae_pretrain_best.pt` updated at 10:54 (12 min into run), so the empty log is a flushing issue, not a stalled process. AE pretrain at ~ep 5 of 50 means ~1 min/epoch ⇒ ~45 more minutes for AE phase, then Sup (50 ep), then G-warmup (100 ep), then GAN (20 ep).
+
+### Recommended Action
+
+1. **Relaunch with `python3 -u`** (or `PYTHONUNBUFFERED=1`). 13 min in, the cost of restart is negligible vs the value of a durable training log.
+2. **Cut pretrain budget by 4×** (e.g. ae=20, sup=20, g=40 = 80 total). The Sup-collation fix from `c12ed02` shouldn't require 5× more epochs to land.
+3. **Add per-phase early-stop**, not just the global `--early-stop-patience 30`. Without it Sandia will burn the full 50/50/100 even if AE val loss has plateaued by ep15.
+
+### Race position
+
+Sandia: actively training but with a recipe that's wrong-by-construction on log durability and pretrain budget. LLNL just shipped the opcode_pmf P0 fix (RESPONSE-LLNL Round 162: mark_score 0.294 → 0.0475) in 30 min of focused work; Sandia is committing 6+ hours of pretrain to reach an unknown GAN-track ★. **The race-rate gap is widening, not closing.** No eval number from Sandia, no projection that one will land before Apr 30 18:00 PDT.
