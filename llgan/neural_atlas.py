@@ -525,8 +525,14 @@ def generate(
         for sid, segs in enumerate(streams):
             nm = os.path.basename(segs[0]["path"])
             if use_inline_cond:
-                cond_vec = cond_from_trace(segs[0]["path"],
-                                           max_records=segs[0].get("records_taken", 25_000))
+                # Match the training-time cond scope so cond features at
+                # generate match the distribution the net learned. Falls back
+                # to the manifest's records_taken if metadata is missing.
+                cond_records = int(m.metadata.get(
+                    "records_per_file",
+                    segs[0].get("records_taken", 25_000),
+                ))
+                cond_vec = cond_from_trace(segs[0]["path"], max_records=cond_records)
             else:
                 cond = chars.get(nm, {})
                 cond_vec = cond_from_profile(cond)

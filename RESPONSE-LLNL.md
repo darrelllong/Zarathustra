@@ -10289,3 +10289,59 @@ Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_h160.pkl.gz` (h160 model, kept for record)
 - `/home/darrell/v_alibaba_h160_T*.csv` (T sweep CSVs)
 - `/home/darrell/v_tencent_T*.csv` (T sweep CSVs)
+
+
+## Round 176 — 50k record budget closed-FAILED at HRC-MAE 0.0184; train-eval scope match matters
+
+**Date**: 2026-04-30 14:50 PDT
+
+### What ran
+
+Retrained alibaba b2 with `--records-per-file 50000` (vs R172's 25000), same h96 / inline-cond / ep600. trans_loss converged to 0.934 (vs R172's 0.915 — slightly worse because the larger record budget gives noisier per-file conditional).
+
+Bug found: generate() was computing cond from 25k records (manifest spec) but trained model expected 50k-record cond. Fixed by reading `metadata["records_per_file"]` at generate time and passing through to `cond_from_trace`.
+
+### Result on alibaba_stackatlas
+
+| recipe | reuse / real | P50 / real | P90 / real | footprint | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R172 25k records | 0.276 / 0.269 | 190 / 201 | 1379 / 1452 | 18102 | **0.0069** |
+| R176 50k cond-mismatch (bug) | 0.342 / 0.269 | 41 / 201 | 947 / 1452 | 16462 | 0.0811 |
+| **R176 50k cond-fixed** | 0.291 / 0.269 | **195 / 201** | **1485 / 1452** | 17728 | **0.0184** |
+
+P50 195 is **near-perfect** (real 201) and P90 1485 even slightly over real 1452. Reuse 0.291 close to 0.269. Per-stream metrics LOOK better than R172 25k, but the per-cache-size HRC curve has a different shape that costs ~3× HRC-MAE.
+
+### Diagnosis
+
+Train-eval scope match matters: the eval streams use 25k records per stream from the manifest. Training b2 at 50k record scope teaches it transition patterns that DON'T match the 25k eval scope. The net learns long-range transition structure at 50k that doesn't show up in the 25k eval window.
+
+### b2 exploration summary — 4 axes tested, all closed at R172/R173 baseline
+
+| axis | best variant | HRC-MAE | best vs R172 |
+|---|---|---|---|
+| State space (R174) | n_phase_bins=4, marginal rank PMF | 0.0120 | 1.7× worse |
+| Net width (R175) | hidden=160 | 0.0118 | 1.7× worse |
+| Sampling temperature (R175) | T=1.0 | 0.0069 | tie (R172 baseline) |
+| Record budget (R176) | 50k records | 0.0184 | 2.7× worse |
+| **R172 baseline** | h96, T=1.0, 25k records, 6-state | **0.0069** | **best** |
+
+The b2 architecture as currently designed has converged to its operating point. The 3.8× alibaba / 2.4× tencent gap to LANL requires a structurally different addition (mark model, richer cond features, multi-corpus training, or a different generative procedure entirely).
+
+### Standing race position — unchanged
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout** | **0.0069 (R172)** | 0.001826 | 3.8× |
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173)** | 0.008735 | 2.4× |
+
+### Next move: ep1000 on the working 25k recipe
+
+Cheapest remaining experiment: train R172's recipe for 1000 epochs instead of 600. trans_loss curve at ep600 was still slowly decreasing (0.915 with slight downward trend). Maybe extra training squeezes 0.0005-0.0010 out. ~10 min retrain.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_50k.pkl.gz` (50k model, closed-failed)
+- `/home/darrell/v_alibaba_b2_50k_fix.csv` (50k generation with cond-fix)
