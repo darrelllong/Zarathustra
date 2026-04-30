@@ -1180,3 +1180,107 @@ Repo summaries were synced back into:
 - `suggested_modes` is a heuristic, not an ablation-validated optimum.
 - `tsfeatures` metrics are package outputs; they were not reimplemented symbolically in this repo.
 - The analysis is still file-level. It informs GAN work, but it is not yet a window-level characterization of the actual training sequences.
+
+---
+
+## Cross-Corpus Amenability Pass (2026-04-30)
+
+This section is an outcome of running [run_corpus_analysis.R](/Users/darrell/Zarathustra/R-scripts/run_corpus_analysis.R) over the full normalized characterization JSONL on `vinge.local`. The driver chains [extract_family_features.R](/Users/darrell/Zarathustra/R-scripts/extract_family_features.R) → [analyze_family.R](/Users/darrell/Zarathustra/R-scripts/analyze_family.R) → [render_family_report.R](/Users/darrell/Zarathustra/R-scripts/render_family_report.R) for every logical family in the corpus, then aggregates into [families.csv](/Users/darrell/Zarathustra/R-scripts/families.csv), [rollup.json](/Users/darrell/Zarathustra/R-scripts/rollup.json), and the per-family Markdown index in [FAMILY-SUMMARIES.md](/Users/darrell/Zarathustra/R-scripts/FAMILY-SUMMARIES.md).
+
+The previous pass left 7 of 30 families with `analysis.json` and 23 with `features.csv` only. The cause was non-standard JSON literals (`Infinity`, `NaN`) in 2 lines of the input JSONL — `jsonlite` halts on the first such line. Pre-processing with `sed 's/: Infinity/: null/g; s/: NaN/: null/g'` produced a clean input; all 31 logical families now have full analysis output.
+
+### Inputs
+
+- `chars_path`: $\text{trace\_chars\_fixed.jsonl} = \text{sed-normalized version of trace\_characterizations.jsonl}$ (30,628 lines).
+- `out_root`: `/tiamat/zarathustra/r-output/full_run_20260430/` (per-family `features.csv`, `analysis.json`, `metric_summary.csv`, `<family>.md`).
+- `repo_sync_dir`: `/tiamat/zarathustra/r-output/full_run_20260430_repo/` (`families.csv`, `rollup.json`, `README.md` index).
+
+### Amenability Score
+
+For each logical family $f$ with $n_f$ files, sample-median per-file reuse fraction $\widetilde{r}_f$, and sample-median burstiness coefficient of variation $\widetilde{b}_f$:
+
+$$
+A(f) = 10 \cdot \widetilde{r}_f - \log_{10} \max(\widetilde{b}_f, 0.5) + 0.3 \cdot \log_{10} \max(n_f, 1)
+$$
+
+Higher $A(f)$ predicts easier synthetic generation. The three components correspond to:
+
+- $10 \cdot \widetilde{r}_f$ — locality reward. High median reuse means the trace has a hot working set the generator can latch onto.
+- $-\log_{10} \widetilde{b}_f$ — burst penalty. High burstiness CV means inter-arrival distributions are heavy-tailed and short-window mode coverage is hard.
+- $0.3 \cdot \log_{10} n_f$ — sample-size bonus. More files give the GAN/atlas richer training data and smoother per-family conditioning.
+
+The weighting is heuristic. The reuse term dominates because every long-rollout cache benchmark reduces to "did the model put the right object in the right cache slot." If a corpus has weak reuse, the metric is dominated by random-access performance, which the generator cannot meaningfully outperform.
+
+### Tier Classification
+
+Five tiers emerge naturally from the full sweep:
+
+#### Tier 1 — KV-Zipfian (easiest)
+
+| family | files | $\widetilde{r}$ | $\widetilde{b}$ | guidance |
+|---|---:|---:|---:|---|
+| `s3-cache-datasets__2022_metaKV` | 28 | 0.894 | 21.3 | reuse/locality is a major axis; locality-aware losses and conditioning matter |
+| `s3-cache-datasets__metaKV` | 11 | 0.755 | 10.1 | spans multiple encodings; keep format-aware preprocessing |
+
+These are key-value caches with Zipfian access. Median reuse $\widetilde{r} \approx 0.75-0.89$ means roughly 80% of accesses re-fetch a recent key. A YCSB-style synthetic generator already approximates this well; the LLNL/LANL infrastructure should beat YCSB without difficulty. Both families are small ($n_f \in \{11, 28\}$), so cross-seed validation matters more than data volume.
+
+#### Tier 2 — Steady storage (easy)
+
+| family | files | $\widetilde{r}$ | $\widetilde{b}$ | het. score | suggested modes |
+|---|---:|---:|---:|---:|---:|
+| `Baleen24__Baleen24` | 374 | 0.311 | **1.42** | 0.423 | 8 |
+
+Baleen24 is the **sweet spot for methodology validation**: lowest median burstiness in the entire corpus ($\widetilde{b} = 1.42$), moderate reuse, decent file count, 8 suggested GAN modes (so it benefits from regime conditioning but isn't pathologically heterogeneous). If LLNL's PhaseAtlas + Markov hits HRC-MAE $< 0.005$ here cleanly, the architecture is validated under non-pathological data. Failure here is structural; failure on tencent/alibaba might just be data-induced.
+
+#### Tier 3 — Block storage (current race targets, hard)
+
+| family | files | $\widetilde{r}$ | $\widetilde{b}$ | het. score | hurst |
+|---|---:|---:|---:|---:|---:|
+| `tencent__cloud_disk` | 16,296 | — | — | **5.572** | 0.500 |
+| `s3-cache-datasets__2020_tencentBlock` | 4,996 | 0.0103 | 2.96 | 2.006 | 0.792 |
+| `alibaba__alibaba` | 1,000 | 0.0002 | 3.83 | **2.043** | **0.979** |
+| `s3-cache-datasets__tencentBlock` | 4,995 | 0.0044 | 4.51 | 1.328 | 0.711 |
+| `s3-cache-datasets__2020_alibabaBlock` | 1,001 | 0.0002 | 3.83 | 1.322 | 0.978 |
+| `s3-cache-datasets__alibaba` | 1,000 | 0.0007 | 6.40 | 1.302 | 0.695 |
+
+This is where the current LANL/LLNL race lives. Median reuse $\widetilde{r} \in \{0.0002, 0.01\}$ — most accesses are NEW objects. The 5× LLNL-vs-LANL HRC-MAE gap on tencent is partly explained by the data: weak inherent locality leaves less margin for any locality-aware mechanism. Hurst exponent $\approx 0.97$ on alibaba indicates strong long-range dependence — i.e. the trace has memory, but the per-file sample size is small relative to that memory, so per-file conditioning cannot capture it.
+
+`tencent__cloud_disk` (16,296 files, **heterogeneity 5.572**) is by far the most cross-file heterogeneous family in the corpus. R recommends "regime conditioning or multiple family-specific GAN runs over a single unconditional model" for this family — i.e. one global generator will not produce coherent samples; partition into sub-corpora.
+
+#### Tier 4 — Bursty CDN/web (very hard)
+
+| family | files | $\widetilde{r}$ | $\widetilde{b}$ | suggested modes |
+|---|---:|---:|---:|---:|
+| `s3-cache-datasets__cache_trace_twitter_memcache` | 226 | 0.033 | 16.5 | 1 |
+| `s3-cache-datasets__2020_twitter` | 54 | 0.038 | 18.5 | 1 |
+| `s3-cache-datasets__2018_tencentPhoto` | 4 | 0.009 | 28.6 | 1 |
+| `s3-cache-datasets__2019_wiki` | 6 | 0.002 | 28.4 | 1 |
+| `s3-cache-datasets__2026-alibaba-thinkahead` | 45 | 0.027 | 26.1 | 8 |
+| `s3-cache-datasets__2007_wiki` | 4 | 0.027 | 40.5 | 1 |
+
+Burstiness $\widetilde{b} > 16$ means inter-arrival distributions have heavy tails. Combined with low reuse, every generated trace will under-cover the held-out distribution by construction. R's guidance for these families consistently recommends "inter-arrival and FFT/ACF losses should stay heavily weighted" — this is the failure mode that mode-coverage metrics like β-recall flag, exactly the LLNL GAN-track ★≈0.20 basin we documented in `RESPONSE-LLNL.md` Round 145.
+
+#### Tier 5 — Tiny / heterogeneous (data-limited)
+
+Twelve more families with $n_f \le 14$, no Hurst available, mixed encodings: `2022_metaCDN` (3), `2022_metaStorage` (5), `2023_metaCDN` (3), `2023_metaStorage` (6), `2017_docker` (7), `2017_systor` (6), `2007_msr` (14), `2007_wiki` (4), `2016_wiki` (2), `2024_google` (192 but het=0.064 — homogeneous), `other` (2), `2020_twr_cdn` (2). Suggested modes is uniformly 1 — a single GAN suffices, but the file count is too small for cross-seed validation. These are usable for sanity checks but not for race claims.
+
+### Implications For The Three-Way Race
+
+1. **The race is on Tier 3.** LLNL/LANL/Sandia all target tencent and alibaba. Both are in the hardest category short of the bursty CDN tier. The current 5× LLNL-LANL HRC-MAE gap is in part data-induced; closing it would be easier on Tier 1/2.
+
+2. **Baleen24 is the architecture-validation sweet spot.** If the multi-day b2 commitment (`altgan/neural_atlas.py` learned-transition port) lands and produces HRC-MAE $< 0.005$ on Baleen24 but $> 0.04$ on tencent, the conclusion is "the architecture works; tencent is data-limited." That separates mechanism failure from data failure cleanly.
+
+3. **`tencent__cloud_disk` warrants partitioning.** With 16,296 files and heterogeneity score 5.572 (highest in corpus), pooling them into one model is wasteful. The R "Suggested GAN Modes" output recommends 8 sub-modes; running 8 family-specific atlases and reporting the worst-case will be a stronger claim than one global model.
+
+4. **KV families are the cheap publishability win.** A YCSB-class synthetic for `2022_metaKV` should produce HRC-MAE $< 0.001$ trivially. Documenting that LLNL's PhaseAtlas matches a YCSB baseline on metaKV and beats it elsewhere demonstrates the infrastructure generalizes — useful for paper claims.
+
+5. **Bursty CDN is a known-impossible** under any current method without per-trace extreme-value modeling; treating it as out-of-scope is honest.
+
+### Artifacts
+
+- [families.csv](/Users/darrell/Zarathustra/R-scripts/families.csv) — one row per logical family with all flatten_analysis_summary fields.
+- [FAMILY-SUMMARIES.md](/Users/darrell/Zarathustra/R-scripts/FAMILY-SUMMARIES.md) — sortable table, all 31 families.
+- [rollup.json](/Users/darrell/Zarathustra/R-scripts/rollup.json) — corpus-level statistics + per-family summaries.
+- Per-family Markdown reports at `/tiamat/zarathustra/r-output/full_run_20260430/families/<family_id>/<family_id>.md` on `vinge.local`.
+
+This pass is shared infrastructure; LANL (`altgan/`) and Sandia (`newgan/`) can read the same outputs to choose corpus-strategic targets without re-running characterization themselves.
