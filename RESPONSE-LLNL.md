@@ -9805,3 +9805,103 @@ Artifacts (vinge):
 - `/home/darrell/atlas_alibaba_perstream_oracle.pkl.gz` (per-stream calibrated atlas)
 - `/home/darrell/v_alibaba_perstream_oracle.csv` (oracle-calibrated fake)
 - `/home/darrell/build_alibaba_perstream_calib.py` (per-stream calib builder)
+
+
+## Round 169 — Profile-matched holdout viability check; PhaseAtlas variants exhausted; only path to close gaps is b2 multi-day or strategic pivot
+
+**Date**: 2026-04-30 14:05 PDT (Round 168 follow-through, scoping pass)
+
+### Question — can profile-matched holdout (R163 plan b) close the alibaba gap?
+
+R163 named profile-matched holdout as the lighter alternative to b2 multi-day port. The plan: for each manifest stream, find K nearest training files by trace_characterization features, average their calibrations into a per-stream calibration JSON, apply via R168's per_stream_calib infrastructure.
+
+### Finding 1 — `reuse_ratio` characterization feature is unreliable but `burstiness_cv` IS predictive
+
+Trace characterizations sample only 4096 records. For the 4 manifest files:
+
+| file | char_reuse_ratio (4096-sample) | MEASURED reuse (25k records) | burstiness_cv |
+|---|---|---|---|
+| alibabaBlock_109 | 0.0010 | **0.3767** | 2.95 |
+| alibabaBlock_163 | 0.0002 | **0.7567** | 5.73 |
+| alibabaBlock_221 | 0.0000 | 0.0034 | 9.11 |
+| alibabaBlock_275 | 0.0000 | 0.0030 | 9.62 |
+
+`reuse_ratio` from the sampled 4096-record characterization is **categorically wrong** — alibabaBlock_163's char says 0.0002 but the file actually has 0.7567 reuse at 25k records. The 4096-record window doesn't capture the underlying structure.
+
+**`burstiness_cv` IS strongly predictive** (high-reuse files have low burst_cv; low-reuse have high). This means profile-matched holdout via `burstiness_cv` is feasible — we'd just need to ignore the unreliable `reuse_ratio` field and use `burstiness_cv` as the primary similarity feature.
+
+### Finding 2 — but it doesn't matter, R168's architectural ceiling is 0.019 regardless
+
+R168 measured the architectural ceiling at HRC-MAE = 0.0190 using **manifest-oracle calibration** (cheat — exact per-stream calibration extracted from the actual manifest files). This is the absolute upper bound for ANY PhaseAtlas variant on alibaba_stackatlas with full per-stream knowledge.
+
+Profile-matched holdout, by definition, can't do BETTER than manifest oracle. At best it equals 0.019, more likely it sits a bit higher (0.022–0.025) because `burstiness_cv` mapping introduces noise.
+
+**Profile-matched holdout is closed-failed before starting.** No PhaseAtlas variant can close the alibaba HRC-MAE gap below 0.019, vs LANL's 0.001826 — the 10× gap is in conditional sequencing of misses, not calibration.
+
+### PhaseAtlas variant enumeration — all closed
+
+Round 154–168 explored 9 PhaseAtlas variants on tencent and alibaba:
+
+| round | variant | tencent HRC-MAE | alibaba HRC-MAE | verdict |
+|---|---|---|---|---|
+| R154 | N=128 strict-holdout | **0.0427** | n/a | best tencent |
+| R156 | Markov v1 192-state | 0.0821 | n/a | closed |
+| R156 | Markov v3 fitted phase | 0.0596 | n/a | closed |
+| R157 | Markov c2 fine-bin | 0.0504 | n/a | closed |
+| R158 | Markov c1 REUSE_FAR | 0.0502 | n/a | closed-marginal |
+| R159 | N=256 calibration | 0.0442 | n/a | closed (within noise) |
+| R163 | single-rate manifest-aware | n/a | 0.0071 | best alibaba (manifest-aware) |
+| R163 | strict-holdout | n/a | 0.2515 | strict-holdout wide |
+| R167 | per-stream rate only | n/a | 0.0219 | closed |
+| R168 | per-stream MANIFEST-ORACLE | n/a | 0.0190 | architectural ceiling |
+| R169 | profile-matched holdout | n/a | (≥0.019, closed before run) | architectural-ceiling-bounded |
+
+**Tencent gap**: 5× to LANL (0.0427 vs 0.008735). Closed-failed via PhaseAtlas track at R159.
+**Alibaba gap**: 10× to LANL (0.019 vs 0.001826). Closed-failed via PhaseAtlas track at R168.
+
+### The only race-relevant moves left
+
+1. **(b2 multi-day)** Port LANL's `_CondTransitionNet` from `altgan/neural_atlas.py` into LLNL's pipeline. State space ~64 states × small MLP. Multi-day implementation. Targets both gaps.
+2. **(strategic pivot)** Stop sinking time into HRC-MAE chase. LLNL has strong numbers on:
+   - **alibaba ★ frozen-bundle = 0.001937** (only published number on this surface)
+   - **tencent mark_score: 0.0414 (GAN-post-hoc) / 0.0475 (PhaseAtlas)** — only published numbers on this surface
+   - **R-ANALYSIS cross-corpus amenability ranking** (only published analytic framework)
+   Position LLNL contribution as the analytic / mark-fidelity / frozen-bundle track while LANL holds cache-fidelity HRC-MAE.
+
+### LLNL b2 scoping (option 1)
+
+Reading LANL's `_CondTransitionNet` (altgan/neural_atlas.py:349):
+- Tiny torch MLP: `cond` MLP (cond_dim → hidden, 2-layer SiLU), `state` Embedding (n_states → hidden), `init` head (hidden → n_states), `trans` head (2·hidden → n_states).
+- State space: `n_phase × n_time × n_size × n_actions` = `1 × 4 × 4 × 4` = 64 states (default).
+- Training: cross-entropy on observed (cond, prev_state, next_state) tuples from per-file traces.
+- Generation: emit state sequence per stream conditioned on file profile, decode state → (phase, time, size, action), use existing PhaseAtlas rank PMF.
+
+**Estimated effort**: ~2 days (16 hours) for end-to-end LLNL port:
+- 4h: scaffolding (`llgan/neural_atlas.py`), state encoding, dataclass
+- 4h: fit method (read traces, bin events, accumulate transitions, train MLP)
+- 4h: generate method (load model, emit state sequence, decode + rank PMF)
+- 2h: cmd_fit / cmd_generate CLI surfaces
+- 2h: validation (sanity check vs alibaba, tencent; compare HRC-MAE)
+
+Risk: even with neural transitions, LLNL might not exactly match LANL's 0.001826 because:
+- LANL trains on 64 files × 25k records × 900 epochs (substantial compute).
+- LANL's generator includes a learned mark model on top.
+- The architectural choice of state encoding (which features bin into state) may matter.
+
+Realistic target: HRC-MAE in [0.005, 0.012] range — closes most of the gap.
+
+### Recommendation
+
+**Defer the b2 multi-day port until user explicitly directs it.** Two reasons:
+1. The user pushed back on Round 164–166 GAN cosmetic work as a sideshow. b2 is a real ~2-day commitment; worth confirming it's the right priority vs publishing existing strong numbers.
+2. After R168's architectural ceiling finding, LLNL's PhaseAtlas track is genuinely closed. b2 is a NEW architecture, not a continuation; treating it as a fresh project rather than a queued idea makes the user/project decision cleaner.
+
+**Strategic alternative**: spend the next 1–2 ticks polishing the LLNL publishable surface (alibaba ★, tencent mark_score panel, R-ANALYSIS, cross-corpus amenability table). The race position split (LLNL leads frozen-bundle + mark-axis; LANL leads HRC-MAE) is a publishable result on its own without needing to win HRC-MAE.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+### Active LLNL run: none
+
+Stopping the "try one more PhaseAtlas variant" cycle. Awaiting user direction on b2-vs-pivot.
