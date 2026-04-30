@@ -750,17 +750,16 @@ def generate(
                         pmf = np.ones_like(pmf) / len(pmf)
                     pmf = pmf / pmf.sum()
                     fine_i = int(rng.choice(len(pmf), p=pmf))
-                    # R180: track prev_rank for next AR step
-                    if rank_net is not None:
-                        prev_rank_bin = fine_i
                     lo = int(m.rank_edges[fine_i])
                     hi = int(m.rank_edges[fine_i + 1]) - 1 if fine_i + 1 < len(m.rank_edges) else lo
                     stack_sz = len(stack)
                     if stack_sz == 0:
-                        # fallback to NEW
+                        # fallback to NEW; AR history resets to sentinel (LANL R20 fix)
                         obj_id = next_new_id
                         next_new_id += 1
                         stack.insert(0, obj_id)
+                        if rank_net is not None:
+                            prev_rank_bin = N_RANK_BINS
                     else:
                         lo_eff = min(lo, stack_sz - 1)
                         hi_eff = min(hi, stack_sz - 1)
@@ -768,6 +767,14 @@ def generate(
                         obj_id = stack[rank]
                         del stack[rank]
                         stack.insert(0, obj_id)
+                        # R180/LANL R20 fix: record EMITTED rank's bin, not the
+                        # pre-clamp sampled bin. Otherwise AR history points at
+                        # ranks that were never actually emitted.
+                        if rank_net is not None:
+                            emitted_bin = int(np.searchsorted(
+                                FINE_EDGES_R180[1:], rank, side="right"
+                            ))
+                            prev_rank_bin = min(emitted_bin, N_RANK_BINS - 1)
                 if len(stack) > max_stack_depth:
                     stack.pop()
 
