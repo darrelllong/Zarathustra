@@ -161,3 +161,56 @@ Convention going forward:
 - Author-owned files NOT renamed: `PEER-REVIEW.md` (Darrell), `PEER-REVIEW-GEMINI.md` (Gemini), `README.md`, `TODO.md`, `R-*.md` (R-related), `REBUTTAL.md`, `paper/*` (multi-author)
 
 Sandia peer-review pipelines that read those filenames should update; internal cross-references across the renamed and LLNL-owned docs were updated in the same commit. The `R-REBUTTAL-RESPONSE.md` filename is unchanged — only the bare `RESPONSE.md` was renamed.
+
+---
+
+## Round 4 (2026-04-29) — newgan Smoke Path Is Not Yet a Valid Race Launcher
+
+**Reviewer:** LANL / altgan, while running Tencent long-rollout mark sweeps.
+
+### Findings
+
+1. `[P1]` `newgan/v1_baseline.sh` passes flags that `newgan/train.py` does not
+   parse. The launcher includes `--loss`, `--cond-drop-prob`, `--var-cond`,
+   `--var-cond-kl-weight`, `--pcf-loss-weight`, `--pcf-n-freqs`,
+   `--retrieval-memory`, `--retrieval-*`, and `--mixed-type-recovery` at
+   `newgan/v1_baseline.sh:32-61`, but the parser in `newgan/train.py:711-736`
+   defines none of those options. The full v1 launcher will exit at argparse
+   before training. The current remote `s001_test` command avoids those flags,
+   so it is only a smoke test of the reduced script, not a v165-style baseline.
+
+2. `[P1]` `files_per_epoch` is ignored during data loading. `load_data()` accepts
+   `files_per_epoch` at `newgan/train.py:682-684`, but then uses all shuffled
+   training files at `newgan/train.py:695-703`. On Tencent that means the v1
+   script's advertised `--files-per-epoch 12` actually attempts to materialize
+   thousands of files at `records_per_file=20000`. That changes the recipe and
+   can turn a quick reproduction into a huge memory/time sink.
+
+3. `[P1]` The validation path passes a list of `TraceDataset` objects into
+   `DataLoader` instead of a concatenated dataset. `load_data()` assigns
+   `val_ds, _ = _load_epoch_dataset(...)` at `newgan/train.py:703`, but
+   `_load_epoch_dataset()` returns a list of per-file datasets. The pretrain
+   phases then call `DataLoader(val_ds, ...)` and expect each batch to support
+   `.to(device)`. Once validation is reached, that is not a tensor batch; it is
+   a collated list/object path. Validation and pretrain ranking are therefore
+   not trustworthy until the val side uses `ConcatDataset` or a real tensor
+   dataset.
+
+4. `[P1]` `newgan/run.py` cannot generate from the trained checkpoints. It
+   constructs `Generator(cfg)` at `newgan/run.py:23`, but `llgan.model.Generator`
+   requires explicit `noise_dim`, `num_cols`, `hidden_size`, etc. It also sets
+   `cfg.generated_path = args.cfg` at `newgan/run.py:48`, so the default output
+   path would be `llgan/config.py`. This blocks the promised long I/O trace
+   generation path even if training succeeds.
+
+5. `[P2]` `_load_raw_df()` uses `tempfile.NamedTemporaryFile` for non-oracle
+   `.zst` inputs at `newgan/train.py:66` without importing `tempfile`. Tencent
+   `oracle_general` avoids this branch, but the first compressed CSV/MSR-style
+   run will fail immediately.
+
+### Recommended Action
+
+Make `s001_test` pass end to end before launching another long run: align the
+parser with `v1_baseline.sh`, apply `files_per_epoch`, fix validation collation,
+and repair `newgan/run.py` so it can emit an evaluable long trace. Until then,
+Sandia is still not on the long-rollout board.
