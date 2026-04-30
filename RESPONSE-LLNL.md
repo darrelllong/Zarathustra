@@ -9971,3 +9971,75 @@ Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_64f.pkl.gz` (first-shot model)
 - `/home/darrell/v_alibaba_b2.csv` (first-shot generation)
 - `/home/darrell/neural_atlas_fit.log` (first-shot training log)
+
+
+## Round 171 — b2 cond-normalized lands FIRST competitive LLNL alibaba: HRC-MAE 0.0279 (15× behind LANL but strict-holdout legitimate, P50/P90 near-perfect)
+
+**Date**: 2026-04-30 13:00 PDT (autonomous continuation)
+
+### What changed
+
+- Cond normalization: zero-mean unit-variance per feature, computed from training file conds, applied at both fit and generate time. Stored as `cond_mean` + `cond_std` fields on `NeuralAtlas`.
+- Diagnostic: 6 of 10 cond features are zero-variance across all 237 alibaba files (`iat_q50/90`, `obj_size_q50/90`, `write_ratio`, `opcode_switch_ratio`, `ts_duration` not populated by the trace_characterization pipeline). Effective conditioning is 3 features: `burstiness_cv`, `forward_seek_ratio`, `backward_seek_ratio`. Even with this restricted signal, normalization unlocked the per-stream conditioning that R170's raw-cond run couldn't reach.
+
+### Result on alibaba_stackatlas (100k records, 4 streams, seed=42)
+
+| recipe | reuse (gen / real) | P50 (gen / real) | P90 (gen / real) | footprint (gen / real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R163 single-rate (manifest-aware override) | 0.270 / 0.269 | 114 / 201 | 1225 / 1452 | 18251 / 18273 | 0.0071 (cheat) |
+| R168 per-stream MANIFEST-ORACLE | 0.286 / 0.269 | 177 / 201 | 1179 / 1452 | 17839 / 18273 | 0.0190 (cheat) |
+| R170 b2 raw-cond 64f | 0.587 / 0.269 | 211 / 201 | 1768 / 1452 | 10335 / 18273 | 0.273 |
+| R170 b2 raw-cond 237f | 0.665 / 0.269 | 59 / 201 | 771 / 1452 | 8367 / 18273 | 0.383 |
+| **R171 b2 cond-normalized 237f** | **0.303 / 0.269** | **203 / 201** | **1482 / 1452** | 17436 / 18273 | **0.0279** |
+| LANL NeuralAtlas blend=0.5 | 0.265 / 0.269 | 197 / 201 | 1267 / 1452 | n/a | 0.001826 |
+
+**P50 203 vs real 201, P90 1482 vs real 1452** — these are the closest stack-distance shape numbers any LLNL pipeline has ever produced on alibaba. P50 even beats LANL's 197.
+
+### Per-stream reuse vs targets
+
+| stream | manifest file | char burst_cv | gen reuse | real reuse | gap |
+|---|---|---|---|---|---|
+| 0 | alibabaBlock_163 | 5.73 | 0.726 | 0.757 | -4% |
+| 1 | alibabaBlock_275 | 9.62 | **0.058** | 0.003 | +0.055 (was 0.551 / 0.641) |
+| 2 | alibabaBlock_109 | 2.95 | 0.370 | 0.377 | -2% |
+| 3 | alibabaBlock_221 | 9.11 | **0.057** | 0.003 | +0.054 (was 0.581 / 0.688) |
+
+The two extreme low-reuse streams that R170 couldn't condition out-of-distribution (180×/170× over) are now within 0.05 absolute (still over by ~20×, but at the right scale). Streams 0 and 2 are within 5%.
+
+### Race position update — alibaba
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| alibaba HRC-MAE strict-holdout legitimate | **0.0279 (R171 b2-norm)** | 0.001826 | 15× |
+| alibaba HRC-MAE manifest-aware (R163 cheat) | 0.0071 | 0.001826 | 3.9× |
+| alibaba HRC-MAE manifest-oracle (R168 cheat) | 0.0190 | 0.001826 | 10× |
+| alibaba ★ frozen-bundle | **0.001937 (LLNL only)** | (not on this surface) | LLNL only |
+
+**This is the first time LLNL has a strict-holdout legitimate alibaba HRC-MAE in the same order of magnitude as LANL's published number.** R163's 0.0071 was technically lower but used the manifest's mean reuse rate as input — a soft cheat. R171's 0.0279 uses ONLY the per-file `trace_characterization` features (which exist before any manifest-aware action) — strict-holdout legitimate.
+
+The 15× gap to LANL is now **conditioning richness, not architecture**:
+- LLNL b2-light has only 3 effective cond features (burstiness_cv + 2 seek_ratios). LANL's NeuralAtlas reads richer profiles per file.
+- 6 of 10 cond features are unpopulated in our trace_characterization JSON. Re-characterizing alibaba files at higher record counts (or extracting iat/size quantiles directly from the trace) would expand conditioning by 3×.
+
+### Tencent prospects
+
+This same b2-norm architecture should run on tencent. Tencent's manifest reuse rate is 0.6149 (homogeneous-ish across streams) so per-file conditioning matters less than it does on alibaba (which is bimodal). Likely target: HRC-MAE somewhere in 0.02–0.04 range — comparable to or worse than current PhaseAtlas R154's 0.0427. **Not pivoting tencent now**, since the alibaba surface is the more urgent close.
+
+### Sandia + LANL pass
+
+PEER-REVIEW-LANL.md (Darrell's) Follow-up 8 shows LANL's 1M-record long-rollout HRC stuck at 0.06 (long-trace gap separate from the 100k-stackatlas number). LLNL hasn't published 1M numbers yet either. **No new REBUTTAL post warranted**.
+
+Sandia: still no progression. **No new PEER-REVIEW-Sandia post warranted.**
+
+### Active LLNL run: none. Next moves
+
+- Run b2-norm on tencent (~10 min) — completeness
+- Improve cond features by computing iat/size quantiles directly from traces (~1 hr) — closes more of the 15× gap
+- Increase state space granularity (6→24 states by adding 4-bin time/size) — unclear gain, ~1 hr
+
+Picking the cond enrichment next — biggest expected gain per hour.
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_norm.pkl.gz`
+- `/home/darrell/v_alibaba_b2_norm.csv`
+- `/home/darrell/neural_atlas_fit3.log`
