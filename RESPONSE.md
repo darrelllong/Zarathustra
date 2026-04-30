@@ -7832,3 +7832,76 @@ Owner is 500 miles from `vinge` with no remote-hands access; v232 (PID 810509) i
 - LANL pipeline is on a different host and is NOT known to be paused; the tencent gap (4.4×) is the exposed flank and will widen if LANL pushes any new microblend or seed-confirmation row before reconnect.
 
 While paused, work that does not need `vinge` continues: Rust cache-simulator skeleton pre-staged in `tools/cachesim/`, simulator plan sharpened in `TODO.md` with manifest-fetch specifics (which `.zst` filenames to grab so simulator HRC-MAE is apples-to-apples with the published 0.00887 / 0.001937).
+
+
+## Round 136 — Reconnected; v232 Swept Dead; v233 Launched; IDEA #117 Filed
+
+**Date**: 2026-04-29
+
+### Reconnect Summary
+
+`vinge.local` reachable again after 5-day gap. v232 process (PID 810509) had completed its 200-epoch run on 2026-04-24 22:33 PDT (training never failed; the gap was owner-side). Frozen sweep over all 22 v232 checkpoints completed on reconnect:
+
+| ckpt | ★ | MMD² | β-recall | note |
+|------|---|------|----------|------|
+| epoch_0010.pt | **0.23197** | 0.14157 | 0.5480 | sweep best |
+| epoch_0020.pt | 0.23544 | 0.13424 | 0.4940 | |
+| epoch_0030.pt | 0.26586 | 0.10616 | 0.2015 | β-recall collapse |
+| epoch_0040.pt | 0.30892 | 0.11472 | 0.0290 | mode collapse |
+| best.pt (train ep145) | 0.31762 | — | — | +37% worse than ep10; train selector mis-rank |
+
+**Verdict**: seed=42 confirmed dead basin, ★=0.23197 = **6× worse than v229 ep10 ATB ★=0.039**. IDEA #115 (carried-state LRU diagnostic) hypothesis confirmed: seed selects the basin, and the diagnostic readout in the train log corroborates the carried-state divergence. No new ATB. Race position unchanged.
+
+### v233 Launched (Round 135 recipe, fixed)
+
+Two launch failures fixed before v233 went live:
+1. `python -m llgan.train` fails with `ModuleNotFoundError: No module named 'config'` (train.py uses bare imports). Must be invoked as `cd llgan/ && python train.py`.
+2. `--eval-real-seed 42` is an `eval.py` / `frozen_sweep.py` flag, not a `train.py` flag.
+
+`/home/darrell/launch_v233.sh` corrected; v233 PID 1912815 now in Phase 2.5 (G warm-up). Recipe per Round 135 (seed=7, `--long-chain-weight 2.0 --long-chain-windows 10`, `--w-stop-threshold 7.0`). Gates unchanged: ep5 lru_actual ≥ 0.40, ep10 HRC-MAE < 0.200, target < 0.039.
+
+### IDEA #117: Thread retrieval_state through the main WGAN forward (Gemini Round 3 P1 #2 follow-up)
+
+**Status**: Gemini Round 3 P1 #2 is partially fixed. `retrieval_state` is currently threaded through the BS (boundary-smoothness) and OC (overlap-consistency) sub-loss two-window helpers (train.py:2124-2195). The main WGAN critic/generator forward path still runs each T=12 window with a fresh retrieval bank.
+
+**Why this matters**: The retrieval bank has `mem_size=32` and only writes one entry per timestep, so a single T=12 training window only ever fills 12/32 slots — the eviction logic (`evict_score`) and saturated-attention behaviour are **never trained**. At eval time, generation chains windows over 100k+ steps with a fully saturated, evicting bank — exactly the OOD regime Gemini flagged. This is plausibly the root cause of v165's seed-locked retrieval-memory behaviour (seed=5 ★=0.03752, seed=7 ★=0.16819, seed=11 collapse): the bank's eviction policy is essentially random init at deployment time, and seed selects whether that random init happens to align with the bank's saturated-eval geometry.
+
+**v229's ATB is on the same architectural footing**, so even if v233's IDEA #116 long-chain loss closes the carried-LSTM-state gap, the retrieval bank remains untrained-at-saturation.
+
+**Implementation sketch** (v234, queued):
+1. Maintain a `retrieval_carry` per-batch tensor across consecutive training windows in the same epoch's file batch (analogous to `h_carry` in some legacy paths, or to the BS sub-loss's `r_b_carry`).
+2. Reset `retrieval_carry` at file boundaries (parallel to how training windows already reset on file boundaries).
+3. Pass `retrieval_state=retrieval_carry` and `return_retrieval_state=True` to the main `G(...)` forward in the critic update and generator update blocks.
+4. Add `--retrieval-train-carry` flag (default off for safety; turn on for v234).
+
+**v234 recipe (queued, not launched)**:
+```bash
+cd /home/darrell/Zarathustra/llgan && python train.py \
+  --trace-dir /home/darrell/traces/tencent_block_1M \
+  --fmt oracle_general \
+  --char-file /home/darrell/traces/characterization/trace_characterizations.jsonl \
+  --checkpoint-dir /home/darrell/checkpoints/tencent_v234 \
+  --seed 5 \
+  --epochs 200 \
+  --retrieval-memory --retrieval-train-carry \
+  --multi-scale-critic --mixed-type-recovery \
+  --pcf-loss-weight 0.5 --moment-loss-weight 0.5 \
+  --reuse-rate-loss-weight 10.0 --reuse-rate-target 0.70 \
+  --lru-cache-depth 15000 --lru-eval-every 5 --lru-eval-corpus tencent \
+  --long-chain-weight 2.0 --long-chain-windows 10 \
+  --w-stop-threshold 7.0 \
+  --no-compile --no-amp
+```
+
+Use **seed=5** (the v165/v229 known-good basin) so the test isolates the retrieval-carry effect from seed-basin lottery. Gates: ep10 HRC-MAE < 0.039 (matches v229); ep20 should not collapse (vs v229 ep20 reuse=0.049 catastrophic) — that is the actual hypothesis under test. If ep20 holds, retrieval-train-carry is the structural fix; if ep20 collapses, the long-chain loss is doing the real work and IDEA #117 is a no-op.
+
+**Cross-seed plan**: if v234 ep10 hits ATB AND ep20 holds, immediately launch v235 seed=7 (the catastrophic basin) with same recipe. A two-seed mechanism beats a one-seed lottery.
+
+### Race Dashboard (Round 136)
+
+| Corpus | LLNL ATB | LANL ATB | Sandia | Status |
+|--------|----------|----------|--------|--------|
+| Alibaba | **0.001937** (v195 ep110) | 0.00301 | not yet | **LLNL +35%** |
+| Tencent | 0.039 (v229 ep10) | 0.00887 | not yet | LANL 4.4× |
+
+LANL has been silent since 2026-04-23 (6 days). Sandia is onboarding via newgan/v1_baseline.sh. v233 in pretrain — first frozen ★ readout in ~6.5h. v234 (IDEA #117) queued behind v233 if v233 fails the ep20 hold.
