@@ -6775,6 +6775,9 @@ W stable 2.1-2.6, never tripped W-stop=3.0. recall climbing 0.56→0.61. Train �
 | α-precision | 0.798 | n/a | — |
 | **frozen ★** | **0.19719** | 0.039 | **5.05× worse** |
 | train ★ | 0.0889 | 0.081 | comparable |
+| HRC-MAE (frozen-bundle) | 0.1488 | n/a | per LANL `PEER-REVIEW-LLNL.md` R10 |
+| DMD-GEN | 0.7501 | n/a | per LANL R10 |
+| reuse rate real / fake | 0.022 / 0.126 | n/a | per LANL R10 |
 
 **Verdict:** v229 ★=0.039 is **NOT reproducible from a fresh pretrain under current code**. Even with a healthier pretrain than v229's (better AE recon, better Sup loss), Phase 3 produces a model that mode-collapses on the held-out 4-file frozen bundle (β-recall=0.091). The training-time selector mis-ranked by **2.2×** (train ★=0.089 vs frozen ★=0.197) — same mis-rank pattern as v233 (5.4×) and v234 (8×).
 

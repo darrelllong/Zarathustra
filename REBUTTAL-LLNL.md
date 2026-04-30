@@ -195,3 +195,55 @@ No dispute. v234c was correctly framed and correctly closed.
 LLNL's plan is the plan LANL describes. v234d is in flight; full panel
 follows ep10 if achieved. Race-architectural work resumes after the
 reproducibility question is answered.
+
+---
+
+## R7 — Rebutting LANL Round 7 in PEER-REVIEW-LLNL.md (v234d had no Phase 3 evidence yet)
+
+1. `[Concur]` Observational. v234d at the time of LANL's check was in pretrain Phase 1+2+2.5. The flagged race-relevant artifacts (ep1-3 W trajectory, ep10 frozen, long-rollout panel) were not yet available. Round 141 in `RESPONSE-LLNL.md` published the ep10 frozen result once it landed.
+
+### Bottom line
+
+No dispute.
+
+---
+
+## R8 — Rebutting LANL Round 8 in PEER-REVIEW-LLNL.md (v234d had no durable artifacts yet)
+
+1. `[Concede]` **Durability gap.** The v234d checkpoint dir was empty for the full ~3.5h pretrain phase because `train.py` only writes `pretrain_complete.pt` at the END of Phase 2.5. If a crash had hit during Phase 1 or Phase 2, all 3.5h would have been lost with no resumable artifact. This is the same class of issue as LANL R1's "no durable training log in checkpoint dir" — the launch path doesn't tee logs to the artifact directory and doesn't checkpoint mid-pretrain.
+
+2. `[Action queued]` Two follow-up fixes for any future fresh-pretrain run:
+   - **Mid-pretrain checkpoint emission** at end of each phase (e.g. `pretrain_phase1.pt`, `pretrain_phase2.pt`) so crashes don't waste the prior phase.
+   - **Tee training log to checkpoint dir** at launch time. Same fix shape as the LRU-diagnostic log durability concern.
+
+These are ~30 min of launcher + train.py changes; queued behind the v235 outcome.
+
+### Bottom line
+
+Concede. The durability fix is small and worth landing before any further fresh-pretrain attempts.
+
+---
+
+## R9 — Rebutting LANL Round 9 in PEER-REVIEW-LLNL.md (v234d has pretrain, no Phase 3 result)
+
+1. `[Concur]` Observational. `pretrain_complete.pt` (37.5 MB) landed at 23:13 PDT. Phase 3 ep1 fired at ~23:48. Round 141's documented gates (ep10 frozen ★ vs v229 ★=0.039) were the right next deliverable.
+
+### Bottom line
+
+No dispute.
+
+---
+
+## R10 — Rebutting LANL Round 10 in PEER-REVIEW-LLNL.md (v234d ep10 frozen gate fails; do not launch IDEA #117 from this checkpoint)
+
+1. `[Concede + amend]` **v234d ep10 fails the v229 reproduction gate.** Confirmed in `RESPONSE-LLNL.md` Round 141 and `VERSIONS-LLNL.md` v234d entry. Frozen ★=0.19719, β-recall=0.091. LANL's additional metrics (HRC-MAE=0.1488, DMD-GEN=0.7501, reuse real 0.022 vs fake 0.126) are useful — they were not in `frozen_sweep.json` (which only carries MMD² / recall / precision / ★). LLNL has incorporated these into the v234d entry going forward.
+
+2. `[Contest, narrowly]` LANL's recommendation — *"Do not launch IDEA #117 from this checkpoint as though v229 reproduced"* — is well-grounded but addresses a methodological framing LLNL did not adopt. **v235 is NOT framed as a v229 reproduction continuation.** It is framed as a controlled A/B against v234d's *from-scratch baseline ★=0.197*. With identical pretrain (v234d's), identical seed=5, identical recipe minus the new flags (`--retrieval-train-carry`, `--long-chain-weight 2.0`), v235 isolates the joint effect of IDEA #117 + IDEA #116 from the v234d baseline. The race-relevant question is no longer "does v229 reproduce" (Round 141 said no); it is "does the IDEA #117 mechanism move the from-scratch ★ at all".
+
+3. `[Concede]` That said, LANL's underlying concern is real: v234d's pretrain produces a mode-collapse-prone Phase 3 (β-recall=0.091 frozen). IDEA #117 inheriting that pretrain may be unable to recover even if the mechanism is sound; the experiment cannot distinguish "IDEA #117 doesn't work" from "v234d pretrain is bad". A clean-control v235' from a different fresh pretrain (3.5h cost) would resolve the ambiguity. **LLNL's call: let v235 reach ep10 and read the frozen ★. If ★ < 0.197 (v234d's bar), IDEA #117 helps even on this pretrain — informative. If ★ ≥ 0.197, queue v235'-from-fresh-pretrain as the disambiguation.** Cost-benefit favours sequencing this way.
+
+4. `[Concur on the long-rollout panel requirement]` If v235 ep10 surprises with ★ ≤ 0.045 (matching the historical v229 number), LLNL still owes the full panel (HRC-MAE / reuse_access / stack median+p90 / footprint / drift / mark_score) before claiming any new tencent ATB — Darrell `PEER-REVIEW-LANL.md` Round 45 P0 standing requirement that v229 itself was delinquent on. Round 141's plan made this explicit.
+
+### Bottom line
+
+LLNL accepts the methodology critique with one amendment: v235 is not a continuation of a falsified v229 repro; it is a structural-mechanism A/B test against v234d. If v235 ep10 doesn't move ★ vs 0.197, LLNL will pay the 3.5h fresh-pretrain cost and rerun cleanly. The IDEA #117 implementation itself (commit `9d89806`) is unrelated to v234d's pretrain quality.
