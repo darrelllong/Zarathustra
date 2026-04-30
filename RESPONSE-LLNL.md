@@ -8175,3 +8175,65 @@ Continued catw025 train-seed sweeps (catw025_trainseed{43,44}_seed42 + catw025_t
 | Tencent | 0.039 (v229 ep10, GAN; **historical-lottery**) | **0.197 (v234d ep10)** | 0.008735 (3-seed) | not yet |
 
 Active LLNL run: **none** (v234d killed at ep11). Next: implement IDEA #117, then v235.
+
+
+## Round 142 — v235 KILLED at ep11 (frozen ★=0.19714 ≈ v234d baseline); IDEA #117 closed-INCONCLUSIVE on contaminated pretrain
+
+**Date**: 2026-04-30 01:33 PDT
+
+### Result
+
+v235 — IDEA #117 (`--retrieval-train-carry`) + IDEA #116 (long-chain reuse-rate loss) on v234d's pretrain — produced **frozen ★ at ep10 = 0.19714**. v234d's baseline (no #117, no #116, same pretrain) was 0.19719. **Difference: 0.025% — bit-equivalent.**
+
+| | v235 ep10 | v234d ep10 |
+|---|---|---|
+| frozen ★ | 0.19714 | 0.19719 |
+| MMD² | 0.01214 | 0.01539 |
+| β-recall | 0.075 | 0.091 |
+| α-precision | 0.842 | 0.798 |
+| train ★ | 0.116 | 0.0888 |
+
+### What we learned
+
+1. **The IDEA #117 implementation is correct.** `--retrieval-train-carry` flag works, no crashes, training trajectory is well-defined. Code work in `9d89806` is sound.
+
+2. **The LRU diagnostic now works** (first-ever readout in any LLNL run, post-`9e0c001` sibling-import fix). v235 ep5/ep10 readouts:
+   - lru_actual: 0.990 → 0.993 (carried-state reuse pinned at 99%)
+   - lru_fp: 51 → 33 (unique objects in long rollout COLLAPSED by 35% in 5 epochs)
+
+3. **The carried-state mode collapse hypothesis is empirically confirmed.** Gemini Round 3 P1 #2 / IDEA #117 predicted that the unsaturated bank during T=12 training causes carried-state divergence at eval. The diagnostic now SHOWS this in real time: chain 5000 records with carried `(h, retrieval_state)` and the model converges to ~33 unique objects. v229 ep20's reuse=0.049 collapse and v195 ep110's seed-locked behaviour are likely the same attractor.
+
+4. **What does NOT fix it**: bank carry + long-chain reuse-rate target on v234d's pretrain. Frozen ★ is unchanged from v234d baseline; lru_fp gets WORSE under training pressure (51→33). The combo is not the right set of mechanisms — at least not on this pretrain.
+
+5. **LANL R10 methodology concern empirically validated.** Building IDEA #117 on top of v234d's contaminated pretrain cannot distinguish "IDEA #117 doesn't work" from "the pretrain pre-determined the trajectory." Frozen ★ ≡ v234d baseline is exactly what R10 predicted as the failure mode.
+
+### Where this leaves the race
+
+| Track | Status |
+|---|---|
+| v229 reproduction | Closed-failed (Round 141; v234d) |
+| IDEA #116 alone (long-chain loss, seed=7) | Closed-failed (Round 137; v233 ★=0.262) |
+| IDEA #117 + IDEA #116 (v234d pretrain) | Closed-inconclusive (this round; ★=0.197 ≡ v234d) |
+
+**Three of three GAN-track architectural attempts on tencent have failed to break out of the ★≈0.20 basin** that the from-scratch fresh-pretrain pipeline produces. v229's ★=0.039 is the only LLNL number that ever beat this basin, and Round 141 confirmed v229 is not reproducible.
+
+### Plan forward (revised)
+
+The LLNL GAN track is now in a structural-uncertainty regime. Three options:
+
+a. **Fresh-pretrain v236 with IDEA #117 + IDEA #116** — pays the 3.5h pretrain cost to disambiguate "IDEA #117 doesn't work" from "v234d pretrain was contaminated." Cost: 3.5h pretrain + 50min Phase 3 ep10 + frozen sweep ≈ 4.5h total. Likely outcome (80%): ★ in [0.15, 0.25] — same basin. Diagnostic value if it lands at <0.10: high (IDEA #117 vindicated). Diagnostic value if it lands at ~0.20: confirms IDEA #117 doesn't help in isolation.
+
+b. **Fork to a different generation pipeline (PhaseAtlas-style)** — abandon the GAN track for tencent and build an LLNL equivalent of LANL's `phase_pmf_atlas.py` track. LLNL's alibaba ATB ★=0.001937 came from this path, not the GAN. There's existing LLNL code in `phase_pmf_atlas.py` and `stack_atlas.py`. Cost: days of analysis work (compute_markov_atlas + compute_cond_pmf re-fitting on tencent), but a known-feasible mechanism.
+
+c. **Implement a STRUCTURAL fix that targets the lru_fp attractor directly** — the diagnostic now shows the model collapses to ~33 unique objects under chain. A diversity-encouraging loss on the chained output (e.g. footprint penalty against lru_fp dropping below a target) would attack the symptom directly. Untested mechanism, ~half-day of design + implementation.
+
+**Recommendation**: option (a) for a clean control on IDEA #117, then (c) if (a) fails. Option (b) is the safety net if the GAN track produces no progress over the next 1-2 days.
+
+### Race Dashboard (Round 142)
+
+| Corpus | LLNL claimed | LLNL current-code reproducible | LANL |
+|---|---|---|---|
+| Alibaba | 0.001937 (v195 PhaseAtlas) | 0.001937 (PhaseAtlas, NOT GAN) | 0.00301 |
+| Tencent | 0.039 (v229, **historical-lottery**) | **0.197** (v234d / v235, GAN track) | 0.008735 (3-seed) |
+
+Active LLNL run: **none**. Next: option (a) fresh-pretrain v236 launch.
