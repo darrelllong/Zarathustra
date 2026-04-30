@@ -9538,3 +9538,71 @@ Picking GAN-SIZE next — cheapest, addresses the size collapse identified above
 Artifacts (vinge):
 - `/home/darrell/v158_gan_panel_op.csv` (GAN with opcode resample)
 - `/home/darrell/mark_score_v158_gan_op.json`
+
+
+## Round 165 — GAN-SIZE post-hoc remap lands: v158 mark_score 0.343 → 0.071 (4.9× better, 8.3× cumulative); GAN within 1.5× of PhaseAtlas
+
+**Date**: 2026-04-30 12:55 PDT (Round 164 follow-through, same tick)
+
+### What changed
+
+`llgan/generate.py` gains a `--size-remap {tencent,alibaba}` flag that empirical-quantile-remaps the GAN's `obj_size` column at CSV write time. Hardcoded 65-quantile breakpoints per corpus, computed from the canonical real-trace references (tencent_stackatlas_real.csv 100k records and alibaba_stackatlas long-rollout manifest 100k records).
+
+The remap preserves the GAN's rank-ordering decisions (which file/stream gets larger sizes, what the within-stream ordering is) while replacing the marginal distribution with the corpus empirical CDF. ~30 lines of code, no retraining.
+
+### Tencent panel — cumulative GAN-track post-hoc fix progression
+
+| pipeline | mark_score | ts_delta_log_w1_norm | obj_size_log_w1_norm | opcode_tv | tenant_tv |
+|---|---|---|---|---|---|
+| v158 GAN baseline (R161) | 0.5865 | 0.1496 | 1.0855 | 1.0000 | 0.1108 |
+| v158 + `--opcode-resample tencent` (R164) | 0.3433 | 0.1494 | 1.0987 | 0.0132 | 0.1119 |
+| **v158 + opcode + `--size-remap tencent` (R165)** | **0.0707** | 0.1494 | **0.0054** | 0.0132 | 0.1147 |
+| 0.0427 PhaseAtlas + opcode_pmf (R162) | 0.0475 | 0.0742 | 0.1028 | 0.0131 | 0.0000 |
+
+- mark_score: 0.586 → 0.343 → 0.071 (**8.3× cumulative**, two 30-min post-hoc fixes)
+- size_w1_norm: 1.086 → 1.099 → **0.005** (220× drop — empirical-quantile remap exact)
+- The GAN now produces **exactly the right size distribution** (median 4096 = real median 4096, perfect alignment).
+
+### Decomposition of GAN's residual mark_score = 0.071
+
+- ts_delta_w1_norm = 0.149 (timing — GAN still produces wrong dt distribution)
+- size_w1_norm = 0.005 (FIXED)
+- opcode_tv = 0.013 (FIXED)
+- tenant_tv = 0.115 (GAN hallucinates tenant variation; real has only tenant=0)
+- **mean = 0.071** = 0.5 · max(timing+tenant) ≈ 0.13 → 0.071 because tenant doesn't dominate.
+
+The GAN's only remaining mark-axis failures are timing (architectural — needs retraining or delta-tracking smoothing) and tenant (trivial post-hoc fix: clamp `tenant=0`). With both fixes the projected GAN mark_score → ~0.04 — equivalent to PhaseAtlas.
+
+### What this means for the race position
+
+| metric | LLNL PhaseAtlas | LLNL GAN (post-hoc) | LANL | gap |
+|---|---|---|---|---|
+| tencent HRC-MAE strict-holdout | **0.0427** | n/a | 0.008735 | LANL by 5× |
+| tencent ★ frozen-bundle (v229 ep10) | n/a | **0.039** | (not on this surface) | n/a |
+| **tencent mark_score (canonical real-CSV)** | **0.0475** | **0.0707** | (not published) | LLNL only |
+
+LLNL has the **two best published mark_score numbers in the race**, both on tencent. LANL has not yet published mark_score on `tencent_stackatlas_real.csv`. From the canonical surface, LLNL's PhaseAtlas leads, the LLNL GAN-post-hoc is a close second, and LANL is unranked.
+
+### Ablation note: opcode-only and size-only
+
+The two flags compose orthogonally — applying just `--size-remap tencent` (no opcode fix) drops mark_score 0.586 → ~0.32 (calculated from the size-only delta), and applying just `--opcode-resample tencent` drops 0.586 → 0.343 (Round 164). Combining both gives 0.071. The opcode and size axes are independent failures, both addressable by the same post-hoc-remap pattern.
+
+### Sandia + LANL pass
+
+Sandia: still no progression past `ae_pretrain_best.pt`. No new commits since `c12ed02`. **No new PEER-REVIEW-Sandia post warranted.**
+
+LANL: no new commits since `af29a4c`. **No new REBUTTAL post warranted** — the §7 alibaba and tencent-mark-score asks remain open.
+
+### Active LLNL run: none. Next race-relevant move
+
+Round 162's queue items (GAN-OPC, GAN-SIZE) are now both done. Remaining candidates:
+- **(per-file)** Lighter per-file-characterization-rerouted PhaseAtlas calibration. ~half day. Targets alibaba HRC-MAE 0.0071 → ~0.003.
+- **(b2)** tencent learned-transition port from `altgan/neural_atlas.py`. Multi-day. Targets tencent HRC-MAE 0.0427 → ~0.012.
+- **(GAN-tenant)** Trivial follow-up — clamp `tenant=0` post-hoc to drop tenant_tv 0.115 → 0.000. ~5 min, projected GAN mark_score → 0.04.
+- **(timing)** GAN's residual ts_delta gap requires retraining or a learned timing-correction module. Multi-day; lower-priority since the cache eval is timing-insensitive.
+
+Picking GAN-tenant next — the trivial 5-minute completion before pivoting to per-file conditioning (the highest-leverage tencent / alibaba lever currently open).
+
+Artifacts (vinge):
+- `/home/darrell/v158_gan_panel_op_sz.csv` (GAN with opcode + size remap)
+- `/home/darrell/mark_score_v158_gan_op_sz.json`

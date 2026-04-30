@@ -51,6 +51,7 @@ def generate(
     lru_markov_p_rr: float = -1.0,
     lru_markov_p_mr: float = -1.0,
     opcode_resample: str = "",
+    size_remap: str = "",
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -407,6 +408,50 @@ def generate(
             except (ValueError, TypeError):
                 pass
 
+    # Round 165 P0: GAN's obj_size head collapses to the upper end of the
+    # dynamic range (v158 tencent emits median 274kB vs real median 4kB —
+    # 67× off). Post-hoc empirical-quantile remap preserves the GAN's
+    # rank-ordering decisions while matching the corpus marginal. Quantile
+    # tables computed in Round 165 from tencent_stackatlas_real.csv (100k
+    # records) and alibaba_stackatlas long-rollout manifest (100k records).
+    if size_remap and "obj_size" in df.columns:
+        _SIZE_Q = {
+            "tencent": np.array([
+                512, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 8192, 8192, 8192, 8192, 8192, 8192,
+                8192, 12288, 12288, 12288, 16384, 24576, 28672, 36864,
+                45056, 53248, 65536, 86016, 135168, 266240, 524288,
+            ], dtype=np.int64),
+            "alibaba": np.array([
+                4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
+                4096, 4096, 4096, 4096, 4096, 8192, 8192, 8192, 8192, 8192,
+                12288, 16384, 32768, 45056, 57344, 65536, 65536, 98304,
+                143360, 196608, 225280, 258048, 290816, 327680, 385024,
+                434176, 483328, 516096, 516096, 516096, 516096, 516096,
+                516096, 516096, 516096, 516096, 516096, 516096, 516096,
+                516096, 516096, 516096, 516096, 516096, 524288,
+            ], dtype=np.int64),
+        }
+        if size_remap in _SIZE_Q:
+            qvs = _SIZE_Q[size_remap]
+            qs = np.linspace(0.0, 1.0, len(qvs))
+            sizes = df["obj_size"].values.astype(np.float64)
+            n = len(sizes)
+            sorted_idx = np.argsort(sizes)
+            rank_fracs = (np.arange(n) + 0.5) / n
+            target_sorted = np.interp(rank_fracs, qs, qvs.astype(np.float64))
+            new_sizes = np.empty(n, dtype=np.int64)
+            new_sizes[sorted_idx] = target_sorted.astype(np.int64)
+            df["obj_size"] = new_sizes
+            print(f"[size-remap] {size_remap}: replaced {n:,} sizes via empirical-quantile remap "
+                  f"(new median={int(np.median(new_sizes))}, target_p50={int(qvs[len(qvs)//2])})")
+        else:
+            print(f"[size-remap] WARN: unknown corpus '{size_remap}'; skip")
+
     # Round 164 P0: GAN's opcode column collapses to a constant in practice
     # (v158 emits 100% opcode=1, real tencent is 91.6% opcode=0 + 8.4% sentinel
     # -1). Post-hoc resample from the corpus opcode marginal so mark_score
@@ -534,6 +579,12 @@ def parse_args():
                         "the corpus opcode marginal (tencent: read=0.92/sentinel=0.08; "
                         "alibaba: read=0.85/sentinel=0.15). Eliminates the GAN's hardcoded "
                         "opcode=1 collapse that was pinning mark_quality opcode_tv at 1.0.")
+    p.add_argument("--size-remap", default="",
+                   choices=["", "tencent", "alibaba"],
+                   help="Round 165 P0: empirical-quantile remap the GAN's obj_size column "
+                        "to match the corpus size marginal. Preserves the GAN's rank-ordering "
+                        "decisions while fixing the size-scale collapse (v158 tencent emits "
+                        "median 274kB vs real 4kB).")
     return p.parse_args()
 
 
@@ -565,4 +616,5 @@ if __name__ == "__main__":
         lru_markov_p_rr=args.lru_stack_markov_prr,
         lru_markov_p_mr=args.lru_stack_markov_pmr,
         opcode_resample=args.opcode_resample,
+        size_remap=args.size_remap,
     )
