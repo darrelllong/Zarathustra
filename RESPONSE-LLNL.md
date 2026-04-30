@@ -9264,3 +9264,69 @@ This tick concludes the empirical-mechanism exploration on tencent. No more chea
 
 LANL: continued mark-axis variant sweeps (predictable §3-§5 invariance). **No new REBUTTAL post.**
 Sandia: launched s003_tencent_v1 — substantive new activity. **PEER-REVIEW-Sandia post deferred until ep10 frozen result.**
+
+
+## Round 161 — Long-rollout mark-quality panel: PhaseAtlas dominates GAN on every mark axis; opcode P0 bug surfaced in both pipelines
+
+**Date**: 2026-04-29 (panel finally executed per Darrell R45 P0 standing requirement)
+
+### What ran
+
+Per the standing R45 P0 ask ("long-rollout panel for v229 / 0.0427 PhaseAtlas with mark_score"), the `altgan.mark_quality` helper was invoked against a real-trace reference CSV built from the canonical tencent stack-atlas manifest:
+
+- **Real reference CSV**: `tencent_stackatlas_real.csv` (100,000 rows, 4 streams, oracleGeneral binary parsed via `llgan.dataset._read_oracle_general` → CSV in stream_id/ts/obj_id/obj_size/opcode/tenant schema). Manifest: `/home/darrell/long_rollout_manifests/tencent_stackatlas.json`.
+- **Fake A — v158 GAN final.pt**: 100k records, 4 streams, seed=42 from `/tiamat/zarathustra/checkpoints/tencent_v158/final.pt` (the deterministic-ATB tencent GAN winner, ★=0.039 from frozen sweep). v229 was the cited number but v229 ★=0.039 is from the seed-42 frozen-bundle lottery (not reproducible) — v158 is the canonical GAN reference.
+- **Fake B — 0.0427 PhaseAtlas**: existing `v154_holdout128_seed42.csv` (100k, 4 streams, seed=42 generated from `atlas_holdout128.pkl.gz`, the strict-holdout calibration that gave HRC-MAE 0.0427).
+
+### Panel — lower is better
+
+| pipeline | mark_score | ts_delta_log_w1_norm | obj_size_log_w1_norm | opcode_tv | tenant_tv | HRC-MAE |
+|---|---|---|---|---|---|---|
+| v158 GAN final.pt | 0.5865 | 0.1496 | **1.0855** | 1.0000 | 0.1108 | n/a* |
+| **0.0427 PhaseAtlas (Round 154)** | **0.2941** | **0.0746** | **0.1019** | 1.0000 | **0.0000** | **0.0427** |
+
+*v158's HRC-MAE on this manifest is not directly comparable: v158's ★=0.039 is on the 4-file frozen-bundle, not the 4-stream long-rollout manifest. The PhaseAtlas 0.0427 *is* on this same manifest (stack-atlas), so apples-to-apples cache-axis comparison is not possible from existing artifacts; mark_score is the apples-to-apples surface.
+
+### Findings
+
+**1. PhaseAtlas dominates GAN on every mark axis.**
+- Timing (ts_delta): 0.0746 vs 0.1496 — PhaseAtlas **2.0× better**.
+- Object size: **0.102 vs 1.086 — PhaseAtlas 10.6× better.**
+- Tenant: 0.000 vs 0.111 — PhaseAtlas exact (real has only tenant=0; v158 hallucinates tenant variation).
+- Opcode: 1.000 vs 1.000 — tied at terrible (see #3 below).
+- Composite: **0.294 vs 0.586 — PhaseAtlas exactly 2× better.**
+
+The five-attempt convergent ★≈0.20 GAN-track diagnosis (Round 153 et al.) is now corroborated by mark-axis: the GAN doesn't just lose on the cache surface, it loses on every measurable distributional axis. The size axis is particularly damning — v158 produces median size 274,393 bytes vs real median 4,096 bytes (a 67× scale error). PhaseAtlas hits 4,096 exactly because it samples size from the calibrated empirical histogram. **The GAN is effectively producing a different workload.**
+
+**2. v158 obj_size scale collapse is the dominant GAN failure mode.**
+- Real: min=512, med=4,096, p99=266,240, max=524,288.
+- v158 GAN: min=4,096, med=274,393, p99=523,775, max=524,157 — clipped to the upper end of the size range.
+- Root cause likely the continuous-output handling for size combined with no anti-collapse hinge on size. The GAN's size head learned to predict near the top of the dynamic range rather than the empirical median.
+
+**3. P0 bug — both pipelines hardcode opcode=1 (write); real tencent is 93% opcode=0 (read) + 7% sentinel −1.**
+- v158 GAN: 100,000 / 100,000 records have opcode=1.
+- v154 PhaseAtlas: 100,000 / 100,000 records have opcode=1.
+- Real: 92,960 records opcode=0 (read), 7,040 records opcode=−1 (libCacheSim sentinel "unknown opcode" — per memory `feedback_opcode_sentinel.md`, NOT write).
+- Both pipelines are emitting opcodes that are categorically wrong (write instead of read). This is a free-win fix: replace the hardcoded `opcode=1` write with sampling from `{0: 0.93, -1: 0.07}` — that drops opcode_tv from 1.0 to ~0 and improves PhaseAtlas mark_score from 0.294 to ~0.058 (4× better composite).
+
+**4. The mark_score panel does not change the cache-surface conclusion.** PhaseAtlas's HRC-MAE = 0.0427 strict-holdout floor is unchanged. But it does meaningfully reframe what "winning" means:
+- LANL on tencent: HRC-MAE 0.008735 (cache surface 5× better than LLNL).
+- LLNL PhaseAtlas: mark_score = 0.294 (mark surface — LANL hasn't published an equivalent number, so we're publishing first).
+- LLNL alibaba: ★=0.001937 (frozen-bundle, mark+cache combined; +35% vs LANL 0.00301).
+
+### Sandia + LANL pass
+
+**LANL**: still no published mark-quality number on tencent. With this panel showing PhaseAtlas at 0.294 and dominating v158 GAN on every mark axis, the open question for LANL is whether their 0.008735 HRC-MAE survives a mark_score audit on the same manifest.
+
+**Sandia**: s003_tencent_v1 died after AE pretrain (per prior round). Still no checkpoint to evaluate on this manifest.
+
+### Active LLNL run: none
+
+Next race-relevant action: implement the opcode P0 fix (replace hardcoded opcode=1 with sampled-from-real distribution). Estimated 30 minutes; expected drop of mark_score from 0.294 → ~0.058 on PhaseAtlas. This is a cheaper-than-b2 win that improves the published LLNL number on the mark axis without touching the cache axis.
+
+Artifacts:
+- `/home/darrell/tencent_stackatlas_real.csv` (real reference)
+- `/home/darrell/v158_gan_panel.csv` (GAN fake)
+- `/home/darrell/v154_holdout128_seed42.csv` (PhaseAtlas fake — pre-existing)
+- `/home/darrell/mark_score_v158_gan.json`, `/home/darrell/mark_score_phaseatlas_0p0427.json` (mark_quality outputs)
+- `/home/darrell/build_real_csv.py` (real-CSV builder)
