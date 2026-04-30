@@ -426,6 +426,11 @@ class PhasePMFAtlas:
         phase_window: int = PHASE_WINDOW,
         burst_prob: float = 0.0,
         burst_pool_size: int = 20,
+        # IDEA #121: ports of LANL altgan/neural_atlas.py knobs that produce
+        # the LANL tencent ATB HRC-MAE=0.008735. See RESPONSE-LLNL.md Round 148.
+        local_prob_power: float = 1.0,                # power transform on per-phase fine PMF
+        force_phase_schedule: bool = False,           # cycle phase by step position vs. unique-rate
+        stack_rank_phase_scales: Optional[List[float]] = None,  # per-phase rank multiplier
     ) -> "list[dict]":
         rng = np.random.default_rng(seed)
         per_stream = int(np.ceil(n_records / n_streams))
@@ -450,8 +455,14 @@ class PhasePMFAtlas:
 
             for step in range(per_stream):
                 # Determine current phase
-                pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
-                pb = min(pb, self.n_phase_bins - 1)
+                # IDEA #121: when force_phase_schedule is on, cycle phase deterministically
+                # by step position (LANL behaviour). Otherwise use unique-rate window (LLNL default).
+                if force_phase_schedule and self.n_phase_bins > 1:
+                    pb = (step * self.n_phase_bins) // per_stream
+                    pb = min(pb, self.n_phase_bins - 1)
+                else:
+                    pb = int(np.searchsorted(self.phase_edges, current_rate, side="right"))
+                    pb = min(pb, self.n_phase_bins - 1)
 
                 # Reuse decision: prefer eval_phase_rr (from actual eval streams)
                 # over coarse reuse_adj (BIT training ratios).
@@ -501,6 +512,15 @@ class PhasePMFAtlas:
                         fine_pmf = fine_pmf / fine_pmf.sum()
                     else:
                         fine_pmf = effective_fine_pmf / effective_fine_pmf.sum()
+                    # IDEA #121: power transform on the fine PMF (LANL local_prob_power).
+                    # power < 1 sharpens peaks; power > 1 flattens. Renormalize after.
+                    if local_prob_power != 1.0 and local_prob_power > 0.0:
+                        fine_pmf = np.power(np.maximum(fine_pmf, 0.0), local_prob_power)
+                        _s = fine_pmf.sum()
+                        if _s > 0:
+                            fine_pmf = fine_pmf / _s
+                        else:
+                            fine_pmf = effective_fine_pmf / effective_fine_pmf.sum()
                     # IDEA #67: burst injection — redirect a reuse to the hot pool
                     # instead of sampling from the fine PMF. Preserves total reuse rate;
                     # shifts HRC mass from large ranks to small ranks to match working-set bursts.
@@ -516,6 +536,14 @@ class PhasePMFAtlas:
                         lo_eff = min(lo, stack_sz - 1)
                         hi_eff = min(hi, stack_sz - 1)
                         rank = int(rng.integers(lo_eff, hi_eff + 1))
+                    # IDEA #121: per-phase rank multiplicative scaling (LANL
+                    # stack_rank_phase_scales). Late-phase scales >1.0 push the
+                    # rank deeper into the LRU stack, biasing toward less-recent objects.
+                    if stack_rank_phase_scales is not None and len(stack_rank_phase_scales) > 0:
+                        _scale_idx = min(pb, len(stack_rank_phase_scales) - 1)
+                        _scale = float(stack_rank_phase_scales[_scale_idx])
+                        if _scale != 1.0:
+                            rank = int(min(round(rank * _scale), max(len(stack) - 1, 0)))
                     obj_id = stack[rank]
                     del stack[rank]
                     stack.insert(0, obj_id)
@@ -576,6 +604,11 @@ def cmd_generate(args):
     print(f"Loading model from {args.model} ...")
     model = PhasePMFAtlas.load(args.model)
     print(f"Generating {args.n:,} events across {args.n_streams} streams ...")
+    # IDEA #121: parse stack_rank_phase_scales as a comma-list float vector
+    _srps = getattr(args, "stack_rank_phase_scales", None)
+    _srps_list: Optional[List[float]] = None
+    if _srps:
+        _srps_list = [float(x) for x in _srps.split(",") if x.strip()]
     rows = model.generate(
         args.n,
         n_streams=args.n_streams,
@@ -584,6 +617,9 @@ def cmd_generate(args):
         phase_window=args.phase_window,
         burst_prob=getattr(args, "burst_prob", 0.0),
         burst_pool_size=getattr(args, "burst_pool_size", 20),
+        local_prob_power=getattr(args, "local_prob_power", 1.0),
+        force_phase_schedule=bool(getattr(args, "force_phase_schedule", False)),
+        stack_rank_phase_scales=_srps_list,
     )
     df = pd.DataFrame(rows)
     df.to_csv(args.output, index=False)
@@ -670,6 +706,16 @@ def main():
                       help="IDEA #67: probability of hot-pool burst replay per step")
     pgen.add_argument("--burst-pool-size", type=int, default=20,
                       help="IDEA #67: working-set pool size for burst injection")
+    pgen.add_argument("--local-prob-power", type=float, default=1.0,
+                      help="IDEA #121 (LANL knob port): power transform on per-phase fine PMF "
+                           "(power<1 sharpens, >1 flattens). LANL-best for tencent: 0.8")
+    pgen.add_argument("--force-phase-schedule", action="store_true",
+                      help="IDEA #121 (LANL knob port): cycle phase deterministically by step "
+                           "position instead of unique-rate window. LANL-best: True")
+    pgen.add_argument("--stack-rank-phase-scales", type=str, default="",
+                      help="IDEA #121 (LANL knob port): comma-list of per-phase rank multipliers "
+                           "(e.g. '1.0,1.0,1.1,1.1' = scale ranks +10%% in late phases). "
+                           "LANL-best for tencent: 1.0,1.0,1.1,1.1")
 
     pcal = sub.add_parser("calibrate-from-json",
                           help="Build/update nophase atlas from eval JSON calibration")
