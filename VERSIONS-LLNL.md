@@ -7063,3 +7063,47 @@ R172 b2-inline running on tencent now (background `b3r94brxw`).
 - `fe73e22` Round 171 cond-normalization fields + flow
 - `d0694f5` Round 171 result writeup
 - `14f6f7c` Round 172 inline-cond + writeup
+
+
+## Round 173-174 — b2 tencent inline-cond lands HRC-MAE 0.0206; state-space expansion (24 vs 6) closed-marginal
+
+### v173 (b2 tencent, 6-state, inline-cond, ep600, hidden=96) — HRC-MAE 0.0206
+
+Same architecture as v172 alibaba, retrained on 237 tencent files × 25k records. trans_loss 1.79 → 1.068 (higher floor than alibaba 0.92 because tencent files are more uniform in profile, less per-file variance for cond to predict).
+
+Result on `tencent_stackatlas` (100k records, 4 streams, seed=42):
+- HRC-MAE **0.0206** (R154 PhaseAtlas: 0.0427; LANL: 0.008735)
+- reuse 0.637 / real 0.615
+- P50 52 / real 60; P90 156 / real 174; footprint 9073 / real 9627
+
+**Tencent gap to LANL: 5× → 2.4×.** First competitive LLNL tencent HRC-MAE.
+
+### v174 (b2 alibaba, 24-state with 4-bin phase, ep600, hidden=96) — closed-MARGINAL
+
+State expansion: state = `phase_bin*N_DIST_STATES + dist_state` for n_phase_bins=4 → 24 states. Phase quartile edges fitted from training-data running-unique-rate windows: `[0.63, 0.84, 0.995]` (29,625 windows).
+
+Two rank-PMF strategies tested:
+- per-phase rank PMF: HRC-MAE **0.0238**, P50 25, P90 217 (catastrophic — fragmented PMFs)
+- marginal rank PMF (sum over phases of same dist_state): HRC-MAE **0.0120**, P50 170, P90 1340
+
+Both worse than R172's 6-state HRC-MAE 0.0069 / P50 190 / P90 1379. Per-stream reuse is *better* in 24-state (s1/s3 essentially perfect 0.0030/0.0021), but rank fidelity regresses.
+
+**Verdict closed-MARGINAL.** cond already carries the per-stream signal; adding phase to the state space is redundant. Generate-time phase forcing means net's phase prediction is overridden, leaving only dist_state | prev_state, cond as the learned signal — same as 6-state.
+
+### Standing race position after R173-174
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout** | **0.0069 (R172 6-state)** | 0.001826 | 3.8× |
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173)** | 0.008735 | 2.4× |
+| alibaba ★ frozen-bundle | 0.001937 (v195) | — | LLNL only |
+| tencent ★ frozen-bundle | 0.039 (v229 lottery) | — | n/a |
+
+LLNL has closed the order-of-magnitude HRC-MAE gap on **both** corpora (5×→2.4× tencent, 137×→3.8× alibaba) in 4 round-rounds (R170-173) — about 2 hours of focused work.
+
+### Code changes
+
+- `c8a2002` Round 173 tencent b2-inline writeup
+- `602c5ac` Round 174 state-space expansion scaffolding
+- `8a8f70a` Round 174 closed-marginal writeup
+- `1b7ce3e` VERSIONS-LLNL R170-172 post-mortem
