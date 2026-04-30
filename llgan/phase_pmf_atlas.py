@@ -467,6 +467,10 @@ class PhasePMFAtlas:
         local_prob_power: float = 1.0,                # power transform on per-phase fine PMF
         force_phase_schedule: bool = False,           # cycle phase by step position vs. unique-rate
         stack_rank_phase_scales: Optional[List[float]] = None,  # per-phase rank multiplier
+        # Round 167 P0: per-stream reuse override (closes the alibaba 3.9× gap
+        # exposed in Round 163; alibaba files are bimodal in reuse profile and
+        # a single global rate over-/under-calls each stream).
+        per_stream_reuse_rate: Optional[List[float]] = None,
     ) -> "list[dict]":
         rng = np.random.default_rng(seed)
         per_stream = int(np.ceil(n_records / n_streams))
@@ -512,8 +516,13 @@ class PhasePMFAtlas:
                     pb = min(pb, self.n_phase_bins - 1)
 
                 # Reuse decision: prefer eval_phase_rr (from actual eval streams)
-                # over coarse reuse_adj (BIT training ratios).
-                if reuse_rate_override >= 0.0:
+                # over coarse reuse_adj (BIT training ratios). Per-stream rate
+                # (R167) takes priority over the global override.
+                if (per_stream_reuse_rate is not None
+                        and stream_id < len(per_stream_reuse_rate)
+                        and per_stream_reuse_rate[stream_id] >= 0.0):
+                    rr = float(per_stream_reuse_rate[stream_id])
+                elif reuse_rate_override >= 0.0:
                     rr = reuse_rate_override
                 else:
                     eval_rr_map = getattr(self, "eval_phase_rr", None)
@@ -657,6 +666,12 @@ def cmd_generate(args):
     _srps_list: Optional[List[float]] = None
     if _srps:
         _srps_list = [float(x) for x in _srps.split(",") if x.strip()]
+    # R167: parse per-stream reuse rate vector
+    _psr = getattr(args, "per_stream_reuse_rate", "")
+    _psr_list: Optional[List[float]] = None
+    if _psr:
+        _psr_list = [float(x) for x in _psr.split(",") if x.strip()]
+        print(f"Per-stream reuse rates: {_psr_list}")
     rows = model.generate(
         args.n,
         n_streams=args.n_streams,
@@ -668,6 +683,7 @@ def cmd_generate(args):
         local_prob_power=getattr(args, "local_prob_power", 1.0),
         force_phase_schedule=bool(getattr(args, "force_phase_schedule", False)),
         stack_rank_phase_scales=_srps_list,
+        per_stream_reuse_rate=_psr_list,
     )
     df = pd.DataFrame(rows)
     df.to_csv(args.output, index=False)
@@ -820,6 +836,12 @@ def main():
                       help="IDEA #121 (LANL knob port): comma-list of per-phase rank multipliers "
                            "(e.g. '1.0,1.0,1.1,1.1' = scale ranks +10%% in late phases). "
                            "LANL-best for tencent: 1.0,1.0,1.1,1.1")
+    pgen.add_argument("--per-stream-reuse-rate", type=str, default="",
+                      help="Round 167 P0: comma-list of per-stream reuse rates "
+                           "(e.g. '0.7567,0.0030,0.3767,0.0034' for 4 streams). "
+                           "Overrides --reuse-rate when provided. Closes the alibaba "
+                           "single-rate failure mode (R163) where the manifest's per-file "
+                           "reuse heterogeneity blew the global rate.")
 
     pcal = sub.add_parser("calibrate-from-json",
                           help="Build/update nophase atlas from eval JSON calibration")

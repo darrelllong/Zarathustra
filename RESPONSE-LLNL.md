@@ -9659,3 +9659,67 @@ Picking (1) per-file conditioning next. The tencent gap on cache-fidelity is the
 Artifacts (vinge):
 - `/home/darrell/v158_gan_full_postfix.csv` (GAN with all three post-hoc fixes)
 - `/home/darrell/mark_score_v158_full.json`
+
+
+## Round 167 — Per-stream reuse alone closed-FAILED at HRC-MAE 0.0219 (3× worse than R163's single-rate 0.0071); per-file conditioning needs full per-stream calibration
+
+**Date**: 2026-04-30 13:15 PDT (Round 166 pivot to actual race lever)
+
+### What ran
+
+Hypothesis: alibaba's per-file reuse heterogeneity (R163: streams [0.7567, 0.0030, 0.3767, 0.0034]) is the architectural bottleneck. Wired `--per-stream-reuse-rate R0,R1,...` into `phase_pmf_atlas generate` so the reuse decision per record uses the stream-specific rate instead of a single global override.
+
+Generated 100k records / 4 streams / seed=42 from the same R163 alibaba atlas (`atlas_alibaba_holdout128_op.pkl.gz`) with the per-stream rates above.
+
+### Result
+
+| recipe | reuse (gen vs real) | footprint (gen vs real) | P50 (gen / real) | P90 (gen / real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R163 single-rate (override 0.2691) | 0.270 / 0.269 | 18251 / 18273 | 114 / 201 | 1225 / 1452 | **0.0071** |
+| **R167 per-stream rates** | 0.285 / 0.269 | 17868 / 18273 | 114 / 201 | 1100 / 1452 | **0.0219** |
+| LANL NeuralAtlas blend=0.5 | 0.265 / 0.269 | n/a | 197 / 201 | 1267 / 1452 | 0.001826 |
+
+Per-stream-reuse-only is **3× WORSE** than the single-rate manifest-aware result. P50/P90 stack-distance mismatch is essentially unchanged. The aggregated reuse rate is fine (0.285 close to 0.269), but the within-stream stack distribution doesn't change because the rank PMF is still global (`corpus_eval_fine_pmf` from the 128-file holdout calibration, applied uniformly across all 4 streams).
+
+### Diagnosis — per-stream conditioning needs both rate AND stack-distance PMF
+
+The 4 manifest streams don't just differ in reuse rate — they differ in *the shape of their stack-distance distribution*:
+- Stream 0 (alibabaBlock_163, reuse=0.76): high-locality, P50 likely small (~100)
+- Stream 1 (alibabaBlock_275, reuse=0.003): essentially unique-per-access, P50 undefined (no reuses to measure)
+- Stream 2 (alibabaBlock_109, reuse=0.38): moderate, P50 likely medium
+- Stream 3 (alibabaBlock_221, reuse=0.003): same as Stream 1
+
+Mixing four streams with the SAME per-bucket PMF (which is the corpus-mean of all 128 holdout files) produces aggregated stack-distances that are intermediate between everyone's true distribution. The single-rate version got a coincidentally-good HRC-MAE because the corpus-mean PMF happens to interpolate decently when reuse is also corpus-mean. Splitting the reuse but keeping the PMF global breaks the interpolation.
+
+LANL's NeuralAtlas conditions transitions per-file via a profile encoder, so each stream gets its OWN distribution shape. That's why their P50 is 197 (close to real 201) while LLNL's stays at 114 across both single-rate and per-stream variants.
+
+### Closed-failed verdict
+
+`--per-stream-reuse-rate` alone is **closed-failed** as a path to closing the alibaba HRC-MAE gap. The per-stream rate signal is necessary but not sufficient.
+
+### What works — full per-stream calibration
+
+For LLNL to legitimately compete on alibaba HRC-MAE without porting LANL's neural transition net, the path is:
+1. Extend `cmd_calibrate_from_json` to accept N calibration JSONs (one per stream).
+2. Each JSON has its OWN `stack_distance_histogram` and `reuse_access_rate`.
+3. Generate switches calibration per stream_id.
+
+The legitimate (non-cheat) source of per-stream calibration JSONs:
+- **(a) Profile-matched holdout** — for each manifest stream, match its trace_characterization features to N similar-profile training files, build a calibration JSON from those. Half-day effort. The per-file characterizations are pre-computed in `/tiamat/zarathustra/analysis/out/trace_characterizations.jsonl`.
+- **(b) Manifest oracle (cheat)** — calibrate each stream from the corresponding manifest file directly. Cheap, but not strict-holdout. Useful as an upper-bound (LLNL's "this is the most we could ever do with this architecture") number to compare against LANL's "manifest oracle 0.00739" baseline in their `RESULTS.md`.
+
+### Active LLNL run: none. Race-relevant queue update
+
+Next move (in priority order):
+1. **(per-stream calibration A)** Build per-stream calibration JSONs via profile-matched holdout. ~half day. Race-changing IF it lands at HRC-MAE < 0.005 on alibaba.
+2. **(per-stream calibration B)** Manifest-oracle calibration per stream — cheat baseline, ~1 hour. Quantifies the LLNL pipeline's architectural ceiling. If this also fails to beat LANL, b2 (multi-day learned-transition port) is the only path.
+3. **(b2)** Multi-day b2 port. Closes both alibaba and tencent gaps.
+
+Picking 2 first — it's a 1-hour validation that determines whether LLNL's PhaseAtlas architecture has any path to compete with LANL's NeuralAtlas at all. If even the cheat baseline doesn't beat 0.005, the whole PhaseAtlas track on alibaba is closed.
+
+### Sandia + LANL pass
+
+No active processes on vinge (GPU 0%). No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/v_alibaba_perstream.csv` (per-stream reuse fake)
