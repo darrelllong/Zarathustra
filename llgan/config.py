@@ -169,6 +169,18 @@ class Config:
     # generate.py and long_rollout_eval.py. Requires --retrieval-memory.
     retrieval_train_carry: bool = False
 
+    # IDEA #118: chain-diversity hinge loss on obj_id_stride variance.
+    # v235 ep5/ep10 diagnostic showed lru_fp collapsing 51→33 under IDEA #117+#116
+    # — chained generation converges to a small object set. obj_id_stride variance
+    # is the differentiable surrogate for "decoder sees N distinct objects." Hinge
+    # against variance below target. Requires --long-chain-weight > 0 to take
+    # effect (reuses long_chain_windows for K).
+    chain_diversity_weight: float = 0.0      # 0=off; try 0.5–2.0 alongside long-chain
+    chain_diversity_target: float = 1.0      # target variance floor in feature-space
+                                             # (post-R() obj_id_stride). Real tencent
+                                             # signed-log strides have var ~0.5-1.5;
+                                             # 1.0 is a sane starting target.
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):

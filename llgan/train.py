@@ -1951,6 +1951,14 @@ def train(cfg: Config) -> None:
                     _h_lc = None
                     _r_lc = None
                     _lc_reuse_chunks = []
+                    # IDEA #118: also collect obj_id_stride for the diversity loss
+                    # if --chain-diversity-weight is on. The v235 lru_fp 51→33
+                    # collapse showed the chained generator converging to a small
+                    # object set; obj_id_stride variance is the differentiable
+                    # surrogate for "how many distinct objects the decoder sees."
+                    _div_w = float(getattr(cfg, "chain_diversity_weight", 0.0))
+                    _div_collect = (_div_w > 0.0 and stride_col >= 0)
+                    _lc_stride_chunks: list = [] if _div_collect else None
                     for _lci in range(_lc_K):
                         _z_ll = G.sample_z_local(B, cfg.timestep, device)
                         if _h_lc is None:
@@ -1975,6 +1983,8 @@ def train(cfg: Config) -> None:
                                                   hidden=_h_lc, return_hidden=True)
                         _feat_lc = R(_H_lc)                       # decode to feature space
                         _lc_reuse_chunks.append(_feat_lc[:, :, obj_id_col])  # (B, T)
+                        if _div_collect:
+                            _lc_stride_chunks.append(_feat_lc[:, :, stride_col])
                     _lc_reuse_all = torch.cat(_lc_reuse_chunks, dim=1)       # (B, K*T)
                     # Hybrid surrogate: correct gradient everywhere in (-∞, +∞)
                     _lc_neg = torch.sigmoid(_lc_reuse_all * _T_sr)
@@ -1985,6 +1995,23 @@ def train(cfg: Config) -> None:
                     _lc_target = getattr(cfg, 'reuse_rate_target', 0.265)
                     loss_long_chain = (_lc_rate - _lc_target) ** 2
                     g_loss = g_loss + _lcw * loss_long_chain
+
+                    # IDEA #118: chain-diversity loss on obj_id_stride.
+                    # v235 ep5/ep10 diagnostic showed lru_fp collapsing 51 → 33
+                    # under IDEA #117 + #116 — model converges to a small object
+                    # set in long rollout. The proximate symptom is low obj_id_stride
+                    # variance across the K*T-step chain (consecutive small strides
+                    # cycle through the same handful of objects in the LRU stack).
+                    # Penalty: hinge-loss against per-batch stride variance dropping
+                    # below --chain-diversity-target. Differentiable, no decoder.
+                    if _div_collect:
+                        _lc_stride_all = torch.cat(_lc_stride_chunks, dim=1)  # (B, K*T)
+                        # Per-batch variance across K*T positions (B,)
+                        _stride_var = _lc_stride_all.var(dim=1)
+                        _div_target = float(getattr(cfg, "chain_diversity_target", 1.0))
+                        # Hinge: only penalize when variance is BELOW target.
+                        loss_chain_div = torch.clamp(_div_target - _stride_var, min=0.0).mean()
+                        g_loss = g_loss + _div_w * loss_chain_div
 
                 # L_retrieval_bce: supervise RetrievalMemory's p_reuse gate
                 # (IDEAS.md #17).  The gate emits a per-step [0,1] probability
@@ -3168,6 +3195,16 @@ def parse_args() -> Config:
                         "(addresses Gemini Round 3 P1 #2 — bank is never saturated during "
                         "T=12 windows otherwise). Requires --retrieval-memory and "
                         "--long-chain-weight > 0 to take effect.")
+    p.add_argument("--chain-diversity-weight", type=float, default=0.0,
+                   help="IDEA #118: weight for obj_id_stride variance hinge loss on the "
+                        "K*T-step chained output (0=off; try 0.5-2.0). Penalises chain "
+                        "stride variance dropping below --chain-diversity-target. "
+                        "Targets the v235 lru_fp 51→33 collapse symptom directly. "
+                        "Requires --long-chain-weight > 0 to take effect.")
+    p.add_argument("--chain-diversity-target", type=float, default=1.0,
+                   help="IDEA #118: target variance floor for obj_id_stride across the "
+                        "long-chain output. Real tencent signed-log strides have var "
+                        "~0.5-1.5; 1.0 is a sane starting target.")
     args = p.parse_args()
 
     cfg = Config()
@@ -3306,6 +3343,8 @@ def parse_args() -> Config:
     cfg.long_chain_weight            = args.long_chain_weight
     cfg.long_chain_windows           = args.long_chain_windows
     cfg.retrieval_train_carry        = args.retrieval_train_carry
+    cfg.chain_diversity_weight       = args.chain_diversity_weight
+    cfg.chain_diversity_target       = args.chain_diversity_target
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
