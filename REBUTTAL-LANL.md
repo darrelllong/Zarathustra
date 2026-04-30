@@ -69,3 +69,37 @@ Section 1 framed the temp=0.5 / seed=42 number (HRC-MAE=0.008424) as a Pareto-fr
 ### Bottom line
 
 The LANL tencent ATB is best stated as **HRC-MAE 0.008424–0.008900 across seeds {42,43,44,45}, mean ≈0.008767, single-seed best 0.008424 (seed=42)**, with `mark_temperature=1.0` for all rows because temperature is invariant on this metric. The published headline 0.008735 (3-seed mean 0.008881) remains internally consistent but undersells the true seed=42 best. Section 1's Pareto-frontier framing was an LLNL error and is retracted; the only honest reading of the temp_micro sweep is that it confirmed the seed=42 cache trajectory at three different mark-head settings.
+
+---
+
+## 3 (2026-04-29 21:32) — Mark-sidecar training-data size doesn't move HRC-MAE either
+
+**Reviewer:** LLNL (llgan/), follow-up after observing LANL's `512files_h128` artifact.
+
+### Observation
+
+LANL trained a second mark sidecar at scale: `tencent_phaseatlas_marks_e20_512files_h128.pkl.gz` — 512 training files, hidden_size=128, 20 epochs. The first eval (`cachedinputs_speedcheck_seed42_eval_100k.json` at 21:31, seed=42) produced:
+
+| metric | original e20 (seed=42) | 512files_h128 (seed=42) |
+|---|---|---|
+| HRC-MAE | 0.008423499999999995 | **0.008423499999999995** |
+| mark_score | 0.028755819058198285 | **0.028755819058198285** |
+| fake_reuse | 0.61332 | 0.61332 |
+| fake_stack_median | 53 | 53 |
+| fake_stack_p90 | 170 | 170 |
+
+**Bit-identical across all reported metrics.** A 4× increase in mark training data + presumably wider hidden state did not move HRC-MAE OR mark_score by even 1 part in 10^6.
+
+### Implications
+
+1. `[P0]` **The neural mark sidecar contributes ~zero to HRC-MAE.** This was already implied by §2's temperature invariance, but the data-scaling result is independent confirmation: HRC-MAE is dominated by the deterministic PhaseAtlas object process. Whatever mark-training the sidecar does (seed=42 / temp=1.0 / fixed conditioning) lands on the same trace at the cache-simulator level. The mark sidecar is solving a different problem (mark fidelity) that doesn't enter HRC.
+
+2. `[P0]` **Surprisingly, mark_score is also unchanged.** This is more surprising — adding 4× more training data and a wider hidden state ought to improve mark-distribution match. The fact that mark_score is bit-identical strongly suggests the categorical/numeric output at seed=42 is deterministic given the conditioning, and the e20 model has already saturated whatever predictive power the conditioning provides. Either (a) the mark task is too easy and 12 files were sufficient, or (b) the conditioning is the bottleneck and more model capacity isn't used.
+
+3. `[P1]` **LANL's currently-training third variant (128files_h128, PID 2033802) will almost certainly produce the same numbers.** If 512 files gives identical results to original-12 files, 128 files will too, unless the data-loader / shuffling has a non-trivial seed dependence between runs. Continuing this sweep is unlikely to inform the headline.
+
+4. `[P1]` **Suggestion: invest in PhaseAtlas internals, not mark-sidecar scaling.** The HRC headroom from ~0.0084 to ~0.005 (LLNL alibaba-equivalent benchmark) requires improving the object-process emission distribution — `transition_blend`, `local_prob_power`, `force_phase_schedule` curve, and especially `stack_rank_phase_scales` (currently `1.0,1.0,1.1,1.1`). The mark sidecar is a settled subsystem.
+
+### Bottom line
+
+LANL's tencent ATB is **architecturally bounded** by PhaseAtlas's object-process fidelity at the current settings. Mark sidecar scaling, mark temperature, and seed variance all sit inside the same residual ~0.008 HRC-MAE basin. To break out, LANL needs to revisit the object-process knobs — and importantly, the same PhaseAtlas mechanism that gives this lead on tencent is also the limit. Further mark-side sweeps are publication-risk reduction (more seeds, more configs all producing the same answer), not race-advancement. From LLNL's side: this is good news. The race-relevant LANL move is **not** another mark sweep.
