@@ -9050,3 +9050,60 @@ I'll start with the file skeleton + constants + state encoding + class definitio
 LANL pushed `af29a4c Add LANL code map and long-tail controls` — they're adding a code map (mirroring my MAP-LLNL.md, parallel structural docs across labs) plus long-tail controls in altgan. Worth a peek next tick but not race-relevant for LLNL's tencent path. **No new REBUTTAL post.**
 
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 156 — Markov atlas b1 (empirical, no learned transitions) closed-FAILED at HRC-MAE 0.060
+
+**Date**: 2026-04-30 11:18 PDT
+
+### Three-experiment trail in one tick
+
+Round 155 committed to writing the Markov atlas port. This tick shipped it: ~330-line `llgan/markov_atlas.py` (commit `699c6c4`) implementing the empirical-Markov b1 path. Three experiments run end-to-end:
+
+| recipe | states with mass | HRC-MAE | vs PhaseAtlas baseline |
+|---|---|---|---|
+| **v122 v1**: 192-state (time × size × action × phase) | 2/192 | 0.0821 | 1.9× WORSE |
+| **v122 v2**: 12-state (action × phase, fixed phase edges [0.25,0.5,0.75]) | 1/12 | 0.0821 | 1.9× WORSE (no improvement) |
+| **v122 v3**: 12-state (action × phase, fitted phase quartiles from data) | 1/12 | **0.0596** | **1.4× WORSE** |
+
+vs PhaseAtlas single-phase + N=128 calib (Round 154): **HRC-MAE 0.0427**.
+
+### Diagnosis
+
+Two structural degeneracies on tencent:
+
+1. **time and size dimensions collapse**: tencent timestamps are integer ticks (most consecutive diffs = 0, `np.maximum(., 1e-9)` clamps to floor). Sizes cluster at 4-8KB. Quartile edges all stack at the floor → `time_bin = size_bin = 0` always. So the 192-state encoding is effectively action × phase = 12.
+
+2. **phase definition collapses**: unique-rate over a 200-event window distributes tightly around 0.39 for tencent. Even with quartile-fitted phase edges, ~all observations fall into the median bin. Only 1 of 12 states accumulates significant mass.
+
+The Markov chain therefore reduces to a single-state generator with global action and rank distributions. That's the same shape as PhaseAtlas's calibrated single-phase atlas, but with looser rank-bucket sampling (worse P50=116 vs real 60, P90=2534 vs real 174).
+
+### Verdict — b1 (empirical-Markov, no learned transitions) closed-FAILED on tencent
+
+The cheaper port path doesn't reach PhaseAtlas baseline. The LANL `altgan/neural_atlas.py` advantage on tencent therefore comes from BOTH:
+- The compound state machine (which LLNL's port now has, but is degenerate without good phase structure)
+- The **learned conditional transition net** that creates richer conditional structure than empirical counting can capture from a degenerate state space
+
+To improve over PhaseAtlas baseline on tencent, LLNL needs option **b2 — the full learned-transition port**. This is multi-day work: implement `_CondTransitionNet`, training loop on `(cond, state, next_state)` triples, evaluation pipeline. ~1000-1500 lines.
+
+Alternative cheaper experiment before committing to b2: **redesign the phase signal** for tencent. The current unique-rate-window phase is alibaba-tuned. A tencent-specific phase definition (e.g. recent-reuse-rate window, or stack-distance percentile shift over time) might give the empirical-Markov path enough state variation to beat 0.04.
+
+### Decision
+
+**b1 closed-failed**. Three options remain (in cost order):
+- **(c1) Tencent-specific phase definition** + reuse current b1 code: ~1 hour to design + refit + eval. Cheap test of whether b1 can be fixed by phase redesign alone.
+- **(c2) Per-state rank-bucket fine-grain**: replace 8 bucket coarse PMF with 30 fine bins (matching PhaseAtlas's fine bin scheme). May help P50/P90 even with degenerate state. ~30 min code change + refit + eval.
+- **(b2) Full learned-transition port**: multi-day commitment. Justified only after c1/c2 both fail.
+
+**Recommendation**: c2 (cheapest, most direct attack on the rank-distribution mismatch P50=116 vs 60). Then c1 if c2 fails. Then b2 if both fail.
+
+### Race position
+
+LLNL tencent legitimate strict-holdout HRC-MAE remains **0.0427** (PhaseAtlas N=128, Round 154). Markov atlas b1 = 0.060 (closed-failed). Gap to LANL 0.008735 stays **5×**.
+
+### Sandia + LANL pass
+
+- Sandia: idle (Round 20 LANL still notes Sandia config-only; nothing actionable). **No new PEER-REVIEW post.**
+- LANL: continued mark-axis sweeps + new code map (`af29a4c`). **No new REBUTTAL post.**
+
+Active LLNL run: **none**. Next: c2 fine-bin rank PMF in markov_atlas.py.
