@@ -34,6 +34,14 @@ import numpy as np
 # State space: NEW + 5 stack-distance bucket REUSE classes.
 STATE_BUCKET_EDGES = np.array([0, 8, 32, 128, 512, 1 << 30], dtype=np.int64)
 N_DIST_STATES = len(STATE_BUCKET_EDGES)  # 1 NEW + 5 REUSE buckets = 6
+
+# R180: 29 fine bins (matches existing PhaseAtlas eval edges) for AR-rank
+# binning. n_rank_bins = len(FINE_EDGES_R180) - 1 = 29.
+FINE_EDGES_R180 = np.array([
+    1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167, 219, 288,
+    377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323, 5669,
+], dtype=np.int64)
+N_RANK_BINS = len(FINE_EDGES_R180) - 1
 STATE_NEW = 0
 STATE_REUSE_OFFSET = 1
 PHASE_WINDOW = 200  # records per running-unique-rate window
@@ -253,6 +261,46 @@ def make_net(cond_dim: int, hidden: int, n_states: int, dropout: float = 0.0):
     return Net()
 
 
+def make_rank_ar_net(cond_dim: int, hidden: int, n_states: int, n_rank_bins: int, dropout: float = 0.0):
+    """Round 180: AR-rank net.
+
+    Inputs: (cond, dist_state, prev_rank_bin) → rank_bin_logits.
+    Replaces the empirical per-state rank PMF with a learned conditional
+    P(rank_t | dist_state_t, prev_rank_t-1, cond). The history-dependent rank
+    prediction is what b2-light's i.i.d. PMF lookup is missing — closes the
+    overfitting-vs-HRC-MAE tradeoff R175-179 hit.
+    """
+    torch = _torch()
+    import torch.nn as nn
+
+    class RankNet(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.cond_mlp = nn.Sequential(
+                nn.Linear(cond_dim, hidden),
+                nn.SiLU(),
+                nn.Linear(hidden, hidden),
+                nn.SiLU(),
+            )
+            # NEW_FROM_NEW = sentinel for "no prev rank yet" (first step or after NEW)
+            self.prev_rank_emb = nn.Embedding(n_rank_bins + 1, hidden // 2)
+            self.state_emb = nn.Embedding(n_states, hidden // 2)
+            self.head = nn.Sequential(
+                nn.Linear(hidden + hidden // 2 + hidden // 2, hidden),
+                nn.SiLU(),
+                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
+                nn.Linear(hidden, n_rank_bins),
+            )
+
+        def forward(self, cond, dist_state, prev_rank_bin):
+            h_cond = self.cond_mlp(cond)
+            h_state = self.state_emb(dist_state)
+            h_prev = self.prev_rank_emb(prev_rank_bin)
+            return self.head(torch.cat([h_cond, h_state, h_prev], dim=-1))
+
+    return RankNet()
+
+
 @dataclass
 class NeuralAtlas:
     n_states: int
@@ -273,6 +321,12 @@ class NeuralAtlas:
     # unique-rate phase. phase_edges are corpus quantiles fitted at training.
     n_phase_bins: int = 1
     phase_edges: Optional[np.ndarray] = None
+    # Round 180: optional AR-rank net. If non-None, generate samples rank
+    # bins from learned P(rank_t | dist_state_t, prev_rank_t-1, cond) instead
+    # of the empirical rank_pmf_per_state lookup. n_rank_bins matches
+    # rank_edges minus 1.
+    rank_ar_state_dict: Optional[dict] = None
+    rank_ar_hidden: int = 96
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -334,6 +388,9 @@ def fit(
     inline_cond: bool = False,
     n_phase_bins: int = 1,
     dropout: float = 0.0,
+    rank_ar: bool = False,
+    rank_ar_hidden: int = 96,
+    rank_ar_epochs: int = 600,
 ) -> None:
     """Train a CondTransitionNet on (cond, prev_state, next_state) tuples.
 
@@ -387,6 +444,8 @@ def fit(
     transitions: List[Tuple[np.ndarray, int, int]] = []
     initial_states: List[Tuple[np.ndarray, int]] = []
     rank_observations: Dict[int, List[int]] = {s: [] for s in range(n_states)}
+    # Round 180: rank-AR observations: (cond, dist_state, prev_rank_bin, next_rank_bin)
+    rank_ar_obs: List[Tuple[np.ndarray, int, int, int]] = []
 
     for fi, fpath in enumerate(files):
         nm = os.path.basename(fpath)
@@ -427,11 +486,20 @@ def fit(
         for t in range(len(states) - 1):
             transitions.append((cond, int(states[t]), int(states[t + 1])))
 
-        # Per-state rank observations
+        # Per-state rank observations + R180 AR-rank pair observations
+        prev_rank_bin = -1  # sentinel "no prev rank" => sentinel idx N_RANK_BINS
         for i, s in enumerate(states):
             dist_state = int(s) % N_DIST_STATES
             if dist_state >= STATE_REUSE_OFFSET and sd[i] >= 0:
+                this_bin = int(np.searchsorted(FINE_EDGES_R180[1:], int(sd[i]), side="right"))
+                this_bin = min(this_bin, N_RANK_BINS - 1)
                 rank_observations[int(s)].append(int(sd[i]))
+                if rank_ar:
+                    pr_idx = prev_rank_bin if prev_rank_bin >= 0 else N_RANK_BINS
+                    rank_ar_obs.append((cond, dist_state, pr_idx, this_bin))
+                prev_rank_bin = this_bin
+            else:
+                prev_rank_bin = -1  # NEW or non-reuse resets
 
         if fi % 8 == 0:
             print(f"  pass {fi+1}/{len(files)}: {len(transitions):,} transitions accumulated")
@@ -498,6 +566,34 @@ def fit(
             print(f"  ep{ep:>4d}  init_loss={init_loss.item():.4f}  trans_loss={trans_loss.item():.4f}")
 
     state_dict = {k: v.cpu() for k, v in net.state_dict().items()}
+
+    # Round 180: optionally train AR-rank net
+    rank_ar_state_dict_out = None
+    if rank_ar and rank_ar_obs:
+        # Apply same cond normalization to rank-AR observations
+        norm_obs = [(((c - cond_mean) / cond_std).astype(np.float32), ds, pr, nb)
+                    for c, ds, pr, nb in rank_ar_obs]
+        ar_conds = torch.tensor(np.stack([o[0] for o in norm_obs]),
+                                dtype=torch.float32, device=device)
+        ar_dist = torch.tensor([o[1] for o in norm_obs], dtype=torch.long, device=device)
+        ar_prev = torch.tensor([o[2] for o in norm_obs], dtype=torch.long, device=device)
+        ar_next = torch.tensor([o[3] for o in norm_obs], dtype=torch.long, device=device)
+        print(f"Training Rank-AR net on {len(norm_obs):,} observations "
+              f"(hidden={rank_ar_hidden}, epochs={rank_ar_epochs})")
+        rank_net = make_rank_ar_net(
+            COND_DIM, rank_ar_hidden, N_DIST_STATES, N_RANK_BINS, dropout=dropout
+        ).to(device)
+        rank_opt = torch.optim.Adam(rank_net.parameters(), lr=lr)
+        for ep in range(rank_ar_epochs):
+            rank_opt.zero_grad()
+            logits = rank_net(ar_conds, ar_dist, ar_prev)
+            r_loss = F.cross_entropy(logits, ar_next)
+            r_loss.backward()
+            rank_opt.step()
+            if ep % 50 == 0 or ep == rank_ar_epochs - 1:
+                print(f"  rank-ep{ep:>4d}  rank_loss={r_loss.item():.4f}")
+        rank_ar_state_dict_out = {k: v.cpu() for k, v in rank_net.state_dict().items()}
+
     model = NeuralAtlas(
         n_states=n_states,
         cond_dim=COND_DIM,
@@ -510,6 +606,8 @@ def fit(
         cond_std=cond_std,
         n_phase_bins=n_phase_bins,
         phase_edges=phase_edges if len(phase_edges) > 0 else None,
+        rank_ar_state_dict=rank_ar_state_dict_out,
+        rank_ar_hidden=rank_ar_hidden,
         metadata={
             "trace_dir": trace_dir,
             "char_file": char_file,
@@ -520,6 +618,8 @@ def fit(
             "n_transitions": len(transitions),
             "inline_cond": inline_cond,
             "n_phase_bins": n_phase_bins,
+            "rank_ar": rank_ar,
+            "rank_ar_obs": len(rank_ar_obs),
         },
     )
     model.save(output)
@@ -547,6 +647,16 @@ def generate(
     net = make_net(m.cond_dim, m.hidden, m.n_states).to(device)
     net.load_state_dict(m.state_dict)
     net.eval()
+
+    # R180: optional AR-rank net
+    rank_net = None
+    if getattr(m, "rank_ar_state_dict", None) is not None:
+        rank_net = make_rank_ar_net(
+            m.cond_dim, m.rank_ar_hidden, N_DIST_STATES, N_RANK_BINS
+        ).to(device)
+        rank_net.load_state_dict(m.rank_ar_state_dict)
+        rank_net.eval()
+        print("Rank-AR net loaded; using P(rank|state,prev_rank,cond) for rank sampling")
 
     with open(manifest_path) as f:
         manifest = json.load(f)
@@ -602,6 +712,8 @@ def generate(
             current_rate = 0.0
             phase_seen: set = set()
             phase_count = 0
+            # R180: prev_rank_bin tracking for AR-rank sampling
+            prev_rank_bin = N_RANK_BINS  # sentinel "no prev" = idx N_RANK_BINS
 
             for step in range(per_stream):
                 # Decode current state to (phase, dist_state) → action
@@ -610,13 +722,18 @@ def generate(
                     obj_id = next_new_id
                     next_new_id += 1
                     stack.insert(0, obj_id)
+                    prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
                 else:
-                    # R174: use phase-marginalized rank PMF (sum over phase bins
-                    # of states with same dist_state). Decouples phase-conditioned
-                    # transitions from rank decoding so the dist_state's true
-                    # rank distribution drives the rank pick instead of a
-                    # phase-restricted slice that may be heavily skewed.
-                    if n_phase_bins > 1:
+                    # R180: use AR-rank net if available, else fall back to
+                    # empirical PMF (R172/R174 logic).
+                    if rank_net is not None:
+                        ds_t = torch.tensor([dist_state], dtype=torch.long, device=device)
+                        pr_t = torch.tensor([prev_rank_bin], dtype=torch.long, device=device)
+                        with torch.no_grad():
+                            r_logits = rank_net(cond_t, ds_t, pr_t)
+                            pmf = torch.softmax(r_logits / max(temperature, 1e-3), dim=-1).cpu().numpy()[0]
+                    elif n_phase_bins > 1:
+                        # R174: phase-marginalized rank PMF.
                         pmf_acc = np.zeros(len(m.rank_edges) - 1, dtype=np.float64)
                         for pb in range(n_phase_bins):
                             s_pb = pb * N_DIST_STATES + dist_state
@@ -633,6 +750,9 @@ def generate(
                         pmf = np.ones_like(pmf) / len(pmf)
                     pmf = pmf / pmf.sum()
                     fine_i = int(rng.choice(len(pmf), p=pmf))
+                    # R180: track prev_rank for next AR step
+                    if rank_net is not None:
+                        prev_rank_bin = fine_i
                     lo = int(m.rank_edges[fine_i])
                     hi = int(m.rank_edges[fine_i + 1]) - 1 if fine_i + 1 < len(m.rank_edges) else lo
                     stack_sz = len(stack)
@@ -715,6 +835,12 @@ def main():
                            "4 = 24 states with running-unique-rate phase quartiles.")
     pfit.add_argument("--dropout", type=float, default=0.0,
                       help="R179: dropout in cond_mlp + trans_head; regularizes overfitting.")
+    pfit.add_argument("--rank-ar", action="store_true",
+                      help="R180: also train an AR-rank net P(rank|dist_state,prev_rank,cond) "
+                           "that replaces the empirical rank PMF lookup at generate time. "
+                           "Targets the b2-light i.i.d. PMF ceiling.")
+    pfit.add_argument("--rank-ar-hidden", type=int, default=96)
+    pfit.add_argument("--rank-ar-epochs", type=int, default=600)
 
     pgen = sub.add_parser("generate")
     pgen.add_argument("--model", required=True)
@@ -734,6 +860,8 @@ def main():
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
             inline_cond=args.inline_cond, n_phase_bins=args.n_phase_bins,
             dropout=args.dropout,
+            rank_ar=args.rank_ar, rank_ar_hidden=args.rank_ar_hidden,
+            rank_ar_epochs=args.rank_ar_epochs,
         )
     elif args.cmd == "generate":
         generate(
