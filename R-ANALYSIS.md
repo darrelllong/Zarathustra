@@ -839,9 +839,9 @@ R sets
 $$
 \mathrm{split\\_by\\_format} =
 \mathbf{1}\{
-\# \mathrm{formats} > 1
+\\# \mathrm{formats} > 1
 \text{ or }
-\# \mathrm{parsers} > 1
+\\# \mathrm{parsers} > 1
 \}
 $$
 
