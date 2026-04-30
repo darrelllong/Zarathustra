@@ -8115,3 +8115,63 @@ So the data-scaling sweep produces:
 | Tencent | 0.039 (frozen ★, v229 ep10) — **reproducibility OPEN, v234d testing fresh-pretrain** | 0.008424–0.008900 (4-seed HRC-MAE) | not on board |
 
 Active LLNL run: **v234d in Phase 1 AE pretrain**. ETA 3.5h to Phase 3 start.
+
+
+## Round 141 — v234d KILLED at ep10; v229 ATB confirmed non-reproducible from fresh pretrain
+
+**Date**: 2026-04-30 00:09 PDT
+
+### v234d ep10 frozen ★ = 0.19719 — the v229 ATB is run-state-locked
+
+The fresh-pretrain reproduction test (v234d) is the cleanest control we can run for v229. Phase 1+2+2.5 were trained from scratch under current code state, with **better internal metrics than v229's pretrain** (AE recon 0.00001 vs v229's ~0.03; Sup loss 0.035 vs v229's 0.07). Phase 3 used the v229 recipe EXACTLY. Result at ep10:
+
+| | v234d ep10 | v229 ep10 ATB |
+|---|---|---|
+| MMD² | 0.01539 | 0.00553 |
+| β-recall | **0.091** (mode collapse) | 0.710 |
+| α-precision | 0.798 | n/a |
+| **frozen ★** | **0.19719** | **0.039** |
+| train ★ | 0.0889 | 0.081 |
+
+**Verdict: v229 ★=0.039 is NOT reproducible from fresh pretrain under current code.** Train ★ matched v229 within 10%; frozen ★ is **5× worse** than v229. The training-time selector mis-ranks by 2.2× — same pattern as v233 (5.4× mis-rank) and v234 (8× mis-rank).
+
+This is the definitive answer to the reproducibility question Round 137 set up. The v229 ATB was a single-run lottery; the specific (pretrain × Phase 3 trajectory) pair that gave 0.039 on 2026-04-23 cannot be re-created. The honest current LLNL tencent ★ from-scratch is **0.197 (v234d ep10)** — 5× worse than the historical claim, ~23× worse than LANL's 0.008735.
+
+### Implications for the race
+
+1. **LLNL's tencent ATB needs a footnote.** The published 0.039 is no longer a current-code reproducible mechanism; it's a historical numeric target. Race tables should mark it `historical-lottery, not currently reproducible`. The current LLNL from-scratch tencent ★ is 0.197.
+
+2. **No cheap path back to 0.039.** Any v229-recipe variant on current code lands in the same broken basin. We've now eliminated:
+   - cloned-pretrain (v234, v234b, v234c — all W-blew up)
+   - fresh pretrain + identical recipe (v234d — mode collapse, frozen ★=0.197)
+   - long-chain loss + seed=7 (v233 — frozen ★=0.262)
+
+3. **The next move must be structural.** IDEA #117 (retrieval-train-carry) is the queued architectural fix; it requires implementing `--retrieval-train-carry` in `train.py` (threading `retrieval_state` through the main critic/G forward, not just BS/OC sub-losses). Plan: implement, then launch v235 with fresh pretrain under the new mechanism.
+
+4. **The reuse_rate anomaly was a real signal.** v234d Phase 3 reuse_rate was 0.06-0.13 vs v229's 0.55-0.65 — 5-10× lower. This foreshadowed the mode collapse on the frozen bundle. Worth investigating whether the obj_id_reuse signal in real data shifted between v229's training time and now (preprocessor schema, file selection, or a code drift).
+
+### LLNL track summary
+
+Open work, ordered by ETA:
+- (a) Patch LRU diagnostic import error + thread retrieval_state in diagnostic (LANL R1 / Sandia VERSIONS-Sandia L94) — tens of minutes
+- (b) Implement `--retrieval-train-carry` in `train.py` — IDEA #117 — couple of hours
+- (c) Launch v235 with fresh pretrain + IDEA #117 + v229 recipe — 3.5h pretrain + Phase 3
+- (d) If v235 ep10 hits frozen ★ ≤ 0.045, run the long-rollout panel (HRC-MAE / reuse_access / stack_median+p90 / footprint / drift / mark_score) for parity with LANL — ~10 min eval
+- (e) If v235 fails too, the tencent track needs a wholesale architectural reset (possibly fork from PhaseAtlas like LANL did)
+
+### LANL update
+
+Continued catw025 train-seed sweeps (catw025_trainseed{43,44}_seed42 + catw025_trainseed44_confirm seed-{43,44}). Predictable HRC-MAE invariance per §5. No new ATB.
+
+### Sandia update
+
+`03d8560` (2026-04-29 23:27) fixed all LANL Round 4/5 P1 blockers (tempfile import, validation collation, files_per_epoch, missing parser flags, run.py Generator init). Added `MAP-Sandia.md` cognitive map. `d132dd5` (23:32) added LANL Rounds 8/9 (then 10) to PEER-REVIEW-Sandia.md noting "checkpoint gate still red." Sandia hasn't relaunched yet but bug-fixes are landed.
+
+### Race Dashboard (Round 141)
+
+| Corpus | LLNL claimed ATB | LLNL current-code reproducible | LANL ATB | Sandia |
+|--------|------------------|---------------------------------|----------|--------|
+| Alibaba | 0.001937 (v195 ep110, PhaseAtlas path) | 0.001937 (PhaseAtlas; not GAN) | 0.00301 | not yet |
+| Tencent | 0.039 (v229 ep10, GAN; **historical-lottery**) | **0.197 (v234d ep10)** | 0.008735 (3-seed) | not yet |
+
+Active LLNL run: **none** (v234d killed at ep11). Next: implement IDEA #117, then v235.

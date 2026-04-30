@@ -6746,3 +6746,43 @@ The `--lru-cache-depth 15000` flag was NOT the cause of the W blowup. Round 139'
 - W>3 in first 5 ep of Phase 3 → v229 ATB is run-locked; pivot to architectural changes (IDEA #117 implementation needed regardless, as a new angle not a repro)
 
 PID logged in /home/darrell/train_tencent_v234d.log; expect ep1 of Phase 3 around 2026-04-30 01:20 PDT.
+
+---
+
+### tencent_v234d — CLOSED-FAILED (2026-04-30 00:09) — fresh pretrain did NOT reproduce v229; v229 ATB is run-state-locked
+
+**Recipe:** v229 recipe EXACTLY (seed=5, retrieval-mem + multi-scale + mixed-type + PCF 0.5 + reuse-rate 10.0 + target 0.70, w-stop 3.0, files-per-epoch 12), **FRESH pretrain from scratch** under current code state (no clone of v229's pretrain). Phase 1 AE 50ep, Phase 2 Sup 50ep, Phase 2.5 G-warm 100ep, then Phase 3.
+
+**Pretrain quality:** AE recon converged to 0.00001 (better than v229's), Sup ended at 0.035 (better than v229's 0.07), G-warm sup saturated at 0.00000. By any internal measure the pretrain was as good or better than v229's.
+
+**Phase 3 trajectory** (alive through ep11, killed at ep11):
+
+| ep | W | G | reuse_rate | EMA MMD² | recall | train ★ |
+|---|---|---|---|---|---|---|
+| 1 | 0.88 | 4.11 | 0.0707 | — | — | — |
+| 5 | 2.28 | 4.07 | 0.1033 | 0.01511 | 0.559 | 0.10331 |
+| 10 | 2.55 | 4.36 | 0.1037 | 0.01024 | 0.607 | **0.08884** |
+| 11 | 2.57 | 4.06 | 0.1240 | — | — | — |
+
+W stable 2.1-2.6, never tripped W-stop=3.0. recall climbing 0.56→0.61. Train ★ at ep10 = 0.0889 — comparable to v229 ep10 train ★=0.081. Looked like a near-reproduction at the training-time level.
+
+**Frozen-bundle gate:**
+
+| | v234d ep10 | v229 ep10 ATB | ratio |
+|---|---|---|---|
+| MMD² | 0.01539 | 0.00553 | 2.78× worse |
+| β-recall | **0.091** | 0.710 | **-87% (mode collapse)** |
+| α-precision | 0.798 | n/a | — |
+| **frozen ★** | **0.19719** | 0.039 | **5.05× worse** |
+| train ★ | 0.0889 | 0.081 | comparable |
+
+**Verdict:** v229 ★=0.039 is **NOT reproducible from a fresh pretrain under current code**. Even with a healthier pretrain than v229's (better AE recon, better Sup loss), Phase 3 produces a model that mode-collapses on the held-out 4-file frozen bundle (β-recall=0.091). The training-time selector mis-ranked by **2.2×** (train ★=0.089 vs frozen ★=0.197) — same mis-rank pattern as v233 (5.4×) and v234 (8×).
+
+**This is a definitive negative result on v229 reproducibility.** The v229 ATB ★=0.039 was a single-run lottery. It depends on the specific historical (pretrain × Phase 3 trajectory) pair that produced it on 2026-04-23, and that combination cannot be re-created from scratch on the current code path. By LANL's own publishing standard (multi-seed required for mechanism claims) and Darrell PEER-REVIEW-LANL Round 45 P0 (long-rollout panel required), the v229 number was always a "single-seed numeric target" but is now demonstrably non-reproducible.
+
+**Implications:**
+1. LLNL's claimed tencent ATB ★=0.039 (v229 ep10) should be marked as `historical-lottery, not currently reproducible` in race tables. The honest current LLNL tencent ★ from-scratch is **0.197 (v234d ep10)** — 5× worse than the historical claim, 23× worse than LANL's 0.008735.
+2. The reuse_rate anomaly (v234d ~0.10 vs v229 ~0.61) was a real signal of distribution drift; it foreshadowed the frozen-bundle mode collapse.
+3. The fix is not another v229-style legacy retry. It must be a structural change: IDEA #117 retrieval-train-carry, or a fundamentally new generation pipeline (possibly forking from PhaseAtlas like LANL did).
+
+**Process:** v234d PID 2051911, killed manually 00:09. Log /home/darrell/train_tencent_v234d.log. Frozen sweep at /home/darrell/checkpoints/tencent_v234d/frozen_sweep.json.
