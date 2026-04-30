@@ -83,22 +83,21 @@ def _label_streams(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Walk a stream, label each step's (state, rank_bucket) using LRU stack.
 
-    Returns:
-        states: (T,) int array of compound state at each step
-        rank_buckets: (T,) int array of LRU rank bucket if action != NEW,
-                      else -1 for NEW steps.
+    c1: phase signal = running fraction of REUSE_FAR actions in last
+    PHASE_WINDOW steps. Bursty workloads (alternating shallow-burst vs
+    deep-sweep regimes) produce varying phase; flat workloads stay in one
+    phase. Replaces unique-rate (degenerate on tencent).
     """
     T = len(obj_ids)
     states = np.empty(T, dtype=np.int64)
     rank_buckets = np.full(T, -1, dtype=np.int64)
 
-    # LRU stack: most-recent at index 0 (deque-like semantics with list)
     stack: List[int] = []
-    in_stack: Dict[int, int] = {}  # obj_id → current rank in stack
+    in_stack: Dict[int, int] = {}
 
-    # Phase tracking via tumbling unique-rate window
-    win_unique: set = set()
-    win_count = 0
+    # c1: ring buffer of last PHASE_WINDOW actions; phase = fraction == 2 (REUSE_FAR)
+    action_window: List[int] = []
+    n_far_in_window = 0
     cur_phase_rate = 0.0
 
     for t in range(T):
@@ -113,35 +112,33 @@ def _label_streams(
         if oid in in_stack:
             rank = in_stack[oid]
             if rank < REUSE_NEAR_RANK_CUTOFF:
-                action = 1  # REUSE_NEAR
+                action = 1
             else:
-                action = 2  # REUSE_FAR
-            # c2: use fine bins (29 log-spaced) instead of 8 coarse buckets
+                action = 2
             rb = int(np.searchsorted(EVAL_FINE_EDGES, rank + 1, side="right")) - 1
             rb = max(0, min(rb, N_FINE - 1))
             rank_buckets[t] = rb
-            # Move obj_id to position 0
             stack.pop(rank)
             stack.insert(0, oid)
-            # Update positions for everything that shifted
             for i in range(rank + 1):
                 in_stack[stack[i]] = i
         else:
-            action = 0  # NEW
+            action = 0
             stack.insert(0, oid)
             for i in range(len(stack)):
                 in_stack[stack[i]] = i
 
         states[t] = _encode_state(time_bin, size_bin, action, phase_bin)
 
-        # Update phase window
-        if oid not in win_unique:
-            win_unique.add(oid)
-        win_count += 1
-        if win_count >= PHASE_WINDOW:
-            cur_phase_rate = len(win_unique) / float(win_count)
-            win_unique.clear()
-            win_count = 0
+        # Update action ring buffer for phase signal (REUSE_FAR fraction)
+        action_window.append(action)
+        if action == 2:
+            n_far_in_window += 1
+        if len(action_window) > PHASE_WINDOW:
+            old = action_window.pop(0)
+            if old == 2:
+                n_far_in_window -= 1
+        cur_phase_rate = n_far_in_window / float(len(action_window))
 
     return states, rank_buckets
 
@@ -206,26 +203,45 @@ class MarkovAtlas:
         dt_edges = np.array([-np.inf, dt_qs[1], dt_qs[2], dt_qs[3], np.inf], dtype=np.float64)
         size_edges = np.array([-np.inf, size_qs[1], size_qs[2], size_qs[3], np.inf], dtype=np.float64)
 
-        # Pre-compute phase_rate samples to fit quartile edges (otherwise phase is degenerate).
+        # c1: phase samples = running REUSE_FAR fraction (not unique-rate).
+        # Walk LRU stack to compute action labels, then sample running far-fraction.
         phase_rate_samples: List[float] = []
         for fname in sampled[:8]:
             path = os.path.join(trace_dir, fname)
-            win_unique: set = set()
-            win_count = 0
+            stack_l: List[int] = []
+            in_stack_l: Dict[int, int] = {}
+            action_window: List[int] = []
+            n_far_w = 0
             count = 0
             for (_ts, oid, _sz) in _read_trace(path):
-                win_unique.add(oid)
-                win_count += 1
-                if win_count >= PHASE_WINDOW:
-                    phase_rate_samples.append(len(win_unique) / float(win_count))
-                    win_unique = set()
-                    win_count = 0
+                if oid in in_stack_l:
+                    rank = in_stack_l[oid]
+                    action = 2 if rank >= REUSE_NEAR_RANK_CUTOFF else 1
+                    stack_l.pop(rank)
+                    stack_l.insert(0, oid)
+                    for i in range(rank + 1):
+                        in_stack_l[stack_l[i]] = i
+                else:
+                    action = 0
+                    stack_l.insert(0, oid)
+                    for i in range(len(stack_l)):
+                        in_stack_l[stack_l[i]] = i
+                action_window.append(action)
+                if action == 2:
+                    n_far_w += 1
+                if len(action_window) > PHASE_WINDOW:
+                    old = action_window.pop(0)
+                    if old == 2:
+                        n_far_w -= 1
+                if len(action_window) >= PHASE_WINDOW:
+                    phase_rate_samples.append(n_far_w / float(len(action_window)))
                 count += 1
                 if count >= max_records_per_file:
                     break
-        phase_rate_arr = np.array(phase_rate_samples, dtype=np.float64) if phase_rate_samples else np.array([0.5])
+        phase_rate_arr = np.array(phase_rate_samples, dtype=np.float64) if phase_rate_samples else np.array([0.1])
         ph_qs = np.quantile(phase_rate_arr, [0.0, 0.25, 0.5, 0.75, 1.0])
         phase_edges = np.array([-np.inf, ph_qs[1], ph_qs[2], ph_qs[3], np.inf], dtype=np.float64)
+        print(f"  phase REUSE_FAR-rate quartiles: {ph_qs}")
         print(f"  dt edges: {dt_edges[1:-1]}  size edges: {size_edges[1:-1]}")
 
         # Pass 2: compute states, transitions, rank PMFs
