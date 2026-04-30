@@ -22,21 +22,19 @@ Main entrypoints:
 
 1. Python wrote normalized per-file rows into `trace_characterizations.normalized.jsonl`.
 2. R flattened each JSON row into one tabular row of scalar features.
-3. R grouped rows by
-   \( \text{logical\_family\_id} = \text{"dataset\_\_family"} \),
-   where the string is formed by concatenating `dataset`, `"__"`, and `family`.
+3. R grouped rows by $\text{logical\_family\_id} = \text{"dataset\_\_family"}$, where the string is formed by concatenating `dataset`, `"__"`, and `family`.
 4. R ran one family-level analysis per group.
 5. R wrote `analysis.json`, `metric_summary.csv`, optional diagnostics CSVs, and one Markdown report per family.
 
 ## Notation
 
-For a family with \( n \) files and \( p \) numeric features:
+For a family with $n$ files and $p$ numeric features:
 
-- \( x_{ij} \) is feature \( j \) for file \( i \)
-- \( x_{\cdot j} \) is the vector of all finite values for feature \( j \)
-- \( m_j \) is the number of finite observations for feature \( j \)
-- \( \widetilde{x}_j \) is the sample median of feature \( j \)
-- \( s_j \) is the sample standard deviation of feature \( j \)
+- $x_{ij}$ is feature $j$ for file $i$
+- $x_{\cdot j}$ is the vector of all finite values for feature $j$
+- $m_j$ is the number of finite observations for feature $j$
+- $\widetilde{x}_j$ is the sample median of feature $j$
+- $s_j$ is the sample standard deviation of feature $j$
 
 When a feature is only partially present, R computes the statistic on the finite subset.
 
@@ -46,7 +44,7 @@ These formulas were computed in Python before R ever saw the data.
 
 ### Request-Sequence Profiles
 
-Given timestamps \( t_1, \dots, t_n \), opcodes \( o_1, \dots, o_n \), object ids \( u_1, \dots, u_n \), and object sizes \( b_1, \dots, b_n \):
+Given timestamps $t_1, \dots, t_n$, opcodes $o_1, \dots, o_n$, object ids $u_1, \dots, u_n$, and object sizes $b_1, \dots, b_n$:
 
 Inter-arrival times:
 
@@ -126,7 +124,7 @@ $$
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i < 0 \}
 $$
 
-Lag-1 autocorrelation for a sequence \( y_1, \dots, y_m \):
+Lag-1 autocorrelation for a sequence $y_1, \dots, y_m$:
 
 $$
 \rho_1(y) =
@@ -140,7 +138,7 @@ Summary fields like `iat_q50`, `iat_q90`, `iat_q99`, `obj_size_q50`, and `abs_st
 
 ### Aggregate Time-Series Profiles
 
-Given timestamped samples with read IOPS \( r_i \), write IOPS \( w_i \), read bandwidth \( R_i \), write bandwidth \( W_i \), and disk usage \( d_i \):
+Given timestamped samples with read IOPS $r_i$, write IOPS $w_i$, read bandwidth $R_i$, write bandwidth $W_i$, and disk usage $d_i$:
 
 Sampling interval:
 
@@ -178,7 +176,7 @@ $$
 
 ### Structured-Table Profiles
 
-Given schema column summaries \( c_1, \dots, c_q \):
+Given schema column summaries $c_1, \dots, c_q$:
 
 Column count:
 
@@ -212,14 +210,14 @@ $$
 `extract_family_features.R` performs deterministic field extraction only:
 
 - missing paths become `NA`
-- boolean flags become \( 0 \) or \( 1 \)
+- boolean flags become $0$ or $1$
 - counts and summaries are copied into one wide row per file
 
 No estimation or learned model enters here.
 
 ## Univariate Statistics Per Feature
 
-For each feature \( j \), R takes the finite subset
+For each feature $j$, R takes the finite subset
 
 $$
 x_{\cdot j}^{\ast} = \{ x_{ij} : x_{ij} \text{ is finite} \}
@@ -285,8 +283,8 @@ Sample skewness and kurtosis came from package implementations:
 
 ### Quantiles
 
-R used `stats::quantile(, type = 7)`. For probability \( p \in (0,1) \), let the sorted sample be
-\( x_{(1)} \leq \dots \leq x_{(m)} \), and define
+R used `stats::quantile(, type = 7)`. For probability $p \in (0,1)$, let the sorted sample be
+$x_{(1)} \leq \dots \leq x_{(m)}$, and define
 
 $$
 h = (m - 1)p + 1
@@ -302,13 +300,13 @@ $$
 Q(p) = (1 - \gamma) x_{(k)} + \gamma x_{(k+1)}
 $$
 
-with the obvious endpoint handling when \( h \) lands on the boundary.
+with the obvious endpoint handling when $h$ lands on the boundary.
 
-R computed \( Q(0.10) \), \( Q(0.25) \), \( Q(0.75) \), and \( Q(0.90) \) for the family reports, and the parser-side Python code had already supplied many \( Q(0.50) \), \( Q(0.90) \), and \( Q(0.99) \) summaries per file.
+R computed $Q(0.10)$, $Q(0.25)$, $Q(0.75)$, and $Q(0.90)$ for the family reports, and the parser-side Python code had already supplied many $Q(0.50)$, $Q(0.90)$, and $Q(0.99)$ summaries per file.
 
 ## Heterogeneity Score
 
-For a family with valid per-feature CVs \( \mathrm{CV}_1, \dots, \mathrm{CV}_r \), R defines
+For a family with valid per-feature CVs $\mathrm{CV}_1, \dots, \mathrm{CV}_r$, R defines
 
 $$
 \mathrm{heterogeneity\_score} =
@@ -330,11 +328,7 @@ Starting from the wide feature table, R builds the multivariate matrix in five s
 
 1. keep only `numeric_columns`
 2. coerce every retained column to numeric
-3. keep column \( j \) only if it has at least
-   $$
-   \max(4, \lfloor 0.5 n \rfloor)
-   $$
-   finite values
+3. keep column $j$ only if it has at least $\max(4, \lfloor 0.5 n \rfloor)$ finite values
 4. keep only rows that are complete across the retained columns
 5. drop zero-variance columns
 
@@ -348,7 +342,7 @@ $$
 C = \mathrm{cor}(X, \text{use} = \text{"pairwise.complete.obs"})
 $$
 
-For each feature pair \( (a,b) \), it records
+For each feature pair $(a,b)$, it records
 
 $$
 \left| C_{ab} \right|
@@ -358,7 +352,7 @@ and ranks pairs by that absolute correlation.
 
 ## PCA
 
-Let the complete-case matrix be \( X \in \mathbb{R}^{n_c \times p_c} \).
+Let the complete-case matrix be $X \in \mathbb{R}^{n_c \times p_c}$.
 
 R centers and scales each column:
 
@@ -366,9 +360,9 @@ $$
 z_{ij} = \dfrac{x_{ij} - \mu_j}{\sigma_j}
 $$
 
-where \( \mu_j \) and \( \sigma_j \) are the column mean and sample standard deviation on the complete-case matrix.
+where $\mu_j$ and $\sigma_j$ are the column mean and sample standard deviation on the complete-case matrix.
 
-Then `prcomp(..., center = TRUE, scale. = TRUE)` computes the singular value decomposition of the standardized matrix. Equivalently, PCA diagonalizes the sample covariance of \( Z \):
+Then `prcomp(..., center = TRUE, scale. = TRUE)` computes the singular value decomposition of the standardized matrix. Equivalently, PCA diagonalizes the sample covariance of $Z$:
 
 $$
 \dfrac{1}{n_c - 1} Z^\top Z = V \Lambda V^\top
@@ -376,11 +370,8 @@ $$
 
 Outputs used by the reports:
 
-- principal-component scores
-  $$
-  S = ZV
-  $$
-- loadings \( V \)
+- principal-component scores $S = ZV$
+- loadings $V$
 - variance explained by each component
 - `pc1_variance`, the proportion explained by PC1
 
@@ -392,7 +383,7 @@ $$
 k \in \{ 2, 3, \dots, \min(12, n_c - 1) \}
 $$
 
-For each \( k \), it fits k-means with `nstart = 10` and records total within-cluster sum of squares:
+For each $k$, it fits k-means with `nstart = 10` and records total within-cluster sum of squares:
 
 $$
 \mathrm{WSS}(k) =
@@ -400,9 +391,9 @@ $$
 \left\| s_i - \mu_g \right\|_2^2
 $$
 
-where \( s_i \) is the feature vector or PCA-space vector being clustered and \( \mu_g \) is cluster centroid \( g \).
+where $s_i$ is the feature vector or PCA-space vector being clustered and $\mu_g$ is cluster centroid $g$.
 
-If the `cluster` package is available, R also computes the average silhouette width. For file \( i \):
+If the `cluster` package is available, R also computes the average silhouette width. For file $i$:
 
 $$
 a(i) = \text{mean dissimilarity from } i \text{ to its own cluster}
@@ -424,9 +415,9 @@ $$
 \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathrm{sil}(i)
 $$
 
-If \( n_c > 1200 \), silhouette scoring is evaluated on a random 1200-row subset for cost control.
+If $n_c > 1200$, silhouette scoring is evaluated on a random 1200-row subset for cost control.
 
-Selected \( k \):
+Selected $k$:
 
 $$
 k^\ast =
@@ -452,7 +443,7 @@ $$
 
 and keeps the model with maximum BIC.
 
-For a candidate model with log-likelihood \( \ell \), \( d \) free parameters, and \( n_c \) observations, the BIC score used by `mclust` is of the form
+For a candidate model with log-likelihood $\ell$, $d$ free parameters, and $n_c$ observations, the BIC score used by `mclust` is of the form
 
 $$
 \mathrm{BIC} = 2 \ell - d \log n_c
@@ -460,12 +451,12 @@ $$
 
 The pipeline retains:
 
-- selected component count \( G^\ast \)
+- selected component count $G^\ast$
 - model name
 - maximum BIC
 - mean classification uncertainty
 
-If posterior responsibilities are \( \tau_{ig} \), then per-file uncertainty is
+If posterior responsibilities are $\tau_{ig}$, then per-file uncertainty is
 
 $$
 u_i = 1 - \max_g \tau_{ig}
@@ -485,26 +476,22 @@ $$
 \mathrm{minPts} = \max\left(4, \min\left(20, \left\lfloor 3 \log n_c \right\rfloor \right)\right)
 $$
 
-It then computes the `kNNdist` vector using \( \mathrm{minPts} \) neighbors and sets
+It then computes the `kNNdist` vector using $\mathrm{minPts}$ neighbors and sets
 
 $$
 \varepsilon = Q_{0.90}(\mathrm{kNNdist})
 $$
 
-Then it runs DBSCAN with that \( \varepsilon \) and `minPts`.
+Then it runs DBSCAN with that $\varepsilon$ and `minPts`.
 
 Reported outputs:
 
 - number of non-noise clusters
-- noise fraction
-  $$
-  \mathrm{noise\_fraction} =
-  \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathbf{1}\{ \mathrm{cluster}_i = 0 \}
-  $$
+- noise fraction $\mathrm{noise\_fraction} = \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathbf{1}\{ \mathrm{cluster}_i = 0 \}$
 
 ## Outlier Scoring
 
-Let \( S \) be the retained PCA-score matrix after dropping zero-variance PCs.
+Let $S$ be the retained PCA-score matrix after dropping zero-variance PCs.
 
 Primary outlier score:
 
@@ -512,7 +499,7 @@ $$
 d_i^2 = (s_i - \mu)^\top \Sigma^{-1} (s_i - \mu)
 $$
 
-where \( \mu \) is the mean PCA-score vector and \( \Sigma \) is the sample covariance of the PCA scores.
+where $\mu$ is the mean PCA-score vector and $\Sigma$ is the sample covariance of the PCA scores.
 
 This is Mahalanobis distance squared.
 
@@ -531,7 +518,7 @@ R ranks files by descending outlier score and keeps the top 8 in the report.
 
 ## Outlier Decomposition
 
-For each numeric feature \( j \), R computes a robust center and scale:
+For each numeric feature $j$, R computes a robust center and scale:
 
 $$
 c_j = \mathrm{median}(x_{\cdot j})
@@ -552,13 +539,13 @@ r_j =
 \end{cases}
 $$
 
-Then for each reported outlier file \( i \), R computes robust per-feature z-scores:
+Then for each reported outlier file $i$, R computes robust per-feature z-scores:
 
 $$
 z_{ij} = \dfrac{x_{ij} - c_j}{r_j}
 $$
 
-It ranks features by \( |z_{ij}| \) and reports the top contributors.
+It ranks features by $|z_{ij}|$ and reports the top contributors.
 
 ## Outlier Sensitivity
 
@@ -577,7 +564,7 @@ $$
 N \in \{ 1, 3, 5, 10 \}
 $$
 
-when valid for the family, R removes the top \( N \) outliers and compares medians.
+when valid for the family, R removes the top $N$ outliers and compares medians.
 
 Baseline median:
 
@@ -600,7 +587,7 @@ $$
 {\max\left( \left| m_j^{\mathrm{base}} \right|, 10^{-9} \right)}
 $$
 
-Rows are ranked by \( |\mathrm{relative\_shift}_{j,N}| \).
+Rows are ranked by $|\mathrm{relative\_shift}_{j,N}|$.
 
 ## Regime Detection
 
@@ -653,19 +640,19 @@ $$
 
 then segments are
 
-- segment 1: \( 1, \dots, c_1 \)
-- segment 2: \( c_1 + 1, \dots, c_2 \)
+- segment 1: $1, \dots, c_1$
+- segment 2: $c_1 + 1, \dots, c_2$
 - ...
-- segment \( m+1 \): \( c_m + 1, \dots, n \)
+- segment $m+1$: $c_m + 1, \dots, n$
 
-For each segment \( r \), R stores:
+For each segment $r$, R stores:
 
 - file count
 - minimum and maximum `ts_start`
-- \( \mathrm{median}(\mathrm{PC1}) \)
-- \( \mathrm{sd}(\mathrm{PC1}) \)
+- $\mathrm{median}(\mathrm{PC1})$
+- $\mathrm{sd}(\mathrm{PC1})$
 
-For each adjacent segment pair \( A \) and \( B \), and each feature \( j \):
+For each adjacent segment pair $A$ and $B$, and each feature $j$:
 
 Left and right medians:
 
@@ -685,7 +672,7 @@ $$
 s_{p,j} = \sqrt{\dfrac{s_{A,j}^2 + s_{B,j}^2}{2}}
 $$
 
-Fallback if \( s_{p,j} \) is zero or non-finite:
+Fallback if $s_{p,j}$ is zero or non-finite:
 
 $$
 s_{p,j} =
@@ -700,7 +687,7 @@ $$
 e_j = \dfrac{|a_j - b_j|}{s_{p,j}}
 $$
 
-For each transition, features are ranked by \( e_j \), and the top drivers are written into `regime_transitions.csv` and into the family report.
+For each transition, features are ranked by $e_j$, and the top drivers are written into `regime_transitions.csv` and into the family report.
 
 ## Temporal Sampling Diagnostic
 
@@ -708,16 +695,12 @@ To test whether sequential blocks are more coherent than random batches, R:
 
 1. orders files by `ts_start`
 2. keeps available PC coordinates among PC1, PC2, and PC3
-3. chooses
-   $$
-   \mathrm{block\_size} =
-   \max\left(4, \min\left(16, \left\lfloor \sqrt{n} \right\rfloor \right)\right)
-   $$
+3. chooses $\mathrm{block\_size} = \max\left(4, \min\left(16, \left\lfloor \sqrt{n} \right\rfloor \right)\right)$
 4. splits the ordered series into contiguous non-overlapping blocks
 5. computes the mean pairwise Euclidean distance inside each block
 6. draws 64 random batches of the same size and computes the same statistic
 
-For a block \( B \), the within-block distance summary is
+For a block $B$, the within-block distance summary is
 
 $$
 D(B) =
@@ -726,7 +709,7 @@ D(B) =
 \left\| s_u - s_v \right\|_2
 $$
 
-where \( P(B) \) is the set of unordered pairs inside the block.
+where $P(B)$ is the set of unordered pairs inside the block.
 
 R then computes
 
@@ -746,10 +729,10 @@ $$
 
 Interpretation:
 
-- values near \( 1 \) mean ordered blocks are not much more coherent than random batches
-- values well below \( 1 \) mean temporal adjacency matters
+- values near $1$ mean ordered blocks are not much more coherent than random batches
+- values well below $1$ mean temporal adjacency matters
 
-The current report emits a block-sampling warning when the ratio is below \( 0.85 \).
+The current report emits a block-sampling warning when the ratio is below $0.85$.
 
 ## Conditioning Audit
 
@@ -768,7 +751,7 @@ R audits the current GAN-facing conditioning set:
 
 ### Near-Constant Detection
 
-A current conditioning feature \( j \) is flagged as near-constant when either
+A current conditioning feature $j$ is flagged as near-constant when either
 
 $$
 \mathrm{sd}(x_{\cdot j}) \leq 10^{-9}
@@ -782,7 +765,7 @@ $$
 
 ### Redundancy Detection
 
-Using the family correlation matrix \( C \), a pair \( (i,j) \) is flagged as highly redundant when
+Using the family correlation matrix $C$, a pair $(i,j)$ is flagged as highly redundant when
 
 $$
 |C_{ij}| \geq 0.95
@@ -796,14 +779,11 @@ R separately evaluates:
 - `signed_stride_lag1_autocorr`
 - `obj_size_std`
 
-For each candidate \( z \), it stores:
+For each candidate $z$, it stores:
 
-- \( \mathrm{sd}(z) \)
-- \( \mathrm{IQR}(z) \)
-- maximum absolute correlation with the current conditioning set
-  $$
-  \max_j | \mathrm{corr}(z, x_j) |
-  $$
+- $\mathrm{sd}(z)$
+- $\mathrm{IQR}(z)$
+- maximum absolute correlation with the current conditioning set $\max_j | \mathrm{corr}(z, x_j) |$
 
 A candidate is marked recommended when
 
@@ -850,7 +830,7 @@ $$
 \right)
 $$
 
-So the recommendation is explicitly capped at \( 8 \).
+So the recommendation is explicitly capped at $8$.
 
 ## Split-By-Format Flag
 
@@ -875,11 +855,11 @@ The report guidance bullets are deterministic rules on top of the computed stati
 - if `heterogeneity_score > 2.5`, warn against one unconditional model
 - if Mclust finds at least 3 components, note multi-mode structure
 - if changepoints exist, note regime structure
-- if mean read share exceeds \( 0.9 \), warn that the family is strongly read-skewed
-- if mean write ratio exceeds \( 0.6 \), emphasize write-pressure preservation
-- if median `reuse_ratio` exceeds \( 0.5 \), emphasize locality-aware conditioning
-- if median `burstiness_cv` exceeds \( 10 \), emphasize burst-sensitive losses
-- if median `tenant_unique` exceeds \( 8 \), suggest tenant-aware conditioning
+- if mean read share exceeds $0.9$, warn that the family is strongly read-skewed
+- if mean write ratio exceeds $0.6$, emphasize write-pressure preservation
+- if median `reuse_ratio` exceeds $0.5$, emphasize locality-aware conditioning
+- if median `burstiness_cv` exceeds $10$, emphasize burst-sensitive losses
+- if median `tenant_unique` exceeds $8$, suggest tenant-aware conditioning
 - if `block_random_distance_ratio < 0.85`, suggest block or curriculum sampling
 - if the conditioning audit recommends additions, mention those candidate features
 
@@ -911,7 +891,7 @@ $$
 \mathrm{train\_combined}_e = \mathrm{EMA\_MMD}^2_e + 0.2 (1 - \mathrm{EMA\_recall}_e)
 $$
 
-for each logged epoch \( e \), then keeps
+for each logged epoch $e$, then keeps
 
 $$
 \mathrm{best\_train\_combined} = \min_e \mathrm{train\_combined}_e
@@ -929,7 +909,7 @@ $$
 \Delta = \overline{s}_{\mathrm{on}} - \overline{s}_{\mathrm{off}}
 $$
 
-where \( s \) is either `combined` for evaluated runs or `best_train_combined` for train-history runs.
+where $s$ is either `combined` for evaluated runs or `best_train_combined` for train-history runs.
 
 For example, the eval-time PCF effect is
 
@@ -985,15 +965,15 @@ The feature-space distance uses a robustly scaled root-mean-square gap over
 - `hurst`
 - `block_random_distance_ratio`
 
-For feature \( j \), let \( r_j \) be the median absolute deviation over all families:
+For feature $j$, let $r_j$ be the median absolute deviation over all families:
 
 $$
 r_j = \mathrm{median}_i \left| x_{ij} - \mathrm{median}_k x_{kj} \right|
 $$
 
-If \( r_j \) is zero or unavailable, the script falls back to the sample standard deviation for that feature.
+If $r_j$ is zero or unavailable, the script falls back to the sample standard deviation for that feature.
 
-For a family \( f \) and anchor \( a \), the anchor distance is
+For a family $f$ and anchor $a$, the anchor distance is
 
 $$
 d(f, a) =
@@ -1004,7 +984,7 @@ d(f, a) =
 }
 $$
 
-where \( J^\ast \) is the set of features with finite values for both the family and the anchor and a nonzero scale.
+where $J^\ast$ is the set of features with finite values for both the family and the anchor and a nonzero scale.
 
 The chosen anchor is
 
@@ -1110,7 +1090,7 @@ On 2026-04-18, R was run on `vinge.local` against the `/tiamat` model-aware feat
 - input: `/tiamat/zarathustra/r-output/model_aware_20260416_0929/results/all_features.csv`
 - output: `/tiamat/zarathustra/r-output/higher_moments_20260418_1058/`
 
-This pass computed standardized central moments through order 6 for every numeric feature within each logical family. For feature \( j \), finite values \( x_1,\dots,x_m \), mean \( \overline{x} \), and sample standard deviation \( s \), the additional moment of order \( r \in \{5,6\} \) is:
+This pass computed standardized central moments through order 6 for every numeric feature within each logical family. For feature $j$, finite values $x_1,\dots,x_m$, mean $\overline{x}$, and sample standard deviation $s$, the additional moment of order $r \in \{5,6\}$ is:
 
 $$
 \mu_r^{\ast}(j) =
