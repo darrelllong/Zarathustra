@@ -8581,3 +8581,63 @@ Active LLNL run: **none**. GPU idle (won't be needed for the PhaseAtlas port —
 LANL active (PEER-REVIEW skipped per drive-by rule): continued mark-axis sweeps; HRC bit-identical, mark_score variations only. Same §3-§5 invariance pattern.
 
 Sandia idle. **No PEER-REVIEW posts this tick.**
+
+
+## Round 149 — IDEA #121 LANL-knob port closed-FAILED on LLNL PhaseAtlas; architectural mismatch confirmed
+
+**Date**: 2026-04-30 08:18 PDT
+
+### Ablation results
+
+Generate `/home/darrell/llnl_phase_pmf_atlas_tencent_traincalib.pkl.gz` at seed=42 across knob combinations:
+
+| recipe | HRC-MAE | reuse | result |
+|---|---|---|---|
+| baseline (no knobs) | **0.04375** | 0.6502 | reproduces historical |
+| `--local-prob-power 0.8` | **0.04652** | 0.6495 | -6.4% (WORSE) |
+| `--force-phase-schedule` | 0.04375 | 0.6502 | no effect |
+| `--stack-rank-phase-scales 1,1,1.1,1.1` | 0.04375 | 0.6502 | no effect |
+| all three | 0.04652 | 0.6495 | no improvement over `--local-prob-power 0.8` alone |
+
+**Two of three LANL knobs are no-ops; the third actively hurts.**
+
+### Why the knobs don't transfer
+
+1. **`force_phase_schedule` no-op**: LLNL uses 4 phase bins from unique-rate windows; the position-schedule yields essentially the same phase progression because tencent traces are well-modeled by uniform position. The `_state_with_phase` machinery in LANL's `neural_atlas.py:170-171` only matters when phase is decoupled from a learned transition — LLNL doesn't have one.
+
+2. **`stack_rank_phase_scales 1.0,1.0,1.1,1.1` no-op**: `int(round(rank * 1.1))` for typical ranks {0,1,2,...} rounds to the same int often enough; combined with the `min(rank, stack_sz-1)` cap, the 10% bump rarely shifts the picked obj_id. This knob meaningful in LANL's framework where it scales a continuous phase-rank-distribution; in LLNL's discrete PMF + integer-rank-within-bucket pipeline it gets clipped.
+
+3. **`local_prob_power 0.8` HURTS**: LLNL's `effective_fine_pmf` is already calibrated against the eval JSON's stack_distance histogram (10 fine bins). Sharpening peaks via `pmf ** 0.8` pulls more mass to dominant buckets, AWAY from the rank distribution that produces real-like cache behavior. The diagnostic confirms it: ep10 P50 stack rank shifts from 60 (baseline matching real) to 112 (WAY off), and P90 from ~174 (baseline) to 1,101 (catastrophic).
+
+### Verdict
+
+IDEA #121 closed-FAILED: the LANL-knob port doesn't work on LLNL's direct-PMF PhaseAtlas. The 5× tencent gap (LLNL 0.04375 vs LANL 0.008735) is in the **architectural difference** — LANL's compound-state Markov chain over `(time × size × action × phase)` vs LLNL's direct phase-conditioned PMF sampling. Three flag-level knobs cannot bridge this.
+
+### Plan revised
+
+Three options remain, ordered by expected ROI:
+
+1. **Increase PhaseAtlas calibration file count** (cheapest):
+   `tencent_traincalib.pkl.gz` was fitted on 8 random files. Refit with 32 / 64 / 128 / 256 files might tighten the per-phase fine PMF and per-phase reuse-rate estimates. Expected: 5-15% HRC-MAE improvement (0.04375 → ~0.037-0.042 range), not enough to close the 5× gap but free along the way.
+
+2. **Architectural rewrite — port LANL's compound-state Markov chain** (multi-day, the highest-ROI lever):
+   `altgan/neural_atlas.py` is ~1000 lines; LLNL would need to adopt the `(time_bin × size_bin × action × phase_bin)` state space and learn transition probabilities. This is the LANL mechanism that gets 0.008735. Multi-day implementation, but it's the only path to break out of LLNL's 0.04 floor.
+
+3. **Hybrid: replace LLNL's phase-derivation with LANL's force_phase_schedule semantics + use LANL's rank-distribution shape**:
+   Rather than porting flags, port the rank-sampling logic directly. Half-day. Expected: closes maybe 30-50% of the 5× gap (HRC ~0.020-0.025) but won't reach LANL's 0.008.
+
+Recommendation: option (1) for a fast quality-of-life improvement, then option (2) as the multi-day commitment. Option (3) is a middle-effort middle-result path.
+
+### Race Dashboard (Round 149)
+
+| Corpus | LLNL (HRC-MAE strict-holdout) | LANL (HRC-MAE strict-holdout) | gap |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas) | 0.00301 (PhaseAtlas) | LLNL +35% |
+| Tencent | 0.04375 (PhaseAtlas traincalib, no LANL knobs) | 0.008735 | LLNL 5.0× behind |
+
+Active LLNL run: **none**. Next: option (1) PhaseAtlas refit-with-more-files sweep.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis sweeps (predictable invariance). **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
