@@ -199,7 +199,27 @@ class MarkovAtlas:
         size_qs = np.quantile(size_arr, [0.0, 0.25, 0.5, 0.75, 1.0])
         dt_edges = np.array([-np.inf, dt_qs[1], dt_qs[2], dt_qs[3], np.inf], dtype=np.float64)
         size_edges = np.array([-np.inf, size_qs[1], size_qs[2], size_qs[3], np.inf], dtype=np.float64)
-        phase_edges = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float64)
+
+        # Pre-compute phase_rate samples to fit quartile edges (otherwise phase is degenerate).
+        phase_rate_samples: List[float] = []
+        for fname in sampled[:8]:
+            path = os.path.join(trace_dir, fname)
+            win_unique: set = set()
+            win_count = 0
+            count = 0
+            for (_ts, oid, _sz) in _read_trace(path):
+                win_unique.add(oid)
+                win_count += 1
+                if win_count >= PHASE_WINDOW:
+                    phase_rate_samples.append(len(win_unique) / float(win_count))
+                    win_unique = set()
+                    win_count = 0
+                count += 1
+                if count >= max_records_per_file:
+                    break
+        phase_rate_arr = np.array(phase_rate_samples, dtype=np.float64) if phase_rate_samples else np.array([0.5])
+        ph_qs = np.quantile(phase_rate_arr, [0.0, 0.25, 0.5, 0.75, 1.0])
+        phase_edges = np.array([-np.inf, ph_qs[1], ph_qs[2], ph_qs[3], np.inf], dtype=np.float64)
         print(f"  dt edges: {dt_edges[1:-1]}  size edges: {size_edges[1:-1]}")
 
         # Pass 2: compute states, transitions, rank PMFs
