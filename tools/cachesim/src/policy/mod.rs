@@ -1,7 +1,12 @@
 //! Cache replacement policies.
 
 pub mod arc;
+pub mod car;
+pub mod fifo;
 pub mod lru;
+pub mod sieve;
+pub mod slru;
+pub mod util;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
@@ -23,11 +28,19 @@ pub trait Policy {
 pub enum PolicyKind {
     Lru,
     Arc,
+    Fifo,
+    Sieve,
+    Slru,
+    Car,
 }
 
 pub fn make(kind: PolicyKind, capacity: usize) -> Box<dyn Policy> {
     match kind {
         PolicyKind::Lru => Box::new(lru::Lru::with_capacity(capacity)),
         PolicyKind::Arc => Box::new(arc::Arc::with_capacity(capacity)),
+        PolicyKind::Fifo => Box::new(fifo::Fifo::with_capacity(capacity)),
+        PolicyKind::Sieve => Box::new(sieve::Sieve::with_capacity(capacity)),
+        PolicyKind::Slru => Box::new(slru::Slru::with_capacity(capacity)),
+        PolicyKind::Car => Box::new(car::Car::with_capacity(capacity)),
     }
 }

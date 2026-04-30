@@ -5,19 +5,25 @@ pub mod oracle;
 
 use std::path::Path;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Op {
     Read,
     Write,
+    #[default]
     Other,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Access {
     pub obj_id: u64,
     pub size: u32,
     pub op: Op,
     pub ts: u64,
+    /// Stream / tenant identifier. Multi-stream synthetic CSVs reuse the
+    /// same `obj_id` namespace per stream; the simulator combines this
+    /// with `obj_id` to form a unique cache key. Single-stream traces
+    /// (oracleGeneral .zst) leave this at 0.
+    pub stream_id: u32,
 }
 
 pub trait Trace: Iterator<Item = anyhow::Result<Access>> {}

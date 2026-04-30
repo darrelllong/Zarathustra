@@ -53,6 +53,7 @@ impl Iterator for OracleReader {
                     size,
                     op: Op::Other,
                     ts,
+                    stream_id: 0,
                 }))
             }
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {

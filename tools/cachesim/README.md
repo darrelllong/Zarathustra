@@ -1,15 +1,23 @@
 # cachesim
 
-Cache simulator (LRU, ARC) for evaluating real and synthetic I/O traces from
-`llgan/generate.py` and `altgan/generate.py`. First Rust crate in the repo;
-chosen over Python for speed on long-rollout simulations.
+Cache simulator for evaluating real and synthetic I/O traces from
+`llgan/generate.py` and `altgan/generate.py`. First Rust crate in the
+repo; chosen over Python for speed on long-rollout simulations.
 
-## Status
+## Policies
 
-**Pre-staged skeleton** — compiles, CLI parses, LRU policy passes basic unit
-tests. ARC, Mattson stack-distance HRC, real-vs-fake HRC-MAE, and grid loaders
-land once a real Tencent / Alibaba `.zst` is available locally for validation
-(see `TODO.md` → "Rust cache simulator").
+| Policy | Reference                                  | Notes                                |
+| ------ | ------------------------------------------ | ------------------------------------ |
+| FIFO   | folklore                                   | Insert-time order, no hit reordering |
+| LRU    | Belady-era textbook                        | Recency only                         |
+| SLRU   | Karedla–Love–Wherry, IEEE Computer 1994    | 80/20 protected/probationary         |
+| ARC    | Megiddo–Modha, FAST 2003                   | Adaptive recency/frequency           |
+| CAR    | Bansal–Modha, FAST 2004                    | ARC over CLOCK lists, lazy promotion |
+| SIEVE  | Zhang–Yang–Yue–Vigfusson, NSDI 2024        | One-bit FIFO with reverse hand       |
+
+All policies share an O(1) doubly-linked arena (`policy::util::DList`):
+hit, miss, eviction, and ghost manipulation are all amortised constant
+time per access.
 
 ## Build
 
@@ -21,49 +29,56 @@ cargo build --release
 Toolchain pinned in `rust-toolchain.toml` (stable). All trace bytes go in
 `tools/cachesim/testdata/`, which is gitignored.
 
-## Run (current capability)
+## Run
 
 ```sh
 cargo run --release -- \
-    --trace path/to/synthetic.csv \
-    --policy lru \
-    --cache-size 65536 \
+    --trace path/to/trace.oracleGeneral.zst \
+    --policy lru,arc,fifo,sieve,slru,car \
+    --cache-sizes 1024,4096,16384,65536,262144 \
     --out report.json
 ```
 
-## Planned CLI (final v1)
+The trace is loaded once into memory; every (policy × cache_size) pair
+is simulated in parallel via rayon. On vinge (20 cores) a 14M-access
+oracleGeneral trace clears 30 simulations in ~3s wall-clock.
+
+## Planned CLI extensions
 
 ```
 cachesim
-    --trace <path>
-    --real  <path>                  # optional; enables HRC-MAE vs real
-    --policy lru,arc
-    --cache-size N | --cache-sizes N1,N2,... | --grid lanl-tencent
+    --real  <path>                  # enables HRC-MAE vs real
+    --grid  lanl-tencent            # named cache-size grids
     --format auto|oracle|csv
     --n-streams 4 --seed 42
-    --threads 0
-    --out eval.json
 ```
 
 ## Output schema
 
-JSON byte-identical to `llgan/long_rollout_eval.py` sidecar:
+JSON, schema-compatible with `llgan/long_rollout_eval.py` sidecar:
 
 ```json
 {
-    "policy": "lru",
-    "hrc_mae_vs_real": 0.00887,
-    "reuse_access_rate": 0.6145,
-    "stack_distance_median": 60,
-    "stack_distance_p90": 174,
-    "footprint_mean_per_stream": 9627,
-    "n_accesses": 100000,
-    "per_cache_size": [{"size": 128, "miss_ratio": 0.41}, ...]
+    "policy": "arc",
+    "hrc_mae_vs_real": null,
+    "reuse_access_rate": 0.0,
+    "stack_distance_median": null,
+    "stack_distance_p90": null,
+    "footprint_mean_per_stream": 0,
+    "n_accesses": 13934482,
+    "per_cache_size": [{"size": 1024, "miss_ratio": 0.4573}, ...]
 }
 ```
 
+`hrc_mae_vs_real`, the stack-distance fields, `reuse_access_rate`, and
+`footprint_mean_per_stream` populate when the Mattson single-pass HRC and
+the paired-trace HRC-MAE pass land.
+
 ## Validation gates (pre-1.0)
 
-1. Unit: LRU on Mattson textbook example; ARC on Megiddo–Modha 5-request example.
-2. Real-vs-real: HRC-MAE(real, real) ≈ 0 on a fetched Tencent and Alibaba `.zst`.
-3. Real-vs-fake: reproduce LANL Tencent **0.00887** on a paired altgan CSV.
+1. Unit: LRU on Mattson textbook example; ARC on Megiddo–Modha 5-request
+   example. (Done.)
+2. Real-vs-real: HRC-MAE(real, real) ≈ 0 on a fetched Tencent and
+   Alibaba `.zst`. (Pending.)
+3. Real-vs-fake: reproduce LANL Tencent **0.00887** on a paired altgan
+   CSV. (Pending.)

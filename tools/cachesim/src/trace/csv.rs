@@ -7,6 +7,7 @@
 //!   - size       : `obj_size` | `size` | `bytes`
 //!   - op         : `op` | `opcode` | `read_write` (optional; defaults to Read)
 //!   - timestamp  : `ts` | `timestamp` | `time` (optional; defaults to row index)
+//!   - stream     : `stream_id` | `stream` | `tenant` (optional; defaults to 0)
 //!
 //! On a column-name mismatch the reader returns a clear error rather than
 //! silently misaligning fields.
@@ -27,6 +28,7 @@ struct ColIdx {
     size: Option<usize>,
     op: Option<usize>,
     ts: Option<usize>,
+    stream: Option<usize>,
 }
 
 impl CsvReader {
@@ -55,6 +57,7 @@ fn resolve_columns(headers: &csv::StringRecord) -> anyhow::Result<ColIdx> {
         size: find(&["obj_size", "size", "bytes"]),
         op: find(&["op", "opcode", "read_write"]),
         ts: find(&["ts", "timestamp", "time"]),
+        stream: find(&["stream_id", "stream", "tenant"]),
     })
 }
 
@@ -90,14 +93,23 @@ impl Iterator for CsvReader {
                         None => Op::Read,
                     };
                     let ts: u64 = match self.cols.ts {
-                        Some(i) => rec.get(i).and_then(|s| s.parse().ok()).unwrap_or(self.row_ix),
+                        Some(i) => rec
+                            .get(i)
+                            .and_then(|s| s.parse::<f64>().ok())
+                            .map(|t| (t * 1_000_000.0) as u64)
+                            .unwrap_or(self.row_ix),
                         None => self.row_ix,
+                    };
+                    let stream_id: u32 = match self.cols.stream {
+                        Some(i) => rec.get(i).and_then(|s| s.parse().ok()).unwrap_or(0),
+                        None => 0,
                     };
                     Ok(Access {
                         obj_id,
                         size,
                         op,
                         ts,
+                        stream_id,
                     })
                 };
                 let out = parse();

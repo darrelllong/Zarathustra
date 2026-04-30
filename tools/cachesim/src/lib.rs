@@ -1,7 +1,8 @@
-//! cachesim — LRU / ARC cache simulator for real and synthetic I/O traces.
+//! cachesim — cache simulator for real and synthetic I/O traces.
 //!
 //! v1 scope:
-//!   - Policies: LRU + ARC (classic Megiddo–Modha 2003).
+//!   - Policies: FIFO, LRU, SLRU, ARC (Megiddo–Modha 2003),
+//!     CAR (Bansal–Modha 2004), SIEVE (Zhang et al. NSDI 2024).
 //!   - Trace formats: oracleGeneral `.zst` (real) and synthetic CSV from
 //!     `llgan/generate.py` and `altgan/generate.py`.
 //!   - Output JSON schema: byte-identical to `llgan/long_rollout_eval.py`
