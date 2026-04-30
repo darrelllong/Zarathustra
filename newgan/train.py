@@ -56,7 +56,7 @@ def _collect_files(trace_dir: str, fmt: str) -> List[Path]:
 
 def _load_raw_df(path: Path, fmt: str, max_records: int):
     """Load a single file into a raw DataFrame."""
-    reader = _readers.get(fmt)
+    reader = _READERS.get(fmt)
     if reader is None:
         raise ValueError(f"Unknown format '{fmt}'")
 
