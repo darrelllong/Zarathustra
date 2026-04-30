@@ -30,9 +30,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-# Import llgan models
+# Import llgan models (using bare imports to match llgan/train.py structure)
+# This script runs from /home/darrell/Zarathustra/newgan/
+import sys
+import os
+# Add parent directory to path so llgan module is accessible
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from llgan.config import Config
-from llgan.dataset import load_trace, TraceDataset, TracePreprocessor
+from llgan.dataset import load_trace, TraceDataset, TracePreprocessor, _collect_files, _fit_prep_on_files, _load_epoch_dataset
 from llgan.model import Generator, Critic, Encoder, Recovery, Supervisor
 
 
