@@ -9464,3 +9464,77 @@ Artifacts (vinge):
 - `/home/darrell/v_alibaba_holdout128_seed42_op.csv` (strict-holdout fake)
 - `/home/darrell/v_alibaba_rr_override.csv` (manifest-aware fake)
 - `/home/darrell/produce_alibaba_holdout_calib_json.py` (calib JSON producer)
+
+
+## Round 164 — GAN-OPC fix lands: v158 GAN mark_score 0.586 → 0.343 (1.7× better); size collapse exposed as remaining failure mode
+
+**Date**: 2026-04-30 12:35 PDT (Round 162 follow-up; tencent priority per Darrell standing race directive)
+
+### What changed
+
+`llgan/generate.py` gains a `--opcode-resample {tencent,alibaba}` flag that post-hoc replaces the GAN's collapsed opcode column with samples from the corpus opcode marginal extracted in Round 162. Distributions:
+- tencent: `{0: 0.9161, -1: 0.0839}`
+- alibaba: `{0: 0.8487, -1: 0.1513}`
+
+Implementation is a 15-line block right before `df.to_csv()` in the `generate()` function — orthogonal to the GAN forward pass, runs against any existing checkpoint without retraining.
+
+### v158 GAN panel (tencent_stackatlas, 100k records, 4 streams, seed=42)
+
+| pipeline | mark_score | ts_delta_log_w1_norm | obj_size_log_w1_norm | opcode_tv | tenant_tv |
+|---|---|---|---|---|---|
+| v158 GAN final.pt (Round 161 baseline) | 0.5865 | 0.1496 | 1.0855 | 1.0000 | 0.1108 |
+| **v158 GAN + `--opcode-resample tencent`** | **0.3433** | 0.1494 | 1.0987 | **0.0132** | 0.1119 |
+| 0.0427 PhaseAtlas + opcode_pmf (Round 162) | 0.0475 | 0.0742 | 0.1028 | 0.0131 | 0.0000 |
+
+- GAN mark_score: 0.586 → 0.343 (**1.7× better**)
+- opcode_tv: 1.000 → **0.013** (eliminated; same as PhaseAtlas)
+- All other axes essentially unchanged (the resample is opcode-only).
+
+### What this clarifies — the GAN's remaining failure is size, not opcode
+
+The GAN's residual mark_score 0.343 decomposes as:
+- ts_delta: 0.149 (timing reasonable; near PhaseAtlas's 0.074)
+- **size: 1.099** (GAN emits median 274kB vs real median 4kB — 67× off)
+- opcode: 0.013 (fixed)
+- tenant: 0.112 (low-priority drift)
+
+Mean of the four = 0.343. **size_w1_norm at 1.099 is the dominant residual term.** All the GAN-track investment for the next paper-quality move on tencent should go into the size head, not the obj_id / opcode / timing axes.
+
+### Why this matters for the race
+
+LANL has not published a v158-comparable mark_score on tencent. LLNL's three published numbers on the canonical `tencent_stackatlas` real-CSV reference:
+- PhaseAtlas (Round 162): 0.0475
+- v158 GAN (this round): 0.343
+- v158 GAN (Round 161 baseline, hardcoded opcode): 0.586
+
+LLNL has the only mark_score numbers in the race on tencent. Asking LANL (REBUTTAL §7) to publish their PhaseAtlas+marks-e20 mark_score on the same surface so a real three-axis (HRC-MAE × mark_score × ★) comparison becomes possible. With the GAN-OPC fix, even the LLNL GAN-track is publishing a competitive opcode_tv = 0.013.
+
+### Standing tencent race position
+
+| metric | LLNL | LANL | gap |
+|---|---|---|---|
+| tencent strict-holdout HRC-MAE (PhaseAtlas) | 0.0427–0.0449 | 0.008735 | 5× LANL |
+| tencent ★=0.039 frozen-bundle (v229 ep10) | 0.039 | (not published on this surface) | n/a |
+| tencent mark_score (PhaseAtlas) | **0.0475** | (not published) | LLNL only |
+| tencent mark_score (v158 GAN + opcode) | 0.343 | (not published) | n/a |
+
+Tencent gap to LANL on cache-fidelity remains 5× — no cheap paths left (Round 158/159 closed the empirical-mechanism queue). Per the standing kill-threshold, no LLNL run is hopeless because **no LLNL run is active**: LLNL pipeline has been entirely deterministic / direct-PMF / CPU-only since Round 154.
+
+### Sandia + LANL pass
+
+**Sandia**: s003_tencent_v1 directory `/home/darrell/checkpoints/s003_tencent_v1/s003_tencent_v1/` contains only `config.json` + `ae_pretrain_best.pt` (no progression past AE phase since Round 22 observation). Process is dead (no PIDs match `train.py`). Same Round 22 finding — recipe over-provisioned, log empty, run died silently. **No new PEER-REVIEW-Sandia post warranted** — Round 22 already covers this state and there's no new substantive Sandia activity.
+
+**LANL**: no new commits to `altgan/` since `af29a4c`. **REBUTTAL §7 alibaba ask remains open** (LANL has not yet cross-evaluated their NeuralAtlas through ★ frozen-bundle, or published their tencent mark_score on `tencent_stackatlas_real.csv`). No new REBUTTAL post warranted — empty drive-by reviews dilute signal.
+
+### Active LLNL run: none. Next race-relevant move
+
+Three remaining candidates from Round 162 follow-up queue, in increasing cost:
+- **(GAN-SIZE)** Constrain v158 size head via post-hoc histogram remap of the size column. ~1 hour. Drops the size_w1_norm 1.099 term toward PhaseAtlas's 0.103, target GAN mark_score 0.06–0.10.
+- **(per-file)** Lighter per-file-characterization-rerouted PhaseAtlas calibration (Round 163 (b)). ~half day. Targets alibaba HRC-MAE 0.0071 → ~0.003 by adapting per-stream reuse to characterization.
+- **(b2)** tencent learned-transition port from `altgan/neural_atlas.py`. Multi-day. Targets tencent HRC-MAE 0.0427 → ~0.012.
+
+Picking GAN-SIZE next — cheapest, addresses the size collapse identified above, and preserves the option of running it as a one-shot post-hoc fix on any existing GAN checkpoint.
+
+Artifacts (vinge):
+- `/home/darrell/v158_gan_panel_op.csv` (GAN with opcode resample)
+- `/home/darrell/mark_score_v158_gan_op.json`

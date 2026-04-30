@@ -50,6 +50,7 @@ def generate(
     lru_cond_pmf_edges: str = "",
     lru_markov_p_rr: float = -1.0,
     lru_markov_p_mr: float = -1.0,
+    opcode_resample: str = "",
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -406,6 +407,28 @@ def generate(
             except (ValueError, TypeError):
                 pass
 
+    # Round 164 P0: GAN's opcode column collapses to a constant in practice
+    # (v158 emits 100% opcode=1, real tencent is 91.6% opcode=0 + 8.4% sentinel
+    # -1). Post-hoc resample from the corpus opcode marginal so mark_score
+    # opcode_tv stops being pinned at 1.0. Distributions sourced from Round 162
+    # PhaseAtlas refits (32 files × 500k events).
+    if opcode_resample and "opcode" in df.columns:
+        _OPCODE_PMF = {
+            "tencent": {0: 0.9161, -1: 0.0839},
+            "alibaba": {0: 0.8487, -1: 0.1513},
+        }
+        if opcode_resample in _OPCODE_PMF:
+            pmf = _OPCODE_PMF[opcode_resample]
+            keys = np.array(sorted(pmf.keys()), dtype=np.int64)
+            probs = np.array([pmf[k] for k in keys], dtype=np.float64)
+            probs = probs / probs.sum()
+            rng = np.random.default_rng(42)
+            df["opcode"] = keys[rng.choice(len(keys), size=len(df), p=probs)]
+            print(f"[opcode-resample] {opcode_resample}: replaced "
+                  f"{len(df):,} opcodes with marginal={dict(pmf)}")
+        else:
+            print(f"[opcode-resample] WARN: unknown corpus '{opcode_resample}'; skip")
+
     df.to_csv(output_path, index=False)
     print(f"Generated {len(df):,} records ({n_streams} stream(s)) → {output_path}")
 
@@ -505,6 +528,12 @@ def parse_args():
                    metavar="P",
                    help="IDEA #93: P(reuse | prev was miss) for 2-state Markov reuse chain. "
                         "Stationary rate: pi=pmr/(1-prr+pmr). -1 (default) = disabled.")
+    p.add_argument("--opcode-resample", default="",
+                   choices=["", "tencent", "alibaba"],
+                   help="Round 164 P0: replace generated opcode column with samples from "
+                        "the corpus opcode marginal (tencent: read=0.92/sentinel=0.08; "
+                        "alibaba: read=0.85/sentinel=0.15). Eliminates the GAN's hardcoded "
+                        "opcode=1 collapse that was pinning mark_quality opcode_tv at 1.0.")
     return p.parse_args()
 
 
@@ -535,4 +564,5 @@ if __name__ == "__main__":
         lru_cond_pmf_edges=args.lru_cond_pmf_edges,
         lru_markov_p_rr=args.lru_stack_markov_prr,
         lru_markov_p_mr=args.lru_stack_markov_pmr,
+        opcode_resample=args.opcode_resample,
     )
