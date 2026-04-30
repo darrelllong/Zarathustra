@@ -7905,3 +7905,70 @@ Use **seed=5** (the v165/v229 known-good basin) so the test isolates the retriev
 | Tencent | 0.039 (v229 ep10) | 0.00887 | not yet | LANL 4.4× |
 
 LANL has been silent since 2026-04-23 (6 days). Sandia is onboarding via newgan/v1_baseline.sh. v233 in pretrain — first frozen ★ readout in ~6.5h. v234 (IDEA #117) queued behind v233 if v233 fails the ep20 hold.
+
+
+## Round 137 — v233 KILLED (IDEA #116 closed-failed); v234 launched (v229 repro); LANL temp sweep landing
+
+**Date**: 2026-04-29 evening
+
+### v233 ep10 frozen-bundle gate: HARD FAIL
+
+Frozen sweep on v233 epoch_0010.pt (the only ckpt produced before kill):
+
+| metric | v233 ep10 | v229 ep10 (ATB) | ratio |
+|---|---|---|---|
+| MMD² | 0.10654 | 0.00553 | **19× worse** |
+| β-recall | 0.2215 | 0.710 | -69% |
+| α-precision | 0.723 | n/a | — |
+| frozen ★ | **0.26224** | 0.039 | **6.7× worse** |
+| train ★ at ep10 | 0.04863 | 0.039 | 1.25× worse |
+
+The train-time selector mis-ranked by **5.4×** (train ★=0.0486 vs frozen ★=0.262). recall=0.222 on the frozen 4-file bundle indicates mode-fragmentation: the generator is producing modes that the held-out files don't contain.
+
+**IDEA #116 (long-chain decoded reuse rate loss, weight=2.0) closed-failed.** It did not stabilise the seed=7 catastrophic basin; if anything, the long-chain pressure pulled the latent toward an even more mode-fragmented region than v231 / v232 produced without it. The hypothesis from Round 135 — "long-chain loss closes the carried-state LSTM divergence" — is rejected on tencent at seed=7. Possible alternative reading: the long-chain loss is correct in spirit but seed=7 is the wrong test bed because the pretrain basin itself is unrecoverable for THIS architecture, regardless of training-time loss.
+
+v233 process (PID 1912815) killed on confirmation of frozen ★ ≥ 0.26 at ep10.
+
+### v234 — v229 repro (seed=5, NO long-chain) launched
+
+PID 2006337 on vinge. Recipe is the v229 ATB recipe **exactly**:
+- seed=5, pretrain_complete.pt cloned from `/home/darrell/checkpoints/tencent_v229/pretrain_complete.pt` (saves 3.5h)
+- `--retrieval-memory --multi-scale-critic --mixed-type-recovery`
+- `--pcf-loss-weight 0.5 --moment-loss-weight 0.5`
+- `--reuse-rate-loss-weight 10.0 --reuse-rate-target 0.70`
+- `--lru-cache-depth 15000 --lru-eval-every 5 --lru-eval-corpus tencent`
+- `--w-stop-threshold 3.0` (legacy; long-chain dropped)
+- 200 epochs, no AMP, no compile
+
+**Why repro before IDEA #117**: v233 demonstrated that frozen ★ can blow up to 0.26 from a cleanly-trained run. Before claiming any new architectural fix (#117), we need fresh evidence that the v229 recipe itself reproduces ★=0.039 on the current code state. If v234 ep10 ≈ 0.039, the system is healthy and IDEA #117 (retrieval-train-carry) becomes the next experiment as v235. If v234 ep10 fails, the v229 ATB itself is unstable and the deeper concern is preprocessor / seed-fit drift since 2026-04-22, not architectural.
+
+**Gates for v234**:
+- ep10 frozen ★ ≤ 0.045 → system healthy, queue v235 (IDEA #117)
+- ep20 reuse_rate must not collapse below 0.10 (v229 ep20 collapsed to reuse=0.049 — that was the original IDEA #115 / #116 motivation)
+- ep10 frozen ★ > 0.10 → kill, escalate (preprocessor / pretrain manifest reproducibility issue)
+
+ETA: ep1 in ~5 min, ep10 gate in ~50 min (Phase 3 only, pretrain reused).
+
+### LANL Update — `mark_temperature` micro-sweep dropping 0.008735 → 0.008424 at temp=0.5
+
+Between Round 136 (Apr 29 20:09 confirmation sweep) and now (~21:00), LANL launched a `temp_micro_seed42` sweep on `mark_temperature ∈ {0.5, 0.75, ...}` keeping every other knob fixed. Single-seed result at temp=0.5:
+
+| metric | temp=1.0 (3-seed mean ATB) | temp=0.5 seed=42 |
+|---|---|---|
+| HRC-MAE | 0.008881 | 0.008424 (-5.2%) |
+| mark_score | 0.028305 | 0.045156 (+59.5%) |
+
+LLNL critique posted to `REBUTTAL-LANL.md` Section 1: this is a Pareto-frontier move (lower temp → sharper categorical marks → better cache fidelity, worse mark fidelity), not a strict improvement. Promotion to a new tencent ATB requires either a compound HRC×mark score or multi-seed confirmation at temp=0.5 plus evidence the mark regression is benign on downstream cache benchmarks. Until then, race position holds at LANL 0.008735.
+
+### Sandia Update — newgan/train.py is now the Sandia training pipeline
+
+Five Sandia commits since the last peer-review tick (`6e561ab`, `1b0c1f2`, `0f91074`, `f42478d`, plus an initial drop): Sandia has stopped wrapping `llgan/train.py` and now ships `newgan/train.py` directly. Imports are still from `llgan.config` / `llgan.dataset` / `llgan.model` (so the model architecture is shared), but the training loop is theirs. They've been working through `_readers → _READERS` import case mismatches and `Generator` constructor signature mismatches — typical first-light debugging. Currently running a 5-epoch / batch-4 / pretrain-1/1/1 smoke test at `/home/darrell/checkpoints/s001_test`. No frozen ★ yet. Sandia commitment to long-horizon focus (per their docstring) is encouraging; they listened to the Round 2 / Round 1 PEER-REVIEW-Sandia.md feedback about pretrain quality and cross-seed validation. **No PEER-REVIEW-Sandia.md note posted this round** — debugging-stage commits are not actionable critique.
+
+### Race Dashboard (Round 137)
+
+| Corpus | LLNL ATB | LANL ATB | Sandia | Status |
+|--------|----------|----------|--------|--------|
+| Alibaba | **0.001937** (v195 ep110) | 0.00301 | not yet | **LLNL +35%** |
+| Tencent | 0.039 (v229 ep10) | 0.008735 (3-seed) / 0.008424 (single-seed temp=0.5, contested) | not yet | LANL 4.47× (3-seed) |
+
+v233 closed-failed, IDEA #116 closed-failed. Active LLNL run: v234 (v229 repro, seed=5). Next architectural attempt: v235 = IDEA #117 (--retrieval-train-carry) once v234 confirms baseline.

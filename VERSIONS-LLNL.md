@@ -4,79 +4,6 @@ All runs use oracle_general Tencent Block 2020 1M corpus (3234 files) unless not
 
 ---
 
-## LANL / altgan Cross-Race Checkpoint (2026-04-23)
-
-LANL's explicit object-process branch is still ahead on the long-rollout cache
-panel. The current promoted Tencent altgan candidate is strict-holdout
-PhaseAtlas with forced phase, `transition_blend=0.55`, and late rank scales
-`1.0,1.0,1.1,1.1`. The earlier `local_prob_power=0.85` branch held up on seeds
-`58-65` at mean HRC-MAE `0.009288`, but a fresh micro-refinement on seeds
-`66-69` found `local_prob_power=0.8` to be better on HRC: mean `0.009109`
-versus `0.009790` for `0.85` and `0.009969` for `0.9`, with reuse and
-stack-distance still close to real.
-
-That result does not change the architectural conclusion. The next LANL move is
-IDEA #53, not another scalar loop: a Tencent neural mark sidecar around the
-strict-holdout PhaseAtlas winner. Alibaba already showed that direct neural
-mark replacement and raw/log numeric interpolation can preserve HRC while
-damaging mark quality or collapsing timing drift. The open question is whether
-Tencent's better object process can carry a sequential mark head without giving
-back the HRC/reuse/stack-distance lead.
-
-Artifacts:
-- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_lp085_moreseeds_summary.csv`
-- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_localpow_micro_refine_summary.csv`
-
----
-
-## LANL / altgan Tencent Update (2026-04-29 20:09 PDT) — Neural Mark Sidecar Lands
-
-LANL completed the IDEA #53 follow-up flagged in the 2026-04-23 entry: a
-PhaseAtlas-marks-e20 neural mark sidecar around the strict-holdout
-PhaseAtlas winner. Three-seed confirmation sweep (`fixedhistory_confirm`)
-finished at 20:09:
-
-| seed | HRC-MAE | mark_score |
-|------|---------|------------|
-| 43 | ~0.0089 | ~0.028 |
-| 44 | 0.008849 | 0.027895 |
-| **45** | **0.008735** | 0.028510 |
-| **3-seed mean** | **0.008881** | 0.028305 |
-
-Recipe (from `tencent_phaseatlas_marks_e20_fixedhistory_confirm_best.json`):
-- `transition_blend = 0.55`
-- `local_prob_power = 0.8`
-- `force_phase_schedule = true`
-- `stack_rank_phase_scales = 1.0,1.0,1.1,1.1`
-- `categorical_source = neural`, `mark_temperature = 1.0`,
-  `mark_numeric_blend = 0.0`, `mark_numeric_blend_space = log`,
-  `mark_numeric_fields = both`, `mark_numeric_noise = 0.05`
-
-**Implications for LLNL race:**
-- LANL tencent ATB **moved 0.00887 → 0.008735** (-1.5%), now 3-seed reproducible.
-- LLNL tencent gap widens: `0.039 / 0.008735 ≈ 4.47×` (was 4.39×).
-- The neural mark sidecar successfully carried PhaseAtlas's HRC lead WITHOUT
-  damaging mark quality (mark_score 0.028 vs older numeric-only marks). The
-  open question from 2026-04-23 — "can Tencent's object process carry a
-  sequential mark head?" — answered: yes.
-- LANL's stack-distance match: median 53 vs real 60; p90 170 vs real 174.
-- LANL's tencent lead is now hardened. Multi-seed confirmation makes it a
-  publishable mechanism, not a single-seed lottery win.
-
-Artifacts:
-- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_confirm_best.json`
-- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_confirm_seed-{43,44,45}_*.json`
-
-LLNL state: v233 (seed=7, IDEA #116 long-chain loss) currently in Phase 3
-ep4 with healthy stats (W=2.51, G=-0.39, reuse=0.643). v234 (IDEA #117
-retrieval-train-carry, seed=5) queued behind v233. LANL's new 0.008735
-sharpens the urgency: even if v233 hits ★=0.039 with multi-seed support,
-the gap to LANL is still 4.47×. Closing it requires architectural change,
-not loss-weight tuning. IDEA #117 (Gemini Round 3 P1 #2 carry fix) is
-LLNL's strongest unlanded structural lever on tencent.
-
----
-
 ## Frozen-Bundle Eval Baselines (2026-04-15, seed=42)
 
 Round 15 peer review revealed that the previous eval protocol resampled a
@@ -6698,3 +6625,41 @@ Eval files (manifest `/home/darrell/long_rollout_manifests/tencent_stackatlas.js
 - Phase 3 (GAN training): NOT STARTED — ep10 gate will be the first honest chain-reuse tencent test
 - Log: /home/darrell/train_tencent_v220.log
 - PID: 476897 (as of 2026-04-23 18:30)
+
+
+---
+
+### tencent_v233 — CLOSED-FAILED (2026-04-29 21:00) — IDEA #116 closed-failed
+
+**Recipe:** seed=7 (v231 catastrophic basin) + `--long-chain-weight 2.0 --long-chain-windows 10` (IDEA #116) + v229 base recipe (retrieval-mem + multi-scale-critic + mixed-type-recovery + PCF 0.5 + reuse-rate 10.0). W-stop 7.0 (long-chain tolerance).
+
+**Hypothesis under test (Round 135):** the long-chain decoded reuse rate loss closes the carried-state LSTM divergence that causes seed=7 to collapse where seed=5 thrives. If true, ep10 would land at HRC-MAE < 0.039 with stable reuse, and ep20 would not collapse.
+
+**Result — frozen-bundle ★ at ep10:**
+- MMD² = 0.10654 (vs v229 ep10 0.00553 = 19× worse)
+- β-recall = 0.2215 (mode-fragmentation; vs v229 0.710)
+- α-precision = 0.723
+- frozen ★ = **0.26224** (vs v229 ATB 0.039 = 6.7× worse)
+- train ★ at ep10 = 0.04863 (selector mis-rank by 5.4×)
+
+**Verdict:** Hypothesis rejected. The long-chain loss did not stabilise seed=7; it pulled the latent toward an even more mode-fragmented region than v231/v232 produced without it. IDEA #116 closed-failed on tencent at this seed.
+
+**What is NOT closed:** seed=5 + IDEA #116 has never been tested, so we cannot rule out that IDEA #116 is corpus-and-seed-conditioned. Given the GPU/time cost, it stays in the icebox unless v234 / v235 produce an unrelated reason to revisit it.
+
+**Process:** PID 1912815, killed manually after frozen ★ readout. Log /home/darrell/train_tencent_v233.log.
+
+---
+
+### tencent_v234 — RUNNING (launched 2026-04-29 21:00) — v229 ATB repro (seed=5, NO long-chain)
+
+**Recipe:** v229 ATB recipe **EXACTLY** — seed=5, retrieval-mem + multi-scale + mixed-type + PCF 0.5 + reuse-rate 10.0 + LRU diagnostic (--lru-eval-every 5). W-stop 3.0. Pretrain reused from `/home/darrell/checkpoints/tencent_v229/pretrain_complete.pt` (Phase 1/2/2.5 skipped → saves 3.5h).
+
+**Why:** v233 demonstrated that a single fresh-pretrain Phase 3 run can blow up to frozen ★=0.26 from clean code. Before claiming any new architectural lever (IDEA #117 retrieval-train-carry, queued as v235), we need fresh evidence that the v229 ATB itself reproduces on the current code state.
+
+**Gates:**
+- ep10 frozen ★ ≤ 0.045 → system healthy, queue v235 (IDEA #117 retrieval-train-carry)
+- ep10 frozen ★ > 0.10 → kill, escalate (preprocessor / pretrain manifest reproducibility issue, deeper than architecture)
+- ep20 reuse_rate must not collapse below 0.10 (v229 ep20 collapsed to reuse=0.049)
+
+**Status:** PID 2006337 on vinge; Phase 3 ep1 starting. ETA ep10 ~50 min, ep20 ~100 min. Log /home/darrell/train_tencent_v234.log.
+
