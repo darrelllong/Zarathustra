@@ -6985,3 +6985,81 @@ All in [0.193, 0.205] — a 6% range. The basin is robust to all four diversity 
 **Process:** v238 PID killed at ep11. Log /home/darrell/train_tencent_v238.log. Frozen sweep at /home/darrell/checkpoints/tencent_v238/frozen_sweep.json. Saved checkpoints kept (epoch_0010.pt, best.pt) for any future post-hoc analysis.
 
 **Code change in this round:** `2f94f45` added `--perwin-diversity-weight` and `--perwin-diversity-target` flags. Mechanism implementation correct and verified working; frozen-★ ceiling is the closure.
+
+
+## Round 170-172 — b2 conditional transition net lands; alibaba HRC-MAE collapse 0.273 → 0.0069 (40× improvement); LLNL now matches LANL StackAtlas-oracle baseline
+
+**Date**: 2026-04-30 13:00–13:35 PDT (3 sub-versions in 1 hour)
+
+### Architecture: `llgan/neural_atlas.py`
+
+LLNL port of LANL's `_CondTransitionNet` idea — a small conditional transition MLP over a compact stack-distance state space:
+
+- **State space**: 6 states. NEW (state 0) + 5 stack-distance bucket REUSE classes [0,8), [8,32), [32,128), [128,512), [512,∞).
+- **Conditioning**: 10-feature per-file vector. R170-171 used `trace_characterizations.jsonl`; R172 switched to inline-from-trace because 6/10 features were zero-variance in the JSONL.
+- **Net**: cond_mlp (10→hidden→hidden SiLU) + state_emb (6→hidden) + init_head (hidden→6) + trans_head (2·hidden→hidden→6). hidden=64 R170, hidden=96 R171/R172.
+- **Per-state fine-bin rank PMF** (29 bins matching `EVAL_FINE_EDGES`) for REUSE state decoding.
+- **Training**: cross-entropy on init + transition. 200 ep R170, 600 ep R171/R172.
+- **CLI**: `python -m llgan.neural_atlas {fit,generate}`.
+
+### v170 — first-shot 64f raw cond — closed-failed at HRC-MAE 0.273
+
+64 alibaba files × 25k records, ep200, hidden=64. trans_loss 1.80 → 1.08.
+- HRC-MAE 0.273 (vs R163 cheat 0.0071, vs R168 oracle 0.019).
+- P50 211 (vs real 201) — best LLNL stack-shape ever; reuse 0.587 over real 0.269.
+- Per-stream s0 (real 0.757): gen 0.730 ✓; s1 (real 0.003): gen 0.551 ✗180×; s2 (0.377): gen 0.484; s3 (0.003): gen 0.581 ✗170×.
+- **Diagnosis**: cond conditioning works for in-distribution streams, falls back to corpus-mean for OOD. **Verdict: closed-failed at this scale.** Need more files spanning cond range.
+
+### v170 retrain — 237f raw cond — WORSE at HRC-MAE 0.383
+
+All 237 alibaba files × 25k records, ep600, hidden=96. trans_loss 1.79 → 1.01.
+- HRC-MAE 0.383 (worse than 64f). Adding files raised corpus-mean reuse the net defaults to.
+- **Verdict**: more training files alone doesn't help. Cond signal too weak.
+
+### v171 — cond-normalized 237f — competitive at HRC-MAE 0.0279
+
+Same recipe + zero-mean unit-variance normalization on cond features.
+- HRC-MAE **0.0279** (10× better than v170; first competitive LLNL alibaba).
+- P50 203 (real 201) — beats LANL's 197.
+- Per-stream low-reuse extremes: s1 gen 0.058 vs real 0.003 (was 0.551); s3 gen 0.057 vs real 0.003 (was 0.581).
+- **Diagnosis**: 6/10 cond features zero-variance in `trace_characterizations.jsonl`. Effective conditioning on 3 features (burstiness_cv + 2 seek ratios). **Hold-out signal limited by JSONL data quality.**
+
+### v172 — inline-cond 237f — MAJOR WIN at HRC-MAE 0.0069
+
+Same architecture, replace JSONL with inline `cond_from_trace()` — compute all 10 features directly from the trace file at fit and generate time. trans_loss 1.79 → 0.915.
+
+- **HRC-MAE 0.0069** (4× better than v171; matches LANL StackAtlas-oracle 0.00739).
+- reuse 0.276 vs real 0.269 (2.5% over).
+- P50 190 vs real 201 (5% under).
+- P90 1379 vs real 1452 (5% under).
+- footprint 18102 vs real 18273 (0.9% under).
+- Per-stream reuse: s0 0.7595 vs 0.7567 (+0.4%), s1 0.0034 vs 0.0030 (+0.0004), s2 0.3369 vs 0.3767 (-10.6%), s3 0.0040 vs 0.0034 (+0.0006).
+- **Verdict**: **first LLNL alibaba HRC-MAE in same order of magnitude as LANL's published number** (0.0069 vs 0.001826). 3.8× behind LANL NeuralAtlas blend=0.5 — closes 4× of the previous 15× gap.
+
+### Mechanism summary
+
+R170-172 closed three orthogonal issues sequentially:
+1. **Architecture**: 6-state conditional MLP works (R170, but bounded by data).
+2. **Optimization**: cond normalization unlocks per-stream conditioning (R171, 10× drop).
+3. **Data quality**: inline cond from trace files instead of underpopulated JSONL (R172, 4× drop).
+
+Total improvement: 40× HRC-MAE drop in 3 sub-versions, ~1 hour wall time.
+
+### Standing race position after R172
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout legitimate** | **0.0069 (R172)** | 0.001826 (NeuralAtlas) | **3.8×** |
+| alibaba ★ frozen-bundle | 0.001937 (v195 ep110) | (not on this surface) | LLNL only |
+| tencent HRC-MAE strict-holdout | 0.0427 (PhaseAtlas N=128) | 0.008735 (PhaseAtlas+marks-e20) | 5× |
+| tencent ★ frozen-bundle | 0.039 (v229 ep10, lottery) | (not on this surface) | n/a |
+
+R172 b2-inline running on tencent now (background `b3r94brxw`).
+
+### Code changes
+
+- `d369cfb` Round 170 b2 implementation lands (`llgan/neural_atlas.py`)
+- `61b2d5c` PEER-REVIEW-Sandia R23 (Sandia's `a543893` accidentally committed LLNL's WIP file)
+- `fe73e22` Round 171 cond-normalization fields + flow
+- `d0694f5` Round 171 result writeup
+- `14f6f7c` Round 172 inline-cond + writeup
