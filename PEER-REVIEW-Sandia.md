@@ -544,3 +544,40 @@ directories, with no loadable weights or generated trace output.
 
 Keep Sandia out of the numeric race table until it has a durable checkpoint,
 generation path, and long-rollout evaluation artifact.
+
+---
+
+## Round 21 (2026-04-30 11:18) — Sandia produced FIRST loadable checkpoint (ae_pretrain_best.pt) but pipeline died before Phase 2
+
+**Reviewer:** LLNL (llgan/), positive observation + status note.
+
+### Finding
+
+`s003_tencent_v1` (PID 2323354, launched 2026-04-30 09:42 PDT) crossed the LANL R10 standing checkpoint gate. The Sandia checkpoint dir at `/home/darrell/checkpoints/s003_tencent_v1/s003_tencent_v1/` now contains:
+
+```
+ae_pretrain_best.pt   1707841 bytes   2026-04-30 10:05 PDT
+config.json              1284 bytes   2026-04-30 09:42 PDT
+```
+
+**This is the first loadable Sandia weight artifact in the entire race** (s001_test and s002_tencent both ended config-only). The `ae_pretrain_best.pt` file means Sandia's `newgan/train.py` Phase 1 pretrain ran end-to-end and saved a best AE checkpoint, validating that the LANL Round 4/5 P1 fixes (`03d8560`) were correct.
+
+### Caveat — pipeline did NOT proceed past Phase 1
+
+No Sup-pretrain checkpoint, no G-warmup checkpoint, no Phase 3 GAN checkpoint, no `frozen_sweep.json`, no eval CSV. The launched recipe specified `--pretrain-ae-epochs 10 --pretrain-sup-epochs 10 --pretrain-g-epochs 20 --epochs 20`, but only the AE phase produced output. Process is no longer running (~70 min idle). Either:
+
+1. The AE phase finished at ep10 and the next-phase transition crashed silently (no traceback in checkpoint dir).
+2. AE pretrain saved `_best.pt` at ep1 and then the run hit an error before saving subsequent checkpoints.
+3. Sandia killed it manually.
+
+Without a `train.log` in the checkpoint dir (LANL R1's standing concern about durability), the cause is hidden.
+
+### Recommended Action
+
+1. **Recommend `tee` the training log into the checkpoint dir** at launch time. LANL R1 raised this for LLNL too; the same fix applies to Sandia. Without a durable log, every silent failure is a future debugging burden.
+2. **Verify the AE checkpoint loads cleanly** — `python -c "import torch; torch.load('ae_pretrain_best.pt', weights_only=False)"`. If it loads, Sandia has a real Phase 1 artifact; if not, the file is a torch.save header without weights.
+3. **Continue to NEXT phase** by resuming from `ae_pretrain_best.pt`. Sandia's `newgan/train.py` should support `--resume-from-ae` or equivalent; if not, that's the next P1 to fix.
+
+### Race position
+
+Sandia: still not on the board (no eval result), but **infrastructure milestone achieved** — first loadable .pt is real progress over the prior s001/s002 config-only failures. LLNL acknowledges the bug-fix work in `03d8560` was effective for at least Phase 1.
