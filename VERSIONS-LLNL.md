@@ -6939,3 +6939,49 @@ Frozen ★ landed in the same [0.20, 0.21] basin as v234d / v235. **β-recall wo
 **Process:** v237 PID killed at ep11. Log /home/darrell/train_tencent_v237.log. Frozen sweep at /home/darrell/checkpoints/tencent_v237/frozen_sweep.json. Saved checkpoints kept (epoch_0010.pt, best.pt) for any post-hoc analysis on the carried-state mechanism.
 
 **Code change in this round:** `20856dc` added `--chain-diversity-weight` and `--chain-diversity-target` flags to train.py + Config. The mechanism implementation is correct and verified working; the issue is the metric mismatch, not the implementation.
+
+---
+
+### tencent_v238 — CLOSED-MARGINAL (2026-04-30 06:33) — IDEA #119 squeezed 1% off the basin; structural ceiling
+
+**Recipe:** v229 base + IDEA #117 (--retrieval-train-carry) + IDEA #116 (--long-chain-weight 2.0) + **IDEA #119 (--perwin-diversity-weight 1.0 --perwin-diversity-target 0.5)**. **NO IDEA #118** — ablated to isolate per-window vs chain effects. Pretrain reused from v234d (deterministic at seed=5).
+
+**Phase 3 trajectory** (alive through ep11):
+
+| ep | W | G | reuse_rate | EMA MMD² | recall | train ★ | lru_actual | lru_fp |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1.12 | 8.13 | 0.063 | — | — | — | — | — |
+| 5 | 2.59 | 7.76 | 0.041 | 0.01051 | **0.645** | **0.0815** ★ | 0.992 | 38 |
+| 10 | 2.69 | 8.62 | 0.050 | 0.00921 | 0.541 | 0.1010 | 0.993 | 33 |
+
+ep5 train ★=0.0815 was the strongest training-time number in the v23x series. Train recall improved markedly vs v237 (0.645 vs 0.576) — IDEA #119's per-window stride variance hinge IS pushing val_ds mode coverage up.
+
+**Frozen-bundle gate:**
+
+| ckpt | frozen ★ | MMD² | β-recall | α-precision |
+|---|---|---|---|---|
+| **ep5 best.pt** | **0.1935** | 0.0092 | 0.0785 | 0.886 |
+| ep10 | 0.1977 | 0.0115 | 0.069 | 0.704 |
+
+ep5 ★=0.1935 is **0.7% better than v234d's 0.197 baseline**. Within noise. The mechanism worked at the val_ds level (train recall 0.576 → 0.645 = +12%) but did NOT generalize to the frozen-bundle (frozen recall 0.078 — same as v234d's 0.075-0.091).
+
+**Structural finding: the LLNL GAN track is bounded by file-to-file generalization, not mechanism choice.** Train EMA recall (val_ds) and frozen recall (held-out 4-file bundle, seed=42) **decouple by 8.2×** at v238 ep5. No per-window or chain loss on val_ds can fix held-out-bundle coverage by construction. v229's ★=0.039 was a single-run lottery where train/frozen happened to agree; in five current-code reruns they consistently disagree by 2.2-8×.
+
+**Five-attempt summary at ★≈0.19-0.20 basin:**
+
+| run | recipe | frozen ★ |
+|---|---|---|
+| v234d | v229 base | 0.197 |
+| v235 | + #117 + #116 | 0.197 |
+| v237 ep5 | + #117 + #116 + #118 | 0.205 |
+| v237 ep10 | same | 0.201 |
+| **v238 ep5** | **+ #117 + #116 + #119** | **0.1935** |
+| v238 ep10 | same | 0.1977 |
+
+All in [0.193, 0.205] — a 6% range. The basin is robust to all four diversity mechanisms (#117/#118/#119 + recipe variants).
+
+**Verdict — IDEA #119 closed-MARGINAL.** The per-window stride hinge does what it's designed for (val_ds recall up); doesn't translate to the metric we're scored on (frozen-bundle recall on a different file selection). To break the basin, we need a fundamentally different track — option (b) PhaseAtlas-style fork. The GAN track for tencent is closed-bounded at ★≈0.19 under deterministic seed=5 + current-code.
+
+**Process:** v238 PID killed at ep11. Log /home/darrell/train_tencent_v238.log. Frozen sweep at /home/darrell/checkpoints/tencent_v238/frozen_sweep.json. Saved checkpoints kept (epoch_0010.pt, best.pt) for any future post-hoc analysis.
+
+**Code change in this round:** `2f94f45` added `--perwin-diversity-weight` and `--perwin-diversity-target` flags. Mechanism implementation correct and verified working; frozen-★ ceiling is the closure.

@@ -8394,3 +8394,77 @@ Active LLNL: **none**. v237 killed; IDEA #119 design pending.
 
 - Sandia: still no relaunch since `03d8560` bug fixes. **No new PEER-REVIEW-Sandia post.**
 - LANL: continued mark-axis sweeps (sizeblend, fieldblend, hidden-size, epoch counts). All bit-identical HRC-MAE per the §3-§5 invariance argument. **No new REBUTTAL post.**
+
+
+## Round 146 — v238 frozen ★=0.1935 (1% improvement); IDEA #119 closed-MARGINAL; structural ceiling at ★≈0.19
+
+**Date**: 2026-04-30 06:33 PDT
+
+### v238 frozen-sweep results
+
+| ckpt | frozen ★ | MMD² | β-recall | α-precision | train ★ |
+|---|---|---|---|---|---|
+| **ep5 best.pt** | **0.1935** | 0.0092 | 0.0785 | 0.886 | 0.0815 |
+| ep10 | 0.1977 | 0.0115 | 0.069 | 0.704 | 0.1010 |
+
+v238's best frozen ★ = 0.1935 is **0.7% better than v234d's baseline (0.197)** — within noise. The per-window stride diversity hinge (IDEA #119) moved the needle by 0.0035 on ★. Net: closed-MARGINAL.
+
+### The diagnostic finding that closes this basin
+
+**Train EMA recall = 0.645 → frozen recall = 0.0785**: an 8.2× gap.
+
+The training-time EMA recall is computed on `val_ds` (the held-out validation files used by `_load_epoch_dataset` for EMA selection). The frozen-bundle recall is computed on a different held-out 4-file bundle (seed=42 selection from `eval.py --eval-real-seed 42`). IDEA #119's per-window stride variance hinge improved val_ds coverage (0.576 → 0.645 from v237's recipe) but did NOT generalize to the frozen-bundle 4-file selection.
+
+**This is a file-to-file generalization gap**, not a mechanism gap. The model is fitting val_ds modes but the frozen-bundle modes are different (different file selection at seed=42). No per-window or chained loss on the train side can fix this — the held-out bundle is held-out by construction.
+
+### Structural ceiling — LLNL GAN track tencent ★≈0.19, five attempts confirm
+
+| run | recipe | frozen ★ |
+|---|---|---|
+| v234d | v229 base, fresh pretrain | 0.197 |
+| v235 | + IDEA #117 + #116 | 0.197 |
+| v237 ep5 | + IDEA #117 + #116 + #118 | 0.205 |
+| v237 ep10 | (same) | 0.201 |
+| **v238 ep5 best** | **+ IDEA #117 + #116 + #119 (no #118)** | **0.1935** |
+| v238 ep10 | (same) | 0.1977 |
+
+All five frozen ★ readouts cluster in [0.193, 0.205] — a 6% range. The ceiling is real and robust to:
+- IDEA #117 (retrieval bank carry)
+- IDEA #116 (long-chain reuse-rate target)
+- IDEA #118 (chain-output stride-variance hinge — moved lru_fp 51→1450 in v237 but didn't help frozen ★)
+- IDEA #119 (per-window stride-variance hinge — moved val_ds recall 0.576→0.645 but didn't generalize to frozen-bundle)
+
+Each mechanism does what it's designed for at the loss-level metric it targets, but the frozen-bundle ★ doesn't move because the frozen bundle is a different file selection and our training-side losses can't see it.
+
+### Why v229's ★=0.039 was a lottery, in plain terms
+
+The v229 single-run that hit ★=0.039 happened to land on an LSTM trajectory whose training EMA selection ALSO produced low frozen-bundle ★ — the train selector and frozen evaluator agreed on that specific run. In the four current-code reruns (v234d through v238), train and frozen disagree by 2.2–8× consistently. v229's agreement was the lottery, not the absolute number.
+
+### Plan revised — pivot to track (b) PhaseAtlas
+
+Three options remained at Round 145; (a) and (c) are now both spent:
+- ~~(a) Fresh pretrain disambiguation~~ — moot, deterministic at seed=5 (Round 143).
+- ~~(c) Diversity loss on chained lru_fp~~ — moved lru_fp but not ★ (v237/Round 145).
+- ~~Sub-option: per-window diversity (IDEA #119)~~ — moved val_ds recall but not frozen ★ (this round).
+
+**Option (b): PhaseAtlas-style fork for tencent.** LLNL's alibaba ATB ★=0.001937 came from `phase_pmf_atlas.py`, NOT the GAN. LANL's tencent 0.008735 also comes from PhaseAtlas (with neural mark sidecar). The LLNL GAN track on tencent is empirically capped at ★≈0.19-0.20; further GAN mechanism work won't break this without addressing file-to-file generalization, which the held-out protocol prevents by construction.
+
+The path forward: **fit a PhaseAtlas analogue for tencent**, similar to LANL's `tencent_phaseatlas_*.pkl.gz` artifacts. LLNL has `phase_pmf_atlas.py` + `compute_markov_atlas.py` + `compute_cond_pmf.py` already wired for alibaba; tencent application requires fitting on tencent traces. Cost: days of analysis, but a known-feasible mechanism (LANL's race-leading number proves it works).
+
+### Decision
+
+v238 killed at ep11. **The LLNL GAN track for tencent is closed-bounded at ★≈0.19** under the deterministic seed=5 + current-code regime. Active LLNL run: **none**. Next: PhaseAtlas-track planning.
+
+### Race Dashboard (Round 146)
+
+| Corpus | LLNL claimed | LLNL current-code reproducible | LANL |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas) | 0.001937 (PhaseAtlas) | 0.00301 (PhaseAtlas) |
+| Tencent | 0.039 (v229 historical-lottery) | **0.1935** (v238 ep5; GAN track) | 0.008735 (PhaseAtlas + marks-e20) |
+
+LLNL's reproducible tencent number under current code is **0.1935** — best of five from-scratch GAN attempts. 22.6× behind LANL's 0.008735. The honest race position is "GAN track underperforming PhaseAtlas track on this corpus by an order of magnitude; pivot to PhaseAtlas."
+
+### Sandia + LANL pass
+
+- Sandia: still idle (per LANL's PEER-REVIEW-Sandia Rounds 11-13). **No new PEER-REVIEW-Sandia post.**
+- LANL: continuing fine-grained variant sweeps (size-blend confirm-restored, hidden-size variants, snap-checkpoints). Predictable §3-§5 invariance. **No new REBUTTAL post.**
