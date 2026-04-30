@@ -10518,3 +10518,98 @@ GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBU
 Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_dropout.pkl.gz`
 - `/home/darrell/v_alibaba_b2_dropout.csv`
+
+
+## Round 181 — Diagnostic-driven hot-pool boost; CORRECTIVE: my Python eval was mis-calibrated, the real cachesim gap is 3-10× larger than I claimed
+
+**Date**: 2026-04-30 16:30 PDT (Darrell prompt: "synthetic traces suck compared to real on the cache simulator")
+
+### Diagnostic finding (`llgan/diag_hrc.py`)
+
+Real workloads concentrate accesses on a small hot pool. b2-light's i.i.d. PMF sampling spreads uniformly across the LRU stack:
+
+| metric | tencent_real | R173 b2-inline | gap |
+|---|---|---|---|
+| top-100 access share | 34.90% | 1.71% | **20.4× too uniform** |
+| top-1000 access share | 54.32% | 11.14% | 4.9× too uniform |
+| adjacent-duplicate rate | 0.0031 | 0.0000 | fake never repeats |
+
+| metric | alibaba_real | R172 b2-inline | gap |
+|---|---|---|---|
+| top-100 access share | 8.05% | 1.81% | 4.5× too uniform |
+| top-1000 access share | 20.01% | 10.50% | 2× too uniform |
+
+### Hot-pool boost implementation
+
+`llgan/neural_atlas.py` adds a sliding-window hot-pool tracker (deque of last 5000 obj_ids, top-K=100 by frequency). With probability `--hot-pool-prob` per REUSE step, redirect to a randomly-chosen hot-pool object instead of i.i.d. PMF rank.
+
+### Result on Python eval-csv-hrc surface (false positive)
+
+| recipe | tencent HRC-MAE | alibaba HRC-MAE |
+|---|---|---|
+| R173/R172 baseline | 0.0206 / 0.0069 | |
+| **R181 hot-pool P=0.05** | **0.0172** / **0.0061** | apparent 17% / 12% improvement |
+
+I claimed (commit `986e152`) that "tencent broke under-2× to LANL for the first time."
+
+### CORRECTIVE: real cachesim shows the boost does NOT help
+
+Re-evaluated R181 P=0.05 through `tools/cachesim` (Darrell's 6-policy simulator landed in `d59ed98`) at cap = 32/128/512/2048/8192. Per-policy HRC-MAE (mean |fake_MR - real_MR| across 5 caps):
+
+| policy | R173 baseline | R181 hot-pool 0.05 | direction |
+|---|---|---|---|
+| LRU | 0.033 | 0.041 | worse |
+| ARC | 0.080 | 0.089 | worse |
+| FIFO | 0.035 | ~0.04 | worse |
+| **SIEVE** | **0.345** | 0.336 | tiny improvement |
+| SLRU | 0.052 | 0.059 | worse |
+| CAR | 0.082 | ~0.09 | worse |
+
+ARC at cap=128 is the worst per-cell: real 0.572 vs both R173/R181 at ~0.79 (Δ +0.21). Both variants miss this equally — ARC exploits recency+frequency in real workloads in a way i.i.d. PMF sampling never produces.
+
+SIEVE catastrophic for both: real adjacent-duplicate rate is 0.31% but fake is 0.00% (fake never emits same-id back-to-back). SIEVE relies on second-chance bit set by hits; without consecutive same-id, SIEVE degrades to FIFO with extra cost.
+
+### Why the Python eval missed this
+
+`llgan/phase_pmf_atlas.py:eval-csv-hrc` uses `cache_sizes = footprint_mean × [0.005, 0.01, ..., 3.0]`. For tencent footprint=9627, this gives caps 48 → 28880. The cachesim surface uses cap = 32/128/512/2048/8192 — significantly different.
+
+Critical missing range: my Python eval barely covers cap=128 where ARC's recency-frequency exploit fires hardest. The Python eval averages across cache sizes that don't include the small-cap regime where the synth shape error dominates.
+
+### Honest race position update
+
+- **My published HRC-MAE numbers (R172 alibaba 0.0069, R173 tencent 0.0206) are on the Python eval-csv-hrc surface, NOT cachesim**.
+- On the cachesim surface (the policy-relevant metric), the gap to real is **3-10× larger** across LRU/ARC/CAR. Best-case LRU HRC-MAE ≈ 0.033 tencent (R173 baseline); ARC ≈ 0.080; SIEVE ≈ 0.345.
+- LANL's published 0.008735 tencent number is on their own evaluator. Need a comparable-surface eval to know the actual race position.
+- My R181 "hot-pool boost wins" claim is corrected: the boost moves the eval-csv-hrc number but doesn't move the cachesim numbers — false positive on the wrong metric.
+
+### Real architectural failures the cachesim exposes
+
+1. **Shape error**: synth too pessimistic at small caches (cap=32 LRU: real 0.852 vs fake 0.937, Δ +0.085) and slightly too optimistic at large caches (cap=8192: real 0.388 vs fake 0.367, Δ −0.021). The HRC curve crosses real around cap=4096.
+2. **Adjacent-duplicate gap**: fake adj-dup rate = 0.000 (never), real = 0.0031 (~0.3%). Single-step repeats cost SIEVE catastrophically; LRU/ARC less but still measurable.
+3. **Hot-set concentration**: top-K share off by 4-20×. Hot-pool boost addresses the symptom but at hot-pool-prob 0.05 it doesn't reach real's 35% top-100 share AND it shifts the wrong cap regime.
+
+### What would actually help
+
+- **Allow back-to-back duplicates** (small probability of resampling rank=0). Cheap; fixes SIEVE.
+- **Stronger hot-set**: instead of P=0.05 uniform-from-top-K, use P=0.30 with weighted sampling by frequency. Still doesn't fix shape error directly but might pull more synth misses onto the hot pool.
+- **Sequence-aware generation** (transformer): the only structural fix for the cap-128 ARC gap. Multi-day commitment.
+
+### Sandia + LANL pass
+
+- LANL committed `8108850` (long-reuse boost controls) and `d59ed98` (cachesim build-out + PEER-REVIEW.md). The first is altgan/, the second is shared infrastructure. **No new REBUTTAL post warranted — this is constructive infrastructure.**
+- LANL Round 20 in PEER-REVIEW-LLNL.md (in user's working tree but not yet pushed to remote) caught a real bug in R180 AR-rank — patched in `1bba204`.
+- Sandia: still no published ATB. Last newgan/ commit is `4bed62e` (tensor-dim fix). No PEER-REVIEW-Sandia post warranted.
+
+### Active LLNL run: none. Next move
+
+Three-way priority shift:
+1. **Acknowledge** the corrective publicly (this writeup + commit) — done.
+2. **Allow back-to-back duplicates** on R173 baseline. ~10 min. Fixes SIEVE catastrophic gap from 0.345 to estimable.
+3. **Run all R172/R173 numbers through cachesim** for an honest race-position table. ~30 min. Replace eval-csv-hrc as the LLNL headline metric.
+
+Picking #2 next — cheapest path to a smaller gap.
+
+Artifacts:
+- `/Users/darrell/Zarathustra/llgan/diag_hrc.py` (diagnostic — committed `3b1d3ea`)
+- `/tmp/v_tencent_hot0.05.csv` and family on vinge (R181 hot-pool outputs)
+- `/tmp/cs_compare.py` local cachesim comparison harness
