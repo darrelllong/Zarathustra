@@ -8824,3 +8824,60 @@ Active LLNL run: **none**. The Round 149 option (1) "refit with more files" trac
 
 LANL: continued mark-axis sweeps. **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 153 — Calibration-seed sweep characterizes the lottery: 0.019 (best) → 0.112 (worst); historical 0.04375 is the median
+
+**Date**: 2026-04-30 09:48 PDT
+
+### Sweep methodology
+
+Held the 32f BIT-fit constant. Varied the calibration-JSON sample seed across {101, 102, 103, 104, 105}, each producing 8 holdout-files-disjoint-from-eval, computed per-stream stack-distance histogram + reuse_access_rate, calibrated → generated → eval.
+
+### Results
+
+| seed | calib reuse_rate | HRC-MAE | |Δreuse vs eval 0.615| |
+|---|---|---|---|
+| 101 | 0.5167 | 0.1119 | 0.098 |
+| 102 | 0.6383 | 0.0504 | 0.023 |
+| **103** | 0.6203 | **0.0192** | **0.005** (best match) |
+| 104 | 0.6137 | 0.0281 | 0.001 |
+| 105 | 0.5864 | 0.0450 | 0.029 |
+
+- **5.9× spread** in HRC-MAE across draws (0.019 to 0.112).
+- **Strong correlation**: closer calibration `reuse_rate` to eval's 0.615 → lower HRC-MAE.
+- **Median HRC-MAE = 0.045** ≈ historical 0.04375 baseline — confirms historical was the **median** of the lottery, not exceptional.
+- **Lucky tail seed=103: HRC-MAE = 0.0192** — 2.3× better than baseline, **only 2.2× behind LANL's 0.008735**.
+
+### Why 0.0192 is NOT a legitimate ATB claim
+
+Selecting seed=103 BECAUSE it scored best on the eval is post-hoc test-set selection. The methodologically clean path is to **pre-register the seed** before running the eval, OR use a target-matching protocol that doesn't require eval-side knowledge.
+
+The eval bundle's `reuse_access_rate=0.615` IS technically known publicly (it's part of the manifest), but using it to select among 5 calibration draws is "test-set tuning" — same epistemic class as the historical 0.04375 lottery, just with more samples.
+
+### Methodologically defensible path
+
+The seed-103 result suggests **PhaseAtlas calibration variance is dominated by reuse-rate matching**. A clean improvement strategy:
+
+1. **Use more calibration files** (N=64, N=128, N=256, N=all-3230). Larger N → lower variance → converges toward population mean. If the population mean reuse_rate is ~0.61 (consistent with the eval bundle), large-N calibration will land near that without needing eval-side selection.
+
+2. **Use the entire training corpus** (3230 files, all DISJOINT from the 4 eval files by definition) for one big calibration JSON. Eliminates the small-N lottery; the resulting calibration matches the population distribution by construction.
+
+That's a legitimate strict-holdout protocol AND should produce a stable, reproducible HRC-MAE around the seed-103/104 region (0.02-0.03) without lottery selection.
+
+### Decision
+
+Run a large-N calibration experiment next (Round 154). Pick N=128 first (compute scales linearly; 128 files × 25k records = 3.2M, reasonable). If that converges to reuse_rate ≈ 0.61 (population), the resulting HRC-MAE estimate is the legitimate strict-holdout LLNL number on the single-phase track.
+
+The current seed-103 result (0.0192) stays in this round's record as "best of 5-seed sweep, not promoted," and as evidence that the methodology has a real ceiling around 0.02 if calibration matches population.
+
+### Race position (preliminary, pending N=128 verification)
+
+If N=128 lands at HRC-MAE ~0.02, **LLNL closes the gap from 5× to 2.3× behind LANL** on tencent. Still behind, but a meaningful step. v229's GAN ★=0.039 historical-lottery is comparatively worse than this PhaseAtlas track in absolute terms (frozen-★ and HRC-MAE are different protocols, but on the HRC-MAE protocol LLNL hasn't broken below 0.04 reproducibly until now).
+
+Active LLNL run: **none**. Next: N=128 calibration experiment.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis variant sweeps (predictable invariance). **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
