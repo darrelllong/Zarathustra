@@ -365,6 +365,10 @@ class SandiaTrainer:
                 with torch.no_grad():
                     h = self.E(batch)
 
+                # h should be (batch, T, latent_dim), but may be (T, latent_dim) if batch=1
+                # Add batch dimension if needed
+                if h.dim() == 2:
+                    h = h.unsqueeze(0)
                 pred = self.S(h[:, :-1, :])
                 loss = F.mse_loss(pred, h[:, 1:, :])
 
@@ -387,6 +391,8 @@ class SandiaTrainer:
                             batch, _ = batch
                         batch = batch.to(self.device)
                         h = self.E(batch)
+                        if h.dim() == 2:
+                            h = h.unsqueeze(0)
                         pred = self.S(h[:, :-1, :])
                         loss = F.mse_loss(pred, h[:, 1:, :])
                         val_loss += loss.item() * batch.size(0)
@@ -449,6 +455,8 @@ class SandiaTrainer:
 
                 with torch.no_grad():
                     h_real = self.E(batch)
+                    if h_real.dim() == 2:
+                        h_real = h_real.unsqueeze(0)
                     h_pred = self.S(h_real[:, :-1, :])
 
                 B, T, _ = h_pred.shape
@@ -477,6 +485,8 @@ class SandiaTrainer:
                             batch, _ = batch
                         batch = batch.to(self.device)
                         h_real = self.E(batch)
+                        if h_real.dim() == 2:
+                            h_real = h_real.unsqueeze(0)
                         h_pred = self.S(h_real[:, :-1, :])
                         B, T, _ = h_pred.shape
                         z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
@@ -582,7 +592,11 @@ class SandiaTrainer:
                 # Supervisor consistency loss
                 with torch.no_grad():
                     h_real = self.E(batch)
+                    if h_real.dim() == 2:
+                        h_real = h_real.unsqueeze(0)
                     h_pred = self.S(h_real[:, :-1, :])
+                if h_fake.dim() == 2:
+                    h_fake = h_fake.unsqueeze(0)
                 h_pred_fake = self.S(h_fake[:, :-1, :])
                 sup_loss = F.mse_loss(h_pred_fake, h_fake[:, 1:, :])
 
