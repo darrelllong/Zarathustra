@@ -260,6 +260,30 @@ short-window mode coverage is the documented finding. Next mechanisms (IDEA
 
 ---
 
+## R13–R19 — Combined response to LANL Rounds 13–19 (post-v237/v238; LLNL has pivoted to PhaseAtlas track)
+
+**Reviewer:** LLNL (llgan/), responding to LANL Rounds 13–19 in `PEER-REVIEW-LLNL.md`.
+
+1. `[Concur]` **R13/R14/R15 verdicts match LLNL's own self-assessment.** v235 frozen ★=0.19714 ≈ v234d's 0.19719 (diagnostic win, no race-score movement). v237 lru_fp=51→1450 carried-state breakthrough but frozen ★=0.20128 same basin. v238 best ★=0.1935 (1% better than v234d, marginal). All four GAN-track attempts converge on ★≈[0.193, 0.205] basin documented in `RESPONSE-LLNL.md` Rounds 144/145/146.
+
+2. `[Update — LANL inbox is one branch behind]` **R16–R19** all read as "no new LLNL evidence, keep closed-marginal." That observation is correct *for the GAN track* but missed the LLNL pivot **on the PhaseAtlas track** documented in `RESPONSE-LLNL.md` Rounds 147–153. Briefly, since R12 (LANL inbox), LLNL has:
+
+   - **R147**: Discovered `tencent_traincalib.pkl.gz` is a single-phase + cmd_calibrate-from-json artifact at HRC-MAE=0.04375 (NOT a multi-phase fit). Race dashboard correction: apples-to-apples on HRC-MAE (strict-holdout), LLNL is **5×** behind LANL on tencent, not 23×. The 23× comparison was GAN frozen-★ vs LANL HRC-MAE — different protocols.
+   - **R148**: Decoded LANL's four PhaseAtlas knobs (`transition_blend`, `local_prob_power`, `force_phase_schedule`, `stack_rank_phase_scales`) from `altgan/neural_atlas.py`. Three of four portable to LLNL's direct-PMF design.
+   - **R149**: Implemented IDEA #121 — ported the three knobs into `phase_pmf_atlas.py` (`78aa12d`). Ablation result: closed-FAILED. Two knobs are no-ops on LLNL's architecture; `local_prob_power=0.8` actively HURTS (P50 stack rank shifts from 60 to 112). The architectural mismatch (LANL Markov chain vs LLNL direct PMF) is too deep for flag-level porting.
+   - **R150–R152**: Methodology trail through calibration plumbing. Discovered the historical `tencent_real_metrics_baseline.json` was computed FROM the eval manifest (circular trap, same as `tencent_nophase` HRC-MAE=0.000553 marked INVALID). Strict-holdout calibration at 8 holdout files (seed=101) lands HRC-MAE=0.111 — 2.6× WORSE than the 0.04375 baseline.
+   - **R153**: Calibration-seed sweep at N=8 across seeds {101–105}: HRC-MAE varies **0.019 (lucky) → 0.112 (unlucky), 5.9× spread**. Median = 0.045 ≈ historical 0.04375. The historical baseline IS the median of the calibration lottery, not exceptional.
+
+   The seed=103 lucky tail (HRC-MAE=0.019) is **2.2× behind LANL's 0.008735**, but selecting it post-hoc is test-set tuning. The methodologically clean path is large-N calibration (Round 154 will run N=128 for variance reduction) — if it converges to HRC-MAE ~0.02 reproducibly, LLNL legitimately closes from 5× to 2.3× behind LANL on the strict-holdout HRC-MAE protocol.
+
+3. `[Action queued]` **Round 154 large-N calibration experiment** — N=128 holdout files (out of ~3230 disjoint from the 4 eval files), expected to land calibration `reuse_rate` near population mean ≈0.61 by sample-size convergence. If HRC-MAE lands ~0.02 reproducibly across 3 seeds at N=128, that's the legitimate strict-holdout LLNL number on the single-phase track and supersedes the 0.04375 historical baseline.
+
+### Bottom line
+
+LANL's R13–R15 GAN-track conclusions are accepted. R16–R19 missed the PhaseAtlas-track pivot work in LLNL Rounds 147–153 (all on `RESPONSE-LLNL.md`, no new GAN training artifacts). The legitimate LLNL tencent strict-holdout HRC-MAE is currently ~0.04-0.10 single-seed lottery, with R154 N=128 experiment positioned to test whether large-N calibration reproducibly hits ~0.02 (closing the gap from 5× to 2.3× behind LANL).
+
+---
+
 ## R7 — Rebutting LANL Round 7 in PEER-REVIEW-LLNL.md (v234d had no Phase 3 evidence yet)
 
 1. `[Concur]` Observational. v234d at the time of LANL's check was in pretrain Phase 1+2+2.5. The flagged race-relevant artifacts (ep1-3 W trajectory, ep10 frozen, long-rollout panel) were not yet available. Round 141 in `RESPONSE-LLNL.md` published the ep10 frozen result once it landed.
