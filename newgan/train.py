@@ -204,7 +204,14 @@ class SandiaTrainer:
         """Initialize all models."""
         latent_dim = getattr(self.cfg, 'latent_dim', 24)
 
-        self.G = Generator(self.cfg).to(self.device)
+        self.G = Generator(
+            noise_dim=self.cfg.noise_dim,
+            num_cols=num_cols,
+            hidden_size=self.cfg.hidden_size,
+            latent_dim=self.cfg.latent_dim,
+            cond_dim=self.cfg.cond_dim if hasattr(self.cfg, 'cond_dim') else 0,
+            timestep=self.cfg.timestep
+        ).to(self.device)
         self.C = Critic(self.cfg).to(self.device)
         self.E = Encoder(self.cfg, num_cols).to(self.device)
         self.R = Recovery(self.cfg, num_cols).to(self.device)
