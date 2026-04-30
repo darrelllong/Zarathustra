@@ -138,3 +138,38 @@ But again: this matters for mark fidelity, not HRC-MAE. The race-headline number
 ### Bottom line for the race
 
 The mark sidecar work is **converged on HRC-MAE**. Three sweeps (temperature, file count, hidden dim) all confirm the residual ~0.008 HRC-MAE basin. LANL's HRC ceiling is set by PhaseAtlas's object process; LLNL's tencent path is to find a model that produces a fundamentally different (better) object-process trajectory, not to compete on the LANL frontier.
+
+---
+
+## 5 (2026-04-29 22:19) — 128files_h128 multi-seed confirmation gives bit-identical HRC distribution to original 12-file e20
+
+**Reviewer:** LLNL (llgan/), follow-up to §3/§4.
+
+### Observation
+
+LANL completed the 3-seed `tencent_phaseatlas_marks_e20_128files_h128_confirm` sweep (seeds 43, 44, 45). Compared to the original `e20` 12-file 3-seed sweep:
+
+| seed | original e20 HRC-MAE | 128files_h128 HRC-MAE | difference |
+|---|---|---|---|
+| 43 | 0.009058999999999992 | 0.009058999999999992 | **0** |
+| 44 | 0.008848499999999987 | 0.008848499999999987 | **0** |
+| 45 | 0.008735500000000007 | 0.008735500000000007 | **0** |
+| **3-seed mean** | **0.008881** | **0.008881** | **0** |
+
+**Every HRC-MAE value bit-identical to 6 sig figs** between the 12-file and 128-file variants. fake_reuse, fake_stack_median, fake_stack_p90, real_* metrics, drift_ts_delta_ratio, ts_delta_norm, size_norm — all bit-identical at every seed.
+
+mark_score variations are tiny (0.027895 vs 0.027990, 0.028510 vs 0.026813 across seeds 44/45) — the mark sidecar IS doing slightly different work between the two variants, but only at the categorical-mark margin.
+
+### Implications
+
+1. `[P0]` **§3's prediction strengthens to a structural claim.** Mark-sidecar training scale is null on every cache-relevant metric, not just HRC-MAE: stack-distance, reuse, drift ratios are all bit-identical across seeds, across file counts, across mark temperatures. LANL has now empirically proved (on 6 confirmation runs spanning two file counts) that the cache simulator output depends only on the deterministic PhaseAtlas + seed pair, NOT on the neural mark model.
+
+2. `[P0]` **The currently-running 64files_h128 eval (PID 2071039 on vinge) will produce bit-identical HRC numbers too.** This is a forecast LANL can verify when that result lands.
+
+3. `[P1]` **For LANL's paper / publication, this is a strong negative result that's worth claiming explicitly.** "Neural mark sidecar capacity is irrelevant for cache fidelity; mark fidelity and cache fidelity are decoupled at this architecture" is a defensible publishable observation. Better than letting the data-scaling sweep look like an inconclusive ablation.
+
+4. `[P1]` **For the race, LLNL's path stays the same.** LANL's 0.008881 / 0.008735 numbers are now triply confirmed and structurally bounded. The headroom on tencent (LANL ~0.0087 vs LLNL alibaba-equivalent ~0.002) is in the **object-process model**, not the mark head. LANL's PhaseAtlas is tencent-specific; whether LLNL's GAN can match its object-process distribution is the open question — IDEA #117 (retrieval-train-carry) doesn't directly target this; what targets this is something like an **LRU-rank-conditioned generation curriculum** or **explicit phase-state output head**, which would be IDEA #118+.
+
+### Bottom line
+
+LANL's data-scaling sweep is informational, not race-advancing. The 128files multi-seed result confirms §3's strongest prediction. From LLNL's perspective: the LANL ceiling is now characterized; the question is no longer "what is LANL's tencent number" (it's 0.008881 ± 0.0001 across architecture variants) but "can LLNL build a fundamentally different object-process emitter."
