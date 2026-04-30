@@ -35,9 +35,14 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 try:
-    from llgan.phase_pmf_atlas import _read_trace, BUCKET_EDGES, N_BUCKETS
+    from llgan.phase_pmf_atlas import _read_trace, BUCKET_EDGES, N_BUCKETS, EVAL_FINE_EDGES
 except ModuleNotFoundError:
-    from phase_pmf_atlas import _read_trace, BUCKET_EDGES, N_BUCKETS
+    from phase_pmf_atlas import _read_trace, BUCKET_EDGES, N_BUCKETS, EVAL_FINE_EDGES
+
+# c2: use 30 fine bins (29 fine ranges) instead of 8 coarse buckets.
+# Edges from phase_pmf_atlas.EVAL_FINE_EDGES, fitted from alibaba real eval —
+# but the BIN STRUCTURE (log-spaced rank ranges) is corpus-agnostic.
+N_FINE = len(EVAL_FINE_EDGES) - 1   # 29 fine bins
 
 
 # ---------------------------------------------------------------------------
@@ -111,8 +116,9 @@ def _label_streams(
                 action = 1  # REUSE_NEAR
             else:
                 action = 2  # REUSE_FAR
-            rb = int(np.searchsorted(BUCKET_EDGES, rank, side="right")) - 1
-            rb = max(0, min(rb, N_BUCKETS - 1))
+            # c2: use fine bins (29 log-spaced) instead of 8 coarse buckets
+            rb = int(np.searchsorted(EVAL_FINE_EDGES, rank + 1, side="right")) - 1
+            rb = max(0, min(rb, N_FINE - 1))
             rank_buckets[t] = rb
             # Move obj_id to position 0
             stack.pop(rank)
@@ -147,7 +153,7 @@ def _label_streams(
 class MarkovAtlas:
     init_probs: np.ndarray = field(default_factory=lambda: np.zeros(N_STATES))
     transition_p: np.ndarray = field(default_factory=lambda: np.zeros((N_STATES, N_STATES)))
-    rank_pmf: np.ndarray = field(default_factory=lambda: np.zeros((N_STATES, N_BUCKETS)))
+    rank_pmf: np.ndarray = field(default_factory=lambda: np.zeros((N_STATES, N_FINE)))
     dt_pmf: np.ndarray = field(default_factory=lambda: np.zeros(N_TIME_BINS))
     dt_edges: np.ndarray = field(default_factory=lambda: np.zeros(N_TIME_BINS + 1))
     size_edges: np.ndarray = field(default_factory=lambda: np.zeros(N_SIZE_BINS + 1))
@@ -225,7 +231,7 @@ class MarkovAtlas:
         # Pass 2: compute states, transitions, rank PMFs
         init_counts = np.zeros(N_STATES, dtype=np.int64)
         trans_counts = np.zeros((N_STATES, N_STATES), dtype=np.int64)
-        rank_counts = np.zeros((N_STATES, N_BUCKETS), dtype=np.int64)
+        rank_counts = np.zeros((N_STATES, N_FINE), dtype=np.int64)
         dt_per_bin = [[] for _ in range(N_TIME_BINS)]
         size_per_bin = [[] for _ in range(N_SIZE_BINS)]
         n_total_records = 0
@@ -372,14 +378,16 @@ class MarkovAtlas:
                 else:
                     bucket_p = self.rank_pmf[state]
                     if bucket_p.sum() <= 0:
-                        rb = 0
+                        fine_i = 0
                     else:
-                        rb = int(rng.choice(N_BUCKETS, p=bucket_p))
-                    lo = int(BUCKET_EDGES[rb])
-                    hi = int(BUCKET_EDGES[rb + 1]) - 1
+                        fine_i = int(rng.choice(N_FINE, p=bucket_p))
+                    # c2: fine-bin sampling (29 log-spaced bins from EVAL_FINE_EDGES)
+                    # rank is 0-indexed; EVAL_FINE_EDGES are 1-indexed (bin 0 = rank 0)
+                    lo = int(EVAL_FINE_EDGES[fine_i]) - 1
+                    hi = int(EVAL_FINE_EDGES[fine_i + 1]) - 1
                     stack_sz = len(stack)
-                    lo_eff = min(lo, stack_sz - 1)
-                    hi_eff = min(hi, stack_sz - 1)
+                    lo_eff = max(0, min(lo, stack_sz - 1))
+                    hi_eff = max(lo_eff, min(hi, stack_sz - 1))
                     rank = int(rng.integers(lo_eff, hi_eff + 1))
                     obj_id = stack[rank]
                     del stack[rank]
