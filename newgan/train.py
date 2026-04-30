@@ -562,12 +562,16 @@ class SandiaTrainer:
 
                     with torch.no_grad():
                         h_real = self.E(batch)
+                    if h_real.dim() == 2:
+                        h_real = h_real.unsqueeze(0)
                     C_real = self.C(h_real)
                     C_real_loss = -C_real.mean()
 
                     z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
                     z_local = torch.randn(B, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
                     h_fake = self.G(z_global, z_local)
+                    if h_fake.dim() == 2:
+                        h_fake = h_fake.unsqueeze(0)
                     C_fake = self.C(h_fake.detach())
                     C_fake_loss = C_fake.mean()
 
@@ -585,6 +589,8 @@ class SandiaTrainer:
                 z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
                 z_local = torch.randn(B, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
                 h_fake = self.G(z_global, z_local)
+                if h_fake.dim() == 2:
+                    h_fake = h_fake.unsqueeze(0)
                 C_fake = self.C(h_fake)
 
                 G_loss = -C_fake.mean()
