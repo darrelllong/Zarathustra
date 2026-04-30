@@ -9905,3 +9905,69 @@ GPU 0%, no active processes. No new commits since `c12ed02` Sandia / `af29a4c` L
 ### Active LLNL run: none
 
 Stopping the "try one more PhaseAtlas variant" cycle. Awaiting user direction on b2-vs-pivot.
+
+
+## Round 170 — b2 light port lands and trains end-to-end; first-shot HRC-MAE 0.273 (cond conditioning works for high-reuse stream, fails for low-reuse extremes)
+
+**Date**: 2026-04-30 14:30 PDT (b2 implementation, autonomous continuation)
+
+### What shipped
+
+`llgan/neural_atlas.py` (~310 lines) — minimal port of LANL's `_CondTransitionNet` idea:
+
+- **State space**: 6 states. `STATE_NEW=0` plus 5 stack-distance bucket REUSE classes (`[0,8), [8,32), [32,128), [128,512), [512,∞)`).
+- **Conditioning**: 10-feature vector per file from `trace_characterizations.jsonl` (burstiness_cv, iat_q50/q90, obj_size_q50/q90, write_ratio, opcode_switch_ratio, forward/backward_seek_ratio, ts_duration). **Excludes `reuse_ratio`** because R169 found its 4096-sample value categorically wrong.
+- **Net**: `cond_mlp` (10→64→64 SiLU) + `state_emb` (6→64) + `init_head` (64→6) + `trans_head` (128→64→6).
+- **Training**: cross-entropy on (cond, prev_state, next_state) tuples + initial-state loss.
+- **Generation**: per-stream cond from manifest file's characterization → roll out state sequence → decode REUSE state → fine-bin rank PMF (per-state, fitted from training observations) → existing PhaseAtlas-style stack.
+
+CLI: `python -m llgan.neural_atlas {fit,generate}`. Reuses `phase_pmf_atlas eval-csv-hrc` for evaluation.
+
+### First-shot training (64 alibaba files × 25k records, 200 epochs, hidden=64)
+
+- 1.6M transitions accumulated, per-state reuse counts well-balanced ([0, 137k, 142k, 167k, 256k, 217k]).
+- Train loss: init 1.80 → 0.0005 (memorizes 64 initial states perfectly), trans 1.80 → 1.08 (close to log(6)=1.79 floor — modest improvement).
+
+### First-shot HRC-MAE on alibaba_stackatlas
+
+| recipe | reuse (gen / real) | P50 (gen / real) | P90 (gen / real) | footprint (gen / real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R163 single-rate (0.2691 manifest-aware) | 0.270 / 0.269 | 114 / 201 | 1225 / 1452 | 18251 / 18273 | 0.0071 |
+| R168 per-stream MANIFEST-ORACLE | 0.286 / 0.269 | 177 / 201 | 1179 / 1452 | 17839 / 18273 | 0.0190 |
+| **R170 b2 (64 files, ep200)** | **0.587 / 0.269** | **211 / 201** | 1768 / 1452 | 10335 / 18273 | **0.273** |
+| LANL NeuralAtlas blend=0.5 | 0.265 / 0.269 | 197 / 201 | 1267 / 1452 | n/a | 0.001826 |
+
+40× worse than R163 single-rate. P50 alignment IS better (211 vs 197 LANL — closest match yet on stack-distance shape) but the reuse rate is way over.
+
+### Per-stream diagnosis
+
+| stream | manifest file | char burst_cv | gen reuse | real reuse | conditioning quality |
+|---|---|---|---|---|---|
+| 0 | alibabaBlock_163 | 5.73 | **0.730** | 0.757 | **spot-on (1% off)** |
+| 1 | alibabaBlock_275 | 9.62 | 0.551 | 0.003 | **180× over** |
+| 2 | alibabaBlock_109 | 2.95 | 0.484 | 0.377 | 28% over |
+| 3 | alibabaBlock_221 | 9.11 | 0.581 | 0.003 | **170× over** |
+
+The net conditions CORRECTLY for stream 0 (high-reuse, burst_cv=5.73 sits in the training distribution's middle). It can NOT condition for streams 1/3 (very low reuse, burst_cv > 9) because the 64 random training files didn't span that cond extreme — the net falls back to corpus-mean predictions for out-of-distribution cond inputs.
+
+### Plan to fix
+
+**Train on all 237 alibaba files** instead of 64. The full corpus should span the entire burst_cv range (we know files 221, 275 are in there with burst_cv ~9.1–9.6). Also bump epochs 200→600 and hidden 64→96 for better fit.
+
+Currently running: `python -m llgan.neural_atlas fit --max-files 237 --records-per-file 25000 --epochs 600 --hidden 96` (background task `bv6d6o6ms`). ~5-10 min on the BIT-based stack-distance pass + GPU/CPU training.
+
+### Race position interpretation
+
+**This is the first LLNL alibaba result that's CLOSE on the stack-distance shape** (P50=211 vs LANL's 197, vs LLNL prior best of 114). The net IS doing the conditional sequencing that PhaseAtlas's i.i.d. rank sampling can't. The remaining gap is conditioning coverage — when training data spans the cond space, per-stream predictions should adapt.
+
+If 237-file retrain gets stream 1/3 reuse below 0.05, expected HRC-MAE drops below R163's 0.0071 baseline. If it lands in the 0.005–0.012 range projected in R169 scoping, **LLNL is competitive on alibaba HRC-MAE for the first time**.
+
+### Sandia + LANL pass
+
+GPU 0% (the 237f fit is CPU-bound during stack-distance computation). No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/Zarathustra/llgan/neural_atlas.py` (b2 implementation)
+- `/home/darrell/llnl_neural_atlas_alibaba_64f.pkl.gz` (first-shot model)
+- `/home/darrell/v_alibaba_b2.csv` (first-shot generation)
+- `/home/darrell/neural_atlas_fit.log` (first-shot training log)
