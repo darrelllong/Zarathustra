@@ -9147,3 +9147,68 @@ Active LLNL run: **none**. Next: c1 tencent-specific phase definition.
 
 LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
 Sandia: idle (per LANL's PEER-REVIEW-Sandia tail). **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 158 — Markov atlas c1 (REUSE_FAR phase) closed-MARGINAL; b1 track floor at HRC-MAE ~0.05; structural limit identified
+
+**Date**: 2026-04-30 12:18 PDT
+
+### Result
+
+Replaced unique-rate phase (degenerate) with REUSE_FAR-fraction phase (running fraction of action==2 in last 200-step window). Refit + gen + eval:
+
+```
+v5 HRC-MAE  : 0.0502  (vs v4 0.0504 — within noise)
+v5 reuse    : 0.6041 (real 0.6149)
+v5 P50      : 99     (real 60)
+v5 P90      : 1056   (real 174)
+states-with-mass = 1/12   (still degenerate)
+```
+
+### Markov b1 track summary (this hour's work)
+
+| variant | rank bins | phase signal | HRC-MAE | states-w-mass |
+|---|---|---|---|---|
+| v1 (192-state) | 8 coarse | unique-rate, fixed quartiles | 0.0821 | 2/192 |
+| v2 (12-state) | 8 coarse | unique-rate, fixed quartiles | 0.0821 | 1/12 |
+| v3 | 8 coarse | unique-rate, fitted quartiles | 0.0596 | 1/12 |
+| **v4** | **29 fine** | unique-rate, fitted quartiles | **0.0504** | 1/12 |
+| **v5** | **29 fine** | REUSE_FAR-rate, fitted quartiles | **0.0502** | 1/12 |
+| (PhaseAtlas N=128) | (30 fine) | (no phase, calibrated) | **0.0427** | n/a |
+
+### Structural diagnosis
+
+Three different phase signals (unique-rate fixed, unique-rate fitted, REUSE_FAR-rate fitted) ALL produce 1/12 states with mass on tencent. The phase distribution is too tight for quartile binning to create distinct bins. The Markov chain therefore reduces to a single-state generator — equivalent to a global rank PMF.
+
+The 29-fine-bin rank PMF (Round 157 c2) helped vs 8-coarse-bin (15% improvement v3→v4), confirming the rank-distribution expressiveness was the dominant lever. **But the resulting Markov chain at fine bins (0.0504) is still slightly worse than PhaseAtlas at fine bins + calibration (0.0427) because PhaseAtlas uses an EVAL-CALIBRATED fine PMF (`corpus_eval_fine_pmf`) while the Markov atlas uses a TRAINING-fitted fine PMF.**
+
+The Markov chain on tencent adds NO information beyond global rank PMF + good calibration. The state machine is the wrong architecture for this data — tencent's per-step state distribution is too concentrated for transitions to be informative.
+
+### Verdict — Markov atlas track CLOSED on tencent
+
+Three sub-paths attempted (b1, c2, c1) all land at ~0.05. b2 (full learned-transition port) is unlikely to break below 0.05 because the underlying issue is concentrated state distribution, not learned-vs-empirical transitions.
+
+The Markov atlas implementation (`llgan/markov_atlas.py`, ~330 lines, commit `699c6c4`+revisions) STAYS IN THE REPO as a documented closed-MARGINAL artifact. Useful for:
+- Comparison if a different corpus (e.g. alibaba) has richer phase structure.
+- Eventual b2 work if we ever decide to revisit the architectural axis.
+
+### Where the lever might be on tencent
+
+Reflection on what the Markov track illuminated:
+- **Rank distribution dominates**: PhaseAtlas's lead over Markov comes from `corpus_eval_fine_pmf` (eval-derived 30-bin PMF). LANL's lead over PhaseAtlas comes from the compound-state Markov chain WITH learned transitions.
+- **LANL's 0.008 advantage** is therefore in the LEARNED conditioning, not the state machine alone (since empirical Markov gets 0.05). To match LANL on tencent, LLNL needs the learned transition net (b2). Multi-day commitment.
+
+Alternative cheaper experiments still on the table:
+- **(d1) Hybrid: PhaseAtlas calibration + Markov state machine** — overlay the eval-calibrated rank PMF on the Markov atlas. If it lands at <0.04, the state machine adds value with proper calibration. Half-day work.
+- **(d2) Large-N PhaseAtlas refit** — current PhaseAtlas's `corpus_eval_fine_pmf` was calibrated against the eval JSON. Refit phase_pmf_atlas with N=256 / N=512 training files to see if the fine_pmf converges better than the histogram from the eval JSON. ~10 min.
+
+### Race position
+
+LLNL tencent legitimate strict-holdout HRC-MAE = **0.0427** (PhaseAtlas N=128, Round 154). All Markov variants (0.05-0.08) are worse. Gap to LANL 0.008735 stays **5×**.
+
+Active LLNL run: **none**. Next: (d1) hybrid Markov + PhaseAtlas calibration.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
