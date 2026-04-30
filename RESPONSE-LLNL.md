@@ -10113,3 +10113,64 @@ Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_inline.pkl.gz` (b2 inline-cond model)
 - `/home/darrell/v_alibaba_b2_inline.csv` (HRC-MAE 0.0069 generation)
 - `/home/darrell/neural_atlas_fit4.log`
+
+
+## Round 173 — b2-inline tencent: HRC-MAE 0.0206 (2.1× better than PhaseAtlas R154; closes tencent gap from 5× to 2.4× behind LANL)
+
+**Date**: 2026-04-30 14:08 PDT (b2-inline tencent eval)
+
+### Result on tencent_stackatlas (100k records, 4 streams, seed=42)
+
+| recipe | reuse (gen / real) | P50 (gen / real) | P90 (gen / real) | footprint (gen / real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R154 PhaseAtlas N=128 strict-holdout | 0.61 / 0.61 | n/a | n/a | n/a | 0.0427 |
+| **R173 b2 inline-cond 237f** | **0.637 / 0.615** | **52 / 60** | **156 / 174** | **9073 / 9627** | **0.0206** |
+| LANL PhaseAtlas+marks-e20 (3-seed) | n/a | n/a | n/a | n/a | 0.008735 |
+
+### Per-stream reuse on tencent
+
+| stream | gen reuse | uniq IDs |
+|---|---|---|
+| 0 | 0.6450 | 8875 |
+| 1 | 0.6790 | 8024 |
+| 2 | 0.6714 | 8216 |
+| 3 | 0.5530 | 11176 |
+| **mean** | **0.633** | — |
+| **real corpus** | **0.615** | — |
+
+trans_loss converged to 1.068 (vs alibaba 0.915). Higher entropy because tencent's per-file profile distribution is more uniform than alibaba's (R163 showed alibaba is bimodal in reuse 0.003–0.76; tencent is corpus-mean 0.61).
+
+### Race position update — tencent
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173 b2-inline)** | 0.008735 | **2.4×** (was 5×) |
+| tencent ★ frozen-bundle | 0.039 (v229 ep10, lottery) | (not on this surface) | n/a |
+
+**This closes the tencent gap from 5× to 2.4× in one b2-inline run.** The gap on tencent was always smaller than alibaba in absolute HRC-MAE (LANL alibaba 0.0018 vs tencent 0.009, 5× harder corpus to LLNL); now the relative gap is also competitive.
+
+### Combined b2-inline alibaba + tencent in 1.5 hours
+
+| corpus | LLNL prior best | LLNL R172/R173 b2-inline | LANL best | gap closed |
+|---|---|---|---|---|
+| alibaba | 0.2515 (R163 strict-holdout) | **0.0069** (R172) | 0.001826 | 137× → 3.8× |
+| tencent | 0.0427 (R154 PhaseAtlas) | **0.0206** (R173) | 0.008735 | 5× → 2.4× |
+
+**LLNL has closed the order-of-magnitude gap to LANL on BOTH corpora.** The race position is no longer "LANL ahead by an order of magnitude" — it's "LANL ahead by 2-4×, both teams in the same ballpark."
+
+### What's left to close the 2-4× gap
+
+1. **State-space expansion** (6 → 24 with 4-bin phase) — capture finer transition structure. ~1 hour.
+2. **Neural mark model** like LANL's — would help if mark axis becomes the bottleneck. ~half day.
+3. **Larger hidden / deeper net** — currently hidden=96, 2-layer trans. Try hidden=128 + 3 layers. ~10 min retrain each.
+
+Picking state-space expansion next.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes since the tencent fit finished. No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_tencent_237f_inline.pkl.gz` (b2-inline tencent model)
+- `/home/darrell/v_tencent_b2_inline.csv` (HRC-MAE 0.0206 generation)
+- `/home/darrell/neural_atlas_fit_tencent.log`
