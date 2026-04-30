@@ -308,16 +308,16 @@ Zarathustra/
 ├── paper/                       # NAS 2024 paper sources + revisions
 ├── pubs/                        # Reference papers
 ├── assets/                      # Images
-├── VERSIONS.md                  # Per-version experiment log (the run book)
-├── IDEAS.md                     # Backlog of architecture / loss / curriculum ideas
+├── VERSIONS-LLNL.md                  # Per-version experiment log (the run book)
+├── IDEAS-LLNL.md                     # Backlog of architecture / loss / curriculum ideas
 ├── PEER-REVIEW.md               # Darrell's peer-review notes
 └── PEER-REVIEW-GEMINI.md        # Gemini peer-review notes
 ```
 
 The active workflow lives in three files at the repo root:
 
-- **`VERSIONS.md`** — append-only log of every Phase-3 launch: recipe, hyperparameters, motivation, training-★ trajectory, frozen-bundle ATB on completion, post-mortem.
-- **`IDEAS.md`** — numbered backlog of pending architecture / loss / curriculum bets, with status (queued / wired / running / closed).
+- **`VERSIONS-LLNL.md`** — append-only log of every Phase-3 launch: recipe, hyperparameters, motivation, training-★ trajectory, frozen-bundle ATB on completion, post-mortem.
+- **`IDEAS-LLNL.md`** — numbered backlog of pending architecture / loss / curriculum bets, with status (queued / wired / running / closed).
 - **`PEER-REVIEW.md`** + **`PEER-REVIEW-GEMINI.md`** — the two outside reviewers' running feedback. Read both at the start of each session.
 
 ---

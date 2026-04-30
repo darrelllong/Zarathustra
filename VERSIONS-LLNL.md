@@ -1098,7 +1098,7 @@ v165's ★=0.03752 is a **single-seed lottery win at seed=5**, not a reproducibl
 ---
 
 ### tencent_v163 — CLOSED-FAILED (FFT-weight amplification 0.05 → 1.0 on v158 stack; W-spike auto-stop @ ep68; frozen-best ep20 ★=0.05420 = **+37.5% vs ATB 0.03942**, 2026-04-18)
-**Why (closed)**: TSGDiff-motivated Fourier amplification. IDEA #0 had deprioritized FFT-aware losses as "corpora are near-white-noise"; TSGDiff's ablation hinted that Fourier MSE still supervises higher-order spectral moments. v163 amplifies the default `fft_loss_weight` from 0.05 (already on in v158) to 1.0 (20× heavier). **Note (Round 21 P2 correction)**: this is an *amplification* test, not an on/off test — VERSIONS.md previously mis-framed it; FFT is on by default in `config.py:75`.
+**Why (closed)**: TSGDiff-motivated Fourier amplification. IDEA #0 had deprioritized FFT-aware losses as "corpora are near-white-noise"; TSGDiff's ablation hinted that Fourier MSE still supervises higher-order spectral moments. v163 amplifies the default `fft_loss_weight` from 0.05 (already on in v158) to 1.0 (20× heavier). **Note (Round 21 P2 correction)**: this is an *amplification* test, not an on/off test — VERSIONS-LLNL.md previously mis-framed it; FFT is on by default in `config.py:75`.
 **Recipe**: v158 EXACTLY (SSM+MTPP+multi-scale+PCF+mixed-type, K=8, var-cond, gmm-8) + `--fft-loss-weight 1.0` + `--seed 5`. Fresh pretrain. PID 615527. Log `/home/darrell/train_tencent_v163.log`.
 **Training (Phase 3)**: ep5 W=+2.1, ep10 W=+2.5, ep20 W=+3.26 (comb=0.06137), ep30 comb=0.05406★, ep45 comb=0.05426, ep50 comb=0.05410, ep55 comb=0.05209★, ep60 comb=0.05327, ep65 comb=0.05245, ep66–68 W=3.03/3.07/3.21 → W-spike guard fired, `final.pt` written at ep68.
 **Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
@@ -1225,7 +1225,7 @@ v165's ★=0.03752 is a **single-seed lottery win at seed=5**, not a reproducibl
 
 ### alibaba_v160 — CLOSED-CONFOUNDED (BS+OC overlap-mode semantics bug; frozen-best ep20 ★=0.06887 = +38% vs ATB 0.04982, killed ep24, 2026-04-18)
 **Why (closed)**: first test of TRUE WaveStitch overlap-mode sub-loss (b) layered on v157 (BS=1.0 recipe). **Implementation bug surfaced by Round 19 peer review**: in the original wiring, when `--boundary-smoothness-weight > 0 AND --overlap-consistency-mode overlap`, BS was computed on `H_b2` that started from `h_mid` (not A's final hidden) — so BS silently changed from adjacent-window continuity to same-absolute-timestep overlap compare. alibaba_v160 has BS=1.0, so the run is confounded and can't cleanly attribute any result to overlap-mode OC. tencent_v160 is NOT affected (no BS in recipe).
-**Original rationale**: RESPONSE.md commitment after v159 closed the v132-seed sweep. New `--overlap-consistency-mode=overlap` splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise.
+**Original rationale**: RESPONSE-LLNL.md commitment after v159 closed the v132-seed sweep. New `--overlap-consistency-mode=overlap` splits chunk A at step T-k to capture h_mid; A's suffix and B's prefix both start from h_mid with INDEPENDENT local noise.
 **Recipe**: v157 (v132) EXACTLY + `--overlap-consistency-weight 0.5 --overlap-consistency-k 2 --overlap-consistency-mode overlap` + `--seed 4`. Fresh pretrain. Launched 12:27 PDT, PID 544183. Log `/home/darrell/train_alibaba_v160.log`.
 **Training (Phase 3)**: ep5 ★=0.12476, ep10 ★=0.09153, **ep15 ★=0.07352 (train-best)**, ep20 ★=0.07576 (regressed), ep21-24 W spiked to 2.97/3.12/3.13/2.76. Killed ep24 — 9 stale from ep15, trajectory hopeless (+48% vs ATB), AND recipe confounded.
 **Deterministic `frozen_sweep` (seeds 42/42, 2026-04-18)**:
@@ -1251,7 +1251,7 @@ v165's ★=0.03752 is a **single-seed lottery win at seed=5**, not a reproducibl
 | epoch_0010.pt / best.pt (identical) | 0.00861 | 0.7060 | 0.06741 |
 | **final.pt** | **0.00725** | **0.7505** | **★=0.05715** (frozen-best) |
 
-**Finding — v132-recipe seed distribution is WIDER than hoped**: three alibaba v132-recipe seeds now frozen-measured — seed-orig (v132) 0.0578, seed-2 (v157 final) 0.04982, seed-3 (v159 final) 0.05715. Range 0.050–0.058, std ≈ 0.004. v157's 0.04982 ATB is real but the recipe is NOT reliably sub-0.05; seed-2 was favorable. v159 final.pt does NOT beat v157. best.pt mis-ranked by +18% vs frozen-best — **4th consecutive empirical confirmation** of Round 18 P1 #1 (checkpoint-selection bottleneck). Alibaba race slot OPEN. Next: representation-level change (IDEA #21 real overlap-mode chunk stitching, per RESPONSE.md commitment).
+**Finding — v132-recipe seed distribution is WIDER than hoped**: three alibaba v132-recipe seeds now frozen-measured — seed-orig (v132) 0.0578, seed-2 (v157 final) 0.04982, seed-3 (v159 final) 0.05715. Range 0.050–0.058, std ≈ 0.004. v157's 0.04982 ATB is real but the recipe is NOT reliably sub-0.05; seed-2 was favorable. v159 final.pt does NOT beat v157. best.pt mis-ranked by +18% vs frozen-best — **4th consecutive empirical confirmation** of Round 18 P1 #1 (checkpoint-selection bottleneck). Alibaba race slot OPEN. Next: representation-level change (IDEA #21 real overlap-mode chunk stitching, per RESPONSE-LLNL.md commitment).
 **Status** (2026-04-18): CLOSED-FAILED. frozen_best.pt promoted → final.pt.
 
 ---
@@ -1867,7 +1867,7 @@ Each added either D-side balance change, G-side capacity, or G-side pluggable me
 
 **Frozen-bundle eval**: NOT RUN. best.pt (ep10, ~24MB) preserved at `/home/darrell/checkpoints/alibaba_v119/best.pt` alongside `epoch_0010.pt`, `epoch_0020.pt`, `epoch_0030.pt`. If a future sweep wants to validate the projection, eval on that.
 
-**Verdict**: Chunk-stitching at weight 0.1 on top of continuity did NOT help alibaba reach v114's training ★=0.073 ceiling. Boundary-smoothness may still help frozen β-recall (not measured), but the training gap is too large to justify compute. Closes "chunk-stitching + continuity" cocktail on alibaba. Next alibaba bet: v120 = v114 base + retrieval memory (IDEA #17, never tested on alibaba; top of IDEAS.md R16 recommended build order).
+**Verdict**: Chunk-stitching at weight 0.1 on top of continuity did NOT help alibaba reach v114's training ★=0.073 ceiling. Boundary-smoothness may still help frozen β-recall (not measured), but the training gap is too large to justify compute. Closes "chunk-stitching + continuity" cocktail on alibaba. Next alibaba bet: v120 = v114 base + retrieval memory (IDEA #17, never tested on alibaba; top of IDEAS-LLNL.md R16 recommended build order).
 
 ---
 
@@ -1902,7 +1902,7 @@ Each added either D-side balance change, G-side capacity, or G-side pluggable me
 
 ## Post-Mortem: tencent_v144 — retrieval memory #17 (killed ep47, 2026-04-16, 32 ep stale from ★=0.08191 ep15)
 
-**Recipe**: v143 args (multi-scale critic + PCF 2.0 + mixed-type-recovery) + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` via strict=False. First architecture-bet from Round 16 backlog (IDEAS.md #17).
+**Recipe**: v143 args (multi-scale critic + PCF 2.0 + mixed-type-recovery) + `--retrieval-memory` (M=32, key=32, val=32, decay=0.85, tau_write=0.5, warmup=4). 98,913 retrieval params added (+32% over base 314K G params). Identity-init fusion: module starts as passthrough, GAN learns to use it. Hot-start from `/home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` via strict=False. First architecture-bet from Round 16 backlog (IDEAS-LLNL.md #17).
 
 **Training-log**: Three consecutive stars in the first 15 ep: ep5=0.10494★ (recall=0.537), ep10=0.08655★ (recall=0.619), ep15=**0.08191★** (recall=0.631, EMA MMD²=0.00811). Then flat: ep20=0.09709, ep25=0.09802, ep30=0.10441, ep35=0.10083, ep40=0.10373, ep45=0.10187. W stable throughout (0.66–1.69, never near 3.0). PCF saturated 0.70–0.93. No new ★ after ep15.
 
@@ -1910,7 +1910,7 @@ Each added either D-side balance change, G-side capacity, or G-side pluggable me
 
 **Frozen-bundle eval**: NOT YET RUN. best.pt (ep15, 24MB) preserved at `/home/darrell/checkpoints/tencent_v144/best.pt`, along with epoch_0010–0040 snapshots. Prior tencent frozen ATB on the plain multi-scale+PCF recipe = 0.178 (v136, 3-seed). Training ★=0.08191 sits between v142=0.0856 and v143=0.07681 — i.e. the retrieval module did NOT improve the training-★ ceiling vs seed-only retries of the base recipe.
 
-**Verdict (provisional)**: Retrieval memory did not measurably beat base multi-scale+PCF on tencent training trajectory. Whether it helps FROZEN-bundle (which is the ATB-claim benchmark, not training ★) is worth checking — the locality mechanism could in principle help β-recall on the held-out bundle even if training-★ looks similar. If frozen-eval of v144 best.pt lands at ~0.178 it's a null result; if it lands materially below, the architecture still has upside and a seed retry is warranted. If it lands above 0.178 it's a clear miss and IDEA #17 closes on tencent. Next tencent slot: run frozen-eval on v144 best.pt, then either seed-retry (if frozen is promising) or pivot to **IDEA #18 cache-descriptor distillation** (next in Round 16 architecture queue per IDEAS.md recommended build order; module `llgan/cache_descriptor.py` already committed, monitor wiring pending).
+**Verdict (provisional)**: Retrieval memory did not measurably beat base multi-scale+PCF on tencent training trajectory. Whether it helps FROZEN-bundle (which is the ATB-claim benchmark, not training ★) is worth checking — the locality mechanism could in principle help β-recall on the held-out bundle even if training-★ looks similar. If frozen-eval of v144 best.pt lands at ~0.178 it's a null result; if it lands materially below, the architecture still has upside and a seed retry is warranted. If it lands above 0.178 it's a clear miss and IDEA #17 closes on tencent. Next tencent slot: run frozen-eval on v144 best.pt, then either seed-retry (if frozen is promising) or pivot to **IDEA #18 cache-descriptor distillation** (next in Round 16 architecture queue per IDEAS-LLNL.md recommended build order; module `llgan/cache_descriptor.py` already committed, monitor wiring pending).
 
 ---
 
@@ -1951,7 +1951,7 @@ Each added either D-side balance change, G-side capacity, or G-side pluggable me
 - v142 frozen = 0.1795 (1-seed)
 - v143 expected frozen: ~0.17-0.18 if recipe holds; the lower training ★ may or may not transfer to frozen.
 
-**Verdict**: Multi-scale-critic+PCF recipe **demonstrably reproducible** (5 seeds total: 0.073/0.082/0.090/0.0856/0.07681 training ★). v143 is best-ever training run on this recipe family but plateau pattern matches v136/v142 — peak around ep35-45 then stuck. Recipe ceiling appears to be ~0.07-0.08 training ★ → ~0.18 frozen ATB. Cannot reach below 0.10 by seed retries alone. **Architectural change required to beat 0.18 frozen ATB.** v144 launched as first architecture-bet (retrieval memory, IDEAS.md #17).
+**Verdict**: Multi-scale-critic+PCF recipe **demonstrably reproducible** (5 seeds total: 0.073/0.082/0.090/0.0856/0.07681 training ★). v143 is best-ever training run on this recipe family but plateau pattern matches v136/v142 — peak around ep35-45 then stuck. Recipe ceiling appears to be ~0.07-0.08 training ★ → ~0.18 frozen ATB. Cannot reach below 0.10 by seed retries alone. **Architectural change required to beat 0.18 frozen ATB.** v144 launched as first architecture-bet (retrieval memory, IDEAS-LLNL.md #17).
 
 ---
 
@@ -1959,7 +1959,7 @@ Each added either D-side balance change, G-side capacity, or G-side pluggable me
 
 ## Round 16 Architecture Backlog — Wiring Phase
 
-All 6 standalone modules from IDEAS.md backlog now committed with smoke tests:
+All 6 standalone modules from IDEAS-LLNL.md backlog now committed with smoke tests:
 
 | Idea | Module | Status |
 |------|--------|--------|
@@ -1970,7 +1970,7 @@ All 6 standalone modules from IDEAS.md backlog now committed with smoke tests:
 | #21 chunk stitching | `llgan/chunk_stitching.py` | committed |
 | #22 hybrid diffusion | `llgan/hybrid_diffusion.py` | committed (2709330) |
 
-**Per IDEAS.md "Recommended build order"**: #17 → #18 → (#21 OR #19) → #22. Currently in step 1 (#17 wired). Next: when v143 hits 30-stale kill, launch tencent_v144 with `--retrieval-memory --resume-from /home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` (strict=False load handles new retrieval params). Step 2 (#18 monitor wiring) is the next code change.
+**Per IDEAS-LLNL.md "Recommended build order"**: #17 → #18 → (#21 OR #19) → #22. Currently in step 1 (#17 wired). Next: when v143 hits 30-stale kill, launch tencent_v144 with `--retrieval-memory --resume-from /home/darrell/checkpoints/tencent_v86/pretrain_complete.pt` (strict=False load handles new retrieval params). Step 2 (#18 monitor wiring) is the next code change.
 
 ---
 

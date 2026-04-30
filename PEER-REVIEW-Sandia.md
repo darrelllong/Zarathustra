@@ -121,7 +121,7 @@ This is a **hard generator collapse**:
 
 ### Root Cause Hypothesis
 
-`newgan/v1_baseline.sh` sets `--pretrain-ae-epochs 0 --pretrain-sup-epochs 0 --pretrain-g-epochs 0`. Without the AE / Supervisor / G-warmup pretrain phases, Phase 3 starts the generator from random init against a critic that converges in ~5 epochs to a perfect classifier. This is the canonical "no-pretrain WGAN collapse" mode — confirmed in LLNL v196 post-mortem (VERSIONS.md L266) and elsewhere.
+`newgan/v1_baseline.sh` sets `--pretrain-ae-epochs 0 --pretrain-sup-epochs 0 --pretrain-g-epochs 0`. Without the AE / Supervisor / G-warmup pretrain phases, Phase 3 starts the generator from random init against a critic that converges in ~5 epochs to a perfect classifier. This is the canonical "no-pretrain WGAN collapse" mode — confirmed in LLNL v196 post-mortem (VERSIONS-LLNL.md L266) and elsewhere.
 
 The v165 reference recipe that v1 is meant to reproduce was trained with full pretrain (AE 50 + Sup 50 + G-warm 100). Skipping those is not equivalent to v165; it produces a fundamentally different (and unrecoverable) trajectory.
 
@@ -139,3 +139,25 @@ Both `tencent_v1` (Sandia, ep86, 452 MiB) and `tencent_v233` (LLNL, in pretrain,
 ### Short Take
 
 v1 is **dead in the water**. Re-launch with the full v165 pretrain pipeline; otherwise no Phase 3 step will ever produce a meaningful frozen-bundle ★. We're not citing this against Sandia — it's a launch-script issue, not a methodology issue. Race position: Sandia not yet on the board, LLNL tencent ★=0.039, LANL tencent ★=0.00887.
+
+---
+
+## Round 3 (2026-04-29) — Notice: LLNL-Owned Doc Rename
+
+**Reviewer:** LLNL (llgan/), administrative.
+
+For clean cross-team separation paralleling the Sandia naming convention, the following LLNL-owned root-level docs have been renamed:
+
+| Old name | New name |
+|---|---|
+| `RESPONSE.md` | `RESPONSE-LLNL.md` |
+| `VERSIONS.md` | `VERSIONS-LLNL.md` |
+| `IDEAS.md` | `IDEAS-LLNL.md` |
+
+Convention going forward:
+- LLNL-owned cross-team docs: `*-LLNL.md`
+- Sandia-owned cross-team docs: `*-Sandia.md` (already in use)
+- LANL pipeline lives under `altgan/`, not in root
+- Author-owned files NOT renamed: `PEER-REVIEW.md` (Darrell), `PEER-REVIEW-GEMINI.md` (Gemini), `README.md`, `TODO.md`, `R-*.md` (R-related), `REBUTTAL.md`, `paper/*` (multi-author)
+
+Sandia peer-review pipelines that read those filenames should update; internal cross-references across the renamed and LLNL-owned docs were updated in the same commit. The `R-REBUTTAL-RESPONSE.md` filename is unchanged — only the bare `RESPONSE.md` was renamed.

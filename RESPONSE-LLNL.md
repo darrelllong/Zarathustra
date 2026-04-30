@@ -6,7 +6,7 @@
 ## Summary
 
 Round 16 told the project to stop squeezing the old list and execute the newly-added
-`IDEAS.md` sections #17–#22 as a serious architecture queue. Taken seriously. Four of
+`IDEAS-LLNL.md` sections #17–#22 as a serious architecture queue. Taken seriously. Four of
 the six have been run; one is already the current alibaba champion; one looks like a
 tencent champion in flight. The queue is not just opened — it has produced the two best
 training-★ trajectories the project has ever recorded on both corpora.
@@ -162,7 +162,7 @@ showed `desc_mse` nearly flat across 2× variation in ★ — a weak monitor,
 not a weak idea. IDEA #18 Phase A is de-scoped back to "monitor is
 misaligned with design intent"; Phase B held until the target is rewired to
 the per-file descriptor pool that `cache_descriptor.py:41` actually
-defines. VERSIONS.md language tightened to stop calling `#18` weak based on
+defines. VERSIONS-LLNL.md language tightened to stop calling `#18` weak based on
 the global-mean probe.
 
 ### R17 P1 #2 — chunk-stitching "CLOSED" is too broad
@@ -173,7 +173,7 @@ as the reviewer points out calls `boundary_latent_smoothness` on a second
 decoded chunk — not the true paired-window overlap-consistency
 `overlap_consistency()` that `chunk_stitching.py:41` defines. "Chunk
 stitching CLOSED on alibaba" / "closing on tencent" is inaccurate; what has
-been tested is BS alone and BS+second-chunk regularization. VERSIONS.md
+been tested is BS alone and BS+second-chunk regularization. VERSIONS-LLNL.md
 updates will label these "BS-family CLOSED" and leave full overlap-mode
 #21 open. The real-overlap implementation remains the next
 representation-level priority after current runs resolve.
@@ -235,7 +235,7 @@ v159 decides, tencent moves on.
 ### R18 P1 #4 — don't let v157 reopen IDEA #18
 
 **Agreed**. IDEA #18 stays off the priority lane until the monitor is
-rewired from global-mean to file-level target. VERSIONS.md front matter
+rewired from global-mean to file-level target. VERSIONS-LLNL.md front matter
 updated accordingly.
 
 ### R18 P2 #5 — post-train sweep + frozen-best artifact — SHIPPED
@@ -334,7 +334,7 @@ blocking current runs (v157/v158/v160/v161 all post-date the unification).
   #21 arc closes.
 - **Half-wired features** (hybrid diffusion stages 2-3, SSM hot-start, retrieval-BCE
   on ground-truth reuse, cache-descriptor Phase B, mtpp-timing head): agreed.
-  "Wire-or-delete" policy is sensible; IDEAS.md will be annotated with "DORMANT"
+  "Wire-or-delete" policy is sensible; IDEAS-LLNL.md will be annotated with "DORMANT"
   tags for held features so they're not mistaken for active code.
 - **No pytest suite**: acknowledged. Current tests are smoke-level. A targeted
   suite (PCF minimax direction, overlap semantics, retrieval BCE, generate→compare
@@ -361,7 +361,7 @@ blocking current runs (v157/v158/v160/v161 all post-date the unification).
 Two of Grok's bug claims don't survive inspection. Two are real safety gaps worth
 fixing before the next architectural bet (PCF minimax guard, overlap-consistency
 contract). The engineering-debt items are agreed and will be worked after the
-current chunk-stitching experiment closes. No new IDEAS.md entries — Grok's
+current chunk-stitching experiment closes. No new IDEAS-LLNL.md entries — Grok's
 review is code-quality, not architectural.
 
 ---
@@ -485,7 +485,7 @@ Round 20 proposes discipline over queue breadth. Six adoptions:
 7. **R20-P2 #7 (citation discipline).** Adopted. `references.bib` already marks
    entries VERIFIED/UNVERIFIED; DiffCATS remains UNVERIFIED and will not be
    cited or implemented until Darrell or I pull the paper and confirm title +
-   claim. Future `IDEAS.md` imports from external audits follow the same gate.
+   claim. Future `IDEAS-LLNL.md` imports from external audits follow the same gate.
 
 ### What this means for the next 48h
 
@@ -552,7 +552,7 @@ criterion for #28/#31/#32. All four are now in.
    two runs once the manifest was written.
 
 5. **R21-P2 #5 (FFT framing).** Already adopted. The `tencent_v163`
-   post-mortem in `VERSIONS.md` (commit `90bd638`) reframed the result as
+   post-mortem in `VERSIONS-LLNL.md` (commit `90bd638`) reframed the result as
    "FFT-weight amplification at 20× (0.05 → 1.0)" rather than off-vs-on
    spectral loss. Round 22 re-checked this and agreed the framing was
    correct; it only asked that the conclusion not be generalized beyond the
@@ -596,7 +596,7 @@ JSON at `/tmp/lre_smoke.json` shows:
   IDEA #21 status reconciliation, long-rollout-gate-vs-v164 tension) are
   tracked separately — the sidecar fix alone does not address them.
 - Round 23 / Round 24 (higher-moment tail-regime, full-corpus leaderboard,
-  IDEAS.md #34) are independent follow-ups.
+  IDEAS-LLNL.md #34) are independent follow-ups.
 
 The sidecar is now a valid acceptance criterion. The next #28/#31/#32 branch
 can launch against it without repeating the Round 20 "built the right kind of
@@ -607,7 +607,7 @@ infrastructure but not yet the right gate" pattern.
 # Response to peer review Round 27 + Gemini Round 3 (2026-04-19)
 
 **Status**: two P1 code bugs patched live while `alibaba_v174` was running;
-v167 language downgraded in the VERSIONS.md top table; interpretation rework
+v167 language downgraded in the VERSIONS-LLNL.md top table; interpretation rework
 on moment-loss / scalar ladder / retrieval-as-global-flag taken.
 
 Round 27 and Gemini Round 3 landed together and converge on the same two
@@ -666,7 +666,7 @@ window per batch, so the bank only fills during BS/OC forwards and only to
 ~2·T = 24 entries (< mem_size=32). True saturation needs multi-chunk
 sequential training (e.g., draw 4+ adjacent windows per sample and chain
 them), which is a larger restructuring of the batch-assembly path. Flagged
-in IDEAS.md as a follow-up. Tencent retrieval runs from before this patch
+in IDEAS-LLNL.md as a follow-up. Tencent retrieval runs from before this patch
 (v165, v166) remain uncontaminated only in the "bank visits during training"
 sense — the bank still never saturated.
 
@@ -686,7 +686,7 @@ pressure" in the IDEA #34 sense (M5/M6 tail regimes on `iat_*`,
 `abs_stride_*`, reuse surfaces). The v169/v170 "dose-response"
 interpretation was a category error.
 
-**VERSIONS.md rework**: the v169 section still contains "first alibaba test
+**VERSIONS-LLNL.md rework**: the v169 section still contains "first alibaba test
 of explicit higher-moment pressure (IDEA #34 motivation)" — this will be
 reworded in the next commit as "low-order moment auxiliary weight sweep
 (matches M1–M3 and slope only; NOT an IDEA #34 test)". IDEA #34's
@@ -712,11 +712,11 @@ distance metrics (not only short-window ★) before any claim about
 retrieval + BS/OC additivity. The v165 tencent ATB remains promoted, but
 with the hedge "retrieval-memory works on tencent corpora specifically;
 alibaba transfer failed; IDEA #35 workload-conditioned gate is the open
-follow-up." This will be added to the v165 VERSIONS.md entry.
+follow-up." This will be added to the v165 VERSIONS-LLNL.md entry.
 
 ## 7. Darrell R27 P2 #5 — v167 mechanism language — RETRACTED
 
-**Done.** VERSIONS.md top ATB table: v167 is now listed as
+**Done.** VERSIONS-LLNL.md top ATB table: v167 is now listed as
 "Alibaba prior — retracted" with the basin analysis
 {0.029, 0.042, 0.081} cited explicitly. v164's 0.03457 is re-instated as
 the reproducible alibaba ATB. Promotion rule going forward: any NEW
@@ -734,7 +734,7 @@ reproducibility under at least one other seed before ATB claim.
   scoped into a runnable recipe. The retrieval asymmetry is the clearest
   motivating case; BS/OC may also benefit from per-corpus gating once the
   patched BS establishes a fresh baseline.
-- **v169 / v170 wording fix** in VERSIONS.md — pending the post-v174 commit
+- **v169 / v170 wording fix** in VERSIONS-LLNL.md — pending the post-v174 commit
   cycle.
 
 ## Why this cycle matters
@@ -751,9 +751,9 @@ reproducible baseline.
 
 # Response to peer review Rounds 28–32 (2026-04-20)
 
-**Status**: Rounds 28–32 feedback was absorbed incrementally via VERSIONS.md patches
+**Status**: Rounds 28–32 feedback was absorbed incrementally via VERSIONS-LLNL.md patches
 and commit messages. This entry records formal acceptance/action for each item, and
-flags the one remaining VERSIONS.md fix applied today (IDEA #21 STATUS terminology).
+flags the one remaining VERSIONS-LLNL.md fix applied today (IDEA #21 STATUS terminology).
 
 ---
 
@@ -761,7 +761,7 @@ flags the one remaining VERSIONS.md fix applied today (IDEA #21 STATUS terminolo
 
 ### P1 #1 — tail-strata table labeled retracted v167 as Alibaba ATB — FIXED
 
-VERSIONS.md tail table updated: v167 rows now carry "(RETRACTED — seed-lottery)"; v164
+VERSIONS-LLNL.md tail table updated: v167 rows now carry "(RETRACTED — seed-lottery)"; v164
 rows say "(seed-locked numeric target, buggy-BS baseline)". Tail-heavy and ordinary
 strata for v164 still show *not yet run* — those runs remain deferred until a patched-code
 candidate worth comparing to v164 exists.
@@ -779,7 +779,7 @@ a race target, not mechanism evidence.
 The partial patch (threading `retrieval_state` across the BS/OC chunk pairs) gives
 ~24 entries of bank exposure, still below `mem_size=32`. Eviction and long-reuse
 attention never train. Acknowledged as OOD-at-inference for v165/v177/v180. The
-fix requires multi-chunk sequential training (IDEAS #28/#31); flagged in IDEAS.md
+fix requires multi-chunk sequential training (IDEAS #28/#31); flagged in IDEAS-LLNL.md
 as a follow-up. All v165-lineage frozen-★ numbers are valid as measurements; none
 are valid as evidence that persistent retrieval was trained correctly.
 
@@ -829,7 +829,7 @@ recipe worth investing in is identified.
 
 ### P2 #5 — tail gate needed explicit tail MMD/shape requirement — FIXED
 
-Tail-strata gate in VERSIONS.md revised per Round 32 P2 #4: candidate must (a)
+Tail-strata gate in VERSIONS-LLNL.md revised per Round 32 P2 #4: candidate must (a)
 improve tail MMD² (or direct shape-distance metric) without regressing ordinary-★,
 AND (b) beat full-corpus numeric target by >bundle-variance margin. Tail β-recall
 is reported separately, not rolled into composite tail-★ for promotion.
@@ -884,7 +884,7 @@ the seed=5 basket" until a seed-bundle and long-rollout panel says more.
 
 ### P1 #1 — v184 "never tested on Alibaba" factually stale — FIXED
 
-VERSIONS.md and commit message corrected: v184 is a *retest* of retrieval memory
+VERSIONS-LLNL.md and commit message corrected: v184 is a *retest* of retrieval memory
 on alibaba, not a first test. Prior negative results (v127, v168) cited inline.
 v184 result: closed-failed, +261% vs v176. Alibaba retrieval is now definitively
 negative across three separate Alibaba branches. IDEA #17 on alibaba CLOSED.
@@ -914,7 +914,7 @@ router remains the open follow-up if retrieval specificity is investigated furth
 
 ### P1 #1 — residual "current ATB" language in IDEA #21 STATUS — FIXED TODAY
 
-IDEA #21 STATUS block (previously at VERSIONS.md line 936) rewritten 2026-04-20:
+IDEA #21 STATUS block (previously at VERSIONS-LLNL.md line 936) rewritten 2026-04-20:
 removed "current alibaba ATB" and "the recipe produces ATBs"; replaced with
 "legacy buggy-BS numeric target" and explicit statement that the deterministic BS
 scalar ladder is CLOSED on alibaba under patched code. The ★=0.03457 threshold
@@ -947,13 +947,13 @@ mechanism proofs even if they fail to degrade performance.
 
 ### P2 #4 — tail gate: composite tail-★ too prominent — FIXED
 
-Gate in VERSIONS.md updated per Round 32 P2 #4 label: tail MMD² (or direct
+Gate in VERSIONS-LLNL.md updated per Round 32 P2 #4 label: tail MMD² (or direct
 shape-distance improvement) is now a required condition, not an optional component
 of a composite score. Tail β-recall reported separately.
 
 ### P2 #5 — "May-2026" date provenance error — FIXED IN PRIOR COMMIT
 
-The Round 32 P1 doc-integrity commit (75dc00e) corrected this. VERSIONS.md line 19
+The Round 32 P1 doc-integrity commit (75dc00e) corrected this. VERSIONS-LLNL.md line 19
 now reads "2026-04-18 capture" (the actual frozen-sweep date).
 
 ---
@@ -980,7 +980,7 @@ mechanism claims about retrieval or PCF.
 # Response to peer review Round 33 (2026-04-20)
 
 **Status**: Round 33 arrived while the Mac was down. Responding same session. P1 #3
-(IDEA #21 "producing ATBs" language) was already fixed in this session's VERSIONS.md
+(IDEA #21 "producing ATBs" language) was already fixed in this session's VERSIONS-LLNL.md
 edit (IDEA #21 STATUS fully rewritten 2026-04-20). Remaining items accepted below.
 
 ## P1 #1 — component ablations are within-basin forensics, not mechanism validation — ACCEPTED
@@ -1236,7 +1236,7 @@ Retraction is now moot: v191 ep30 confirms collapse, not proximity:
 
 The trajectory matches v190's collapse pattern. Run is live under patience=60 from ep20; may show
 late-epoch recovery (v190's frozen-best was ep65). "Within 0.004 of ATB" language removed from
-VERSIONS.md and RESPONSE.md. v191 ep20 is a launch-health signal, not an ATB-near result.
+VERSIONS-LLNL.md and RESPONSE-LLNL.md. v191 ep20 is a launch-health signal, not an ATB-near result.
 
 ## P1 #2 — bc_gap mixes temporal discrimination with raw-vs-decoded artifact — ACCEPTED
 
@@ -1573,7 +1573,7 @@ raw-vs-decoded artifact.
 
 ## P1 #2 — Closing IDEA #42 as "latent space too low-dimensional" is overidentified — ACCEPTED
 
-The closure text in Round 36 and RESPONSE.md identified the failure mechanism as
+The closure text in Round 36 and RESPONSE-LLNL.md identified the failure mechanism as
 "latent_dim=24 too low-dimensional for D_bc to provide sufficient gradient pressure." That
 explanation is a plausible hypothesis, not an identified cause. The empirical verdict is firm —
 v192 and v193 both failed with β-recall ceilings ~0.48 — but the root cause could equally be
@@ -1599,7 +1599,7 @@ within-basin forensics, not mechanism validation — the same standard applied t
 seed-5 component audit.
 
 **Corrected doc**: the text "Same seed as ATB holder v165 (★=0.051)" has been fixed in
-VERSIONS.md to "Same seed as Alibaba ATB holder v176 (★=0.051)." v165 is the Tencent seed-5
+VERSIONS-LLNL.md to "Same seed as Alibaba ATB holder v176 (★=0.051)." v165 is the Tencent seed-5
 numeric target (★=0.038). v176 (seed=7) is the Alibaba ATB at ★=0.051.
 
 **Standard going forward**: if v194 ep85 ★=0.054 is the run's best checkpoint, the result is
@@ -1637,7 +1637,7 @@ notes it is not a cross-file boundary.
 | IDEA #44 (domain-matched decoded bc) | Next boundary probe after v194 closes |
 | IDEA #42 closure text | Retracted "too low-dimensional" explanation |
 | IDEA #43 (matched carry-state bc) | Kept alive; not buried by IDEA #42 closure |
-| v165 → v176 Alibaba ATB reference | Fixed in VERSIONS.md |
+| v165 → v176 Alibaba ATB reference | Fixed in VERSIONS-LLNL.md |
 | Long-rollout panel gate | Removed; panel queued for v176, v191, v193, v194 ep85 |
 | boundary_critic.py docstring | Fixed: "in-file adjacent-window boundary at stride T" |
 
@@ -1843,7 +1843,7 @@ piece was the log output, not the training signal.
 ### P1 #2 — v194 post-collapse extension is peak chasing
 
 Accepted. Conclusion frozen: "seed-5 decoded bc with relaxed guard found an ep85
-short-window near-miss (★=0.054 vs v176 ★=0.051, 6.8% worse)." Updated VERSIONS.md
+short-window near-miss (★=0.054 vs v176 ★=0.051, 6.8% worse)." Updated VERSIONS-LLNL.md
 to label post-ep88 sweeps as diagnostic forensics, not mainline evidence. Kill
 deadline remains ep160 but no further extensions will be granted. The current
 frozen sweep (#12, ep5-ep140) running now is the last mainline sweep; subsequent
@@ -1852,7 +1852,7 @@ adversarial-game qualitative change at ep88.
 
 ### P1 #3 — v194 seed provenance still wrong after Round 37 fix
 
-Accepted. Fixed VERSIONS.md line for v194: replaced "Same seed as Alibaba ATB
+Accepted. Fixed VERSIONS-LLNL.md line for v194: replaced "Same seed as Alibaba ATB
 holder v176 (★=0.051)" with "Same seed-5 basin as v193/v192/v191; numeric target
 is v176 (seed=7, ★=0.051) — different seed." Added explicit interpretation
 annotation: "seed-5 decoded-bc evidence only; not mechanism validation until a
@@ -2136,22 +2136,22 @@ now the active slots. In light of LANL's NeuralAtlas results in Rounds 42-44, ID
 LRU stack decoder) is promoted ahead of IDEA #47 (continuation training) — the object-process
 decoder is the more urgent architectural gap.
 
-### P2 #1 — v195 "NEW OVERALL ATB" language is wrong — ACCEPTED; FIXING VERSIONS.md
+### P2 #1 — v195 "NEW OVERALL ATB" language is wrong — ACCEPTED; FIXING VERSIONS-LLNL.md
 
 Accepted. v195 set the best clean-code short-window frozen-bundle score (★=0.04204), but it
 failed the long-rollout gate (reuse_access=0.0081 vs real 0.265; HRC-MAE=0.129). Labelling
 it "overall ATB" after that failure is incorrect. Correcting all v195 references to "best
-clean-code short-window score, failed long-rollout locality gate." VERSIONS.md will be updated.
+clean-code short-window score, failed long-rollout locality gate." VERSIONS-LLNL.md will be updated.
 
-### P2 #2 — IDEAS.md IDEA #45 stale IRD language — ACCEPTED; WILL FIX
+### P2 #2 — IDEAS-LLNL.md IDEA #45 stale IRD language — ACCEPTED; WILL FIX
 
 Accepted. IDEA #45's motivation text still says "every LRU cache always misses." The corrected
 framing (IRD=1 floor means the object process lacks long-gap reuse law, not that every access
-misses) will be applied to the IDEA #45 body in IDEAS.md.
+misses) will be applied to the IDEA #45 body in IDEAS-LLNL.md.
 
-### P2 #3 — v196 promotion bar incomplete in VERSIONS.md — ACCEPTED; FIXING
+### P2 #3 — v196 promotion bar incomplete in VERSIONS-LLNL.md — ACCEPTED; FIXING
 
-Accepted. VERSIONS.md v196 block lists only frozen ★≤0.054 and reuse_access≥0.10, missing the
+Accepted. VERSIONS-LLNL.md v196 block lists only frozen ★≤0.054 and reuse_access≥0.10, missing the
 bc_diag criterion (bc_real > bc_shuf by ≥0.05 in second half of training). The three-part gate
 from the Round 40 response amendment will be added to the run-state table.
 
@@ -2491,7 +2491,7 @@ v200 tests the next mechanism: **copy-path BCE at weight=50.0** (no rate-matchin
 
 v200 acceptance test at ep5: if `reuse_bce < 2.0` (loss converging) and `reuse_rate > 0.10`, the per-event BCE is working. Otherwise, IDEA #54 (Gumbel-Softmax categorical head) is the correct path.
 
-### IDEA #54: Categorical Gumbel-Softmax Reuse Head (Added to IDEAS.md)
+### IDEA #54: Categorical Gumbel-Softmax Reuse Head (Added to IDEAS-LLNL.md)
 
 The fundamental issue with scalar approaches: the `obj_id_reuse` Recovery output is a continuous scalar constrained to [-1, 1] by the normalization. Any gradient-based approach must overcome the Recovery decoder's learned prior (bias toward -1 = new object). Continuous scalars cannot be cleanly binary-constrained.
 
@@ -2505,7 +2505,7 @@ This is the symmetric structural move to LANL's StackAtlas, implemented within t
 
 ### LANL IDEA #52 / #53 Alert
 
-LANL has added two new IDEAs to IDEAS.md:
+LANL has added two new IDEAs to IDEAS-LLNL.md:
 - **IDEA #52** (Phase-conditioned atlas): extend NeuralAtlas with within-file phase conditioning to fix nonstationarity
 - **IDEA #53** (Neural mark head): freeze PhaseAtlas for object IDs, add a lightweight sequential model for `dt`, `size`, `opcode`, `tenant`
 
@@ -2932,7 +2932,7 @@ If ep100 frozen ★ < 0.042: new ATB. First ATB under clean code beating buggy-v
 
 ### IDEA #57: Gradient-Stop Fix for Reuse Column
 
-Added to IDEAS.md. The core insight: `fake_decoded[:,:,obj_id_col].detach()` before passing to critic blocks WGAN gradient from the reuse head while preserving BCE. In the current setup, WGAN sees the reuse column value (forward pass) but its gradient doesn't flow back to `reuse_head.weight`. BCE alone determines the equilibrium. Expected: reuse_rate → 0.265 at natural BCE optimum.
+Added to IDEAS-LLNL.md. The core insight: `fake_decoded[:,:,obj_id_col].detach()` before passing to critic blocks WGAN gradient from the reuse head while preserving BCE. In the current setup, WGAN sees the reuse column value (forward pass) but its gradient doesn't flow back to `reuse_head.weight`. BCE alone determines the equilibrium. Expected: reuse_rate → 0.265 at natural BCE optimum.
 
 v205 will implement this fix. Planned launch after v204 reaches ep100 (baseline comparison).
 
@@ -3202,7 +3202,7 @@ Neither approach touches the GAN. Both replace `generate.py`'s i.i.d. Bernoulli 
 
 ### LLNL Counter: IDEA #62 Empirical Markov Atlas Decoder
 
-Added IDEA #62 to `IDEAS.md`. Summary:
+Added IDEA #62 to `IDEAS-LLNL.md`. Summary:
 
 **Phase A (target 0.003010, no training needed)**:
 Build empirical 8×8 transition matrix `T[r_prev][r_next]` from real training trace LRU simulations. Replace `np.random.choice(8, p=pmf)` in `generate.py` with `np.random.choice(8, p=T[prev_rank])`. Initialization: first access from marginal PMF; subsequent from Markov chain.
@@ -3365,7 +3365,7 @@ The 0.002373 result confirms LANL's pure PhaseAtlas (no MLP conditioning) achiev
 
 ### v207 Crash and Relaunch
 
-v207 crashed at Phase 3 start with `torch._inductor.exc.InductorError: fatal error: Python.h: No such file or directory`. The Triton JIT compilation triggered by `torch.compile()` requires Python dev headers that are not installed on vinge's GB10. This error is documented in VERSIONS.md (`torch.compile: Broken on vinge's GB10`), but v207 was launched without `--no-compile`.
+v207 crashed at Phase 3 start with `torch._inductor.exc.InductorError: fatal error: Python.h: No such file or directory`. The Triton JIT compilation triggered by `torch.compile()` requires Python dev headers that are not installed on vinge's GB10. This error is documented in VERSIONS-LLNL.md (`torch.compile: Broken on vinge's GB10`), but v207 was launched without `--no-compile`.
 
 **Relaunched** as v207b with `--no-compile`, PID=20382. Phase 1 recon=0.00001 at ep20/50 — same fast convergence as previous runs. Phase 2 + 2.5 expected in ~45 minutes, Phase 3 in ~90 minutes.
 
@@ -3586,7 +3586,7 @@ Seed=42 calibration: reuse=0.627 vs real=0.627 (99.9%), median=56 vs real=64 (87
 
 ### Next Actions
 1. Cross-validate: run our eval on LANL's checkpoint using the same real baseline to verify numbers are comparable.
-2. Document tencent eval setup discrepancy in IDEAS.md to prevent future confusion.
+2. Document tencent eval setup discrepancy in IDEAS-LLNL.md to prevent future confusion.
 3. v208 first long-rollout eval at ep20 (still in early training, ep9).
 
 ---
@@ -4187,7 +4187,7 @@ LANL has solved alibaba HRC-MAE with an explicit LRU-state paradigm. Our GAN app
 1. **v212 ep10** (~2.5h from now): reuse_access > 0.10? HRC-MAE < 0.10? (eval watcher running)
 2. **v213 ep10** (~3h): same test for tencent — reuse_access > 0.30 expected (tencent 3× higher reuse)
 3. **Mark quality benchmark** on v195 with IDEA #74: quantify improvement from 0.614 → expected ~0.005
-4. **If v212 ep20+ shows HRC < 0.05**: frozen_sweep → ATB claim; launch IDEAS.md IDEA #73 (stride rank)
+4. **If v212 ep20+ shows HRC < 0.05**: frozen_sweep → ATB claim; launch IDEAS-LLNL.md IDEA #73 (stride rank)
 
 ---
 
@@ -5535,7 +5535,7 @@ Empirical measurement of 20 tencent training files (oracle_general binary format
 
 ### Seed Basin Analysis
 
-From VERSIONS.md:
+From VERSIONS-LLNL.md:
 - **v165 (seed=5)**: ★=0.03752, β-recall=0.822 at ep45 — **ATB**
 - **v177 (seed=7, same recipe as v165)**: ★=0.168, β-recall=0.06-0.19 — mode collapse
 - **v223 ep20 (seed=7)**: ★=0.133 — consistent with seed=7 basin
@@ -5664,7 +5664,7 @@ The same structural problem likely affected alibaba long-rollout before Phase-PM
 
 ### IDEA #90: Cross-Window Object Identity
 
-Three fix options (see IDEAS.md):
+Three fix options (see IDEAS-LLNL.md):
 1. **Object pool carry-over**: top-N object IDs from previous window → next window conditioning
 2. **Stateful object register**: global object ID register across windows
 3. **Stack-distance auxiliary loss**: penalize stack_distance=0 behavior
@@ -6293,7 +6293,7 @@ The oracle tencent result (0.005421) establishes a theoretical floor: the LRU st
 
 ### IDEA #96: Differentiable LRU Loss During GAN Training
 
-(Filed in IDEAS.md this round)
+(Filed in IDEAS-LLNL.md this round)
 
 **Motivation**: All legitimate calibration paths for tencent LRU rate have failed:
 - Cold-start prefix estimation: underestimates full-trace rate (cold-stack bias)
@@ -6604,7 +6604,7 @@ Process 590408 killed. Freed GPU compute for IDEA #95 calibration and v226.
 
 ### IDEA #97: LRU Hit Indicator as Training Feature
 
-Filed in IDEAS.md. Replace `obj_id_reuse` (consecutive ±1) with `obj_id_lru_hit_K` (LRU cache of depth K=15,000, ±1 per step). The GAN then directly learns to generate sequences with 61.5% cache hit rate. No Bernoulli override needed — result is fully legitimate. Implementation requires `dataset.py` `_apply_obj_locality()` change; plan for v226.
+Filed in IDEAS-LLNL.md. Replace `obj_id_reuse` (consecutive ±1) with `obj_id_lru_hit_K` (LRU cache of depth K=15,000, ±1 per step). The GAN then directly learns to generate sequences with 61.5% cache hit rate. No Bernoulli override needed — result is fully legitimate. Implementation requires `dataset.py` `_apply_obj_locality()` change; plan for v226.
 
 ### IDEA #95 Calibration Running — Immediate Path
 
@@ -7543,7 +7543,7 @@ v230 starts Phase 3 at the v229 ep10 state — the best LLNL checkpoint (HRC-MAE
 
 If v230 ep10 shows HRC-MAE ≤ 0.039 (maintained or improved), slow-LR stabilization is confirmed. Target: HRC-MAE < 0.020 by v230 ep20-50.
 
-### IDEA #107: Long-Rollout Training Signal (Added to IDEAS.md)
+### IDEA #107: Long-Rollout Training Signal (Added to IDEAS-LLNL.md)
 
 The training-eval mismatch is fundamental: training uses 12-timestep windows, eval uses 25k-record rollouts. Adding a periodic long-rollout eval signal to the generator loss (e.g., every 5 epochs: generate 5k records, compute LRU metrics, add soft penalty) would force the GAN to maintain long-horizon quality. Expensive but directly addresses the root cause.
 
@@ -7810,8 +7810,8 @@ Use seed=7 specifically because seed=7 (v231) collapsed catastrophically at ep10
 
 1. `llgan/config.py`: Added `long_chain_weight: float = 0.0` and `long_chain_windows: int = 10`
 2. `llgan/train.py`: Added `--long-chain-weight` and `--long-chain-windows` CLI flags; implemented loss block using hybrid surrogate on decoded features with carried LSTM state
-3. `IDEAS.md`: IDEA #116 filed with full design rationale and v233 recipe
-4. `RESPONSE.md`: Round 135 progress report
+3. `IDEAS-LLNL.md`: IDEA #116 filed with full design rationale and v233 recipe
+4. `RESPONSE-LLNL.md`: Round 135 progress report
 
 ### Competitive Analysis
 

@@ -411,7 +411,7 @@ Items marked ✓ are done and in the repo.
 
 - [ ] `[P1]` Fix PRDC fallback in `llgan/eval.py:297,321,330,337` — `r_fake` unused; "recall" and "coverage" both derived from the same `in_real_ball.any(axis=1).mean()`. Either install `prdc` as a hard dep or implement the correct fallback (recall uses real-in-fake-balls, coverage uses unique-real-in-fake-balls).
 - [ ] `[P1]` Fix `eval.py --baseline` path at `llgan/eval.py:586` — passes no real windows to `_sample_fake()` for conditional checkpoints; will raise at `llgan/eval.py:432`. Thread real windows through the baseline branch.
-- [ ] `[P1]` Fix reuse-rate hard-coded column index at `llgan/eval.py:539,542,546` — use `prep.col_names.index("obj_id_reuse")` the way `llgan/train.py:446` already does. Reverify recent VERSIONS.md reuse numbers after fix.
+- [ ] `[P1]` Fix reuse-rate hard-coded column index at `llgan/eval.py:539,542,546` — use `prep.col_names.index("obj_id_reuse")` the way `llgan/train.py:446` already does. Reverify recent VERSIONS-LLNL.md reuse numbers after fix.
 - [ ] `[P2]` Fix `TraceDataset` off-by-one at `llgan/dataset.py:988` — `len = max(0, len(data) - timestep + 1)`. Files with exactly `timestep` records currently contribute zero windows.
 - [ ] `[P2]` Fix small-val-set crash in `llgan/mmd.py:113,115,250,252` — reshape using the actual returned count, not the requested `n_samples`.
 - [ ] `[P2]` Decouple parser from hard-coded `/tiamat/zarathustra/traces` root in `parsers/core.py:19` and `traces/analysis/*.py:25,97`. Accept via env var or CLI.
@@ -420,7 +420,7 @@ Items marked ✓ are done and in the repo.
 
 ## Reviewer Action Items (Round 2 — Strategic Race Focus)
 
-- [ ] `[P1]` Build a pretrain bank: train 5–10 fresh pretrains under varied seeds/settings, rank by downstream joint-phase outcomes, then launch Phase 3 runs from the top few. Operationalize "pretrain quality is dominant variable" (VERSIONS.md:1902).
+- [ ] `[P1]` Build a pretrain bank: train 5–10 fresh pretrains under varied seeds/settings, rank by downstream joint-phase outcomes, then launch Phase 3 runs from the top few. Operationalize "pretrain quality is dominant variable" (VERSIONS-LLNL.md:1902).
 - [ ] `[P1]` Fork corpus playbooks in CLAUDE.md / README: Tencent = high-K regime (K=8) + multimodal prior; Alibaba = low-K regime (K=2) + more exploration noise. Do not unify recipes.
 - [ ] `[P1]` Locality engine (explicit copy path): two-head generator that first decides reuse vs new seek, then either copies from recent-object memory or regresses a stride. Currently only supervising with L_loc scalar — reviewer is right that this is a regression, not a mechanism.
 - [ ] `[P2]` Add HRC + reuse-rate to the combined checkpoint score (currently just MMD² + 0.2·(1−recall) + optional DMD-GEN weight). Use HRC-MAE as a third tiebreaker.
@@ -455,7 +455,7 @@ Items marked ✓ are done and in the repo.
 
 - [ ] `[P1]` Complete verbatim controls before making mechanism-level claims in the rebuttal. Do not declare "mechanism is clear" until reproducibility runs confirm the result. Frame as "leading hypothesis" until then.
 - [ ] `[P1]` Run Fourier spectral analysis — this is now the third round requesting it. The latest results (v78 tencent record with poor DMD-GEN; v51 alibaba best DMD-GEN but poor combined; v82 tencent best Context-FID) create exactly the tradeoff profile where spectral diagnostics are essential.
-- [ ] `[P1]` Do not close Tencent multi-scale critic without a full eval. Old v70 result had no full eval, and VERSIONS.md says it was "not killable yet." Inconsistent to close it after recalibrating other closures as too aggressive.
+- [ ] `[P1]` Do not close Tencent multi-scale critic without a full eval. Old v70 result had no full eval, and VERSIONS-LLNL.md says it was "not killable yet." Inconsistent to close it after recalibrating other closures as too aggressive.
 - [ ] `[P2]` Reframe rebuttal claims: replace "mechanism is clear" with "leading hypothesis" where z_global unification and preprocessor freezing are still undone. Accepted measurement caveats and mechanism certainty are contradictory.
 - [ ] `[P2]` Stop treating combined score as the sole lens — v51 (best DMD-GEN), v82 (best Context-FID + AutoCorr) contain useful signal even though they "lost" on combined.
 - [ ] `[P2]` Resume structural bets: explicit locality/copy path, window-level characterization bridge, path-space critic, MoE generator. The post-record exploitation sweep does not mean the structural design space is exhausted.
