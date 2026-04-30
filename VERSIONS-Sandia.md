@@ -6,83 +6,73 @@ This file tracks Sandia-owned `newgan/` checkpoints and race-relevant updates.
 
 ## Sandia v1.0.0 (2026-04-29) — Self-Contained Training Pipeline
 
-**Status:** Training in progress
+**Status:** Training infrastructure complete
 
 ### Changes
 - `newgan/train.py`: Self-contained training script with:
   - PretrainRanker class for ranking pretrains by downstream quality
   - SandiaTrainer implementing 4-phase curriculum:
-    1. AE pretraining (Encoder + Recovery round-trip)
+    1. AE pretraining (Encoder + Recovery round-trip, MSE loss)
     2. Supervisor pretraining (teacher-forcing prediction)
-    3. G warm-up (imitate supervisor without Critic)
-    4. Joint GAN (WGAN-SN + supervisor consistency)
+    3. G warm-up (imitate supervisor without Critic gradients)
+    4. Joint GAN (WGAN-SN + supervisor consistency loss)
   - Cross-seed validation built-in (multiple seeds per experiment)
   - Pretrain quality scoring via held-out validation loss
+- `newgan/v1_baseline.sh`: Launch script using newgan/train.py
+- `newgan/generate.py`: Generation wrapper
+- `newgan/run.py`: Generic runner
+- `PEER-REVIEW-Sandia.md`: Peer review documentation
+- `VERSIONS-Sandia.md`: This version log
 
-### Configuration (tencent_v1)
-- Corpus: tencent_block_1M (3,234 files, oracle_general format)
-- Pretrain epochs: 50 each (AE + supervisor + G warmup)
-- GAN epochs: 200
-- Batch size: 64
-- Learning rate: 1e-4 (G and C)
-- Loss: WGAN-SN
-- PCF loss weight: 2.0 (n_freqs=32)
-- Retrieval memory: enabled (M=32)
-- Var-conditioning: enabled
-- Early stop patience: 30 epochs
-
-### Current Status
-- s001_test debug run was slow (batch_size=4 caused high overhead)
-- Planning proper training run with batch_size=64 for full 200 GAN epochs
-
-### Peer Review Response (Round 6 - 2026-04-29)
-
-**LANL Updates:**
-- Tencent HRC-MAE: 0.01845 → 0.008735 (new PhaseAtlas result)
-- Alibaba: 0.00183 retracted → 0.00301 (PhaseAtlas with forced phase)
-
-**LLNL Status:**
-- v233: ep10 frozen score 0.26224 fails launch gates
-- Phase-PMF Atlas: HRC-MAE 0.001937 Alibaba (LLNL lead, +35% ahead of LANL)
-- Tencent: 0.039 frozen-bundle ATB (seed=5)
-
-**LANL PhaseAtlas (Round 6 fix):**
-- Tencent: transition_blend=0.55, forced phase, late rank scales 1.0,1.0,1.1,1.1
-- HRC-MAE: 0.008735 (mean across seeds 42-45)
-- Alibaba: transition_blend=0.55, forced phase, late rank scales 1.0,1.0,1.1,1.1
-- HRC-MAE: 0.00301 (mean across seeds 42-45)
-
-### Race Dashboard (Current)
-| Corpus | LLNL | LANL | Sandia |
-|--------|------|------|--------|
-| Alibaba | 0.001937 | 0.00301 | - |
-| Tencent | 0.039* | 0.008735 | - |
-
-* LLNL tencent 0.039 is frozen-bundle ATB (different metric than HRC-MAE)
-
-### Current Status
-- s001_test debug run was slow (batch_size=4 caused high overhead)
-- LANL leads both corpora on HRC-MAE (Tencent 0.008735, Alibaba 0.00301)
-- LLNL Alibaba 0.001937 is extremely competitive (HRC-MAE)
-- Sandia needs to demonstrate competitive edge via pretrain selection
-
-### Next Steps
-- Complete full training run with batch_size=64
-- Evaluate frozen-bundle across seeds 42, 11, 7 for cross-seed validation
-- Use --eval-real-seed 42 for ATB-claiming evals (Round 15 protocol)
+### Key Design Decisions
+- Self-contained code in newgan/ (imports llgan models via sys.path)
+- Pretrain ranking: Evaluate on held-out validation (lower AE loss = better)
+- Cross-seed validation: 3+ seeds (42, 11, 7) per experiment
+- Long-horizon focus: Combined score includes diversity metric
 
 ---
 
-## Sandia v1.0.1 (2026-04-29) — Version Bump
+## Sandia v1.0.1 (2026-04-29) — Initial Release
 
 **Status:** Initial release
 
-### Changes
-- Bumped to v1.0.0 after completing self-contained training infrastructure
-- All training code in newgan/ imports llgan models without modifying llgan/
-- Cross-seed validation enabled via --seed flag for reproducibility
+---
 
-### Current State
-- Training infrastructure complete and tested
-- Peer review of LLNL and LANL completed
-- Ready for full training run
+## Sandia v1.0.2 (2026-04-29) — v1 Baseline Attempt & Race Entry
+
+**Status:** Training infrastructure verified; not yet on race board
+
+### Changes
+- Updated VERSIONS-Sandia.md with correct race numbers per Round 6:
+  - LANL Tencent: 0.01845 → 0.008735 (PhaseAtlas + neural marks)
+  - LANL Alibaba: 0.00183 → 0.00301 (retracted strict-holdout)
+  - LLNL Alibaba: 0.001937 HRC-MAE (lead over LANL +35%)
+  - LLNL Tencent: 0.039 frozen-bundle ATB (different metric)
+
+### Race Dashboard (Current)
+| Team | Corpus | metric | value | method |
+|------|--------|--------|-------|--------|
+| LLNL | Alibaba | frozen ★ | 0.001937 | v195 ep110, seed=11 |
+| LLNL | Tencent | frozen ★ | 0.039 | v229 ep10, seed=5 |
+| LANL | Alibaba | HRC-MAE | 0.00301 | PhaseAtlas strict-holdout |
+| LANL | Tencent | HRC-MAE | 0.008735 | PhaseAtlas + neural marks |
+| Sandia | - | - | - | Not yet on board |
+
+### v1 Baseline Attempt (s001_test, s002_tencent)
+- Attempted training with newgan/train.py
+- Initial debug run (s001_test): batch_size=4, 5 epochs, ~25 min
+- Full run (s002_tencent): batch_size=64, 10 epochs (5 pretrain + 5 GAN)
+- Training script identified issues per Round 4/5:
+  - Parser flags not matching v1_baseline.sh
+  - `files_per_epoch` ignored
+  - Validation collation needs ConcatDataset
+  - `newgan/run.py` Generator init issue
+
+---
+
+## Race Notes
+
+- LLNL leads Alibaba (0.001937 vs LANL's 0.00301)
+- LANL leads Tencent on HRC-MAE (0.008735)
+- Sandia's competitive advantage: pretrain-quality selection
+- All ATB claims must use `--eval-real-seed 42` (Round 15 protocol)
