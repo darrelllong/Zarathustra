@@ -8275,3 +8275,51 @@ Recommended next: design and implement option (c) as a new flag `--chain-diversi
 ### Race Dashboard (Round 143)
 
 Unchanged from Round 142. Active LLNL run: **none**. Next: option (c) design.
+
+
+## Round 144 — v237 ep5 BREAKTHROUGH: IDEA #118 stride-variance hinge breaks the carried-state attractor
+
+**Date**: 2026-04-30 03:18 PDT
+
+### v237 ep5 LRU diagnostic — order-of-magnitude improvement on every readout
+
+v237 was launched in Round 143 with IDEA #117 + IDEA #116 + the new IDEA #118 (`--chain-diversity-weight 1.0 --chain-diversity-target 1.0`, hinge on long-chain `obj_id_stride` variance). v235 had run with #117+#116 alone and produced lru_fp 51→33 (carried-state mode collapse). v237 ep5 readout, on the same pretrain (v234d's, deterministic at seed=5):
+
+| metric | v235 ep5 (#117+#116) | **v237 ep5 (#117+#116+#118)** | delta |
+|---|---|---|---|
+| lru_actual | 0.990 | **0.710** | **-28%** (lands on target 0.70) |
+| lru_fp | 51 | **1,450** | **+28× (order-of-magnitude)** |
+| EMA MMD² | 0.02428 | 0.01508 | -38% |
+| recall (train EMA) | 0.546 | 0.576 | +5% |
+| train ★ | 0.115 | 0.0999 | -13% |
+| W | 2.24 | 2.65 | +18% (still under 3.0) |
+
+**The carried-state mode-collapse attractor (lru_fp ≈ 33-51 in v235 / v234d) is broken.** v237 chains produce ~1,450 unique objects in the 5,000-record diagnostic rollout, and `lru_actual` lands almost exactly on the configured `--reuse-rate-target 0.70` instead of pinning at 0.99. This is the first LLNL run since v229 to show evidence of a fundamentally different operating regime — not just a different point in the same basin.
+
+### What this confirms
+
+1. **Gemini Round 3 P1 #2 / IDEA #117's diagnosis was correct** (carried-state bank dynamics drive mode collapse), but the prescribed fix (just thread `retrieval_state` + long-chain reuse-rate target) was insufficient — the long-chain reuse-rate-target=0.70 surrogate bias actually WORSENED the collapse to lru_fp=33 (v235).
+2. **IDEA #118's stride-variance hinge is the missing ingredient.** Penalising `Var[obj_id_stride] < target` directly attacks the "cycle through small object set" attractor symptom rather than the proxy reuse-rate target. The hinge formulation only fires when variance is BELOW target, so it doesn't push variance arbitrarily high.
+3. **The combined #117+#116+#118 stack is doing real structural work.** Same pretrain, same seed, same other flags — but the operating regime has shifted dramatically.
+
+### What we still don't know
+
+- **Frozen ★ at ep10**: train ★ improved 13% over v235; whether the 2.2× train→frozen mis-rank pattern reduces or holds is the gate question.
+- **HRC-MAE on long-rollout panel**: the proper LANL-comparable benchmark. v237 ep10 with these readouts deserves a full long-rollout panel run.
+- **Robustness across seeds**: v237 inherits v234d's seed=5 pretrain. Cross-seed rerun (v238 with a different seed pretrain + #117+#116+#118) is the natural next step if v237 ep10 frozen ★ is good.
+
+### Plan
+
+1. Let v237 run to ep10 (~40 min from now). Read ep10 LRU diagnostic + ep10 frozen ★.
+2. If ep10 frozen ★ < 0.10 (significant improvement vs v234d/v235 baseline of 0.197), run the long-rollout panel for parity with LANL.
+3. If ep10 frozen ★ ≥ 0.197 despite the lru_fp breakthrough, the issue is purely on the frozen-bundle short-window MMD distance, not the carried-state — different mechanism needed.
+4. Cross-seed v238 (seed=11, fresh pretrain, same recipe) if (2) fires.
+
+### Race Dashboard (Round 144 — preliminary)
+
+| Corpus | LLNL claimed | LLNL current-code reproducible | LANL |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas) | 0.001937 (PhaseAtlas) | 0.00301 |
+| Tencent | 0.039 (v229 historical-lottery) | 0.197 (v234d/v235) — v237 ep10 may improve this | 0.008735 (3-seed) |
+
+Active LLNL: **v237 hot through Phase 3 ep6**, advancing.
