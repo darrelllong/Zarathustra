@@ -277,6 +277,8 @@ class SandiaTrainer:
             count = 0
 
             for batch in train_loader:
+                if isinstance(batch, (list, tuple)):
+                    batch, _ = batch
                 batch = batch.to(self.device)
                 h = self.E(batch)
                 recon = self.R(h)
@@ -298,6 +300,8 @@ class SandiaTrainer:
                 self.R.eval()
                 with torch.no_grad():
                     for batch in val_loader:
+                        if isinstance(batch, (list, tuple)):
+                            batch, _ = batch
                         batch = batch.to(self.device)
                         h = self.E(batch)
                         recon = self.R(h)
@@ -354,6 +358,9 @@ class SandiaTrainer:
             count = 0
 
             for batch in train_loader:
+                # Unpack if DataLoader returns (batch, file_cond) tuple
+                if isinstance(batch, (list, tuple)):
+                    batch, _ = batch
                 batch = batch.to(self.device)
                 with torch.no_grad():
                     h = self.E(batch)
@@ -376,6 +383,8 @@ class SandiaTrainer:
                 self.S.eval()
                 with torch.no_grad():
                     for batch in val_loader:
+                        if isinstance(batch, (list, tuple)):
+                            batch, _ = batch
                         batch = batch.to(self.device)
                         h = self.E(batch)
                         pred = self.S(h[:, :-1, :])
@@ -400,15 +409,19 @@ class SandiaTrainer:
         print(f"\n[Supervisor] Best val loss: {best_val_loss:.6f}")
         return best_val_loss
 
-    def train_generator(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+    def train_generator(self, train_ds: Dataset, val_ds: Optional[np.ndarray],
                         epochs: int = 100, ckpt_dir: str = None) -> float:
         """Phase 2.5: Generator warm-up."""
         print(f"\n{'='*60}")
         print(f"Phase 2.5: Generator Warm-up ({epochs} epochs)")
         print(f"{'='*60}")
 
-        from torch.utils.data import ConcatDataset
-        train_dataset = ConcatDataset(train_ds)
+        # Handle both ConcatDataset and list of datasets
+        if isinstance(train_ds, list):
+            from torch.utils.data import ConcatDataset
+            train_dataset = ConcatDataset(train_ds)
+        else:
+            train_dataset = train_ds
 
         self.E.eval()
         self.R.eval()
@@ -430,6 +443,8 @@ class SandiaTrainer:
             count = 0
 
             for batch in train_loader:
+                if isinstance(batch, (list, tuple)):
+                    batch, _ = batch
                 batch = batch.to(self.device)
 
                 with torch.no_grad():
@@ -458,6 +473,8 @@ class SandiaTrainer:
                 self.G.eval()
                 with torch.no_grad():
                     for batch in val_loader:
+                        if isinstance(batch, (list, tuple)):
+                            batch, _ = batch
                         batch = batch.to(self.device)
                         h_real = self.E(batch)
                         h_pred = self.S(h_real[:, :-1, :])
@@ -524,6 +541,8 @@ class SandiaTrainer:
             count = 0
 
             for batch in train_loader:
+                if isinstance(batch, (list, tuple)):
+                    batch, _ = batch
                 batch = batch.to(self.device)
                 B = batch.size(0)
 
