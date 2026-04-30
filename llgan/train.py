@@ -2491,24 +2491,45 @@ def train(cfg: Config) -> None:
         if _lru_eval_every > 0 and (epoch + 1) % _lru_eval_every == 0 and obj_id_col >= 0:
             _lru_live = None
             try:
-                from llgan.lru_stack_decoder import LRUStackDecoder as _LRUDec
+                # Sibling-import fallback so the diagnostic survives both
+                # `cd llgan/ && python train.py` (no package context) and
+                # `python -m llgan.train` invocations (LANL R1 / Sandia
+                # VERSIONS-Sandia L94).
+                try:
+                    from llgan.lru_stack_decoder import LRUStackDecoder as _LRUDec
+                except ModuleNotFoundError:
+                    from lru_stack_decoder import LRUStackDecoder as _LRUDec
                 _lru_live = copy.deepcopy(G.state_dict())
                 G.load_state_dict({k: v.to(device) for k, v in ema_G_state.items()})
                 G.eval()
                 _lru_n = int(getattr(cfg, 'lru_eval_n', 5000))
                 _n_win = max(1, _lru_n // cfg.timestep)
                 _reuse_chunks: list = []
+                # Thread retrieval_state across windows when retrieval-memory
+                # is on, so the diagnostic mirrors the deployed long-rollout
+                # contract (LANL R1 P1 #2 / IDEA #117 — eval-side).
+                _rm_active = bool(getattr(cfg, "retrieval_memory", False))
                 with torch.no_grad():
                     _zg_lr, _ = _make_z_global(1, cfg, device, training=False, G=G)
                     _h_lr = None
+                    _r_lr = None
                     for _wi in range(_n_win):
                         _zl_lr = G.sample_z_local(1, cfg.timestep, device)
                         try:
-                            _H_lr, _h_lr = G(_zg_lr, _zl_lr,
-                                             hidden=_h_lr, return_hidden=True)
+                            if _rm_active:
+                                _H_lr, _h_lr, _r_lr = G(
+                                    _zg_lr, _zl_lr,
+                                    hidden=_h_lr, return_hidden=True,
+                                    retrieval_state=_r_lr,
+                                    return_retrieval_state=True,
+                                )
+                            else:
+                                _H_lr, _h_lr = G(_zg_lr, _zl_lr,
+                                                 hidden=_h_lr, return_hidden=True)
                         except TypeError:
                             _H_lr = G(_zg_lr, _zl_lr)
                             _h_lr = None
+                            _r_lr = None
                         if latent_ae:
                             _H_lr = R(_H_lr)
                         _reuse_chunks.append(
