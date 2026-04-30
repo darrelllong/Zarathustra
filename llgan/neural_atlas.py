@@ -233,22 +233,20 @@ def make_net(cond_dim: int, hidden: int, n_states: int, dropout: float = 0.0):
         def __init__(self):
             super().__init__()
             self.dropout_p = dropout
-            self.cond_mlp = nn.Sequential(
-                nn.Linear(cond_dim, hidden),
-                nn.SiLU(),
-                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-                nn.Linear(hidden, hidden),
-                nn.SiLU(),
-                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            )
+            cond_layers = [nn.Linear(cond_dim, hidden), nn.SiLU()]
+            if dropout > 0:
+                cond_layers.append(nn.Dropout(dropout))
+            cond_layers += [nn.Linear(hidden, hidden), nn.SiLU()]
+            if dropout > 0:
+                cond_layers.append(nn.Dropout(dropout))
+            self.cond_mlp = nn.Sequential(*cond_layers)
             self.state_emb = nn.Embedding(n_states, hidden)
             self.init_head = nn.Linear(hidden, n_states)
-            self.trans_head = nn.Sequential(
-                nn.Linear(hidden * 2, hidden),
-                nn.SiLU(),
-                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-                nn.Linear(hidden, n_states),
-            )
+            trans_layers = [nn.Linear(hidden * 2, hidden), nn.SiLU()]
+            if dropout > 0:
+                trans_layers.append(nn.Dropout(dropout))
+            trans_layers.append(nn.Linear(hidden, n_states))
+            self.trans_head = nn.Sequential(*trans_layers)
 
         def forward_init(self, cond):
             return self.init_head(self.cond_mlp(cond))
@@ -635,6 +633,9 @@ def generate(
     seed: int = 42,
     max_stack_depth: int = 8192,
     temperature: float = 1.0,
+    hot_pool_prob: float = 0.0,
+    hot_pool_k: int = 100,
+    hot_pool_window: int = 5_000,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -714,6 +715,15 @@ def generate(
             phase_count = 0
             # R180: prev_rank_bin tracking for AR-rank sampling
             prev_rank_bin = N_RANK_BINS  # sentinel "no prev" = idx N_RANK_BINS
+            # R181: per-stream hot-pool tracking (object-id frequency over a
+            # sliding window). Closes the "fake is too uniform" failure mode
+            # diagnosed in llgan/diag_hrc.py: real top-100 share = 35% on
+            # tencent vs fake 1.7% before this fix.
+            from collections import Counter, deque
+            hot_counts: Counter = Counter()
+            hot_window: deque = deque(maxlen=int(hot_pool_window))
+            hot_pool_list: List[int] = []
+            hot_pool_refresh_every = 200
 
             for step in range(per_stream):
                 # Decode current state to (phase, dist_state) → action
@@ -723,6 +733,20 @@ def generate(
                     next_new_id += 1
                     stack.insert(0, obj_id)
                     prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
+                elif (hot_pool_prob > 0.0
+                      and len(hot_pool_list) > 0
+                      and rng.random() < hot_pool_prob):
+                    # R181: redirect to hot-pool object — closes the top-K
+                    # access-share gap (real concentrates 35% of tencent
+                    # accesses on top-100 objects; fake spreads uniformly).
+                    hot_idx = int(rng.integers(0, len(hot_pool_list)))
+                    obj_id = hot_pool_list[hot_idx]
+                    if obj_id in stack:
+                        rank = stack.index(obj_id)
+                        del stack[rank]
+                    stack.insert(0, obj_id)
+                    if rank_net is not None:
+                        prev_rank_bin = N_RANK_BINS  # sentinel: hot-pool isn't a sampled rank
                 else:
                     # R180: use AR-rank net if available, else fall back to
                     # empirical PMF (R172/R174 logic).
@@ -795,6 +819,18 @@ def generate(
                     "tenant": 0,
                 })
 
+                # R181: maintain sliding-window hot pool
+                if hot_pool_prob > 0.0:
+                    if len(hot_window) == hot_window.maxlen:
+                        evicted = hot_window[0]
+                        hot_counts[evicted] -= 1
+                        if hot_counts[evicted] <= 0:
+                            del hot_counts[evicted]
+                    hot_window.append(int(obj_id))
+                    hot_counts[int(obj_id)] += 1
+                    if step % hot_pool_refresh_every == 0:
+                        hot_pool_list = [o for o, _ in hot_counts.most_common(hot_pool_k)]
+
                 # Update running unique-rate phase
                 if n_phase_bins > 1 and phase_edges is not None:
                     phase_seen.add(int(obj_id))
@@ -858,6 +894,15 @@ def main():
     pgen.add_argument("--temperature", type=float, default=1.0,
                       help="Softmax temperature for state-transition sampling. "
                            "Lower = sharper / closer to argmax. R175 experiment.")
+    pgen.add_argument("--hot-pool-prob", type=float, default=0.0,
+                      help="R181: probability of redirecting a reuse to a hot-pool "
+                           "object (top-K by sliding-window frequency) instead of "
+                           "the i.i.d. PMF rank. Closes the 20x top-100 access "
+                           "concentration gap diagnosed in llgan/diag_hrc.py.")
+    pgen.add_argument("--hot-pool-k", type=int, default=100,
+                      help="R181: hot-pool size (top-K by sliding-window count).")
+    pgen.add_argument("--hot-pool-window", type=int, default=5_000,
+                      help="R181: sliding window size for hot-pool counting.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -874,6 +919,8 @@ def main():
         generate(
             args.model, args.manifest, args.output,
             n_records=args.n, seed=args.seed, temperature=args.temperature,
+            hot_pool_prob=args.hot_pool_prob, hot_pool_k=args.hot_pool_k,
+            hot_pool_window=args.hot_pool_window,
         )
 
 
