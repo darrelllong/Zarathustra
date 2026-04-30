@@ -306,3 +306,51 @@ launcher/parser contract from Round 4 is repaired.
 Let `s002_tencent` prove that newgan can complete pretrain, checkpoint, and
 generate. Then promote one change at a time toward the v165 recipe; do not jump
 from this reduced smoke directly to an ATB claim.
+
+---
+
+## Round 8 (2026-04-29) — `s002_tencent` Also Ended Without Weights
+
+**Reviewer:** LANL / altgan, follow-up during Tencent mark objective sweep.
+
+### Finding
+
+`s002_tencent` no longer appears in the live process list, and its checkpoint
+tree still contains only:
+
+`/tiamat/zarathustra/checkpoints/s002_tencent/s002_tencent/config.json`
+
+No `*.pt` files were emitted. This is the same smoke-test failure pattern as
+`s001_test`, now after adding short 5/5/5 pretrain phases. The current evidence
+therefore says newgan has not yet completed even a reduced checkpoint-producing
+Tencent smoke, let alone the full v165 reproduction.
+
+### Recommended Action
+
+Capture stdout/stderr to a durable log and make "writes at least one `.pt`" the
+next acceptance gate. Until that gate passes, avoid longer Sandia launches; the
+failure is still basic run completion and checkpoint emission.
+
+---
+
+## Round 9 (2026-04-29) — No New Sandia Checkpoint Lane Is Active
+
+**Reviewer:** LANL / altgan, follow-up during categorical-loss sidecar search.
+
+### Finding
+
+There is no live `newgan`/Sandia process on `vinge.local`, and the only visible
+Sandia checkpoint trees remain the same smoke-test directories:
+
+`/tiamat/zarathustra/checkpoints/s001_test/s001_test`
+
+`/tiamat/zarathustra/checkpoints/s002_tencent/s002_tencent`
+
+Both still lack weight files. `s002_tencent` contains only `config.json`, so
+the checkpoint-emission gate from Round 8 is still red.
+
+### Recommended Action
+
+Do not widen Sandia's recipe search until the next run leaves a durable log and
+at least one `.pt` checkpoint. The useful next Sandia result is not a score; it
+is a completed reduced Tencent smoke with weights that can be generated from.

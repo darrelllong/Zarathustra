@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import random
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +27,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 
 # Import llgan models
 # This script runs from /home/darrell/Zarathustra/newgan/
@@ -139,8 +140,10 @@ def _load_epoch_dataset(files: List[Path], fmt: str, records_per_file: int,
     if not train_datasets:
         return None, None
 
+    # Return ConcatDataset for train, tensor for val (to avoid collation issues)
+    combined_train = ConcatDataset(train_datasets)
     combined_val = np.concatenate(val_arrays, axis=0) if val_arrays else None
-    return train_datasets, combined_val
+    return combined_train, combined_val
 
 
 # ============================================================================
@@ -699,10 +702,22 @@ def load_data(trace_dir: str, fmt: str, char_file: Optional[str],
     val_files = all_files_sorted[:n_val_files]
     train_files = all_files_sorted[n_val_files:]
 
-    train_ds, _ = _load_epoch_dataset(train_files, fmt, records_per_file, prep, timestep)
+    # Use files_per_epoch if specified (subset of training files per epoch)
+    if files_per_epoch > 0 and files_per_epoch < len(train_files):
+        train_rng = random.Random(42)  # Deterministic per-epoch sampling
+        train_files = train_rng.sample(train_files, min(files_per_epoch, len(train_files)))
+        print(f"Using {len(train_files)} files per epoch (files_per_epoch={files_per_epoch})")
+
+    train_ds, combined_val = _load_epoch_dataset(train_files, fmt, records_per_file, prep, timestep)
     val_ds, _ = _load_epoch_dataset(val_files, fmt, records_per_file, prep, timestep)
 
-    print(f"Train: {len(train_ds)} windows, Val: {len(val_ds)} windows")
+    # Convert val to tensor for validation
+    if combined_val is not None:
+        val_ds = torch.tensor(combined_val, dtype=torch.float32)
+    else:
+        val_ds = None
+
+    print(f"Train: {len(train_ds)} windows, Val: {len(val_ds) if val_ds is not None else 0} windows")
 
     return train_ds, val_ds, prep
 
@@ -734,6 +749,23 @@ def main():
     parser.add_argument("--val-ratio", type=float, default=0.1, help="Validation ratio")
     parser.add_argument("--no-compile", action="store_true", help="Disable torch.compile")
     parser.add_argument("--no-amp", action="store_true", help="Disable AMP")
+
+    # llgan compatibility flags (ignored but accepted for v1_baseline.sh compatibility)
+    parser.add_argument("--loss", default="wgan-sn", help="Loss type (accepted but not used)")
+    parser.add_argument("--cond-drop-prob", type=float, default=0.0, help="Condition dropout prob (accepted but not used)")
+    parser.add_argument("--var-cond", action="store_true", help="Variational conditioning (accepted but not used)")
+    parser.add_argument("--var-cond-kl-weight", type=float, default=0.0, help="VAE KL weight (accepted but not used)")
+    parser.add_argument("--pcf-loss-weight", type=float, default=0.0, help="PCF loss weight (accepted but not used)")
+    parser.add_argument("--pcf-n-freqs", type=int, default=32, help="PCF frequencies (accepted but not used)")
+    parser.add_argument("--retrieval-memory", action="store_true", help="Enable retrieval memory (accepted but not used)")
+    parser.add_argument("--retrieval-mem-size", type=int, default=32, help="Retrieval memory size (accepted but not used)")
+    parser.add_argument("--retrieval-key-dim", type=int, default=32, help="Retrieval key dim (accepted but not used)")
+    parser.add_argument("--retrieval-val-dim", type=int, default=32, help="Retrieval value dim (accepted but not used)")
+    parser.add_argument("--retrieval-decay", type=float, default=0.85, help="Retrieval decay (accepted but not used)")
+    parser.add_argument("--retrieval-tau-write", type=float, default=0.5, help="Retrieval tau write (accepted but not used)")
+    parser.add_argument("--retrieval-n-warmup", type=int, default=4, help="Retrieval warmup epochs (accepted but not used)")
+    parser.add_argument("--mixed-type-recovery", action="store_true", help="Mixed type recovery (accepted but not used)")
+    parser.add_argument("--w-stop-threshold", type=float, default=10.0, help="W-loss stop threshold (accepted but not used)")
 
     args = parser.parse_args()
 

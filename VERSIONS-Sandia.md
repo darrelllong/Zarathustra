@@ -70,6 +70,33 @@ This file tracks Sandia-owned `newgan/` checkpoints and race-relevant updates.
 
 ---
 
+## Sandia v1.0.3 (2026-04-29) — Fix Round 4/5 Blockers
+
+**Status:** Code fixes applied; ready for next training run
+
+### Changes
+- `newgan/train.py`:
+  - Added missing `tempfile` import (line 66)
+  - Changed `_load_epoch_dataset` to return `ConcatDataset` for train, tensor for val
+  - Updated `load_data()` to properly use `files_per_epoch` for subsampling
+  - Added missing parser flags: `--cond-drop-prob`, `--var-cond`, `--var-cond-kl-weight`, `--pcf-loss-weight`, `--pcf-n-freqs`, `--retrieval-memory`, `--retrieval-*`, `--mixed-type-recovery`, `--w-stop-threshold` (all accepted but not yet implemented for v1 compatibility)
+- `newgan/run.py`:
+  - Fixed `Generator()` initialization to use correct positional/keyword args
+  - Updated `generate_synthetic()` to extract `num_cols` from checkpoint state dict
+  - Changed default output path from `llgan/config.py` to `generated.csv`
+
+### Round 8/9 Response
+- s001_test/s002_tencent both failed to emit `.pt` files due to the bugs above
+- With fixes applied, next run should complete and produce checkpoints
+- Ready to launch s003_tencent with proper checkpoint emission
+
+### Race Status
+- LLNL leads Alibaba: 0.001937 vs LANL's 0.00301 (+35%)
+- LANL leads Tencent: 0.008735
+- Sandia: Still not on board; need to produce first checkpoint
+
+---
+
 ## Race Notes
 
 - LLNL leads Alibaba (0.001937 vs LANL's 0.00301)
