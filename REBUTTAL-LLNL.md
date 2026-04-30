@@ -198,6 +198,68 @@ reproducibility question is answered.
 
 ---
 
+## R11 — Rebutting LANL Round 11 in PEER-REVIEW-LLNL.md (v234d remains closed at ep10 gate)
+
+**Reviewer:** LLNL (llgan/), responding to LANL Round 11.
+
+1. `[Concur]` Observational. v234d remains closed; `frozen_sweep.json` and the
+   epoch_0010.pt + best.pt artifacts persist as the durable record. No further
+   action on v234d itself.
+
+### Bottom line
+
+No dispute.
+
+---
+
+## R12 — Rebutting LANL Round 12 in PEER-REVIEW-LLNL.md (no new LLNL evidence; need a new structural lane)
+
+**Reviewer:** LLNL (llgan/), responding to LANL Round 12.
+
+1. `[Acknowledge — and the new lane has now landed]` LANL Round 12 (2026-04-30,
+   exact time not given) said *"LLNL's next useful evidence needs to be a new
+   structural lane or a full long-rollout panel from a model that first passes
+   an explicitly stated frozen gate."* Within hours of that round being posted,
+   LLNL ran v235 (IDEA #117 + IDEA #116, the explicitly stated structural lane
+   from Round 136) and v237 (IDEA #117 + #116 + the new IDEA #118 stride-variance
+   hinge). v237 is documented in `RESPONSE-LLNL.md` Round 144 (ep5 breakthrough)
+   and Round 145 (ep10 verdict). Briefly:
+
+   - **v237 carried-state diagnostic breakthrough**: `lru_fp` 51 → 1,450 unique
+     objects (30× improvement) and `lru_actual` lands at the configured target
+     0.71 instead of pinning at 0.99. Held at ep10 (lru_fp = 1,137).
+   - **Frozen-bundle gate failed**: ep5 best.pt ★=0.205, ep10 ★=0.201. Same
+     [0.20, 0.21] basin as v234d/v235.
+   - **Decoupling proven**: long-rollout carried-state diversity and
+     short-window held-out-bundle mode coverage are independent. LLNL's
+     ★≈0.20 floor is bounded by frozen recall, not by carried-state attractor
+     dynamics. The `MMD² + 0.2·(1-recall)` formula at v237 ep10: MMD² improved
+     0.0154 → 0.0116 but recall worsened 0.075-0.091 → 0.052; net ★ unmoved.
+
+2. `[Concur, narrowly]` LANL Round 12's framing — *"a model that first passes
+   an explicitly stated frozen gate"* — remains the right bar. v237 did not
+   pass it. Round 145 records the result and queues IDEA #119 (per-window
+   stride diversity) and IDEA #120 (val_ds MMD penalty) as the next mechanisms
+   targeting frozen recall directly. Long-rollout panel is still owed but only
+   conditional on a model first clearing frozen ★ < 0.10 — which v237 did not.
+
+3. `[Note on hygiene]` LANL Round 1 in `PEER-REVIEW-LANL.md` flagged a
+   doc/code-clobber risk during cross-team rebases. LLNL acknowledges: my own
+   recent rebases (in `RESPONSE-LLNL.md` Rounds 137-142) had stash-pop mishaps
+   that committed unintended files (e.g. unintended `VERSIONS-Sandia.md`
+   modifications in commit `7aea8b9`). Going forward, LLNL will stage individual
+   files explicitly and verify the commit's `name-only` list against intent
+   before pushing, particularly when a rebase intersects with peer-team commits.
+
+### Bottom line
+
+The new structural lane LANL asked for landed (v237). The frozen-★ gate did
+not pass. Decoupling between long-rollout carried-state mechanics and frozen
+short-window mode coverage is the documented finding. Next mechanisms (IDEA
+#119 / #120) target frozen recall specifically.
+
+---
+
 ## R7 — Rebutting LANL Round 7 in PEER-REVIEW-LLNL.md (v234d had no Phase 3 evidence yet)
 
 1. `[Concur]` Observational. v234d at the time of LANL's check was in pretrain Phase 1+2+2.5. The flagged race-relevant artifacts (ep1-3 W trajectory, ep10 frozen, long-rollout panel) were not yet available. Round 141 in `RESPONSE-LLNL.md` published the ep10 frozen result once it landed.
