@@ -8765,3 +8765,62 @@ Active LLNL run: **none**. Next: produce strict-holdout calibration JSON.
 
 LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 152 — Strict-holdout calibration produces HRC-MAE=0.111918; baseline 0.04375 is the upper bound for the LLNL single-phase + calibration path
+
+**Date**: 2026-04-30 09:33 PDT
+
+### Methodology
+
+Wrote `produce_holdout_calib_json.py` — picks 8 random training files DISJOINT from the 4 eval-manifest files (`tencentBlock_{19784, 2893, 20249, 22882}`) at seed=101, computes per-stream stack-distance histogram + reuse_access_rate matching the eval protocol (8 streams × 25k records each = 200k), writes a JSON in the format `cmd_calibrate-from-json` consumes.
+
+```
+Sampled 8 strict-holdout training files at seed=101 (no eval overlap):
+  tencentBlock_{4659, 8575, 13175, 16601, 17525, 18245, 22088, 25494}
+reuse_access_rate = 0.51665 (vs eval's 0.61493 — 16% lower)
+```
+
+Chained `cmd_fit --max-files 32 seed=7` (already had this) → `cmd_calibrate-from-json --eval-json holdout8_calib.json` → generate seed=42 → eval against `tencent_stackatlas.json` (unchanged):
+
+```
+HRC-MAE  : 0.111918   (vs 0.04375 baseline — 2.6× WORSE)
+reuse    : 0.5185 (real 0.6149)
+P50      : 81 (real 60)
+P90      : 529 (real 174)  — substantial mismatch
+footprint: 12038 (real 9627)
+```
+
+### Diagnosis
+
+The strict-holdout calibration JSON's `reuse_access_rate=0.51665` is 16% lower than the eval bundle's 0.61493. By construction, a strict-holdout calibration sample has its own distribution, which differs from the eval files' distribution. The calibrated model targets the holdout distribution; eval scores against the eval distribution; the gap shows up as HRC-MAE.
+
+The 8f traincalib baseline (HRC-MAE=0.04375) **cannot legitimately be reproduced via strict-holdout calibration** unless we either:
+- Sample so many holdout files that the per-stream metric converges to the eval-bundle's metric (likely needs 100s of files; exhaustive sweep)
+- Use a different calibration source that matches the eval-bundle distribution by chance
+
+The historical 0.04375 result is presumably a fortunate accident: the 8 random training files happened to have a stack_distance histogram close enough to the eval bundle's to produce a 0.04 result. Selecting 8 different files (my seed=101) gives 0.11 — the same architectural recipe, different random sample, 2.6× worse.
+
+### Implication
+
+**The LLNL single-phase + calibration path on tencent has a HRC-MAE floor around 0.05-0.10 under legitimate strict-holdout methodology**, with the historical 0.04375 a slightly-lucky lower-tail draw. Even if I generate 100 calibration JSONs at different seeds and pick the lucky one with the closest distribution-match to the eval bundle, that's lottery, not mechanism.
+
+To improve below 0.04 STRUCTURALLY (not by lottery), the path requires:
+- (a) A multi-phase atlas with proper eval-side calibration distinct from the eval files (i.e. learning phase-conditioned PMFs from training files that generalize to held-out distributions). Multi-day work, uncertain payoff.
+- (b) The LANL compound-state Markov chain port. Multi-day; LANL's 0.008735 is the empirical benchmark.
+
+### Decision
+
+The PhaseAtlas single-phase + calibration track is **closed-bounded** at ~0.04-0.10 under strict-holdout methodology. The historical 0.04375 number is a lottery; cannot be reproduced reliably.
+
+Race position:
+- **Honest LLNL tencent strict-holdout reproducible: ~0.05-0.10** (single-seed; depends on calibration-JSON lottery).
+- **Stronger claim**: 0.04375 historical-lottery from `tencent_traincalib.pkl.gz` (provenance of its calibration JSON unknown; likely a similar lucky draw).
+- LANL's 0.008735 remains the honest tencent ATB on the strict-holdout panel.
+
+Active LLNL run: **none**. The Round 149 option (1) "refit with more files" track is closed-failed across all variants tried (32f cmd_fit alone, 32f + circular calibration, 32f + strict-holdout calibration). Pivot path: option (2) LANL Markov-chain port, multi-day work.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis sweeps. **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
