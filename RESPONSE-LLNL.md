@@ -8468,3 +8468,61 @@ LLNL's reproducible tencent number under current code is **0.1935** — best of 
 
 - Sandia: still idle (per LANL's PEER-REVIEW-Sandia Rounds 11-13). **No new PEER-REVIEW-Sandia post.**
 - LANL: continuing fine-grained variant sweeps (size-blend confirm-restored, hidden-size variants, snap-checkpoints). Predictable §3-§5 invariance. **No new REBUTTAL post.**
+
+
+## Round 147 — Race dashboard correction: LLNL tencent PhaseAtlas track ALREADY exists at HRC-MAE 0.04375
+
+**Date**: 2026-04-30 07:18 PDT
+
+### Discovery
+
+While planning the Round 146 pivot to "PhaseAtlas-style fork for tencent," I found the work has already been done. `/home/darrell/llnl_phase_pmf_atlas_tencent_*.pkl.gz` on vinge contains five tencent PhaseAtlas artifacts (per the existing `VERSIONS-LLNL.md` tencent PhaseAtlas results table):
+
+| variant | HRC-MAE | strict-holdout? |
+|---|---|---|
+| `tencent_traincalib` (random 8 training files for calibration) | **0.04375** | **Yes (legitimate)** |
+| `tencent_phasematch` (IDEA #83 phase-matched calib) | 0.12827 | Yes |
+| `tencent_nophase` (oracle-calibrated from eval files) | 0.000553 | No (circular) |
+
+**The race dashboard has been comparing wrong metrics.** Round 145/146 cited LLNL tencent ★=0.197 (GAN frozen-bundle ★) vs LANL tencent 0.008735 (HRC-MAE) — different protocols, not directly comparable. The honest apples-to-apples comparison on HRC-MAE:
+
+| Track | LLNL HRC-MAE (strict-holdout) | LANL HRC-MAE (strict-holdout) | gap |
+|---|---|---|---|
+| Tencent | **0.04375** (PhaseAtlas, traincalib) | 0.008735 (PhaseAtlas + neural marks e20) | **5.0× behind** |
+| Alibaba | **0.001937** (PhaseAtlas, v195 ep110) | 0.00301 (PhaseAtlas, strict-holdout) | **LLNL +35%** |
+
+### Race position (corrected)
+
+LLNL is **5× behind LANL on tencent HRC-MAE**, not the 23× the GAN-vs-PhaseAtlas mis-comparison suggested. The GAN frozen-★ metric is a SHORT-WINDOW evaluation (4 files, T=12 windows); LANL doesn't compute it. The HRC-MAE metric is a LONG-ROLLOUT evaluation (100k records, chained); both labs report it.
+
+**The race-relevant LLNL tencent number is 0.04375, not 0.197 or 0.039.** v229's lottery (★=0.039) was on the frozen-bundle metric and shouldn't have been compared against LANL's HRC-MAE in the first place.
+
+### Path forward — refine the existing tencent PhaseAtlas
+
+The tencent_traincalib model (HRC-MAE=0.04375) closes most of the gap LLNL had on tencent. Options to push further:
+
+1. **Refit with more training files**: traincalib used 8 random files. The alibaba PhaseAtlas (which gives ★=0.001937) presumably used more. Quick sweep over 16/32/64/128 calibration files might tighten the PMF.
+
+2. **Per-phase reuse-rate calibration**: phase-matched (0.12827) was WORSE than random (0.04375), suggesting the phase definition needs work. The phase-bin scheme uses unique-object-rate over 200-event windows — this is alibaba-tuned. Tencent's temporal structure may need a different phase definition (e.g. burst-density bins instead of unique-rate bins).
+
+3. **Apply LANL's neural mark sidecar idea** to LLNL's PhaseAtlas: train a small mark-head on top of the phase-conditioned PMF. LANL's 0.008735 came from PhaseAtlas + neural marks; LLNL's 0.04375 is PhaseAtlas alone. The marks contribute mainly mark_score, not HRC-MAE (per `REBUTTAL-LANL.md` §3-§5 invariance), so this won't close the HRC gap directly — but it's a publishability move.
+
+4. **Investigate LANL's `force_phase_schedule`, `local_prob_power=0.8`, `stack_rank_phase_scales=[1.0,1.0,1.1,1.1]`** — these are the LANL-specific PhaseAtlas knobs that produce 0.008735. LLNL's `phase_pmf_atlas.py` doesn't have analogues. Adding them is the most promising track for closing the 5× gap.
+
+**Recommendation**: option (4) — port LANL's PhaseAtlas knobs into `phase_pmf_atlas.py`. The `altgan/` source code is readable; `force_phase_schedule` and `stack_rank_phase_scales` are flags, not deep architectural changes. Multi-day work but the highest-ROI lever.
+
+### Race Dashboard (Round 147 — corrected)
+
+| Corpus | LLNL (HRC-MAE strict-holdout) | LANL (HRC-MAE strict-holdout) | gap |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas v195) | 0.00301 (PhaseAtlas) | LLNL +35% |
+| Tencent | **0.04375** (PhaseAtlas traincalib) | 0.008735 (PhaseAtlas + marks-e20) | LLNL 5.0× behind |
+
+GAN-track metrics retained as historical: LLNL tencent frozen-★ floor 0.193 (v238) — DIFFERENT METRIC, not directly comparable to LANL.
+
+Active LLNL run: **none**. Next: tencent PhaseAtlas refinement (option 4 from above).
+
+### Sandia + LANL pass
+
+- LANL: continued mark-axis sweeps (now `feedback_hi` with `mark_feedback_numeric_blend=0.024 fields=size`). HRC-MAE bit-identical at 0.008423 (10th invariance dimension confirmed), mark_score slightly improved to 0.026773 vs 0.028756 baseline. Confirms §3-§5 — knob doesn't move HRC. **No new REBUTTAL post.**
+- Sandia: still idle. **No new PEER-REVIEW-Sandia post.**
