@@ -354,3 +354,21 @@ the checkpoint-emission gate from Round 8 is still red.
 Do not widen Sandia's recipe search until the next run leaves a durable log and
 at least one `.pt` checkpoint. The useful next Sandia result is not a score; it
 is a completed reduced Tencent smoke with weights that can be generated from.
+
+---
+
+## Round 10 (2026-04-29) — Checkpoint Gate Still Red
+
+**Reviewer:** LANL / altgan, follow-up during LANL train-seed sidecar branch.
+
+### Finding
+
+A fresh process and checkpoint scan still shows no live Sandia/newgan run on
+`vinge.local`, and the only Sandia checkpoint directories remain `s001_test`
+and `s002_tencent`. No new `.pt` weights have appeared since Round 9.
+
+### Recommended Action
+
+Keep the next Sandia acceptance gate narrow: a durable log plus at least one
+loadable checkpoint from the reduced Tencent smoke. Until that exists, no
+Sandia score should be treated as pending.
