@@ -7972,3 +7972,56 @@ Five Sandia commits since the last peer-review tick (`6e561ab`, `1b0c1f2`, `0f91
 | Tencent | 0.039 (v229 ep10) | 0.008735 (3-seed) / 0.008424 (single-seed temp=0.5, contested) | not yet | LANL 4.47× (3-seed) |
 
 v233 closed-failed, IDEA #116 closed-failed. Active LLNL run: v234 (v229 repro, seed=5). Next architectural attempt: v235 = IDEA #117 (--retrieval-train-carry) once v234 confirms baseline.
+
+
+## Round 138 — v234 reproducibility miss; v234b launched with --files-per-epoch 12; LANL temp_micro nullified
+
+**Date**: 2026-04-29 21:21
+
+### v234 W-stop ep6: v229 recipe DID NOT reproduce
+
+v234 used the v229 ATB recipe exactly — seed=5, same retrieval-mem + multi-scale + mixed-type + PCF + reuse-rate=10.0 + LRU diagnostic, pretrain reused from v229's `pretrain_complete.pt`. Result:
+
+| ep | W | G | reuse | t |
+|---|---|---|---|---|
+| 1 | 1.83 | 3.51 | 0.602 | 191s |
+| 2 | 1.83 | 2.81 | 0.622 | 189s |
+| 3 | 2.96 | 4.52 | 0.540 | 191s |
+| 4 | 3.34 | 3.55 | 0.588 | 190s |
+| 5 | 3.74 | 3.16 | 0.588 | 185s |
+| 6 | 3.14 | 2.14 | 0.585 | 186s → **W-stop fired** |
+
+Compared to v229 ep1-5 (W = 0.72, 1.40, 1.14, 1.03, ?, all under 1.5), v234 starts at W=1.83 and climbs.
+
+Frozen-bundle:
+- best.pt (ep5): **★=0.29486** (MMD²=0.12, recall=0.15)
+- final.pt: ★=0.23681 (MMD²=0.13, recall=0.47)
+
+**6× worse than v229 ATB ★=0.039.** The recipe did not reproduce. Most likely cause: launcher omitted `--files-per-epoch 12`, defaulting to 8. v229's training log explicitly says `files=12`. Same model code, same pretrain, same seed → different epoch-data → different critic strength → different W trajectory → different convergence.
+
+This is a **reproducibility incident**, not just a v234 failure. v229's ATB ★=0.039 is now in question: any new recipe variant that doesn't EXACTLY match v229's launcher (including non-obvious flags like `--files-per-epoch`) may fail to reproduce. Per `PEER-REVIEW-GEMINI.md` Round 1 P1 #5 ("preprocessor fit creates cross-run leakage via inconsistent seeding"), the seed-fit is part of the experiment definition and depends on `--files-per-epoch`. The pretrain manifest probably needs to be a frozen artifact, not a re-fit-each-launch quantity.
+
+### v234b queued
+
+`/home/darrell/launch_v234b.sh` waits for frozen_sweep to release GPU then launches with `--files-per-epoch 12` explicit (only difference from v234). If v234b reproduces v229 ★=0.039 within 2×, the system is healthy and IDEA #117 (retrieval-train-carry) becomes v235. If v234b also fails, the v229 ATB is run-state-locked and the deeper concern (preprocessor manifest reproducibility) blocks all further mechanism claims until resolved.
+
+### LANL temp_micro nullified on HRC-MAE
+
+LANL's `temp_micro_seed42` sweep ran temp ∈ {0.5, 0.75, 1.25, 1.5} at seed=42 and produced **bit-identical HRC-MAE = 0.008423499999999995 across all four** (`*temp_micro_seed42_summary.csv`). This confirms `REBUTTAL-LANL.md` §2: `mark_temperature` is mathematically invariant on HRC-MAE because the cache simulator consumes only `obj_id`+rank, not the mark distribution. The 0.008424 number is purely a seed=42 effect, not a temperature effect. LANL's published 3-seed best stays at 0.008735; the natural extension is the 4-seed mean ~0.008767 with seed=42 as best.
+
+### Sandia first peer review of LLNL/LANL
+
+`VERSIONS-Sandia.md` (commit `ed98f34`) contains Sandia's first peer review of both LLNL and LANL, plus a self-contained `newgan/train.py`. Highlights:
+- `[Concur]` Sandia's v233 critique (kill, launch retrieval-state carry) matches LLNL's Round 137 plan.
+- `[Acknowledged]` Sandia caught the lru_eval not threading retrieval_state — independent confirmation of IDEA #117 from the eval side.
+- `[Friendly correction]` Sandia cites stale LANL numbers (LANL Tencent 0.01845 / Alibaba 0.00183 — both retracted ~3 weeks ago). Posted Round 6 to `PEER-REVIEW-Sandia.md` with current numbers.
+- LANL Rounds 4/5 in `PEER-REVIEW-Sandia.md` flag five P1 bugs in `newgan/{train,run}.py` that block any v1 reproduction. LLNL concurs.
+
+### Race Dashboard (Round 138)
+
+| Corpus | LLNL ATB | LANL ATB | Sandia | Status |
+|--------|----------|----------|--------|--------|
+| Alibaba | **0.001937** (v195 ep110) | 0.00301 | not yet | **LLNL +35%** |
+| Tencent | 0.039 (v229 ep10) — **reproducibility unconfirmed pending v234b** | 0.008735 (3-seed) / 0.008424 (4-seed best) | not yet | LANL ~4.6× |
+
+Active LLNL run: **none** (v234 W-stopped). v234b queued behind frozen_sweep.

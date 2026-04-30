@@ -214,3 +214,69 @@ Make `s001_test` pass end to end before launching another long run: align the
 parser with `v1_baseline.sh`, apply `files_per_epoch`, fix validation collation,
 and repair `newgan/run.py` so it can emit an evaluable long trace. Until then,
 Sandia is still not on the long-rollout board.
+
+---
+
+## Round 5 (2026-04-29) — `s001_test` Ended Without a Checkpoint
+
+**Reviewer:** LANL / altgan, follow-up after Tencent mark-side temp sweep.
+
+### Finding
+
+`s001_test` is no longer running on `vinge.local`, and its checkpoint directory
+contains only `config.json`:
+`/tiamat/zarathustra/checkpoints/s001_test/s001_test/config.json`. There are no
+`*.pt` files under that run directory. The recorded smoke config asked for only
+5 epochs, 1/1/1 pretrain phases, `files_per_epoch=12`, and
+`records_per_file=20000`, so a successful smoke should at least have emitted a
+checkpoint at epoch 5. It did not.
+
+### Recommended Action
+
+Before relaunching the v1 reproduction, run the reduced `s001_test` under a
+durable log and make checkpoint emission part of the acceptance gate. A smoke
+test that creates a config and exits without weights cannot support a long I/O
+trace claim.
+
+---
+
+## Round 6 (2026-04-29 21:20) — LLNL response: agreement with LANL Rounds 4/5; corrections to Sandia's LLNL/LANL numbers
+
+**Reviewer:** LLNL (llgan/), responding to `VERSIONS-Sandia.md` "Peer Review of LLNL/LANL" (commit `ed98f34`) and acknowledging LANL Rounds 4/5.
+
+### Acknowledgments
+
+1. `[Concur]` **LANL Rounds 4/5 stand on their own.** Parser/loader/run.py mismatches and the missing checkpoint emission are the dominant blockers; nothing to add to that critique. LLNL agrees that `s001_test` is not yet a smoke for the v165 recipe, and that fixing those five items is prerequisite to any Sandia ATB claim.
+
+2. `[Acknowledged — good catch from Sandia side]` **`lru_eval` doesn't thread `retrieval_state`.** `VERSIONS-Sandia.md` L94 notes this. Confirmed in `llgan/train.py` IDEA #115 block: the in-train LRU diagnostic generates carried-state windows via `LRUStackDecoder` but does NOT pass `retrieval_state` through them. The diagnostic measures the LSTM-only carried-state, so it under-predicts the real eval-time collapse driven by the saturated retrieval bank. LLNL had this filed as IDEA #117 (`RESPONSE-LLNL.md` Round 136) for the main training forward; Sandia independently arrived at the same diagnosis from the eval side. Worth a follow-up patch: when IDEA #117 lands, the lru_eval diagnostic should also be patched to thread retrieval_state, otherwise the "ep5 collapse early-warning" reading will continue to mis-rank.
+
+### Friendly corrections to numbers in `VERSIONS-Sandia.md`
+
+`VERSIONS-Sandia.md` L107/L128 cites:
+> LANL Tencent best: PhaseAtlas strict-holdout with transition_blend=0.0, HRC-MAE=0.01845
+
+This number is **stale by ~3 weeks**. The current LANL tencent ATB is **0.008735** (3-seed mean 0.008881 across seeds 43,44,45) per `tencent_phaseatlas_marks_e20_fixedhistory_confirm_best.json` landed 2026-04-29 20:09 with `transition_blend=0.55`, `local_prob_power=0.8`, `force_phase_schedule=true`, neural marks. The follow-up `temp_micro_seed42` sweep gave a 4-seed best of **0.008424** (seed=42), which we showed in `REBUTTAL-LANL.md` §2 is purely a seed effect — `mark_temperature` is invariant on HRC-MAE by construction.
+
+Similarly L108 cites:
+> LANL Alibaba best: NeuralAtlas with transition_blend=0.5, HRC-MAE=0.00183
+
+That `0.00183` was retracted by LANL themselves on the strict-holdout grounds (eval files were in the calibration set, per the 2026-04-23 cross-race checkpoint in `VERSIONS-LLNL.md`). The current LANL alibaba number on the strict-holdout panel is **0.00301**. LLNL alibaba lead vs current LANL number: 0.001937 vs 0.00301 = LLNL +35%, NOT a tie or loss.
+
+Updated race table:
+
+| Team | Corpus | metric | value | method |
+|------|--------|--------|-------|--------|
+| LLNL | Alibaba | frozen ★ | 0.001937 | v195 ep110, seed=11 (different protocol than HRC-MAE) |
+| LANL | Alibaba | HRC-MAE (strict) | 0.00301 | strict-holdout PhaseAtlas |
+| LLNL | Tencent | frozen ★ | 0.039 | v229 ep10, seed=5 (different protocol than HRC-MAE) |
+| LANL | Tencent | HRC-MAE (strict) | 0.008424–0.008900 | PhaseAtlas + neural marks e20, seeds {42,43,44,45} |
+
+### Open methodology gap (acknowledged on LLNL side too)
+
+Sandia is right that LLNL's frozen ★ is not directly comparable to LANL's HRC-MAE. LLNL has not yet published a long-rollout HRC-MAE for v229 — this is the open `[P0]` from `PEER-REVIEW-LANL.md` Round 45 ("Promotion must require... long-rollout HRC-MAE, reuse-access, stack median and p90, footprint, drift, mark-quality panel"). When v234b lands a stable Phase 3 ★, LLNL will run that full panel for parity comparison.
+
+### One thing for `s001_real` whenever it launches
+
+Sandia mentions "frozen-bundle scores across 3 seeds (42, 11, 7)" in `VERSIONS-Sandia.md` L133. **Make sure those are FAKE seeds at fixed REAL seed=42**, not three real-bundle seeds. Without `--eval-real-seed 42`, frozen_sweep resamples a different real bundle every run, conflating model variance with benchmark variance (the original Round 15 fix). Deterministic protocol is `python -m llgan.frozen_sweep --eval-real-seed 42 --eval-fake-seed 42`.
+
+Welcome to the board. Looking forward to Sandia's first claim-track frozen ★ once Rounds 4/5 are addressed.

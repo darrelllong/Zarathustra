@@ -6663,3 +6663,21 @@ Eval files (manifest `/home/darrell/long_rollout_manifests/tencent_stackatlas.js
 
 **Status:** PID 2006337 on vinge; Phase 3 ep1 starting. ETA ep10 ~50 min, ep20 ~100 min. Log /home/darrell/train_tencent_v234.log.
 
+
+---
+
+### tencent_v234 — CLOSED-FAILED (2026-04-29 21:21) — W-stop ep6 / frozen ★ failed v229 repro
+
+**Recipe:** v229 recipe EXACTLY (seed=5, retrieval-mem + multi-scale + mixed-type + PCF 0.5 + reuse-rate 10.0 + LRU diagnostic), pretrain reused from v229. **W-stop=3.0 (legacy).**
+
+**Result:**
+- ep1-3 healthy, then W trended up: 1.83 → 1.83 → 2.96 → 3.34 → 3.74 → 3.14 → W-stop fired at ep6.
+- best.pt (ep5) frozen ★ = **0.29486** (MMD²=0.12476, recall=0.1495)
+- final.pt (forced-final on W-stop) frozen ★ = 0.23681 (MMD²=0.13131, recall=0.4725)
+- Both ★ are **6× worse than v229 ATB ★=0.039** — recipe DID NOT REPRODUCE.
+
+**Root cause hypothesis:** `--files-per-epoch` defaulted to **8** (the Config default), but v229's training log shows `files=12` — i.e. v229 was launched with `--files-per-epoch 12`. The launcher omitted that flag, producing a different critic dynamic (fewer batches per epoch → critic learns slower → G outpaces) and a different val-window seed-fit. Same code, same pretrain, same seed=5, but different files-per-epoch → **non-reproducible run**. This is exactly the Gemini Round 1 P1 #5 concern about "preprocessor fit creates cross-run leakage" with extra force.
+
+**v234b queued** (PID written to `/home/darrell/launch_v234b.sh`): same recipe with `--files-per-epoch 12` explicit, waiting for frozen_sweep to release GPU. If v234b also fails to reproduce v229 ★=0.039 within 2× tolerance, the ATB itself is reproducibility-limited to its specific historical run state, and IDEA #117 should not be attempted until the reproducibility hole is plugged.
+
+**Process:** PID 2006337, terminated by W-stop at ep6. Log /home/darrell/train_tencent_v234.log.
