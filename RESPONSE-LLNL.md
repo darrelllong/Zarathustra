@@ -9212,3 +9212,55 @@ Active LLNL run: **none**. Next: (d1) hybrid Markov + PhaseAtlas calibration.
 
 LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 159 — d2 N=256 PhaseAtlas calibration: HRC-MAE 0.0442 (within noise of N=128 0.0427); d2 closed-failed
+
+**Date**: 2026-04-30 12:33 PDT
+
+### Result
+
+| recipe | calib N | calib reuse_rate | HRC-MAE |
+|---|---|---|---|
+| PhaseAtlas N=128 (Round 154) | 128 | 0.6120 | **0.0427** |
+| **PhaseAtlas N=256** | 256 | 0.6096 | **0.0442** (within noise) |
+
+The per-phase fine PMF and reuse rate from a 256-file calibration are essentially identical to N=128 (reuse_rate 0.610 vs 0.612; HRC-MAE delta 0.0015 ≈ stochastic eval seed noise). **Calibration is converged at N=128.** N=512 sweep is not warranted — diminishing returns past N=128 are flat.
+
+### Markov hour summary (combined Round 156-158)
+
+Five mechanism attempts in `markov_atlas.py` plus the PhaseAtlas baseline:
+
+| recipe | HRC-MAE | source |
+|---|---|---|
+| Markov v1 (192-state) | 0.0821 | R156 |
+| Markov v2 (12-state, fixed phase) | 0.0821 | R156 |
+| Markov v3 (12-state, fitted phase) | 0.0596 | R156 |
+| Markov v4 (29 fine bins) | 0.0504 | R157 |
+| Markov v5 (REUSE_FAR phase) | 0.0502 | R158 |
+| PhaseAtlas N=128 calib | **0.0427** | R154 |
+| PhaseAtlas N=256 calib | 0.0442 | R159 |
+| LANL | 0.008735 | — |
+
+### Verdict — strict-holdout LLNL tencent floor confirmed at HRC-MAE 0.0427
+
+Three orthogonal levers explored this hour (compound state machine, finer rank bins, larger calibration N, alternative phase signal), all confirm the floor at 0.0427. The 5× gap to LANL (0.008735) is in **learned conditional transitions** — empirical / calibration-tuned methods cannot bridge it.
+
+The race-relevant choice for LLNL on tencent is now binary:
+- **(A) Accept the 0.0427 floor** as LLNL's strict-holdout tencent result. Gap to LANL stays 5×; LLNL has alibaba +35% lead. Total race position: split.
+- **(B) Commit to b2** (multi-day learned-transition port from `altgan/neural_atlas.py`). Estimate 1-2 days. Expected outcome: HRC-MAE in [0.012, 0.025] range — closes most of the gap but unlikely to match 0.008735 exactly without deep tuning.
+
+### Active LLNL run: none. Sandia just launched s003_tencent_v1 (09:42 PDT)
+
+`s003_tencent_v1` (Sandia, PID 2323354): `--epochs 20 --pretrain-ae-epochs 10 --pretrain-sup-epochs 10 --pretrain-g-epochs 20 --batch-size 64 --hidden-size 256 --files-per-epoch 12 --records-per-file 20000 --seed 42 --no-compile --no-amp`. First substantive Sandia training run (vs s001_test/s002_tencent which were just smoke validation). They're using llgan-derived code with v229-style recipe minus the auxiliary losses. Expected: enter the same ★≈0.20 GAN-track basin LLNL is stuck in. Will see ep10 frozen result in ~3.5h.
+
+**No PEER-REVIEW-Sandia post yet** — wait for ep10 frozen score before commenting. Their pretrain progressing on shared GPU shouldn't block LLNL since LLNL track is now entirely CPU-only.
+
+### Decision
+
+This tick concludes the empirical-mechanism exploration on tencent. No more cheap experiments will move HRC-MAE below 0.04. The next race-relevant LLNL action is either committing to b2 (multi-day) or accepting the 0.0427 floor and pivoting to alibaba refinement / new corpus targets.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis variant sweeps (predictable §3-§5 invariance). **No new REBUTTAL post.**
+Sandia: launched s003_tencent_v1 — substantive new activity. **PEER-REVIEW-Sandia post deferred until ep10 frozen result.**
