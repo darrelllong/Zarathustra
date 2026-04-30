@@ -678,6 +678,62 @@ def cmd_generate(args):
     print(f"Reuse rate (within-stream duplicates): {reuse:.4f}")
 
 
+def cmd_eval_csv_hrc(args):
+    """Evaluate a pre-generated CSV against a long-rollout real manifest.
+
+    Loads the manifest, samples the real reference stream, computes long-rollout
+    metrics on both, and reports HRC-MAE plus secondary stack-distance / reuse
+    diagnostics. Default manifest is the canonical tencent_stackatlas.json so
+    the historical eval contract still works.
+    """
+    import sys as _sys
+    import json as _json
+    _sys.path.insert(0, "/home/darrell/Zarathustra")
+    from llgan.long_rollout_eval import (
+        _metrics_for_stream, _per_stream_obj_ids, _sample_real_stream, _gap,
+    )
+
+    with open(args.manifest) as _f:
+        manifest = _json.load(_f)
+
+    real_df, _ = _sample_real_stream(
+        trace_dir=manifest["trace_dir"], fmt=manifest["fmt"],
+        n_records=manifest["n_records"], n_streams=manifest["n_streams"],
+        seed=manifest["seed"], manifest_path=args.manifest,
+    )
+
+    import pandas as _pd
+    gen_df = _pd.read_csv(args.csv)
+    if "stream_id" not in gen_df.columns:
+        gen_df["stream_id"] = 0
+
+    per_stream_real = _per_stream_obj_ids(real_df)
+    footprints = [len(np.unique(s)) for s in per_stream_real]
+    fp_mean = float(np.mean(footprints))
+
+    cache_sizes = np.array([
+        max(1, int(fp_mean * r))
+        for r in [0.005, 0.01, 0.02, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.3,
+                  0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 3.0]
+    ])
+    cache_sizes = np.unique(cache_sizes)
+
+    real_m = _metrics_for_stream(real_df, cache_sizes)
+    gen_m = _metrics_for_stream(gen_df, cache_sizes)
+    gap = _gap(gen_m, real_m)
+
+    print(f"manifest : {args.manifest}")
+    print(f"HRC-MAE  : {gap['hrc_mae']:.6f}")
+    print(f"reuse    : {gen_m['reuse_access_rate']:.4f} "
+          f"(real {real_m['reuse_access_rate']:.4f})")
+    print(f"P50      : {gen_m['stack_distance_median']} "
+          f"(real {real_m['stack_distance_median']})")
+    print(f"P90      : {gen_m['stack_distance_p90']} "
+          f"(real {real_m['stack_distance_p90']})")
+    print(f"footprint: {gen_m['footprint_mean_per_stream']:.0f} "
+          f"(real {real_m['footprint_mean_per_stream']:.0f})")
+
+
 def cmd_calibrate_from_json(args):
     """Create or update a nophase atlas calibrated from an eval JSON file.
 
@@ -773,6 +829,11 @@ def main():
                       help="Existing atlas to patch (if omitted, creates minimal nophase atlas)")
     pcal.add_argument("--output", required=True)
 
+    peval = sub.add_parser("eval-csv-hrc",
+                           help="Long-rollout HRC-MAE eval of a generated CSV against a real manifest")
+    peval.add_argument("--csv", required=True, help="Generated CSV path")
+    peval.add_argument("--manifest", required=True, help="long_rollout_manifest JSON path")
+
     args = p.parse_args()
     if args.cmd == "fit":
         cmd_fit(args)
@@ -780,6 +841,8 @@ def main():
         cmd_generate(args)
     elif args.cmd == "calibrate-from-json":
         cmd_calibrate_from_json(args)
+    elif args.cmd == "eval-csv-hrc":
+        cmd_eval_csv_hrc(args)
 
 
 if __name__ == "__main__":

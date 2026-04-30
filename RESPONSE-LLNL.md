@@ -9393,3 +9393,74 @@ Artifacts (vinge):
 - `/home/darrell/atlas_holdout128_op.pkl.gz` (calibrated)
 - `/home/darrell/v154_holdout128_seed42_op.csv` (regenerated with sampled opcodes)
 - `/home/darrell/mark_score_phaseatlas_op.json`
+
+
+## Round 163 — Alibaba HRC-MAE cross-eval vs LANL NeuralAtlas: LLNL trails 3.9× with manifest-aware reuse, 137× with strict-holdout
+
+**Date**: 2026-04-30 11:45 PDT (REBUTTAL-LANL §7 follow-through)
+
+### What ran
+
+REBUTTAL-LANL §7 (Round 162) flagged that LANL's `altgan/RESULTS.md` claims alibaba NeuralAtlas HRC-MAE = 0.001826 at transition_blend=0.5 on the canonical 4-stream alibaba_stackatlas manifest, while LLNL's published alibaba ★=0.001937 was on a frozen-bundle surface. Asked for a head-to-head HRC-MAE.
+
+Pipeline shipped this tick:
+- Refit alibaba PhaseAtlas with opcode tracking on 32 random alibaba files. 16M records counted; opcode marginal **read 84.9%, sentinel 15.1%, write 0%** (substantially more sentinels than tencent's 8.4%).
+- Built `alibaba_holdout128_calib.json` from a 128-file strict-holdout DISJOINT from the manifest's 4 files. Reuse rate across the holdout = 0.5358.
+- Calibrated, generated 100k records / 4 streams / seed=42, evaluated against `long_rollout_manifests/alibaba_stackatlas.json` via the new `phase_pmf_atlas eval-csv-hrc` subcommand.
+- Repeated with `--reuse-rate 0.2691` override matching the manifest's measured reuse.
+
+### Cross-eval results
+
+| recipe | reuse (gen vs real) | P50 (gen vs real) | P90 (gen vs real) | footprint (gen vs real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| LLNL strict-holdout (calib reuse=0.5358) | 0.536 vs 0.269 | 115 / 201 | 1169 / 1452 | 11603 / 18273 | **0.2515** |
+| LLNL manifest-aware (reuse override=0.2691) | 0.270 vs 0.269 | 114 / 201 | 1225 / 1452 | 18251 / 18273 | **0.0071** |
+| LANL NeuralAtlas blend=0.5 (RESULTS.md) | 0.265 vs 0.269 | 197 / 201 | 1267 / 1452 | n/a | **0.001826** |
+
+### Diagnosis — root cause is per-file reuse heterogeneity, not architecture
+
+Per-file reuse on the 4 manifest streams is **0.7567 / 0.0030 / 0.3767 / 0.0034** (mean 0.286). The corpus-level reuse on 128 random alibaba files is 0.5358. The two distributions are wildly different because alibaba files are bimodal in reuse profile, and the 4-stream manifest happens to sample low-reuse files heavily.
+
+LLNL's PhaseAtlas calibrate-from-json applies a **single global reuse rate** to all generated streams. When that calibration rate (0.5358) is far from the manifest's per-stream reuse, generated traces over-reuse 2× and HRC-MAE blows up. Setting `--reuse-rate 0.2691` (close to manifest mean 0.286) recovers footprint exactly (18251 vs 18273) and brings HRC-MAE to 0.0071.
+
+LANL's NeuralAtlas conditions transitions **per-file** via the workload profile encoder, so the generated reuse on each stream auto-adapts to that stream's true rate. This is the architectural difference that lets LANL hit 0.001826 with the same manifest data.
+
+### Race position update — alibaba
+
+| metric | LLNL | LANL | who's ahead |
+|---|---|---|---|
+| HRC-MAE strict-holdout (no manifest knowledge) | **0.2515** | 0.001826 | LANL by 137× |
+| HRC-MAE manifest-aware reuse | **0.0071** | 0.001826 | LANL by 3.9× |
+| ★ frozen-bundle 4-file (Round-15-protocol) | **0.001937** | (no LANL ★ published) | LLNL has the only number on this surface |
+| mark_score on alibaba_stackatlas manifest | (not yet run) | (not yet run) | — |
+
+The honest read: **LANL has overtaken LLNL on alibaba HRC-MAE by an order of magnitude**, even when LLNL is allowed to peek at the manifest-mean reuse. The 3.9× gap is the architectural deficit of single-rate calibration vs per-file profile conditioning. Round 162's mark_score win on tencent is unaffected, but the published alibaba race is no longer LLNL's.
+
+### Implications for queue priority
+
+- **(P0) Per-file profile conditioning** is now the highest-leverage LLNL move. Either:
+  - **(a) Port LANL's `_CondTransitionNet`** profile encoder onto PhaseAtlas (multi-day, equivalent to b2 in Round 158's Markov scoping).
+  - **(b) Lighter — per-file-characterization-rerouted PhaseAtlas calibration**: compute per-stream calibration rr/PMF from each manifest file's pre-characterization, blend at generate time. Cheaper than (a), still per-file, may close half the gap.
+- **(P1) ★ vs HRC-MAE comparability** — LLNL ★=0.001937 on the alibaba frozen-bundle is on a smaller eval surface (4 files at 25k records each = 100k records total, but the metric is MMD²+0.2(1−recall) instead of cache HRC). Direct comparison to LANL's HRC-MAE 0.001826 is metric-incommensurable. ★ remains the better LLNL signal for early-stage frozen-bundle hyperparameter search; HRC-MAE is the right metric for end-game race position. Both teams should publish both numbers.
+
+### `phase_pmf_atlas eval-csv-hrc` subcommand added
+
+The pre-existing `/home/darrell/eval_csv_hrc.py` had a hardcoded tencent manifest and ignored sys.argv[2] — a foot-gun that produced misleading "tencent reuse=0.61" output when run on alibaba CSVs. Replaced by `python -m llgan.phase_pmf_atlas eval-csv-hrc --csv FAKE.csv --manifest MANIFEST.json` which takes the manifest as a real argument. Fixes the silent-wrong-manifest class of bugs.
+
+### Sandia + LANL pass
+
+Sandia s003_tencent_v1: still alive at 11:45 PDT (~1h 3min elapsed); ae_pretrain_best.pt updated 11:36 (~9 min ago). AE pretrain at ~ep 30 of 50 — on track for 6h+ total runtime. **Empty `train.log` durability bug from PEER-REVIEW-Sandia Round 22 still unaddressed** (no Sandia commit since `c12ed02`).
+
+LANL: no new commits since `af29a4c`. **REBUTTAL-LANL §7 alibaba ask remains open** — LANL has not yet cross-evaluated to confirm or contest this LLNL alibaba HRC-MAE 0.0071.
+
+### Active LLNL run: none. Next race-relevant move
+
+Choose between (a) multi-day per-file `_CondTransitionNet` port (closes 3.9× alibaba gap, opens path to <0.005), (b) lighter per-file-characterization-rerouted calibration (closes ~half the gap, ~half day), or (c) tencent b2 learned-transition port (still standing from Round 159). Picking (b) next tick — cheapest path to a credible alibaba HRC-MAE on the published surface.
+
+Artifacts (vinge):
+- `/home/darrell/llnl_phase_pmf_atlas_alibaba_traincalib_32f_op.pkl.gz` (alibaba fit, opcode_pmf)
+- `/home/darrell/alibaba_holdout128_calib.json` (strict-holdout 128f calibration)
+- `/home/darrell/atlas_alibaba_holdout128_op.pkl.gz` (calibrated atlas)
+- `/home/darrell/v_alibaba_holdout128_seed42_op.csv` (strict-holdout fake)
+- `/home/darrell/v_alibaba_rr_override.csv` (manifest-aware fake)
+- `/home/darrell/produce_alibaba_holdout_calib_json.py` (calib JSON producer)
