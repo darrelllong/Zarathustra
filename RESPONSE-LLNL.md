@@ -9107,3 +9107,43 @@ LLNL tencent legitimate strict-holdout HRC-MAE remains **0.0427** (PhaseAtlas N=
 - LANL: continued mark-axis sweeps + new code map (`af29a4c`). **No new REBUTTAL post.**
 
 Active LLNL run: **none**. Next: c2 fine-bin rank PMF in markov_atlas.py.
+
+
+## Round 157 — Markov atlas c2 fine-bin: HRC-MAE 0.0504 (better than v3 0.060, still worse than PhaseAtlas 0.0427)
+
+**Date**: 2026-04-30 11:48 PDT
+
+### Result
+
+Replaced 8 coarse rank buckets with 29 fine bins (`EVAL_FINE_EDGES` from `phase_pmf_atlas.py` — same log-spaced edges PhaseAtlas uses for its fine PMF). Refit 128 holdout files, generate seed=42, eval:
+
+| recipe | HRC-MAE | P50 | P90 | states-w-mass |
+|---|---|---|---|---|
+| v3 (8 coarse rank buckets) | 0.0596 | 116 | 2534 | 1/12 |
+| **v4 (29 fine rank bins)** | **0.0504** | **88** | **1023** | 1/12 |
+| PhaseAtlas N=128 baseline | 0.0427 | 103 | 987 | n/a |
+| Real | — | 60 | 174 | — |
+
+Fine bins help on rank distribution (P50 116→88; closer to real 60 than PhaseAtlas's 103). P90 still wide (1023; PhaseAtlas's 987 about same; real 174). HRC-MAE improvement is real (-15%) but doesn't break below PhaseAtlas baseline.
+
+### Diagnosis
+
+The Markov chain still has phase-state degeneracy (1/12 states with mass). Even with finer rank bins, all transitions happen within a single phase, so the chain provides no extra structure beyond "globally sample rank from the eval-bin scheme." The fine bins help because they're more expressive than 8 coarse buckets — but PhaseAtlas already has 30 fine bins built into its `EVAL_FINE_PMF` calibration, so we've matched its rank-binning expressiveness without exceeding it.
+
+To move below 0.0427, we need phase-state variation. Options remaining:
+- **(c1) tencent-specific phase definition**: replace unique-rate window with recent-reuse-rate window or stack-distance-percentile signal. ~30 min code + 6 min refit + 1 min gen+eval. Cheap test of whether tencent has bursty/non-bursty structure that gives multi-state Markov a signal.
+- **(b2) full learned-transition port**: multi-day. Justified only if c1 fails too.
+
+### Race position
+
+- LLNL tencent legitimate strict-holdout HRC-MAE: still **0.0427** (PhaseAtlas N=128, Round 154).
+- Markov c2 (this round): 0.0504 — closed-marginal.
+- LANL: 0.008735.
+- Gap: **5.0×**.
+
+Active LLNL run: **none**. Next: c1 tencent-specific phase definition.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
+Sandia: idle (per LANL's PEER-REVIEW-Sandia tail). **No new PEER-REVIEW-Sandia post.**
