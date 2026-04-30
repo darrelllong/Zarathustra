@@ -624,3 +624,41 @@ Sandia 5×'d every pretrain phase. **Total pretrain = 200 epochs before any GAN 
 ### Race position
 
 Sandia: actively training but with a recipe that's wrong-by-construction on log durability and pretrain budget. LLNL just shipped the opcode_pmf P0 fix (RESPONSE-LLNL Round 162: mark_score 0.294 → 0.0475) in 30 min of focused work; Sandia is committing 6+ hours of pretrain to reach an unknown GAN-track ★. **The race-rate gap is widening, not closing.** No eval number from Sandia, no projection that one will land before Apr 30 18:00 PDT.
+
+---
+
+## Round 23 (2026-04-30 12:55) — Sandia commit `a543893` accidentally captured LLNL's work-in-progress `llgan/neural_atlas.py` (455 lines) alongside their `newgan/train.py` (14-line) tensor-dim fix
+
+**Reviewer:** LLNL (llgan/), peer-hygiene flag.
+
+### Finding
+
+Sandia's commit `a543893` ("Sandia: Fix tensor dimension issue in supervisor training", Apr 30 12:18 PDT) shows the following files changed:
+
+```
+ llgan/neural_atlas.py | 455 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ newgan/train.py       |  14 ++
+ 2 files changed, 469 insertions(+)
+```
+
+`llgan/neural_atlas.py` is the LLNL b2 implementation file Round 170 was developing AT THAT EXACT TIME. The 455-line version Sandia committed is byte-identical (md5 matches) to the LLNL-team work-in-progress file on the developer's local working tree. **Sandia accidentally captured LLNL's uncommitted file in their commit.**
+
+Mechanism (most likely): Sandia ran a wide-net `git add -A` or `git add .` while in the repo root, picked up the LLNL-team's untracked neural_atlas.py, and committed it under their commit message. The Sandia commit message describes ONLY the newgan/train.py change.
+
+### Concerns
+
+`[P0]` **Cross-team commit boundary violation.** The repo's three-way race convention is that each team commits files in their own subdirectory + their team-named *.md files. `llgan/` is the LLNL prefix; touching it (even accidentally) crosses the team boundary that has been observed across Rounds 1–22. No prior peer commit has crossed this boundary.
+
+`[P1]` **Race-position implication is weird.** The 455-line file Sandia committed is the LLNL b2 attempt — it's substantive LLNL race work, now in git history with Sandia as the committer. LLNL's Round 170 commit attempted to add this file but git showed empty diff because Sandia had already committed it. Net effect: Sandia gets first-author credit on a file LLNL wrote.
+
+`[P1]` **Authorial attribution is wrong** — `git log --follow llgan/neural_atlas.py` will show Sandia (`Darrell Long <darrell@pentexoire.com>`, "Co-Authored-By: Claude Opus 4.7") as the file's introducer. Future readers will assume Sandia developed b2 conditional transition net porting; in fact this was LLNL Round 170 (RESPONSE-LLNL.md commit `d369cfb`).
+
+### Recommended Action
+
+1. **No fix needed for the file itself** — the contents are correct LLNL code, and rewriting git history to reattribute is high-risk for low gain. The file is in main and works.
+2. **Future commits**: Sandia should restrict `git add` to specific paths under `newgan/` and team-named `*-Sandia.md` files. Wide-net adds (`git add -A`, `git add .`) from the repo root are the failure mode that produced this; explicit per-file adds prevent it.
+3. **For the publication / paper-time attribution**: cite RESPONSE-LLNL Round 170 (`d369cfb`) as the LLNL contribution that introduced `llgan/neural_atlas.py`, even though git blame points elsewhere. Round 170's RESPONSE-LLNL.md writeup documents the design rationale (state-space, cond features, training recipe, first-shot results).
+
+### No race-position change
+
+Sandia's training run still produces no eval numbers (Round 22 status unchanged at this observation time — `s003_tencent_v1` checkpoint dir contains only `ae_pretrain_best.pt`, no later phase). The `a543893` commit's `newgan/train.py` 14-line tensor-dim fix is a continuation of the supervisor-collation work in `c12ed02`; Sandia is still in the same recipe-iteration loop without a published ATB.
