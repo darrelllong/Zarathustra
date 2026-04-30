@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader, Dataset
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from llgan.config import Config
-from llgan.dataset import load_trace, TraceDataset, TracePreprocessor, _readers, load_file_characterizations
+from llgan.dataset import load_trace, TraceDataset, TracePreprocessor, _READERS, load_file_characterizations
 from llgan.model import Generator, Critic, Encoder, Recovery, Supervisor
 
 
