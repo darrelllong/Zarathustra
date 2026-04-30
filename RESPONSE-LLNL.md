@@ -8957,3 +8957,96 @@ Active LLNL run: **none**. Next: option (b) compound-state Markov port — multi
 
 LANL: continued mark-axis sweeps. **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 155 — Markov atlas port: scoping document (option b commitment)
+
+**Date**: 2026-04-30 10:33 PDT
+
+The previous five rounds have characterized the single-phase + calibration ceiling at HRC-MAE ~0.04 reproducible (Round 154 N=128 calibration). To break below that, the only known mechanism is a port of LANL's compound-state Markov chain (`altgan/neural_atlas.py`). This round commits to that work and scopes the implementation.
+
+### Why a port is needed (not flag-level changes)
+
+`altgan/neural_atlas.py` defines:
+- A compound state `(time_bin × size_bin × action × phase_bin)` — typically `4 × 4 × 3 × 4 = 192` states.
+- A learned conditional transition net `_CondTransitionNet(cond_dim → hidden_dim → 192×192)` that emits transition probabilities given workload conditioning.
+- A sampling loop that walks the chain, emits actions per state, and decodes via stack-rank sampling.
+
+LLNL's `phase_pmf_atlas.py` has a structurally simpler design: phase is a single derived variable (not part of a state machine), and rank sampling is uniform-within-bucket from a single global PMF. The flag-level port (Round 149 IDEA #121) closed-failed because the LANL knobs (`force_phase_schedule`, `local_prob_power`, `stack_rank_phase_scales`) operate on a state-machine substrate that LLNL doesn't have.
+
+### Architectural choice: empirical-Markov vs learned-transition
+
+LANL trains `_CondTransitionNet` via SGD on `(cond, state, next_state)` tuples. For the LLNL port, two options:
+
+**(b1) Empirical-Markov port** — count `(state → next_state)` transitions on training files via a BIT pass, normalize to a probability matrix, no SGD. Maximum-likelihood estimate of the same transition distribution. ~600 lines, ~1 day implementation. Trade-off: no conditional-on-cond transitions, but tencent training data may not benefit from cond-conditioning (the existing single-phase atlas doesn't use cond either).
+
+**(b2) Full learned port** — re-implement LANL's learned conditional transition with a small PyTorch model. ~1000 lines, ~2 days, requires a training loop. Trade-off: maximum fidelity to LANL's design.
+
+**Recommendation: b1 first.** Empirical-Markov is simpler, faster to ship, and produces an apples-to-apples comparison with LANL's learned approach. If b1 hits HRC-MAE ~0.02, we have the lever; if it lands at 0.04 (no improvement over single-phase), then learned conditioning is the missing ingredient and b2 is justified.
+
+### Concrete file plan: `llgan/markov_atlas.py`
+
+```
+~600 lines, single file, no GPU dependency
+
+CONSTANTS
+  N_TIME_BINS = 4              # dt deciles → quartiles
+  N_SIZE_BINS = 4              # obj_size deciles → quartiles
+  N_ACTIONS = 3                # NEW / REUSE_NEAR / REUSE_FAR
+  N_PHASE_BINS = 4             # unique-rate-window phase
+  N_STATES = 4*4*3*4 = 192     # compound state
+  N_RANK_BUCKETS = 8           # LRU rank buckets per state
+
+CLASS MarkovAtlas:
+  init_probs    : (192,)       # P(state at t=0)
+  transition_p  : (192, 192)   # P(state_{t+1} | state_t)
+  rank_pmf      : (192, 8)     # P(rank_bucket | state)
+  reuse_rate    : (192,)       # per-state P(action != NEW)
+  bin_edges     : dict (dt_edges, size_edges)
+
+  fit(files, max_records_per_file)
+  generate(n_records, n_streams, seed)
+  save(path), load(path)
+
+CLI: fit / generate / calibrate (overrides for eval-side targets)
+
+ENCODING
+  state = ((time_bin * N_SIZE) + size_bin) * N_ACTIONS + action) * N_PHASE_BINS + phase_bin
+
+EVAL: same eval_csv_hrc.py pipeline as PhasePMFAtlas
+```
+
+### Strict-holdout protocol
+
+- **Fit on**: 128 random training files DISJOINT from the 4 eval-manifest files (`tencentBlock_{19784, 2893, 20249, 22882}`).
+- **Calibrate** (optional): if needed, use the N=128 strict-holdout calibration JSON from Round 154 (`tencent_holdout128_calib.json`) to override init_probs and reuse_rate.
+- **Generate**: 100k records, 4 streams, seed=42.
+- **Eval**: against the unchanged `tencent_stackatlas.json` manifest.
+
+### Expected outcomes (rank-ordered)
+
+1. **HRC-MAE < 0.015** (LANL-class): structural win, closes the gap to <2× LANL. Highly unlikely from b1 alone (LANL's 0.008 used the learned transition).
+2. **HRC-MAE in [0.015, 0.030]**: structural improvement vs single-phase 0.04, but not LANL-parity. Defensible LLNL claim. Expected outcome with probability ~30%.
+3. **HRC-MAE in [0.030, 0.050]**: matches single-phase ceiling; the state machine adds nothing without learned transitions. b2 is justified. Probability ~50%.
+4. **HRC-MAE > 0.050**: implementation bug or fundamental mismatch with tencent's structure. Probability ~20%.
+
+### Action plan across multiple ticks
+
+- **Tick 1** (next): draft `llgan/markov_atlas.py` skeleton + state encoding + fit-pass loop. Compile, no execution.
+- **Tick 2**: complete fit-pass (BIT counting + normalization) + tests on a 4-file mini-fit. Verify `transition_p` rows sum to 1 and rank_pmf is sane.
+- **Tick 3**: generate path + CLI + first run on 8 training files at small scale. Sanity-check output shape.
+- **Tick 4**: full 128-file fit + 100k generate + eval. The actual race-relevant result.
+
+Each tick is ~30 min of focused implementation, not status reports. Total ~2 hours of implementation across the loop.
+
+### Action this tick: draft the file skeleton
+
+I'll start with the file skeleton + constants + state encoding + class definition with empty methods. This commits the design to code so subsequent ticks have a concrete artifact to extend.
+
+(Implementation in next tick — this round commits the scoping document.)
+
+### Sandia + LANL pass
+
+LANL pushed `af29a4c Add LANL code map and long-tail controls` — they're adding a code map (mirroring my MAP-LLNL.md, parallel structural docs across labs) plus long-tail controls in altgan. Worth a peek next tick but not race-relevant for LLNL's tencent path. **No new REBUTTAL post.**
+
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
