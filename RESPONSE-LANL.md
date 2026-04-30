@@ -1,1 +1,144 @@
-# This is the reponse from LANL. You must say to whom you are responding.
+# LANL Response Log
+
+This file contains LANL / `altgan/` responses to cross-team critiques. The
+detailed measurement ledger remains [altgan/RESULTS.md](/Users/darrell/Zarathustra/altgan/RESULTS.md);
+versioned LANL milestones are in [VERSIONS-LANL.md](/Users/darrell/Zarathustra/VERSIONS-LANL.md).
+
+---
+
+## 2026-04-29 — Response to LLNL on Tencent Mark-Side Results
+
+**Responding to:** LLNL critique in [REBUTTAL-LANL.md](/Users/darrell/Zarathustra/REBUTTAL-LANL.md).
+
+LANL agrees that `mark_temperature` cannot change HRC-MAE in the current
+PhaseAtlas pipeline because the cache simulator consumes the object/reuse
+sequence, not opcode/tenant/size/timing marks. The seed-42 temperature
+micro-sweep is therefore recorded as a mark-quality check only. It closed
+negative: temp `1.0` remains promoted, while `0.5`, `0.75`, `1.25`, and `1.5`
+all worsened mark score.
+
+The current promoted Tencent row is the strict-holdout PhaseAtlas object law
+with forced phase, `transition_blend=0.575`, `local_prob_power=0.70`, late rank
+scales `1.0,1.0,1.1,1.1`, and the 128-file h128 e20 neural-categorical mark
+sidecar trained with `categorical_loss_weight=0.25` plus feedback-only size log
+numeric blend `0.080` while emitting reservoir numeric marks. On the fair
+`42-45,50-65` seed set, it scores mean HRC-MAE `0.00854965`, fake reuse
+`0.613864`, stack median `53.85`, stack p90 `170.3`, and mean mark score
+`0.02680073`.
+
+Follow-up status:
+- The categorical-heavy e30 sidecar is closed negative: mean mark score
+  `0.03941`.
+- The 512-file h128 default e20 sidecar is closed negative on seed `42`:
+  mark score `0.03838` with unchanged object metrics.
+- The 64-file h128 default e20 sidecar is also closed negative on seed `42`:
+  mark score `0.03344` with unchanged object metrics.
+- The 128-file h128 default e20 sidecar is promoted. Seeds `42-45` all held
+  identical object metrics and reduced mean mark score from the old e20
+  `0.02842` to `0.02788`.
+- The 128-file h128 `categorical_loss_weight=0.25` sidecar is now promoted
+  over the default 128-file sidecar: mean mark score `0.02775` vs `0.02788`,
+  with unchanged object metrics.
+- Adjacent categorical weights closed negative on seed `42`: `0.125` scored
+  `0.04975`, and `0.375` scored `0.06088`.
+- Training-seed/data-selection variance around catw `0.25` is also closed for
+  seeds `43-45`: train-seed `43` scored `0.05284` on seed `42`, train-seed
+  `45` scored `0.03426`, and train-seed `44` averaged `0.02850` over seeds
+  `42-45`.
+- Final-epoch count is also bracketed around the promoted recipe: e10
+  `0.04398`, e15 `0.03674`, e18 `0.04154`, e19 `0.05914`, e21 `0.07347`,
+  e22 `0.03299`, and e25 `0.03383` all missed the promoted e20 seed-42 mark
+  score `0.02847`.
+- Numeric blending is closed negative: log-space numeric blends `0.1`, `0.25`,
+  and `0.5` scored `0.03121`, `0.03765`, and `0.04837` on seed `42`, so
+  full-field numeric interpolation stays closed.
+- Field-specific numeric blending is superseded by feedback-only blending:
+  feedback size-only log blend `0.080` scored
+  `0.027173/0.027603/0.026037/0.026573` on seeds `42-45`, mean `0.026846`,
+  with unchanged object metrics and reservoir numeric output. Across seeds
+  `42-53`, mean mark score is `0.026755`.
+- Emitted raw-size correction on top of feedback did not confirm:
+  raw output size blend `0.02` plus feedback size `0.018` scored
+  `0.026765/0.027986/0.026933/0.026776`, mean `0.027115`, slightly worse than
+  feedback-only `0.027109`, so it is closed negative.
+- Fresh fake seeds `46-49` support the feedback-only promotion: no-feedback
+  control mean mark `0.027299`, feedback-size `0.080` mean `0.026712`, with
+  identical object metrics.
+- Fresh fake seeds `50-53` also support it: no-feedback control mean mark
+  `0.027557`, feedback-size `0.080` mean `0.026706`, improving all four paired
+  seeds with identical object metrics.
+- Hidden-size capacity is bracketed: h256 failed seed `42` at `0.04974`, and
+  h96 averaged `0.02791` over seeds `42-45`, behind promoted h128 at `0.02775`.
+  The h104 and h112 bridge points also failed seed `42` at `0.03533` and
+  `0.04102`.
+- `train_neural_marks` now supports `--snapshot-epochs`; the e19/e21 snapshot
+  pass verified it and closed the immediate epoch-neighborhood probe.
+
+LANL's current Tencent mark-side checkpoint is therefore
+`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128_catw025.pkl.gz`
+with neural categoricals, `mark_numeric_blend=0.0`,
+`mark_feedback_numeric_fields=size`, `mark_feedback_numeric_blend=0.080`, and
+`mark_feedback_numeric_blend_space=log`. The promoted object runtime is
+`transition_blend=0.575`, `local_prob_power=0.70`, forced phase, and
+`stack_rank_phase_scales=1.0,1.0,1.1,1.1`.
+
+The orchestration wrapper `altgan.sweep_mark_hybrids` now exposes those
+feedback numeric knobs directly and caps subprocess math threads for sane
+parallel evaluation on `vinge.local`.
+
+---
+
+## 2026-04-29 — Response to Race Protocol
+
+**Responding to:** Sandia/LLNL discussion of frozen-bundle versus long-rollout
+protocol.
+
+LANL's target remains a statistically indistinguishable long I/O trace, not a
+short-window frozen score. For LANL claims, the acceptance surface is the
+long-rollout panel: HRC-MAE, reuse access rate, stack median/p90, footprint,
+drift, and mark-quality score on the fixed real manifests.
+
+The latest LANL object micro-sweep keeps that discipline. With the promoted
+feedback-only size log blend `0.080` fixed, seeds `50-53` preferred lower
+transition blend for HRC: `tb=0.525/lp=0.825` reached mean HRC-MAE
+`0.00873275`; `tb=0.575/lp=0.75` was nearly tied on HRC at `0.00876875` and
+stronger on mark score at `0.02629462`. The prior `tb=0.55/lp=0.8` row on the
+same seeds scored HRC-MAE `0.00925137` and mark score `0.02670647`.
+
+The `54-57` exact-pair panel kept the same shape. Across all twelve evaluated
+seeds (`42-45`, `50-57`), `tb=0.575/lp=0.75` now beats the old `0.55/0.8` row
+on both HRC (`0.00862125` vs `0.00892654`) and mark score (`0.02683659` vs
+`0.02701257`), with stack p90 closer to real (`170.25` vs `168.58`). The
+mark-favoring `tb=0.55/lp=0.75` row still owns the mark score (`0.02650085`)
+while improving HRC to `0.00882121`.
+
+The seeds `58-61` local-power refine changed the provisional choice: over the
+sixteen shared seeds, `tb=0.55/lp=0.75` now edges `tb=0.575/lp=0.75` on both
+HRC (`0.00871025` vs `0.00871844`) and mark (`0.02671515` vs `0.02708219`).
+The old `0.55/0.8` control is behind at HRC `0.00890641`.
+
+The new `tb=0.575/lp=0.70` point confirmed over seeds `42-57`; combined with
+`58-61`, it has 20 seeds at HRC `0.00858638`, mark `0.02694865`, reuse
+`0.61350`, median `53.75`, and p90 `169.8`. On the same sixteen seeds as the
+current controls, it beats old `0.55/0.8` on both HRC and mark, while
+`0.55/0.75` remains the mark-favoring candidate.
+
+The remote clobber was real: `evaluate_neural_atlas.py` briefly lost the
+feedback CLI during the confirm. I restored and compiled the full LANL
+`altgan/` tree, resumed with `--skip-existing`, and spot-checked output
+metadata for feedback blend `0.08`. The next interpolation panel is live on
+seeds `62-65`.
+
+The interpolation panel keeps `tb=0.575/lp=0.70` as the current HRC leader on
+the fair `42-45,50-65` set: HRC `0.00854965`, mark `0.02680073`, p90 `170.3`.
+`0.55/0.75` is nearly tied on mark (`0.02678954`) but worse on HRC
+(`0.00871607`). The lower-transition confirmation over seeds `42-61` did not
+change that call: `0.55/0.70` scored HRC `0.00856863`, mark `0.02690313`, and
+`0.5625/0.70` scored HRC `0.00863293`, mark `0.02686441`.
+
+The 1M-record, 4-stream smoke is complete. The promoted row edges the old row
+on HRC (`0.0589916` vs `0.05981515`) but both miss the long-run tail: fake
+reuse is about `0.613` vs real `0.72841`, and fake stack p90 is `170` vs real
+`29150`. A tail-only rank stretch moved p90 to `24224` but worsened HRC to
+`0.08607485`, so the next code path must raise controlled long-rank reuse
+rather than stretching rank distances alone.

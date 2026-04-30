@@ -9,7 +9,7 @@ remain valid and the object-law champion can be frozen while marks improve.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
@@ -69,6 +69,13 @@ class NeuralMarkRuntime:
         self.rng = np.random.default_rng(seed)
         self.temperature = max(float(temperature), 1e-6)
         self.numeric_noise = max(float(numeric_noise), 0.0)
+        # Mark rollout is one tiny GRU step at a time; multi-threaded CPU kernels
+        # spend more time coordinating than computing.
+        torch.set_num_threads(1)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass
         self.net = _MarkHeadNet(
             model.cond_dim,
             model.hidden_dim,
@@ -78,12 +85,60 @@ class NeuralMarkRuntime:
             len(model.tenants),
         )
         self.net.load_state_dict(model.state_dict)
+        self.net.requires_grad_(False)
         self.net.eval()
         self.torch = torch
         self.hidden = [None for _ in range(n_streams)]
         self.prev_num = np.zeros((n_streams, 2), dtype=np.float32)
         self.prev_opcode = np.full(n_streams, model.default_opcode, dtype=np.int64)
         self.prev_tenant = np.full(n_streams, model.default_tenant, dtype=np.int64)
+        self.opcode_to_idx = {str(v): i for i, v in enumerate(model.opcodes)}
+        self.tenant_to_idx = {str(v): i for i, v in enumerate(model.tenants)}
+        self._cond_inputs = [
+            torch.empty((1, 1, model.cond_dim), dtype=torch.float32)
+            for _ in range(n_streams)
+        ]
+        self._state_inputs = [
+            torch.empty((1, 1), dtype=torch.long)
+            for _ in range(n_streams)
+        ]
+        self._action_inputs = [
+            torch.empty((1, 1), dtype=torch.long)
+            for _ in range(n_streams)
+        ]
+        self._rank_inputs = [
+            torch.empty((1, 1), dtype=torch.long)
+            for _ in range(n_streams)
+        ]
+        self._prev_num_inputs = [
+            torch.empty((1, 1, 2), dtype=torch.float32)
+            for _ in range(n_streams)
+        ]
+        self._prev_opcode_inputs = [
+            torch.empty((1, 1), dtype=torch.long)
+            for _ in range(n_streams)
+        ]
+        self._prev_tenant_inputs = [
+            torch.empty((1, 1), dtype=torch.long)
+            for _ in range(n_streams)
+        ]
+        self._cond_views = [x.numpy()[0, 0] for x in self._cond_inputs]
+        self._state_views = [x.numpy() for x in self._state_inputs]
+        self._action_views = [x.numpy() for x in self._action_inputs]
+        self._rank_views = [x.numpy() for x in self._rank_inputs]
+        self._prev_num_views = [x.numpy()[0, 0] for x in self._prev_num_inputs]
+        self._prev_opcode_views = [x.numpy() for x in self._prev_opcode_inputs]
+        self._prev_tenant_views = [x.numpy() for x in self._prev_tenant_inputs]
+        self._cond_cached = [False for _ in range(n_streams)]
+
+    def set_conditions(self, conds: np.ndarray) -> None:
+        """Cache fixed stream conditioning tensors for repeated mark rollout."""
+        arr = np.asarray(conds, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = arr[None, :]
+        for sid in range(min(len(arr), len(self._cond_inputs))):
+            self._cond_views[sid][:] = _fixed_cond(arr[sid], self.model.cond_dim)
+            self._cond_cached[sid] = True
 
     def sample(
         self,
@@ -95,22 +150,25 @@ class NeuralMarkRuntime:
         stack_distance: int,
         stride: int,
     ) -> EventSample:
-        torch = self.torch
         sid = int(stream_id)
-        cond_arr = np.asarray(cond, dtype=np.float32)[: self.model.cond_dim]
-        if len(cond_arr) < self.model.cond_dim:
-            cond_arr = np.pad(cond_arr, (0, self.model.cond_dim - len(cond_arr)))
+        if not self._cond_cached[sid]:
+            self._cond_views[sid][:] = _fixed_cond(cond, self.model.cond_dim)
+        self._state_views[sid][0, 0] = np.clip(int(state), 0, self.model.n_states - 1)
+        self._action_views[sid][0, 0] = np.clip(int(action_class), 0, StackAtlasModel.N_ACTIONS - 1)
+        self._rank_views[sid][0, 0] = rank_bucket(stack_distance)
+        self._prev_num_views[sid][:] = self.prev_num[sid]
+        self._prev_opcode_views[sid][0, 0] = int(self.prev_opcode[sid])
+        self._prev_tenant_views[sid][0, 0] = int(self.prev_tenant[sid])
 
-        with torch.no_grad():
+        with self.torch.inference_mode():
             out, hidden = self.net(
-                torch.tensor(cond_arr[None, None, :], dtype=torch.float32),
-                torch.tensor([[np.clip(int(state), 0, self.model.n_states - 1)]], dtype=torch.long),
-                torch.tensor([[np.clip(int(action_class), 0, StackAtlasModel.N_ACTIONS - 1)]],
-                             dtype=torch.long),
-                torch.tensor([[rank_bucket(stack_distance)]], dtype=torch.long),
-                torch.tensor(self.prev_num[sid][None, None, :], dtype=torch.float32),
-                torch.tensor([[int(self.prev_opcode[sid])]], dtype=torch.long),
-                torch.tensor([[int(self.prev_tenant[sid])]], dtype=torch.long),
+                self._cond_inputs[sid],
+                self._state_inputs[sid],
+                self._action_inputs[sid],
+                self._rank_inputs[sid],
+                self._prev_num_inputs[sid],
+                self._prev_opcode_inputs[sid],
+                self._prev_tenant_inputs[sid],
                 self.hidden[sid],
             )
         self.hidden[sid] = hidden
@@ -141,6 +199,24 @@ class NeuralMarkRuntime:
             action_class=int(action_class),
         )
 
+    def observe(self, stream_id: int, mark: EventSample) -> None:
+        """Update autoregressive inputs with the mark that was actually emitted."""
+        sid = int(stream_id)
+        dt_log = np.log1p(max(float(mark.dt), 0.0))
+        size_log = np.log(max(float(mark.obj_size), 1.0))
+        self.prev_num[sid] = np.array([
+            (dt_log - self.model.dt_mean) / self.model.dt_std,
+            (size_log - self.model.size_mean) / self.model.size_std,
+        ], dtype=np.float32)
+        self.prev_opcode[sid] = self.opcode_to_idx.get(
+            str(mark.opcode),
+            int(self.model.default_opcode),
+        )
+        self.prev_tenant[sid] = self.tenant_to_idx.get(
+            str(mark.tenant),
+            int(self.model.default_tenant),
+        )
+
 
 def fit_mark_head(
     base: NeuralAtlasModel,
@@ -153,9 +229,13 @@ def fit_mark_head(
     batch_size: int = 64,
     window_len: int = 128,
     lr: float = 1e-3,
+    numeric_loss_weight: float = 1.0,
+    categorical_loss_weight: float = 0.5,
     seed: int = 7,
     device: str = "auto",
     progress_every: int = 1,
+    checkpoint_epochs: set[int] | None = None,
+    checkpoint_callback: Callable[[int, NeuralMarkHead], None] | None = None,
 ) -> NeuralMarkHead:
     import torch
     import torch.nn.functional as F
@@ -209,9 +289,16 @@ def fit_mark_head(
     net.to(run_device)
     opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-4)
     losses: list[float] = []
+    loss_num_trace: list[float] = []
+    loss_cat_trace: list[float] = []
+    numeric_loss_weight = float(numeric_loss_weight)
+    categorical_loss_weight = float(categorical_loss_weight)
+    checkpoint_epochs = set(checkpoint_epochs or ())
     for epoch in range(int(epochs)):
         net.train()
         epoch_loss = 0.0
+        epoch_num = 0.0
+        epoch_cat = 0.0
         for _ in range(int(steps_per_epoch)):
             batch = _to_device(_sample_batch(eligible, actual_window, batch_size, rng), run_device)
             opt.zero_grad()
@@ -235,20 +322,110 @@ def fit_mark_head(
                 out["tenant_logits"].reshape(-1, len(tenants)),
                 batch["tenant"].reshape(-1),
             )
-            loss = loss_num + 0.5 * loss_cat
+            loss = numeric_loss_weight * loss_num + categorical_loss_weight * loss_cat
             loss.backward()
             opt.step()
             epoch_loss += float(loss.detach().cpu())
+            epoch_num += float(loss_num.detach().cpu())
+            epoch_cat += float(loss_cat.detach().cpu())
         avg_loss = epoch_loss / max(int(steps_per_epoch), 1)
+        avg_num = epoch_num / max(int(steps_per_epoch), 1)
+        avg_cat = epoch_cat / max(int(steps_per_epoch), 1)
         if epoch == 0 or (epoch + 1) % max(1, epochs // 10) == 0:
             losses.append(avg_loss)
+            loss_num_trace.append(avg_num)
+            loss_cat_trace.append(avg_cat)
         if progress_every and ((epoch + 1) % max(int(progress_every), 1) == 0):
             print(
                 "[altgan.neural_marks] "
-                f"epoch={epoch + 1}/{int(epochs)} loss={avg_loss:.6f} device={run_device}",
+                f"epoch={epoch + 1}/{int(epochs)} loss={avg_loss:.6f} "
+                f"num={avg_num:.6f} cat={avg_cat:.6f} device={run_device}",
                 flush=True,
             )
+        epoch_num = epoch + 1
+        if checkpoint_callback is not None and epoch_num in checkpoint_epochs:
+            checkpoint_callback(
+                epoch_num,
+                _make_mark_head(
+                    base=base,
+                    hidden_dim=hidden_dim,
+                    opcodes=opcodes,
+                    tenants=tenants,
+                    net=net,
+                    dt_mean=dt_mean,
+                    dt_std=dt_std,
+                    size_mean=size_mean,
+                    size_std=size_std,
+                    n_sequences=len(seqs),
+                    n_records=int(sum(len(seq["states"]) for seq in seqs)),
+                    epochs=epoch_num,
+                    steps_per_epoch=steps_per_epoch,
+                    batch_size=batch_size,
+                    window_len=actual_window,
+                    lr=lr,
+                    numeric_loss_weight=numeric_loss_weight,
+                    categorical_loss_weight=categorical_loss_weight,
+                    seed=seed,
+                    run_device=run_device,
+                    losses=losses,
+                    loss_num_trace=loss_num_trace,
+                    loss_cat_trace=loss_cat_trace,
+                ),
+            )
 
+    return _make_mark_head(
+        base=base,
+        hidden_dim=hidden_dim,
+        opcodes=opcodes,
+        tenants=tenants,
+        net=net,
+        dt_mean=dt_mean,
+        dt_std=dt_std,
+        size_mean=size_mean,
+        size_std=size_std,
+        n_sequences=len(seqs),
+        n_records=int(sum(len(seq["states"]) for seq in seqs)),
+        epochs=int(epochs),
+        steps_per_epoch=steps_per_epoch,
+        batch_size=batch_size,
+        window_len=actual_window,
+        lr=lr,
+        numeric_loss_weight=numeric_loss_weight,
+        categorical_loss_weight=categorical_loss_weight,
+        seed=seed,
+        run_device=run_device,
+        losses=losses,
+        loss_num_trace=loss_num_trace,
+        loss_cat_trace=loss_cat_trace,
+    )
+
+
+def _make_mark_head(
+    *,
+    base: NeuralAtlasModel,
+    hidden_dim: int,
+    opcodes: list[Any],
+    tenants: list[Any],
+    net: Any,
+    dt_mean: float,
+    dt_std: float,
+    size_mean: float,
+    size_std: float,
+    n_sequences: int,
+    n_records: int,
+    epochs: int,
+    steps_per_epoch: int,
+    batch_size: int,
+    window_len: int,
+    lr: float,
+    numeric_loss_weight: float,
+    categorical_loss_weight: float,
+    seed: int,
+    run_device: Any,
+    losses: Sequence[float],
+    loss_num_trace: Sequence[float],
+    loss_cat_trace: Sequence[float],
+) -> NeuralMarkHead:
     return NeuralMarkHead(
         version=1,
         cond_dim=base.cond_dim,
@@ -266,16 +443,20 @@ def fit_mark_head(
         default_tenant=0,
         metadata={
             "model": "NeuralMarkHead",
-            "n_sequences": len(seqs),
-            "n_records": int(sum(len(seq["states"]) for seq in seqs)),
+            "n_sequences": int(n_sequences),
+            "n_records": int(n_records),
             "epochs": int(epochs),
             "steps_per_epoch": int(steps_per_epoch),
             "batch_size": int(batch_size),
-            "window_len": int(actual_window),
+            "window_len": int(window_len),
             "lr": float(lr),
+            "numeric_loss_weight": float(numeric_loss_weight),
+            "categorical_loss_weight": float(categorical_loss_weight),
             "seed": int(seed),
             "device": str(run_device),
-            "loss_trace": losses,
+            "loss_trace": list(losses),
+            "loss_num_trace": list(loss_num_trace),
+            "loss_cat_trace": list(loss_cat_trace),
         },
     )
 

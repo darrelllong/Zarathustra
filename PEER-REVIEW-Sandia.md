@@ -372,3 +372,175 @@ and `s002_tencent`. No new `.pt` weights have appeared since Round 9.
 Keep the next Sandia acceptance gate narrow: a durable log plus at least one
 loadable checkpoint from the reduced Tencent smoke. Until that exists, no
 Sandia score should be treated as pending.
+
+---
+
+## Round 11 (2026-04-30) — Still No New Sandia Evidence
+
+**Reviewer:** LANL / altgan, paired peer check with LLNL v234d ep10 review.
+
+### Finding
+
+The checkpoint scan still shows only the old `s001_test` and `s002_tencent`
+directories under `/tiamat/zarathustra/checkpoints`, with no new Sandia weights
+and no live `newgan` process. The Sandia lane remains idle from the standpoint
+of race evidence.
+
+### Recommended Action
+
+Keep the same gate: durable log, loadable `.pt`, and a generation smoke before
+any v165-style reproduction or score claim.
+
+---
+
+## Round 12 (2026-04-30) — Sandia Lane Still Idle
+
+**Reviewer:** LANL / altgan, paired check during LANL h112/h104 mark-head work.
+
+### Finding
+
+The latest scan under `/tiamat/zarathustra/checkpoints` still shows only
+`s001_test` and `s002_tencent`, each with `config.json` and no `.pt` weights.
+There is also no live `newgan`/Sandia process.
+
+### Recommended Action
+
+Keep Sandia's next gate operational rather than numeric: produce a reduced
+Tencent smoke with durable logs, at least one loadable checkpoint, and a
+generation/evaluation path before launching a longer reproduction.
+
+---
+
+## Round 13 (2026-04-30) — No Change During LANL Size-Blend Loop
+
+**Reviewer:** LANL / altgan, current loop peer check.
+
+### Finding
+
+The current process/artifact scan again shows no live `newgan` process and no
+new Sandia checkpoint artifact beyond the old config-only `s001_test` and
+`s002_tencent` smoke directories.
+
+### Recommended Action
+
+Do not assign Sandia a pending race score until it produces a loadable
+checkpoint and an evaluable generated trace.
+
+---
+
+## Round 14 (2026-04-30) — Namespace/Feedback Loop Check Still Shows No Sandia Run
+
+**Reviewer:** LANL / altgan, paired check while cleaning LANL-owned docs.
+
+### Finding
+
+The latest `vinge.local` process and checkpoint scan still shows no live
+`newgan` process and no new Sandia artifact beyond the old config-only
+`s001_test` and `s002_tencent` directories.
+
+### Recommended Action
+
+Keep Sandia's gate operational: durable log, loadable checkpoint, and generated
+trace evaluation before any score claim enters the race table.
+
+---
+
+## Round 15 (2026-04-30) — Still No Sandia Artifact During LANL Feedback Sweep
+
+**Reviewer:** LANL / altgan, paired check during feedback-strength sweep.
+
+### Finding
+
+The latest `vinge.local` scan still shows no live `newgan` process. The only
+Sandia checkpoint directories under `/tiamat/zarathustra/checkpoints` remain
+`s001_test` and `s002_tencent`, both config-only with no loadable weights.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it has a durable checkpoint and
+an evaluable generated trace.
+
+---
+
+## Round 16 (2026-04-30) — Still Config-Only During LANL Object Confirmation
+
+**Reviewer:** LANL / altgan, paired check during object micro-sweep confirmation.
+
+### Finding
+
+The latest `vinge.local` scan again shows no live `newgan` process. The only
+Sandia checkpoint paths under `/tiamat/zarathustra/checkpoints` are still
+`s001_test` and `s002_tencent`, and both contain only `config.json`.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it produces a durable log, a
+loadable checkpoint, and an evaluable generated trace.
+
+---
+
+## Round 17 (2026-04-30) — No Sandia Change During LANL Object Refinement
+
+**Reviewer:** LANL / altgan, paired check during local-power refinement.
+
+### Finding
+
+The current `vinge.local` scan still shows no live `newgan` process. The only
+Sandia checkpoint paths remain `s001_test` and `s002_tencent`, each config-only
+with no loadable model weights.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it has a durable log, loadable
+checkpoint, and generated-trace evaluation.
+
+---
+
+## Round 18 (2026-04-30) — Sandia Still Has No Loadable Artifact
+
+**Reviewer:** LANL / altgan, paired check during low-transition confirmation.
+
+### Finding
+
+The latest scan again shows no live `newgan` process. Sandia's only checkpoint
+paths are still `s001_test` and `s002_tencent`, both config-only.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it has a loadable checkpoint
+and generated-trace evaluation.
+
+---
+
+## Round 19 (2026-04-30) — No Sandia Change During LANL 1M Smoke
+
+**Reviewer:** LANL / altgan, paired check during promoted-row 1M smoke.
+
+### Finding
+
+The current `vinge.local` process scan still shows no live `newgan` process.
+The only Sandia checkpoint artifacts remain the config-only `s001_test` and
+`s002_tencent` directories under `/tiamat/zarathustra/checkpoints`.
+
+### Recommended Action
+
+Keep Sandia's next acceptance gate operational: durable log, loadable `.pt`
+checkpoint, generation path, and long-rollout evaluation before any numeric
+claim is compared against LANL or LLNL.
+
+---
+
+## Round 20 (2026-04-30) — Sandia Still Config-Only During LANL Tail Test
+
+**Reviewer:** LANL / altgan, paired check during promoted-row tail-stretch test.
+
+### Finding
+
+The latest `vinge.local` scan shows no live `newgan` process. Sandia's visible
+checkpoint state remains the same config-only `s001_test` and `s002_tencent`
+directories, with no loadable weights or generated trace output.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it has a durable checkpoint,
+generation path, and long-rollout evaluation artifact.

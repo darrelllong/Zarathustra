@@ -47,10 +47,18 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--window-len", type=int, default=128)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--numeric-loss-weight", type=float, default=1.0,
+                   help="Weight for dt/size regression loss in the mark head.")
+    p.add_argument("--categorical-loss-weight", type=float, default=0.5,
+                   help="Weight for opcode/tenant classification loss in the mark head.")
     p.add_argument("--device", default="auto",
                    help="Torch device for mark-head training: auto, cuda, or cpu.")
     p.add_argument("--progress-every", type=int, default=1,
                    help="Print flushed progress every N epochs; 0 disables progress prints.")
+    p.add_argument("--snapshot-epochs", default="",
+                   help="Comma-separated 1-based epochs to save during training.")
+    p.add_argument("--snapshot-template", default="",
+                   help="Optional output template for snapshots; may include {epoch}.")
     return p.parse_args()
 
 
@@ -79,6 +87,21 @@ def main() -> int:
     if not frames:
         raise RuntimeError("no files had usable conditioning profiles")
 
+    training_meta = {
+        "fmt": args.fmt,
+        "char_file": args.char_file,
+        "paths": [str(p) for p in paths],
+        "records_per_file": args.records_per_file,
+    }
+    snapshot_epochs = _parse_epoch_list(args.snapshot_epochs)
+
+    def save_snapshot(epoch: int, mark_model) -> None:
+        path = _snapshot_path(args.output, args.snapshot_template, epoch)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _attach_mark_model(model, mark_model, training_meta)
+        model.save(path)
+        print(f"[altgan.train_neural_marks] wrote snapshot epoch={epoch} {path}", flush=True)
+
     mark_model = fit_mark_head(
         model,
         frames,
@@ -89,19 +112,15 @@ def main() -> int:
         batch_size=args.batch_size,
         window_len=args.window_len,
         lr=args.lr,
+        numeric_loss_weight=args.numeric_loss_weight,
+        categorical_loss_weight=args.categorical_loss_weight,
         seed=args.seed,
         device=args.device,
         progress_every=args.progress_every,
+        checkpoint_epochs=snapshot_epochs,
+        checkpoint_callback=save_snapshot if snapshot_epochs else None,
     )
-    model.mark_model = mark_model
-    model.metadata.setdefault("attached_models", {})
-    model.metadata["attached_models"]["mark_model"] = mark_model.metadata
-    model.metadata["mark_training"] = {
-        "fmt": args.fmt,
-        "char_file": args.char_file,
-        "paths": [str(p) for p in paths],
-        "records_per_file": args.records_per_file,
-    }
+    _attach_mark_model(model, mark_model, training_meta)
     model.save(args.output)
     print(f"[altgan.train_neural_marks] wrote {args.output}", flush=True)
     print(json.dumps(mark_model.metadata, indent=2), flush=True)
@@ -128,6 +147,38 @@ def _select_paths(args: argparse.Namespace) -> list[Path]:
     if not paths:
         raise RuntimeError("no trace files selected")
     return paths
+
+
+def _attach_mark_model(model: NeuralAtlasModel, mark_model, training_meta: dict) -> None:
+    model.mark_model = mark_model
+    model.metadata.setdefault("attached_models", {})
+    model.metadata["attached_models"]["mark_model"] = mark_model.metadata
+    model.metadata["mark_training"] = dict(training_meta)
+
+
+def _parse_epoch_list(value: str) -> set[int]:
+    epochs: set[int] = set()
+    for part in str(value or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        epoch = int(part)
+        if epoch <= 0:
+            raise ValueError("--snapshot-epochs values must be positive")
+        epochs.add(epoch)
+    return epochs
+
+
+def _snapshot_path(output: str, template: str, epoch: int) -> Path:
+    if template:
+        return Path(template.format(epoch=epoch))
+    path = Path(output)
+    name = path.name
+    if name.endswith(".pkl.gz"):
+        snap = f"{name[:-7]}_epoch{epoch:04d}.pkl.gz"
+    else:
+        snap = f"{path.stem}_epoch{epoch:04d}{path.suffix}"
+    return path.with_name(snap)
 
 
 if __name__ == "__main__":

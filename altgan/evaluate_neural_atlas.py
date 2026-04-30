@@ -46,6 +46,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Scale sampled reuse stack ranks before LRU lookup.")
     p.add_argument("--stack-rank-max", type=int, default=-1,
                    help="Optional maximum reuse stack rank after scaling; negative disables.")
+    p.add_argument("--stack-rank-tail-pivot", type=int, default=-1,
+                   help="Leave scaled ranks at or below this pivot unchanged before tail stretch; negative disables.")
+    p.add_argument("--stack-rank-tail-scale", type=float, default=1.0,
+                   help="Scale only the excess above --stack-rank-tail-pivot.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -64,6 +68,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Apply numeric blending to both marks, only timing dt, or only obj_size.")
     p.add_argument("--mark-categorical-source", choices=["neural", "reservoir"], default="neural",
                    help="Use neural or reservoir opcode/tenant when neural marks are attached.")
+    p.add_argument("--mark-feedback-numeric-blend", type=float, default=None,
+                   help="Optional numeric blend used only for autoregressive mark feedback.")
+    p.add_argument("--mark-feedback-numeric-blend-space", choices=["raw", "log"], default="log",
+                   help="Blend space for feedback-only numeric marks.")
+    p.add_argument("--mark-feedback-numeric-fields", choices=["both", "dt", "size"], default="both",
+                   help="Numeric fields affected by feedback-only blending.")
     p.add_argument("--real-manifest", default="")
     p.add_argument("--cache-sizes", default="")
     p.add_argument("--output", default="")
@@ -106,6 +116,8 @@ def main() -> int:
         force_phase_schedule=args.force_phase_schedule,
         stack_rank_scale=args.stack_rank_scale,
         stack_rank_max=None if args.stack_rank_max < 0 else args.stack_rank_max,
+        stack_rank_tail_pivot=None if args.stack_rank_tail_pivot < 0 else args.stack_rank_tail_pivot,
+        stack_rank_tail_scale=args.stack_rank_tail_scale,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
@@ -114,6 +126,9 @@ def main() -> int:
         mark_numeric_blend_space=args.mark_numeric_blend_space,
         mark_numeric_fields=args.mark_numeric_fields,
         mark_categorical_source=args.mark_categorical_source,
+        mark_feedback_numeric_blend=args.mark_feedback_numeric_blend,
+        mark_feedback_numeric_blend_space=args.mark_feedback_numeric_blend_space,
+        mark_feedback_numeric_fields=args.mark_feedback_numeric_fields,
     )
     if args.disable_neural_marks:
         model.mark_model = saved_mark_model
@@ -144,6 +159,8 @@ def main() -> int:
         "force_phase_schedule": args.force_phase_schedule,
         "stack_rank_scale": args.stack_rank_scale,
         "stack_rank_max": args.stack_rank_max,
+        "stack_rank_tail_pivot": args.stack_rank_tail_pivot,
+        "stack_rank_tail_scale": args.stack_rank_tail_scale,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,
@@ -152,6 +169,9 @@ def main() -> int:
         "mark_numeric_blend_space": args.mark_numeric_blend_space,
         "mark_numeric_fields": args.mark_numeric_fields,
         "mark_categorical_source": args.mark_categorical_source,
+        "mark_feedback_numeric_blend": args.mark_feedback_numeric_blend,
+        "mark_feedback_numeric_blend_space": args.mark_feedback_numeric_blend_space,
+        "mark_feedback_numeric_fields": args.mark_feedback_numeric_fields,
         "uses_neural_marks": saved_mark_model is not None and not args.disable_neural_marks,
         "source_traces": source_names,
         "fake": fake_m,

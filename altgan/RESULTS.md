@@ -22,7 +22,7 @@ manifest per corpus.
 | Alibaba | NeuralStack | 64 files x 25k, temp 1.0 | 0.00333 | 0.27373 | 0.26909 | 204 | 201 | 1331 | 1452 |
 
 These are directly comparable to the peer long-rollout sidecar.  The current
-peer evidence in `VERSIONS.md` reports Tencent `v158` HRC-MAE `0.2435` and
+peer evidence in `VERSIONS-LLNL.md` reports Tencent `v158` HRC-MAE `0.2435` and
 Alibaba `v194` HRC-MAE `0.1305` with reuse-access `0.006` vs real `0.265`.
 The later peer LRU decoder ablation reaches Alibaba HRC-MAE `0.0051` only with
 a real-rate reuse override, while `v199` rate matching and `v200` high-weight
@@ -317,6 +317,345 @@ seeds now point to `local_prob_power=0.8` as the better HRC candidate. The
 next LANL move is no longer another object-process scalar sweep. Tencent now
 moves to IDEA #53 sidecar mark training around this strict-holdout PhaseAtlas
 winner.
+
+The first Tencent sidecar mark follow-up fixed the hybrid rollout contract so
+the autoregressive mark head observes the mark that was actually emitted after
+reservoir/neural blending. It then compared the older default-loss e20 sidecar
+against a freshly trained categorical-heavy e30 sidecar on the same
+strict-holdout PhaseAtlas object law. Both checks used reservoir numeric marks
+and neural categoricals (`mark_numeric_blend=0.0`, log space, temp `1.0`,
+noise `0.05`), so HRC/reuse/stack metrics stayed exactly paired.
+
+The categorical-heavy e30 training run
+(`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_catw2_num05_e30.pkl.gz`)
+used `numeric_loss_weight=0.5`, `categorical_loss_weight=2.0`, 30 epochs,
+hidden dim `192`, and the fixed real-manifest holdout exclusion. It improved
+mean mark score from the reservoir control's `0.04684` to `0.03941`. Rerunning
+the older e20 checkpoint under the fixed emitted-history runtime was much
+better: mean mark score `0.02842` on the same four seeds, a 39.3% paired gain
+over reservoir marks and a 27.9% gain over the e30 sidecar. The full artifacts
+are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_catw2_num05_e30_confirm_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_confirm_summary.csv`,
+and the seed-42 e20 fixed-history JSON
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_fixedhistory_seed42_cat-neural_blend-0p0_space-log_fields-both_temp-1p0_noise-0p05_eval_100k.json`.
+
+| mark source | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score | opcode TV | tenant TV |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| reservoir control | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.04684 | 0.04105 | 0.04105 |
+| e30 reservoir numeric + neural categorical | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.03941 | 0.02640 | 0.02600 |
+| e20 reservoir numeric + neural categorical | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | **0.02842** | **0.00404** | **0.00438** |
+
+This promotes the e20 neural-categorical sidecar as the current Tencent mark
+champion around the strict-holdout object-process winner. The next useful work
+is not more categorical loss weight; it is either a temperature/noise
+micro-sweep around e20 or an inference-speed patch, because the event-by-event
+GRU rollout makes broad mark sweeps expensive.
+
+The e20 categorical-temperature micro-sweep closed negative. On seed `42`,
+temps `0.5`, `0.75`, `1.25`, and `1.5` all preserved HRC/reuse/stack behavior
+but worsened categorical mark quality versus the promoted temp `1.0` row. The
+full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_temp_micro_seed42_summary.csv`
+and `_best.json`.
+
+| categorical temp | HRC-MAE | mark score | opcode TV | tenant TV |
+|---:|---:|---:|---:|---:|
+| 0.50 | 0.008424 | 0.04516 | 0.03623 | 0.03783 |
+| 0.75 | 0.008424 | 0.03772 | 0.02117 | 0.02313 |
+| 1.00 | 0.008424 | **0.02876** | **0.00354** | **0.00492** |
+| 1.25 | 0.008424 | 0.03591 | 0.01883 | 0.01823 |
+| 1.50 | 0.008424 | 0.04859 | 0.04461 | 0.04320 |
+
+Keep `mark_categorical_temp=1.0`; the next mark-side move should be inference
+throughput or a different sidecar objective, not categorical sampling
+temperature.
+
+The mark-sidecar training-data-size follow-up found a small but stable mark
+gain. A broader 512-file h128 default-loss e20 sidecar closed negative on
+seed `42`: it preserved HRC (`0.008423`) but worsened mark score to `0.03838`.
+The narrower 128-file h128 default-loss e20 sidecar improved all four paired
+seeds while again leaving object metrics unchanged. The full artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_confirm_summary.csv`,
+`_best.json`, and the seed-42 JSON
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_seed42_eval_100k.json`.
+
+| mark source | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score | opcode TV | tenant TV |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| e20 256-file sidecar | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.02842 | 0.00404 | 0.00438 |
+| e20 128-file h128 sidecar | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | **0.02788** | **0.00343** | **0.00282** |
+
+This promotes
+`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128.pkl.gz`
+as the current Tencent mark-side checkpoint. The cached-input runtime patch
+preserved metrics exactly but did not clearly improve elapsed time under
+contention (`572.80s` vs the prior `532.93s` seed-42 speedcheck), so do not
+count it as a throughput win yet.
+
+The narrower 64-file h128 sidecar then closed negative on seed `42`: it again
+kept HRC-MAE at `0.008423` but worsened mark score to `0.03344`. The
+data-size branch therefore prefers 128 files over 64, 256, and 512 for this
+default-loss sidecar family.
+
+The 128-file objective-shape follow-up found a smaller but confirmed gain. A
+reduced categorical-loss sidecar
+(`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128_catw025.pkl.gz`)
+used the same 128 training files, hidden dim `128`, e20 schedule, seed `42`,
+and `numeric_loss_weight=1.0`, but lowered `categorical_loss_weight` from
+`0.5` to `0.25`. It preserved the object process exactly and reduced the
+four-seed mean mark score from `0.02788` to `0.02775`. The improvement is
+modest but paired: seeds `42`, `44`, and `45` improved, while seed `43`
+regressed slightly. Adjacent points closed negative on seed `42`: catw `0.125`
+scored `0.04975`, and catw `0.375` scored `0.06088`. The full confirmation
+artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_confirm_summary.csv`,
+`_best.json`, and the seed-42 JSON
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_seed42_eval_100k.json`.
+
+| mark source | seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score | opcode TV | tenant TV |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| e20 128-file h128, catw 0.50 | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.02788 | 0.00343 | **0.00282** |
+| e20 128-file h128, catw 0.25 | 4 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | **0.02775** | **0.00287** | 0.00286 |
+
+This promotes
+`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128_catw025.pkl.gz`
+as the current Tencent mark-side checkpoint. The objective-shape bracket is
+not monotonic; do not chase lower categorical weights without a new mechanism.
+
+The follow-up training-seed/data-selection pass closed negative. Reusing the
+catw `0.25` objective with different training seeds changed both initialization
+and the sampled 128-file training subset. Train-seed `43` was rejected on the
+seed-42 gate (`mark_score=0.05284`). Train-seed `45` was also rejected on the
+seed-42 gate (`mark_score=0.03426`). Train-seed `44` looked promising on the
+same gate (`0.02828` versus `0.02847` for the promoted train-seed `42`
+checkpoint), but failed confirmation: seeds `42-45` averaged `0.02850`, worse
+than the promoted `0.02775`.
+
+| catw 0.25 training seed | eval seeds | mean HRC-MAE | mean mark score | verdict |
+|---:|---:|---:|---:|---|
+| 42 | 42-45 | 0.008767 | **0.02775** | promoted |
+| 43 | 42 only | 0.008423 | 0.05284 | closed |
+| 44 | 42-45 | 0.008767 | 0.02850 | closed |
+| 45 | 42 only | 0.008423 | 0.03426 | closed |
+
+The training-seed branch therefore keeps the existing promoted catw `0.25`,
+train-seed `42` checkpoint. The next useful mark-side idea needs a mechanism
+change or checkpoint selection inside a single training run, not more random
+128-file subsets.
+
+The coarse and tight epoch-selection pass also closed negative. With the same
+128-file subset, seed `42`, h128, and catw `0.25` objective, e10/e15 were too
+early and e25 overran the seed-42 mark gate. A tighter e18/e22 bracket around
+the promoted e20 checkpoint also missed. A snapshot run then filled the exact
+neighbors, and e19/e21 were both worse. The seed-42 mark scores were:
+
+| epochs | HRC-MAE | mark score | verdict |
+|---:|---:|---:|---|
+| 10 | 0.008423 | 0.04398 | closed |
+| 15 | 0.008423 | 0.03674 | closed |
+| 18 | 0.008423 | 0.04154 | closed |
+| 19 | 0.008423 | 0.05914 | closed |
+| 20 | 0.008423 | **0.02847** | promoted |
+| 21 | 0.008423 | 0.07347 | closed |
+| 22 | 0.008423 | 0.03299 | closed |
+| 25 | 0.008423 | 0.03383 | closed |
+
+For this sidecar family, epoch `20` is the only checkpoint-length point that
+survived the seed-42 gate. Further improvement likely needs changing the mark
+model or numeric mark mechanism, not simply changing the final epoch count.
+
+The full-field numeric-blend mechanism check also closed negative. Keeping neural
+categoricals from the promoted catw `0.25` checkpoint, log-space blends of the
+neural dt/size predictions into the reservoir numeric marks worsened the
+seed-42 mark score: blend `0.1` scored `0.03121`, blend `0.25` scored
+`0.03765`, and blend `0.5` scored `0.04837`, all versus the promoted
+reservoir-numeric row at `0.02847`. Do not blend both numeric fields together.
+
+A field-selective numeric pass then reopened the useful part of that mechanism.
+Keeping reservoir timing and blending only object size in log space found a
+confirmed gain at `mark_numeric_fields=size`, `mark_numeric_blend=0.018`. The
+nearby `0.02` setting first confirmed the mechanism, then a finer seed-42 check
+found `0.018`; seeds `43-45` confirmed the tiny additional gain. Object metrics
+remain unchanged because the object process is untouched.
+
+The stronger result is feedback-only numeric blending: emit reservoir numeric
+marks, but feed the autoregressive mark head a size-only log blend for its
+next-step state. This keeps the reservoir dt/size W1 terms unchanged while
+collapsing categorical TV closer to zero. Feedback-only dt and both-field
+variants missed on seed `42` (`0.02694`, `0.02701`, `0.02680`) versus the
+size-only branch.
+
+| numeric runtime | eval seeds | mean HRC-MAE | mean fake reuse | real reuse | mean stack med | real stack med | mean stack p90 | real stack p90 | mean mark score | verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| reservoir numeric, neural categoricals | 42-45 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.02775 | old promoted |
+| emitted size-only log blend 0.018, neural categoricals | 42-45 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.02725 | closed |
+| feedback-only size log blend 0.018, neural categoricals | 42-45 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.02711 | superseded |
+| feedback-only size log blend 0.080, neural categoricals | 42-45 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | **0.02685** | promoted |
+| feedback size log 0.018 + emitted raw size 0.02 | 42-45 | 0.008767 | 0.61369 | 0.61493 | 53 | 60 | 170 | 174 | 0.027115 | closed |
+
+Seed-level mark scores for the promoted size-only row were `0.026914`,
+`0.028132`, `0.027070`, and `0.026901`. The supporting artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_fieldblend_seed42_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_sizeblend002_seed42_restored_eval_100k.json`,
+and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_sizeblend002_confirm_restored_summary.csv`.
+A seed-42 micro-refine over size-only blends `0.01`, `0.015`, `0.02`,
+`0.025`, `0.03`, and `0.04` kept `0.02` as the best tested point; the nearest
+competitor was `0.015` at `0.02695`, still slightly worse than `0.02` at
+`0.02695` by the unrounded score (`0.02695463` vs `0.02694582`).
+A finer seed-42 check then found `0.018` at `0.02691395`; confirmation over
+seeds `43-45` gave a four-seed mean `0.02725443`, beating `0.02` by
+`0.00000723`. Fine artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_sizeblend_fine_seed42_restored_summary.csv`
+and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_sizeblend018_confirm_restored_summary.csv`.
+Feedback-only artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_size018_seed42_eval_100k.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_size018_seed43_eval_100k.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_size018_seed44_eval_100k.json`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_size018_seed45_eval_100k.json`.
+The emitted-output follow-up tried a tiny raw-size blend `0.02` while keeping
+feedback-size `0.018`. It produced seed scores `0.02676478`, `0.02798556`,
+`0.02693309`, and `0.02677625`, mean `0.02711492`, so the seed-42 hairline win
+did not survive the four-seed panel. Artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback018_outsize_raw002_seed42_eval_100k.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback018_outsize_raw002_seed43_eval_100k.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback018_outsize_raw002_seed44_eval_100k.json`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback018_outsize_raw002_seed45_eval_100k.json`.
+
+Fresh fake seeds `46-49` support the feedback-only setting out-of-sample. The
+no-feedback neural-categorical control scored mean mark `0.02729909`; the same
+runtime with feedback-size log blend `0.018` scored mean mark `0.02722472`.
+Object metrics were bit-identical between the paired cells: mean HRC-MAE
+`0.00941475`, fake reuse `0.6137475`, real reuse `0.61493`, stack median `53`
+vs real `60`, and stack p90 `166.75` vs real `174`. The paired mark deltas by
+seed were `-0.0000675`, `+0.0000425`, `-0.0002200`, and `-0.0000525`.
+Robustness artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_robust_base_seed46_49_summary.csv` and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_robust_feedback_size018_seed46_49_summary.csv`.
+
+The feedback-strength sweep then moved the promotion from `0.018` to `0.080`.
+On seeds `42-45`, feedback blends `0.021`, `0.024`, `0.027`, `0.030`,
+`0.036`, `0.045`, `0.060`, `0.080`, `0.100`, and `0.120` gave mean mark
+scores `0.027098`, `0.027083`, `0.027003`, `0.026980`, `0.026960`,
+`0.026941`, `0.026941`, `0.026846`, `0.026878`, and `0.026984`. On fresh
+seeds `46-49`, `0.080` scored `0.026712`, better than `0.024` (`0.027176`),
+`0.036` (`0.026970`), `0.045` (`0.026947`), and `0.060` (`0.026939`). Across
+the eight paired seeds `42-49`, feedback-size `0.080` averages mark score
+`0.02677934` while keeping object metrics unchanged. This is the current
+Tencent mark-runtime promotion. Artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_micro_seed46_49_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_hi_confirm_seed42_45_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_upper_seed42_45_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_upper_seed46_49_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_feedback_hi2_seed42_45_summary.csv`.
+The next fresh panel, seeds `50-53`, strengthened the promotion: no-feedback
+mean mark was `0.02755709`, feedback-size `0.080` mean was `0.02670647`, and
+all four paired seeds improved while HRC/reuse/stack stayed identical. Across
+seeds `42-53`, feedback-size `0.080` averages mark score `0.02675505`. Added
+artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_robust_base_seed50_53_summary.csv` and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_128files_h128_catw025_robust_feedback080_seed50_53_summary.csv`.
+
+Holding that promoted feedback runtime fixed, a seeds `50-53` object micro-sweep
+tested nearby `transition_blend` and `local_prob_power` values. The best HRC
+cell was `transition_blend=0.525`, `local_prob_power=0.825`, with mean HRC-MAE
+`0.00873275`, fake reuse `0.61370`, stack median `52.75`, stack p90 `165.25`,
+and mean mark score `0.02675281`. The balanced neighbor
+`transition_blend=0.575`, `local_prob_power=0.75` scored mean HRC-MAE
+`0.00876875`, fake reuse `0.61368`, stack median `54`, stack p90 `170.5`, and
+mean mark score `0.02629462`. The old object row (`0.55`, `0.8`) scored
+HRC-MAE `0.00925137` and mark `0.02670647` on the same seeds. The seeds `42-45`
+confirmation shifted the HRC lead to `0.575/0.75` on that panel (`0.00848437`)
+but with worse mark score (`0.02733755`). Across the combined eight seeds
+`42-45,50-53`, `0.575/0.75` has the best HRC (`0.00862656`) and p90
+(`170.25`), while `0.55/0.75` has the better mean mark score (`0.02651714`)
+with HRC `0.00886219`. The exact-pair panel on seeds `54-57` confirmed
+`0.575/0.75` as the HRC-leading candidate. Across all twelve evaluated seeds,
+it beats the old `0.55/0.8` object row on both HRC (`0.00862125` vs
+`0.00892654`) and mark (`0.02683659` vs `0.02701257`), with stack p90 closer
+to real (`170.25` vs `168.58`). The `0.55/0.75` row is still the
+mark-favoring candidate at mark `0.02650085` and HRC `0.00882121`. A seeds
+`58-61` local-power refinement changed the shared-seed readout: over the
+sixteen seeds where both are measured, `0.55/0.75` now edges `0.575/0.75` on
+both HRC (`0.00871025` vs `0.00871844`) and mark (`0.02671515` vs
+`0.02708219`), while the old `0.55/0.8` row is weaker at HRC `0.00890641` and
+mark `0.02704201`. The new `0.575/0.70` point confirmed over seeds `42-57`;
+combined with the original `58-61` panel, it has 20 seeds at HRC `0.00858638`,
+mark `0.02694865`, reuse `0.61350`, stack median `53.75`, and stack p90
+`169.8`. On the same sixteen seeds where `0.55/0.75` and old `0.55/0.8` are
+measured, `0.575/0.70` scores HRC `0.00853172`, mark `0.02683922`, reuse
+`0.61373688`, and stack p90 `170.125`; `0.55/0.75` scores HRC `0.00871025`,
+mark `0.02671515`; old `0.55/0.8` scores HRC `0.00890641`, mark
+`0.02704201`. A seeds `62-65` interpolation panel reinforced `0.575/0.70` as
+the current HRC-leading shared candidate. On the fair `42-45,50-65` seed set,
+`0.575/0.70` scores HRC `0.00854965`, mark `0.02680073`, reuse `0.613864`,
+stack median `53.85`, and p90 `170.3`; `0.55/0.75` scores HRC `0.00871607`
+and mark `0.02678954`; old `0.55/0.8` scores HRC `0.00897950` and mark
+`0.02697943`. The interpolation panel opened lower-transition challengers, but
+the seeds `42-61` confirmation did not dislodge `0.575/0.70`: `0.55/0.70`
+scored HRC `0.00856863`, mark `0.02690313`, reuse `0.61286`, p90 `168.35`,
+and `0.5625/0.70` scored HRC `0.00863293`, mark `0.02686441`, reuse
+`0.61362`, p90 `169.5`. On the fair principal set (`42-45,50-65`),
+`0.575/0.70` remains the HRC leader at `0.00854965`, with mark
+`0.02680073`; `0.55/0.75` is the closest mark row at `0.02678954` but worse on
+HRC (`0.00871607`). The promoted object runtime is now forced phase,
+`transition_blend=0.575`, `local_prob_power=0.70`, late rank scales
+`1.0,1.0,1.1,1.1`, and feedback-only size blend `0.080`.
+
+The first 1M-record, 4-stream panel changed the diagnosis. The promoted row
+still edges the old row on HRC, but both rows miss the longer real reuse tail.
+
+| Row | HRC-MAE | fake reuse | real reuse | fake stack med | real stack med | fake stack p90 | real stack p90 | mark score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| promoted `0.575/0.70` | **0.0589916** | 0.612863 | 0.728415 | 54 | 84 | 170 | 29150 | 0.030864 |
+| old `0.55/0.8` | 0.0598152 | 0.613847 | 0.728415 | 53 | 84 | 169 | 29150 | **0.030274** |
+| promoted + tail pivot 84 / scale 340 | 0.0860748 | 0.612863 | 0.728415 | 54 | 84 | 24224 | 29150 | 0.030864 |
+
+The tail-only rank transform is therefore a useful diagnostic but not a
+solution. It can stretch p90 toward the real panel, but HRC worsens because
+fake reuse access remains capped near `0.613` while real reuse is `0.728`.
+The next object-process probe should convert a controlled share of would-be new
+events into long-rank reuses rather than only stretching sampled reuse ranks.
+
+The `0.575/0.70` confirm also exposed a remote clobber: `evaluate_neural_atlas`
+lost the feedback CLI after some cells had completed. LANL restored and
+compiled the full `altgan/` tree on `vinge.local`, resumed with
+`--skip-existing`, and verified output metadata for feedback blend `0.08` on
+reused and newly completed cells. Artifacts are
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_micro_seed50_53_fb080_summary.csv` and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_micro_seed50_53_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_confirm_seed42_45_fb080_summary.csv`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_confirm_seed42_45_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_pairs_seed54_57_fb080_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_pairs_seed54_57_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_localrefine_seed58_61_fb080_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_localrefine_seed58_61_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_tb575_lp070_confirm_seed42_57_fb080_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_tb575_lp070_confirm_seed42_57_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_interp_seed62_65_fb080_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_interp_seed62_65_fb080_best.json`,
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_lowtrans_confirm_seed42_61_fb080_summary.csv`, and
+`/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_lowtrans_confirm_seed42_61_fb080_best.json`.
+
+The hidden-size capacity pass did not dislodge h128. A larger h256 mark head
+overfit the training objective and failed the seed-42 gate (`mark_score=0.04974`).
+A smaller h96 mark head improved seed `42` (`0.02808`) but failed confirmation:
+seeds `42-45` averaged `0.02791`, behind the promoted h128 mean `0.02775`. The
+h104 and h112 bridge points also missed the seed-42 gate at `0.03533` and
+`0.04102`, so the current capacity branch still promotes h128.
+
+| hidden dim | eval seeds | mean HRC-MAE | mean mark score | verdict |
+|---:|---:|---:|---:|---|
+| 96 | 42-45 | 0.008767 | 0.02791 | closed |
+| 104 | 42 only | 0.008423 | 0.03533 | closed |
+| 112 | 42 only | 0.008423 | 0.04102 | closed |
+| 128 | 42-45 | 0.008767 | **0.02775** | promoted |
+| 256 | 42 only | 0.008423 | 0.04974 | closed |
+
+The trainer snapshot path (`--snapshot-epochs`) is verified by the e19/e21 run
+and remains useful for future checkpoint-selection sweeps, but the h128/catw
+`0.25` epoch neighborhood is now closed.
 
 ## Alibaba PhaseAtlas Calibration Ablations
 

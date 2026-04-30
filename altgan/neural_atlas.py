@@ -79,6 +79,8 @@ class NeuralAtlasModel:
         force_phase_schedule: bool = False,
         stack_rank_scale: float = 1.0,
         stack_rank_max: int | None = None,
+        stack_rank_tail_pivot: int | None = None,
+        stack_rank_tail_scale: float = 1.0,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -87,6 +89,9 @@ class NeuralAtlasModel:
         mark_numeric_blend_space: str = "raw",
         mark_numeric_fields: str = "both",
         mark_categorical_source: str = "neural",
+        mark_feedback_numeric_blend: float | None = None,
+        mark_feedback_numeric_blend_space: str = "log",
+        mark_feedback_numeric_fields: str = "both",
     ):
         import pandas as pd
         import torch
@@ -103,11 +108,20 @@ class NeuralAtlasModel:
         transition_blend = float(np.clip(transition_blend, 0.0, 1.0))
         local_prob_power = max(float(local_prob_power), 0.0)
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
+        stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
+        if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
+            stack_rank_tail_pivot = None
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
+        if mark_feedback_numeric_blend is not None:
+            mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
         if mark_numeric_blend_space not in {"raw", "log"}:
             raise ValueError("mark_numeric_blend_space must be 'raw' or 'log'")
+        if mark_feedback_numeric_blend_space not in {"raw", "log"}:
+            raise ValueError("mark_feedback_numeric_blend_space must be 'raw' or 'log'")
         if mark_numeric_fields not in {"both", "dt", "size"}:
             raise ValueError("mark_numeric_fields must be 'both', 'dt', or 'size'")
+        if mark_feedback_numeric_fields not in {"both", "dt", "size"}:
+            raise ValueError("mark_feedback_numeric_fields must be 'both', 'dt', or 'size'")
         if mark_categorical_source not in {"neural", "reservoir"}:
             raise ValueError("mark_categorical_source must be 'neural' or 'reservoir'")
         mark_runtime = None
@@ -119,6 +133,7 @@ class NeuralAtlasModel:
                 temperature=temperature if mark_temperature is None else mark_temperature,
                 numeric_noise=mark_numeric_noise,
             )
+            mark_runtime.set_conditions(conds)
 
         net = _CondTransitionNet(self.cond_dim, self.hidden_dim, self.n_states)
         net.load_state_dict(self.state_dict)
@@ -170,6 +185,8 @@ class NeuralAtlasModel:
                         ev.stack_distance,
                         stack_rank_scale=phase_rank_scale,
                         stack_rank_max=phase_rank_max,
+                        stack_rank_tail_pivot=stack_rank_tail_pivot,
+                        stack_rank_tail_scale=stack_rank_tail_scale,
                         stack_len=len(stack),
                     )
                     obj_id = stack[rank]
@@ -223,6 +240,25 @@ class NeuralAtlasModel:
                             stack_distance=int(ev.stack_distance),
                             action_class=int(ev.action_class),
                         )
+                    feedback_mark = mark
+                    if mark_feedback_numeric_blend is not None:
+                        feedback_dt, feedback_size = _blend_numeric_marks(
+                            ev,
+                            neural_mark,
+                            mark_feedback_numeric_blend,
+                            mark_feedback_numeric_blend_space,
+                            mark_feedback_numeric_fields,
+                        )
+                        feedback_mark = EventSample(
+                            dt=float(feedback_dt),
+                            obj_size=float(feedback_size),
+                            opcode=mark.opcode,
+                            tenant=mark.tenant,
+                            stride=int(ev.stride),
+                            stack_distance=int(ev.stack_distance),
+                            action_class=int(ev.action_class),
+                        )
+                    mark_runtime.observe(stream_id, feedback_mark)
 
                 ts += max(float(mark.dt), 0.0)
                 rows.append({
@@ -605,9 +641,14 @@ def _calibrated_stack_rank(
     *,
     stack_rank_scale: float,
     stack_rank_max: int | None,
+    stack_rank_tail_pivot: int | None,
+    stack_rank_tail_scale: float,
     stack_len: int,
 ) -> int:
     rank = int(round(max(int(raw_rank), 0) * stack_rank_scale))
+    if stack_rank_tail_pivot is not None and rank > stack_rank_tail_pivot:
+        tail = rank - int(stack_rank_tail_pivot)
+        rank = int(stack_rank_tail_pivot) + int(round(tail * stack_rank_tail_scale))
     if stack_rank_max is not None and stack_rank_max >= 0:
         rank = min(rank, int(stack_rank_max))
     return min(max(rank, 0), int(stack_len) - 1)
