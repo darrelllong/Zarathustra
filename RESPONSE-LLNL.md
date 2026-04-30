@@ -10174,3 +10174,52 @@ Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_tencent_237f_inline.pkl.gz` (b2-inline tencent model)
 - `/home/darrell/v_tencent_b2_inline.csv` (HRC-MAE 0.0206 generation)
 - `/home/darrell/neural_atlas_fit_tencent.log`
+
+
+## Round 174 — State-space expansion (6 → 24 with phase) closed-MARGINAL: HRC-MAE 0.0120 (1.7× worse than R172's 6-state 0.0069)
+
+**Date**: 2026-04-30 14:25 PDT
+
+### What ran
+
+`llgan/neural_atlas.py` extended with `--n-phase-bins` flag. State = `phase_bin*N_DIST_STATES + dist_state` (6→24 with `n_phase_bins=4`). Phase quartile edges fitted from training-data running-unique-rate windows: `[0.63, 0.84, 0.995]` (29,625 windows from 237 alibaba files). Generate tracks running-unique-rate per stream and forces sampled state's phase to track empirical phase.
+
+### Result on alibaba_stackatlas
+
+| recipe | reuse (gen / real) | P50 / P90 | footprint | **HRC-MAE** |
+|---|---|---|---|---|
+| R172 b2 inline-cond 6-state | 0.276 / 0.269 | 190 / 1379 | 18102 | **0.0069** |
+| R174 b2 24-state per-phase rank PMF | 0.260 / 0.269 | **25 / 217** | 18506 | 0.0238 |
+| R174 b2 24-state marginal rank PMF | 0.280 / 0.269 | 170 / 1340 | 18004 | 0.0120 |
+
+Per-stream reuse is *better* in 24-state (s1/s3 hit 0.0030/0.0021 vs target 0.0030/0.0034 — essentially perfect), but P50/P90 collapse to short stack distances when the per-phase rank PMF is used (25/217 instead of ~200/~1400). Marginalizing rank PMF across phase recovers most of the lost shape (170/1340) but doesn't beat the 6-state baseline.
+
+### Diagnosis
+
+24-state phase expansion fragments the rank-distance observations (1.6M transitions / 24 states = 67k/state vs 270k/state in 6-state). Per-state PMFs become noisier. **The 6-state R172 model already captures the per-stream conditioning we need via cond**; adding a phase dimension to the state space is redundant when cond conveys the same per-file information.
+
+The verdict is **closed-marginal**: the architecture works (per-stream reuse near-perfect), but rank-distribution fidelity regresses. **R172 6-state inline-cond stays best for alibaba.**
+
+### What WAS NOT learned by 24-state
+
+The phase forcing (`expected_pb = searchsorted(phase_edges, current_rate)`) at generate time means each step's chosen state is constrained to the empirical phase, not the net's predicted phase. So the net's phase prediction is overridden — the only signal the net contributes is dist_state given prev_state and cond, which is what the 6-state model already does.
+
+A more honest 24-state experiment would let the net's phase prediction drive without forcing. That would be a future round.
+
+### Continuing race-relevant work
+
+R172/R173 stand as the LLNL b2 best on alibaba (0.0069) and tencent (0.0206). Next ideas:
+
+1. **Larger hidden / deeper trans head**. ~10 min retrain.
+2. **Train b2 with bigger record budget** (50k / 100k records per file). Currently 25k matches eval window. ~30 min retrain.
+3. **Neural mark model** for completeness — would help mark_score axis. Lower race-relevance.
+
+Picking #1 (hidden=160, trans 3-layer) next — cheapest path to closing a bit more of the LANL gap.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_p4.pkl.gz` (24-state model — kept for diagnosis)
+- `/home/darrell/v_alibaba_b2_p4_marg.csv` (HRC-MAE 0.0120 marginal-rank gen)

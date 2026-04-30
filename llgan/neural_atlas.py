@@ -557,7 +557,24 @@ def generate(
                     next_new_id += 1
                     stack.insert(0, obj_id)
                 else:
-                    pmf = m.rank_pmf_per_state.get(state, np.ones(len(m.rank_edges) - 1) / (len(m.rank_edges) - 1))
+                    # R174: use phase-marginalized rank PMF (sum over phase bins
+                    # of states with same dist_state). Decouples phase-conditioned
+                    # transitions from rank decoding so the dist_state's true
+                    # rank distribution drives the rank pick instead of a
+                    # phase-restricted slice that may be heavily skewed.
+                    if n_phase_bins > 1:
+                        pmf_acc = np.zeros(len(m.rank_edges) - 1, dtype=np.float64)
+                        for pb in range(n_phase_bins):
+                            s_pb = pb * N_DIST_STATES + dist_state
+                            p = m.rank_pmf_per_state.get(s_pb, None)
+                            if p is not None and p.sum() > 0:
+                                pmf_acc += p
+                        if pmf_acc.sum() > 0:
+                            pmf = pmf_acc / pmf_acc.sum()
+                        else:
+                            pmf = np.ones(len(m.rank_edges) - 1) / (len(m.rank_edges) - 1)
+                    else:
+                        pmf = m.rank_pmf_per_state.get(state, np.ones(len(m.rank_edges) - 1) / (len(m.rank_edges) - 1))
                     if pmf.sum() <= 0:
                         pmf = np.ones_like(pmf) / len(pmf)
                     pmf = pmf / pmf.sum()
