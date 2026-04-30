@@ -52,6 +52,7 @@ def generate(
     lru_markov_p_mr: float = -1.0,
     opcode_resample: str = "",
     size_remap: str = "",
+    tenant_clamp: "int|None" = None,
 ) -> None:
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -457,6 +458,12 @@ def generate(
     # -1). Post-hoc resample from the corpus opcode marginal so mark_score
     # opcode_tv stops being pinned at 1.0. Distributions sourced from Round 162
     # PhaseAtlas refits (32 files × 500k events).
+    # Round 166: clamp tenant to a single value (real block traces are
+    # constant tenant=0; GAN hallucinates variation).
+    if tenant_clamp is not None and "tenant" in df.columns:
+        df["tenant"] = int(tenant_clamp)
+        print(f"[tenant-clamp] set {len(df):,} tenant values to {int(tenant_clamp)}")
+
     if opcode_resample and "opcode" in df.columns:
         _OPCODE_PMF = {
             "tencent": {0: 0.9161, -1: 0.0839},
@@ -585,6 +592,11 @@ def parse_args():
                         "to match the corpus size marginal. Preserves the GAN's rank-ordering "
                         "decisions while fixing the size-scale collapse (v158 tencent emits "
                         "median 274kB vs real 4kB).")
+    p.add_argument("--tenant-clamp", type=int, default=None,
+                   metavar="T",
+                   help="Round 166: clamp the tenant column to a single value. Real tencent "
+                        "and alibaba block traces are constant tenant=0; GAN hallucinates "
+                        "tenant variation. Pass --tenant-clamp 0 to drop tenant_tv to 0.")
     return p.parse_args()
 
 
@@ -617,4 +629,5 @@ if __name__ == "__main__":
         lru_markov_p_mr=args.lru_stack_markov_pmr,
         opcode_resample=args.opcode_resample,
         size_remap=args.size_remap,
+        tenant_clamp=args.tenant_clamp,
     )
