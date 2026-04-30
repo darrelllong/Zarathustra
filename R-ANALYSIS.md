@@ -22,7 +22,7 @@ Main entrypoints:
 
 1. Python wrote normalized per-file rows into `trace_characterizations.normalized.jsonl`.
 2. R flattened each JSON row into one tabular row of scalar features.
-3. R grouped rows by $\text{logical\_family\_id} = \text{"dataset\_\_family"}$, where the string is formed by concatenating `dataset`, `"__"`, and `family`.
+3. R grouped rows by $\text{logical\\_family\\_id} = \text{"dataset\\_\\_family"}$, where the string is formed by concatenating `dataset`, `"__"`, and `family`.
 4. R ran one family-level analysis per group.
 5. R wrote `analysis.json`, `metric_summary.csv`, optional diagnostics CSVs, and one Markdown report per family.
 
@@ -55,15 +55,15 @@ $$
 Duration:
 
 $$
-\mathrm{ts\_duration} = t_n - t_1
+\mathrm{ts\\_duration} = t_n - t_1
 $$
 
 Sample record rate:
 
 $$
-\mathrm{sample\_record\_rate} =
+\mathrm{sample\\_record\\_rate} =
 \begin{cases}
-\dfrac{n}{\mathrm{ts\_duration}}, & \mathrm{ts\_duration} > 0 \\
+\dfrac{n}{\mathrm{ts\\_duration}}, & \mathrm{ts\\_duration} > 0 \\
 \mathrm{NA}, & \text{otherwise}
 \end{cases}
 $$
@@ -71,14 +71,14 @@ $$
 Zero-IAT ratio:
 
 $$
-\mathrm{iat\_zero\_ratio} =
+\mathrm{iat\\_zero\\_ratio} =
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \mathrm{iat}_i = 0 \}
 $$
 
 Burstiness coefficient of variation:
 
 $$
-\mathrm{burstiness\_cv} =
+\mathrm{burstiness\\_cv} =
 \begin{cases}
 \dfrac{\mathrm{sd}(\mathrm{iat})}{\mathrm{mean}(\mathrm{iat})}, & \mathrm{mean}(\mathrm{iat}) \neq 0 \\
 \mathrm{NA}, & \text{otherwise}
@@ -88,13 +88,13 @@ $$
 Write ratio:
 
 $$
-\mathrm{write\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ o_i < 0 \}
+\mathrm{write\\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ o_i < 0 \}
 $$
 
 Opcode switch ratio:
 
 $$
-\mathrm{opcode\_switch\_ratio} =
+\mathrm{opcode\\_switch\\_ratio} =
 \begin{cases}
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ o_i \neq o_{i-1} \}, & n \geq 2 \\
 \mathrm{NA}, & \text{otherwise}
@@ -110,17 +110,17 @@ $$
 Reuse, forward-seek, and backward-seek ratios:
 
 $$
-\mathrm{reuse\_ratio} =
+\mathrm{reuse\\_ratio} =
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i = 0 \}
 $$
 
 $$
-\mathrm{forward\_seek\_ratio} =
+\mathrm{forward\\_seek\\_ratio} =
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i > 0 \}
 $$
 
 $$
-\mathrm{backward\_seek\_ratio} =
+\mathrm{backward\\_seek\\_ratio} =
 \dfrac{1}{n-1} \sum_{i=2}^{n} \mathbf{1}\{ \Delta_i < 0 \}
 $$
 
@@ -149,25 +149,25 @@ $$
 Total IOPS:
 
 $$
-\mathrm{total\_iops}_i = r_i + w_i
+\mathrm{total\\_iops}_i = r_i + w_i
 $$
 
 Total bandwidth:
 
 $$
-\mathrm{total\_bw}_i = R_i + W_i
+\mathrm{total\\_bw}_i = R_i + W_i
 $$
 
 Idle ratio:
 
 $$
-\mathrm{idle\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ \mathrm{total\_iops}_i = 0 \}
+\mathrm{idle\\_ratio} = \dfrac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{ \mathrm{total\\_iops}_i = 0 \}
 $$
 
 Write-share IOPS mean:
 
 $$
-\mathrm{write\_share\_iops\_mean} =
+\mathrm{write\\_share\\_iops\\_mean} =
 \begin{cases}
 \dfrac{\sum_{i=1}^{n} w_i}{\sum_{i=1}^{n} (r_i + w_i)}, & \sum_{i=1}^{n} (r_i + w_i) > 0 \\
 \mathrm{NA}, & \text{otherwise}
@@ -181,28 +181,28 @@ Given schema column summaries $c_1, \dots, c_q$:
 Column count:
 
 $$
-\mathrm{schema\_column\_count} = q
+\mathrm{schema\\_column\\_count} = q
 $$
 
 Numeric-column count:
 
 $$
-\mathrm{schema\_numeric\_cols} =
-\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{numeric\_ratio}(c_\ell) \geq 0.8 \}
+\mathrm{schema\\_numeric\\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{numeric\\_ratio}(c_\ell) \geq 0.8 \}
 $$
 
 Mixed-column count:
 
 $$
-\mathrm{schema\_mixed\_cols} =
-\sum_{\ell=1}^{q} \mathbf{1}\{ 0.2 < \mathrm{numeric\_ratio}(c_\ell) < 0.8 \}
+\mathrm{schema\\_mixed\\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ 0.2 < \mathrm{numeric\\_ratio}(c_\ell) < 0.8 \}
 $$
 
 High-cardinality-column count:
 
 $$
-\mathrm{schema\_high\_cardinality\_cols} =
-\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{unique\_tokens}(c_\ell) \geq 100 \}
+\mathrm{schema\\_high\\_cardinality\\_cols} =
+\sum_{\ell=1}^{q} \mathbf{1}\{ \mathrm{unique\\_tokens}(c_\ell) \geq 100 \}
 $$
 
 ## R Flattening
@@ -234,7 +234,7 @@ $$
 Missing fraction:
 
 $$
-\mathrm{missing\_frac}_j =
+\mathrm{missing\\_frac}_j =
 1 - \dfrac{m_j}{n}
 $$
 
@@ -309,7 +309,7 @@ R computed $Q(0.10)$, $Q(0.25)$, $Q(0.75)$, and $Q(0.90)$ for the family reports
 For a family with valid per-feature CVs $\mathrm{CV}_1, \dots, \mathrm{CV}_r$, R defines
 
 $$
-\mathrm{heterogeneity\_score} =
+\mathrm{heterogeneity\\_score} =
 \mathrm{median}\left(
 \min(\mathrm{CV}_1, 25),
 \dots,
@@ -487,7 +487,7 @@ Then it runs DBSCAN with that $\varepsilon$ and `minPts`.
 Reported outputs:
 
 - number of non-noise clusters
-- noise fraction $\mathrm{noise\_fraction} = \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathbf{1}\{ \mathrm{cluster}_i = 0 \}$
+- noise fraction $\mathrm{noise\\_fraction} = \dfrac{1}{n_c} \sum_{i=1}^{n_c} \mathbf{1}\{ \mathrm{cluster}_i = 0 \}$
 
 ## Outlier Scoring
 
@@ -506,7 +506,7 @@ This is Mahalanobis distance squared.
 Fallback if covariance inversion fails:
 
 $$
-\mathrm{outlier\_score}_i =
+\mathrm{outlier\\_score}_i =
 \sum_{j=1}^{q}
 \left(
 \dfrac{s_{ij} - \overline{s}_{\cdot j}}
@@ -582,12 +582,12 @@ $$
 Relative shift:
 
 $$
-\mathrm{relative\_shift}_{j,N} =
+\mathrm{relative\\_shift}_{j,N} =
 \dfrac{m_{j,N}^{\mathrm{trim}} - m_j^{\mathrm{base}}}
 {\max\left( \left| m_j^{\mathrm{base}} \right|, 10^{-9} \right)}
 $$
 
-Rows are ranked by $|\mathrm{relative\_shift}_{j,N}|$.
+Rows are ranked by $|\mathrm{relative\\_shift}_{j,N}|$.
 
 ## Regime Detection
 
@@ -600,7 +600,7 @@ R attempts regime detection only when:
 Files are ordered by
 
 $$
-( \mathrm{ts\_start}, \mathrm{rel\_path} )
+( \mathrm{ts\\_start}, \mathrm{rel\\_path} )
 $$
 
 and R takes the ordered PC1 sequence
@@ -695,7 +695,7 @@ To test whether sequential blocks are more coherent than random batches, R:
 
 1. orders files by `ts_start`
 2. keeps available PC coordinates among PC1, PC2, and PC3
-3. chooses $\mathrm{block\_size} = \max\left(4, \min\left(16, \left\lfloor \sqrt{n} \right\rfloor \right)\right)$
+3. chooses $\mathrm{block\\_size} = \max\left(4, \min\left(16, \left\lfloor \sqrt{n} \right\rfloor \right)\right)$
 4. splits the ordered series into contiguous non-overlapping blocks
 5. computes the mean pairwise Euclidean distance inside each block
 6. draws 64 random batches of the same size and computes the same statistic
@@ -714,17 +714,17 @@ where $P(B)$ is the set of unordered pairs inside the block.
 R then computes
 
 $$
-\mathrm{median\_block\_distance} = \mathrm{median}(D(B_1), \dots, D(B_q))
+\mathrm{median\\_block\\_distance} = \mathrm{median}(D(B_1), \dots, D(B_q))
 $$
 
 $$
-\mathrm{median\_random\_distance} = \mathrm{median}(D(R_1), \dots, D(R_{64}))
+\mathrm{median\\_random\\_distance} = \mathrm{median}(D(R_1), \dots, D(R_{64}))
 $$
 
 $$
-\mathrm{block\_random\_distance\_ratio} =
-\dfrac{\mathrm{median\_block\_distance}}
-{\mathrm{median\_random\_distance}}
+\mathrm{block\\_random\\_distance\\_ratio} =
+\dfrac{\mathrm{median\\_block\\_distance}}
+{\mathrm{median\\_random\\_distance}}
 $$
 
 Interpretation:
@@ -804,7 +804,7 @@ or when that maximum correlation is unavailable.
 R defines
 
 $$
-\mathrm{mclust\_modes} =
+\mathrm{mclust\\_modes} =
 \begin{cases}
 G^\ast, & \text{if Mclust succeeded} \\
 1, & \text{otherwise}
@@ -812,9 +812,9 @@ G^\ast, & \text{if Mclust succeeded} \\
 $$
 
 $$
-\mathrm{regime\_modes} =
+\mathrm{regime\\_modes} =
 \begin{cases}
-\mathrm{changepoint\_count} + 1, & \text{if changepoints exist} \\
+\mathrm{changepoint\\_count} + 1, & \text{if changepoints exist} \\
 1, & \text{otherwise}
 \end{cases}
 $$
@@ -822,11 +822,11 @@ $$
 Then
 
 $$
-\mathrm{suggested\_modes} =
+\mathrm{suggested\\_modes} =
 \max\left(
 1,
-\min(8, \mathrm{mclust\_modes}),
-\min(8, \mathrm{regime\_modes})
+\min(8, \mathrm{mclust\\_modes}),
+\min(8, \mathrm{regime\\_modes})
 \right)
 $$
 
@@ -837,7 +837,7 @@ So the recommendation is explicitly capped at $8$.
 R sets
 
 $$
-\mathrm{split\_by\_format} =
+\mathrm{split\\_by\\_format} =
 \mathbf{1}\{
 \# \mathrm{formats} > 1
 \text{ or }
@@ -888,13 +888,13 @@ where lower is better.
 For train logs, the script parses the logged EMA values
 
 $$
-\mathrm{train\_combined}_e = \mathrm{EMA\_MMD}^2_e + 0.2 (1 - \mathrm{EMA\_recall}_e)
+\mathrm{train\\_combined}_e = \mathrm{EMA\\_MMD}^2_e + 0.2 (1 - \mathrm{EMA\\_recall}_e)
 $$
 
 for each logged epoch $e$, then keeps
 
 $$
-\mathrm{best\_train\_combined} = \min_e \mathrm{train\_combined}_e
+\mathrm{best\\_train\\_combined} = \min_e \mathrm{train\\_combined}_e
 $$
 
 The best evaluated checkpoint for a corpus is the run with minimum `combined`.  
@@ -1001,7 +1001,7 @@ Persistent ordering:
 $$
 \mathrm{persistent} =
 \mathbf{1}\{
-\mathrm{block\_random\_distance\_ratio} < 0.85
+\mathrm{block\\_random\\_distance\\_ratio} < 0.85
 \text{ or }
 \mathrm{hurst} \geq 0.75
 \}
@@ -1012,9 +1012,9 @@ Multimodal family:
 $$
 \mathrm{multimodal} =
 \mathbf{1}\{
-\mathrm{suggested\_modes} \geq 4
+\mathrm{suggested\\_modes} \geq 4
 \text{ or }
-\mathrm{heterogeneity\_score} \geq 1.5
+\mathrm{heterogeneity\\_score} \geq 1.5
 \}
 $$
 
@@ -1023,25 +1023,25 @@ Bursty family:
 $$
 \mathrm{bursty} =
 \mathbf{1}\{
-\mathrm{burstiness\_cv} \geq 5
+\mathrm{burstiness\\_cv} \geq 5
 \}
 $$
 
 Locality-sensitive family:
 
 $$
-\mathrm{locality\_sensitive} =
+\mathrm{locality\\_sensitive} =
 \mathbf{1}\{
-\mathrm{reuse\_ratio} \geq 0.2
+\mathrm{reuse\\_ratio} \geq 0.2
 \}
 $$
 
 Sampling advice is then
 
 $$
-\mathrm{sampling\_recommendation} =
+\mathrm{sampling\\_recommendation} =
 \begin{cases}
-\text{split-by-format-first}, & \text{if } \mathrm{split\_by\_format} = 1 \\
+\text{split-by-format-first}, & \text{if } \mathrm{split\\_by\\_format} = 1 \\
 \text{block}, & \text{if } \mathrm{persistent} = 1 \\
 \text{random-ok}, & \text{otherwise}
 \end{cases}
@@ -1050,10 +1050,10 @@ $$
 Regime advice is
 
 $$
-\mathrm{regime\_recommendation} =
+\mathrm{regime\\_recommendation} =
 \begin{cases}
-K \approx 8, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} \geq 6 \\
-K \approx 4, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\_modes} < 6 \\
+K \approx 8, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\\_modes} \geq 6 \\
+K \approx 4, & \text{if } \mathrm{multimodal} = 1 \text{ and } \mathrm{suggested\\_modes} < 6 \\
 \text{single}, & \text{otherwise}
 \end{cases}
 $$
@@ -1061,10 +1061,10 @@ $$
 Char-file conditioning is recommended exactly when
 
 $$
-\mathrm{family\_kind} \in
+\mathrm{family\\_kind} \in
 \{
-\text{request\_sequence},
-\text{aggregate\_time\_series}
+\text{request\\_sequence},
+\text{aggregate\\_time\\_series}
 \}
 $$
 
