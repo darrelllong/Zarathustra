@@ -8237,3 +8237,41 @@ c. **Implement a STRUCTURAL fix that targets the lru_fp attractor directly** —
 | Tencent | 0.039 (v229, **historical-lottery**) | **0.197** (v234d / v235, GAN track) | 0.008735 (3-seed) |
 
 Active LLNL run: **none**. Next: option (a) fresh-pretrain v236 launch.
+
+
+## Round 143 — v236 KILLED 17 min in: pretrain is deterministic at seed=5 → v236 ≡ v235
+
+**Date**: 2026-04-30 02:23 PDT
+
+### Determinism finding
+
+v236 was launched per Round 142 option (a) — fresh pretrain + IDEA #117 + IDEA #116 — to disambiguate whether v235's null result came from v234d's contaminated pretrain or from the mechanism itself. After ~17 min, v236's Phase 2 supervisor trajectory landed:
+
+```
+v234d sup: 0.05622, 0.03922, 0.03622, 0.03449, 0.03613, 0.03498
+v236 sup:  0.05622, 0.03922, 0.03622, 0.03449, 0.03613, 0.03498
+```
+
+**Bit-identical at every checkpoint.** Confirmed: at fixed seed=5 + same preprocessor + same code path + same `--files-per-epoch 12`, Phase 1+2+2.5 are deterministic. The `--retrieval-train-carry` and `--long-chain-weight` flags only enter Phase 3, so they don't perturb pretrain. **v236's `pretrain_complete.pt` would have been bit-identical to v234d's.** Phase 3 with same pretrain + same flags + same seed = same experiment as v235 (modulo Phase-3-noise from random `z_global` / `z_local` / val-bundle calls — which v235's frozen sweep already showed lands at ★≈0.197).
+
+Round 142 option (a) — "fresh pretrain disambiguates contamination from mechanism" — is **moot at seed=5**. The contamination concern only matters across distinct seeds. Genuinely fresh pretrain requires a different seed (e.g. 11), but that changes the recipe and is no longer a v229 / v234d-comparable experiment.
+
+**v236 killed at Phase 2.5 ep1** to avoid burning 4h on a deterministic re-run.
+
+### Implication for the IDEA #117 verdict
+
+LANL R10's "do not launch IDEA #117 from contaminated pretrain" critique implicitly assumed pretrain quality varies across runs. The determinism finding strengthens the result: **v235's ★=0.19714 is the unique outcome of (seed=5 + current-code + IDEA #117 + #116)**, not a draw from a noisy distribution that might happen to land lower with a different fresh pretrain. To actually probe whether IDEA #117 helps, we have to vary something else: the seed (changes basin), the loss weights (changes gradient pressure), the layer of insertion (changes where the bank carry takes effect), or the bank capacity itself.
+
+### Plan revised — option (c) is the better next bet
+
+Round 142's option (a) is now closed-redundant. Of the remaining options:
+
+- **(c) Diversity loss on chained `lru_fp`** is well-targeted: the v235 diagnostic empirically showed `lru_fp` collapsing 51 → 33 across ep5→ep10. A loss that explicitly penalises `lru_fp` dropping below a target (e.g. 5000) would attack the symptom directly. Untested mechanism.
+
+- **(b) PhaseAtlas-style fork for tencent** remains the multi-day safety net.
+
+Recommended next: design and implement option (c) as a new flag `--chain-diversity-weight` + `--chain-diversity-target` operating on the same chained-output that long-chain currently consumes. Estimated implementation time: ~half-day. v237 launches with that loss + IDEA #117 (the bank carry remains useful even if the long-chain reuse-rate target is dropped or reweighted).
+
+### Race Dashboard (Round 143)
+
+Unchanged from Round 142. Active LLNL run: **none**. Next: option (c) design.
