@@ -8526,3 +8526,58 @@ Active LLNL run: **none**. Next: tencent PhaseAtlas refinement (option 4 from ab
 
 - LANL: continued mark-axis sweeps (now `feedback_hi` with `mark_feedback_numeric_blend=0.024 fields=size`). HRC-MAE bit-identical at 0.008423 (10th invariance dimension confirmed), mark_score slightly improved to 0.026773 vs 0.028756 baseline. Confirms §3-§5 — knob doesn't move HRC. **No new REBUTTAL post.**
 - Sandia: still idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 148 — LANL knob semantics decoded; LLNL `phase_pmf_atlas.py` porting plan
+
+**Date**: 2026-04-30 07:33 PDT
+
+### LANL PhaseAtlas knob mapping (read from `altgan/neural_atlas.py`)
+
+The four LANL knobs that produce HRC-MAE=0.008735 on tencent:
+
+| LANL knob | Default | LANL-best value | What it does (`neural_atlas.py:100-187`) |
+|---|---|---|---|
+| `transition_blend` | 0.75 | **0.55** | Convex blend between learned init-state probs and reservoir-derived init probs. 0.55 → 45% learned + 55% reservoir. Less reliance on the neural transition net at init. |
+| `local_prob_power` | 1.0 | **0.8** | Power transform on the local (reservoir-fitted) PMF: `local_p ** power`. <1 sharpens peaks. |
+| `force_phase_schedule` | False | **True** | If True, cycle `phase = (pos * n_phase_bins) // per_stream` deterministically by position; align state's phase component to the schedule via `_state_with_phase`. Pins phase progression instead of letting transitions drift it. |
+| `stack_rank_phase_scales` | None | **[1.0, 1.0, 1.1, 1.1]** | Per-phase multiplier on stack-rank scaling. Late phases (2,3) prefer deeper stack accesses by 10%. Implements "phase 3 has different cache locality than phase 0." |
+
+### Comparison to LLNL `phase_pmf_atlas.py`
+
+LLNL's phase atlas is structurally simpler:
+- Phase = unique-object-rate over 200-event tumbling window (4 bins)
+- Per-phase 8-bucket LRU PMF + reuse_rate + (dt, size) reservoir
+- At generation: phase derived from current position's unique-rate; sample bucket from per-phase PMF; pick object by rank
+
+LANL is a Markov chain over compound states `(time_bin × size_bin × action × phase_bin)`; LLNL is direct PMF sampling. The structural differences:
+
+| feature | LLNL | LANL | port feasibility |
+|---|---|---|---|
+| State machine | none (direct PMF) | Markov chain over compound states | structurally incompatible — would require rewrite |
+| `transition_blend` | n/a (no init transition) | learned vs reservoir blend | NOT applicable to LLNL (no learned transition) |
+| `local_prob_power` | could apply to per-phase PMF | applies to reservoir-fitted PMF | **portable** — multiply per-phase PMF by power, renormalize |
+| `force_phase_schedule` | phase derived from current data window | cycle by position | **portable** — at gen time, set phase = (pos * 4) // n_records instead of computing from window |
+| `stack_rank_phase_scales` | n/a (rank picked uniformly within bucket) | per-phase scaling | **portable** — multiplicative scale on rank-within-bucket sampling |
+
+### Port plan — three feasible knobs (skip `transition_blend`)
+
+1. **`local_prob_power`** in `phase_pmf_atlas.py`: apply `pmf ** power` then renormalize at generation time, after the per-phase PMF lookup. ~10 lines.
+2. **`force_phase_schedule`**: replace the unique-rate-window phase derivation with `phase = (pos * n_phase_bins) // n_records` at generation. ~5 lines.
+3. **`stack_rank_phase_scales`**: when picking an object by rank, multiply rank by `phase_rank_scale[phase]`. ~5 lines.
+
+Total: ~20 lines of code in `phase_pmf_atlas.py` cmd_generate. Plus CLI flags and config wire-up. ~half-day work.
+
+The biggest gap (LANL's compound state machine) is not portable as a flag — it's the architecture. But the three phase-conditioning knobs that LANL specifically reports as its tencent-best recipe ARE portable. Worth attempting; expected to close some fraction of the 5× gap (LLNL 0.04375 → ?).
+
+### Decision
+
+Implement the three portable knobs in `phase_pmf_atlas.py` next tick. Generate + eval. If HRC-MAE drops below 0.02, structurally significant. If it stays at ~0.04, the gap is in the state-machine architecture and we'd need a deeper port (multi-day rewrite of `phase_pmf_atlas.py` to a Markov-state-chain).
+
+Active LLNL run: **none**. GPU idle (won't be needed for the PhaseAtlas port — it's CPU-only generation/eval, takes ~5-10 min per generate+eval pair).
+
+### Sandia + LANL pass
+
+LANL active (PEER-REVIEW skipped per drive-by rule): continued mark-axis sweeps; HRC bit-identical, mark_score variations only. Same §3-§5 invariance pattern.
+
+Sandia idle. **No PEER-REVIEW posts this tick.**
