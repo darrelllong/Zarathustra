@@ -173,3 +173,37 @@ mark_score variations are tiny (0.027895 vs 0.027990, 0.028510 vs 0.026813 acros
 ### Bottom line
 
 LANL's data-scaling sweep is informational, not race-advancing. The 128files multi-seed result confirms §3's strongest prediction. From LLNL's perspective: the LANL ceiling is now characterized; the question is no longer "what is LANL's tencent number" (it's 0.008881 ± 0.0001 across architecture variants) but "can LLNL build a fundamentally different object-process emitter."
+
+---
+
+## 6 (2026-04-30 00:56) — `mark_numeric_blend` makes mark_score WORSE, not better
+
+**Reviewer:** LLNL (llgan/), follow-up after observing the new `numericblend` sweep.
+
+### Observation
+
+LANL's `numericblend` sweep at seed=42 / catw025 / 128files_h128 / e20:
+
+| variant | mark_numeric_blend | HRC-MAE | mark_score |
+|---|---|---|---|
+| baseline (no blend) | 0.0 | 0.008423 | 0.028756 |
+| blend-0p1 | 0.1 | **0.008423** | **0.031213** (+8.5% vs baseline) |
+| blend-0p5 | 0.5 | **0.008423** | **0.048365** (+68% vs baseline) |
+
+HRC-MAE is bit-identical (predicted by §3-§5 invariance — blending in numeric marks doesn't change the obj_id trajectory, so the cache simulator output is unchanged).
+
+**The surprise is mark_score**: blending in oracle-pulled real numeric values **makes mark_score WORSE in monotonic proportion to the blend ratio.** Naively you'd expect the opposite — mixing real values into generated should reduce divergence from real. The data says no.
+
+### Hypothesis
+
+`mark_score` is plausibly computed as a Wasserstein- or KS-style divergence over the joint distribution of (ts_delta, obj_size, opcode, tenant). Blending oracle values into generated marks at log-space ratio `blend` produces a **bimodal artifact** at the mixing boundary: the resulting distribution has two peaks (one near generated, one near real) where neither pure-generated nor pure-real would be bimodal. A divergence metric over the joint distribution penalises this bimodal structure even though the marginal density approaches real.
+
+If this is right, the blend knob is a regression on every metric LANL might care about for mark fidelity. It's only useful for sanity-checking that the eval pipeline notices when oracle values are injected (a control), not as a knob to actually deploy.
+
+### Suggestion
+
+`mark_numeric_blend > 0` should be retracted from the candidate-recipe space and labeled as a control-only knob. The 0.0 baseline is the right operating point for any LANL tencent ATB claim.
+
+### Bottom line
+
+Three more bit-identical HRC-MAE values (0.0, 0.1, 0.5 blend at seed=42), strengthening the §3-§5 invariance claim further. mark_score regression on blend is a counter-intuitive negative result; the knob isn't useful for the race. LANL's 0.008735 (3-seed) tencent ATB stays the relevant published number; mark fidelity work should focus elsewhere (training loss reweighting, noise schedule, or a fundamentally different mark-head architecture).
