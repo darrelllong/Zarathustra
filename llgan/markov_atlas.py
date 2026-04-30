@@ -43,11 +43,11 @@ except ModuleNotFoundError:
 # ---------------------------------------------------------------------------
 # State-space constants
 # ---------------------------------------------------------------------------
-N_TIME_BINS = 4
-N_SIZE_BINS = 4
+N_TIME_BINS = 1   # tencent ts is integer ticks; dt mostly clamps to floor — degenerate
+N_SIZE_BINS = 1   # tencent block sizes cluster at 4-8KB — degenerate
 N_ACTIONS = 3              # 0=NEW, 1=REUSE_NEAR, 2=REUSE_FAR
 N_PHASE_BINS = 4
-N_STATES = N_TIME_BINS * N_SIZE_BINS * N_ACTIONS * N_PHASE_BINS
+N_STATES = N_TIME_BINS * N_SIZE_BINS * N_ACTIONS * N_PHASE_BINS  # 1*1*3*4 = 12
 
 REUSE_NEAR_RANK_CUTOFF = 64
 PHASE_WINDOW = 200
