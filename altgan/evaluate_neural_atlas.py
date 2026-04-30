@@ -50,6 +50,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Leave scaled ranks at or below this pivot unchanged before tail stretch; negative disables.")
     p.add_argument("--stack-rank-tail-scale", type=float, default=1.0,
                    help="Scale only the excess above --stack-rank-tail-pivot.")
+    p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
+                   help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
+    p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
+                   help="Minimum LRU rank for injected new-to-reuse events.")
+    p.add_argument("--stack-reuse-boost-rank-power", type=float, default=1.0,
+                   help="Power shaping for injected reuse ranks; values >1 favor deeper ranks.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -77,6 +83,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--real-manifest", default="")
     p.add_argument("--cache-sizes", default="")
     p.add_argument("--output", default="")
+    p.add_argument("--fake-output", default="",
+                   help="Optional CSV path for the generated fake trace.")
     return p.parse_args()
 
 
@@ -118,6 +126,9 @@ def main() -> int:
         stack_rank_max=None if args.stack_rank_max < 0 else args.stack_rank_max,
         stack_rank_tail_pivot=None if args.stack_rank_tail_pivot < 0 else args.stack_rank_tail_pivot,
         stack_rank_tail_scale=args.stack_rank_tail_scale,
+        stack_reuse_boost_prob=args.stack_reuse_boost_prob,
+        stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
+        stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
@@ -132,6 +143,11 @@ def main() -> int:
     )
     if args.disable_neural_marks:
         model.mark_model = saved_mark_model
+    if args.fake_output:
+        fake_out = Path(args.fake_output)
+        fake_out.parent.mkdir(parents=True, exist_ok=True)
+        fake_df.to_csv(fake_out, index=False)
+        print(f"[altgan.evaluate_neural_atlas] wrote fake trace {fake_out}")
 
     if args.cache_sizes:
         cache_sizes = np.array([int(x) for x in args.cache_sizes.split(",") if x.strip()],
@@ -161,6 +177,9 @@ def main() -> int:
         "stack_rank_max": args.stack_rank_max,
         "stack_rank_tail_pivot": args.stack_rank_tail_pivot,
         "stack_rank_tail_scale": args.stack_rank_tail_scale,
+        "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
+        "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
+        "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,

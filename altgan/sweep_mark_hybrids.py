@@ -55,6 +55,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Leave scaled ranks at/below this pivot unchanged, then stretch the tail.")
     p.add_argument("--stack-rank-tail-scale", type=float, default=1.0,
                    help="Scale only the rank excess above --stack-rank-tail-pivot.")
+    p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
+                   help="Probability of converting sampled NEW events into reuse events.")
+    p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
+                   help="Minimum LRU rank for injected new-to-reuse events.")
+    p.add_argument("--stack-reuse-boost-rank-power", type=float, default=1.0,
+                   help="Injected reuse rank shaping; values >1 favor deeper ranks.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase reuse stack-rank scales.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -288,6 +294,9 @@ def _run_eval(
         "--stack-rank-max", str(args.stack_rank_max),
         "--stack-rank-tail-pivot", str(args.stack_rank_tail_pivot),
         "--stack-rank-tail-scale", str(args.stack_rank_tail_scale),
+        "--stack-reuse-boost-prob", str(args.stack_reuse_boost_prob),
+        "--stack-reuse-boost-min-rank", str(args.stack_reuse_boost_min_rank),
+        "--stack-reuse-boost-rank-power", str(args.stack_reuse_boost_rank_power),
         "--n-records", str(args.n_records),
         "--n-streams", str(args.n_streams),
         "--seed", str(seed),
@@ -344,6 +353,9 @@ def _summarize(
         "stack_rank_max": data.get("stack_rank_max"),
         "stack_rank_tail_pivot": data.get("stack_rank_tail_pivot"),
         "stack_rank_tail_scale": data.get("stack_rank_tail_scale"),
+        "stack_reuse_boost_prob": data.get("stack_reuse_boost_prob"),
+        "stack_reuse_boost_min_rank": data.get("stack_reuse_boost_min_rank"),
+        "stack_reuse_boost_rank_power": data.get("stack_reuse_boost_rank_power"),
         "stack_rank_phase_scales": ",".join(str(x) for x in data.get("stack_rank_phase_scales", [])),
         "stack_rank_phase_maxes": ",".join(str(x) for x in data.get("stack_rank_phase_maxes", [])),
         "categorical_source": source,

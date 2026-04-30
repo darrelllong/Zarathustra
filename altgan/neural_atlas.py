@@ -81,6 +81,9 @@ class NeuralAtlasModel:
         stack_rank_max: int | None = None,
         stack_rank_tail_pivot: int | None = None,
         stack_rank_tail_scale: float = 1.0,
+        stack_reuse_boost_prob: float = 0.0,
+        stack_reuse_boost_min_rank: int = 0,
+        stack_reuse_boost_rank_power: float = 1.0,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -111,6 +114,9 @@ class NeuralAtlasModel:
         stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
+        stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
+        stack_reuse_boost_min_rank = max(int(stack_reuse_boost_min_rank), 0)
+        stack_reuse_boost_rank_power = max(float(stack_reuse_boost_rank_power), 1e-6)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
             mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
@@ -176,37 +182,58 @@ class NeuralAtlasModel:
                     state = _state_with_phase(state, phase, base_span)
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
+                boosted_reuse = (
+                    not wants_reuse
+                    and bool(stack)
+                    and stack_reuse_boost_prob > 0.0
+                    and rng.random() < stack_reuse_boost_prob
+                )
+                if boosted_reuse:
+                    wants_reuse = True
                 if wants_reuse and stack:
-                    phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
-                    phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
-                    if phase_rank_max is not None and phase_rank_max < 0:
-                        phase_rank_max = None
-                    rank = _calibrated_stack_rank(
-                        ev.stack_distance,
-                        stack_rank_scale=phase_rank_scale,
-                        stack_rank_max=phase_rank_max,
-                        stack_rank_tail_pivot=stack_rank_tail_pivot,
-                        stack_rank_tail_scale=stack_rank_tail_scale,
-                        stack_len=len(stack),
-                    )
+                    if boosted_reuse:
+                        rank = _boosted_reuse_rank(
+                            stack_len=len(stack),
+                            min_rank=stack_reuse_boost_min_rank,
+                            rank_power=stack_reuse_boost_rank_power,
+                            rng=rng,
+                        )
+                    else:
+                        phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                        phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                        if phase_rank_max is not None and phase_rank_max < 0:
+                            phase_rank_max = None
+                        rank = _calibrated_stack_rank(
+                            ev.stack_distance,
+                            stack_rank_scale=phase_rank_scale,
+                            stack_rank_max=phase_rank_max,
+                            stack_rank_tail_pivot=stack_rank_tail_pivot,
+                            stack_rank_tail_scale=stack_rank_tail_scale,
+                            stack_len=len(stack),
+                        )
+                    effective_stack_distance = int(rank)
+                    effective_action_class = _action_class(effective_stack_distance)
                     obj_id = stack[rank]
                     del stack[rank]
                     stack.insert(0, obj_id)
                 else:
+                    effective_stack_distance = int(ev.stack_distance)
+                    effective_action_class = int(ev.action_class)
                     obj_id, next_new_id = StackAtlasModel._new_object_id(
                         prev_obj, next_new_id, int(ev.stride), in_stack
                     )
                     stack.insert(0, obj_id)
                     in_stack.add(obj_id)
+                effective_state = _state_with_action(state, effective_action_class)
 
                 mark = ev
                 if mark_runtime is not None:
                     neural_mark = mark_runtime.sample(
                         stream_id=stream_id,
                         cond=conds[stream_id],
-                        state=state,
-                        action_class=ev.action_class,
-                        stack_distance=ev.stack_distance,
+                        state=effective_state,
+                        action_class=effective_action_class,
+                        stack_distance=effective_stack_distance,
                         stride=ev.stride,
                     )
                     if (
@@ -237,8 +264,8 @@ class NeuralAtlasModel:
                                 else ev.tenant
                             ),
                             stride=int(ev.stride),
-                            stack_distance=int(ev.stack_distance),
-                            action_class=int(ev.action_class),
+                            stack_distance=effective_stack_distance,
+                            action_class=effective_action_class,
                         )
                     feedback_mark = mark
                     if mark_feedback_numeric_blend is not None:
@@ -255,8 +282,8 @@ class NeuralAtlasModel:
                             opcode=mark.opcode,
                             tenant=mark.tenant,
                             stride=int(ev.stride),
-                            stack_distance=int(ev.stack_distance),
-                            action_class=int(ev.action_class),
+                            stack_distance=effective_stack_distance,
+                            action_class=effective_action_class,
                         )
                     mark_runtime.observe(stream_id, feedback_mark)
 
@@ -268,12 +295,14 @@ class NeuralAtlasModel:
                     "obj_size": max(int(round(mark.obj_size)), 1),
                     "opcode": mark.opcode,
                     "tenant": mark.tenant,
+                    "stack_distance": effective_stack_distance,
+                    "action_class": effective_action_class,
                 })
                 prev_obj = int(obj_id)
                 state = self._next_state(
                     reservoir,
-                    state,
-                    trans_probs[stream_id, state],
+                    effective_state,
+                    trans_probs[stream_id, effective_state],
                     transition_blend,
                     local_prob_power,
                     rng,
@@ -636,6 +665,11 @@ def _state_with_phase(state: int, phase: int, base_span: int) -> int:
     return int(phase) * int(base_span) + (int(state) % int(base_span))
 
 
+def _state_with_action(state: int, action_class: int) -> int:
+    action = min(max(int(action_class), 0), StackAtlasModel.N_ACTIONS - 1)
+    return int(state) - (int(state) % StackAtlasModel.N_ACTIONS) + action
+
+
 def _calibrated_stack_rank(
     raw_rank: int,
     *,
@@ -652,6 +686,24 @@ def _calibrated_stack_rank(
     if stack_rank_max is not None and stack_rank_max >= 0:
         rank = min(rank, int(stack_rank_max))
     return min(max(rank, 0), int(stack_len) - 1)
+
+
+def _boosted_reuse_rank(
+    *,
+    stack_len: int,
+    min_rank: int,
+    rank_power: float,
+    rng: np.random.Generator,
+) -> int:
+    if stack_len <= 1:
+        return 0
+    lo = min(max(int(min_rank), 0), int(stack_len) - 1)
+    span = int(stack_len) - lo
+    if span <= 1:
+        return lo
+    u = float(rng.random())
+    offset = int(np.floor((u ** (1.0 / max(float(rank_power), 1e-6))) * span))
+    return min(lo + offset, int(stack_len) - 1)
 
 
 def _power_probs(probs: np.ndarray, power: float) -> np.ndarray:

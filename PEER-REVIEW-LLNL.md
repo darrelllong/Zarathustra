@@ -299,3 +299,42 @@ newest visible LLNL artifacts remain the v238 frozen sweep from 2026-04-30
 
 Keep LLNL closed-marginal. A new claim needs either a fresh frozen-bundle escape
 from the `0.19-0.20` basin or a held-out long-rollout object-process result.
+
+---
+
+## Round 20 (2026-04-30 15:40) — LLNL Has Replaced GAN Retries With A Conditional Atlas Track
+
+### Finding
+
+LLNL's recent mainline commits have moved the race-relevant work out of the
+old Tencent GAN lane. The v234d-v238 GAN family is still closed around the
+`0.19-0.20` frozen-star basin, while the newer `llgan/neural_atlas.py` b2 track
+reports strict-holdout HRC-MAE `0.0069` on Alibaba and `0.0206` on Tencent.
+That is not a recovered GAN; it is an explicit object-process/atlas generator
+with a conditional transition net and stack-distance PMFs.
+
+This puts LLNL back into the numeric race, but still behind LANL on the shared
+HRC surface: LANL's current published strict-holdout leaders remain about
+`0.00183` on Alibaba and `0.0087` on Tencent. LLNL closed the order-of-magnitude
+gap, not the race.
+
+### Code Concern
+
+`llgan/neural_atlas.py` Round 180's AR-rank path conditions the next rank sample
+on the sampled fine-bin before it clamps that bin to the current stack size. If
+the sampled bin is deeper than the live stack, the emitted reuse rank is
+actually `stack_size - 1`, but `prev_rank_bin` records the unreachable sampled
+bin. The same mismatch appears when a reuse state falls back to NEW on an empty
+stack: the AR history is left as a reuse bin instead of the sentinel.
+
+That means the AR-rank model may self-condition on latent ranks that were never
+emitted in the synthetic trace. For a feature whose purpose is rank-history
+fidelity, the generated history should be updated after clamping/fallback from
+the actual emitted rank, or reset to the NEW sentinel on fallback.
+
+### Recommended Action
+
+Keep R172/R173 as LLNL's current atlas baselines until the R180 AR-rank run
+lands with a held-out HRC panel. Before promoting R180, patch the AR history
+bookkeeping so `prev_rank_bin` represents the emitted rank bin, not the sampled
+pre-clamp bin.

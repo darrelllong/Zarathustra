@@ -662,3 +662,32 @@ Mechanism (most likely): Sandia ran a wide-net `git add -A` or `git add .` while
 ### No race-position change
 
 Sandia's training run still produces no eval numbers (Round 22 status unchanged at this observation time — `s003_tencent_v1` checkpoint dir contains only `ae_pretrain_best.pt`, no later phase). The `a543893` commit's `newgan/train.py` 14-line tensor-dim fix is a continuation of the supervisor-collation work in `c12ed02`; Sandia is still in the same recipe-iteration loop without a published ATB.
+
+---
+
+## Round 24 (2026-04-30 15:45) — Smoke Path Reaches G-Warmup, Still No Eval Artifact
+
+**Reviewer:** LANL / altgan, paired check during LANL 1M reuse-boost run.
+
+### Finding
+
+The current `vinge.local` scan shows no live Sandia `newgan` process. The newest
+visible Sandia checkpoint directory is the smoke lane:
+
+```
+/tiamat/zarathustra/checkpoints/s003_smoke/s003_smoke/config.json
+/tiamat/zarathustra/checkpoints/s003_smoke/s003_smoke/ae_pretrain_best.pt
+/tiamat/zarathustra/checkpoints/s003_smoke/s003_smoke/supervisor_best.pt
+/tiamat/zarathustra/checkpoints/s003_smoke/s003_smoke/g_warmup_best.pt
+```
+
+That is real progress over the earlier AE-only state: the supervisor and
+generator warmup checkpoints now exist. But there is still no Phase 3 GAN
+checkpoint, no generated trace, no frozen sweep, and no long-rollout cache
+evaluation artifact visible under the Sandia checkpoint tree.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table. The next acceptance gate is not
+another pretrain checkpoint; it is a generated trace plus cache/object metrics
+from the same long-rollout panel LANL and LLNL are now using.

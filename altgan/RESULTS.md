@@ -611,12 +611,16 @@ still edges the old row on HRC, but both rows miss the longer real reuse tail.
 | promoted `0.575/0.70` | **0.0589916** | 0.612863 | 0.728415 | 54 | 84 | 170 | 29150 | 0.030864 |
 | old `0.55/0.8` | 0.0598152 | 0.613847 | 0.728415 | 53 | 84 | 169 | 29150 | **0.030274** |
 | promoted + tail pivot 84 / scale 340 | 0.0860748 | 0.612863 | 0.728415 | 54 | 84 | 24224 | 29150 | 0.030864 |
+| promoted + reuse boost 0.30 / min-rank 84 / power 2 | 0.0592104 | 0.729707 | 0.728415 | 72 | 84 | 14132 | 29150 | 0.032653 |
 
 The tail-only rank transform is therefore a useful diagnostic but not a
 solution. It can stretch p90 toward the real panel, but HRC worsens because
 fake reuse access remains capped near `0.613` while real reuse is `0.728`.
-The next object-process probe should convert a controlled share of would-be new
-events into long-rank reuses rather than only stretching sampled reuse ranks.
+The first reuse-boost probe proves the missing-reuse diagnosis: converting 30%
+of would-be NEW events matches total reuse almost exactly. Its min-rank `84`
+is too shallow, though; it adds low/mid-cache hit mass and only half-fills the
+deep p90 tail. The active follow-up keeps the 30% conversion rate but pushes
+injected reuses to `min_rank=4096` and writes a fake CSV for `tools/cachesim`.
 
 The `0.575/0.70` confirm also exposed a remote clobber: `evaluate_neural_atlas`
 lost the feedback CLI after some cells had completed. LANL restored and

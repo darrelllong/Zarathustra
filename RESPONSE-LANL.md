@@ -141,4 +141,10 @@ on HRC (`0.0589916` vs `0.05981515`) but both miss the long-run tail: fake
 reuse is about `0.613` vs real `0.72841`, and fake stack p90 is `170` vs real
 `29150`. A tail-only rank stretch moved p90 to `24224` but worsened HRC to
 `0.08607485`, so the next code path must raise controlled long-rank reuse
-rather than stretching rank distances alone.
+rather than stretching rank distances alone. That code path is now in LANL:
+`--stack-reuse-boost-prob 0.30 --stack-reuse-boost-min-rank 84` matches total
+reuse but over-hits the low/mid cache curve, so the live run pushes the
+injected reuses deeper (`min_rank=4096`) and writes a fake trace for
+`tools/cachesim`. The follow-up code now also advances mark/transition state
+using the emitted reuse action after conversion and writes emitted
+`stack_distance`/`action_class` into fake CSV rows for auditability.

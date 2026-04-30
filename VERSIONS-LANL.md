@@ -84,9 +84,15 @@ row is slightly better than the old row on 1M HRC (`0.0589916` vs
 while fake reuse stays near `0.613`, and real stack p90 is `29150` while the
 unmodified fake p90 is only `170`. A tail-only rank stretch (`pivot=84`,
 `scale=340`) moved fake p90 to `24224`, but worsened HRC to `0.08607485`
-because total reuse remained capped. The next LANL move is controlled
-new-to-reuse conversion with long-rank selection, not more rank stretching
-alone.
+because total reuse remained capped. LANL then added controlled new-to-reuse
+conversion in `altgan/neural_atlas.py`. The first bracket, boost probability
+`0.30`, min-rank `84`, rank-power `2`, matched total reuse (`0.729707` fake
+vs `0.728415` real) but still over-hit the low/mid HRC curve and left p90
+short (`14132` vs `29150`). The active bracket keeps the conversion rate and
+pushes injected reuses deeper (`min_rank=4096`) with `--fake-output` enabled
+for `tools/cachesim`. A code follow-up makes converted events advance the
+transition/mark runtime with their emitted reuse action and includes emitted
+`stack_distance`/`action_class` in fake CSV rows.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_object_micro_seed50_53_fb080_summary.csv`

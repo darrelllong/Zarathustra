@@ -4,7 +4,7 @@ LANL owns `altgan/`: the explicit cache-object-process track for the
 Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
-Last refreshed: 2026-04-30, after the Tencent 1M tail check.
+Last refreshed: 2026-04-30, during the Tencent 1M reuse-boost bracket.
 
 ---
 
@@ -93,17 +93,21 @@ panel changed the diagnosis:
 | promoted `0.575/0.70` | 0.05899 | 0.61286 | 0.72841 | 54 | 84 | 170 | 29150 | 0.03086 |
 | old `0.55/0.8` | 0.05982 | 0.61385 | 0.72841 | 53 | 84 | 169 | 29150 | 0.03027 |
 | promoted + tail scale 340 | 0.08607 | 0.61286 | 0.72841 | 54 | 84 | 24224 | 29150 | 0.03086 |
+| promoted + reuse boost 0.30, min-rank 84 | 0.05921 | 0.72971 | 0.72841 | 72 | 84 | 14132 | 29150 | 0.03265 |
 
 Conclusion: rank-tail stretching is real but insufficient. It can move p90,
 but it cannot fix the upper HRC curve while total fake reuse stays near 0.613
-and real reuse is 0.728. The next LANL code move should target controlled
-new-to-reuse conversion plus long-rank selection, not only rank scaling.
+and real reuse is 0.728. Controlled new-to-reuse conversion fixes the reuse
+total, but a low min-rank over-hits the low/mid cache curve. The active bracket
+pushes injected reuse deeper (`min_rank=4096`) and emits a CSV for
+`tools/cachesim`.
 
 1M artifacts:
 
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_old_tb055_lp080_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_tailp84_tails340_seed42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min84_pow2_seed42_eval_1M.json`
 
 ---
 
@@ -174,6 +178,9 @@ for each stream:
         if action says reuse:
             calibrate sampled stack rank
             pick object from LRU stack and move to front
+        else if reuse-boost fires:
+            convert NEW into a deep LRU reuse
+            pick object from LRU stack and move to front
         else:
             allocate new object id using sampled stride
         optionally sample neural mark sidecar
@@ -196,6 +203,12 @@ Important knobs:
   they truncate useful tail.
 - `stack_rank_tail_pivot` / `stack_rank_tail_scale`: tail-only rank stretch.
   Current evidence: useful diagnostic, not enough alone.
+- `stack_reuse_boost_prob`, `stack_reuse_boost_min_rank`,
+  `stack_reuse_boost_rank_power`: converts some sampled NEW events into reuse
+  events and samples the injected rank from the live LRU stack. Current
+  evidence: `prob=0.30,min_rank=84,power=2` matches total reuse but adds too
+  much low/mid-cache hit mass. The code now advances mark/transition state
+  using the emitted action after conversion; the deeper-rank bracket is running.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
@@ -215,7 +228,9 @@ Important knobs:
    missing long-reuse tail and missing total reuse.
 6. Feedback-only mark blending must be recorded separately from emitted numeric
    blending.
-7. Do not sync stale local code over vinge without compiling and checking CLI
+7. `--fake-output` should be used on 1M probes that need `tools/cachesim`
+   comparison.
+8. Do not sync stale local code over vinge without compiling and checking CLI
    flags.
 
 ---
