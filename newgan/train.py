@@ -9,10 +9,7 @@ This script implements Sandia's competitive strategy:
 
 Usage on vinge.local:
     cd /home/darrell/Zarathustra/newgan
-    python3 train.py --corpus tencent --seed 42 --exp-name s001
-
-For full eval with frozen-bundle protocol:
-    python3 eval_sweep.py --checkpoint-dir checkpoints/s001 --seed 42
+    python3 train.py --trace-dir /home/darrell/traces/tencent_block_1M --fmt oracle_general --seed 42 --exp-name s001
 """
 
 import argparse
@@ -25,20 +22,125 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-# Import llgan models (using bare imports to match llgan/train.py structure)
+# Import llgan models
 # This script runs from /home/darrell/Zarathustra/newgan/
 import sys
-import os
-# Add parent directory to path so llgan module is accessible
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from llgan.config import Config
-from llgan.dataset import load_trace, TraceDataset, TracePreprocessor, _collect_files, _fit_prep_on_files, _load_epoch_dataset
+from llgan.dataset import load_trace, TraceDataset, TracePreprocessor, _readers, load_file_characterizations
 from llgan.model import Generator, Critic, Encoder, Recovery, Supervisor
+
+
+# ============================================================================
+# Helper functions (copied from llgan/train.py)
+# ============================================================================
+
+def _collect_files(trace_dir: str, fmt: str) -> List[Path]:
+    """Return all candidate trace files in a directory."""
+    d = Path(trace_dir)
+    candidates = [p for p in d.iterdir() if p.is_file() and not p.name.startswith(".")]
+    if fmt in ("spc", "msr", "k5cloud", "systor", "csv"):
+        exts = {".csv", ".tsv", ".txt", ".gz", ".zst", ""}
+    else:
+        exts = {".zst", ".gz", "", ".bin", ".oracleGeneral"}
+        candidates = [p for p in candidates
+                      if any(p.name.endswith(e) or e == "" for e in exts)]
+    return sorted(candidates)
+
+
+def _load_raw_df(path: Path, fmt: str, max_records: int):
+    """Load a single file into a raw DataFrame."""
+    reader = _readers.get(fmt)
+    if reader is None:
+        raise ValueError(f"Unknown format '{fmt}'")
+
+    p = str(path)
+    if fmt != "oracle_general" and p.endswith(".zst"):
+        import subprocess
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        subprocess.run(["zstd", "-d", p, "-o", tmp.name, "-f"], check=True)
+        try:
+            df = reader(tmp.name, max_records)
+        finally:
+            os.unlink(tmp.name)
+    else:
+        df = reader(p, max_records)
+    return df
+
+
+def _fit_prep_on_files(files: List[Path], fmt: str, records_per_file: int,
+                       obj_size_granularity: int = 0, lru_cache_depth: int = 0) -> TracePreprocessor:
+    """Fit a TracePreprocessor on a sample of files."""
+    dfs = []
+    for f in files:
+        try:
+            df = _load_raw_df(f, fmt, records_per_file)
+            if len(df) > 0:
+                dfs.append(df)
+        except Exception as e:
+            print(f"  [warn] skipping {f.name}: {e}")
+    if not dfs:
+        raise RuntimeError("No files could be loaded for fitting preprocessor.")
+    combined = pd.concat(dfs, ignore_index=True)
+    prep = TracePreprocessor(obj_size_granularity=obj_size_granularity,
+                             lru_cache_depth=lru_cache_depth)
+    prep.fit(combined)
+    return prep
+
+
+def _load_epoch_dataset(files: List[Path], fmt: str, records_per_file: int,
+                        prep: TracePreprocessor, timestep: int,
+                        char_lookup: Optional[dict] = None) -> Tuple[Optional[Dataset], Optional[np.ndarray]]:
+    """
+    Load records_per_file from each file, transform with fitted prep, and
+    return a list of per-file TraceDatasets.
+    """
+    train_datasets = []
+    val_arrays = []
+
+    cond_dim = next(iter(char_lookup.values())).shape[0] if char_lookup else 0 if char_lookup else 0
+
+    for f in files:
+        try:
+            df = _load_raw_df(f, fmt, records_per_file)
+            if len(df) < timestep + 2:
+                continue
+            arr = prep.transform(df)
+            n_train = int(len(arr) * 0.8)
+            train_arr = arr[:n_train]
+            val_arr = arr[n_train:]
+
+            file_cond = None
+            if char_lookup:
+                fname = f.name
+                file_cond = char_lookup.get(fname)
+                if file_cond is None:
+                    for ext in (".zst", ".gz"):
+                        if fname.endswith(ext):
+                            file_cond = char_lookup.get(fname[:-len(ext)])
+                            if file_cond is not None:
+                                break
+                if file_cond is None:
+                    file_cond = torch.zeros(cond_dim)
+
+            if len(train_arr) > timestep:
+                train_datasets.append(TraceDataset(train_arr, timestep, file_cond=file_cond))
+            if len(val_arr) > 0:
+                val_arrays.append(val_arr)
+        except Exception as e:
+            print(f"  [warn] skipping {f.name}: {e}")
+
+    if not train_datasets:
+        return None, None
+
+    combined_val = np.concatenate(val_arrays, axis=0) if val_arrays else None
+    return train_datasets, combined_val
 
 
 # ============================================================================
@@ -49,14 +151,11 @@ class PretrainRanker:
     """Rank pretrains by their downstream quality potential."""
 
     def __init__(self):
-        self.pretrain_scores = {}  # {exp_name: score}
+        self.pretrain_scores = {}
 
     def evaluate_pretrain(self, encoder: nn.Module, recovery: nn.Module,
-                         val_dataset: Dataset, device: torch.device) -> float:
-        """
-        Evaluate pretrain quality on held-out validation.
-        Lower reconstruction loss = better pretrain.
-        """
+                          val_dataset: Dataset, device: torch.device) -> float:
+        """Evaluate pretrain quality on held-out validation."""
         encoder.eval()
         recovery.eval()
 
@@ -66,20 +165,15 @@ class PretrainRanker:
         with torch.no_grad():
             for batch in DataLoader(val_dataset, batch_size=64, shuffle=False):
                 batch = batch.to(device)
-                # Forward through encoder
                 h = encoder(batch)
-                # Decode
                 recon = recovery(h)
-                # Reconstruction loss (MSE)
                 loss = F.mse_loss(recon, batch)
                 total_loss += loss.item() * batch.size(0)
                 count += batch.size(0)
 
-        avg_loss = total_loss / count
-        return avg_loss  # Lower is better
+        return total_loss / count
 
     def rank_pretrains(self) -> List[Tuple[str, float]]:
-        """Return pretrains sorted by quality (best first)."""
         return sorted(self.pretrain_scores.items(), key=lambda x: x[1])
 
 
@@ -98,35 +192,22 @@ class SandiaTrainer:
             np.random.seed(self.seed)
             random.seed(self.seed)
 
-        # Models
         self.G = None
         self.C = None
         self.E = None
         self.R = None
         self.S = None
-
-        # Training state
-        self.current_epoch = 0
         self.best_combined = float('inf')
         self.stale_epochs = 0
 
-    def init_models(self, prep: TracePreprocessor):
+    def init_models(self, num_cols: int):
         """Initialize all models."""
         latent_dim = getattr(self.cfg, 'latent_dim', 24)
 
-        # Generator: takes z_global + z_local, produces latent windows
         self.G = Generator(self.cfg).to(self.device)
-
-        # Critic: scores latent windows
         self.C = Critic(self.cfg).to(self.device)
-
-        # Encoder: maps real windows to latent space
-        self.E = Encoder(self.cfg, prep.num_cols).to(self.device)
-
-        # Recovery: maps latent back to feature space
-        self.R = Recovery(self.cfg, prep.num_cols).to(self.device)
-
-        # Supervisor: predicts next latent step from current
+        self.E = Encoder(self.cfg, num_cols).to(self.device)
+        self.R = Recovery(self.cfg, num_cols).to(self.device)
         self.S = Supervisor(self.cfg).to(self.device)
 
         print(f"[models] G: {sum(p.numel() for p in self.G.parameters())} params")
@@ -135,28 +216,25 @@ class SandiaTrainer:
         print(f"[models] R: {sum(p.numel() for p in self.R.parameters())} params")
         print(f"[models] S: {sum(p.numel() for p in self.S.parameters())} params")
 
-    def pretrain_ae(self, train_ds: Dataset, val_ds: Dataset,
-                   epochs: int = 50, ckpt_dir: str = None) -> Tuple[float, float]:
-        """
-        Phase 1: Autoencoder pretraining.
-        Train Encoder + Recovery to round-trip real windows.
-        """
+    def pretrain_ae(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+                    epochs: int = 50, ckpt_dir: str = None) -> Tuple[float, float]:
+        """Phase 1: Autoencoder pretraining."""
         print(f"\n{'='*60}")
         print(f"Phase 1: Autoencoder Pretraining ({epochs} epochs)")
         print(f"{'='*60}")
 
+        from torch.utils.data import ConcatDataset
+        train_dataset = ConcatDataset(train_ds)
+
         self.E.train()
         self.R.train()
 
-        opt = torch.optim.Adam(
-            list(self.E.parameters()) + list(self.R.parameters()),
-            lr=self.cfg.lr_g,
-            betas=(0.5, 0.9)
-        )
+        opt = torch.optim.Adam(list(self.E.parameters()) + list(self.R.parameters()),
+                               lr=self.cfg.lr_g, betas=(0.5, 0.9))
 
-        train_loader = DataLoader(train_ds, batch_size=self.cfg.batch_size,
+        train_loader = DataLoader(train_dataset, batch_size=self.cfg.batch_size,
                                  shuffle=True, num_workers=0)
-        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0)
+        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0) if val_ds is not None else None
 
         best_val_loss = float('inf')
         best_epoch = 0
@@ -168,14 +246,8 @@ class SandiaTrainer:
 
             for batch in train_loader:
                 batch = batch.to(self.device)
-
-                # Encode
                 h = self.E(batch)
-
-                # Decode
                 recon = self.R(h)
-
-                # Reconstruction loss
                 loss = F.mse_loss(recon, batch)
 
                 opt.zero_grad()
@@ -187,31 +259,29 @@ class SandiaTrainer:
 
             train_loss /= count
 
-            # Validation
-            self.E.eval()
-            self.R.eval()
             val_loss = 0.0
             vcount = 0
+            if val_loader:
+                self.E.eval()
+                self.R.eval()
+                with torch.no_grad():
+                    for batch in val_loader:
+                        batch = batch.to(self.device)
+                        h = self.E(batch)
+                        recon = self.R(h)
+                        loss = F.mse_loss(recon, batch)
+                        val_loss += loss.item() * batch.size(0)
+                        vcount += batch.size(0)
+                val_loss /= vcount
+                self.E.train()
+                self.R.train()
 
-            with torch.no_grad():
-                for batch in val_loader:
-                    batch = batch.to(self.device)
-                    h = self.E(batch)
-                    recon = self.R(h)
-                    loss = F.mse_loss(recon, batch)
-                    val_loss += loss.item() * batch.size(0)
-                    vcount += batch.size(0)
-
-            val_loss /= vcount
             elapsed = time.time() - start
-
             print(f"Epoch {epoch+1}/{epochs} | Train: {train_loss:.6f} | Val: {val_loss:.6f} | t={elapsed:.1f}s")
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_epoch = epoch + 1
-
-                # Save checkpoint
                 if ckpt_dir:
                     Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
                     torch.save({
@@ -221,31 +291,28 @@ class SandiaTrainer:
                         'best_val_loss': best_val_loss,
                     }, os.path.join(ckpt_dir, 'ae_pretrain_best.pt'))
 
-            self.E.train()
-            self.R.train()
-
         print(f"\n[AE] Best val loss: {best_val_loss:.6f} at epoch {best_epoch}")
         return best_val_loss, best_epoch
 
-    def pretrain_supervisor(self, train_ds: Dataset, val_ds: Dataset,
-                           epochs: int = 50, ckpt_dir: str = None) -> float:
-        """
-        Phase 2: Supervisor pretraining.
-        Train Supervisor to predict next latent step from real trajectories.
-        """
+    def pretrain_supervisor(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+                            epochs: int = 50, ckpt_dir: str = None) -> float:
+        """Phase 2: Supervisor pretraining."""
         print(f"\n{'='*60}")
         print(f"Phase 2: Supervisor Pretraining ({epochs} epochs)")
         print(f"{'='*60}")
 
-        self.E.eval()  # Encoder frozen
+        from torch.utils.data import ConcatDataset
+        train_dataset = ConcatDataset(train_ds)
+
+        self.E.eval()
         self.R.eval()
         self.S.train()
 
         opt = torch.optim.Adam(self.S.parameters(), lr=self.cfg.lr_g, betas=(0.5, 0.9))
 
-        train_loader = DataLoader(train_ds, batch_size=self.cfg.batch_size,
+        train_loader = DataLoader(train_dataset, batch_size=self.cfg.batch_size,
                                  shuffle=True, num_workers=0)
-        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0)
+        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0) if val_ds is not None else None
 
         best_val_loss = float('inf')
 
@@ -256,14 +323,10 @@ class SandiaTrainer:
 
             for batch in train_loader:
                 batch = batch.to(self.device)
-
                 with torch.no_grad():
-                    h = self.E(batch)  # Get latents from real data
+                    h = self.E(batch)
 
-                # Supervisor predicts h_{t+1} from h_t
-                # h shape: (B, T, L), predict h[:, 1:] from h[:, :-1]
-                pred = self.S(h[:, :-1, :])  # (B, T-1, L)
-
+                pred = self.S(h[:, :-1, :])
                 loss = F.mse_loss(pred, h[:, 1:, :])
 
                 opt.zero_grad()
@@ -275,23 +338,22 @@ class SandiaTrainer:
 
             train_loss /= count
 
-            # Validation
-            self.S.eval()
             val_loss = 0.0
             vcount = 0
+            if val_loader:
+                self.S.eval()
+                with torch.no_grad():
+                    for batch in val_loader:
+                        batch = batch.to(self.device)
+                        h = self.E(batch)
+                        pred = self.S(h[:, :-1, :])
+                        loss = F.mse_loss(pred, h[:, 1:, :])
+                        val_loss += loss.item() * batch.size(0)
+                        vcount += batch.size(0)
+                val_loss /= vcount
+                self.S.train()
 
-            with torch.no_grad():
-                for batch in val_loader:
-                    batch = batch.to(self.device)
-                    h = self.E(batch)
-                    pred = self.S(h[:, :-1, :])
-                    loss = F.mse_loss(pred, h[:, 1:, :])
-                    val_loss += loss.item() * batch.size(0)
-                    vcount += batch.size(0)
-
-            val_loss /= vcount
             elapsed = time.time() - start
-
             print(f"Epoch {epoch+1}/{epochs} | Train: {train_loss:.6f} | Val: {val_loss:.6f} | t={elapsed:.1f}s")
 
             if val_loss < best_val_loss:
@@ -303,20 +365,18 @@ class SandiaTrainer:
                         'best_val_loss': best_val_loss,
                     }, os.path.join(ckpt_dir, 'supervisor_best.pt'))
 
-            self.S.train()
-
-        print(f"\n[Supervisor] Best val loss: {val_loss:.6f}")
+        print(f"\n[Supervisor] Best val loss: {best_val_loss:.6f}")
         return best_val_loss
 
-    def train_generator(self, train_ds: Dataset, val_ds: Dataset,
-                       epochs: int = 100, ckpt_dir: str = None) -> float:
-        """
-        Phase 2.5: Generator warm-up.
-        Train Generator to imitate Supervisor outputs (no Critic yet).
-        """
+    def train_generator(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+                        epochs: int = 100, ckpt_dir: str = None) -> float:
+        """Phase 2.5: Generator warm-up."""
         print(f"\n{'='*60}")
         print(f"Phase 2.5: Generator Warm-up ({epochs} epochs)")
         print(f"{'='*60}")
+
+        from torch.utils.data import ConcatDataset
+        train_dataset = ConcatDataset(train_ds)
 
         self.E.eval()
         self.R.eval()
@@ -326,9 +386,9 @@ class SandiaTrainer:
 
         opt = torch.optim.Adam(self.G.parameters(), lr=self.cfg.lr_g, betas=(0.5, 0.9))
 
-        train_loader = DataLoader(train_ds, batch_size=self.cfg.batch_size,
+        train_loader = DataLoader(train_dataset, batch_size=self.cfg.batch_size,
                                  shuffle=True, num_workers=0)
-        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0)
+        val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=0) if val_ds is not None else None
 
         best_val_loss = float('inf')
 
@@ -341,20 +401,14 @@ class SandiaTrainer:
                 batch = batch.to(self.device)
 
                 with torch.no_grad():
-                    # Get real latents
                     h_real = self.E(batch)
-                    # Get supervisor prediction
                     h_pred = self.S(h_real[:, :-1, :])
 
-                # Sample noise
                 B, T, _ = h_pred.shape
                 z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
                 z_local = torch.randn(B, T, self.cfg.noise_dim, device=self.device)
-
-                # Generate fake latent
                 h_fake = self.G(z_global, z_local)
 
-                # Supervised loss: match supervisor prediction
                 loss = F.mse_loss(h_fake, h_pred)
 
                 opt.zero_grad()
@@ -366,27 +420,26 @@ class SandiaTrainer:
 
             train_loss /= count
 
-            # Validation
-            self.G.eval()
             val_loss = 0.0
             vcount = 0
+            if val_loader:
+                self.G.eval()
+                with torch.no_grad():
+                    for batch in val_loader:
+                        batch = batch.to(self.device)
+                        h_real = self.E(batch)
+                        h_pred = self.S(h_real[:, :-1, :])
+                        B, T, _ = h_pred.shape
+                        z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
+                        z_local = torch.randn(B, T, self.cfg.noise_dim, device=self.device)
+                        h_fake = self.G(z_global, z_local)
+                        loss = F.mse_loss(h_fake, h_pred)
+                        val_loss += loss.item() * batch.size(0)
+                        vcount += batch.size(0)
+                val_loss /= vcount
+                self.G.train()
 
-            with torch.no_grad():
-                for batch in val_loader:
-                    batch = batch.to(self.device)
-                    h_real = self.E(batch)
-                    h_pred = self.S(h_real[:, :-1, :])
-                    B, T, _ = h_pred.shape
-                    z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
-                    z_local = torch.randn(B, T, self.cfg.noise_dim, device=self.device)
-                    h_fake = self.G(z_global, z_local)
-                    loss = F.mse_loss(h_fake, h_pred)
-                    val_loss += loss.item() * batch.size(0)
-                    vcount += batch.size(0)
-
-            val_loss /= vcount
             elapsed = time.time() - start
-
             print(f"Epoch {epoch+1}/{epochs} | Train: {train_loss:.6f} | Val: {val_loss:.6f} | t={elapsed:.1f}s")
 
             if val_loss < best_val_loss:
@@ -398,20 +451,18 @@ class SandiaTrainer:
                         'best_val_loss': best_val_loss,
                     }, os.path.join(ckpt_dir, 'g_warmup_best.pt'))
 
-            self.G.train()
-
         print(f"\n[Generator] Best val loss: {best_val_loss:.6f}")
         return best_val_loss
 
-    def train_gan(self, train_ds: Dataset, val_ds: Dataset,
-                 epochs: int = 200, ckpt_dir: str = None) -> Dict:
-        """
-        Phase 3: Joint GAN training.
-        Full WGAN-SN training of G vs C with all auxiliary losses.
-        """
+    def train_gan(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+                  epochs: int = 200, ckpt_dir: str = None) -> Dict:
+        """Phase 3: Joint GAN training."""
         print(f"\n{'='*60}")
         print(f"Phase 3: Joint GAN Training ({epochs} epochs)")
         print(f"{'='*60}")
+
+        from torch.utils.data import ConcatDataset
+        train_dataset = ConcatDataset(train_ds)
 
         self.E.eval()
         self.R.eval()
@@ -419,24 +470,15 @@ class SandiaTrainer:
         self.G.train()
         self.C.train()
 
-        # Optimizers
         optG = torch.optim.Adam(self.G.parameters(), lr=self.cfg.lr_g, betas=(0.5, 0.9))
         optC = torch.optim.Adam(self.C.parameters(), lr=self.cfg.lr_d, betas=(0.5, 0.9))
 
-        train_loader = DataLoader(train_ds, batch_size=self.cfg.batch_size,
+        train_loader = DataLoader(train_dataset, batch_size=self.cfg.batch_size,
                                  shuffle=True, num_workers=0)
 
-        # Validation dataset as tensor for quick eval
-        val_tensor = torch.stack([val_ds[i] for i in range(min(1000, len(val_ds)))]).to(self.device)
+        val_tensor = torch.stack([val_ds[i] for i in range(min(1000, len(val_ds)))]) if val_ds is not None else None
 
-        history = {
-            'epochs': [],
-            'G_loss': [],
-            'C_loss': [],
-            'C_real': [],
-            'C_fake': [],
-            'combined_score': []
-        }
+        history = {'epochs': [], 'G_loss': [], 'C_loss': [], 'C_real': [], 'C_fake': [], 'combined_score': []}
 
         print("\n[Training loop starting...]")
 
@@ -453,32 +495,22 @@ class SandiaTrainer:
                 batch = batch.to(self.device)
                 B = batch.size(0)
 
-                # ------ Critic update ------
+                # Critic update
                 for _ in range(self.cfg.n_critic):
                     optC.zero_grad()
 
-                    # Real
                     with torch.no_grad():
                         h_real = self.E(batch)
                     C_real = self.C(h_real)
                     C_real_loss = -C_real.mean()
 
-                    # Fake
                     z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
                     z_local = torch.randn(B, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
                     h_fake = self.G(z_global, z_local)
                     C_fake = self.C(h_fake.detach())
                     C_fake_loss = C_fake.mean()
 
-                    # WGAN-SN loss
                     C_loss = C_fake_loss + C_real_loss
-
-                    # Gradient penalty (simple L2 on critic output)
-                    grad_penalty = 0.0
-                    if hasattr(self.C, 'fc') and self.C.fc.weight.grad is not None:
-                        grad_penalty = 0.1 * (self.C.fc.weight ** 2).mean()
-                    C_loss = C_loss + grad_penalty
-
                     C_loss.backward()
                     optC.step()
 
@@ -486,7 +518,7 @@ class SandiaTrainer:
                     C_real_sum += C_real_loss.item()
                     C_fake_sum += C_fake_loss.item()
 
-                # ------ Generator update ------
+                # Generator update
                 optG.zero_grad()
 
                 z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
@@ -500,8 +532,6 @@ class SandiaTrainer:
                 with torch.no_grad():
                     h_real = self.E(batch)
                     h_pred = self.S(h_real[:, :-1, :])
-
-                # Predict what supervisor would do on fake
                 h_pred_fake = self.S(h_fake[:, :-1, :])
                 sup_loss = F.mse_loss(h_pred_fake, h_fake[:, 1:, :])
 
@@ -512,14 +542,12 @@ class SandiaTrainer:
                 G_epoch_loss += total_G_loss.item()
                 count += 1
 
-            # Epoch metrics
             avg_G = G_epoch_loss / count
             avg_C = C_epoch_loss / (count * self.cfg.n_critic)
             avg_C_real = C_real_sum / (count * self.cfg.n_critic)
             avg_C_fake = C_fake_sum / (count * self.cfg.n_critic)
 
-            # Quick validation: compute combined score
-            combined = self._quick_val(val_tensor, epoch)
+            combined = self._quick_val(val_tensor) if val_tensor is not None else 0.0
 
             elapsed = time.time() - start
 
@@ -534,7 +562,6 @@ class SandiaTrainer:
             history['C_fake'].append(avg_C_fake)
             history['combined_score'].append(combined)
 
-            # Checkpoint
             if ckpt_dir and (epoch + 1) % self.cfg.checkpoint_every == 0:
                 Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
                 torch.save({
@@ -546,7 +573,6 @@ class SandiaTrainer:
                     'history': history,
                 }, os.path.join(ckpt_dir, f'epoch_{epoch+1:04d}.pt'))
 
-            # Early stopping check
             if combined < self.best_combined:
                 self.best_combined = combined
                 self.stale_epochs = 0
@@ -565,37 +591,28 @@ class SandiaTrainer:
 
         return history
 
-    def _quick_val(self, val_tensor: torch.Tensor, epoch: int) -> float:
-        """Quick validation score (MMD-like on latent space)."""
+    def _quick_val(self, val_tensor: torch.Tensor) -> float:
+        """Quick validation score."""
         self.G.eval()
         self.C.eval()
 
         with torch.no_grad():
-            # Real latents
             h_real = self.E(val_tensor[:128])
-
-            # Fake latents
             z_global = torch.randn(128, self.cfg.noise_dim, device=self.device)
             z_local = torch.randn(128, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
             h_fake = self.G(z_global, z_local)
-
-            # MMD-like: distance between means
             mmd = ((h_real.mean(0) - h_fake.mean(0)) ** 2).mean()
-
-            # diversity: mean pairwise distance
             dist_real = ((h_real.unsqueeze(1) - h_real.unsqueeze(0)) ** 2).mean()
             dist_fake = ((h_fake.unsqueeze(1) - h_fake.unsqueeze(0)) ** 2).mean()
             diversity = 0.5 * (dist_real + dist_fake)
-
-            # Combined: lower is better
             combined = mmd + 0.1 * diversity
 
         self.G.train()
         self.C.train()
         return combined.item()
 
-    def run_full_pipeline(self, train_ds: Dataset, val_ds: Dataset,
-                         ckpt_dir: str = None) -> Dict:
+    def run_full_pipeline(self, train_ds: List[Dataset], val_ds: Optional[np.ndarray],
+                          ckpt_dir: str = None) -> Dict:
         """Run complete Sandia training pipeline."""
         print(f"\n{'#'*60}")
         print(f"# Sandia Training Pipeline")
@@ -604,22 +621,18 @@ class SandiaTrainer:
         print(f"# Start: {datetime.now().isoformat()}")
         print(f"{'#'*60}\n")
 
-        # Phase 1: AE pretrain
         ae_loss, ae_epoch = self.pretrain_ae(train_ds, val_ds,
                                               epochs=getattr(self.cfg, 'pretrain_ae_epochs', 50),
                                               ckpt_dir=ckpt_dir)
 
-        # Phase 2: Supervisor pretrain
         sup_loss = self.pretrain_supervisor(train_ds, val_ds,
                                              epochs=getattr(self.cfg, 'pretrain_sup_epochs', 50),
                                              ckpt_dir=ckpt_dir)
 
-        # Phase 2.5: Generator warm-up
         g_loss = self.train_generator(train_ds, val_ds,
                                       epochs=getattr(self.cfg, 'pretrain_g_epochs', 100),
                                       ckpt_dir=ckpt_dir)
 
-        # Phase 3: Joint GAN
         history = self.train_gan(train_ds, val_ds,
                                 epochs=getattr(self.cfg, 'epochs', 200),
                                 ckpt_dir=ckpt_dir)
@@ -638,23 +651,24 @@ class SandiaTrainer:
 # ============================================================================
 
 def load_data(trace_dir: str, fmt: str, char_file: Optional[str],
-              files_per_epoch: int, records_per_file: int,
-              timestep: int, val_ratio: float = 0.1):
+              files_per_epoch: int, records_per_file: int, timestep: int,
+              val_ratio: float = 0.1):
     """Load and prepare training data."""
-    from llgan.dataset import _collect_files, _fit_prep_on_files, _load_epoch_dataset
-
     all_files = _collect_files(trace_dir, fmt)
     print(f"Found {len(all_files)} files in {trace_dir}")
 
-    # Fit preprocessor on seed files
     _prep_rng = random.Random(0)
     seed_files = _prep_rng.sample(sorted(all_files), min(4, len(all_files)))
     prep = _fit_prep_on_files(seed_files, fmt, records_per_file)
     print(f"Preprocessor fitted on {len(seed_files)} files")
     print(f"  Columns: {prep.col_names}")
 
-    # Load with 10% held out for validation
-    train_files, val_files = _split_files(all_files, val_ratio)
+    all_files_sorted = sorted(all_files)
+    rng_val = random.Random(42)
+    rng_val.shuffle(all_files_sorted)
+    n_val_files = int(len(all_files_sorted) * val_ratio)
+    val_files = all_files_sorted[:n_val_files]
+    train_files = all_files_sorted[n_val_files:]
 
     train_ds, _ = _load_epoch_dataset(train_files, fmt, records_per_file, prep, timestep)
     val_ds, _ = _load_epoch_dataset(val_files, fmt, records_per_file, prep, timestep)
@@ -662,19 +676,6 @@ def load_data(trace_dir: str, fmt: str, char_file: Optional[str],
     print(f"Train: {len(train_ds)} windows, Val: {len(val_ds)} windows")
 
     return train_ds, val_ds, prep
-
-
-def _split_files(all_files: list, val_ratio: float) -> Tuple[list, list]:
-    """Split files into train/val with deterministic seed."""
-    rng = random.Random(42)
-    shuffled = sorted(all_files)  # Deterministic order
-    rng.shuffle(shuffled)
-
-    n_val = int(len(shuffled) * val_ratio)
-    val_files = shuffled[:n_val]
-    train_files = shuffled[n_val:]
-
-    return train_files, val_files
 
 
 def main():
@@ -707,7 +708,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Determine device
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -717,7 +717,6 @@ def main():
 
     print(f"[device] {device}")
 
-    # Load data
     train_ds, val_ds, prep = load_data(
         trace_dir=args.trace_dir,
         fmt=args.fmt,
@@ -728,7 +727,6 @@ def main():
         val_ratio=args.val_ratio
     )
 
-    # Build config
     cfg = Config()
     cfg.trace_dir = args.trace_dir
     cfg.trace_format = args.fmt
@@ -753,16 +751,12 @@ def main():
     cfg.files_per_epoch = args.files_per_epoch
     cfg.records_per_file = args.records_per_file
     cfg.col_names = list(prep.col_names) if hasattr(prep, 'col_names') else None
-
-    # Disable compile/amp for stability on GB10
     cfg.no_compile = args.no_compile
     cfg.amp = not args.no_amp
 
-    # Create checkpoint dir
     full_ckpt_dir = os.path.join(args.checkpoint_dir, args.exp_name)
     Path(full_ckpt_dir).mkdir(parents=True, exist_ok=True)
 
-    # Save config
     with open(os.path.join(full_ckpt_dir, 'config.json'), 'w') as f:
         json.dump({
             'exp_name': args.exp_name,
@@ -771,9 +765,8 @@ def main():
             'args': {k: v for k, v in vars(args).items() if not k.startswith('_')}
         }, f, indent=2)
 
-    # Initialize and run trainer
     trainer = SandiaTrainer(cfg, device)
-    trainer.init_models(prep)
+    trainer.init_models(prep.num_cols)
     history = trainer.run_full_pipeline(train_ds, val_ds, full_ckpt_dir)
 
     print(f"\nTraining complete. Results saved to {full_ckpt_dir}")
