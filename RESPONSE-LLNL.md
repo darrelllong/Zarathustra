@@ -8702,3 +8702,66 @@ The 5× LLNL-vs-LANL tencent gap remains; the path is more methodologically intr
 
 LANL: continued mark-axis sweeps (predictable invariance). **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 151 — 32f+calibrate produces HRC-MAE=0.00053 but it's the historical CIRCULAR trap; methodologically invalid
+
+**Date**: 2026-04-30 09:03 PDT
+
+### Result and the trap
+
+Chained `cmd_fit --max-files 32` (no eval-file overlap in fit set, verified) + `cmd_calibrate-from-json --eval-json tencent_real_metrics_baseline.json` produced:
+
+```
+HRC-MAE  : 0.00053
+reuse    : 0.6142 (real 0.6149)  — perfect match
+P50      : 59 (real 60)            — perfect match
+P90      : 170 (real 174)          — perfect match
+footprint: 9646 (real 9627)        — perfect match
+```
+
+The match is too good to be true. Investigation:
+
+```
+$ jq .manifest /home/darrell/tencent_real_metrics_baseline.json
+"/home/darrell/long_rollout_manifests/tencent_stackatlas.json"
+```
+
+**The calibration JSON was generated FROM the eval-manifest's 4 files.** Using it to calibrate the atlas means we're injecting the eval files' `stack_distance_histogram` into the model. The eval then scores against THE SAME files' histogram. That's not a model; it's a memorize-then-replay loop. This is **exactly the historical `tencent_nophase` failure mode** noted in `VERSIONS-LLNL.md`:
+
+> Oracle-calibrated (circular) | tencent_nophase.pkl.gz | **0.000553** | **No** | Eval files used for calib
+
+My 0.00053 is the same number as `tencent_nophase`'s 0.000553 to 4 sig figs — not a coincidence; it's the same circularity pattern.
+
+### The methodologically clean experiment
+
+To get a legitimate strict-holdout HRC-MAE improvement on the multi-phase + calibrated path:
+
+1. Pick a separate set of 8 (or N) random TRAINING files, disjoint from the eval-manifest's 4 files.
+2. Run `long_rollout_eval.py --produce-real-metrics-only` on those training files to compute their `stack_distance_histogram`.
+3. Use THAT JSON (not `tencent_real_metrics_baseline.json`) to calibrate.
+4. Eval against the unchanged tencent_stackatlas.json manifest.
+
+The training-file calibration is strict-holdout because the eval files are never seen at calibration OR fit time. This is presumably what the historical `tencent_traincalib.pkl.gz` (HRC-MAE=0.04375) was: random 8 files at fit time, calibrated against a JSON computed from a DIFFERENT random 8 training files (or maybe the same fit-set; the documentation is ambiguous).
+
+### Decision
+
+The 0.00053 result is **INVALID** and not race-relevant. I will not promote it to any race table. The 32f_calib artifact stays archived as a documented circularity reproduction.
+
+To make legitimate progress, I need to produce a strict-holdout calibration JSON. That requires:
+- Running `long_rollout_eval.py` (or equivalent) on a separate training-file manifest.
+- This is ~5-10 min compute work, plus careful verification that the chosen training files are disjoint from the eval manifest.
+
+Round 151 stops here without committing the invalid result to any artifacts; documentation only.
+
+### Race position unchanged
+
+LLNL tencent legitimate strict-holdout: still **HRC-MAE 0.04375** (8f traincalib).
+Gap to LANL 0.008735: still 5×.
+
+Active LLNL run: **none**. Next: produce strict-holdout calibration JSON.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis variant sweeps. **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
