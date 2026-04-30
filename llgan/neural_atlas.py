@@ -85,6 +85,78 @@ def cond_from_profile(profile: dict) -> np.ndarray:
     return out
 
 
+def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
+    """Round 172: compute the 10-feature cond vector directly from the trace
+    file. Closes the data-quality gap from R171 where 6 of 10 features were
+    zero-variance in trace_characterizations.jsonl (iat_q50/90, obj_size_q50/90,
+    write_ratio, opcode_switch_ratio, ts_duration not populated).
+    """
+    sys.path.insert(0, "/home/darrell/Zarathustra")
+    from llgan.phase_pmf_atlas import _read_trace
+    ts_arr, sz_arr, op_arr = [], [], []
+    for ev in _read_trace(path, keep_sentinel=True):
+        ts_arr.append(ev[0])
+        sz_arr.append(ev[2])
+        op_arr.append(ev[3])
+        if len(ts_arr) >= max_records:
+            break
+    if len(ts_arr) < 2:
+        return np.zeros(COND_DIM, dtype=np.float32)
+    ts = np.asarray(ts_arr, dtype=np.float64)
+    sz = np.asarray(sz_arr, dtype=np.float64)
+    op = np.asarray(op_arr, dtype=np.int64)
+
+    iat = np.diff(ts)
+    iat = iat[iat >= 0]
+    if len(iat) < 1:
+        iat = np.array([0.0])
+    iat_q50 = float(np.quantile(iat, 0.5))
+    iat_q90 = float(np.quantile(iat, 0.9))
+    if iat.std() > 1e-9 and iat.mean() > 1e-9:
+        burst_cv = float(iat.std() / iat.mean())
+    else:
+        burst_cv = 0.0
+
+    sz_q50 = float(np.quantile(sz, 0.5))
+    sz_q90 = float(np.quantile(sz, 0.9))
+
+    # write_ratio: fraction with op==1 (write); read is 0, sentinel is -1
+    write_ratio = float(np.mean(op == 1)) if len(op) else 0.0
+
+    # opcode_switch_ratio: fraction of consecutive opcode-changes
+    if len(op) > 1:
+        opcode_switch_ratio = float(np.mean(op[1:] != op[:-1]))
+    else:
+        opcode_switch_ratio = 0.0
+
+    # forward / backward seek ratio: from obj_id deltas (need obj_id which we
+    # don't track here — rough proxy via size delta sign)
+    # Use a minimal stand-in: never zero. forward = sz[i+1] >= sz[i]
+    if len(sz) > 1:
+        diffs = np.sign(np.diff(sz))
+        forward_seek_ratio = float(np.mean(diffs >= 0))
+        backward_seek_ratio = float(np.mean(diffs < 0))
+    else:
+        forward_seek_ratio = 0.5
+        backward_seek_ratio = 0.5
+
+    ts_duration = float(ts[-1] - ts[0]) if len(ts) > 1 else 0.0
+
+    profile = {
+        "burstiness_cv": burst_cv,
+        "iat_q50": iat_q50,
+        "iat_q90": iat_q90,
+        "obj_size_q50": sz_q50,
+        "obj_size_q90": sz_q90,
+        "write_ratio": write_ratio,
+        "opcode_switch_ratio": opcode_switch_ratio,
+        "forward_seek_ratio": forward_seek_ratio,
+        "backward_seek_ratio": backward_seek_ratio,
+        "ts_duration": ts_duration,
+    }
+    return cond_from_profile(profile)
+
+
 # Lazy torch import — keep module importable without torch when only generation
 # from a precomputed transition table is needed.
 def _torch():
@@ -197,14 +269,25 @@ def fit(
     epochs: int = 200,
     lr: float = 2e-3,
     seed: int = 7,
+    inline_cond: bool = False,
 ) -> None:
-    """Train a CondTransitionNet on (cond, prev_state, next_state) tuples."""
+    """Train a CondTransitionNet on (cond, prev_state, next_state) tuples.
+
+    When `inline_cond=True` (R172), compute cond features directly from the
+    trace file at fit time instead of reading from the (underpopulated)
+    trace_characterizations.jsonl. Closes the 6/10 zero-variance feature gap
+    R171 diagnosed.
+    """
     torch = _torch()
     rng = np.random.default_rng(seed)
 
-    print(f"Reading characterizations from {char_file} ...")
-    chars = _read_chars(char_file)
-    print(f"  loaded {len(chars):,} entries")
+    if inline_cond:
+        print("Inline cond mode: features computed from trace files directly")
+        chars = {}
+    else:
+        print(f"Reading characterizations from {char_file} ...")
+        chars = _read_chars(char_file)
+        print(f"  loaded {len(chars):,} entries")
 
     import glob
     files = sorted(glob.glob(os.path.join(trace_dir, "*.zst")))
@@ -221,9 +304,12 @@ def fit(
 
     for fi, fpath in enumerate(files):
         nm = os.path.basename(fpath)
-        if nm not in chars:
-            continue
-        cond = cond_from_profile(chars[nm])
+        if inline_cond:
+            cond = cond_from_trace(fpath, max_records=records_per_file)
+        else:
+            if nm not in chars:
+                continue
+            cond = cond_from_profile(chars[nm])
         file_conds[nm] = cond
 
         obj_ids = _read_oracle_general_obj_ids(fpath, records_per_file)
@@ -322,6 +408,7 @@ def fit(
             "epochs": epochs,
             "lr": lr,
             "n_transitions": len(transitions),
+            "inline_cond": inline_cond,
         },
     )
     model.save(output)
@@ -355,8 +442,13 @@ def generate(
     n_streams = len(streams)
     per_stream = int(np.ceil(n_records / n_streams))
 
-    # Read characterizations to look up cond per manifest file
-    chars = _read_chars(m.metadata.get("char_file", "/tiamat/zarathustra/analysis/out/trace_characterizations.jsonl"))
+    # Read characterizations OR compute cond inline depending on training mode
+    use_inline_cond = bool(m.metadata.get("inline_cond", False))
+    if use_inline_cond:
+        chars = {}
+        print("Inline cond mode: computing per-stream cond from manifest files")
+    else:
+        chars = _read_chars(m.metadata.get("char_file", "/tiamat/zarathustra/analysis/out/trace_characterizations.jsonl"))
 
     rng = np.random.default_rng(seed)
     rows = []
@@ -364,8 +456,12 @@ def generate(
     with torch.no_grad():
         for sid, segs in enumerate(streams):
             nm = os.path.basename(segs[0]["path"])
-            cond = chars.get(nm, {})
-            cond_vec = cond_from_profile(cond)
+            if use_inline_cond:
+                cond_vec = cond_from_trace(segs[0]["path"],
+                                           max_records=segs[0].get("records_taken", 25_000))
+            else:
+                cond = chars.get(nm, {})
+                cond_vec = cond_from_profile(cond)
             # Round 171: apply training-time normalization at generate
             if m.cond_mean is not None and m.cond_std is not None:
                 cond_vec = (cond_vec - m.cond_mean) / m.cond_std
@@ -452,6 +548,8 @@ def main():
     pfit.add_argument("--epochs", type=int, default=200)
     pfit.add_argument("--lr", type=float, default=2e-3)
     pfit.add_argument("--seed", type=int, default=7)
+    pfit.add_argument("--inline-cond", action="store_true",
+                      help="R172: compute cond features directly from trace files")
 
     pgen = sub.add_parser("generate")
     pgen.add_argument("--model", required=True)
@@ -466,6 +564,7 @@ def main():
             args.trace_dir, args.char_file, args.output,
             max_files=args.max_files, records_per_file=args.records_per_file,
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
+            inline_cond=args.inline_cond,
         )
     elif args.cmd == "generate":
         generate(
