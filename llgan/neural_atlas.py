@@ -33,17 +33,31 @@ import numpy as np
 
 # State space: NEW + 5 stack-distance bucket REUSE classes.
 STATE_BUCKET_EDGES = np.array([0, 8, 32, 128, 512, 1 << 30], dtype=np.int64)
-N_STATES = len(STATE_BUCKET_EDGES)  # 1 NEW + 5 buckets = 6
+N_DIST_STATES = len(STATE_BUCKET_EDGES)  # 1 NEW + 5 REUSE buckets = 6
 STATE_NEW = 0
 STATE_REUSE_OFFSET = 1
+PHASE_WINDOW = 200  # records per running-unique-rate window
 
 
-def state_from_sd(sd: int) -> int:
-    """Encode stack distance to state. sd<0 = NEW; otherwise bucket index + offset."""
+def n_states_for(n_phase_bins: int) -> int:
+    return N_DIST_STATES * max(int(n_phase_bins), 1)
+
+
+def _dist_state_from_sd(sd: int) -> int:
+    """Encode stack distance to {NEW, REUSE_b0, ..., REUSE_b4} = 6 dist states."""
     if sd < 0:
         return STATE_NEW
     bucket = int(np.searchsorted(STATE_BUCKET_EDGES[1:], sd, side="right"))
     return STATE_REUSE_OFFSET + min(bucket, len(STATE_BUCKET_EDGES) - 2)
+
+
+def state_from_sd(sd: int, phase_bin: int = 0) -> int:
+    """Encode (sd, phase_bin) to state index = phase_bin*N_DIST_STATES + dist_state."""
+    return int(phase_bin) * N_DIST_STATES + _dist_state_from_sd(sd)
+
+
+# Backwards-compat: legacy 6-state tencent / alibaba models pickled in R170-173.
+N_STATES = N_DIST_STATES
 
 
 # Conditioning features pulled from trace_characterizations.jsonl. Skips
@@ -211,6 +225,11 @@ class NeuralAtlas:
     # both fit and generate time so the net sees zero-mean unit-variance cond.
     cond_mean: Optional[np.ndarray] = None
     cond_std: Optional[np.ndarray] = None
+    # Round 174: state-space expansion. n_phase_bins=1 reproduces R170-173's
+    # 6-state encoding; n_phase_bins=4 expands to 24 states with per-window
+    # unique-rate phase. phase_edges are corpus quantiles fitted at training.
+    n_phase_bins: int = 1
+    phase_edges: Optional[np.ndarray] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -270,16 +289,19 @@ def fit(
     lr: float = 2e-3,
     seed: int = 7,
     inline_cond: bool = False,
+    n_phase_bins: int = 1,
 ) -> None:
     """Train a CondTransitionNet on (cond, prev_state, next_state) tuples.
 
     When `inline_cond=True` (R172), compute cond features directly from the
-    trace file at fit time instead of reading from the (underpopulated)
-    trace_characterizations.jsonl. Closes the 6/10 zero-variance feature gap
-    R171 diagnosed.
+    trace file at fit time. When `n_phase_bins>1` (R174), expand state space
+    to phase × dist bins (24 with n_phase_bins=4).
     """
     torch = _torch()
     rng = np.random.default_rng(seed)
+    n_phase_bins = max(int(n_phase_bins), 1)
+    n_states = n_states_for(n_phase_bins)
+    print(f"State space: n_phase_bins={n_phase_bins} × {N_DIST_STATES} dist = {n_states} states")
 
     if inline_cond:
         print("Inline cond mode: features computed from trace files directly")
@@ -296,11 +318,31 @@ def fit(
         files = [files[i] for i in sorted(idx)]
     print(f"Selected {len(files)} training files")
 
-    # Per-file: read records, compute stack distances, encode states, build cond vector.
+    # Pass 1: collect unique-rate samples to fit phase quantile edges
+    phase_edges = np.array([], dtype=np.float64)
+    if n_phase_bins > 1:
+        ur_samples: List[float] = []
+        for fpath in files:
+            obj_ids = _read_oracle_general_obj_ids(fpath, records_per_file)
+            if len(obj_ids) < PHASE_WINDOW * 2:
+                continue
+            seen: set = set()
+            for i, x in enumerate(obj_ids):
+                seen.add(int(x))
+                if (i + 1) % PHASE_WINDOW == 0:
+                    ur_samples.append(len(seen) / PHASE_WINDOW)
+                    seen = set()
+        if ur_samples:
+            ur = np.array(ur_samples, dtype=np.float64)
+            q = np.linspace(0, 100, n_phase_bins + 1)[1:-1]
+            phase_edges = np.unique(np.percentile(ur, q))
+            print(f"Phase edges (n={len(ur)} windows): {phase_edges.round(3).tolist()}")
+
+    # Per-file: read records, compute stack distances, encode states, build cond.
     file_conds: Dict[str, np.ndarray] = {}
-    transitions: List[Tuple[np.ndarray, int, int]] = []  # (cond, prev_state, next_state)
-    initial_states: List[Tuple[np.ndarray, int]] = []     # (cond, init_state)
-    rank_observations: Dict[int, List[int]] = {s: [] for s in range(N_STATES)}
+    transitions: List[Tuple[np.ndarray, int, int]] = []
+    initial_states: List[Tuple[np.ndarray, int]] = []
+    rank_observations: Dict[int, List[int]] = {s: [] for s in range(n_states)}
 
     for fi, fpath in enumerate(files):
         nm = os.path.basename(fpath)
@@ -316,15 +358,35 @@ def fit(
         if len(obj_ids) < 2:
             continue
         sd = _stack_distance(obj_ids)
-        states = np.array([state_from_sd(int(x)) for x in sd], dtype=np.int64)
+
+        # Compute per-event phase bin (running unique-rate window)
+        if n_phase_bins > 1:
+            phase_per_event = np.zeros(len(obj_ids), dtype=np.int64)
+            current_rate = 0.0
+            seen: set = set()
+            for i in range(len(obj_ids)):
+                pb = int(np.searchsorted(phase_edges, current_rate, side="right"))
+                phase_per_event[i] = min(pb, n_phase_bins - 1)
+                seen.add(int(obj_ids[i]))
+                if (i + 1) % PHASE_WINDOW == 0:
+                    current_rate = len(seen) / PHASE_WINDOW
+                    seen = set()
+        else:
+            phase_per_event = np.zeros(len(obj_ids), dtype=np.int64)
+
+        states = np.array([
+            state_from_sd(int(sd[i]), int(phase_per_event[i]))
+            for i in range(len(sd))
+        ], dtype=np.int64)
 
         initial_states.append((cond, int(states[0])))
         for t in range(len(states) - 1):
             transitions.append((cond, int(states[t]), int(states[t + 1])))
 
-        # Per-state rank observations (for decoding REUSE state → rank)
+        # Per-state rank observations
         for i, s in enumerate(states):
-            if int(s) >= STATE_REUSE_OFFSET and sd[i] >= 0:
+            dist_state = int(s) % N_DIST_STATES
+            if dist_state >= STATE_REUSE_OFFSET and sd[i] >= 0:
                 rank_observations[int(s)].append(int(sd[i]))
 
         if fi % 8 == 0:
@@ -353,21 +415,23 @@ def fit(
         377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323, 5669,
     ], dtype=np.int64)
     rank_pmf_per_state: Dict[int, np.ndarray] = {}
-    for s, ranks in rank_observations.items():
+    n_uniform = len(fine_edges) - 1
+    for s in range(n_states):
+        ranks = rank_observations.get(s, [])
         if not ranks:
-            rank_pmf_per_state[s] = np.ones(len(fine_edges) - 1) / (len(fine_edges) - 1)
+            rank_pmf_per_state[s] = np.ones(n_uniform) / n_uniform
             continue
         ranks_arr = np.array(ranks, dtype=np.int64)
         counts, _ = np.histogram(ranks_arr, bins=fine_edges)
         if counts.sum() == 0:
-            rank_pmf_per_state[s] = np.ones(len(fine_edges) - 1) / (len(fine_edges) - 1)
+            rank_pmf_per_state[s] = np.ones(n_uniform) / n_uniform
         else:
             rank_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
 
     # Train net
     print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr})")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = make_net(COND_DIM, hidden, N_STATES).to(device)
+    net = make_net(COND_DIM, hidden, n_states).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
     init_conds = torch.tensor(np.stack([c for c, _ in initial_states]), dtype=torch.float32, device=device)
@@ -391,7 +455,7 @@ def fit(
 
     state_dict = {k: v.cpu() for k, v in net.state_dict().items()}
     model = NeuralAtlas(
-        n_states=N_STATES,
+        n_states=n_states,
         cond_dim=COND_DIM,
         hidden=hidden,
         state_dict=state_dict,
@@ -400,6 +464,8 @@ def fit(
         rank_edges=fine_edges,
         cond_mean=cond_mean,
         cond_std=cond_std,
+        n_phase_bins=n_phase_bins,
+        phase_edges=phase_edges if len(phase_edges) > 0 else None,
         metadata={
             "trace_dir": trace_dir,
             "char_file": char_file,
@@ -409,6 +475,7 @@ def fit(
             "lr": lr,
             "n_transitions": len(transitions),
             "inline_cond": inline_cond,
+            "n_phase_bins": n_phase_bins,
         },
     )
     model.save(output)
@@ -475,10 +542,17 @@ def generate(
             stack: List[int] = []
             next_new_id = 10_000_000 + sid * (per_stream + 1_000_003)
             ts = 0.0
+            # R174: running unique-rate phase tracking (mirrors fit-time phase)
+            n_phase_bins = max(int(getattr(m, "n_phase_bins", 1)), 1)
+            phase_edges = getattr(m, "phase_edges", None)
+            current_rate = 0.0
+            phase_seen: set = set()
+            phase_count = 0
 
             for step in range(per_stream):
-                # Decode current state to (action, rank)
-                if state == STATE_NEW:
+                # Decode current state to (phase, dist_state) → action
+                dist_state = state % N_DIST_STATES
+                if dist_state == STATE_NEW:
                     obj_id = next_new_id
                     next_new_id += 1
                     stack.insert(0, obj_id)
@@ -523,11 +597,26 @@ def generate(
                     "tenant": 0,
                 })
 
-                # Roll the state forward
+                # Update running unique-rate phase
+                if n_phase_bins > 1 and phase_edges is not None:
+                    phase_seen.add(int(obj_id))
+                    phase_count += 1
+                    if phase_count >= PHASE_WINDOW:
+                        current_rate = len(phase_seen) / PHASE_WINDOW
+                        phase_seen = set()
+                        phase_count = 0
+
+                # Roll the state forward (sampled state already encodes phase)
                 state_t = torch.tensor([state], dtype=torch.long, device=device)
                 trans_logits = net.forward_trans(cond_t, state_t)
                 trans_p = torch.softmax(trans_logits, dim=-1).cpu().numpy()[0]
                 state = int(rng.choice(m.n_states, p=trans_p))
+                # Force the phase component to track the running unique-rate so
+                # the sampled state's phase doesn't drift from the empirical phase.
+                if n_phase_bins > 1 and phase_edges is not None:
+                    expected_pb = int(np.searchsorted(phase_edges, current_rate, side="right"))
+                    expected_pb = min(expected_pb, n_phase_bins - 1)
+                    state = expected_pb * N_DIST_STATES + (state % N_DIST_STATES)
 
     df = pd.DataFrame(rows[:n_records])
     df.to_csv(output_path, index=False)
@@ -550,6 +639,9 @@ def main():
     pfit.add_argument("--seed", type=int, default=7)
     pfit.add_argument("--inline-cond", action="store_true",
                       help="R172: compute cond features directly from trace files")
+    pfit.add_argument("--n-phase-bins", type=int, default=1,
+                      help="R174: state-space expansion. 1 (default) = 6-state R170-173 encoding; "
+                           "4 = 24 states with running-unique-rate phase quartiles.")
 
     pgen = sub.add_parser("generate")
     pgen.add_argument("--model", required=True)
@@ -564,7 +656,7 @@ def main():
             args.trace_dir, args.char_file, args.output,
             max_files=args.max_files, records_per_file=args.records_per_file,
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
-            inline_cond=args.inline_cond,
+            inline_cond=args.inline_cond, n_phase_bins=args.n_phase_bins,
         )
     elif args.cmd == "generate":
         generate(
