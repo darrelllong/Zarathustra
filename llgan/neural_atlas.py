@@ -490,6 +490,7 @@ def generate(
     n_records: int = 100_000,
     seed: int = 42,
     max_stack_depth: int = 8192,
+    temperature: float = 1.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -534,9 +535,9 @@ def generate(
                 cond_vec = (cond_vec - m.cond_mean) / m.cond_std
             cond_t = torch.tensor(cond_vec, dtype=torch.float32, device=device).unsqueeze(0)
 
-            # Initial state
+            # Initial state (temperature-scaled softmax)
             init_logits = net.forward_init(cond_t)
-            init_p = torch.softmax(init_logits, dim=-1).cpu().numpy()[0]
+            init_p = torch.softmax(init_logits / max(temperature, 1e-3), dim=-1).cpu().numpy()[0]
             state = int(rng.choice(m.n_states, p=init_p))
 
             stack: List[int] = []
@@ -626,7 +627,7 @@ def generate(
                 # Roll the state forward (sampled state already encodes phase)
                 state_t = torch.tensor([state], dtype=torch.long, device=device)
                 trans_logits = net.forward_trans(cond_t, state_t)
-                trans_p = torch.softmax(trans_logits, dim=-1).cpu().numpy()[0]
+                trans_p = torch.softmax(trans_logits / max(temperature, 1e-3), dim=-1).cpu().numpy()[0]
                 state = int(rng.choice(m.n_states, p=trans_p))
                 # Force the phase component to track the running unique-rate so
                 # the sampled state's phase doesn't drift from the empirical phase.
@@ -666,6 +667,9 @@ def main():
     pgen.add_argument("--output", required=True)
     pgen.add_argument("--n", type=int, default=100_000)
     pgen.add_argument("--seed", type=int, default=42)
+    pgen.add_argument("--temperature", type=float, default=1.0,
+                      help="Softmax temperature for state-transition sampling. "
+                           "Lower = sharper / closer to argmax. R175 experiment.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -678,7 +682,7 @@ def main():
     elif args.cmd == "generate":
         generate(
             args.model, args.manifest, args.output,
-            n_records=args.n, seed=args.seed,
+            n_records=args.n, seed=args.seed, temperature=args.temperature,
         )
 
 

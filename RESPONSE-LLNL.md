@@ -10223,3 +10223,69 @@ GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBU
 Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_p4.pkl.gz` (24-state model — kept for diagnosis)
 - `/home/darrell/v_alibaba_b2_p4_marg.csv` (HRC-MAE 0.0120 marginal-rank gen)
+
+
+## Round 175 — h160 + temperature sweeps closed-FAILED on both corpora; R172/R173 h96 stays the LLNL best on alibaba/tencent
+
+**Date**: 2026-04-30 14:30 PDT
+
+### What ran
+
+- **h160 alibaba retrain**: 237 files × 25k records, ep600, hidden=160 (vs R172's 96). trans_loss 1.79 → 0.907 (vs R172's 0.915 — modest 0.008 nats gain).
+- **Temperature sweep on h160 alibaba** at T=0.5/0.7/1.0/1.5 — softmax sharpness for state-transition sampling.
+- **Temperature sweep on R173 tencent** at T=0.5/0.7/1.0/1.5.
+
+### Result — h160 alibaba
+
+| recipe | reuse / real | P50 / real | P90 / real | footprint | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R172 h96 T=1.0 (best) | 0.276 / 0.269 | 190 / 201 | 1379 / 1452 | 18102 | **0.0069** |
+| R175 h160 T=1.0 | 0.280 / 0.269 | 184 / 201 | 1309 / 1452 | 17996 | **0.0118** |
+| R175 h160 T=0.7 | 0.240 / 0.269 | 212 / 201 | 1378 / 1452 | 19009 | 0.0282 |
+| R175 h160 T=0.5 | 0.222 / 0.269 | 236 / 201 | 1301 / 1452 | 19440 | 0.0455 |
+| R175 h160 T=1.5 | 0.337 / 0.269 | 141 / 201 | 1335 / 1452 | 16585 | 0.0652 |
+
+h160 trans_loss is lower (0.907 vs 0.915) but HRC-MAE is WORSE (0.0118 vs 0.0069). Larger net overfits the per-file conditioning — sharper per-stream transition predictions actually drift the per-cache-size miss-ratio curve from real. T<1.0 makes it worse (sharper sampling regression); T>1.0 makes it worse (flatter sampling regression). T=1.0 native is the optimum.
+
+### Result — tencent T sweep on R173 model
+
+| T | reuse / real | P50 / real | P90 / real | footprint | **HRC-MAE** |
+|---|---|---|---|---|---|
+| 1.0 (best) | 0.637 / 0.615 | 52 / 60 | 156 / 174 | 9073 | **0.0206** |
+| 0.7 | 0.585 / 0.615 | 57 / 60 | 120 / 174 | 10380 | 0.0259 |
+| 0.5 | 0.548 / 0.615 | 63 / 60 | 116 / 174 | 11310 | 0.0614 |
+| 1.5 | 0.692 / 0.615 | 51 / 60 | 280 / 174 | 7688 | 0.0663 |
+
+Same finding: T=1.0 is optimal for tencent. Sharper or flatter sampling both regress.
+
+### Diagnosis — b2 architecture is at the right operating point
+
+Two scaling axes (hidden width and softmax temperature) both hit local optima at the R172/R173 baseline. The remaining 2.4–3.8× gap to LANL is **not** in:
+- Net capacity (h96 = h160 in terms of HRC-MAE; deeper net needed if any architectural lever)
+- Sampling temperature (T=1.0 is the optimum)
+- State space (R174 closed: 24-state regresses to 0.0120)
+
+What it IS in:
+- Mark model (LANL has neural marks; LLNL uses uniform opcode/size/ts)
+- Larger training record budget (LANL trains on more total events)
+- Different cond features (we use 10-feature; LANL may use richer profile-encoder)
+
+### Standing race position — unchanged
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout** | **0.0069 (R172)** | 0.001826 | 3.8× |
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173)** | 0.008735 | 2.4× |
+
+### Next race-relevant move
+
+Pursuing larger record budget (50k–100k records per file) on alibaba next. Doubles the transition observation count per file → more per-file-conditioned signal for the cond MLP. Cost: ~10 min retrain.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_h160.pkl.gz` (h160 model, kept for record)
+- `/home/darrell/v_alibaba_h160_T*.csv` (T sweep CSVs)
+- `/home/darrell/v_tencent_T*.csv` (T sweep CSVs)
