@@ -61,7 +61,11 @@ N_STATES = N_DIST_STATES
 
 
 # Conditioning features pulled from trace_characterizations.jsonl. Skips
-# `reuse_ratio` because its 4096-sample value is unreliable for alibaba (R169).
+# `reuse_ratio` from JSONL because its 4096-sample value is unreliable for
+# alibaba (R169). Round 178 adds 3 inline-computable features that were
+# missing: inline reuse_rate (the most-informative per-file signal),
+# hot10_residency (working-set concentration), iat_lag1_autocorr (timing
+# predictability). With these, COND_DIM=13.
 COND_FEATURES = [
     "burstiness_cv",
     "iat_q50",
@@ -73,6 +77,9 @@ COND_FEATURES = [
     "forward_seek_ratio",
     "backward_seek_ratio",
     "ts_duration",
+    "reuse_rate_inline",
+    "hot10_residency",
+    "iat_lag1_autocorr",
 ]
 COND_DIM = len(COND_FEATURES)
 
@@ -90,7 +97,8 @@ def cond_from_profile(profile: dict) -> np.ndarray:
         v = profile.get(k)
         if v is None:
             out[i] = 0.0
-        elif k.endswith("_cv") or k.endswith("_ratio"):
+        elif (k.endswith("_cv") or k.endswith("_ratio") or k == "hot10_residency"
+              or k == "reuse_rate_inline" or k == "iat_lag1_autocorr"):
             out[i] = float(v) if np.isfinite(float(v)) else 0.0
         elif k.startswith("iat_") or k.startswith("obj_size_") or k == "ts_duration":
             out[i] = _safe_log1p(v)
@@ -100,16 +108,17 @@ def cond_from_profile(profile: dict) -> np.ndarray:
 
 
 def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
-    """Round 172: compute the 10-feature cond vector directly from the trace
-    file. Closes the data-quality gap from R171 where 6 of 10 features were
-    zero-variance in trace_characterizations.jsonl (iat_q50/90, obj_size_q50/90,
-    write_ratio, opcode_switch_ratio, ts_duration not populated).
+    """Round 172/178: compute the cond vector directly from the trace file.
+    R178: add 3 inline-computable features (reuse_rate, hot10_residency,
+    iat_lag1_autocorr) that the JSONL pipeline doesn't populate or computes
+    on too-short samples.
     """
     sys.path.insert(0, "/home/darrell/Zarathustra")
     from llgan.phase_pmf_atlas import _read_trace
-    ts_arr, sz_arr, op_arr = [], [], []
+    ts_arr, oid_arr, sz_arr, op_arr = [], [], [], []
     for ev in _read_trace(path, keep_sentinel=True):
         ts_arr.append(ev[0])
+        oid_arr.append(ev[1])
         sz_arr.append(ev[2])
         op_arr.append(ev[3])
         if len(ts_arr) >= max_records:
@@ -117,6 +126,7 @@ def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
     if len(ts_arr) < 2:
         return np.zeros(COND_DIM, dtype=np.float32)
     ts = np.asarray(ts_arr, dtype=np.float64)
+    oid = np.asarray(oid_arr, dtype=np.int64)
     sz = np.asarray(sz_arr, dtype=np.float64)
     op = np.asarray(op_arr, dtype=np.int64)
 
@@ -156,6 +166,32 @@ def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
 
     ts_duration = float(ts[-1] - ts[0]) if len(ts) > 1 else 0.0
 
+    # R178: inline reuse_rate (the most-informative per-file feature for
+    # alibaba's bimodal distribution; trace_characterization.jsonl's
+    # 4096-sample reuse_ratio is unreliable per R169)
+    seen: set = set()
+    n_reuses = 0
+    for x in oid:
+        v = int(x)
+        if v in seen:
+            n_reuses += 1
+        seen.add(v)
+    reuse_rate_inline = n_reuses / len(oid)
+
+    # R178: hot10_residency — share of accesses to the top-10 most-frequent ids
+    from collections import Counter
+    counts = Counter(int(x) for x in oid)
+    top_n = min(10, len(counts))
+    top_share = sum(c for _, c in counts.most_common(top_n)) / len(oid)
+    hot10_residency = float(top_share)
+
+    # R178: iat_lag1_autocorr — Pearson correlation of consecutive IATs
+    if len(iat) >= 3 and iat.std() > 1e-9:
+        lag = np.corrcoef(iat[:-1], iat[1:])[0, 1]
+        iat_lag1_autocorr = float(lag) if np.isfinite(lag) else 0.0
+    else:
+        iat_lag1_autocorr = 0.0
+
     profile = {
         "burstiness_cv": burst_cv,
         "iat_q50": iat_q50,
@@ -167,6 +203,9 @@ def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
         "forward_seek_ratio": forward_seek_ratio,
         "backward_seek_ratio": backward_seek_ratio,
         "ts_duration": ts_duration,
+        "reuse_rate_inline": reuse_rate_inline,
+        "hot10_residency": hot10_residency,
+        "iat_lag1_autocorr": iat_lag1_autocorr,
     }
     return cond_from_profile(profile)
 
@@ -526,13 +565,16 @@ def generate(
             nm = os.path.basename(segs[0]["path"])
             if use_inline_cond:
                 # Match the training-time cond scope so cond features at
-                # generate match the distribution the net learned. Falls back
-                # to the manifest's records_taken if metadata is missing.
+                # generate match the distribution the net learned.
                 cond_records = int(m.metadata.get(
                     "records_per_file",
                     segs[0].get("records_taken", 25_000),
                 ))
                 cond_vec = cond_from_trace(segs[0]["path"], max_records=cond_records)
+                # Backwards-compat: if model was trained with fewer cond dims
+                # (R170-177 used COND_DIM=10), trim to that size.
+                if m.cond_dim < len(cond_vec):
+                    cond_vec = cond_vec[: m.cond_dim]
             else:
                 cond = chars.get(nm, {})
                 cond_vec = cond_from_profile(cond)
