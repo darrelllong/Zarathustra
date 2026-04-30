@@ -160,6 +160,15 @@ class Config:
     long_chain_weight: float = 0.0    # loss weight (0=off; try 1.0–5.0; add alongside reuse_rate_loss)
     long_chain_windows: int = 10      # K = number of windows to chain (10 → 120-step horizon)
 
+    # IDEA #117: thread retrieval_state across the long-chain loss windows
+    # (Gemini Round 3 P1 #2). The retrieval bank (mem_size=32) only writes
+    # ~12 entries per T=12 training window, so eviction logic is never trained
+    # at saturation. With this flag, the long-chain block carries retrieval_state
+    # across its K windows so the bank fills and starts evicting under training
+    # supervision — matching the deployed long-rollout contract used by
+    # generate.py and long_rollout_eval.py. Requires --retrieval-memory.
+    retrieval_train_carry: bool = False
+
     # Variational conditioning (IDEAS.md idea #3)
     var_cond: bool = False               # Enable variational encoder on char-file conditioning.
                                          # Replaces fixed cond vector with N(μ(cond), σ(cond)):

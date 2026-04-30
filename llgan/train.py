@@ -1940,18 +1940,39 @@ def train(cfg: Config) -> None:
                 _lc_K = int(getattr(cfg, 'long_chain_windows', 10))
                 if _lcw > 0.0 and obj_id_col >= 0 and latent_ae:
                     _T_sr = 10.0  # surrogate temperature (same as chain_reuse v4)
+                    # IDEA #117: thread retrieval_state across the chain when
+                    # retrieval-memory + retrieval_train_carry are both on, so
+                    # the bank fills and evicts under training supervision.
+                    _rm_carry = (bool(getattr(cfg, "retrieval_train_carry", False))
+                                 and bool(getattr(cfg, "retrieval_memory", False)))
                     _z_lc_g, _ = _make_z_global(B, cfg, device,
                                                  real_features=real_batch,
                                                  file_cond=file_cond_batch, G=G)
                     _h_lc = None
+                    _r_lc = None
                     _lc_reuse_chunks = []
                     for _lci in range(_lc_K):
                         _z_ll = G.sample_z_local(B, cfg.timestep, device)
                         if _h_lc is None:
-                            _H_lc, _h_lc = G(_z_lc_g, _z_ll, return_hidden=True)
+                            if _rm_carry:
+                                _H_lc, _h_lc, _r_lc = G(
+                                    _z_lc_g, _z_ll,
+                                    return_hidden=True,
+                                    return_retrieval_state=True,
+                                )
+                            else:
+                                _H_lc, _h_lc = G(_z_lc_g, _z_ll, return_hidden=True)
                         else:
-                            _H_lc, _h_lc = G(_z_lc_g, _z_ll,
-                                              hidden=_h_lc, return_hidden=True)
+                            if _rm_carry:
+                                _H_lc, _h_lc, _r_lc = G(
+                                    _z_lc_g, _z_ll,
+                                    hidden=_h_lc, retrieval_state=_r_lc,
+                                    return_hidden=True,
+                                    return_retrieval_state=True,
+                                )
+                            else:
+                                _H_lc, _h_lc = G(_z_lc_g, _z_ll,
+                                                  hidden=_h_lc, return_hidden=True)
                         _feat_lc = R(_H_lc)                       # decode to feature space
                         _lc_reuse_chunks.append(_feat_lc[:, :, obj_id_col])  # (B, T)
                     _lc_reuse_all = torch.cat(_lc_reuse_chunks, dim=1)       # (B, K*T)
@@ -3141,6 +3162,12 @@ def parse_args() -> Config:
     p.add_argument("--long-chain-windows", type=int, default=10,
                    help="IDEA #116: K = number of windows to chain for long-chain loss "
                         "(default 10 → 120-step horizon; 10x the training window size).")
+    p.add_argument("--retrieval-train-carry", action="store_true",
+                   help="IDEA #117: thread retrieval_state across long-chain windows so "
+                        "the retrieval bank fills and evicts under training supervision "
+                        "(addresses Gemini Round 3 P1 #2 — bank is never saturated during "
+                        "T=12 windows otherwise). Requires --retrieval-memory and "
+                        "--long-chain-weight > 0 to take effect.")
     args = p.parse_args()
 
     cfg = Config()
@@ -3278,6 +3305,7 @@ def parse_args() -> Config:
     cfg.lru_eval_corpus              = args.lru_eval_corpus
     cfg.long_chain_weight            = args.long_chain_weight
     cfg.long_chain_windows           = args.long_chain_windows
+    cfg.retrieval_train_carry        = args.retrieval_train_carry
     # AVATAR forces 2-step supervisor
     if cfg.avatar:
         cfg.supervisor_steps = 2
