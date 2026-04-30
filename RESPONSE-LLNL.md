@@ -10405,3 +10405,116 @@ GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBU
 Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_ep1000.pkl.gz` (ep1000 model, closed-failed)
 - `/home/darrell/v_alibaba_b2_ep1000.csv`
+
+
+## Round 178 — Rich cond features (10→13) closed-FAILED at HRC-MAE 0.0114; per-stream alignment near-perfect but HRC curve drifts
+
+**Date**: 2026-04-30 15:30 PDT
+
+### What ran
+
+Added 3 new inline-computable cond features to bring COND_DIM from 10 → 13:
+- `reuse_rate_inline`: actual reuse rate from 25k records (was unreliable in trace_characterizations.jsonl per R169)
+- `hot10_residency`: share of accesses to top-10 most-frequent objects
+- `iat_lag1_autocorr`: Pearson correlation of consecutive inter-arrival times
+
+Cond stats showed strong signal:
+- reuse_rate_inline mean=0.499, **std=0.272** (highest variance feature — perfect for alibaba's bimodal reuse distribution)
+- hot10_residency mean=0.076, std=0.07 (working-set concentration)
+- iat_lag1_autocorr mean=-0.023, std=0.10 (timing predictability)
+
+Trained alibaba b2 with R172 recipe + new cond features. trans_loss converged to 0.907 (vs R172's 0.915 — modest improvement).
+
+### Result
+
+| recipe | per-stream reuse alignment | HRC-MAE |
+|---|---|---|
+| R172 baseline | s0/s1/s2/s3: 0.726/0.058/0.337/0.057 vs target 0.757/0.003/0.377/0.003 | **0.0069** |
+| **R178 rich-cond** | s0/s1/s2/s3: **0.745/0.003/0.369/0.003** vs target | 0.0114 |
+
+R178 has **the best per-stream reuse alignment ever** (s1, s3 hit target 0.003 exactly; s0 within 1.6%). But HRC-MAE regresses to 0.0114 — same overfitting pattern as R175 (h160), R176 (50k), R177 (ep1000).
+
+### Diagnosis — same overfitting story
+
+Six axes now show the same pattern: any architectural / data / cond change that *improves* per-stream marginal alignment ALSO *worsens* HRC-MAE. This is structural — LLNL's i.i.d. PMF rank sampling produces a smooth corpus-mean HRC curve that happens to interpolate real well; sharper per-stream conditioning produces sharper per-stream HRC curves whose aggregation drifts from real.
+
+R172's "underfit" sweet spot is genuine: it's where the model knows JUST enough to align reuse rates approximately while keeping the per-cache-size HRC curve soft enough to match real.
+
+### What's left — regularization
+
+The overfitting hypothesis suggests **dropout** is the missing piece. R172 underfits accidentally because of insufficient training; explicit dropout regularization could let the rich features help WITHOUT overfitting.
+
+R179 dropout=0.2 fit currently running on vinge (background `bvwu8nhy0`).
+
+### Sandia + LANL pass
+
+GPU 0% in between fits. No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_richcond.pkl.gz` (rich-cond model, closed-failed)
+- `/home/darrell/v_alibaba_b2_richcond.csv` (HRC-MAE 0.0114 generation)
+
+
+## Round 179 — Dropout 0.2 closed-FAILED at HRC-MAE 0.0168; b2-light 7-axis exploration COMPLETE; R172 baseline is structurally optimal
+
+**Date**: 2026-04-30 15:50 PDT
+
+### What ran
+
+Added dropout regularization to cond_mlp (post each Linear+SiLU) and trans_head. Trained alibaba R172 recipe + dropout=0.2 + 13-feature rich cond. trans_loss 0.934 (vs no-dropout 0.907 — regularization working).
+
+### Result
+
+HRC-MAE = **0.0168** (vs R172's 0.0069). Diagnostics close to real (reuse 0.286 / P50 184 / P90 1345 / footprint 17848 — all within 10% of real). Same pattern as the previous 6 axes.
+
+### b2-light 7-axis exploration — FINAL summary
+
+| axis | best variant | HRC-MAE | vs R172 |
+|---|---|---|---|
+| State space (R174) | n_phase_bins=4, marginal | 0.0120 | 1.7× worse |
+| Net width (R175) | hidden=160 | 0.0118 | 1.7× worse |
+| Sampling temperature (R175) | T=1.0 | 0.0069 | tie |
+| Record budget (R176) | 50k records | 0.0184 | 2.7× worse |
+| Training epochs (R177) | ep1000 | 0.0114 | 1.7× worse |
+| Cond features (R178) | 13-dim rich cond | 0.0114 | 1.7× worse |
+| Dropout (R179) | dropout=0.2 | 0.0168 | 2.4× worse |
+| **R172 baseline** | h96, T=1.0, ep600, 25k, 6-state, 10-cond, no-dropout | **0.0069** | **best** |
+
+7/7 axes tested. R172 is structurally optimal for the b2-light architecture. Every axis that *improves* per-stream marginal alignment regresses HRC-MAE.
+
+### Diagnosis — structural finding
+
+LLNL b2-light samples ranks i.i.d. from the per-state PMF. This produces a smooth corpus-mean HRC curve. Any conditioning improvement that sharpens per-stream predictions also sharpens the per-stream HRC curve, whose aggregation diverges from real even though per-stream marginals improve. R172 sits at a "blurred" sweet spot.
+
+To break this ceiling requires a structurally different generative procedure:
+- LANL's NeuralAtlas does conditional sequencing (next state depends on history), not just per-state PMF lookup.
+- A small autoregressive transformer over the stack-distance sequence would capture this.
+- Estimated effort: 1-2 days. Uncertain payoff (could close the gap to ~0.003 or saturate similarly).
+
+### Standing race position — final after R170-179
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout** | **0.0069 (R172)** | 0.001826 | 3.8× |
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173)** | 0.008735 | 2.4× |
+| alibaba ★ frozen-bundle | 0.001937 | (LLNL only) | — |
+| tencent mark_score canonical | 0.041 (GAN+post-hoc) / 0.0475 (PhaseAtlas) | (LLNL only) | — |
+
+**LLNL has closed the order-of-magnitude HRC-MAE gap on both corpora** in 9 rounds (R170-179). The 2-4× residual gap is the architectural cost of i.i.d. PMF sampling vs neural conditional sequencing.
+
+### Closing the b2-light track
+
+The b2 conditional transition net architecture is **closed at the R172/R173 baseline.** No hyperparameter axis tested can improve beyond this. Continued work on b2 returns diminishing or negative gains.
+
+Three race-relevant options remain:
+1. **Architectural overhaul** — autoregressive transformer over stack-distance sequence. 1-2 day commitment.
+2. **Mark model** — LANL has neural marks; LLNL doesn't. Doesn't help HRC-MAE per LANL's invariance findings (REBUTTAL §3-§5) but improves mark axis. ~half day.
+3. **Accept current race position** and pivot to publication.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_dropout.pkl.gz`
+- `/home/darrell/v_alibaba_b2_dropout.csv`

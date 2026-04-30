@@ -217,24 +217,28 @@ def _torch():
     return torch
 
 
-def make_net(cond_dim: int, hidden: int, n_states: int):
+def make_net(cond_dim: int, hidden: int, n_states: int, dropout: float = 0.0):
     torch = _torch()
     import torch.nn as nn
 
     class Net(nn.Module):
         def __init__(self):
             super().__init__()
+            self.dropout_p = dropout
             self.cond_mlp = nn.Sequential(
                 nn.Linear(cond_dim, hidden),
                 nn.SiLU(),
+                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
                 nn.Linear(hidden, hidden),
                 nn.SiLU(),
+                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
             )
             self.state_emb = nn.Embedding(n_states, hidden)
             self.init_head = nn.Linear(hidden, n_states)
             self.trans_head = nn.Sequential(
                 nn.Linear(hidden * 2, hidden),
                 nn.SiLU(),
+                nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
                 nn.Linear(hidden, n_states),
             )
 
@@ -329,6 +333,7 @@ def fit(
     seed: int = 7,
     inline_cond: bool = False,
     n_phase_bins: int = 1,
+    dropout: float = 0.0,
 ) -> None:
     """Train a CondTransitionNet on (cond, prev_state, next_state) tuples.
 
@@ -468,9 +473,9 @@ def fit(
             rank_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
 
     # Train net
-    print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr})")
+    print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr}, dropout={dropout})")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = make_net(COND_DIM, hidden, n_states).to(device)
+    net = make_net(COND_DIM, hidden, n_states, dropout=dropout).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
     init_conds = torch.tensor(np.stack([c for c, _ in initial_states]), dtype=torch.float32, device=device)
@@ -708,6 +713,8 @@ def main():
     pfit.add_argument("--n-phase-bins", type=int, default=1,
                       help="R174: state-space expansion. 1 (default) = 6-state R170-173 encoding; "
                            "4 = 24 states with running-unique-rate phase quartiles.")
+    pfit.add_argument("--dropout", type=float, default=0.0,
+                      help="R179: dropout in cond_mlp + trans_head; regularizes overfitting.")
 
     pgen = sub.add_parser("generate")
     pgen.add_argument("--model", required=True)
@@ -726,6 +733,7 @@ def main():
             max_files=args.max_files, records_per_file=args.records_per_file,
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
             inline_cond=args.inline_cond, n_phase_bins=args.n_phase_bins,
+            dropout=args.dropout,
         )
     elif args.cmd == "generate":
         generate(
