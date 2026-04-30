@@ -9723,3 +9723,85 @@ No active processes on vinge (GPU 0%). No new commits since `c12ed02` Sandia / `
 
 Artifacts (vinge):
 - `/home/darrell/v_alibaba_perstream.csv` (per-stream reuse fake)
+
+
+## Round 168 — Per-stream MANIFEST-ORACLE calibration closed-FAILED at HRC-MAE 0.0190; PhaseAtlas architecture cannot match LANL NeuralAtlas on alibaba
+
+**Date**: 2026-04-30 13:35 PDT (Round 167 follow-up — full per-stream calibration test, manifest oracle cheat baseline)
+
+### What ran
+
+Hypothesis: Round 167 closed-failed because per-stream reuse alone wasn't enough — the stack-distance PMF was still global. The fix is to override BOTH per-stream rate AND per-stream stack-distance histogram. Wired via:
+- New `per_stream_calib: Optional[List[Dict]]` field on `PhasePMFAtlas` (each entry: `fine_pmf`, `fine_edges`, `calib_rr`).
+- `generate()` per-stream loop reads `per_stream_calib[stream_id]` if set, falling back to global otherwise.
+- One-shot script `build_alibaba_perstream_calib.py` builds 4 manifest-oracle calibrations (read 25k records from each of the 4 manifest files, compute their stack_distance_histogram and reuse_access_rate directly).
+
+Manifest-oracle = **the architectural ceiling cheat**. We're feeding the generator the EXACT calibration of the test files. Cannot do better than this without a learned transition model.
+
+### Per-stream manifest-oracle calibrations (built directly from manifest files)
+
+| stream | manifest file | reuse | hist bins |
+|---|---|---|---|
+| 0 | alibabaBlock_163.oracleGeneral.zst | 0.7567 | 29 |
+| 1 | alibabaBlock_275.oracleGeneral.zst | 0.0030 | 29 |
+| 2 | alibabaBlock_109.oracleGeneral.zst | 0.3767 | 29 |
+| 3 | alibabaBlock_221.oracleGeneral.zst | 0.0034 | 29 |
+
+### Result
+
+| recipe | reuse (gen / real) | P50 (gen / real) | P90 (gen / real) | footprint (gen / real) | **HRC-MAE** |
+|---|---|---|---|---|---|
+| R163 single-rate (manifest-aware) | 0.270 / 0.269 | 114 / 201 | 1225 / 1452 | 18251 / 18273 | 0.0071 |
+| R167 per-stream-rate-only | 0.285 / 0.269 | 114 / 201 | 1100 / 1452 | 17868 / 18273 | 0.0219 |
+| **R168 per-stream MANIFEST-ORACLE (rate + PMF)** | 0.286 / 0.269 | **177 / 201** | 1179 / 1452 | 17839 / 18273 | **0.0190** |
+| LANL NeuralAtlas blend=0.5 | 0.265 / 0.269 | 197 / 201 | 1267 / 1452 | n/a | **0.001826** |
+
+### Diagnosis — per-stream calibration improves P50 but not HRC-MAE
+
+P50 went from 114 (R163, R167) → 177 (R168). That's a real improvement — **the stack-distance distribution shape is now matching real per-stream**. But HRC-MAE got slightly worse than the single-rate manifest-aware version (0.019 vs 0.007).
+
+The HRC-MAE metric averages cache-miss-ratio differences across a cache-size grid. Per-stream calibration produces sharper bimodal stack distributions (Stream 1, 3 are nearly miss-only; Stream 0 is heavy-locality). When the eval aggregates these into a corpus HRC curve, the resulting curve has different shape than real's smoother curve. The single-rate version got coincidentally-good HRC because its uniform output curve happened to interpolate the real curve well, even though P50 was off.
+
+**This is the architectural ceiling.** Even with manifest-oracle cheat per-stream calibration:
+- LLNL PhaseAtlas alibaba HRC-MAE = 0.019 (10× worse than LANL)
+- LANL NeuralAtlas alibaba HRC-MAE = 0.001826
+
+The 10× gap is in something LANL's NeuralAtlas does that LLNL's PhaseAtlas architecture fundamentally can't replicate via post-hoc PMF tuning: **conditional sequencing of misses**. LANL's neural transition net learns WHICH sequence of obj_ids to emit; LLNL's PhaseAtlas just samples ranks i.i.d. from the PMF.
+
+### Closed-failed verdict — alibaba PhaseAtlas track
+
+The alibaba PhaseAtlas track is **closed-failed at HRC-MAE 0.019**. No amount of:
+- Per-stream rate calibration (R167)
+- Per-stream PMF calibration (R168)
+- Manifest-oracle cheat (R168, full-knowledge)
+
+closes the gap below 0.019. **The architectural deficit between empirical PMF + LRU stack and LANL's learned conditional transition net is real, and cannot be closed by smarter calibration alone.**
+
+### Standing race position update
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| alibaba HRC-MAE strict-holdout | 0.2515 (PhaseAtlas) | 0.001826 (NeuralAtlas blend=0.5) | LANL by 137× |
+| alibaba HRC-MAE manifest-aware (single-rate) | 0.0071 (PhaseAtlas) | 0.001826 | LANL by 3.9× |
+| alibaba HRC-MAE manifest-oracle (per-stream cheat) | **0.0190** (PhaseAtlas) | 0.001826 | LANL by 10× |
+| alibaba ★ frozen-bundle | 0.001937 (R-15-protocol v195) | (not on this surface) | LLNL only |
+| tencent HRC-MAE strict-holdout | 0.0427 (PhaseAtlas N=128) | 0.008735 (PhaseAtlas+marks-e20) | LANL by 5× |
+
+**The only LLNL path to close either alibaba or tencent HRC-MAE gap is the b2 multi-day learned-transition port from `altgan/neural_atlas.py`.** Nothing cheaper has worked across 14 rounds (R155-R168).
+
+### Active LLNL run: none. Next race-relevant move
+
+Two options remain:
+1. **(b2 port)** Multi-day. Port `_CondTransitionNet` from `altgan/neural_atlas.py` into LLNL pipeline. Targets both alibaba and tencent HRC-MAE.
+2. **(strategic pivot)** Accept current LLNL race position as established; pivot to publishing the existing strong numbers (alibaba ★=0.001937; tencent PhaseAtlas+post-hoc-mark mark_score 0.0414/0.0475; cross-corpus amenability ranking from R-ANALYSIS). Position the LLNL contribution as the analytic / mark-fidelity track while LANL holds the cache-fidelity track.
+
+Picking (1) but as a SCOPING document next, not the full implementation. ~1 hour scoping; multi-day implementation.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits since `c12ed02` Sandia / `af29a4c` LANL. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/atlas_alibaba_perstream_oracle.pkl.gz` (per-stream calibrated atlas)
+- `/home/darrell/v_alibaba_perstream_oracle.csv` (oracle-calibrated fake)
+- `/home/darrell/build_alibaba_perstream_calib.py` (per-stream calib builder)

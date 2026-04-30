@@ -36,7 +36,7 @@ import pickle
 import subprocess
 import struct
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -217,6 +217,10 @@ class PhasePMFAtlas:
     # → probability. Includes sentinels so generate() reproduces real opcode
     # mix instead of hardcoding write. Round 161 P0 fix.
     opcode_pmf: Optional[Dict[int, float]] = None
+    # Round 168: per-stream calibration overrides — list of dicts each with
+    # `fine_pmf`, `fine_edges`, `calib_rr`. When set, generate() picks
+    # per_stream_calib[stream_id] instead of corpus_eval_*.
+    per_stream_calib: Optional[List[Dict[str, Any]]] = None
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -480,9 +484,15 @@ class PhasePMFAtlas:
         _fine_pmf = getattr(self, "corpus_eval_fine_pmf", None)
         _fine_edges = getattr(self, "corpus_eval_fine_edges", None)
         _calib_rr = getattr(self, "corpus_eval_calibrated_rr", None)
-        effective_fine_pmf = _fine_pmf if _fine_pmf is not None else EVAL_FINE_PMF
-        effective_fine_edges = _fine_edges if _fine_edges is not None else EVAL_FINE_EDGES
-        effective_calib_rr = float(_calib_rr) if _calib_rr is not None else EVAL_CALIBRATED_REUSE_RATE
+        _global_fine_pmf = _fine_pmf if _fine_pmf is not None else EVAL_FINE_PMF
+        _global_fine_edges = _fine_edges if _fine_edges is not None else EVAL_FINE_EDGES
+        _global_calib_rr = float(_calib_rr) if _calib_rr is not None else EVAL_CALIBRATED_REUSE_RATE
+
+        # Round 168: per-stream calibration override list. If set, each stream
+        # picks its own (fine_pmf, fine_edges, calib_rr) from per_stream_calib.
+        _ps_calib = getattr(self, "per_stream_calib", None)
+        if _ps_calib:
+            print(f"Per-stream calibration: {len(_ps_calib)} entries")
 
         # Round 161 P0: precompute opcode sampler from opcode_pmf (or fall back
         # to legacy hardcoded write so existing models stay reproducible).
@@ -496,6 +506,17 @@ class PhasePMFAtlas:
             _op_probs = np.array([1.0], dtype=np.float64)
 
         for stream_id in range(n_streams):
+            # Round 168: per-stream calibration takes priority over global
+            if _ps_calib and stream_id < len(_ps_calib):
+                _e = _ps_calib[stream_id]
+                effective_fine_pmf = np.asarray(_e["fine_pmf"], dtype=np.float64)
+                effective_fine_edges = np.asarray(_e["fine_edges"], dtype=np.int64)
+                effective_calib_rr = float(_e["calib_rr"])
+            else:
+                effective_fine_pmf = _global_fine_pmf
+                effective_fine_edges = _global_fine_edges
+                effective_calib_rr = _global_calib_rr
+
             stack: List[int] = []
             next_new_id = 10_000_000 + stream_id * (per_stream + 1_000_003)
             ts = 0.0
