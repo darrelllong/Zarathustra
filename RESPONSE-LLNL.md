@@ -8641,3 +8641,64 @@ Active LLNL run: **none**. Next: option (1) PhaseAtlas refit-with-more-files swe
 
 LANL: continued mark-axis sweeps (predictable invariance). **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 150 — Round 149 option (1) misdiagnosed; tencent_traincalib is a SINGLE-PHASE atlas with eval-JSON calibration
+
+**Date**: 2026-04-30 08:48 PDT
+
+### Discovery
+
+Inspecting the existing `tencent_traincalib.pkl.gz` (HRC-MAE=0.04375):
+
+```
+n_phase_bins = 1                       (NO multi-phase conditioning!)
+corpus_eval_calibrated_rr = 0.65072    (tencent-calibrated reuse rate)
+corpus_eval_fine_pmf = set             (tencent-calibrated fine PMF)
+```
+
+It's NOT a multi-phase atlas at all — it's a SINGLE-PHASE atlas built via `cmd_calibrate_from_json` from a tencent eval JSON. The "8 training files" refers to the `cmd_fit` call that produced the BIT-fitted reservoir, but the dominant calibration came from the eval-JSON path that overrides the per-phase PMF with `corpus_eval_fine_pmf` (tencent-tuned).
+
+### My 32-file refit (`tencent_traincalib_32f.pkl.gz`) — DRAMATIC REGRESSION
+
+Refitting with `--max-files 32` produces a multi-phase atlas (n_phase_bins=4) WITHOUT eval-JSON calibration. Result:
+
+| | tencent_traincalib (8f, single-phase + eval-JSON) | tencent_traincalib_32f (4-phase, no eval-JSON) |
+|---|---|---|
+| HRC-MAE | **0.04375** | **0.387342** (8.8× WORSE) |
+| reuse rate | ~0.65 | 0.2374 (vs real 0.6149) |
+| corpus_eval_calibrated_rr | 0.65072 (set) | None (default to alibaba's 0.26474) |
+| n_phase_bins | 1 | 4 |
+
+**The 32f atlas defaults `effective_calib_rr` to the alibaba-tuned `EVAL_CALIBRATED_REUSE_RATE = 0.26474`** because `corpus_eval_calibrated_rr` is None. That's why generated reuse plummets to 0.24. This is a methodology trap: `cmd_fit` doesn't transfer the eval-JSON calibration; you need `cmd_calibrate_from_json` AS A POST-PROCESSING step.
+
+### Round 149 plan corrected
+
+Option (1) "increase fit file count" was based on misunderstanding the existing artifact. Refitting more files WITHOUT applying eval-JSON calibration regresses badly. The correct experiment shape is:
+
+1. **Refit with more files via `cmd_fit`** to get richer per-phase BIT statistics.
+2. **THEN apply `cmd_calibrate_from_json` with the tencent eval JSON** to override `corpus_eval_calibrated_rr` and `corpus_eval_fine_pmf`.
+3. Generate + eval, compare to baseline 0.04375.
+
+But there's a wrinkle: the eval JSON `llnl_phase_eval_tencent_real.json` does NOT contain `stack_distance_histogram` and `stack_distance_bin_edges` (only summary stats: `reuse_access_rate`, `stack_distance_median`, `stack_distance_p90`). `cmd_calibrate_from_json` requires the histogram. The JSON used to calibrate the original `tencent_traincalib.pkl.gz` had the histogram — provenance unknown to me.
+
+### Plan revised — three sub-paths under option (1)
+
+a. **Find the original calibration JSON**: search vinge for a tencent eval JSON with `stack_distance_histogram` (likely an output of `long_rollout_eval.py` from earlier rounds). Cost: ~10 min.
+
+b. **Generate a tencent calibration JSON**: run `long_rollout_eval.py --produce-real-metrics` on the eval manifest's 4 real files to compute the histogram. Cost: ~5 min compute + plumbing.
+
+c. **Skip the multi-phase refit**: just use the existing 8f single-phase model and explore other axes (e.g. tighten the `corpus_eval_fine_pmf` calibration with more eval files).
+
+Recommendation: (b) — generate a fresh tencent calibration JSON with `stack_distance_histogram`, then refit + calibrate.
+
+### Decision this round
+
+Hold the 32f atlas as a documented negative result. Don't proceed to 64/128-file refits without first solving the calibration plumbing (tracks (a)/(b) above). Round 150's actual implementation work is small: locate or generate the right calibration JSON, then chain `cmd_fit` + `cmd_calibrate_from_json` properly.
+
+The 5× LLNL-vs-LANL tencent gap remains; the path is more methodologically intricate than Round 149 anticipated.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis sweeps (predictable invariance). **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
