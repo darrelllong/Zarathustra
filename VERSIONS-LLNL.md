@@ -6716,3 +6716,33 @@ Eval files (manifest `/home/darrell/long_rollout_manifests/tencent_stackatlas.js
 - W>3 in first 5 ep → preprocessor schema isn't the only blocker; deeper code drift
 
 PID logged in /home/darrell/train_tencent_v234c.log header.
+
+---
+
+### tencent_v234c — CLOSED-FAILED (2026-04-29 21:46) — bit-identical to v234b; schema diagnosis wrong
+
+**Recipe:** v234b minus `--lru-cache-depth 15000`, `--lru-eval-every 5`, `--lru-eval-corpus tencent`. Pure v229 recipe with v229 pretrain reused.
+
+**Result:** ep1 W=+1.2625, ep2 W=+2.4020 — **bit-identical to v234b ep1/ep2**, killed before W-stop fires (the trajectory matches v234b exactly so W-stop is guaranteed at ep5-6).
+
+The `--lru-cache-depth 15000` flag was NOT the cause of the W blowup. Round 139's schema-mismatch hypothesis is REJECTED: same trajectory with or without the flag means either the flag's effect is too small to matter OR the v229 pretrain itself is incompatible with current code in a more fundamental way.
+
+**Real candidate diagnosis:** the v229 pretrain (saved Apr 23) was trained under code state pre-3f19c05/c978bef. Either an optimizer-state difference, RNG-state difference, or a subtle layer-init change in train.py since 2026-04-23 may have invalidated the pretrain. Or v229's ★=0.039 was a single-run lottery without proven reproducibility — the original v229 was never cross-seed validated; it produced 0.039 once, was archived, and the archived pretrain's Phase 3 dynamics may not be reproducible from any fresh launch.
+
+**Process:** v234c PID 2035345, killed manually 21:47. Log /home/darrell/train_tencent_v234c.log.
+
+---
+
+### tencent_v234d — RUNNING (2026-04-29 21:48) — FRESH pretrain (no clone) under current code state
+
+**Recipe:** identical to v234c (pure v229 recipe, no LRU flags). KEY DIFFERENCE: no pretrain reuse — runs full Phase 1 (AE 50 ep) + Phase 2 (Sup 50 ep) + Phase 2.5 (G-warm 100 ep) under current code state, then Phase 3.
+
+**Hypothesis under test:** if v234d Phase 3 ep1-3 reproduces v229's W trajectory (0.72/1.40/1.14), the v229 ATB is reproducible from-scratch under current code, and the issue was the cloned pretrain. If v234d also blows up at W=2.4+ in early Phase 3, the v229 ATB is single-run-locked and we need a different mechanism, not reproduction.
+
+**Cost:** 3.5h pretrain + Phase 3. Significant, but the only definitive answer to the reproducibility question.
+
+**Gates:**
+- Phase 3 ep1-3 W ≤ 1.5 → v229 ATB reproducible from scratch; queue v235 (IDEA #117 retrieval-train-carry on v234d's pretrain)
+- W>3 in first 5 ep of Phase 3 → v229 ATB is run-locked; pivot to architectural changes (IDEA #117 implementation needed regardless, as a new angle not a repro)
+
+PID logged in /home/darrell/train_tencent_v234d.log; expect ep1 of Phase 3 around 2026-04-30 01:20 PDT.

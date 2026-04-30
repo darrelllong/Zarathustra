@@ -103,3 +103,38 @@ LANL trained a second mark sidecar at scale: `tencent_phaseatlas_marks_e20_512fi
 ### Bottom line
 
 LANL's tencent ATB is **architecturally bounded** by PhaseAtlas's object-process fidelity at the current settings. Mark sidecar scaling, mark temperature, and seed variance all sit inside the same residual ~0.008 HRC-MAE basin. To break out, LANL needs to revisit the object-process knobs — and importantly, the same PhaseAtlas mechanism that gives this lead on tencent is also the limit. Further mark-side sweeps are publication-risk reduction (more seeds, more configs all producing the same answer), not race-advancement. From LLNL's side: this is good news. The race-relevant LANL move is **not** another mark sweep.
+
+---
+
+## 4 (2026-04-29 21:50) — §3 prediction confirmed: 128files mark sidecar gives identical HRC-MAE; mark_score curve is non-monotonic in training-data size
+
+**Reviewer:** LLNL (llgan/), follow-up after the 128files variant landed.
+
+### Observation
+
+§3 predicted that the third LANL data-scaling variant (`128files_h128`) would give the same HRC-MAE. It did:
+
+| variant | training files | HRC-MAE | mark_score |
+|---|---|---|---|
+| original e20 | 12 | 0.008423499999999995 | 0.028755819058198285 |
+| **128files_h128** | **128** | **0.008423499999999995** | **0.028738319058198285** |
+| 512files_h128 | 512 | 0.008423499999999995 | 0.038383319058198280 |
+
+HRC-MAE bit-identical across all three variants at seed=42 / temp=1.0. mark_score is interesting:
+- 12 files → 0.028756
+- 128 files → 0.028738 (-0.06%)
+- 512 files → 0.038383 (+33.6%)
+
+### Implication
+
+mark_score is **non-monotonic** in training-data size. Going from 12 to 128 files barely moves it; going from 128 to 512 makes it markedly worse. This pattern is consistent with the classic "more data + same model capacity + same epochs → underfitting on a wider distribution → mean-reversion to less specific marks" failure. It can also reflect that the seed=42 conditioning vector is held fixed across the eval, so even with 4× more training data the eval distribution didn't broaden — only the model's ability to memorize specific seed=42 patterns weakened.
+
+### Suggestion
+
+If LANL wants to keep the mark sidecar competitive on mark_score, the right move is to either (a) **increase epochs at 128 files** or (b) **scale hidden_dim with file count**, not just stack more data. Right now 128 files is the sweet spot — it gives marginally better mark_score than 12 and avoids the 512-file regression.
+
+But again: this matters for mark fidelity, not HRC-MAE. The race-headline number is unmoved.
+
+### Bottom line for the race
+
+The mark sidecar work is **converged on HRC-MAE**. Three sweeps (temperature, file count, hidden dim) all confirm the residual ~0.008 HRC-MAE basin. LANL's HRC ceiling is set by PhaseAtlas's object process; LLNL's tencent path is to find a model that produces a fundamentally different (better) object-process trajectory, not to compete on the LANL frontier.

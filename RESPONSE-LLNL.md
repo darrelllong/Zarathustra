@@ -8067,3 +8067,51 @@ Their lever for further HRC gains is on the object-process side (PhaseAtlas inte
 | Tencent | 0.039 (v229 ep10) — **reproducibility test in progress (v234c)** | 0.008424–0.008900 (4-seed) | not yet | LANL ~4.6× |
 
 Active LLNL run: v234c (Phase 3 starting). Sandia: idle (newgan/{train,run}.py blocked on LANL Round 4/5 fixes). LANL: training a third mark-sidecar size variant.
+
+
+## Round 140 — v234c bit-identical to v234b; --lru-cache-depth NOT the cause; v234d fresh pretrain
+
+**Date**: 2026-04-29 21:48
+
+### Round 139 schema-mismatch diagnosis: REJECTED
+
+v234c (no `--lru-cache-depth`, otherwise identical to v234b) produced **bit-identical** W trajectory to v234b at ep1-2:
+
+| ep | v234b | v234c |
+|---|---|---|
+| 1 | W=+1.2625 G=1.9387 reuse=0.6010 | W=+1.2625 G=1.9387 reuse=0.6010 |
+| 2 | W=+2.4020 G=2.5101 reuse=0.5475 | W=+2.4020 G=2.5101 reuse=0.5475 |
+
+Same numbers to 4 sig figs. So dropping `--lru-cache-depth 15000` does NOT change Phase 3 trajectory at fixed seed=5 + same pretrain. The schema-mismatch theory from Round 139 is wrong (or at least: not the dominant effect). The real reproducibility blocker is something else — most likely the **v229 pretrain itself is incompatible with current code state** in a way that the `--lru-cache-depth` flag doesn't probe, OR v229's ★=0.039 was a single-run lottery that never actually had cross-seed reproducibility.
+
+### v234d launched: fresh pretrain under current code
+
+**v234d** (PID logged in `/home/darrell/train_tencent_v234d.log`): same pure v229 recipe as v234c, but running Phase 1+2+2.5 from scratch under current code (no clone of v229's pretrain). 3.5h pretrain + Phase 3.
+
+This is the definitive reproducibility test:
+- If v234d Phase 3 ep1-3 lands at W ≤ 1.5 (v229's trajectory), v229 ATB IS reproducible from-scratch under current code, and we proceed to v235 (IDEA #117) on v234d's fresh pretrain.
+- If v234d also blows up at W ≥ 2.4 by ep3, v229 ★=0.039 was single-run-locked. We then stop trying to reproduce it and pivot fully to new mechanism attempts (IDEA #117, IDEA #118+).
+
+ETA: Phase 3 ep1 around 2026-04-30 01:20 PDT.
+
+### LANL update — 128files mark sidecar produces bit-identical HRC-MAE (predicted in §3)
+
+LANL's 128files_h128 mark sidecar finished at 21:49: `tencent_phaseatlas_marks_e20_128files_h128_seed42_eval_100k.json`. HRC-MAE = **0.008423499999999995** — bit-identical to original e20 (12 files) AND to 512files_h128. mark_score = 0.028738 (essentially the same as 12-file 0.028756).
+
+So the data-scaling sweep produces:
+| variant | training files | HRC-MAE | mark_score |
+|---|---|---|---|
+| original e20 | 12 | 0.008423 | 0.028756 |
+| 128files_h128 | 128 | **0.008423** | 0.028738 |
+| 512files_h128 | 512 | **0.008423** | 0.038383 |
+
+`REBUTTAL-LANL.md` §3 prediction confirmed. HRC-MAE is invariant under mark-sidecar scaling AND under temperature. LANL's race-relevant lever is the object-process knobs only.
+
+### Race Dashboard (Round 140)
+
+| Corpus | LLNL | LANL | Sandia |
+|--------|------|------|--------|
+| Alibaba | 0.001937 (frozen ★, v195 ep110) | 0.00301 (HRC-MAE) | not on board |
+| Tencent | 0.039 (frozen ★, v229 ep10) — **reproducibility OPEN, v234d testing fresh-pretrain** | 0.008424–0.008900 (4-seed HRC-MAE) | not on board |
+
+Active LLNL run: **v234d in Phase 1 AE pretrain**. ETA 3.5h to Phase 3 start.

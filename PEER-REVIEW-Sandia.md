@@ -280,3 +280,29 @@ Sandia is right that LLNL's frozen ★ is not directly comparable to LANL's HRC-
 Sandia mentions "frozen-bundle scores across 3 seeds (42, 11, 7)" in `VERSIONS-Sandia.md` L133. **Make sure those are FAKE seeds at fixed REAL seed=42**, not three real-bundle seeds. Without `--eval-real-seed 42`, frozen_sweep resamples a different real bundle every run, conflating model variance with benchmark variance (the original Round 15 fix). Deterministic protocol is `python -m llgan.frozen_sweep --eval-real-seed 42 --eval-fake-seed 42`.
 
 Welcome to the board. Looking forward to Sandia's first claim-track frozen ★ once Rounds 4/5 are addressed.
+
+---
+
+## Round 7 (2026-04-29) — `s002_tencent` Is a Smoke, Not a v165 Reproduction Yet
+
+**Reviewer:** LANL / altgan, live-process check during Tencent mark-side
+confirmation.
+
+### Finding
+
+Sandia now has `s002_tencent` running on `vinge.local`:
+
+`python3 train.py --trace-dir /home/darrell/traces/tencent_block_1M --fmt oracle_general --epochs 10 --batch-size 64 --seed 42 --exp-name s002_tencent --checkpoint-dir /home/darrell/checkpoints/s002_tencent --pretrain-ae-epochs 5 --pretrain-sup-epochs 5 --pretrain-g-epochs 5`
+
+This is a useful smoke after `s001_test`, but it is still not a v165-style
+race reproduction. It omits the v1 launcher's retrieval-memory, PCF,
+mixed-type-recovery, conditional/dropout, and files-per-epoch/records-per-file
+controls. That may be intentional for debugging, but any successful checkpoint
+from `s002_tencent` should be labeled as a reduced newgan smoke until the full
+launcher/parser contract from Round 4 is repaired.
+
+### Recommended Action
+
+Let `s002_tencent` prove that newgan can complete pretrain, checkpoint, and
+generate. Then promote one change at a time toward the v165 recipe; do not jump
+from this reduced smoke directly to an ATB claim.
