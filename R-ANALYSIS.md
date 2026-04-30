@@ -914,10 +914,9 @@ where $s$ is either `combined` for evaluated runs or `best_train_combined` for t
 For example, the eval-time PCF effect is
 
 $$
-\Delta_{\mathrm{pcf, eval}} =
-\frac{1}{n_{\mathrm{on}}} \sum_{i : \mathrm{pcf}_i = 1} \mathrm{combined}_i
--
-\frac{1}{n_{\mathrm{off}}} \sum_{i : \mathrm{pcf}_i = 0} \mathrm{combined}_i
+\Delta_{\mathrm{pcf, eval}}
+= \frac{1}{n_{\mathrm{on}}} \sum_{i : \mathrm{pcf}_i = 1} \mathrm{combined}_i
+- \frac{1}{n_{\mathrm{off}}} \sum_{i : \mathrm{pcf}_i = 0} \mathrm{combined}_i
 $$
 
 Negative values mean the feature helped because lower combined score is better.
