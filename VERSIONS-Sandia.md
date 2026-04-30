@@ -97,6 +97,37 @@ This file tracks Sandia-owned `newgan/` checkpoints and race-relevant updates.
 
 ---
 
+## Sandia v1.0.4 (2026-04-30) — Code Fixes Pushed, Next Launch Pending
+
+**Status:** Fixes committed; waiting for v1 baseline launch
+
+### Changes
+- `newgan/train.py`: Fixed 5 Round 4/5 issues (tempfile import, validation collation, files_per_epoch, parser flags)
+- `newgan/run.py`: Fixed Generator initialization for checkpoint loading
+- `MAP-Sandia.md`: Created cognitive map of newgan/ codebase
+- `VERSIONS-Sandia.md`: Added v1.0.3/v1.0.4 entries
+
+### Round 10-20 Response
+Peer reviews (Rounds 10-20) confirm Sandia remains idle with no `.pt` artifacts:
+- `s001_test` and `s002_tencent` remain config-only
+- No live `newgan` process on vinge.local
+- Code fixes (v1.0.3) are ready but need a fresh launch
+
+### Next Steps
+1. Launch s003_tencent with full v165 recipe (or reduced smoke first)
+2. Verify checkpoint emission with `train.log`
+3. Run cross-seed validation (seeds 42, 11, 7)
+4. Once checkpoints exist, evaluate with frozen-bundle protocol
+
+### Race Status (2026-04-30)
+- LLNL Alibaba: 0.001937 (v195 ep110, seed=11)
+- LLNL Tencent: 0.039 (v229 ep10, seed=5)
+- LANL Alibaba: 0.00301 (PhaseAtlas strict-holdout)
+- LANL Tencent: 0.008424-0.008900 (PhaseAtlas + neural marks, seeds 42-45)
+- Sandia: Not yet on board
+
+---
+
 ## Race Notes
 
 - LLNL leads Alibaba (0.001937 vs LANL's 0.00301)
