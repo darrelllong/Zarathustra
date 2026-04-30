@@ -8881,3 +8881,79 @@ Active LLNL run: **none**. Next: N=128 calibration experiment.
 
 LANL: continued mark-axis variant sweeps (predictable invariance). **No new REBUTTAL post.**
 Sandia: idle. **No new PEER-REVIEW-Sandia post.**
+
+
+## Round 154 — N=128 large-N calibration: HRC-MAE 0.042655 (matches historical baseline; lottery confirmed)
+
+**Date**: 2026-04-30 10:18 PDT
+
+### Result
+
+N=128 holdout files (disjoint from eval, seed=201) → calibration JSON →
+calibrate atlas → generate (seed=42) → eval:
+
+```
+calibration reuse_access_rate = 0.61200   (vs eval 0.61493 — within 0.5%)
+HRC-MAE  : 0.042655                        (vs historical 0.04375)
+reuse    : 0.6126 (real 0.6149)            — match
+P50      : 103 (real 60)                   — rank distribution mismatch
+P90      : 987 (real 174)                  — significant
+footprint: 9685 (real 9627)                — match
+```
+
+### Comparison to all attempted calibrations
+
+| recipe | calib N | calib reuse_rate | HRC-MAE |
+|---|---|---|---|
+| historical traincalib | 8 (unknown seed) | unknown | 0.04375 |
+| circular (eval-derived) | n/a | 0.61493 (eval-self) | 0.000553 (INVALID) |
+| my circular reproduction | 32f + eval-derived | 0.61493 | 0.00053 (INVALID) |
+| holdout 8f seed=101 | 8 | 0.5167 | 0.1119 |
+| holdout 8f seed=102 | 8 | 0.6383 | 0.0504 |
+| holdout 8f **seed=103** | 8 | 0.6203 | **0.0192** (lucky tail; post-hoc) |
+| holdout 8f seed=104 | 8 | 0.6137 | 0.0281 |
+| holdout 8f seed=105 | 8 | 0.5864 | 0.0450 |
+| **holdout N=128 seed=201** | 128 | **0.6120** | **0.042655** |
+
+### Diagnosis
+
+Large-N (N=128) calibration nails the reuse-rate match (within 0.5% of the eval bundle) — this is the population-mean estimate. **But HRC-MAE = 0.043 is not better than the historical 0.044.** The reuse-rate match alone is necessary but not sufficient.
+
+The seed=103 lucky tail at 0.019 wasn't because of reuse-rate match — multiple N=8 seeds also matched reuse rate (102 at 0.638, 104 at 0.614) without hitting 0.019. **Seed=103 happened to ALSO match the eval bundle's stack-rank-bucket distribution by chance**, which a small-N sample can do but a large-N sample cannot (large-N converges to population, not to a specific 4-file bundle).
+
+Looking at the rank distribution at v154:
+- v154 P50 = 103 vs real 60 → fakes pick deeper ranks than real
+- v154 P90 = 987 vs real 174 → tail is much wider than real
+
+The LLNL `phase_pmf_atlas.py` design (8-bucket coarse PMF + 30-bucket fine PMF + uniform-within-bucket rank sampling) cannot match the eval bundle's rank distribution at large N because the eval bundle is one specific draw from the population.
+
+### Verdict — single-phase + calibration track is structurally bounded at HRC-MAE ~0.04
+
+Three converging lines of evidence:
+1. **Historical baseline 0.04375** = median of the N=8 calibration lottery (Round 153).
+2. **N=128 large-N 0.043** = same neighborhood, with reuse-rate match perfect → the residual gap is rank-distribution structure, not reuse-rate calibration.
+3. **Lucky seed=103 0.019** = genuine outlier from the small-N lottery; cannot be reproduced systematically.
+
+To break below 0.04 STRUCTURALLY, the path requires either:
+- (a) Fitting the rank-distribution per-phase from the actual training corpus (instead of using the global EVAL_FINE_PMF override). Multi-day rewrite of the calibration pipeline.
+- (b) Porting LANL's compound-state Markov chain (`altgan/neural_atlas.py`) — the empirical evidence that 0.008 is achievable from a different architecture.
+
+### Decision
+
+Round 154 closes the single-phase-+-calibration line of work. The **legitimate LLNL tencent strict-holdout HRC-MAE = 0.042655** (large-N N=128 calibration, seed=42 eval). This is reproducible (no lottery selection). The historical 0.04375 number can be retired as imprecise; replace with 0.042655 in race tables.
+
+The 5× gap to LANL (0.008735) remains, and the path to close it is the architectural rewrite (option b). That's multi-day work and the next major commitment.
+
+### Race Dashboard (Round 154 — stable)
+
+| Corpus | LLNL (HRC-MAE strict-holdout, reproducible) | LANL | gap |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas v195) | 0.00301 | LLNL +35% |
+| Tencent | **0.042655** (PhaseAtlas N=128 calibration) | 0.008735 | LLNL **4.9× behind** |
+
+Active LLNL run: **none**. Next: option (b) compound-state Markov port — multi-day work.
+
+### Sandia + LANL pass
+
+LANL: continued mark-axis sweeps. **No new REBUTTAL post.**
+Sandia: idle. **No new PEER-REVIEW-Sandia post.**
