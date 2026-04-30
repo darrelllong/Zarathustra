@@ -6905,3 +6905,37 @@ v235 is closed-inconclusive. The carried-state mode collapse (lru_fp 51→33 ove
 2. **P1: If burst_probe optimal burst_prob found, publish updated alibaba HRC-MAE in RESULTS.md and peer-review.** Race claim depends on vinge.local execution and result confirmation.
 3. **P2: Calibrate tencent nophase atlas.** Use `phase_pmf_atlas.py calibrate_from_json` subcommand on tencent long-rollout eval JSON. Then run burst_probe on tencent.
 4. **P3: GAN track.** Either fresh-pretrain IDEA #117 (3.5h) or concede GAN track and redirect effort to atlas track for both corpora.
+
+---
+
+### tencent_v237 — CLOSED-INCONCLUSIVE (2026-04-30 04:35) — IDEA #118 broke carried-state attractor; frozen ★ unchanged
+
+**Recipe:** v234d's pretrain (deterministic at seed=5) + Phase 3 with `--retrieval-memory --retrieval-train-carry --multi-scale-critic --mixed-type-recovery --pcf-loss-weight 0.5 --moment-loss-weight 0.5 --reuse-rate-loss-weight 10.0 --reuse-rate-target 0.70 --long-chain-weight 2.0 --long-chain-windows 10 --chain-diversity-weight 1.0 --chain-diversity-target 1.0 --lru-eval-every 5 --w-stop-threshold 7.0`. The new flag is `--chain-diversity-weight 1.0` (IDEA #118).
+
+**LRU diagnostic trajectory** (the win):
+
+| | v235 ep5 | v235 ep10 | **v237 ep5** | **v237 ep10** |
+|---|---|---|---|---|
+| lru_actual | 0.990 | 0.993 | **0.710** | 0.772 |
+| lru_fp | 51 | 33 | **1,450** | **1,137** |
+
+IDEA #118 broke the carried-state mode-collapse attractor. v237 produces 30-34× more unique objects in long rollouts than v235. lru_actual lands within ~10% of the configured target 0.70 instead of pinning at 0.99. **This is a real structural mechanism win on the carried-state diagnostic.**
+
+**Frozen-bundle gate** (the verdict):
+
+| ckpt | frozen ★ | MMD² | β-recall | α-precision |
+|---|---|---|---|---|
+| ep5 best.pt | 0.20513 | 0.01383 | 0.044 | 0.881 |
+| ep10 | **0.20128** | 0.01158 | 0.052 | 0.812 |
+| v234d / v235 baseline | 0.197 | 0.01539 | 0.075-0.091 | 0.798 |
+
+Frozen ★ landed in the same [0.20, 0.21] basin as v234d / v235. **β-recall worsened (0.05 vs 0.08-0.09) even as MMD² improved (0.0116 vs 0.0154).** The metric structure: ★ = MMD² + 0.2·(1-recall); IDEA #118 traded recall for carried-state diversity.
+
+**Verdict** — IDEA #118 closed-INCONCLUSIVE on the race-relevant frozen-★ metric:
+- **Carried-state diversity hypothesis confirmed**: lru_fp breakthrough is real and reproducible (held from ep5 to ep10).
+- **Decoupling confirmed**: long-rollout diversity and short-window held-out mode coverage are independent. Improving one didn't help the other.
+- **Frozen-★ floor**: the LLNL tencent GAN track ★≈0.20 basin is bounded by **frozen recall** specifically (short-window mode coverage on held-out 4-file bundle), NOT by carried-state attractor dynamics. Future mechanisms must target recall directly.
+
+**Process:** v237 PID killed at ep11. Log /home/darrell/train_tencent_v237.log. Frozen sweep at /home/darrell/checkpoints/tencent_v237/frozen_sweep.json. Saved checkpoints kept (epoch_0010.pt, best.pt) for any post-hoc analysis on the carried-state mechanism.
+
+**Code change in this round:** `20856dc` added `--chain-diversity-weight` and `--chain-diversity-target` flags to train.py + Config. The mechanism implementation is correct and verified working; the issue is the metric mismatch, not the implementation.

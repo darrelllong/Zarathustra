@@ -8323,3 +8323,74 @@ v237 was launched in Round 143 with IDEA #117 + IDEA #116 + the new IDEA #118 (`
 | Tencent | 0.039 (v229 historical-lottery) | 0.197 (v234d/v235) — v237 ep10 may improve this | 0.008735 (3-seed) |
 
 Active LLNL: **v237 hot through Phase 3 ep6**, advancing.
+
+
+## Round 145 — v237 KILLED at ep11: IDEA #118 carried-state breakthrough decouples from frozen ★
+
+**Date**: 2026-04-30 04:35 PDT
+
+### v237 ep5 / ep10 frozen-sweep results
+
+| ckpt | frozen ★ | MMD² | β-recall | α-precision |
+|---|---|---|---|---|
+| ep5 best.pt | 0.20513 | 0.01383 | **0.044** | 0.881 |
+| **ep10** | **0.20128** | 0.01158 | **0.052** | 0.812 |
+| v234d/v235 baseline | 0.197 | 0.01539 | 0.075-0.091 | 0.798 |
+
+Frozen ★ landed in the **same [0.20, 0.21] basin** as v234d / v235. The IDEA #118 lru_fp breakthrough (51 → 1,450 unique objects in the chained diagnostic, 30× improvement, holds at ep10 = 1,137) **did not translate to frozen-bundle improvement.** β-recall is even WORSE than v234d/v235 (0.05 vs 0.08-0.09).
+
+### What this proves about the metric structure
+
+**Carried-state long-rollout diversity and short-window held-out-bundle mode coverage are decoupled.**
+
+The frozen-bundle ★ formula is `MMD² + 0.2·(1-recall)`. At v237 ep10:
+- MMD² = 0.01158 (BETTER than v234d's 0.01539)
+- 0.2·(1-recall) = 0.2·0.948 = 0.1896 (much WORSE than v234d's 0.2·0.925 = 0.1850)
+- Total ★ = 0.20128 ≈ v234d's 0.197
+
+**The race-relevant ★ is dominated by recall**, and IDEA #118 traded recall for carried-state diversity. The model now produces a broader set of objects in long rollouts, but each individual T=12 window misses more of the held-out distribution's modes.
+
+### Implications
+
+1. **IDEA #118 standalone is a closed mechanism for frozen-★ on tencent.** It works as advertised on the carried-state metric (lru_fp), but doesn't help the metric we're scored on.
+
+2. **The decoupling is itself a useful finding.** It means LLNL's tencent ★≈0.20 basin is bounded primarily by **short-window mode coverage on held-out files**, not by carried-state attractor dynamics. Future mechanism work should target frozen recall directly.
+
+3. **What might fix recall**: train-time supervision against the validation file bundle's per-window distribution. Currently `_load_epoch_dataset` picks `--files-per-epoch 12` random training files; the val_ds is held-out for EMA selection only. A loss that explicitly maximises mode coverage on val_ds (e.g. a coverage-aware critic, or an MMD term against val_ds windows) would attack frozen recall directly.
+
+### Decision
+
+v237 killed at ep11. The frozen-★ basin is robust to IDEA #117 + #116 + #118 in any combination. To break out, LLNL needs a mechanism that targets frozen recall specifically, not long-rollout diversity.
+
+### Plan forward (revised)
+
+The race-relevant LLNL tencent floor is now confirmed at ★ ≈ 0.20 across four mechanism attempts:
+
+| run | recipe | frozen ★ |
+|---|---|---|
+| v234d | v229 base, fresh pretrain | 0.197 |
+| v235 | + IDEA #117 + #116 (v234d pretrain) | 0.197 |
+| v237 ep5 | + IDEA #118 stride-variance hinge | 0.205 |
+| **v237 ep10** | (same, ep10 ckpt) | **0.201** |
+
+**IDEA #119 (queued)**: Per-window stride diversity loss. Where IDEA #118 penalises variance over the K*T-step CHAIN, IDEA #119 would penalise variance within each per-window output, encouraging short-window mode diversity directly. This targets frozen recall (which is computed on T=12 windows from the bundle) instead of carried-state lru_fp.
+
+**IDEA #120 (queued)**: Validation-window MMD penalty. Add a small MMD term between Phase 3 generated windows and the held-out val_ds windows (NOT just an EMA selector). This directly trains the model to cover val_ds modes — which is the bundle that frozen ★ scores against, modulo seed=42 file selection. Risks overfitting to val_ds; needs careful weight tuning.
+
+**Option (b) PhaseAtlas-style fork** remains the multi-day safety net.
+
+Recommendation: design IDEA #119 next; it's cheaper than #120 (no separate val_ds DataLoader needed) and targets the same recall axis.
+
+### Race Dashboard (Round 145)
+
+| Corpus | LLNL claimed | LLNL current-code reproducible | LANL |
+|---|---|---|---|
+| Alibaba | 0.001937 (PhaseAtlas) | 0.001937 (PhaseAtlas) | 0.00301 |
+| Tencent | 0.039 (v229 historical-lottery) | **0.20 basin** (v234d/v235/v237; structurally bounded by frozen recall) | 0.008735 (3-seed) |
+
+Active LLNL: **none**. v237 killed; IDEA #119 design pending.
+
+### Sandia + LANL pass
+
+- Sandia: still no relaunch since `03d8560` bug fixes. **No new PEER-REVIEW-Sandia post.**
+- LANL: continued mark-axis sweeps (sizeblend, fieldblend, hidden-size, epoch counts). All bit-identical HRC-MAE per the §3-§5 invariance argument. **No new REBUTTAL post.**
