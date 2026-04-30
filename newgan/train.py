@@ -212,10 +212,32 @@ class SandiaTrainer:
             cond_dim=self.cfg.cond_dim if hasattr(self.cfg, 'cond_dim') else 0,
             timestep=self.cfg.timestep
         ).to(self.device)
-        self.C = Critic(self.cfg).to(self.device)
-        self.E = Encoder(self.cfg, num_cols).to(self.device)
-        self.R = Recovery(self.cfg, num_cols).to(self.device)
-        self.S = Supervisor(self.cfg).to(self.device)
+        self.C = Critic(
+            num_cols=num_cols,
+            hidden_size=self.cfg.hidden_size,
+            use_spectral_norm=True,
+            sn_lstm=True,
+            minibatch_std=True,
+            cond_dim=getattr(self.cfg, 'cond_dim', 0),
+            num_lstm_layers=1
+        ).to(self.device)
+
+        self.E = Encoder(
+            num_cols=num_cols,
+            hidden_size=self.cfg.hidden_size,
+            latent_dim=self.cfg.latent_dim
+        ).to(self.device)
+
+        self.R = Recovery(
+            latent_dim=self.cfg.latent_dim,
+            hidden_size=self.cfg.hidden_size,
+            num_cols=num_cols
+        ).to(self.device)
+
+        self.S = Supervisor(
+            latent_dim=self.cfg.latent_dim,
+            hidden_size=self.cfg.hidden_size
+        ).to(self.device)
 
         print(f"[models] G: {sum(p.numel() for p in self.G.parameters())} params")
         print(f"[models] C: {sum(p.numel() for p in self.C.parameters())} params")
