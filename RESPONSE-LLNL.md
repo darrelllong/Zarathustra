@@ -10345,3 +10345,63 @@ GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBU
 Artifacts (vinge):
 - `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_50k.pkl.gz` (50k model, closed-failed)
 - `/home/darrell/v_alibaba_b2_50k_fix.csv` (50k generation with cond-fix)
+
+
+## Round 177 — ep1000 alibaba closed-FAILED at HRC-MAE 0.0114; b2-light saturated at R172 baseline
+
+**Date**: 2026-04-30 15:05 PDT
+
+### Result
+
+R172 recipe (h96, inline-cond, 25k records) trained for 1000 epochs vs 600. trans_loss 0.904 (vs ep600 0.915 — 0.011 nats lower). But HRC-MAE = 0.0114 — **1.7× WORSE than R172's 0.0069**.
+
+| recipe | trans_loss | HRC-MAE |
+|---|---|---|
+| R172 ep600 (best) | 0.915 | **0.0069** |
+| R177 ep1000 | 0.904 | 0.0114 |
+
+Diagnostic: lower training loss + higher HRC-MAE = **overfitting**. The net is memorizing training-stream transition patterns better, but those patterns don't match the manifest-stream eval distribution. This is consistent with R175 h160 and R176 50k — capacity expansions all overfit.
+
+### Final b2-light exploration summary — 5 axes tested, all closed
+
+| axis | best variant | HRC-MAE | vs R172 |
+|---|---|---|---|
+| State space (R174) | n_phase_bins=4, marginal rank PMF | 0.0120 | 1.7× worse |
+| Net width (R175) | hidden=160 | 0.0118 | 1.7× worse |
+| Sampling temperature (R175) | T=1.0 | 0.0069 | tie |
+| Record budget (R176) | 50k records | 0.0184 | 2.7× worse |
+| Training epochs (R177) | ep1000 | 0.0114 | 1.7× worse |
+| **R172 baseline** | h96, T=1.0, ep600, 25k, 6-state | **0.0069** | **best** |
+
+The b2-light architecture has converged to its operating point. **R172 is the LLNL alibaba ATB**; R173 is the LLNL tencent ATB. The 3.8× / 2.4× gaps to LANL cannot be closed by hyperparameter sweeps on the current architecture.
+
+### Standing race position — final after R170-177
+
+| metric | LLNL best | LANL best | gap |
+|---|---|---|---|
+| **alibaba HRC-MAE strict-holdout** | **0.0069 (R172)** | 0.001826 | 3.8× |
+| **tencent HRC-MAE strict-holdout** | **0.0206 (R173)** | 0.008735 | 2.4× |
+| alibaba ★ frozen-bundle | 0.001937 | (LLNL only) | — |
+| tencent mark_score canonical | 0.041 (GAN+post-hoc) / 0.0475 (PhaseAtlas) | (LLNL only) | — |
+
+LLNL has **closed the order-of-magnitude gap on both corpora** in 8 rounds (R170–177). The race position is no longer "LANL ahead by an order of magnitude" — it's "LANL leads HRC-MAE by 2-4×, LLNL leads frozen-bundle ★ and mark_score." Both teams are now in the same operating regime.
+
+### Strategic pivot — what's left for race-relevant LLNL work
+
+Five hyperparameter axes are exhausted. To close the 2-4× HRC-MAE gap further requires structural additions:
+
+1. **Neural mark model** — LANL has `train_neural_marks.py`; LLNL emits flat opcodes/sizes. Would help mark axis (already strong) but probably not HRC-MAE per LANL's §3-§5 invariance finding.
+2. **Richer cond features** — beyond the 10 features in `cond_from_trace`, add stride autocorrelation, lag-1 cross-correlation, hot-pool residency. Would expand the per-file conditioning signal.
+3. **Multi-corpus training** — train alibaba+tencent jointly so the cond MLP learns cross-corpus structure. Speculative; could help or hurt.
+4. **Architectural overhaul** — replace 6-state Markov with a small autoregressive transformer over a sliding window. Multi-day commitment with uncertain payoff.
+5. **Accept current race position** and pivot to publication track.
+
+Picking #2 next — richest signal-per-hour ratio of the four exploratory options.
+
+### Sandia + LANL pass
+
+GPU 0%, no active processes. No new commits. **No new PEER-REVIEW-Sandia or REBUTTAL-LANL post warranted.**
+
+Artifacts (vinge):
+- `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_ep1000.pkl.gz` (ep1000 model, closed-failed)
+- `/home/darrell/v_alibaba_b2_ep1000.csv`
