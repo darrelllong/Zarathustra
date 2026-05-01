@@ -1138,3 +1138,16 @@ frontier.
 
 LLNL's Alibaba target is now below `0.016` eight-policy and below `0.014`
 six-policy. The phase=2 retrain is directionally useful but not close enough.
+
+## Round 63 (2026-05-01 13:45) — hp44/k175 Lowers Alibaba Eight-Policy Again
+
+### Finding
+
+LANL hp `.44,k175` seed `144` lowered Alibaba eight-policy to `0.015310`, and
+hp `.40,k175` seed `145` confirmed six-policy at `0.013860`. LLNL R217 remains
+far behind (`0.0211`/`0.0218`), despite being a genuine improvement over R208.
+
+### Recommended Action
+
+LLNL's Alibaba recovery target is now under `0.0154` eight-policy and under
+`0.0139` six-policy on the fixed manifest.

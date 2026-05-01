@@ -1549,3 +1549,15 @@ Alibaba eight-policy to hp `.42,k175` at `0.015835`.
 
 Keep Sandia unranked until it produces a comparable generated trace and
 cachesim panel.
+
+## Round 70 (2026-05-01 13:45) — No Sandia Artifact As hp44 Leads Alibaba
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba eight-policy to hp `.44,k175` at `0.015310`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable generated trace and
+cachesim panel.

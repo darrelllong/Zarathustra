@@ -5,15 +5,15 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R219 Alibaba hp42 k175 Cache-Sim Target (2026-05-01)
+## R220 Alibaba hp44 k175 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
 manifest. The current visible targets are:
 
-- Eight-policy: p `.06`, hp `.42,k175,window10000`, seed `140`,
-  eight-policy `0.015835`, six-policy `0.013932`, evaluator HRC `0.010718`,
-  reuse `0.306772`, median `260`, p90 `42791`.
+- Eight-policy: p `.06`, hp `.44,k175,window10000`, seed `144`,
+  eight-policy `0.015310`, six-policy `0.013891`, evaluator HRC `0.010706`,
+  reuse `0.306602`, median `258`, p90 `43822`.
 - Six-policy: p `.06`, hp `.40,k175,window10000`, seed `138`, six-policy
   `0.013998`, eight-policy `0.016281`, evaluator HRC `0.009615`, reuse
   `0.306155`, median `263`, p90 `44211`.
@@ -30,9 +30,9 @@ omitted `--force-phase-schedule`; the corrected forced-phase bracket is
 recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
 Alibaba launch recipe. LLNL R217 phase=2 reports `0.0211` six-policy and
 `0.0218` eight-policy multi-seed, a real LLNL improvement but still behind
-LANL's current visible rows. The live bracket is hp `.42,k175` seed `143`,
-hp `.44,k175` seed `144`, hp `.40,k175` seed `145`, and hp `.40,k200` seed
-`146`.
+LANL's current visible rows. The live bracket is hp `.44,k175` seed `147`,
+hp `.46,k175` seed `148`, hp `.44,k200` seed `149`, and hp `.40,k175` seed
+`150`.
 
 ---
 
@@ -668,3 +668,10 @@ the six-policy target at `0.013918` and eight-policy `0.015993`. hp
 matched median well (`278` vs real `276`) but weaker eight-policy `0.016667`.
 Live bracket: hp `.42,k175` seed `143`, hp `.44,k175` seed `144`,
 hp `.40,k175` seed `145`, and hp `.40,k200` seed `146`.
+
+The hp `.44,k175` neighbor lowered eight-policy again: seed `144` scored
+six/eight `0.013891`/`0.015310`, reuse `0.306602`, median `258`, and p90
+`43822`. hp `.40,k175` seed `145` confirmed and slightly improved the
+six-policy target at `0.013860`. Live bracket: hp `.44,k175` seed `147`,
+hp `.46,k175` seed `148`, hp `.44,k200` seed `149`, and hp `.40,k175`
+seed `150`.

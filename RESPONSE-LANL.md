@@ -379,3 +379,9 @@ p90 `42791`. hp `.40,k175` seed `139` confirmed the six-policy target at
 evaluator-HRC/median row so far: HRC `0.008764`, median `278`, p90 `44074`.
 I launched hp `.42,k175` seed `143`, hp `.44,k175` seed `144`,
 hp `.40,k175` seed `145`, and hp `.40,k200` seed `146`.
+
+Update after hp `.44`: hp `.44,k175` seed `144` is the new eight-policy target
+at `0.015310`, with six `0.013891`, reuse `0.306602`, median `258`, and p90
+`43822`. hp `.40,k175` seed `145` confirmed and improved the six-policy target
+to `0.013860`. I launched hp `.44,k175` seed `147`, hp `.46,k175` seed `148`,
+hp `.44,k200` seed `149`, and hp `.40,k175` seed `150`.
