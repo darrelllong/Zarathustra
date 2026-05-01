@@ -12533,3 +12533,47 @@ LANL still leads alibaba but gap narrows from R208 baseline. Architectural retra
 
 - LANL `5f32d8a`/`764c724`/`0de8a25`/`aac0858`/`eb85964`/`63347f9`: continuing alibaba hp/k axis sweep, current best ~0.0161 6-pol single-seed at hp=.26-.28 with k=125. Multi-seed expected ~0.018. **No race-changing finding** — LANL incrementally widening but well-documented.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 218 — Tencent phase=2 ep=600 retrain closes-NEGATIVE: phase=2 hurts tencent at all hp tested
+
+**Date**: 2026-05-01 11:30 PDT (R217 alibaba phase=2 success motivated trying same on tencent).
+
+### Test
+
+Re-trained tencent b2 with `--n-phase-bins 2 --epochs 600 --records-per-file 25000 --max-files 237`. Final trans_loss 1.0932. Atlas: `/home/darrell/llnl_neural_atlas_tencent_237f_inline_phase2_ep600.pkl.gz`.
+
+### Results
+
+| hp | tencent 6-pol mean (vs phase=2 atlas) | direction |
+|---|---|---|
+| 0.40 | 0.0531 | +75% (much worse than phase=1 R206 0.0304) |
+| 0.45 | 0.0448 | +47% |
+| 0.55 (R206 lock) | 0.0358 | +18% |
+
+Killed remaining iterations (0.50, 0.60, 0.65) early — clear that phase=2 doesn't help tencent at any hp.
+
+### Verdict
+
+Phase=2 atlas helps alibaba marginally (R217 −2%) but **hurts tencent significantly** (+18-75%). The architectural change is **corpus-specific**.
+
+### Mechanism interpretation
+
+Tencent's working set is uniform across streams (R215 multi-seed 0.7% variance); the phase=2 split adds state-space noise without capturing useful structure. Alibaba's heterogeneous per-stream reuse rates (3-90%) DO benefit from the wider state space.
+
+**Per-corpus architecture choice now warranted**: tencent stays on phase=1 (R206 atlas), alibaba uses phase=2 (R217 atlas).
+
+### Final cross-corpus standing claims (post-R218)
+
+| corpus | architecture | recipe | mean HRC-MAE |
+|---|---|---|---|
+| **Tencent** | phase=1 ep=600 | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 | 0.0451 (8-pol) / **0.0304** (6-pol) |
+| **Alibaba** | **phase=2 ep=600** | hp=0.45 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2 | **0.0218** (8-pol) / **0.0211** (6-pol) |
+| **CloudPhysics** | phase=1 ep=600 | hp=0.15 K=50 adj=0.25 tail=0.10 mf=0.5 + rp=0.10 win=2 | **0.0659** (8-pol) |
+
+LLNL recipe family now requires **per-corpus architecture choice** in addition to per-corpus knob settings.
+
+### Sandia + LANL pass
+
+- LANL: `7367beb`/`5834958` continue alibaba hp axis (now hp=.38-.40 with k=125-175). No new substantive finding.
+- Sandia: still off, R38 unfixed.
