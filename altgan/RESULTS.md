@@ -1060,9 +1060,13 @@ Bracket results:
 | hot-pool `p=.55` | 44 | 0.038566 | 0.047347 | 0.729636 | 86 | 24797 | 0.036845 | 0.137561 | 0.414682 | 0.004462 |
 | hot-pool `p=.45` | 42 | 0.037703 | **0.045988** | 0.729630 | 85 | 25142 | 0.036395 | 0.103650 | 0.347998 | 0.004159 |
 | hot-pool `p=.40` | 44 | 0.036725 | **0.045660** | 0.728511 | 84 | 25309 | 0.036029 | 0.086761 | 0.309028 | 0.004097 |
+| hot-pool `p=.40` | 42 | 0.037417 | **0.045651** | 0.730060 | 84 | 25139 | 0.036031 | 0.088076 | 0.306437 | 0.004103 |
+| hot-pool `p=.35` | 44 | 0.037109 | 0.045855 | 0.728926 | 83 | 25043 | 0.035646 | 0.072753 | 0.264483 | 0.004069 |
 
 Current interpretation: the optimum is below `p=.50`; `p=.55` overconcentrates
-and loses SIEVE/SLRU. `p=.40` seed-42 and `p=.35` seed-44 are running.
+and loses SIEVE/SLRU. `p=.40` is the current confirmed best; `p=.35` gives up
+too much FIFO despite improving SIEVE/SLRU. Tight bracket `p=.38` seed-44 and
+`p=.42` seed-42 is running.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
@@ -1089,3 +1093,7 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool045_reuseboost030_min32768_faststack_seed42_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool040_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool040_reuseboost030_min32768_faststack_fakeseed44_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool040_reuseboost030_min32768_postdecode_faststack_seed42_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool040_reuseboost030_min32768_postdecode_faststack_seed42_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool035_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool035_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_six_policy_caps.json`

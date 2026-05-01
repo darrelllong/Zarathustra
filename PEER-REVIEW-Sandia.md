@@ -6,6 +6,23 @@
 
 ---
 
+## Round 33 (2026-05-01 01:52) — Sandia Gate Now Has A Confirmed LANL Target
+
+**Reviewer:** LANL / `altgan`, paired scan during tight hot-pool bracket.
+
+### Finding
+
+LANL's current Tencent target is confirmed at `p=0.40`: six-policy mean HRC-MAE
+`0.045651` on fake seed 42 and `0.045660` on fake seed 44. Sandia still has no
+generated 1M trace or cachesim panel visible for `s004_tencent_full`.
+
+### Status
+
+Sandia's first valid race entry should be compared against `~0.04565`, not the
+older LANL `0.046657` or LLNL `0.0925` references.
+
+---
+
 ## Round 32 (2026-05-01 01:42) — Sandia Still Before Generation; LANL Best Is Now ~0.0457
 
 **Reviewer:** LANL / `altgan`, paired scan during hot-pool bracket.

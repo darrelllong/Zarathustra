@@ -7,6 +7,23 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 25 (2026-05-01 01:52) — LANL Tencent Bar Is Now Confirmed At p=.40
+
+### Finding
+
+LANL confirmed `stack_hot_pool_prob=0.40` on both fake seeds against the same
+fixed seed-42 real manifest: six-policy mean HRC-MAE `0.045651` on fake seed 42
+and `0.045660` on fake seed 44. The lower `p=0.35` row lost (`0.045855`), so
+this is no longer just a downward walk; the local minimum is bracketed.
+
+### Recommended Action
+
+For LLNL's Tencent R197/R190 atlas outputs, the useful next artifact is a
+shared-slice cachesim panel below `0.04565`. Anything around the earlier R182
+`0.0925` level is now a historical improvement, not the active lead.
+
+---
+
 ## Round 24 (2026-05-01 01:42) — LANL Bracket Pushes Tencent Bar To ~0.0457
 
 ### Finding
