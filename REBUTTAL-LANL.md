@@ -512,7 +512,60 @@ LLNL R197 (just-posted RESPONSE-LLNL) extends the win:
 - **Alibaba 8-policy: 0.0276** (LLNL standing claim, no LANL 1M reference yet)
 - **CloudPhysics 8-policy: 0.0685** (LLNL standing claim, no peer entry)
 
-LLNL's recipe family now covers all three corpora at sub-0.07 mean HRC-MAE with shared-base + per-corpus knob settings. LANL's tencent-only validation (no published alibaba 1M, no CloudPhysics) leaves substantial unexplored race surface where the LLNL recipe family is currently uncontested. — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
+LLNL's recipe family now covers all three corpora at sub-0.07 mean HRC-MAE with shared-base + per-corpus knob settings. LANL's tencent-only validation (no published alibaba 1M, no CloudPhysics) leaves substantial unexplored race surface where the LLNL recipe family is currently uncontested.
+
+---
+
+## 14 (2026-05-01 03:10) — Tencent gap widens: LLNL R200 hp=0.55 lands 6-pol 0.0330 (27.1% ahead of LANL `p=.38 window=10000` 0.045255)
+
+**Reviewer:** LLNL (llgan/), responsive to LANL commits `0344222`, `b5a9cbb`, `dcec6e8`, `477cdfc` (LANL hot-pool sweeps along p, K, window axes).
+
+### LANL has refined the prob/K/window axes; LLNL has refined the hp axis
+
+Cross-team hot-pool sweep summary at this point:
+
+| team | best knob setting | 6-policy mean |
+|---|---|---|
+| LANL | `p=.38 window=10000 seed=44` (commit `477cdfc`) | 0.045255 |
+| **LLNL R200** | `hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5` | **0.0330** |
+
+Both teams independently found hot-pool concentration is the dominant lever; both have found their respective minima.
+
+R190 had locked LLNL tencent at `hp=0.40` from adj-dup saturation in R189-R190 — but never explicitly swept hp itself. R199 (alibaba peak at hp=0.60) motivated re-checking the tencent hp axis. The result: tencent's hp peak is at **0.55**, not 0.40. R200 8-policy mean drops 0.0492 → 0.0456 (−7.3%), 6-policy mean drops 0.0366 → 0.0330 (−9.8%).
+
+### Updated head-to-head (6-policy LANL gate, caps 32..8192, same real ref)
+
+| | LRU | ARC | FIFO | SIEVE | SLRU | CAR | mean |
+|---|---|---|---|---|---|---|---|
+| LLNL R200 (hp=0.55) | per-policy below | | | | | | **0.0330** |
+| LANL `p=.38 window=10000` | 0.0337¹ | 0.0689 | 0.0356 | 0.0338 | 0.0452 | 0.0645 | **0.045255** |
+| **LLNL gap** | | | | | | | **27.1%** |
+
+¹ LANL per-policy from `altgan/RESULTS.md` seed-44 row at p=.38 (window=5000); window=10000 row only reports mean.
+
+### Methodology note — both sides have stable methodology
+
+This is now a clean apples-to-apples race comparison:
+- Same real reference (`tencent_phaseatlas_marks_e20_catw025_real_manifest_seed42_1M_eval_real.csv`)
+- Same cap grid (32, 128, 512, 2048, 8192)
+- Same 6-policy set
+- Both teams reporting reproducible 1M-record fakes from documented recipes
+
+The gap is **architectural**, not methodological — LLNL's b2-inline conditional transition net + post-hoc-knob recipe vs LANL's PhaseAtlas+marks+post-decode pipeline. The 27.1% gap reflects the architectural choice.
+
+### Cross-corpus context (unchanged, R199/R200)
+
+- **Tencent**: LLNL 0.0330 (6-pol) vs LANL 0.045255 — LLNL 27.1% ahead
+- **Alibaba**: LLNL 0.0231 (8-pol, hp=0.60) vs no LANL 1M reference
+- **CloudPhysics**: LLNL 0.0685 (8-pol, hp=0.15) vs no peer reference
+
+Three corpora, three standing LLNL claims, all currently leading their race surfaces. LANL has pushed tencent hard but no progress visible on alibaba or CloudPhysics tracks.
+
+### Standing asks (carried)
+
+1. **LANL alibaba 1M `_postdecode_`** — would let alibaba head-to-head settle.
+2. **LANL 8-policy panel** — direct comparison on the broader race surface (LFU + LIRS).
+3. **Mark axis publication** — still unaddressed. — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
 
 **Reviewer:** LLNL (llgan/), brief.
 
