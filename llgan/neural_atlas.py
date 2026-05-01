@@ -648,6 +648,7 @@ def generate(
     recent_pool_prob: float = 0.0,
     recent_pool_window: int = 200,
     tail_reuse_rank_power: float = 1.0,
+    hot_pool_refresh_jitter: bool = False,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -743,6 +744,11 @@ def generate(
             hot_window: deque = deque(maxlen=effective_window)
             hot_pool_list: List[int] = []
             hot_pool_refresh_every = 200
+            # R231 (WaveStitch lesson): optionally jitter the refresh interval
+            # via Poisson(hot_pool_refresh_every) so the periodic hot-pool
+            # composition cycle becomes irregular. Mean interval unchanged.
+            next_refresh_step = 0
+            last_refresh_step = 0
             # R184 decay: each new access multiplies all counts by decay,
             # then adds 1.0 to the new id. Half-life ≈ ln(0.5)/ln(decay) steps.
             hot_decay = 0.9999  # half-life ~6900 steps
@@ -911,16 +917,24 @@ def generate(
                     oid_int = int(obj_id)
                     # Lazy decay: scan dict only on refresh to bound cost
                     hot_freq[oid_int] = hot_freq.get(oid_int, 0.0) + 1.0
-                    if step % hot_pool_refresh_every == 0:
-                        # Apply decay (compound for refresh_every steps) and
+                    if step == next_refresh_step:
+                        # Apply decay (compound for actual elapsed period) and
                         # rebuild top-K. Drop entries below 0.01 to bound size.
-                        decay_factor = hot_decay ** hot_pool_refresh_every
+                        period = max(step - last_refresh_step, 0)
+                        decay_factor = hot_decay ** period
                         hot_freq = {k: v * decay_factor for k, v in hot_freq.items()
                                     if v * decay_factor >= 0.01}
                         hot_pool_list = [
                             k for k, _ in
                             sorted(hot_freq.items(), key=lambda kv: -kv[1])[:hot_pool_k]
                         ]
+                        last_refresh_step = step
+                        if hot_pool_refresh_jitter:
+                            # WaveStitch jitter: Poisson(mean=hot_pool_refresh_every)
+                            interval = max(int(rng.poisson(hot_pool_refresh_every)), 1)
+                            next_refresh_step = step + interval
+                        else:
+                            next_refresh_step = step + hot_pool_refresh_every
 
                 # Update running unique-rate phase
                 if n_phase_bins > 1 and phase_edges is not None:
@@ -1027,6 +1041,11 @@ def main():
                            "alibaba has 15% of IRDs >31k — cap=8192 makes those "
                            "architecturally unreachable. Larger cap allows deep "
                            "reuses; cost is generation time (linear in stack scan).")
+    pgen.add_argument("--hot-pool-refresh-jitter", action="store_true",
+                      help="R231 (WaveStitch lesson): jitter hot-pool refresh "
+                           "interval as Poisson(200) instead of fixed 200 steps. "
+                           "Mean unchanged; breaks the periodic refresh artifact "
+                           "in generated traces.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1052,6 +1071,7 @@ def main():
             recent_pool_window=args.recent_pool_window,
             tail_reuse_rank_power=args.tail_reuse_rank_power,
             max_stack_depth=args.max_stack_depth,
+            hot_pool_refresh_jitter=args.hot_pool_refresh_jitter,
         )
 
 
