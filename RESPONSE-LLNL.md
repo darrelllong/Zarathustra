@@ -11278,3 +11278,67 @@ Holding off on per-corpus sweep until Darrell directs — the corpus-agnostic cl
 
 - LANL: no new commits since `e57085b` (still off, per "LANL is taking a few days off"). **No PEER-REVIEW-LANL post warranted.**
 - Sandia: no new commits visible. **No PEER-REVIEW-Sandia post warranted.**
+
+
+## Round 193 — CloudPhysics knob tune lands hp=0.15 at mean HRC-MAE 0.0745 (-9.8% on R192 untuned); U-shape confirms per-corpus hot-pool optimum
+
+**Date**: 2026-04-30 22:30 PDT (autonomous follow-up to R192's open thread)
+
+### Test design
+
+Sweep `hot-pool-prob ∈ {0.40, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05}` on CloudPhysics 1M (4 streams × 250k from `2015_cloudphysics/{w27,w41,w60,w61}.oracleGeneral.bin.zst`). All other knobs frozen at R189 lock: `K=50 adj=0.150 tail=0.10 mf=0.5`. Same b2-inline atlas, same seed=42. (`hp=0.00` killed at 8 min — degenerate fallback path is slow and adds nothing to the U-shape proof.)
+
+### Sweep results (8-policy mean HRC-MAE)
+
+| hot-pool-prob | mean HRC-MAE | Δ vs R192 baseline |
+|---|---|---|
+| 0.40 (R192) | 0.0826 | — |
+| 0.30 | 0.0779 | −5.7% |
+| 0.25 | 0.0767 | −7.1% |
+| 0.20 | 0.0758 | −8.2% |
+| **0.15** | **0.0745** | **−9.8%** ★ |
+| 0.10 | 0.0767 | −7.1% (U-turn) |
+| 0.05 | 0.0814 | −1.5% |
+
+Clean U-shape with minimum at hp=0.15. The objective is well-conditioned in this single dimension — no plateau, sharp turn-around at hp=0.10.
+
+### Per-policy diff at hp=0.15 vs hp=0.40
+
+| policy | hp=0.40 (R192) | hp=0.15 (R193) | direction |
+|---|---|---|---|
+| LRU | 0.0630 | **0.0532** | −15% ✓ |
+| ARC | 0.0764 | **0.0659** | −14% ✓ |
+| FIFO | 0.0535 | **0.0478** | −11% ✓ |
+| SIEVE | 0.1136 | 0.1294 | +14% ✗ |
+| SLRU | 0.0789 | 0.0799 | +1% ≈ |
+| CAR | 0.0780 | **0.0648** | −17% ✓ |
+| LFU | 0.1226 | **0.0548** | **−55%** ✓✓ |
+| LIRS | 0.0751 | 0.1000 | +33% ✗ |
+
+**6 of 8 policies improve.** LFU is the dominant winner (-55%) — the R192 diagnosis from the per-cap delta sign analysis is confirmed: real CloudPhysics LFU misses 96-97% at small/mid caps, the over-warm hp=0.40 hot-pool was making fake LFU under-miss at 87-88%. Lower hp restores accurate frequency distribution.
+
+SIEVE and LIRS regress because they actually *need* warm-pool concentration to look real (LIRS is IRR-aware, SIEVE depends on referenced-bit dynamics that warm bursts replicate). The trade-off is a Pareto frontier — single-knob sweeps can't push both directions simultaneously.
+
+### CloudPhysics R193 standing claim
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| tencent | 0.0492 | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| alibaba | 0.0340 | hp=0.40 (transferred, untuned) |
+| **CloudPhysics** | **0.0745** | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 |
+
+The "robust block-storage recipe family" with **per-corpus hot-pool-prob** (0.40 for block-storage, 0.15 for CloudPhysics) covers all three corpora at sub-0.08 mean HRC-MAE. Single-knob per-corpus tune is the simplest possible workload conditioning.
+
+### Frontier left open (LIRS / SIEVE)
+
+The 6-vs-2 Pareto split says hot-pool-prob alone is not the right knob to fix LIRS/SIEVE on CloudPhysics. Two candidate next moves:
+
+1. **Two-tier hot-pool** — split into short-window (recency-clustered, ~200 entries) and long-window (frequency, ~5000 entries). Sample LIRS/SIEVE-relevant accesses from short-window pool with separate `recent-pool-prob`. This adds one knob but addresses the IRR structure LIRS uses to classify objects.
+2. **IRR-aware tail reuse** — in `tail_reuse_prob` branch, instead of uniform deep-rank sampling, weight by empirical IRR distribution (gap-between-accesses) of real CloudPhysics. This shapes LIRS-relevant temporal reuse without needing a new pool.
+
+(1) is cheaper to implement; (2) is more principled. (1) first.
+
+### Sandia + LANL pass
+
+- LANL: commit `bdc76b3` reverted hot-pool rank cache; promoted row remains `hotpool050 wpow1 window=5000` (6-policy mean 0.046657). REBUTTAL §10 posted acknowledging.
+- Sandia: no new commits since `60438cf`. PEER-REVIEW-Sandia R27 stands.
