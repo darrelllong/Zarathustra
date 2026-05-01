@@ -11342,3 +11342,47 @@ The 6-vs-2 Pareto split says hot-pool-prob alone is not the right knob to fix LI
 
 - LANL: commit `bdc76b3` reverted hot-pool rank cache; promoted row remains `hotpool050 wpow1 window=5000` (6-policy mean 0.046657). REBUTTAL §10 posted acknowledging.
 - Sandia: no new commits since `60438cf`. PEER-REVIEW-Sandia R27 stands.
+
+
+## Round 195 — recent-pool lever closes-NEGATIVE on mean HRC-MAE; useful side-finding: LIRS does respond but only by trading off SIEVE
+
+**Date**: 2026-04-30 23:05 PDT (R194 patch landed `--recent-pool-prob` / `--recent-pool-window` flags; R195 sweeps the prob lever on CloudPhysics with R193 lock + window=200).
+
+### Test design
+
+R193 lock: `hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5`. Sweep `recent-pool-prob ∈ {0.05, 0.10, 0.20, 0.30}` at default `window=200`. Goal: close the LIRS/SIEVE Pareto regression observed in R193 (the 2-of-8 policies that worsened relative to R192 untuned).
+
+### Sweep results (CloudPhysics 1M, 8-policy mean HRC-MAE)
+
+| recipe | mean HRC-MAE | LIRS | SIEVE | LFU | direction |
+|---|---|---|---|---|---|
+| R193 (rp=0) | **0.0745** | 0.1000 | 0.1294 | 0.0548 | baseline |
+| +rp=0.05 | 0.0744 | 0.0982 | n/a | 0.0505 | tied |
+| +rp=0.10 | 0.0748 | n/a | n/a | n/a | tied |
+| +rp=0.20 | 0.0779 | **0.0901** | 0.1399 | 0.0536 | mean worse |
+| +rp=0.30 | 0.0819 | **0.0847** | 0.1412 | 0.0669 | mean much worse |
+
+### Verdict: closes-NEGATIVE on the optimization target
+
+**Mean HRC-MAE doesn't improve.** R193 lock at 0.0745 stands. Higher rp monotonically raises mean.
+
+### Useful side-finding: the lever IS doing what it was designed to do — for LIRS
+
+LIRS HRC-MAE drops 15% as rp climbs (0.1000 → 0.0901 → 0.0847). The recent-pool with uniform sampling within last 200 emitted IDs **is** providing LIRS-relevant recency-clustered concentration. The IRR-aware reuse generation hypothesis from R193 is at least directionally correct.
+
+But the **same** mechanism inflates SIEVE (0.1294 → 0.1412) and LRU/ARC/CAR. Reason: uniform-recent sampling steals probability mass from both the hot-pool (long-term frequency) and the PMF (long-tail rank distribution). For LIRS this is a net win because IRR cares about recurrence-window. For SIEVE, the referenced-bit dynamics depend on burst structure that uniform-recent sampling washes out — recent_window picks objects from anywhere in the last 200, but real bursts cluster within 5-20 access windows.
+
+### Implications for next moves
+
+The single-knob recent-pool can't push LIRS without taking SIEVE/LRU with it. Options that remain promising:
+
+1. **Tighter window** (50 instead of 200) — preserves SIEVE-friendly burst structure while still concentrating LIRS-relevant recency. Cheap to test.
+2. **Recency-weighted** (exponentially-weighted within window) — picks more-recent IDs more often, restoring some burst structure.
+3. **IRR-aware tail-reuse** — reshape `tail_reuse` to weight rank by empirical IRR distribution from real, instead of uniform deep-rank. Different mechanism, different lever.
+
+(1) is the cheapest test of whether the rp idea has any merit at the right configuration. Trying that next.
+
+### Sandia + LANL pass
+
+- LANL: commit `29e6407` adds `--stack-hot-pool-max-search 8192` to bound the `obj_id in stack` lookup at 1M scale (the same pattern in our hot_pool / recent_pool code). LANL hit 40+ min wall on seed=43 reproduction. Engineering perf fix; not a science finding. **No PEER-REVIEW post warranted** — our LLNL hot-pool runs in ~2 min total for 1M, so b2-atlas stacks stay shallow enough for unbounded `index()`.
+- Sandia: `s004_tencent_full` ongoing AE pretrain ep 19/50, val=0.000008 (converged, running out the 50-epoch budget). Phase 3 ETA ~06:30 PDT. **No new R-series post warranted yet** — R28 stands.
