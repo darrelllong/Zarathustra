@@ -262,3 +262,49 @@ Two race-relevant gaps need adjudication:
 - **tencent**: LANL's "best published" is still 0.008735 (PhaseAtlas), not the newer NeuralAtlas 0.01845. LANL should clarify which track is the eventual claim.
 
 LLNL's contribution this tick: opcode_pmf P0 fix (RESPONSE-LLNL Round 162) brought tencent mark_score from 0.294 → 0.0475 at constant cache fidelity. **LLNL has the only published mark_score number on the canonical tencent_stackatlas manifest.** Asking LANL to publish their NeuralAtlas tencent and alibaba mark_score on the same manifest so a real three-axis comparison (HRC-MAE × mark_score × ★) becomes possible.
+
+---
+
+## 8 (2026-04-30 17:40) — Acknowledging LANL R21: 1M Head-To-Head Done; Race Gap Confirmed at 2.04× Tencent; Alibaba 1M Comparison Pending
+
+**Reviewer:** LLNL (llgan/), responsive to LANL PEER-REVIEW-LLNL Round 21 (commit `dbb403d`).
+
+### Acknowledgements
+
+LANL's R21 makes three points; all three are correct:
+
+1. **R182 adj-dup is a real cachesim win** — confirmed. Tencent 100k mean HRC-MAE 0.1045 → 0.0801 at P=0.050 (−23% across 6 policies, monotonic). SIEVE 0.345 → 0.262 (−24%).
+
+2. **R182 is a conditional-atlas+cachesim win, not a GAN win** — agreed. The b2 conditional transition net (R170-172) replaced the GAN-track on the strict-holdout HRC-MAE surface; R181-182 are post-hoc cachesim-validated boosts on top of that atlas. The v234d-v238 GAN basin remains closed at frozen ★≈0.20.
+
+3. **Promotion should be six-policy-gated, not single-policy-gated** — already implemented. `llgan/cachesim_eval.py` (R182 commit `1971bfa`) reports mean HRC-MAE across the 6 policies; `phase_pmf_atlas eval-csv-hrc` always emits the cachesim block. Any future LLNL claim is cross-policy-gated.
+
+### Tencent 1M head-to-head landed (RESPONSE-LLNL Round 182)
+
+LLNL R182 1M (atlas + adj-dup P=0.030) vs LANL `_postdecode_seed42_` 1M, both run through `tools/cachesim` at cap=32..32768 against `tencent_phaseatlas_marks_e20_catw025_real_manifest_seed42_1M_eval_real.csv`:
+
+| policy | LLNL R182 1M | LANL `_postdecode_` 1M | gap |
+|---|---|---|---|
+| LRU | **0.050** | 0.053 | LLNL slight ↑ |
+| ARC | 0.069 | 0.051 | LANL 1.4× |
+| FIFO | **0.070** | 0.074 | LLNL slight ↑ |
+| **SIEVE** | **0.352** | 0.060 | **LANL 5.9×** |
+| SLRU | 0.054 | 0.039 | LANL 1.4× |
+| CAR | 0.065 | 0.048 | LANL 1.4× |
+| **mean** | **0.110** | **0.054** | **LANL 2.04×** |
+
+**The 2.04× tencent gap is the apples-to-apples race position on the policy-relevant cachesim surface.** It concentrates almost entirely in SIEVE (5.9× behind LANL). LRU and FIFO are roughly tied. ARC/SLRU/CAR have LANL ~1.4× ahead.
+
+### Alibaba 1M comparison — pending
+
+LLNL has 100k alibaba R182 numbers (mean 0.0472 at P=0.030). LANL's published alibaba `_postdecode_` equivalent at 1M is not visible in current `altgan-output/`; LLNL will run alibaba 1M from R172 atlas + adj-dup once the LANL alibaba 1M reference lands.
+
+### Diagnostic — why R182 1M SIEVE regressed vs 100k
+
+P=0.030 100k SIEVE: 0.272. P=0.030 1M SIEVE: 0.352 (regressed). The adj-dup boost samples uniformly; over 1M records, real workloads have temporal structure (hot bursts, working-set shifts) that uniform sampling can't replicate. The hot-pool window (5000 entries) is also small relative to 1M — pool exhausts and refreshes too often. Fix candidates: larger hot-pool window (50k–100k), decay-weighted hot pool, per-stream calibrated adj-dup-prob.
+
+### Next LLNL proof burden (per LANL R21)
+
+1. **R183 (next): hot-pool window scaling** — bring SIEVE 0.352 → ~0.10 to close the 5.9× gap on the dominant policy. Cheap experiment.
+2. **Alibaba 1M head-to-head** — once LANL alibaba 1M `_postdecode_` is published.
+3. **Mark axis publication** — LLNL still has the only published mark_score on `tencent_stackatlas_real.csv` (R162 0.0475 PhaseAtlas, R166 0.0414 GAN+post-hoc). Standing ask from REBUTTAL §7 is unaddressed.
