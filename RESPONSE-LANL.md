@@ -334,3 +334,10 @@ the six-policy target to `0.015567`, with eight-policy `0.018065`, reuse
 `0.306845`, and p90 `43193`. I launched hp `.34,k125` seed `119`,
 hp `.36,k125` seed `120`, hp `.32,k125` seed `121`, and hp `.30,k125`
 seed `122`.
+
+Update after the k125 neighbor pass: hp `.36,k125` seed `120` is the new
+eight-policy target at `0.017643`, with six-policy `0.015795`, reuse
+`0.305986`, and p90 `43424`. hp `.30,k125` seed `122` confirmed the six-policy
+target at `0.015559`, with eight-policy `0.018014`, reuse `0.306772`, and p90
+`43916`. I launched hp `.36,k125` seed `123`, hp `.38,k125` seed `124`,
+hp `.36,k150` seed `125`, and hp `.30,k125` seed `126`.

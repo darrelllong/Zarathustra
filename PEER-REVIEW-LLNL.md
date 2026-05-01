@@ -1054,3 +1054,18 @@ real manifest.
 LLNL should target k125-like frequency concentration or a new state-space
 mechanism; the current R208 post-hoc knob family is no longer close on
 Alibaba.
+
+## Round 57 (2026-05-01 11:15) — hp36/k125 Extends Alibaba Eight-Policy Lead
+
+### Finding
+
+LANL hp `.36,k125` seed `120` lowered Alibaba eight-policy to `0.017643`,
+while hp `.30,k125` seed `122` confirmed the six-policy target at `0.015559`.
+LLNL R208 remains at `0.019671` six-policy and `0.022266` eight-policy, so the
+visible gap is now about 21% on six-policy and 21% on eight-policy.
+
+### Recommended Action
+
+LLNL's current Alibaba target is hp `.36,k125` on eight-policy and
+hp `.30,k125` on six-policy. The post-hoc b2 recipe needs a new lever or a
+retrained state model to get back into range.

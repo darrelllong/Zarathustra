@@ -5,18 +5,18 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R213 Alibaba k125 Cache-Sim Target (2026-05-01)
+## R214 Alibaba hp36 k125 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
 manifest. The current visible targets are:
 
-- Eight-policy: p `.06`, hp `.34,k125,window10000`, seed `117`, mean
-  HRC-MAE `0.017767`, six-policy `0.015648`, reuse `0.306384`, median `244`,
-  p90 `43831`.
-- Six-policy: p `.06`, hp `.30,k125,window10000`, seed `118`, mean HRC-MAE
-  `0.015567` over the six-policy panel and `0.018065` over the eight-policy
-  panel, reuse `0.306845`, median `245`, p90 `43193`.
+- Eight-policy: p `.06`, hp `.36,k125,window10000`, seed `120`, mean
+  HRC-MAE `0.017643`, six-policy `0.015795`, reuse `0.305986`, median `241`,
+  p90 `43424`.
+- Six-policy: p `.06`, hp `.30,k125,window10000`, seed `122`, mean HRC-MAE
+  `0.015559` over the six-policy panel and `0.018014` over the eight-policy
+  panel, reuse `0.306772`, median `244`, p90 `43916`.
 
 LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
 `0.022266` eight-policy), so LANL currently leads the fixed-manifest Alibaba
@@ -25,7 +25,8 @@ omitted `--force-phase-schedule`; the corrected forced-phase bracket is
 recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
 Alibaba launch recipe. The next bracket is hp `.34,k125` seed `119`,
 hp `.36,k125` seed `120`, hp `.32,k125` seed `121`, and hp `.30,k125` seed
-`122`.
+`122`. The live bracket is hp `.36,k125` seed `123`, hp `.38,k125` seed
+`124`, hp `.36,k150` seed `125`, and hp `.30,k125` seed `126`.
 
 ---
 
@@ -612,3 +613,11 @@ but did not beat seed `114` (`0.016635`/`0.018159`), and hp `.36,k100` seed
 `116` was weaker (`0.016904`/`0.018348`). Live k125 bracket: hp `.34,k125`
 seed `119`, hp `.36,k125` seed `120`, hp `.32,k125` seed `121`, and
 hp `.30,k125` seed `122`.
+
+The k125 confirmation kept moving. hp `.36,k125` seed `120` scored six/eight
+`0.015795`/`0.017643`, reuse `0.305986`, median `241`, and p90 `43424`;
+hp `.30,k125` seed `122` confirmed and improved the six-policy target at
+`0.015559` and eight-policy `0.018014`. hp `.32,k125` seed `121` was nearly
+tied with hp `.34,k125` on eight-policy (`0.017782`). Live neighbor bracket:
+hp `.36,k125` seed `123`, hp `.38,k125` seed `124`, hp `.36,k150` seed `125`,
+and hp `.30,k125` seed `126`.

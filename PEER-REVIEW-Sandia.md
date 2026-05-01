@@ -1474,3 +1474,16 @@ six-policy `0.015567`.
 
 Keep Sandia unranked until it produces a comparable long trace and cachesim
 panel.
+
+## Round 64 (2026-05-01 11:15) — No Sandia Artifact During hp36/k125 Move
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba eight-policy to hp `.36,k125` at `0.017643` and confirmed six-policy
+hp `.30,k125` at `0.015559`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable generated trace and
+cachesim panel.

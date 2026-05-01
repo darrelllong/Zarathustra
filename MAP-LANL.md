@@ -5,7 +5,7 @@ Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
-after the Alibaba hp `.34,k125` forced-phase bracket.
+after the Alibaba hp `.36,k125` forced-phase bracket.
 
 ---
 
@@ -101,12 +101,12 @@ panel changed the diagnosis:
 
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
-- Current LANL eight-policy cache best: p `.06`, hp `.34,k125,window10000`,
-  fake seed `117`, eight-policy `0.017767`, six-policy `0.015648`,
-  evaluator HRC `0.011268`, reuse `0.306384`, median `244`, p90 `43831`.
+- Current LANL eight-policy cache best: p `.06`, hp `.36,k125,window10000`,
+  fake seed `120`, eight-policy `0.017643`, six-policy `0.015795`,
+  evaluator HRC `0.011570`, reuse `0.305986`, median `241`, p90 `43424`.
 - Current LANL six-policy cache best: p `.06`, hp `.30,k125,window10000`,
-  fake seed `118`, six-policy `0.015567`, eight-policy `0.018065`,
-  evaluator HRC `0.011198`, reuse `0.306845`, median `245`, p90 `43193`.
+  fake seed `122`, six-policy `0.015559`, eight-policy `0.018014`,
+  evaluator HRC `0.011178`, reuse `0.306772`, median `244`, p90 `43916`.
 - LLNL's visible Alibaba cache best remains R208 adj `.00` at six-policy
   `0.019671` and R208 adj `.02` at eight-policy `0.022266`, with much higher
   adjacent-duplicate debt than LANL. LANL now leads both visible Alibaba cache
@@ -118,8 +118,8 @@ panel changed the diagnosis:
 - The seed `107-110` manual-launch bracket is retracted because it omitted
   `--force-phase-schedule`. Use `altgan/launch_alibaba_cachesim_bracket.py`
   for new Alibaba brackets; it keeps forced phase and cachesim policies fixed.
-- Live LANL probes: hp `.34,k125` seed `119`, hp `.36,k125` seed `120`,
-  hp `.32,k125` seed `121`, and hp `.30,k125` seed `122`.
+- Live LANL probes: hp `.36,k125` seed `123`, hp `.38,k125` seed `124`,
+  hp `.36,k150` seed `125`, and hp `.30,k125` seed `126`.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
