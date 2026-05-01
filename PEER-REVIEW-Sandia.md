@@ -6,6 +6,63 @@
 
 ---
 
+## Round 38 (2026-05-01 02:35) — `s004_tencent_full` CRASHED at Phase 4 epoch 1; two separate bugs localized
+
+**Reviewer:** LLNL (llgan/), bug report.
+
+### Crash summary
+
+`s004_tencent_full` cleared Phase 3 G-warmup (100/100 epochs, best val 0.000030), entered Phase 4 Joint GAN, and crashed at the **first batch of epoch 1**. Two separate issues fired:
+
+#### Bug 1: minibatch_std degenerate (R27 confirmed for Phase 4)
+
+```
+/home/darrell/Zarathustra/newgan/../llgan/model.py:1061:
+UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the
+reduction factor (input numel divided by output numel).
+  std_per_step = x.std(dim=0, keepdim=True)
+```
+
+This is the R27 concern landing for real in Phase 4. The Encoder output for the Critic input must be 2D `(B, D)` here (not 3D as in Phase 3), so `unsqueeze(0)` at `train.py:566` produces `(1, B, D)` — a size-1 axis along which `minibatch_std` computes std at `model.py:1061` and degenerates. The warning is silent; the cat-rank crash from R25 is sidestepped because the std op tolerates size-1 (returns NaN with warning), but downstream the gradient is now ill-conditioned.
+
+**Fix on Sandia side**: change `unsqueeze(0)` to `unsqueeze(1)` at `train.py:566, 574, 593, 602, 605` to produce `(B, 1, D)` — proper batch dim, single timestep. minibatch_std then runs std over a 16-sample batch (or whatever `--batch-size` is) and the degeneracy is gone.
+
+#### Bug 2: cudnn RNN backward through eval-mode network (separate, Phase 4-specific)
+
+```
+File "/home/darrell/Zarathustra/newgan/train.py", line 610, in train_gan
+    total_G_loss.backward()
+RuntimeError: cudnn RNN backward can only be called in training mode
+```
+
+Phase 4 setup at `train.py:525-528`:
+```python
+self.E.eval()
+self.R.eval()
+self.S.eval()  # ← Supervisor in eval
+self.G.train()
+self.C.train()
+```
+
+The Generator loss `total_G_loss` evidently includes a supervisor-consistency term that backpropagates gradients **through `self.S`** (which is in `.eval()` mode), and cudnn refuses to compute RNN gradients for an eval-mode module.
+
+**Fix on Sandia side** — pick one:
+1. **Detach** the S output: `s_out = self.S(h_fake).detach()` so no gradient flows through S. This is correct if S is supposed to stay frozen.
+2. **Train mode + frozen params**: `self.S.train()` plus `for p in self.S.parameters(): p.requires_grad_(False)` — gradients flow to allow cudnn but no weight update.
+3. **Disable cudnn** for the S forward: `with torch.backends.cudnn.flags(enabled=False): s_out = self.S(h_fake)` — falls back to non-cudnn RNN which doesn't have this restriction.
+
+Option 2 is the standard PyTorch fix for the "frozen pretrained component contributes to a downstream loss" pattern.
+
+### Status
+
+Sandia is **off** the race table again. Phase 4 didn't survive the first batch. The G-warmup pretrain checkpoint at `/home/darrell/checkpoints/s004_tencent_full/` is durable; a fixed-train.py rerun can resume from there and save ~3 hours of pretrain.
+
+### Race-table entry timing
+
+If Sandia patches both bugs and resumes from the G-warmup checkpoint, Phase 4 (200 epochs × similar wall to Phase 2) is ~5 hours. First Sandia race-table candidate not until ~07:30 PDT.
+
+---
+
 ## Round 36 (2026-05-01 02:18) — `s004_tencent_full` cleared Phase 2 + Phase 3 reached; R27 unsqueeze(0) guard was dead code on this path
 
 **Reviewer:** LLNL (llgan/), positive update.
