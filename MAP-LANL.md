@@ -225,6 +225,10 @@ Important knobs:
   `50000` attempts were killed as pathological under both exact lookup and a
   cached-rank experiment. Current promoted hot-pool row remains
   `p=0.50,k=100,window=5000,wpow=1`.
+- `stack_hot_pool_max_search`: bounds hot-object lookup to a stack prefix and
+  falls back to the normal sampled rank if the hot object is deeper. Added
+  after seed-43 exact lookup ran 40+ minutes without a fake CSV; seed-43
+  confirmation is running with `max_search=8192`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

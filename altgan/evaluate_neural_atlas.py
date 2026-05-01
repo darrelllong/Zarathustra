@@ -68,6 +68,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Sliding window length used to estimate hot-pool frequency.")
     p.add_argument("--stack-hot-pool-weight-power", type=float, default=1.0,
                    help="Power applied to hot-pool frequency weights.")
+    p.add_argument("--stack-hot-pool-max-search", type=int, default=0,
+                   help="Optional maximum stack prefix searched for hot-pool objects; 0 searches full stack.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -156,6 +158,7 @@ def main() -> int:
         stack_hot_pool_k=args.stack_hot_pool_k,
         stack_hot_pool_window=args.stack_hot_pool_window,
         stack_hot_pool_weight_power=args.stack_hot_pool_weight_power,
+        stack_hot_pool_max_search=args.stack_hot_pool_max_search,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
@@ -218,6 +221,7 @@ def main() -> int:
         "stack_hot_pool_k": args.stack_hot_pool_k,
         "stack_hot_pool_window": args.stack_hot_pool_window,
         "stack_hot_pool_weight_power": args.stack_hot_pool_weight_power,
+        "stack_hot_pool_max_search": args.stack_hot_pool_max_search,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,

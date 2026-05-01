@@ -90,6 +90,7 @@ class NeuralAtlasModel:
         stack_hot_pool_k: int = 100,
         stack_hot_pool_window: int = 5000,
         stack_hot_pool_weight_power: float = 1.0,
+        stack_hot_pool_max_search: int = 0,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -128,6 +129,7 @@ class NeuralAtlasModel:
         stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
         stack_hot_pool_window = max(int(stack_hot_pool_window), 1)
         stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
+        stack_hot_pool_max_search = max(int(stack_hot_pool_max_search), 0)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
             mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
@@ -220,7 +222,28 @@ class NeuralAtlasModel:
                             weight_power=stack_hot_pool_weight_power,
                             rng=rng,
                         )
-                        rank = stack.index(hot_obj) if hot_obj in in_stack else 0
+                        try:
+                            if stack_hot_pool_max_search > 0:
+                                rank = stack.index(
+                                    hot_obj,
+                                    0,
+                                    min(len(stack), stack_hot_pool_max_search),
+                                )
+                            else:
+                                rank = stack.index(hot_obj)
+                        except ValueError:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
                     elif boosted_reuse:
                         rank = _boosted_reuse_rank(
                             stack_len=len(stack),

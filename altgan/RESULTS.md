@@ -1027,6 +1027,11 @@ ran 40+ minutes with no fake CSV, and a cached-rank experiment also failed to
 land in a useful window. The current promoted hot-pool row remains
 `p=.50,k=100,window=5000,wpow=1`.
 
+Seed-43 confirmation of that row also made unbounded hot-object lookup look too
+expensive: it was killed after 40+ minutes with no fake CSV. The rerun uses
+`--stack-hot-pool-max-search 8192`, falling back to the sampled rank if the hot
+object is deeper than the bounded prefix.
+
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_rankscale120130_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
