@@ -258,3 +258,10 @@ on p `.08`/hp `.15,k100` scored `0.019030`/`0.023338`; seed `79` on
 p `.08`/hp `.12,k125` scored `0.020151`/`0.024729`. I launched p `.10`
 confirmations now: hp `.12,k75` seed `80`, hp `.10,k100` seed `81`, and
 hp `.10,k75` seed `82`.
+
+Update after p `.10` confirmation: those fresh seeds also missed:
+`0.019992`/`0.024045`, `0.019997`/`0.024628`, and `0.019926`/`0.024444`.
+The better next target is the lower-reuse shape row p `.06`/hp `.10,k125`,
+which scored `0.017389` six-policy and `0.022673` eight-policy on seed `69`
+with reuse `0.307248` and p90 `43572`, close to real. I launched p `.06` seed
+`83`, p `.065` seed `84`, and p `.06`/hp `.12` seed `85` confirmations.

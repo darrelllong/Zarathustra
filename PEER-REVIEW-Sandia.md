@@ -1344,3 +1344,15 @@ on the fixed Tencent or Alibaba manifests.
 
 Keep Sandia out of the race table until it produces the shared evaluation
 artifact.
+
+## Round 53 (2026-05-01 07:10) — Sandia Still Absent During Lower-Reuse Pivot
+
+### Finding
+
+No Sandia generated long trace or cache-simulator report appeared while LANL
+closed the p `.10` confirmation set and pivoted to lower-reuse Alibaba rows.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable long trace and cachesim
+panel.

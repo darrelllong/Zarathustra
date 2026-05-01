@@ -1487,6 +1487,21 @@ Do not promote the p `.08` single-seed minima as robust. The live pivot is
 back to p `.10` small-hot-pool confirmation: hp `.12,k75` seed `80`,
 hp `.10,k100` seed `81`, and hp `.10,k75` seed `82`.
 
+The p `.10` confirmation set also missed:
+
+| Row | evaluator HRC | six-policy | eight-policy | fake reuse | fake med | fake p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| p `.10`, hp `.12,k75`, seed `80` | 0.015506 | 0.019992 | 0.024045 | 0.335265 | 269 | 70615 |
+| p `.10`, hp `.10,k100`, seed `81` | 0.015364 | 0.019997 | 0.024628 | 0.335853 | 278 | 70246 |
+| p `.10`, hp `.10,k75`, seed `82` | 0.016069 | 0.019926 | 0.024444 | 0.335966 | 268 | 69656 |
+
+Lower-reuse shape row p `.06`/hp `.10,k125` seed `69` is now the more useful
+candidate: six-policy `0.017389`, eight-policy `0.022673`, reuse `0.307248`,
+median `240`, p90 `43572`. It is weaker than the p `.08` best single seed on
+eight-policy but much closer to real reuse/p90 and still beats LLNL R208 on
+six-policy. Live confirmations: p `.06`/hp `.10,k125` seed `83`,
+p `.065`/hp `.10,k125` seed `84`, and p `.06`/hp `.12,k125` seed `85`.
+
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p04_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p06_vs_lanl_realmanifest42_six_policy_caps.json`
@@ -1504,3 +1519,8 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost008_hotpool010k125w10000_p008hp010k125_seed77_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost008_hotpool015k100w10000_p008hp015k100_seed78_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost008_hotpool012k125w10000_p008hp012k125_seed79_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost010_hotpool012k75w10000_p010hp012k75_seed80_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost010_hotpool010k100w10000_p010hp010k100_seed81_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost010_hotpool010k75w10000_p010hp010k75_seed82_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p006hp010k125_seed69_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p0075hp010k125_seed66_eight_policy_caps.json`

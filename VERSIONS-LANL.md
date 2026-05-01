@@ -507,3 +507,12 @@ scored `0.020151`/`0.024729`. The p `.08` rows remain useful as best visible
 seeds, but they are not robust enough to promote. The live confirmation pivot
 returns to the p `.10` small-hot-pool family: hp `.12,k75` seed `80`, hp
 `.10,k100` seed `81`, and hp `.10,k75` seed `82`.
+
+The p `.10` confirmation set also missed on fresh seeds: hp `.12,k75` seed
+`80` scored `0.019992`/`0.024045`, hp `.10,k100` seed `81` scored
+`0.019997`/`0.024628`, and hp `.10,k75` seed `82` scored
+`0.019926`/`0.024444`. The useful next direction is the lower-reuse shape row:
+p `.06`/hp `.10,k125` seed `69` scores six/eight `0.017389`/`0.022673` while
+matching reuse/p90 much more closely (`0.307248`, p90 `43572` vs real
+`0.306465`, p90 `44829`). Live confirmations: p `.06`/hp `.10,k125` seed
+`83`, p `.065`/hp `.10,k125` seed `84`, and p `.06`/hp `.12,k125` seed `85`.

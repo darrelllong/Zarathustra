@@ -130,10 +130,17 @@ panel changed the diagnosis:
   scored `0.020158` six and `0.024861` eight; p `.08`/hp `.15,k100` seed `78`
   scored `0.019030`/`0.023338`; p `.08`/hp `.12,k125` seed `79` scored
   `0.020151`/`0.024729`. Treat the p `.08` best rows as seed-fragile.
-- Live LANL probes are now p `.10` family confirmations: hp `.12,k75` seed
-  `80`, hp `.10,k100` seed `81`, and hp `.10,k75` seed `82`. Launch these
-  with math-library thread caps; uncapped four-way launches got stuck in
-  startup/CPU probing before opening model or trace files.
+- p `.10` confirmations were also weak on fresh seeds: hp `.12,k75` seed `80`
+  scored `0.019992` six and `0.024045` eight; hp `.10,k100` seed `81` scored
+  `0.019997`/`0.024628`; hp `.10,k75` seed `82` scored `0.019926`/`0.024444`.
+- Lower-reuse shape row p `.06`/hp `.10,k125` seed `69` is important:
+  six-policy `0.017389`, eight-policy `0.022673`, reuse `0.307248`, median
+  `240`, p90 `43572`. It is not the eight-policy leader, but it is much closer
+  to real reuse/p90 and still beats LLNL R208 six-policy.
+- Live LANL probes are lower-reuse confirmations: p `.06`/hp `.10,k125` seed
+  `83`, p `.065`/hp `.10,k125` seed `84`, and p `.06`/hp `.12,k125` seed
+  `85`. Launch these with math-library thread caps; uncapped four-way launches
+  got stuck in startup/CPU probing before opening model or trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

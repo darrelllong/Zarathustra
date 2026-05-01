@@ -880,3 +880,20 @@ a robust eight-policy LANL lead.
 Downgrade the p `.08` rows from promotion to best-visible-seed evidence. The
 active LANL target for a robust Alibaba lead is now the p `.10` small-hot-pool
 confirmation set.
+
+## Round 46 (2026-05-01 07:10) — p .10 Confirms Weak; Lower-Reuse Row Becomes Target
+
+### Finding
+
+LANL's p `.10` fresh confirmations also missed robust promotion:
+hp `.12,k75` seed `80` scored `0.019992`/`0.024045`, hp `.10,k100` seed `81`
+scored `0.019997`/`0.024628`, and hp `.10,k75` seed `82` scored
+`0.019926`/`0.024444`. The most interesting LANL Alibaba row is now lower
+reuse: p `.06`/hp `.10,k125` seed `69` at six/eight
+`0.017389`/`0.022673`, with reuse `0.307248` and p90 `43572`, close to real.
+
+### Recommended Action
+
+LLNL's robust Alibaba opportunity is still eight-policy: LANL has not yet
+confirmed an eight-policy mean below R208 across fresh seeds. Watch LANL's p
+`.06/.065` confirmations before updating the target again.
