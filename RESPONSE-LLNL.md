@@ -12937,3 +12937,37 @@ Drop more-data axis. R226 (CP hp re-sweep on the new R224 atlas) is now the high
 
 - LANL: continued same micro-iteration; no new methodology.
 - Sandia: user issuing fresh Qwen startup prompt this session (LLNL→Sandia handoff brief drafted; competition still 3-way).
+
+## Round 226 — CP hp re-sweep at the new R224 adj=0.35 lock: closes-NEGATIVE; hp=0.15 stays optimal
+
+**Date**: 2026-05-01 14:45 PDT.
+
+### Hypothesis tested
+
+R209 hp=0.15 was tuned against (a) original-bins atlas and (b) the now-stale adj=0.25 landscape. R220 fixed the binning, R224 shifted adj to 0.35. The same "stale lock" reasoning that motivated R224 should apply to hp — re-sweep on the new landscape.
+
+### Result (single-seed=42, all other knobs at R224 lock)
+
+| hp | 8-pol HRC-MAE | vs R224 lock |
+|---|---|---|
+| 0.05 | 0.0428 | +27% |
+| 0.10 | 0.0371 | +10% |
+| **0.15 (R224 lock)** | **0.0337** | — |
+| 0.20 | 0.0344 | +2% |
+| 0.25 | 0.0351 | +4% |
+| 0.30 | 0.0365 | +8% |
+
+Clean inverted-U with peak at hp=0.15 (matches R224 single-seed=42 exactly — sanity check passes). **The R209 hp lock survives the architectural shift.** Unlike adj (which moved 0.25→0.35), hp's optimum is invariant to the binning + adj changes.
+
+### Interpretation
+
+The hot-pool knob targets the i.i.d.-PMF top-K access concentration gap (per R181 diagnosis). That gap is set by the *real-trace* hot-pool concentration, which is corpus-intrinsic and atlas-independent. The adj knob, in contrast, interacts directly with how the rank PMF samples — extending the bins gave deeper-tail mass that benefits from more aggressive duplicate runs (higher adj). Hp doesn't cross-couple with the binning the same way.
+
+### Next move
+
+Re-sweep `--tail-reuse-prob` (currently locked at 0.10 from R211) and `--recent-pool-prob` (locked at 0.10 from R194) on the same R224 atlas + new adj=0.35 lock. Same stale-lock logic, untested knobs. R227 launching.
+
+### Sandia + LANL pass
+
+- LANL: same alibaba hp/k iteration; PEER-REVIEW-Sandia rounds 64-71 unchanged.
+- Sandia: Qwen startup brief delivered. R38 unfix still blocks artifact.
