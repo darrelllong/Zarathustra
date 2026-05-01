@@ -188,11 +188,14 @@ class NeuralAtlasModel:
             ts = 0.0
             hot_counts: Counter[int] = Counter()
             hot_window: deque[int] = deque()
-            hot_pool: list[tuple[int, int]] = []
+            hot_pool: list[tuple[int, int, int]] = []
 
             for pos in range(per_stream):
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
-                    hot_pool = hot_counts.most_common(stack_hot_pool_k)
+                    hot_pool = _hot_pool_with_ranks(
+                        hot_counts.most_common(stack_hot_pool_k),
+                        stack,
+                    )
                 phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                 if force_phase_schedule and self.n_phase_bins > 1:
                     state = _state_with_phase(state, phase, base_span)
@@ -215,12 +218,12 @@ class NeuralAtlasModel:
                         and hot_pool
                         and rng.random() < stack_hot_pool_prob
                     ):
-                        hot_obj = _sample_hot_pool_obj(
+                        rank = _sample_hot_pool_rank(
                             hot_pool,
                             weight_power=stack_hot_pool_weight_power,
+                            stack_len=len(stack),
                             rng=rng,
                         )
-                        rank = stack.index(hot_obj) if hot_obj in in_stack else 0
                     elif boosted_reuse:
                         rank = _boosted_reuse_rank(
                             stack_len=len(stack),
@@ -744,17 +747,36 @@ def _boosted_reuse_rank(
     return min(lo + offset, int(stack_len) - 1)
 
 
-def _sample_hot_pool_obj(
-    hot_pool: Sequence[tuple[int, int]],
+def _hot_pool_with_ranks(
+    hot_counts: Sequence[tuple[int, int]],
+    stack: Sequence[int],
+) -> list[tuple[int, int, int]]:
+    hot_ids = {int(obj_id) for obj_id, _ in hot_counts}
+    ranks: dict[int, int] = {}
+    for rank, obj_id in enumerate(stack):
+        obj_int = int(obj_id)
+        if obj_int in hot_ids:
+            ranks[obj_int] = int(rank)
+            if len(ranks) == len(hot_ids):
+                break
+    return [
+        (int(obj_id), int(count), ranks.get(int(obj_id), 0))
+        for obj_id, count in hot_counts
+    ]
+
+
+def _sample_hot_pool_rank(
+    hot_pool: Sequence[tuple[int, int, int]],
     *,
     weight_power: float,
+    stack_len: int,
     rng: np.random.Generator,
 ) -> int:
-    ids = np.array([int(obj_id) for obj_id, _ in hot_pool], dtype=np.int64)
-    weights = np.array([max(int(count), 1) for _, count in hot_pool], dtype=np.float64)
+    weights = np.array([max(int(count), 1) for _, count, _ in hot_pool], dtype=np.float64)
     weights = np.power(weights, max(float(weight_power), 1e-6))
     weights = weights / max(float(weights.sum()), 1e-12)
-    return int(ids[int(rng.choice(len(ids), p=weights))])
+    idx = int(rng.choice(len(hot_pool), p=weights))
+    return min(max(int(hot_pool[idx][2]), 0), max(int(stack_len) - 1, 0))
 
 
 def _power_probs(probs: np.ndarray, power: float) -> np.ndarray:

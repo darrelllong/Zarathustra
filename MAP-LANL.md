@@ -223,6 +223,9 @@ Important knobs:
   `0.2640`). `p=0.60`/`0.70` both lost to `p=0.50`; frequency weight power
   `2.0` catastrophically over-concentrated and is closed negative. The live
   branch keeps `p=0.50,wpow=1` and widens the hot window to `50000`.
+  Wide-window with exact per-event object lookup was killed as pathological
+  after 40+ minutes with no fake CSV; hot-pool refresh now caches ranks every
+  512 steps and samples cached ranks.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

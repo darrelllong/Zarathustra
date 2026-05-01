@@ -30,6 +30,9 @@ Current status:
   `p=0.50`. Frequency weight power `2.0` is closed negative; it collapsed
   stack median to `14` and raised adjacent duplicates to `0.116900`. The live
   branch now widens the hot window to `50000`.
+- The first `window=50000` run was killed after 40+ minutes with no fake CSV.
+  `altgan.neural_atlas` now caches hot-object ranks at hot-pool refresh time
+  and samples cached ranks instead of calling `stack.index()` on every redirect.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
