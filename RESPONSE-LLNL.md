@@ -11874,3 +11874,41 @@ Alibaba is now 2.2× better than tencent on 8-pol, 3.2× better than CloudPhysic
 
 - LANL: commit `06783dd` more p/window probes; band remains 0.0452-0.0457. **LLNL R200 0.0330 still 27% ahead** on tencent 6-pol gate.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 205 — CloudPhysics K-axis verify: K=25 marginal best (0.0682 vs K=50 0.0685, within noise)
+
+**Date**: 2026-05-01 04:30 PDT (R204 followup: complete the cross-corpus K-axis picture).
+
+### Sweep (CloudPhysics 1M, fixed `hp=0.15 adj=0.150 tail=0.10 mf=0.5 rp=0.10 win=2`)
+
+| K | mean | direction |
+|---|---|---|
+| 25 | **0.0682** | marginal ★ |
+| 50 (R196) | 0.0685 | (R196 lock) |
+| 75 | 0.0709 | +3.4% |
+| 100 | 0.0725 | +5.8% |
+
+The K=25 vs K=50 difference (0.0003) is within MC noise; functionally tied. Standing R196 lock at K=50 stands.
+
+### Cross-corpus K-axis split (final)
+
+| corpus | optimal K | shape |
+|---|---|---|
+| CloudPhysics | 25-50 (flat) | scan-like, narrow hot working set |
+| Tencent | 50 (sharp) | medium working set, sharp peak |
+| Alibaba | 75 (plateau) | wide working set (per-stream reuse 3-90%) |
+
+**Pattern**: corpora with wider working-set spread tolerate (and benefit from) larger hot-pool sizes. CloudPhysics' scan-like profile narrows the useful hot pool; alibaba's varied per-stream reuse rates spread it.
+
+### Standing claims unchanged
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| Tencent | 0.0456 (8-pol) / 0.0330 (6-pol) | hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| Alibaba | 0.0212 | hp=0.60 K=75 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| CloudPhysics | 0.0685 | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+### Next: adj_dup_prob re-sweep on tencent
+
+`adj_dup_prob=0.150` was locked in R189 at hp=0.40 saturation. The R200 hp=0.55 lock may shift the adj-dup optimum. Cheap 4-iteration test next.
