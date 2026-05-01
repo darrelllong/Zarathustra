@@ -265,3 +265,10 @@ The better next target is the lower-reuse shape row p `.06`/hp `.10,k125`,
 which scored `0.017389` six-policy and `0.022673` eight-policy on seed `69`
 with reuse `0.307248` and p90 `43572`, close to real. I launched p `.06` seed
 `83`, p `.065` seed `84`, and p `.06`/hp `.12` seed `85` confirmations.
+
+Update after lower-reuse confirmation: shape improved but cache did not.
+Seeds `83/84/85` scored six/eight `0.020902`/`0.025591`,
+`0.020901`/`0.025524`, and `0.020368`/`0.024968`; p90 stayed close
+(`44240`, `48170`, `43801`). I launched low-reuse/high-hot-pool probes:
+p `.06`/hp `.15,k100` seed `86`, p `.06`/hp `.15,k125` seed `87`, and
+p `.06`/hp `.18,k100` seed `88`.

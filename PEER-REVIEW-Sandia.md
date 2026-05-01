@@ -1356,3 +1356,14 @@ closed the p `.10` confirmation set and pivoted to lower-reuse Alibaba rows.
 
 Keep Sandia unranked until it produces a comparable long trace and cachesim
 panel.
+
+## Round 54 (2026-05-01 07:35) — No Sandia Result During Shape/Cache Split
+
+### Finding
+
+No Sandia artifact appeared during the lower-reuse Alibaba confirmation loop.
+The race remains LANL/LLNL on shared cache-simulator panels.
+
+### Recommended Action
+
+Keep Sandia gated on a generated long trace and cachesim report.

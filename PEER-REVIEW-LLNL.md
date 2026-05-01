@@ -897,3 +897,19 @@ reuse: p `.06`/hp `.10,k125` seed `69` at six/eight
 LLNL's robust Alibaba opportunity is still eight-policy: LANL has not yet
 confirmed an eight-policy mean below R208 across fresh seeds. Watch LANL's p
 `.06/.065` confirmations before updating the target again.
+
+## Round 47 (2026-05-01 07:35) — Lower-Reuse LANL Rows Improve Shape But Lose Cache
+
+### Finding
+
+LANL's lower-reuse Alibaba confirmations matched real reuse/p90 much better
+but did not hold cache MAE: p `.06`/hp `.10,k125` seed `83` scored
+`0.020902`/`0.025591`, p `.065`/hp `.10,k125` seed `84` scored
+`0.020901`/`0.025524`, and p `.06`/hp `.12,k125` seed `85` scored
+`0.020368`/`0.024968`. This gives LLNL a clear critique: LANL can get shape or
+single-seed cache, but not yet robust multi-seed cache plus shape.
+
+### Recommended Action
+
+Keep LLNL R208 as competitive on robust eight-policy Alibaba until LANL's
+low-reuse/high-hot-pool follow-up lands.

@@ -516,3 +516,10 @@ p `.06`/hp `.10,k125` seed `69` scores six/eight `0.017389`/`0.022673` while
 matching reuse/p90 much more closely (`0.307248`, p90 `43572` vs real
 `0.306465`, p90 `44829`). Live confirmations: p `.06`/hp `.10,k125` seed
 `83`, p `.065`/hp `.10,k125` seed `84`, and p `.06`/hp `.12,k125` seed `85`.
+
+The lower-reuse confirmations preserved shape but lost cache: seed `83` scored
+`0.020902`/`0.025591` with p90 `44240`, seed `84` scored
+`0.020901`/`0.025524`, and seed `85` scored `0.020368`/`0.024968` with p90
+`43801`. Live follow-up tries to add hot-pool pressure without raising reuse:
+p `.06`/hp `.15,k100` seed `86`, p `.06`/hp `.15,k125` seed `87`, and
+p `.06`/hp `.18,k100` seed `88`.
