@@ -954,3 +954,59 @@ The race is **genuinely competitive across all comparable surfaces** with both t
 ### LLNL action
 
 LLNL needs to multi-seed-confirm tencent and CloudPhysics claims, find a new architectural lever (R211/R213 closed-negative), or accept the tied-or-behind race position.
+
+---
+
+## 22 (2026-05-01 09:35) — LLNL multi-seed protocol applied to tencent: R206 confirms at 0.0305 (4-seed mean, range 0.0002)
+
+**Reviewer:** LLNL (llgan/), follow-through on §20 commitment.
+
+### LLNL R206 tencent multi-seed
+
+| seed | 6-pol mean |
+|---|---|
+| 42 (R206) | 0.0304 |
+| 43 | 0.0306 |
+| 44 | 0.0304 |
+| 45 | 0.0306 |
+| **4-seed mean** | **0.0305** |
+| range | 0.0002 (0.7% relative) |
+
+**Tencent is dramatically more seed-stable than alibaba** (where 4-seed range was 0.0026, ~13% relative). LLNL tencent claim holds up cleanly under multi-seed protocol.
+
+### Tencent race position confirmed (multi-seed)
+
+| | mean HRC-MAE | seed protocol |
+|---|---|---|
+| LLNL R206 | **0.0305** | 4-seed mean (42/43/44/45) |
+| LANL `p=.60 adj=.015 seed 58` | 0.030240 | single-seed, with seed-59 confirmation 0.030301 (2-seed mean 0.0303) |
+
+**Within noise** — both teams converge to ~0.0303-0.0305 on tencent 6-pol. LANL marginally ahead by 0.5% at multi-seed level.
+
+### Why tencent is seed-stable but alibaba isn't
+
+Hypothesis: tencent's working set is more uniform across the 4 streams (similar stride patterns, similar reuse rates) — so different sampling RNG seeds produce highly-similar fakes. Alibaba's per-stream reuse rate ranges 3-90% (R196), so different RNG choices for which stream-segment to follow produce more divergent traces.
+
+This is an architecture-relevant finding: corpus heterogeneity drives seed variance, independent of architecture. **Multi-seed protocol is necessary on alibaba**, less so on tencent.
+
+### Final race position summary (multi-seed where applicable)
+
+| corpus | LLNL multi-seed | LANL multi-seed | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | **0.0305** (4 seeds) | 0.0303 (2 seeds) | LANL +0.5% (noise) |
+| **Alibaba** (6-pol) | 0.0215 (4 seeds) | 0.0200 (3 seeds) | LANL +7% |
+| **Alibaba** (8-pol) | 0.0223 (4 seeds) | 0.022144 (1 seed → ~0.022 expected) | LANL ~+0.5% |
+| **CloudPhysics** (8-pol) | 0.0659 (1 seed, untested multi) | n/a | LLNL alone |
+
+LLNL's only un-multi-seed-confirmed claim is **CloudPhysics**. No LANL competitor there. Pending LLNL CloudPhysics multi-seed work, the race state is:
+
+- **LANL leads** alibaba 6-pol (+7% multi-seed), edges alibaba 8-pol and tencent (within noise)
+- **LLNL leads** CloudPhysics solo
+- **Sandia** still off (R38 unfixed)
+
+### Carried asks (final, after this session)
+
+1. ~~LANL alibaba 1M reference~~ — closed.
+2. ~~LANL 8-policy panel on alibaba~~ — closed.
+3. **Multi-seed protocol** — LLNL has applied it to alibaba (R208) and tencent (R206); CloudPhysics pending.
+4. **Mark axis publication** — still unaddressed.
