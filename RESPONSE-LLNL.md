@@ -12815,3 +12815,75 @@ R221 + R223 together are the cleanest scientific contributions of this session. 
 
 - LANL: continued alibaba hp/k micro-iteration. No new methodology. Skip post.
 - Sandia: still off (R38 unfixed). Restart prompt re-issued to user.
+
+## Round 224 — CP adj re-sweep on extended-bins atlas: peak shifts from 0.25 to 0.35; multi-seed −24%
+
+**Date**: 2026-05-01 13:30 PDT (post-reboot resume of in-flight R224 sweep). Resumed from `/tmp/cp_r223_adj.log` + `/tmp/cp_r224_high.log` artefacts after host reboot interrupted the sweep.
+
+### Why re-sweep adj on the new atlas
+
+R223 locked the CP recipe at adj-dup-prob=0.25 with extended-bins atlas. But the adj knob was originally tuned against the **original-bins** atlas (R209). With 14 deep-tail bins added (R220), the recent-pool / hot-pool / adj-dup interaction surface shifts — there's no a priori reason 0.25 is still optimal under the new IRD shape.
+
+### Single-seed sweep (seed=42, all other knobs locked at R223 recipe)
+
+| adj | mean HRC-MAE (8-pol) | vs R223 |
+|---|---|---|
+| 0.05 | 0.0753 | +69% |
+| 0.10 | 0.0661 | +49% |
+| 0.15 | 0.0581 | +31% |
+| 0.20 | 0.0517 | +16% |
+| **0.25 (R223 lock)** | **0.0445** | — |
+| 0.30 | 0.0377 | **−15%** |
+| **0.35** | **0.0337** | **−24%** |
+| 0.40 | 0.0339 | −24% |
+| 0.45 | 0.0373 | −16% |
+| 0.50 | 0.0442 | −1% |
+
+Clean inverted-U with a flat peak at 0.35–0.40. R223's 0.25 was a **local optimum of the wrong landscape** (original-bins) carried forward unchanged.
+
+### Multi-seed confirmation at adj=0.35 (4 seeds)
+
+| seed | 8-pol mean |
+|---|---|
+| 42 | 0.0337 |
+| 43 | 0.0338 |
+| 44 | 0.0333 |
+| 45 | 0.0342 |
+| **mean** | **0.0338** |
+| range | 0.0009 (2.7% relative) |
+
+Same seed-stability tier as R223 (range 2.0%) and tighter than alibaba (3%). Multi-seed mean **0.0338 vs R223's 0.0444 = −24%**.
+
+### Lesson reinforced (continuation of R220-R223)
+
+When you change the model's input distribution (the PMF binning), every knob tuned against the old distribution becomes a **stale lock**. R223's "recipe shape unchanged" assumption was wrong — the right post-fix protocol is to re-sweep the dominant knobs at the new atlas before posting a claim. R224 cost ~90 minutes of sweep wallclock and recovered another −24% on top of R223's −33%.
+
+### Final cross-corpus standing claims (post-R224, all multi-seed)
+
+| corpus | architecture | recipe | mean HRC-MAE |
+|---|---|---|---|
+| Tencent | phase=1 ep=600 + original bins | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 (R206) | **0.0305** (6-pol, 4-seed) |
+| Alibaba | phase=2 ep=600 + extended bins | hp=0.45 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2 (R221) | **0.0204** (6-pol, 4-seed) |
+| **CloudPhysics** | **phase=1 ep=600 + extended bins** | **hp=0.15 K=50 adj=0.35 tail=0.10 mf=0.5 + rp=0.10 win=2 (R224)** | **0.0338** (8-pol, 4-seed) |
+
+CP improvement compounding across this session: original-bins R209 0.0659 → extended-bins R223 0.0444 (−33%) → adj-retuned R224 **0.0338** (−24% on top, **−49% from R209**).
+
+### Race position update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | 0.0303 | tied |
+| Alibaba (6-pol) | 0.0204 | ~0.014 single-seed | LANL +20% |
+| Alibaba (8-pol) | 0.0209 | ~0.018 multi-seed expected | LANL +14% |
+| **CloudPhysics (8-pol)** | **0.0338** (was 0.0444) | n/a | **LLNL alone, −49% vs R209 baseline** |
+
+### Open work
+
+1. **R225 alibaba more-data retrain** — 50k → 100k records-per-file to populate sparse deep-bin PMFs; could close the LANL +20% gap. Highest-leverage open lever.
+2. **R226 CP hp re-sweep** at the new adj=0.35 lock — hp=0.15 was tuned to R209's atlas + R223's adj=0.25 landscape; both shifted.
+3. **Tencent ceiling** unchanged — still tied with LANL at ~0.030; extended bins doesn't help.
+
+### Sandia + LANL pass
+
+- LANL: still micro-iterating alibaba hp/k axis (PEER-REVIEW-Sandia rounds 64-71). No new methodology.
+- Sandia: still off (R38 unfixed; user reissuing startup prompt this session for the Qwen instance).
