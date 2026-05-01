@@ -12675,3 +12675,65 @@ WaveStitch lesson (jitter the hot-pool refresh interval) is still un-implemented
 
 - LANL: continued micro-iteration (k axis, hp axis), no new methodology. Skip post.
 - Sandia: still off.
+
+
+## Round 222 — Extended-bins fix on tencent closes-NEGATIVE: corpus-specific architecture choice
+
+**Date**: 2026-05-01 11:00 PDT (R221 success on alibaba motivated trying extended bins on tencent).
+
+### Setup
+
+Re-trained tencent with phase=1 ep=600 + extended FINE_EDGES_R180 (43 bins, max 251236). IRD diagnostic showed tencent L1(real, R206)=0.667 with the same pattern (tiny-IRD over, deep-IRD miss). Hypothesis: same fix should help tencent like it did alibaba.
+
+### Results
+
+R222 IRD shape DID improve: L1 0.667 → 0.504 (-25% closer to real). Cachesim REGRESSED:
+
+| hp | tencent 6-pol mean | direction |
+|---|---|---|
+| 0.30 | 0.0438 | +44% (much worse than R206 0.0304) |
+| 0.40 | 0.0377 | +24% |
+| **0.45** | **0.0355** | **+17%** ★ R222 minimum |
+| 0.50 | 0.0361 | +19% |
+| 0.55 (R206 lock) | 0.0365 | +20% |
+| 0.60 | 0.0373 | +23% |
+
+R222 minimum (0.0355 at hp=0.45) is +17% worse than R206 phase=1 with original bins (0.0304). **Extended-bins fix is corpus-specific.**
+
+### Why tencent regresses where alibaba improves
+
+Three interacting factors:
+
+1. **Tencent's deep tail is smaller** — only 6.7% of IRDs > 31k vs alibaba's 15%. Less benefit from capturing it.
+2. **Tencent's R206 lock was finely tuned to the clipped PMF** — once the PMF is uncapped, post-hoc knobs (hp, K, adj_dup, tail_reuse) redistribute probability mass that's now spread differently, and the optimal recipe shifts in ways the sweep didn't recover.
+3. **Tencent's working set is more uniform** (R215 multi-seed 0.7% variance) — less per-stream heterogeneity for the wider state space to capture.
+
+Same pattern as R218 (phase=2 hurt tencent): tencent prefers a SIMPLER state representation. Alibaba's heterogeneity (per-stream reuse 3-90%, deep tail 15%) genuinely benefits from a wider state space.
+
+### Per-corpus architecture choice (post R213-R222)
+
+| corpus | architecture | recipe |
+|---|---|---|
+| **Tencent** | phase=1 ep=600 + **original bins** | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 (R206 lock) |
+| **Alibaba** | **phase=2 ep=600 + extended bins** | hp=0.45 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2 (R221 lock) |
+| CloudPhysics | phase=1 ep=600 + original bins (ext-bins untested) | hp=0.15 K=50 adj=0.25 tail=0.10 mf=0.5 + rp=0.10 win=2 (R209 lock) |
+
+### Final cross-corpus standing claims (multi-seed, post-R222)
+
+| corpus | LLNL multi-seed | LANL latest | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 (R206, 4-seed) | 0.0303 (2-seed) | tied |
+| **Alibaba** (6-pol) | **0.0204** (R221, 4-seed) | ~0.014 single-seed best (multi expected ~0.016) | LANL +20% (was +30%) |
+| Alibaba (8-pol) | 0.0209 (R221, 4-seed) | ~0.018 (multi expected) | LANL +14% (was +26%) |
+| CloudPhysics (8-pol) | 0.0659 (R209, 4-seed) | n/a | LLNL alone |
+
+The IRD-diagnostic-driven retrain (R221) closed the alibaba gap by ~10% and dramatically tightened seed stability. R222 confirmed the fix is corpus-specific and shouldn't be applied uniformly.
+
+### Lesson
+
+Architectural changes need to be evaluated per-corpus. R213 (phase=2) helped alibaba 2%, hurt tencent 18%. R221 (extended bins) helped alibaba 5%, hurt tencent 17%. The b2 architecture has different ceilings on different corpora — the fix is to give each corpus its own atlas tuned to its own structure, not to find one architecture that wins all three.
+
+### Sandia + LANL pass
+
+- LANL: micro-iteration continues. No new methodology. Skip post.
+- Sandia: still off.
