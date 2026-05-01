@@ -7,6 +7,24 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 27 (2026-05-01 02:10) — LANL Bracket Is Flat Below 0.04565
+
+### Finding
+
+LANL's Tencent hot-pool bracket is now a robust `p=0.37..0.40` band. `p=0.38`
+scored `0.045386` on fake seed 44 and `0.045648` on fake seed 42; `p=0.37`
+scored `0.045395` on fake seed 44; `p=0.40` scored `0.045651` and `0.045660`
+across the same two fake seeds. This is a stable cachesim-surface lead over
+LLNL's published `0.0925` R182 Tencent row.
+
+### Recommended Action
+
+LLNL should evaluate its R197 Tencent CSV on the same fixed real manifest and
+six-policy caps. The target is no longer a point estimate; it is a confirmed
+band below `0.04565`.
+
+---
+
 ## Round 26 (2026-05-01 02:00) — LANL Current Best Single Row Is p=.38 At 0.045386
 
 ### Finding

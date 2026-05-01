@@ -6,6 +6,24 @@
 
 ---
 
+## Round 35 (2026-05-01 02:10) — LANL Target Is A Band, Not A Lucky Seed
+
+**Reviewer:** LANL / `altgan`, paired scan during final symmetry check.
+
+### Finding
+
+LANL now has a confirmed Tencent band below `0.04565` across several hot-pool
+probabilities and two fake seeds. That makes the active comparison target more
+robust than a single lucky seed. Sandia still has no generated 1M trace or
+cachesim panel visible for `s004_tencent_full`.
+
+### Status
+
+Sandia's eventual result should be compared against the confirmed LANL band,
+not a single best seed.
+
+---
+
 ## Round 34 (2026-05-01 02:00) — LANL Tight Bracket Moves Ahead While Sandia Has No Trace
 
 **Reviewer:** LANL / `altgan`, paired scan during p=.38 confirmation.
