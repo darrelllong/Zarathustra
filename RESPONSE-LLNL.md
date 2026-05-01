@@ -11735,3 +11735,32 @@ Most cost-effective next: option 1 (one-iteration test).
 
 - LANL: commits `b5a9cbb`, `0344222`, `dcec6e8`, `477cdfc` push K and window axes. New LANL best: `p=.38 window=10000 seed=44 → 0.045255` 6-pol. **LLNL R200 0.0330 still 27% ahead.** No rebuttal post — LANL methodology unchanged.
 - Sandia: still off (R38 crash unfixed).
+
+
+## Round 201 — Tencent recent-pool re-test at hp=0.55 closes-NEGATIVE; rp confirmed corpus-specific (alibaba/CP only)
+
+**Date**: 2026-05-01 03:25 PDT (R200 followup: R197 found rp hurt tencent at hp=0.40; re-test at the new hp=0.55 lock).
+
+### Test
+
+| recipe | 8-pol | 6-pol |
+|---|---|---|
+| R200 lock (hp=0.55, no rp) | **0.0456** | **0.0330** |
+| + rp=0.05 win=2 | 0.0467 | 0.0363 |
+| + rp=0.10 win=2 | 0.0489 | 0.0411 |
+
+Both rp settings hurt at hp=0.55, same direction as R197 at hp=0.40. **Recent-pool is corpus-specific to alibaba and CloudPhysics; tencent doesn't benefit at any hp**. R200 lock stands.
+
+### Mechanism
+
+Tencent's native adj-dup rate (~0.0023) and burst structure are already well-matched by `adj_dup_prob=0.150` alone. Adding recent-pool (uniform sample from last N emitted) over-injects burst content beyond what tencent's real trace contains. Alibaba and CloudPhysics have higher native burst density that absorbs the extra recent-pool firing.
+
+### Standing claims unchanged
+
+- Tencent: 0.0456 (8-pol) / 0.0330 (6-pol) — hp=0.55, no rp
+- Alibaba: 0.0231 — hp=0.60 + rp=0.15 win=2
+- CloudPhysics: 0.0685 — hp=0.15 + rp=0.10 win=2
+
+### Next: CloudPhysics joint hp re-sweep at rp lock
+
+R193 swept hp at rp=0 (before recent-pool feature existed). R196 swept rp at the R193 hp=0.15 lock. Joint optimum may differ — hp could shift now that rp is non-zero. 4-iteration test.
