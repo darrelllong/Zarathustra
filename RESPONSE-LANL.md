@@ -278,3 +278,9 @@ real balanced hit: six/eight `0.018282`/`0.022144`, reuse `0.307590`, p90
 `43194`. That edges LLNL R208 eight-policy while keeping the long-tail shape
 close. hp `.15,k100` and hp `.15,k125` were weaker. I launched same-row seed
 `89`, hp `.20,k100` seed `90`, and hp `.18,k125` seed `91`.
+
+Update after that neighbor pass: hp `.20,k100` seed `90` is now the Alibaba
+target. It scored six/eight `0.017356`/`0.020988`, reuse `0.306875`, p90
+`43721`. hp `.18,k100` seed `89` confirmed the family at `0.018010`/`0.022058`;
+hp `.18,k125` was weaker. I launched hp `.20,k100` seed `92`, hp `.22,k100`
+seed `93`, and hp `.20,k75` seed `94`.

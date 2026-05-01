@@ -531,3 +531,10 @@ to real. hp `.15,k100` seed `86` was weaker (`0.019406`/`0.023606`), and
 hp `.15,k125` seed `87` lost (`0.019937`/`0.024477`). Live confirmations:
 p `.06`/hp `.18,k100` seed `89`, p `.06`/hp `.20,k100` seed `90`, and
 p `.06`/hp `.18,k125` seed `91`.
+
+The confirmation/neighbor pass promoted hp `.20,k100`: seed `90` scored
+six/eight `0.017356`/`0.020988`, reuse `0.306875`, median `240`, and p90
+`43721`. Same-row hp `.18,k100` seed `89` held a good but weaker
+`0.018010`/`0.022058`; hp `.18,k125` seed `91` scored `0.017992`/`0.022436`.
+The live bracket confirms hp `.20,k100` seed `92` and checks hp `.22,k100`
+seed `93` plus hp `.20,k75` seed `94`.

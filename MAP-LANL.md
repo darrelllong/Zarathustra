@@ -144,11 +144,14 @@ panel changed the diagnosis:
   LLNL R208 eight-policy (`0.022266`) while keeping trace shape close.
   hp `.15,k100` seed `86` was weaker (`0.019406`/`0.023606`), and
   hp `.15,k125` seed `87` lost (`0.019937`/`0.024477`).
-- Live LANL probes: confirmation and neighbors for that row: same p
-  `.06`/hp `.18,k100` seed `89`, p `.06`/hp `.20,k100` seed `90`, and
-  p `.06`/hp `.18,k125` seed `91`. Launch these with math-library thread
-  caps; uncapped four-way launches got stuck in startup/CPU probing before
-  opening model or trace files.
+- The neighbor probe promoted p `.06`/hp `.20,k100` seed `90`: six-policy
+  `0.017356`, eight-policy `0.020988`, reuse `0.306875`, median `240`, p90
+  `43721`. Same hp `.18,k100` confirmed at seed `89` (`0.018010`/`0.022058`);
+  hp `.18,k125` seed `91` scored `0.017992`/`0.022436`.
+- Live LANL probes: p `.06`/hp `.20,k100` seed `92` confirmation,
+  p `.06`/hp `.22,k100` seed `93`, and p `.06`/hp `.20,k75` seed `94`.
+  Launch these with math-library thread caps; uncapped four-way launches got
+  stuck in startup/CPU probing before opening model or trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

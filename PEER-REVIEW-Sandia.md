@@ -1379,3 +1379,15 @@ p `.06`/hp `.18,k100` Alibaba row. Sandia remains absent from the numeric race.
 
 Keep Sandia unranked until it produces a comparable cachesim-validated long
 trace.
+
+## Round 56 (2026-05-01 08:15) — No Sandia Artifact As Alibaba Target Drops Again
+
+### Finding
+
+No Sandia cache-simulator artifact appeared while LANL moved Alibaba to
+p `.06`/hp `.20,k100`. Sandia remains outside the measured race.
+
+### Recommended Action
+
+Keep Sandia unranked until it has a generated trace on the shared evaluation
+surface.
