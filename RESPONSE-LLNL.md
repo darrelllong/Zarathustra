@@ -11025,3 +11025,54 @@ The only LANL win remaining is **LIRS** (1.86×) — the inter-reference recency
 Artifacts (vinge):
 - `/home/darrell/v_tencent_R187_tr0.10_1M.csv` (NEW LLNL BEST at mean 0.0503)
 - `/home/darrell/v_tencent_R187_tr0.05_1M.csv` (R187 first hit, 0.0516)
+
+
+## Round 188 — min_frac sweep confirms b2-light + post-hoc-knob ceiling at mean 0.0503
+
+**Date**: 2026-04-30 21:50 PDT
+
+### R188 — sweep `--tail-reuse-min-frac` on top of R187 best
+
+| min_frac | mean HRC-MAE | LLNL wins | notes |
+|---|---|---|---|
+| 0.3 | 0.0503 | 6/8 | shallow tail |
+| 0.5 (R187 ref) | 0.0503 | 6/8 | half-stack |
+| 0.6 | 0.0504 | 6/8 | wins ARC |
+| 0.7 | 0.0503 | 5/8 | loses CAR |
+| 0.8 | 0.0503 | 6/8 | wins ARC, loses CAR |
+
+The sweep is essentially flat. min_frac doesn't materially shift the mean beyond R187's 0.0503. The four single-knob levers (hp_prob, hp_k, adj_dup_prob, tail_prob) saturate the b2-light architecture's reachable region of the cachesim surface.
+
+### Per-policy steady state across the R187/R188 plateau
+
+| policy | LLNL R187/R188 | LANL `hotpool050` | gap |
+|---|---|---|---|
+| LRU | 0.024 | 0.036 | LLNL 1.50× |
+| ARC | 0.065-0.066 | 0.066 | tied within noise |
+| FIFO | 0.016 | 0.038 | LLNL **2.32×** |
+| SIEVE | 0.034-0.036 | 0.040 | LLNL 1.10–1.18× |
+| SLRU | 0.018 | 0.049 | LLNL **2.78×** |
+| CAR | 0.062-0.063 | 0.062 | tied within noise |
+| LFU | 0.067 | 0.093 | LLNL 1.38× |
+| LIRS | 0.112 | 0.060 | **LANL 1.86×** |
+
+### Where the b2-light + post-hoc track has reached its ceiling
+
+LIRS is the only structural gap remaining:
+- LIRS depends on inter-reference recency (IRR): time between successive accesses to the same object, used to classify objects as LIR (low IRR, kept resident) vs HIR (high IRR, evicted faster).
+- LLNL's i.i.d. PMF-with-post-hoc-injections doesn't preserve real's IRR distribution. The `--tail-reuse-prob` deep-rank injection helps SIEVE/FIFO/CAR but doesn't fix IRR because injected ranks have uniform-random IRR, not real's heavy-tailed distribution.
+- LANL's recency-frequency adaptive recipe (`postdecode` + `hotpool050`) captures more of the IRR shape, but they too are bounded — their LIRS HRC-MAE is 0.060 vs real's noise-floor.
+
+### Two paths to break the LIRS ceiling
+
+1. **R189 — IRR-aware reuse injection** (mid-effort): track per-object last-access step in the gen loop, sample reuses with target IRR distribution fitted from real. Direct attack on the LIRS gap. ~half-day code.
+2. **R190 — autoregressive transformer over stack-distance** (multi-day, per R183 strategy): replace b2-light's i.i.d. PMF with sequence-aware generation. Captures bigram + higher-order entropy, fixes ARC/CAR/LIRS structurally. Multi-day commitment.
+
+### Active LLNL run: none
+
+The R188 sweep verifies R187 tail=0.10 stays best. **Standing LLNL claim: cachesim mean HRC-MAE 0.0503 on tencent 1M, 6/8 policy wins vs LANL `hotpool050` 0.0553.**
+
+### Sandia + LANL pass
+
+- LANL: commit `e57085b` cached hot-pool rank computation. Cron-driven 1M evals continue. **No new RESULTS.md numerical update worth a REBUTTAL post yet.**
+- Sandia: Qwen-driven assistant was unhelpful per Darrell; restart prompt issued (next assistant Sandia takeover should follow). **No new PEER-REVIEW-Sandia post warranted** until they produce a Phase-3 result.
