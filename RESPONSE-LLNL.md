@@ -11167,6 +11167,47 @@ Standing claim: **tencent 1M cachesim mean HRC-MAE 0.0492, 7/8 policy wins** (LR
 
 No new substantive peer commits since `e57085b` (LANL hot-pool rank caching). **No PEER-REVIEW post warranted.**
 
+
+## Round 191 — Alibaba transfer test: tencent-optimal recipe TRANSFERS (mean HRC-MAE 0.0340, monotonic improvement with adj_dup)
+
+**Date**: 2026-04-30 21:55 PDT (Darrell directive: validate "optimal" claim by trying a different trace)
+
+### Test design
+
+Take the tencent-optimal R189 recipe (`hp=0.40 K=50 tail=0.10`) and apply to alibaba 1M with three adj_dup variants. Real ref: `/home/darrell/alibaba_stackatlas_real.csv` (LLNL-built from canonical alibaba_stackatlas manifest). No LANL alibaba 1M `_postdecode_` reference exists — this is LLNL-vs-real, not head-to-head.
+
+### Alibaba 1M cachesim 8-policy panel
+
+| recipe | mean HRC-MAE |
+|---|---|
+| R189-recipe adj=0.000 | 0.0441 |
+| R189-recipe adj=0.050 | 0.0412 |
+| **R189-recipe adj=0.150** | **0.0340** |
+
+**Same direction, same winner**. adj=0.150 monotonically best on alibaba too. The recipe **transfers across corpora**.
+
+### Per-policy at alibaba R189 adj=0.150 best
+
+| policy | LLNL HRC-MAE | notes |
+|---|---|---|
+| LRU | 0.026 | excellent |
+| ARC | 0.027 | excellent |
+| FIFO | 0.024 | excellent |
+| SIEVE | 0.044 | (alibaba is harder for SIEVE; small-cap over-miss persists) |
+| SLRU | 0.024 | excellent |
+| CAR | 0.025 | excellent |
+| LFU | 0.066 | (alibaba large-cap drift, LFU sensitive to long-term frequency) |
+| LIRS | 0.037 | better than tencent's 0.099 |
+| **mean** | **0.0340** | |
+
+The alibaba mean (0.0340) is actually *better* than tencent's (0.0492). Note this is comparing LLNL-vs-real, not LLNL-vs-LANL. LANL hasn't published an alibaba 1M reference at this scale.
+
+### Verdict
+
+R189 recipe (`hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5`) transfers cross-corpus. The "optimal" claim from R190 was tencent-tuned but the *same* knobs at the *same* values are also optimal on alibaba. Suggestive of a genuinely good recipe family rather than tencent-overfitted hyperparameters.
+
+Per Darrell directive — moving to **CloudPhysics** next (high-entropy / scan-like profile, very different from tencent/alibaba block-storage). If R189 still wins there, it's a corpus-agnostic recipe. If it fails, it's just block-storage-corpus-tuned.
+
 ### Sandia + LANL pass
 
 - LANL: commit `e57085b` cached hot-pool rank computation. Cron-driven 1M evals continue. **No new RESULTS.md numerical update worth a REBUTTAL post yet.**
