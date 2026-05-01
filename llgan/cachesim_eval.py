@@ -109,12 +109,19 @@ def evaluate(fake: str, real: str, sizes: str = DEFAULT_SIZES,
 
 
 def print_report(report: dict) -> None:
+    """Print REAL / FAKE / Δ columns per cap so the absolute miss-ratios
+    (not just deltas) are visible. Matches Darrell's PEER-REVIEW.md format."""
     sizes = report["cache_sizes"]
-    print(f"cap:    {' '.join(f'{s:>9}' for s in sizes)}")
-    print(f"{'policy':<8} {'HRC-MAE':>9} | {'cap'.center(11*len(sizes))}")
+    # Header: per cap show "REAL FAKE Δ" triplet, 22 chars wide each.
+    cap_header = "  ".join(f"{s:^21}" for s in sizes)
+    triplet_header = "  ".join(f"{'REAL':>6} {'FAKE':>6} {'Δ':>6}" for _ in sizes)
+    print(f"{'cap:':>16}   {cap_header}")
+    print(f"{'policy':<8} {'HRC-MAE':>7} | {triplet_header}")
     for pol, p in report["by_policy"].items():
-        delta_strs = " ".join(f"{d:+9.4f}" for d in p["delta"])
-        print(f"{pol:<8} {p['hrc_mae']:>9.4f} | {delta_strs}")
+        cells = []
+        for r, f, d in zip(p["real_miss_ratio"], p["fake_miss_ratio"], p["delta"]):
+            cells.append(f"{r:6.4f} {f:6.4f} {d:+6.4f}")
+        print(f"{pol:<8} {p['hrc_mae']:>7.4f} | {'  '.join(cells)}")
     print()
     print(f"mean HRC-MAE across policies: {report['mean_hrc_mae']:.4f}")
 
