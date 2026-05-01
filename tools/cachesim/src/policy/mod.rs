@@ -3,6 +3,8 @@
 pub mod arc;
 pub mod car;
 pub mod fifo;
+pub mod lfu;
+pub mod lirs;
 pub mod lru;
 pub mod sieve;
 pub mod slru;
@@ -32,6 +34,8 @@ pub enum PolicyKind {
     Sieve,
     Slru,
     Car,
+    Lfu,
+    Lirs,
 }
 
 pub fn make(kind: PolicyKind, capacity: usize) -> Box<dyn Policy> {
@@ -42,5 +46,7 @@ pub fn make(kind: PolicyKind, capacity: usize) -> Box<dyn Policy> {
         PolicyKind::Sieve => Box::new(sieve::Sieve::with_capacity(capacity)),
         PolicyKind::Slru => Box::new(slru::Slru::with_capacity(capacity)),
         PolicyKind::Car => Box::new(car::Car::with_capacity(capacity)),
+        PolicyKind::Lfu => Box::new(lfu::Lfu::with_capacity(capacity)),
+        PolicyKind::Lirs => Box::new(lirs::Lirs::with_capacity(capacity)),
     }
 }

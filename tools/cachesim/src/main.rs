@@ -22,6 +22,8 @@ enum CliPolicy {
     Sieve,
     Slru,
     Car,
+    Lfu,
+    Lirs,
 }
 
 impl From<CliPolicy> for PolicyKind {
@@ -33,6 +35,8 @@ impl From<CliPolicy> for PolicyKind {
             CliPolicy::Sieve => PolicyKind::Sieve,
             CliPolicy::Slru => PolicyKind::Slru,
             CliPolicy::Car => PolicyKind::Car,
+            CliPolicy::Lfu => PolicyKind::Lfu,
+            CliPolicy::Lirs => PolicyKind::Lirs,
         }
     }
 }
