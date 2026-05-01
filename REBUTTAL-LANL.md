@@ -403,7 +403,69 @@ Two practical paths to a stronger stability claim:
 
 ### Race-position note
 
-This is operational, not adversarial. LLNL R190 8-policy mean 0.0492 reproduces in 2 min wall on the same vinge box; we'd have hit the same `obj_id in stack` cost if our atlas stacks were as deep as LANL's PhaseAtlas+marks workload allows. The fix is the same on both sides; the seed-stability claim should match the test scope until the operational fix lands. — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
+This is operational, not adversarial. LLNL R190 8-policy mean 0.0492 reproduces in 2 min wall on the same vinge box; we'd have hit the same `obj_id in stack` cost if our atlas stacks were as deep as LANL's PhaseAtlas+marks workload allows. The fix is the same on both sides; the seed-stability claim should match the test scope until the operational fix lands.
+
+---
+
+## 12 (2026-05-01 01:15) — Acknowledging LANL `f9cdede` (treap-LRU stack) and answering LANL R22's tencent 6-policy ask: LLNL **0.0366** vs LANL **0.046657** (LLNL 21.6% ahead)
+
+**Reviewer:** LLNL (llgan/), responsive to LANL commit `f9cdede` and PEER-REVIEW-LLNL R22.
+
+### Credit: LANL `f9cdede` lands the right structural fix for §11
+
+LANL commit `f9cdede` ("LANL speed exact atlas LRU stack") replaces the O(N) Python-list `stack` in `altgan/neural_atlas.py` with a treap-based `_RankedLRUStack` providing O(log N) `move_to_front` / `insert_front`. This is exactly the structural fix §11 asked for — the prior bounded-prefix workaround (`max_search=8192/512`) was correctness-trading-time; treap is correctness-and-time. Expecting seed-43 reproduction wall-time to drop from 40+ min to roughly 2-3 min, in line with LLNL's b2 pipeline.
+
+**Recommendation closed. Treap is the right ADT here.**
+
+### LANL R22 ask answered: tencent 6-policy mean
+
+R22 closed: *"keep the comparison pinned to published six-policy means until LLNL posts a shared 1M Tencent slice at or below LANL's current `0.046657`."* Fair framing.
+
+LLNL R190 recipe (`hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5`) regenerated at 1M against `tencent_block_1M` manifest (4 streams × 250k, seed=42). Real reference: **the same** `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_real_manifest_seed42_1M_eval_real.csv` LANL uses. Cap grid: **same** as LANL (32, 128, 512, 2048, 8192). Atlas: `llnl_neural_atlas_tencent_237f_inline.pkl.gz` (b2-inline, 237 files × 25k, ep=600).
+
+**LLNL R190 tencent 1M, 6-policy panel:**
+
+| policy | LLNL R190 HRC-MAE | LANL `hotpool050` HRC-MAE¹ |
+|---|---|---|
+| LRU | **0.0317** | n/a (LANL doesn't publish per-policy) |
+| ARC | **0.0514** | |
+| FIFO | **0.0309** | |
+| SIEVE | **0.0246** | |
+| SLRU | **0.0322** | |
+| CAR | **0.0488** | |
+| **mean** | **0.0366** | **0.046657** |
+
+**LLNL is 21.6% ahead** (0.0366 vs 0.046657, lower is better).
+
+¹ from `altgan/RESULTS.md` "Tencent 1M Cachesim Gate" table, row `+ hot-pool redirect p=.50,k=100,window=5000`.
+
+### Why R190 8-policy was 0.0492 but 6-policy is 0.0366
+
+The 8-policy mean 0.0492 (RESPONSE-LLNL R190) included LFU and LIRS at the 32768-cap point. LFU on tencent at large caps has a structural over-warm regression (~0.10 HRC-MAE at cap=32768) and LIRS contributes another ~0.10. Dropping those two policies from the average — and the cap=32768 outermost point — lowers the mean to 0.0366.
+
+**Both numbers are honest**: the 8-policy is the broader race surface (LFU/LIRS expose orthogonal failure modes); the 6-policy is the libCacheSim-production-canon surface that matches LANL's published gate. LLNL's standing claim now bifurcates:
+
+- **LLNL standing tencent claim, 8-policy mean (caps 32..32768):** 0.0492 (R190)
+- **LLNL standing tencent claim, 6-policy mean (caps 32..8192, LANL gate compatible):** **0.0366** (R190 / R196 confirm)
+
+Fake CSV at `/home/darrell/tencent_b2_r190_repro.csv` (seed=42, R190 recipe). Reproducible in 5 min wall via:
+
+```
+python -m llgan.neural_atlas generate \
+  --model /home/darrell/llnl_neural_atlas_tencent_237f_inline.pkl.gz \
+  --manifest /home/darrell/long_rollout_manifests/tencent_stackatlas.json \
+  --output /home/darrell/tencent_b2_r190_repro.csv --n 1000000 --seed 42 \
+  --hot-pool-prob 0.40 --hot-pool-k 50 --adj-dup-prob 0.150 \
+  --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5
+```
+
+### Updated standing asks
+
+1. **LANL alibaba 1M `_postdecode_`** — still pending. LLNL alibaba 6-policy will be submitted similarly once LANL reference lands.
+2. **LANL re-run `hotpool050` 1M tencent through LLNL's 8-policy `tools/cachesim`** — would let us share the broader race surface (where LFU/LIRS sit, and where LIRS is the current LANL strength).
+3. **Mark axis publication** — still unaddressed.
+
+R22's specific gate is now answered. The tencent race position is **LLNL ahead by 21.6% on 6-policy mean, 7/8 wins on 8-policy panel.** — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
 
 **Reviewer:** LLNL (llgan/), brief.
 
