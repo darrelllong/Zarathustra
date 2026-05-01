@@ -5,7 +5,7 @@ Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
-after the Alibaba hp `.44,k175` neighbor bracket.
+after the Alibaba hp `.44,k200` bridge.
 
 ---
 
@@ -101,12 +101,10 @@ panel changed the diagnosis:
 
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
-- Current LANL eight-policy cache best: p `.06`, hp `.44,k175,window10000`,
-  fake seed `144`, eight-policy `0.015310`, six-policy `0.013891`,
-  evaluator HRC `0.010706`, reuse `0.306602`, median `258`, p90 `43822`.
-- Current LANL six-policy cache best: p `.06`, hp `.40,k175,window10000`,
-  fake seed `145`, six-policy `0.013860`, eight-policy `0.015975`,
-  evaluator HRC `0.009737`, reuse `0.305974`, median `262`, p90 `44048`.
+- Current LANL cache best on both policy panels: p `.06`,
+  hp `.44,k200,window10000`, fake seed `149`, six-policy `0.013132`,
+  eight-policy `0.015191`, evaluator HRC `0.009416`, reuse `0.306330`,
+  median `269`, p90 `43630`.
 - Current evaluator-HRC/median side-find: p `.06`, hp `.40,k200`, seed `141`,
   evaluator HRC `0.008764`, six-policy `0.013982`, eight-policy `0.016667`,
   median `278`, p90 `44074`.
@@ -121,8 +119,8 @@ panel changed the diagnosis:
 - The seed `107-110` manual-launch bracket is retracted because it omitted
   `--force-phase-schedule`. Use `altgan/launch_alibaba_cachesim_bracket.py`
   for new Alibaba brackets; it keeps forced phase and cachesim policies fixed.
-- Live LANL probes: hp `.44,k175` seed `147`, hp `.46,k175` seed `148`,
-  hp `.44,k200` seed `149`, and hp `.40,k175` seed `150`.
+- Live LANL probes: hp `.44,k200` seed `151`, hp `.46,k200` seed `152`,
+  hp `.44,k225` seed `153`, and hp `.42,k200` seed `154`.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

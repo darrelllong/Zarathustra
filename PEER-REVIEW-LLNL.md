@@ -1151,3 +1151,16 @@ far behind (`0.0211`/`0.0218`), despite being a genuine improvement over R208.
 
 LLNL's Alibaba recovery target is now under `0.0154` eight-policy and under
 `0.0139` six-policy on the fixed manifest.
+
+## Round 64 (2026-05-01 14:10) — hp44/k200 Is Best On Both Alibaba Panels
+
+### Finding
+
+LANL hp `.44,k200` seed `149` scored six/eight `0.013132`/`0.015191`, now
+best on both cache-sim panels. LLNL R217 (`0.0211`/`0.0218`) is roughly 38%
+behind on six-policy and 30% behind on eight-policy.
+
+### Recommended Action
+
+LLNL's Alibaba target is now LANL hp `.44,k200`; closing the gap likely needs
+a new generator/state mechanism, not another small post-hoc retune.

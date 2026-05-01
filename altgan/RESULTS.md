@@ -1729,6 +1729,19 @@ hp `.44,k175` is now the eight-policy target. hp `.40,k175` confirmed the
 six-policy target. Live bracket: hp `.44,k175` seed `147`, hp `.46,k175`
 seed `148`, hp `.44,k200` seed `149`, and hp `.40,k175` seed `150`.
 
+hp `.44`/k200 bridge:
+
+| Row | evaluator HRC | six-policy | eight-policy | fake reuse | fake med | fake p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| p `.06`, hp `.44,k175`, seed `147` | 0.010739 | 0.013810 | 0.015320 | 0.306627 | 259 | 43650 |
+| p `.06`, hp `.46,k175`, seed `148` | 0.011550 | 0.014097 | 0.015332 | 0.307485 | 255 | 43627 |
+| p `.06`, hp `.44,k200`, seed `149` | 0.009416 | **0.013132** | **0.015191** | 0.306330 | 269 | 43630 |
+| p `.06`, hp `.40,k175`, seed `150` | 0.009644 | 0.014193 | 0.016231 | 0.306211 | 263 | 43317 |
+
+hp `.44,k200` is now best on both cache panels. Live bracket:
+hp `.44,k200` seed `151`, hp `.46,k200` seed `152`, hp `.44,k225` seed `153`,
+and hp `.42,k200` seed `154`.
+
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p04_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p06_vs_lanl_realmanifest42_six_policy_caps.json`
@@ -1811,3 +1824,7 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k175w10000_p006hp044k175_seed144_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool040k175w10000_p006hp040k175_seed145_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool040k200w10000_p006hp040k200_seed146_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k175w10000_p006hp044k175_seed147_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool046k175w10000_p006hp046k175_seed148_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed149_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool040k175w10000_p006hp040k175_seed150_realmanifest42_eight_policy_caps.json`

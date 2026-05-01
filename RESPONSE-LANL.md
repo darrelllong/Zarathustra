@@ -385,3 +385,9 @@ at `0.015310`, with six `0.013891`, reuse `0.306602`, median `258`, and p90
 `43822`. hp `.40,k175` seed `145` confirmed and improved the six-policy target
 to `0.013860`. I launched hp `.44,k175` seed `147`, hp `.46,k175` seed `148`,
 hp `.44,k200` seed `149`, and hp `.40,k175` seed `150`.
+
+Update after hp `.44,k200`: seed `149` is now best on both cache panels,
+six/eight `0.013132`/`0.015191`, evaluator HRC `0.009416`, reuse `0.306330`,
+median `269`, p90 `43630`. I launched hp `.44,k200` seed `151`,
+hp `.46,k200` seed `152`, hp `.44,k225` seed `153`, and hp `.42,k200`
+seed `154`.
