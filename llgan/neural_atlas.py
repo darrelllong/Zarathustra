@@ -36,10 +36,16 @@ STATE_BUCKET_EDGES = np.array([0, 8, 32, 128, 512, 1 << 30], dtype=np.int64)
 N_DIST_STATES = len(STATE_BUCKET_EDGES)  # 1 NEW + 5 REUSE buckets = 6
 
 # R180: 29 fine bins (matches existing PhaseAtlas eval edges) for AR-rank
-# binning. n_rank_bins = len(FINE_EDGES_R180) - 1 = 29.
+# binning. R220 (IRD-diagnostic-driven): extend the upper tail from 5669 to
+# 251236 (14 added bins), because the IRD diagnostic showed real alibaba has
+# 15% of IRDs > 31k and the fit silently drops ranks >= 5669 from the PMF.
+# This is the actual architectural ceiling that R211/R213/R217 phase-bin
+# expansion couldn't address. Total bins now 43.
 FINE_EDGES_R180 = np.array([
     1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167, 219, 288,
     377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323, 5669,
+    7437, 9750, 12780, 16752, 21959, 28785, 37736, 49467, 64853, 85036,
+    111472, 146148, 191628, 251236,
 ], dtype=np.int64)
 N_RANK_BINS = len(FINE_EDGES_R180) - 1
 STATE_NEW = 0
@@ -519,11 +525,11 @@ def fit(
     transitions = [(((c - cond_mean) / cond_std).astype(np.float32), p, n) for c, p, n in transitions]
     initial_states = [(((c - cond_mean) / cond_std).astype(np.float32), s) for c, s in initial_states]
 
-    # Build per-state fine-bin rank PMF (29 bins, matches existing PhaseAtlas eval edges)
-    fine_edges = np.array([
-        1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167, 219, 288,
-        377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323, 5669,
-    ], dtype=np.int64)
+    # Build per-state fine-bin rank PMF. R220: extended to 43 bins (was 29)
+    # to cover the deep-IRD tail real alibaba exhibits (up to ~250k). The old
+    # cap at 5669 silently dropped 15% of real ranks from the PMF, making
+    # deep IRDs architecturally unreachable at generate time.
+    fine_edges = FINE_EDGES_R180.astype(np.int64)
     rank_pmf_per_state: Dict[int, np.ndarray] = {}
     n_uniform = len(fine_edges) - 1
     for s in range(n_states):
