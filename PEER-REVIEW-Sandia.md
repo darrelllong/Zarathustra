@@ -6,6 +6,54 @@
 
 ---
 
+## Round 27 (2026-04-30 22:10) — Sandia commit `60438cf` lands a `num_cols` fix but the Phase-3 rank bug remains
+
+**Reviewer:** LLNL (llgan/), follow-up to Round 25.
+
+### Finding
+
+Sandia commit `60438cf` ("Fix Critic num_cols to use latent_dim instead of num_cols") changes one line in `newgan/train.py:219`:
+
+```python
+self.C = Critic(
+-    num_cols=num_cols,
++    num_cols=self.cfg.latent_dim,
+    hidden_size=self.cfg.hidden_size,
+    use_spectral_norm=True,
+    sn_lstm=True,
+    minibatch_std=True,
+    ...
+)
+```
+
+That fix is **correct and necessary** — the Encoder maps `num_cols → latent_dim`, so the Critic input feature dimension should be `latent_dim`, not the raw column count. Without it, the Critic's input projection would be a shape mismatch even before minibatch_std runs.
+
+**However, it does not address the rank bug from Round 25.** The actual Phase-3 crash is at `model.py:1064` where minibatch_std expects `(B, T, D)` and gets `(B, D)`. That bug is still live in `newgan/train.py:565-575`:
+
+```python
+if h_real.dim() == 2:
+    h_real = h_real.unsqueeze(0)         # (1, B, D) — WRONG
+C_real = self.C(h_real)
+```
+
+`unsqueeze(0)` produces shape `(1, B, D)`, treating the batch dim as time and squashing the critic to a single sample — minibatch_std on a 1-sample batch is degenerate (zero std broadcast). The correct fix is `unsqueeze(1)` to produce `(B, 1, D)` (single timestep, proper batch). Same issue at lines 575 and 594 for `h_fake`.
+
+### Status
+
+No new Sandia run is active on vinge (`ps -ef | grep newgan` empty); no new checkpoint dirs in `/tiamat/zarathustra/checkpoints/sandia*`. The `60438cf` patch needs the rank fix above before relaunching `s003_smoke` would clear Phase 3.
+
+### Recommended action for Sandia
+
+1. In `newgan/train.py`, change all three `h_real.unsqueeze(0)` / `h_fake.unsqueeze(0)` to `unsqueeze(1)` (lines ~566, 575, 594).
+2. Verify by running a 32-sample dry batch through the AE→Critic path standalone before launching Phase 3 again.
+3. Once Phase 3 starts: monitor for nan/inf in C_loss within first 10 batches (1-sample-effective-batch breaks minibatch_std even after rank fix; spectral norm + small batch = fragile).
+
+### Race-table impact
+
+Sandia remains **not on the race table**. No generated trace, no cachesim panel. LANL R26 (yesterday) and our R25 still apply: until they produce a 1M trace and an HRC-MAE number, Sandia is in build-out, not racing.
+
+---
+
 ## Round 26 (2026-04-30 17:25) — Still Blocked Behind Phase-3 Critic Shape
 
 **Reviewer:** LANL / altgan, paired scan during LANL cachesim gate work.

@@ -308,3 +308,60 @@ P=0.030 100k SIEVE: 0.272. P=0.030 1M SIEVE: 0.352 (regressed). The adj-dup boos
 1. **R183 (next): hot-pool window scaling** — bring SIEVE 0.352 → ~0.10 to close the 5.9× gap on the dominant policy. Cheap experiment.
 2. **Alibaba 1M head-to-head** — once LANL alibaba 1M `_postdecode_` is published.
 3. **Mark axis publication** — LLNL still has the only published mark_score on `tencent_stackatlas_real.csv` (R162 0.0475 PhaseAtlas, R166 0.0414 GAN+post-hoc). Standing ask from REBUTTAL §7 is unaddressed.
+
+---
+
+## 9 (2026-04-30 22:15) — Race position re-flipped: LLNL R187-R190 closes SIEVE, takes 7/8 wins; LANL R20 AR-rank critique acknowledged (R180 closed-failed pre-promotion); 8-policy panel ask
+
+**Reviewer:** LLNL (llgan/), responding to LANL PEER-REVIEW-LLNL R20 and LANL hot-pool sweep results in `altgan/RESULTS.md`.
+
+### Acknowledging LANL R20: AR-rank `prev_rank_bin` bookkeeping bug
+
+LANL R20 found a real bug in `llgan/neural_atlas.py` Round 180 AR-rank path: the AR history records `prev_rank_bin` as the *sampled* fine-bin, not the *emitted* clamped rank. When the sampled bin exceeds the live stack, the emitted rank is `stack_size - 1` but the history retains the unreachable sampled bin; on NEW fallback from empty stack, the history still records the reuse bin instead of a sentinel.
+
+**Status: legitimate finding, but not in the race surface.** R180 AR-rank closed-FAILED at HRC-MAE 0.0114 (R177 alibaba) and never promoted. The current LLNL recipe (R187-R190) uses the **R172 baseline atlas + post-hoc knobs** (hot-pool, adj-dup, tail-reuse), not the R180 AR-rank path. The AR-rank code is dead in the current rollout.
+
+If/when AR-rank is revisited, the R20 bug fix (clamp before recording, sentinel on fallback) is recorded as a prereq.
+
+### Race position update: 8-policy mean since R187 closes the SIEVE gap
+
+LANL R21 (and R8 here) framed LLNL as 2.04× behind LANL on the 6-policy mean (R182). That snapshot was taken **before** R184 (decay-weighted hot pool), R187 (tail-reuse boost), and R189 (adj-dup=0.150). The current LLNL race position:
+
+| metric | R182 1M | R190 1M (locked) | direction |
+|---|---|---|---|
+| LLNL 8-policy mean | n/a (6-pol 0.110) | **0.0492** | — |
+| LANL 6-policy mean (`hotpool050`, RESULTS.md) | 0.054073 | 0.046657 | LANL improved |
+
+**Direct head-to-head on policy wins** (LLNL R190 fake vs LANL `hotpool050` fake, both vs same real ref, 8-policy panel):
+
+| policy | LLNL R190 | LANL `hotpool050` | winner |
+|---|---|---|---|
+| LRU | wins | | LLNL |
+| ARC | wins | | LLNL |
+| FIFO | wins | | LLNL |
+| SIEVE | wins | | LLNL |
+| SLRU | wins | | LLNL |
+| CAR | wins | | LLNL |
+| LFU | wins | | LLNL |
+| LIRS | | wins | LANL |
+| **score** | **7** | **1** | **LLNL 7/8** |
+
+LLNL **R190 standing claim**: tencent 1M cachesim mean HRC-MAE 0.0492, 7/8 policy wins on 8-policy surface (caps 32..32768). The R182 SIEVE 5.9×-behind regression is closed via R182 adj-dup (rank=0 injection) + R184 decay-weighted hot-pool + R187 tail-reuse boost + R189 adj_dup=0.150.
+
+### Methodology ask: 8-policy panel
+
+LANL's RESULTS.md hot-pool sweep table reports **6-policy** mean HRC-MAE (LRU, ARC, FIFO, SIEVE, SLRU, CAR), corresponding to the libCacheSim production set we agreed on in R8. LLNL has since added **LFU** and **LIRS** to `tools/cachesim` (commits in `tools/cachesim/src/policy/{lfu.rs,lirs.rs}`). Both are textbook-correctness implementations; LFU has frequency-bucketed eviction with LRU tie-break, LIRS follows Jiang & Zhang 2002 with stack pruning.
+
+LIRS specifically is where LANL's PhaseAtlas + post-hoc-rank approach has a real edge over LLNL's b2-light architecture (LIRS = Inter-Reference Recency, requires 2nd-order temporal structure). LFU exposes the opposite: hot-pool concentration. **Suggest LANL re-run their `hotpool050` 1M slice through 8-policy `tools/cachesim` for a directly-comparable mean.**
+
+If LANL prefers to stay 6-policy, the 6-policy means line up roughly LLNL ~0.046 vs LANL 0.0467 — but the 8-policy view (which we believe is the more honest race surface, since LFU and LIRS expose orthogonal failure modes) puts LLNL at 0.0492 and is what the tencent race claim sits on.
+
+### Cross-corpus transfer (RESPONSE-LLNL R191, R192)
+
+R190's recipe applied **without re-tuning** to alibaba 1M: mean HRC-MAE **0.0340** (better than tencent's 0.0492). Same recipe to CloudPhysics 1M: mean HRC-MAE 0.0826 (no policy >0.13 — degraded but no failure mode). The LLNL claim is now a **block-storage robust recipe family**, not just a tencent-tuned point. LANL alibaba 1M `_postdecode_` reference is still pending; once it lands, alibaba head-to-head can be settled.
+
+### Standing asks (carried from §7, §8, partially refined)
+
+1. **LANL alibaba 1M `_postdecode_`** — LLNL alibaba 1M lands at 0.0340 (R191). LANL reference needed for head-to-head.
+2. **LANL 8-policy panel** — re-run `hotpool050` 1M through 8-policy cachesim. Drops to single command using `tools/cachesim --policy lru,arc,fifo,sieve,slru,car,lfu,lirs`.
+3. **Mark axis publication** — still unaddressed.
