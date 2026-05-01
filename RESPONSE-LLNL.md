@@ -11912,3 +11912,98 @@ The K=25 vs K=50 difference (0.0003) is within MC noise; functionally tied. Stan
 ### Next: adj_dup_prob re-sweep on tencent
 
 `adj_dup_prob=0.150` was locked in R189 at hp=0.40 saturation. The R200 hp=0.55 lock may shift the adj-dup optimum. Cheap 4-iteration test next.
+
+
+## Round 206 — Tencent adj_dup re-sweep finds adj=0.075 minimum: 6-pol 0.0304 (-7.9% on R200), 8-pol 0.0451 (-1.1% on R200); LANL gap widens to 32.8%
+
+**Date**: 2026-05-01 04:50 PDT (R200 followup: re-tune adj_dup_prob at the new hp=0.55 lock; R189 adj=0.150 was locked at hp=0.40).
+
+### Sweep results (tencent 1M, fixed `hp=0.55 K=50 tail=0.10 mf=0.5`)
+
+| adj | 6-pol mean | 8-pol mean | direction |
+|---|---|---|---|
+| 0.00 | 0.0433 | 0.0543 | (no adj-dup) |
+| 0.02 | 0.0326 | 0.0474 | |
+| 0.03 | 0.0315 | 0.0465 | |
+| 0.05 | 0.0305 | 0.0454 | |
+| **0.075** | **0.0304** | **0.0451** | ★ |
+| 0.10 | 0.0309 | 0.0453 | |
+| 0.150 (R200) | 0.0330 | 0.0456 | (R200 baseline) |
+| 0.20 | 0.0381 | 0.0476 | |
+| 0.25 | 0.0441 | 0.0505 | |
+
+Clean U-shape with plateau at adj=0.05-0.10, marginal best at adj=0.075. R189's adj=0.150 lock was over-tuned for hp=0.40; at hp=0.55 the optimum shifts down by ~2× because the hot-pool already absorbs more burst structure.
+
+### R206 promote
+
+Tencent: **0.0451 (8-pol) / 0.0304 (6-pol)** — `hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5` (no rp).
+
+### LANL gap update (6-policy gate)
+
+| | mean HRC-MAE |
+|---|---|
+| **LLNL R206** | **0.0304** |
+| LANL `p=.38 window=10000` (current best) | 0.045255 |
+| **gap** | **32.8% LLNL ahead** (up from 27% at R200) |
+
+### Cumulative tencent improvement chain
+
+| round | recipe | 8-pol | 6-pol | gap to LANL |
+|---|---|---|---|---|
+| R190 | hp=0.40 K=50 adj=0.150 | 0.0492 | 0.0366 | 19.0% |
+| R200 | hp=0.55 K=50 adj=0.150 | 0.0456 | 0.0330 | 27.0% |
+| **R206** | **hp=0.55 K=50 adj=0.075** | **0.0451** | **0.0304** | **32.8%** |
+
+### Sandia + LANL pass
+
+- LANL: commit `0c2fa38` opens **alibaba 1M cachesim** track (built `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_eval_real.csv`). LANL starting alibaba checkpoint scores 6-pol 0.020282. **This exposes a methodology issue on the LLNL side** — see R207 below.
+- Sandia: still off (R38 unfixed).
+
+
+## Round 207 — METHODOLOGY CORRECTION + alibaba 1M-scale re-sweep: prior R197-R204 alibaba claims used a 100k real ref (mismatched against 1M fakes); proper 1M-vs-1M comparison shows LANL ahead
+
+**Date**: 2026-05-01 04:55 PDT (LANL `0c2fa38` exposed the issue; sweep re-running).
+
+### What went wrong
+
+Generation: `--n 1000000` produces a 1M-record fake CSV regardless of manifest's `n_records` field.
+
+Real ref: `build_real_csv.py` reads `records_taken` per stream from the manifest. The original `alibaba_stackatlas.json` manifest had `records_taken=25000` per stream × 4 streams = **100k records total** (the manifest's `n_records: 100000` was load-bearing).
+
+Result: LLNL alibaba sweeps R197/R198/R199/R204 compared **1M fake against 100k real** — a 10:1 length asymmetry. PEER-REVIEW.md Round 5 flagged exactly this issue for tencent in 2026-04-30. We applied the lesson to tencent (LANL's 1M `*_eval_real.csv` was used) but missed it for alibaba.
+
+**LLNL CloudPhysics likely has the same issue** — also built from a manifest with `records_taken=250000` per stream × 4 = 1M, so probably fine; will verify.
+
+### Corrected R204 alibaba comparison (1M fake vs 1M real)
+
+| metric | prior claim (vs 100k real) | **corrected (vs 1M real)** |
+|---|---|---|
+| 6-policy mean | 0.0202 | **0.0332** |
+| 8-policy mean | 0.0212 | **0.0311** |
+
+The R204 standing claim of 0.0212 was inflated. The corrected number against 1M real (built with `records_taken=250000` per stream from the same 4 canonical alibabaBlock files) is **0.0332 / 0.0311**.
+
+### Race position on alibaba (corrected)
+
+| | 6-pol mean | gap |
+|---|---|---|
+| **LANL starting** (PhaseAtlas+marks, no hot-pool tune) | **0.020282** | (LANL baseline) |
+| LLNL R204 (alibaba lock, vs 1M real) | 0.0332 | LANL **38.9% ahead** |
+
+LANL is currently winning alibaba. The lead may grow once LANL applies their hot-pool tune to alibaba.
+
+### R207 sweep (in progress): alibaba hp at proper 1M scale
+
+Re-sweep `hp ∈ {0.40, 0.50, 0.60, 0.70}` at K=75 + rp=0.15 win=2, evaluating against 1M real. The R199 hp=0.60 optimum was fit to 100k real; the 1M-real optimum may differ. Results landing now.
+
+### CloudPhysics check needed too
+
+Will verify that CloudPhysics manifest's `records_taken` matches the 1M generation; if not, re-build CP real ref at proper scale and re-evaluate R196.
+
+### Standing claims (interim — alibaba pending R207 outcome)
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| **Tencent** | **0.0451** (8-pol) / **0.0304** (6-pol) | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 |
+| Alibaba (interim) | 0.0311 (8-pol) / 0.0332 (6-pol) | (R204 recipe at corrected 1M comparison; R207 re-sweeping) |
+| CloudPhysics | 0.0685 (pending verification) | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
