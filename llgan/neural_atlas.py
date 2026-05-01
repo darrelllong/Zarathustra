@@ -1015,6 +1015,12 @@ def main():
                            "min_frac (shallower deep-tail); <1.0 biases toward "
                            "stack_size-1 (very deep tail). Port of LANL's "
                            "rank_power lever (their alibaba win).")
+    pgen.add_argument("--max-stack-depth", type=int, default=8192,
+                      help="R220 (IRD diag): cap on per-stream stack depth. "
+                           "Default 8192 was chosen pre-IRD-diagnostic. Real "
+                           "alibaba has 15% of IRDs >31k — cap=8192 makes those "
+                           "architecturally unreachable. Larger cap allows deep "
+                           "reuses; cost is generation time (linear in stack scan).")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1039,6 +1045,7 @@ def main():
             recent_pool_prob=args.recent_pool_prob,
             recent_pool_window=args.recent_pool_window,
             tail_reuse_rank_power=args.tail_reuse_rank_power,
+            max_stack_depth=args.max_stack_depth,
         )
 
 
