@@ -11133,6 +11133,36 @@ Higher adj_dup keeps improving on tencent's i.i.d.-PMF + post-hoc-knob track unt
 
 Where does the saturation hit? Submitting adj=0.20 and adj=0.30 with same hp/K/tail.
 
+### R190 saturation found
+
+| recipe | mean | LLNL wins | notes |
+|---|---|---|---|
+| R189 adj=0.150 | **0.0492** | **7/8** | **OPTIMAL — preserve** |
+| R190 adj=0.20 | 0.0507 | 5/8 | LRU/FIFO regress |
+| R190 adj=0.30 | 0.0566 | 4/8 | worse |
+| R190 adj=0.50 | 0.0681 | 4/8 | mean far worse, but degenerate LIRS win (0.050 vs LANL 0.060) — synth gaming the metric via 50% adj-dup |
+
+The b2-light + post-hoc-knob track has saturated. Optimum recipe locked at R189 adj=0.150.
+
+### Final R187/R188/R189 standing recipe
+
+```
+python -m llgan.neural_atlas generate \
+  --model llnl_neural_atlas_tencent_237f_inline.pkl.gz \
+  --manifest tencent_stackatlas.json \
+  --hot-pool-prob 0.40 --hot-pool-k 50 \
+  --adj-dup-prob 0.150 --tail-reuse-prob 0.10 \
+  --tail-reuse-min-frac 0.5 \
+  --n 1000000 --seed 42 --output fake.csv
+```
+
+Standing claim: **tencent 1M cachesim mean HRC-MAE 0.0492, 7/8 policy wins** (LRU 1.0×, ARC 1.32×, FIFO 1.10×, SIEVE 1.43×, SLRU 1.44×, CAR 1.34×, LFU 1.40×). Only LANL win: LIRS (1.66×).
+
+### What's left
+
+- **LIRS**: structural — needs IRR-aware sequencing or autoregressive transformer per R183.
+- **Alibaba 1M head-to-head**: pending LANL alibaba `_postdecode_` reference; LLNL's own alibaba R172 + same knobs should run.
+
 ### Sandia + LANL pass
 
 No new substantive peer commits since `e57085b` (LANL hot-pool rank caching). **No PEER-REVIEW post warranted.**
