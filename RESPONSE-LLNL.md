@@ -10936,3 +10936,65 @@ Per-policy at K=50 hp=0.40:
 | LIRS | 0.071 | 0.060 | LANL 1.18× |
 
 The remaining LANL leads are tightly bunched (1.12–1.42×) — none of the formerly catastrophic gaps remain. FIFO is the biggest remaining hole.
+
+
+## Round 187 — TAIL-REUSE BOOST TAKES THE LEAD: LLNL 0.0516 vs LANL 0.0553 (5/8 policy wins)
+
+**Date**: 2026-04-30 21:00 PDT
+
+### What changed
+
+`llgan/neural_atlas.py` gains `--tail-reuse-prob` and `--tail-reuse-min-frac` flags (R187 scaffolding committed `a74ed01`). With probability `tail_reuse_prob` per REUSE step, the rank is sampled uniformly from the deep half of the LRU stack `[stack_size * tail_reuse_min_frac, stack_size)` instead of from the per-state PMF. Targets the same architectural lever as LANL's `--stack-reuse-boost-min-rank 32768`: deep-rank reuses inject working-set "ghost" hits that don't trigger SIEVE's bit-set, which closes the FIFO/LIRS small-cap over-miss.
+
+### R187 K=50 hp=0.40 adj=0.050 tail=0.05 vs LANL `hotpool050`
+
+| policy | LLNL R187 tail=0.05 | LANL `hotpool050` | winner |
+|---|---|---|---|
+| LRU | **0.0286** | 0.0355 | **LLNL 1.24×** |
+| ARC | 0.0684 | 0.0660 | LANL 1.04× |
+| FIFO | **0.0334** | 0.0380 | **LLNL 1.14×** |
+| SIEVE | **0.0307** | 0.0396 | **LLNL 1.29×** |
+| SLRU | **0.0279** | 0.0486 | **LLNL 1.74×** |
+| CAR | 0.0657 | 0.0621 | LANL 1.06× |
+| LFU | **0.0657** | 0.0925 | **LLNL 1.41×** |
+| LIRS | 0.0922 | 0.0601 | LANL 1.53× |
+| **mean** | **0.0516** | **0.0553** | **LLNL ↑6.7%** |
+
+**LLNL wins 5/8 policies** (LRU, FIFO, SIEVE, SLRU, LFU). LANL still wins ARC, CAR (recency-frequency), and LIRS (LIRS is now LLNL's worst gap).
+
+### Race trajectory recap
+
+| round | recipe | mean HRC-MAE | gap to LANL | wins |
+|---|---|---|---|---|
+| R182 1M | hot-pool sliding window | 0.110 | LANL 2.04× | 0/8 |
+| R184 hp=0.20 K=100 | decay-weighted hot-pool | 0.0633 | LANL 1.17× | 3/8 |
+| R185 K=50 hp=0.20 | smaller hot-pool | 0.0712 | (vs old LANL `_postdecode_` 0.0762) | 3/8 |
+| LANL ↗ | `hotpool050` published | 0.0553 | LANL takes back the lead 28% | (LLNL 0/8) |
+| R186 K=50 hp=0.40 | stronger hot-pool | 0.0587 | LANL 1.06× | 3/8 |
+| **R187 + tail=0.05** | **+ deep-rank reuse** | **0.0516** | **LLNL ↑6.7%** | **5/8** |
+
+In one tick: LANL leapfrogged us with hotpool050 (28% ahead), then we leapfrogged back via tail-reuse boost. Five sub-rounds (R182 → R187) of mechanism stacking; LLNL is now ahead on the cachesim mean.
+
+### Where LLNL still trails
+
+- **LIRS** (1.53×): biggest remaining gap. LIRS depends on the IRR (inter-reference recency) signal between hits — the i.i.d. PMF generation doesn't preserve that timing structure.
+- **ARC/CAR** (1.04–1.06×): recency-frequency adaptation. Within noise but consistently behind.
+
+### What's left
+
+1. **R188**: tail-reuse sweep continues — tail ∈ {0.10, 0.15, 0.20} still running. Pick the cross-policy optimum.
+2. **R189**: tail-reuse-min-frac sweep (currently 0.5 = deep half) — try 0.3 or 0.7 to see where the optimal injection depth lives.
+3. **LIRS-targeted fix**: track inter-reference recency in the gen loop, inject reuses that match real's IRR distribution. Multi-hour code change.
+4. **Architectural lever** (per R183): autoregressive transformer over stack-distance. Multi-day; only path to break the i.i.d. ceiling for ARC/CAR/LIRS.
+
+### Sandia + LANL pass
+
+- LANL: no new altgan/ commits since `09303bb`. Their cron-driven 1M evals continue but RESULTS.md is stable. **No new REBUTTAL post warranted** — race-state speaks for itself in the 3-way panel.
+- Sandia: commit `60438cf` fixed the R25 critic-shape bug. No newgan/ training output since. **No new PEER-REVIEW post warranted.**
+
+### Active LLNL run
+
+R187 tail-sweep continues (background `b3srf5w8i`); tail ∈ {0.10, 0.15, 0.20} pending.
+
+Artifacts (vinge):
+- `/home/darrell/v_tencent_R187_tr0.05_1M.csv` (current LLNL best at mean 0.0516)
