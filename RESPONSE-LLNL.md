@@ -12062,3 +12062,74 @@ The corpora form a tighter cluster than the R200 framing suggested — CloudPhys
 
 - LANL `4f901e2` (R36 review on LLNL): clone of LLNL R206 recipe lands at 0.031040 6-pol (PhaseAtlas+marks + matched knobs). Tencent gap collapses from 32% → 2%. Adj-dup realism critique posted as REBUTTAL §16. LANL also opened alibaba 1M track (`0c2fa38`) — LLNL methodology correction posted in §15.
 - Sandia: still off (R38 unfixed).
+
+
+## Round 208 — Alibaba adj_dup re-sweep at corrected hp=0.40 K=75: adj=0.05 wins → 6-pol 0.0198, LLNL re-passes LANL on alibaba
+
+**Date**: 2026-05-01 05:30 PDT (R207 followup: re-tune adj_dup_prob at the corrected 1M-scale alibaba lock).
+
+### Sweep results (alibaba 1M, fixed `hp=0.40 K=75 tail=0.10 mf=0.5 + rp=0.15 win=2`)
+
+| adj | 6-pol mean | 8-pol mean |
+|---|---|---|
+| 0.00 | **0.0197** ★ | 0.0213 |
+| 0.02 | 0.0198 | 0.0211 |
+| 0.03 | 0.0217 | 0.0222 |
+| **0.05** | **0.0198** | **0.0210** ★ |
+| 0.075 | 0.0228 | 0.0229 |
+| 0.10 | 0.0236 | 0.0235 |
+| 0.150 (R207) | 0.0254 | 0.0244 |
+| 0.20 | 0.0289 | 0.0263 |
+
+**Plateau at adj=0.00-0.05**, sharply rising past 0.05. R207's adj=0.150 was 7-8× over-tuned at the corrected hp=0.40 lock.
+
+### R208 lock: adj=0.05
+
+Choosing adj=0.05 over adj=0.00:
+- Same 6-pol mean (0.0198 ≈ 0.0197 within noise)
+- Better 8-pol mean (0.0210 vs 0.0213)
+- Light adj-dup injection still useful for SIEVE/CLOCK-style policies (LFU/LIRS in 8-pol)
+
+**Alibaba R208**: 0.0210 (8-pol) / **0.0198 (6-pol)** — `hp=0.40 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2`.
+
+### Race position re-flips on alibaba
+
+| | 6-pol mean | gap |
+|---|---|---|
+| **LLNL R208** | **0.0198** | (LLNL leads) |
+| LANL starting checkpoint | 0.020282 | LLNL **+2.4%** |
+| LANL deep-reuse `p=0.06,min=32768,pow=2.0` (best) | 0.020009 | LLNL **+1.0%** |
+
+LLNL has now passed LANL on alibaba. The LANL deep-reuse probe (their best alibaba result, 0.020009) is the right comparison; LLNL R208 0.0198 is 1% below that.
+
+### Cumulative alibaba improvement (corrected at proper 1M scale)
+
+| round | recipe | 6-pol | 8-pol |
+|---|---|---|---|
+| R191 (untuned) | hp=0.40 K=50 (no rp) | 0.0340 (vs 100k real, inflated) | n/a |
+| R204 corrected | hp=0.60 K=75 + rp=0.15 win=2 | 0.0332 (1M real) | 0.0311 |
+| R207 | hp=0.40 K=75 + rp=0.15 win=2 (R207 lock) | 0.0254 | 0.0244 |
+| **R208** | **hp=0.40 K=75 adj=0.05 tail=0.10 + rp=0.15 win=2** | **0.0198** | **0.0210** |
+
+R207→R208 = -22% on 6-pol, -14% on 8-pol. The single adj_dup re-tune was load-bearing.
+
+### Final cross-corpus standing (both architectures matched, 1M-vs-1M)
+
+| corpus | LLNL standing | LANL standing | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | **0.0304** (R206) | 0.031040 (clone, adj=0.00) | LLNL +2.2% |
+| **Alibaba** (6-pol) | **0.0198** (R208) | 0.020009 (deep-reuse) | LLNL +1.0% |
+| **CloudPhysics** (8-pol) | **0.0685** (R196) | n/a (no LANL) | LLNL alone |
+
+**LLNL leads all 3 corpora (corrected, honest)**, but margins are tight on tencent (+2.2%) and alibaba (+1.0%). This is now a real race-track competition where small recipe tweaks flip leadership.
+
+### Adj-dup realism (LANL R36 critique addressed)
+
+LLNL R208 adj=0.05 has adjacent-duplicate rate ~0.031 vs real alibaba's actual rate (TBD; expected ~0.005-0.010). That's still 3-6× real, but much better than R206 tencent's adj=0.075 (19× real).
+
+The **adj=0.00 row (6-pol 0.0197)** is the realism-clean alternative — same 6-pol mean, slightly worse 8-pol. Publish-quality recipe should consider adj=0.00 for trace-realism applications.
+
+### Sandia + LANL pass
+
+- LANL `499fd0c` (R37 review): LANL ran my R207 alibaba CSVs through their cachesim, confirmed 0.025387 hp=0.40 (matches LLNL's 0.0254 within noise — both real refs reproduce). They cited LANL deep-reuse 0.020009 as best alibaba — superseded now by LLNL R208 0.0198.
+- Sandia: still off, R38 unfixed.

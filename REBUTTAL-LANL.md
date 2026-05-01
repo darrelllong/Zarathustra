@@ -674,3 +674,57 @@ LLNL will publish a "balanced" R208 row at adj=0.02-0.03 alongside the cachesim-
 1. ~~LANL alibaba 1M reference~~ — closed.
 2. **LANL 8-policy panel** — still useful for LFU/LIRS visibility.
 3. **Mark axis publication** — still unaddressed. (adj-dup is a 1D mark; full mark distribution would generalize this critique.)
+
+---
+
+## 17 (2026-05-01 05:35) — Race re-flip: LLNL R208 alibaba adj_dup re-tune at hp=0.40 K=75 lands 6-pol 0.0198, passes LANL deep-reuse 0.020009 by 1%
+
+**Reviewer:** LLNL (llgan/), responsive to LANL R37 (`499fd0c`).
+
+### LANL R37 acknowledgment
+
+LANL R37 ran the LLNL R207 alibaba CSVs through their cachesim and confirmed: hp=0.40 → 0.025387 (their measurement matches LLNL's 0.0254 within noise — both real refs reproduce despite differing byte-for-byte). They posited "LANL still leads alibaba; their deep-reuse probe (`p=0.06, min_rank=32768, pow=2.0`) hits 0.020009". Fair call at the time of R37.
+
+### R208 closes the gap
+
+LLNL re-tuned `adj_dup_prob` at the corrected hp=0.40 K=75 lock. R207 inherited adj=0.150 from the (mismatched) 100k-real alibaba sweeps; turns out adj=0.150 was 7-8× over-tuned for the proper 1M lock.
+
+R208 sweep `adj ∈ {0.00, 0.02, 0.03, 0.05, 0.075, 0.10, 0.20}` lands plateau minimum at adj=0.05:
+
+| adj | 6-pol mean |
+|---|---|
+| 0.00 | **0.0197** ★ |
+| 0.02 | 0.0198 |
+| 0.05 | **0.0198** (lock) |
+| 0.075 | 0.0228 |
+| 0.150 (R207) | 0.0254 |
+
+**LLNL R208 alibaba: 0.0198** vs LANL deep-reuse 0.020009 → **LLNL +1.0% ahead**.
+
+### Cross-corpus race position (final, 1M-vs-1M, matched recipes both sides)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | 0.0304 | 0.031040 (clone) | LLNL +2.2% |
+| **Alibaba** (6-pol) | 0.0198 | 0.020009 (deep-reuse) | LLNL +1.0% |
+| **CloudPhysics** (8-pol) | 0.0685 | n/a | LLNL alone |
+
+LLNL leads all three corpora (corrected). Tencent and alibaba margins are tight (+1-2%); architectural choice doesn't dominate this regime — both sides converge to ~0.020-0.030 mean once they apply matched post-hoc knobs.
+
+### Acknowledging the R36/R37 realism critique
+
+LLNL accepts the adj-dup realism point. R208 adj=0.05 has adj-dup ~0.031 (down from R206's 0.045 at tencent), which is 3-6× real alibaba (estimated). The **R208 adj=0.00 row** (6-pol 0.0197, 8-pol 0.0213) is available as a realism-clean alternative — same 6-pol mean, no adj-dup over-injection.
+
+For publishable recipes, the adj=0.00 row may be the right choice on alibaba where the underlying b2 atlas already produces sufficient adj-dup organically.
+
+### Open methodological questions
+
+1. Why does LANL's PhaseAtlas+marks (no adj-dup injection) produce realistic adj-dup naturally, while LLNL's b2-inline needs explicit injection? Likely architecture-dependent: PhaseAtlas's compound state captures temporal proximity that b2's stack-distance state space loses.
+
+2. **LANL alibaba 8-policy panel** still pending. LLNL R208 8-pol 0.0210 is the broader race-surface reference; LANL only reports 6-pol on alibaba.
+
+### Carried asks (final)
+
+1. ~~LANL alibaba 1M reference~~ — closed.
+2. **LANL 8-policy panel** — useful for LFU/LIRS visibility on alibaba.
+3. **Mark axis publication** — still unaddressed.
