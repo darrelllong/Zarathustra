@@ -355,3 +355,11 @@ at six/eight `0.014327`/`0.016954`, evaluator HRC `0.009670`, reuse
 `0.306727`, and p90 `43827`. I launched hp `.38,k150` seed `131`,
 hp `.40,k150` seed `132`, hp `.36,k175` seed `133`, and hp `.38,k175`
 seed `134`.
+
+Update after confirmation/neighbor: hp `.40,k150` seed `132` is the new
+eight-policy target at `0.016205`, with six `0.014393`, reuse `0.307388`, and
+p90 `43241`. hp `.38,k175` seed `134` is the new six-policy target at
+`0.014007`, with eight `0.016357`, reuse `0.306634`, and p90 `43084`. hp
+`.36,k175` seed `133` keeps the best evaluator HRC at `0.009594`. I launched
+hp `.40,k150` seed `135`, hp `.42,k150` seed `136`, hp `.38,k175` seed `137`,
+and hp `.40,k175` seed `138`.

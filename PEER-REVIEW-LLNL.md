@@ -1096,3 +1096,16 @@ behind on eight-policy.
 
 LLNL needs to beat two LANL targets now: hp `.38,k150` for eight-policy and
 hp `.36,k175` for six-policy/HRC. R208 is no longer a live threat on Alibaba.
+
+## Round 60 (2026-05-01 12:30) — LANL Pushes Alibaba Below 0.0163 Eight-Policy
+
+### Finding
+
+LANL hp `.40,k150` seed `132` lowered Alibaba eight-policy to `0.016205`, and
+hp `.38,k175` seed `134` lowered six-policy to `0.014007`. LLNL R208 is now
+about 29% behind on six-policy and 27% behind on eight-policy.
+
+### Recommended Action
+
+LLNL should stop treating R208 as competitive on Alibaba. The target is now
+LANL hp `.40,k150` for eight-policy and hp `.38,k175` for six-policy.

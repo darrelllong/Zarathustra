@@ -5,27 +5,29 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R216 Alibaba k150/k175 Cache-Sim Target (2026-05-01)
+## R217 Alibaba hp40/hp38 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
 manifest. The current visible targets are:
 
-- Eight-policy: p `.06`, hp `.38,k150,window10000`, seed `128`,
-  eight-policy `0.016570`, six-policy `0.014579`, evaluator HRC `0.010962`,
-  reuse `0.306669`, median `253`, p90 `43486`.
-- Six-policy/evaluator HRC: p `.06`, hp `.36,k175,window10000`, seed `129`,
-  six-policy `0.014327`, eight-policy `0.016954`, evaluator HRC `0.009670`,
-  reuse `0.306727`, median `263`, p90 `43827`.
+- Eight-policy: p `.06`, hp `.40,k150,window10000`, seed `132`,
+  eight-policy `0.016205`, six-policy `0.014393`, evaluator HRC `0.011712`,
+  reuse `0.307388`, median `251`, p90 `43241`.
+- Six-policy: p `.06`, hp `.38,k175,window10000`, seed `134`, six-policy
+  `0.014007`, eight-policy `0.016357`, evaluator HRC `0.009952`, reuse
+  `0.306634`, median `263`, p90 `43084`.
+- Evaluator-HRC: p `.06`, hp `.36,k175,window10000`, seed `133`, HRC
+  `0.009594`, six-policy `0.014378`, eight-policy `0.017013`.
 
 LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
 `0.022266` eight-policy), so LANL currently leads the fixed-manifest Alibaba
 cachesim table. The seed `107-110` manual bracket is retracted because it
 omitted `--force-phase-schedule`; the corrected forced-phase bracket is
 recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
-Alibaba launch recipe. The live bracket is hp `.38,k150` seed `131`,
-hp `.40,k150` seed `132`, hp `.36,k175` seed `133`, and hp `.38,k175` seed
-`134`.
+Alibaba launch recipe. The live bracket is hp `.40,k150` seed `135`,
+hp `.42,k150` seed `136`, hp `.38,k175` seed `137`, and hp `.40,k175` seed
+`138`.
 
 ---
 
@@ -635,3 +637,12 @@ six-policy to `0.014327` and evaluator HRC to `0.009670`, with eight-policy
 `0.016954`, median `263`, and p90 `43827`. Live confirmation/neighbor bracket:
 hp `.38,k150` seed `131`, hp `.40,k150` seed `132`, hp `.36,k175` seed `133`,
 and hp `.38,k175` seed `134`.
+
+The confirmation/neighbor bracket improved both cache panels. hp `.40,k150`
+seed `132` lowered eight-policy to `0.016205` with six-policy `0.014393`,
+reuse `0.307388`, median `251`, and p90 `43241`. hp `.38,k175` seed `134`
+lowered six-policy to `0.014007` with eight-policy `0.016357`, reuse
+`0.306634`, median `263`, and p90 `43084`. hp `.36,k175` seed `133` kept the
+best evaluator HRC at `0.009594`. Live bracket: hp `.40,k150` seed `135`,
+hp `.42,k150` seed `136`, hp `.38,k175` seed `137`, and hp `.40,k175`
+seed `138`.
