@@ -228,8 +228,8 @@ Important knobs:
 - `stack_hot_pool_max_search`: bounds hot-object lookup to a stack prefix and
   falls back to the normal sampled rank if the hot object is deeper. Added
   after seed-43 exact lookup ran 40+ minutes without a fake CSV. `max_search=8192`
-  was also killed at 40+ minutes; seed-43 confirmation is running with
-  `max_search=512`.
+  and `max_search=512` were also killed at 40+ minutes. Confirmation pivoted
+  to fixed real manifest seed `42` with fake RNG seed `43`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
