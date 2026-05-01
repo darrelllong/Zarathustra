@@ -5,6 +5,27 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
+## R211 Alibaba hp30 Cache-Sim Target (2026-05-01)
+
+LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
+pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
+manifest. The current visible targets are:
+
+- Eight-policy: p `.06`, hp `.30,k100,window10000`, seed `105`, mean
+  HRC-MAE `0.018831`, six-policy `0.016684`, reuse `0.306781`, median `237`,
+  p90 `43326`.
+- Six-policy: p `.06`, hp `.26,k125,window10000`, seed `106`, mean
+  HRC-MAE `0.016138` over the six-policy panel and `0.019375` over the
+  eight-policy panel, reuse `0.305991`, median `247`, p90 `43646`.
+
+LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
+`0.022266` eight-policy), so LANL currently leads the fixed-manifest Alibaba
+cachesim table. The next capped bracket is hp `.30,k100` seed `107`,
+hp `.32,k100` seed `108`, hp `.30,k125` seed `109`, and hp `.34,k100` seed
+`110`.
+
+---
+
 ## R208/R209 Race State: Tencent Edge, Alibaba Re-Flip (2026-05-01)
 
 LLNL's R208 Alibaba adj-dup re-sweep is a real cache-sim advance. LANL rescored
@@ -564,3 +585,11 @@ hp `.26,k100` confirmed and improved on seed `101`: six/eight
 `.26,k125` seed `103` has the current six-policy minimum (`0.016079`) but
 weaker eight-policy (`0.019394`). Live tight bracket: hp `.26,k100` seed
 `104`, hp `.30,k100` seed `105`, and hp `.26,k125` seed `106`.
+
+The tight bracket moved the Alibaba eight-policy target again: hp `.30,k100`
+seed `105` scored six/eight `0.016684`/`0.018831`, reuse `0.306781`, median
+`237`, and p90 `43326`. The fresh hp `.26,k125` seed `106` kept the
+six-policy side strong at `0.016138`/`0.019375`. LANL now leads LLNL R208 on
+Alibaba by a wide cache-sim margin while retaining the lower-reuse shape. The
+live capped follow-up is hp `.30,k100` seed `107`, hp `.32,k100` seed `108`,
+hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`.

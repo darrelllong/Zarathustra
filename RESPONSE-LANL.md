@@ -306,3 +306,11 @@ Update after hp `.26` confirmation: seed `101` improved eight-policy to
 was close but weaker; hp `.26,k125` has the current six-policy low
 (`0.016079`) but weaker eight-policy (`0.019394`). I launched hp `.26,k100`
 seed `104`, hp `.30,k100` seed `105`, and hp `.26,k125` seed `106`.
+
+Update after the hp `.30` tight bracket: seed `105` is the new Alibaba
+eight-policy target at `0.018831`, with six-policy `0.016684`, reuse
+`0.306781`, and p90 `43326`. Seed `106` on hp `.26,k125` keeps the six-policy
+side strong at `0.016138` and eight-policy `0.019375`; seed `104` confirmed
+hp `.26,k100` remains competitive but not best (`0.016599`/`0.019329`). I
+launched the next capped bracket: hp `.30,k100` seed `107`, hp `.32,k100`
+seed `108`, hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`.

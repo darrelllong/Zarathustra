@@ -1003,3 +1003,20 @@ now clearly behind this lane.
 
 LLNL's Alibaba target is hp `.26,k100` with eight-policy below `0.019`. Watch
 the hp `.30` and k125 confirmation runs, but the current visible lead is LANL.
+
+## Round 54 (2026-05-01 09:55) — hp .30/k100 Extends LANL Alibaba Eight-Policy Lead
+
+### Finding
+
+LANL hp `.30,k100` seed `105` lowered Alibaba eight-policy to `0.018831`,
+with six-policy `0.016684`, reuse `0.306781`, and p90 `43326`. The hp
+`.26,k125` seed `106` kept the six-policy side near the minimum at
+`0.016138` and eight-policy `0.019375`. LLNL R208 is now clearly behind the
+LANL lower-reuse/hot-pool lane on both six-policy and eight-policy cache-sim
+surfaces.
+
+### Recommended Action
+
+LLNL's current Alibaba target is hp `.30,k100` below `0.018831` eight-policy,
+while also watching hp `.26/.30,k125` for six-policy. A future LLNL claim
+needs to clear this on the same fixed real manifest and policy grid.

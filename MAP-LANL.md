@@ -5,7 +5,7 @@ Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
-after the LLNL R210 adj `.04` score and the LANL Alibaba eight-policy fill.
+after the Alibaba hp `.30,k100` tight bracket.
 
 ---
 
@@ -101,64 +101,26 @@ panel changed the diagnosis:
 
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
-- Current LANL six-policy cache best: deep-reuse p `.08` plus hot-pool
-  `.10,k125,window10000`, fake seed `62`, six-policy `0.017260`,
-  eight-policy `0.022470`. Median is low (`257` versus real `276`), p90 is
-  high (`59278` versus real `44829`).
-- Current LANL eight-policy cache best: deep-reuse p `.08` plus hot-pool
-  `.15,k100,window10000`, fake seed `61`, eight-policy `0.021637` and
-  six-policy `0.017641`. p `.08`/hp `.12`/k125 seed `68` is the nearest
-  bridge at six-policy `0.017100` and eight-policy `0.022172`.
-- Seed-46 is not yet robust. The first follow-up launcher malformed decimal
-  probabilities (`.10` as `.010`, `.25` as `.025`); those rows are rejected.
-  Corrected hp `.10` seed `49` scored six-policy `0.017547` and eight-policy
-  `0.022264`; hp `.15` seed `50` scored six-policy `0.018764` and eight-policy
-  `0.022021`; hp `.12` seed `56` improved eight-policy to `0.021982`; hp
-  `.10,k100` seed `57` improved six-policy to `0.017524`. hp `.20`, hp `.25`,
-  and hp `.25` + tail `.30` lose.
-- Current LLNL cache best: R208 adj `.00` at six-policy `0.019671`; adj `.02`
-  has its best rescored eight-policy row at `0.022266`; LANL now leads both
-  visible cache panels, with much lower adjacency debt.
-- Closed negative: p `.08`/hp `.15`/k125 seed `70` (`0.018845` six,
-  `0.023364` eight), p `.075`/hp `.12`/k125 seed `71` (`0.019830`,
-  `0.024602`), p `.08`/hp `.10`/k150 seed `72` (`0.020138`, `0.025011`), and
-  p `.07`/hp `.12`/k125 seed `73` (`0.019743`, `0.024429`).
-- Also closed negative: k100 p `.08`/hp `.12` seed `74` (`0.020097` six,
-  `0.024603` eight), p `.08`/hp `.13` seed `75` (`0.019734`, `0.024003`), and
-  p `.085`/hp `.15` seed `76` (`0.018410`, `0.022816`).
-- Fresh-seed p `.08` confirmations were weak: p `.08`/hp `.10,k125` seed `77`
-  scored `0.020158` six and `0.024861` eight; p `.08`/hp `.15,k100` seed `78`
-  scored `0.019030`/`0.023338`; p `.08`/hp `.12,k125` seed `79` scored
-  `0.020151`/`0.024729`. Treat the p `.08` best rows as seed-fragile.
-- p `.10` confirmations were also weak on fresh seeds: hp `.12,k75` seed `80`
-  scored `0.019992` six and `0.024045` eight; hp `.10,k100` seed `81` scored
-  `0.019997`/`0.024628`; hp `.10,k75` seed `82` scored `0.019926`/`0.024444`.
-- Lower-reuse confirmations show a shape/cache split: p `.06`/hp `.10,k125`
-  seed `83` scored `0.020902` six and `0.025591` eight with p90 `44240`;
-  p `.065`/hp `.10,k125` seed `84` scored `0.020901`/`0.025524`; p
-  `.06`/hp `.12,k125` seed `85` scored `0.020368`/`0.024968` with p90
-  `43801`. These match reuse/p90 much better but lose policy curves.
-- Low-reuse/high-hot-pool found the current best balanced Alibaba row:
-  p `.06`/hp `.18,k100` seed `88` scored `0.018282` six-policy and `0.022144`
-  eight-policy, with reuse `0.307590`, median `240`, p90 `43194`. This beats
-  LLNL R208 eight-policy (`0.022266`) while keeping trace shape close.
-  hp `.15,k100` seed `86` was weaker (`0.019406`/`0.023606`), and
-  hp `.15,k125` seed `87` lost (`0.019937`/`0.024477`).
-- The neighbor probe promoted p `.06`/hp `.20,k100` seed `90`: six-policy
-  `0.017356`, eight-policy `0.020988`, reuse `0.306875`, median `240`, p90
-  `43721`. Same hp `.18,k100` confirmed at seed `89` (`0.018010`/`0.022058`);
-  hp `.18,k125` seed `91` scored `0.017992`/`0.022436`.
-- hp `.26,k100` seed `101` confirmed and improved the Alibaba eight-policy
-  target: six-policy `0.016231`, eight-policy `0.018970`, reuse `0.306704`,
-  median `240`, p90 `44090`. hp `.28,k100` seed `102` was slightly worse
-  (`0.016670`/`0.019061`); hp `.26,k125` seed `103` has the current six-policy
-  minimum (`0.016079`) but weaker eight-policy (`0.019394`).
-- Live LANL probes: hp `.26,k100` seed `104`, hp `.30,k100` seed `105`, and
-  hp `.26,k125` seed `106`. Launch these with math-library
-  thread caps; uncapped four-way launches got stuck in startup/CPU probing before
-  opening model or trace files.
-  caps; uncapped four-way launches got stuck in startup/CPU probing before
-  opening model or trace files.
+- Current LANL eight-policy cache best: p `.06`, hp `.30,k100,window10000`,
+  fake seed `105`, eight-policy `0.018831`, six-policy `0.016684`,
+  evaluator HRC `0.012652`, reuse `0.306781`, median `237`, p90 `43326`.
+- Current LANL six-policy cache best on the tight fresh bracket:
+  p `.06`, hp `.26,k125,window10000`, fake seed `106`, six-policy
+  `0.016138`, eight-policy `0.019375`, evaluator HRC `0.010259`, reuse
+  `0.305991`, median `247`, p90 `43646`. The earlier hp `.26,k125` seed `103`
+  remains the single-row six-policy low at `0.016079`.
+- LLNL's visible Alibaba cache best remains R208 adj `.00` at six-policy
+  `0.019671` and R208 adj `.02` at eight-policy `0.022266`, with much higher
+  adjacent-duplicate debt than LANL. LANL now leads both visible Alibaba cache
+  panels while keeping real-like reuse/p90 shape.
+- The p `.08` and p `.10` rows are demoted to seed-fragile history. The useful
+  branch is lower total reuse (`p=.06`) plus steadily higher hot-pool pressure.
+  hp `.18` first edged R208, hp `.20`, `.22`, `.24`, and `.26` improved it, and
+  hp `.30,k100` is the current eight-policy target.
+- Live LANL probes: hp `.30,k100` seed `107`, hp `.32,k100` seed `108`,
+  hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`. Launch these with
+  math-library thread caps; uncapped four-way launches got stuck in
+  startup/CPU probing before opening model or trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

@@ -1436,3 +1436,15 @@ No Sandia long-trace or cachesim artifact appeared while LANL confirmed the hp
 ### Recommended Action
 
 Keep Sandia unranked until a comparable artifact exists.
+
+## Round 61 (2026-05-01 09:55) — No Sandia Artifact As hp .30 Becomes Target
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+the Alibaba eight-policy target to hp `.30,k100` at `0.018831`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a generated long trace and the shared
+cachesim report on the fixed manifests.
