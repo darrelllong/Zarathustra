@@ -641,6 +641,7 @@ def generate(
     tail_reuse_min_frac: float = 0.5,
     recent_pool_prob: float = 0.0,
     recent_pool_window: int = 200,
+    tail_reuse_rank_power: float = 1.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -756,13 +757,22 @@ def generate(
                 elif (tail_reuse_prob > 0.0 and len(stack) > 0
                       and rng.random() < tail_reuse_prob):
                     # R187: deep-rank reuse injection (LANL-style min-rank boost).
-                    # Pick a rank uniformly from the deep half of the stack
-                    # (tail_reuse_min_frac of stack_size). Closes FIFO/LIRS
-                    # small-cap over-miss without architectural change.
+                    # Pick a rank from [stack*min_frac, stack_size). Default uniform
+                    # (rank_power=1.0); R211 adds power-law weighting to bias toward
+                    # min_frac end (rank_power>1) or very-deep end (rank_power<1).
+                    # Port of LANL's `_boosted_reuse_rank` lever (their alibaba win).
                     stack_sz = len(stack)
                     lo = max(int(stack_sz * tail_reuse_min_frac), stack_sz // 2)
                     lo = min(lo, stack_sz - 1)
-                    rank = int(rng.integers(lo, stack_sz))
+                    if tail_reuse_rank_power == 1.0:
+                        rank = int(rng.integers(lo, stack_sz))
+                    else:
+                        # u^p: p>1 biases toward lo (shallow deep-tail);
+                        #       p<1 biases toward stack_sz-1 (very deep tail).
+                        u = float(rng.random())
+                        biased = u ** tail_reuse_rank_power
+                        rank = int(lo + (stack_sz - 1 - lo) * biased)
+                        rank = max(lo, min(rank, stack_sz - 1))
                     obj_id = stack[rank]
                     del stack[rank]
                     stack.insert(0, obj_id)
@@ -999,6 +1009,12 @@ def main():
                            "washes out.")
     pgen.add_argument("--recent-pool-window", type=int, default=200,
                       help="R194: deque size for recent-pool sampling.")
+    pgen.add_argument("--tail-reuse-rank-power", type=float, default=1.0,
+                      help="R211: power-law weight for tail-reuse rank sampling. "
+                           "1.0 = uniform (R187 default); >1.0 biases toward "
+                           "min_frac (shallower deep-tail); <1.0 biases toward "
+                           "stack_size-1 (very deep tail). Port of LANL's "
+                           "rank_power lever (their alibaba win).")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1022,6 +1038,7 @@ def main():
             tail_reuse_min_frac=args.tail_reuse_min_frac,
             recent_pool_prob=args.recent_pool_prob,
             recent_pool_window=args.recent_pool_window,
+            tail_reuse_rank_power=args.tail_reuse_rank_power,
         )
 
 
