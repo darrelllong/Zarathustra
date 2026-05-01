@@ -148,12 +148,12 @@ panel changed the diagnosis:
   `0.017356`, eight-policy `0.020988`, reuse `0.306875`, median `240`, p90
   `43721`. Same hp `.18,k100` confirmed at seed `89` (`0.018010`/`0.022058`);
   hp `.18,k125` seed `91` scored `0.017992`/`0.022436`.
-- hp `.22,k100` seed `93` is the new Alibaba target: six-policy `0.016815`,
-  eight-policy `0.020036`, reuse `0.306979`, median `240`, p90 `43142`.
-  hp `.20,k100` seed `92` confirmed the family at `0.017476`/`0.021102`;
-  hp `.20,k75` seed `94` scored `0.018045`/`0.021012`.
-- Live LANL probes: hp `.22,k100` seed `95` confirmation, hp `.24,k100` seed
-  `96`, and hp `.22,k75` seed `97`. Launch these with math-library thread
+- hp `.24,k100` seed `96` is the new Alibaba target: six-policy `0.016666`,
+  eight-policy `0.019718`, reuse `0.306815`, median `240`, p90 `43898`.
+  hp `.22,k100` confirmed at seed `95` (`0.016740`/`0.019927`); hp `.22,k75`
+  seed `97` scored `0.017604`/`0.020350`.
+- Live LANL probes: hp `.24,k100` seed `99` confirmation, hp `.26,k100` seed
+  `98`, and hp `.24,k75` seed `100`. Launch these with math-library thread
   caps; uncapped four-way launches got stuck in startup/CPU probing before
   opening model or trace files.
 

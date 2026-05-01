@@ -290,3 +290,8 @@ six/eight `0.016815`/`0.020036`, reuse `0.306979`, p90 `43142`. hp `.20,k100`
 seed `92` confirmed the family at `0.017476`/`0.021102`; hp `.20,k75` scored
 `0.018045`/`0.021012`. I launched hp `.22,k100` seed `95`, hp `.24,k100`
 seed `96`, and hp `.22,k75` seed `97`.
+
+Update after hp `.24`: seed `96` moved Alibaba to six/eight
+`0.016666`/`0.019718`, reuse `0.306815`, p90 `43898`; hp `.22,k100` confirmed
+at seed `95` with `0.016740`/`0.019927`. I launched hp `.24,k100` seed `99`,
+hp `.26,k100` seed `98`, and hp `.24,k75` seed `100`.

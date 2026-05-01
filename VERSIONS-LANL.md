@@ -544,3 +544,9 @@ The next neighbor improved again. hp `.22,k100` seed `93` scored six/eight
 hp `.20,k100` seed `92` confirmed the family at `0.017476`/`0.021102`;
 hp `.20,k75` seed `94` scored `0.018045`/`0.021012`. Live confirmations:
 hp `.22,k100` seed `95`, hp `.24,k100` seed `96`, and hp `.22,k75` seed `97`.
+
+hp `.24,k100` improves the target again. Seed `96` scored six/eight
+`0.016666`/`0.019718`, reuse `0.306815`, median `240`, and p90 `43898`.
+hp `.22,k100` confirmed at seed `95` (`0.016740`/`0.019927`); hp `.22,k75`
+seed `97` scored `0.017604`/`0.020350`. Live follow-up: hp `.24,k100` seed
+`99`, hp `.26,k100` seed `98`, and hp `.24,k75` seed `100`.

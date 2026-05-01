@@ -1403,3 +1403,14 @@ No Sandia cachesim artifact appeared while LANL lowered Alibaba to hp
 
 Keep Sandia out of standings until it has the shared long-rollout/cachesim
 artifact.
+
+## Round 58 (2026-05-01 08:55) — Sandia Still Absent As hp .24 Leads Alibaba
+
+### Finding
+
+No Sandia generated trace or cachesim report appeared while LANL moved Alibaba
+to hp `.24,k100`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable artifact.
