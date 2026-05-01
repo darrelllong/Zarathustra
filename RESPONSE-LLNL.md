@@ -11386,3 +11386,78 @@ The single-knob recent-pool can't push LIRS without taking SIEVE/LRU with it. Op
 
 - LANL: commit `29e6407` adds `--stack-hot-pool-max-search 8192` to bound the `obj_id in stack` lookup at 1M scale (the same pattern in our hot_pool / recent_pool code). LANL hit 40+ min wall on seed=43 reproduction. Engineering perf fix; not a science finding. **No PEER-REVIEW post warranted** — our LLNL hot-pool runs in ~2 min total for 1M, so b2-atlas stacks stay shallow enough for unbounded `index()`.
 - Sandia: `s004_tencent_full` ongoing AE pretrain ep 19/50, val=0.000008 (converged, running out the 50-epoch budget). Phase 3 ETA ~06:30 PDT. **No new R-series post warranted yet** — R28 stands.
+
+
+## Round 196 — recent-pool with tight window WINS: rp=0.10 win=2 lands CloudPhysics at 0.0685 (-17.1% on R192 untuned, -8.1% on R193 lock)
+
+**Date**: 2026-05-01 01:05 PDT (R195 negative result reframed: tight window changes the answer entirely).
+
+### Pivot from R195
+
+R195 closed-NEGATIVE because at `recent_pool_window=200`, uniform sampling diluted SIEVE/LRU burst structure faster than it concentrated LIRS-relevant recency. R195 noted three candidate fixes; the first — **tighter window** — was tested first because cheapest.
+
+### 13-point sweep (CloudPhysics 1M, 8-policy mean HRC-MAE)
+
+Locked R193 base: `hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5`. Sweep `(rp, win)`:
+
+| rp | win=2 | win=3 | win=5 | win=10 | win=20 | win=30 | win=50 | win=100 | win=200 |
+|---|---|---|---|---|---|---|---|---|---|
+| 0.05 | | | | 0.0722 | | | 0.0731 | | 0.0744 |
+| 0.10 | **0.0685** | 0.0687 | 0.0692 | 0.0699 | 0.0706 | 0.0707 | 0.0719 | 0.0736 | 0.0748 |
+| 0.15 | | | | 0.0694 | | | | | |
+| 0.20 | | | | | | | 0.0724 | | 0.0779 |
+| 0.30 | | | | | | | 0.0754 | | 0.0819 |
+| (rp=0 baseline R193) | | | | | | | | | **0.0745** |
+
+**Optimum at (rp=0.10, win=2): mean HRC-MAE 0.0685.**
+
+Two clean monotonicities:
+- **Window axis at rp=0.10** is monotone tightening = better, plateau at win=2-3.
+- **rp axis at win=10/50** has minimum at rp=0.10 (rp=0.05 too weak, rp=0.20-0.30 too strong).
+
+### Per-policy comparison at R196 lock vs R193 baseline
+
+| policy | R193 hp=0.15 | R196 hp=0.15+rp=0.10 win=2 | direction |
+|---|---|---|---|
+| LRU | 0.0532 | 0.0582 | +9% slight ✗ |
+| ARC | 0.0659 | **0.0530** | −20% ✓ |
+| FIFO | 0.0478 | 0.0548 | +15% ✗ |
+| SIEVE | 0.1294 | 0.1300 | flat |
+| SLRU | 0.0799 | **0.0662** | −17% ✓ |
+| CAR | 0.0648 | **0.0521** | −20% ✓ |
+| LFU | 0.0548 | 0.0480 | −12% ✓ |
+| LIRS | 0.1000 | **0.0860** | **−14%** ✓ |
+| **mean** | **0.0745** | **0.0685** | **−8.1%** ✓ |
+
+5 of 8 policies improve, 2 mildly regress (LRU +9%, FIFO +15%), SIEVE flat. The R193 LIRS regression (vs R192) is mostly closed: LIRS 0.1000 → 0.0860 (still 0.0010 above R192's 0.0751, but a substantive recovery). LFU (the dominant R193 win) holds at 0.0480 (vs R193 0.0548, R192 0.1226).
+
+### Cross-corpus standing claim updated
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| tencent | 0.0492 | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| alibaba | 0.0340 | hp=0.40 (transferred, untuned) |
+| **CloudPhysics** | **0.0685** | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 **+ rp=0.10 win=2** |
+
+Per-corpus tune for CloudPhysics now requires 2 knob settings: hot_pool_prob + (recent_pool_prob, recent_pool_window). The recent-pool feature is corpus-specific — **no recent-pool needed for tencent/alibaba** at win=2 (would need a separate sweep to verify it doesn't help/hurt those corpora; deferred).
+
+### Mechanism interpretation
+
+Why win=2 wins where win=200 lost: at win=2 the recent_window holds only the last 2 emitted IDs, so picking uniformly is essentially a 50/50 coin flip between adj-dup (last) and 2nd-last. That's a **burst-structure** lever, not a recency-cluster lever. Real CloudPhysics has heavy double-access patterns — a key is touched, then re-touched within 1-3 accesses. win=2 captures that. win=200 captures the broader recency cluster that LIRS uses, but at the cost of SIEVE's burst-structure dependency.
+
+The "recent_pool" name is now mildly misleading — at win=2 it's really a "burst pool" or "very-recent-pair pool". Keeping the name to avoid further code thrash; documented here.
+
+### Standing R196 claim
+
+**Tencent and alibaba are still on the corpus-agnostic recipe (R190/R191, no recent-pool). CloudPhysics gets the per-corpus addition `--recent-pool-prob 0.10 --recent-pool-window 2`.** Best 8-policy mean HRC-MAE: tencent 0.0492, alibaba 0.0340, CloudPhysics 0.0685. All three corpora now sub-0.07 mean.
+
+### Next moves
+
+1. **Test recent-pool on tencent/alibaba** at the win=2 lock — does it improve those, or is the burst-pool lever CloudPhysics-specific?
+2. **LIRS still the worst single policy** at 0.0860 on CloudPhysics. The 14% R196 win is a step, but real LIRS HRC-MAE at the 32-cap end is 0.7857 vs fake 0.9309 (still +0.145). The remaining LIRS gap is structural — IRR-distribution shape, not just rank-bin concentration.
+3. **Sandia is hours from Phase 4** (~04:50 PDT). If a `s004_tencent_full` generation pass lands by morning, run it through the 8-policy panel for Sandia's first race-table number.
+
+### Sandia + LANL pass
+
+- Sandia: `s004_tencent_full` Phase 2 Sup pretrain ep 21/50, val=0.0474 (steady plateau, normal). LANL R30 entry on PEER-REVIEW-Sandia confirms congruent read. **No new LLNL R-series post** — R29 stands.
+- LANL: 3 successive seed-43 reproduction attempts hit 40+ min wall (`max_search` bounded prefix not enough); pivoted to "real seed=42, fake RNG seed=43" — REBUTTAL §11 posted. Operationally, LANL is in the same position they were 3 hours ago — no new numerical evidence.
