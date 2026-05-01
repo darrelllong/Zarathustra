@@ -12971,3 +12971,64 @@ Re-sweep `--tail-reuse-prob` (currently locked at 0.10 from R211) and `--recent-
 
 - LANL: same alibaba hp/k iteration; PEER-REVIEW-Sandia rounds 64-71 unchanged.
 - Sandia: Qwen startup brief delivered. R38 unfix still blocks artifact.
+
+## Round 227 — CP tail-reuse + recent-pool sweeps at R224 lock: both close-NEGATIVE
+
+**Date**: 2026-05-01 15:00 PDT.
+
+### Setup
+
+Continuing the post-R224 stale-lock audit. R226 already confirmed hp=0.15 invariant. R227 sweeps the remaining two knobs:
+- `tail-reuse-prob` (locked at 0.10 from R211) — controls deep-tail rank-PMF resampling probability.
+- `recent-pool-prob` (locked at 0.10 from R194) — controls window-based recent-object reuse.
+
+All other knobs at R224 lock (hp=0.15 K=50 adj=0.35 tp/rp inactive when not under sweep, tail-reuse-min-frac=0.5 recent-pool-window=2 max-stack=524288). Single-seed=42.
+
+### Results — tail-reuse-prob
+
+| tail-reuse-prob | 8-pol HRC-MAE | vs lock |
+|---|---|---|
+| 0.05 | 0.0361 | +7% |
+| **0.10 (lock)** | **0.0337** | — |
+| 0.15 | 0.0447 | +33% |
+| 0.20 | 0.0573 | +70% |
+| 0.25 | 0.0721 | +114% |
+
+Asymmetric inverted-U with steep right side. The deep-tail resampling probability has a hard ceiling at ~0.10 — pushing higher mass into the deep tail destroys the cache-replay HRC fit.
+
+### Results — recent-pool-prob
+
+| recent-pool-prob | 8-pol HRC-MAE | vs lock |
+|---|---|---|
+| 0.05 | 0.0367 | +9% |
+| **0.10 (lock)** | **0.0337** | — |
+| 0.15 | 0.0338 | tied (MC noise) |
+| 0.20 | 0.0349 | +4% |
+
+Very flat plateau across [0.10, 0.15]. The recent-pool knob is at peak; no headroom on this axis.
+
+### Interpretation
+
+Combined with R226 (hp invariant) and R224 (adj re-tuned 0.25→0.35), the CP knob landscape post-extbins is now fully audited:
+
+| knob | original lock (orig-bins atlas) | new optimum (R220 ext-bins) | shift |
+|---|---|---|---|
+| hp | 0.15 (R209) | 0.15 (R226) | invariant |
+| adj | 0.25 (R209) | 0.35 (R224) | **+0.10** |
+| tail-reuse | 0.10 (R211) | 0.10 (R227) | invariant |
+| recent-pool | 0.10 (R194) | 0.10 (R227, plateau 0.10-0.15) | invariant |
+
+Of the four post-hoc knobs, only adj cross-coupled with the binning architecture. The other three were tuned to corpus-intrinsic properties (top-K access concentration for hp, deep-tail mass for tail-reuse, sliding-window locality for recent-pool) that are independent of the rank-PMF representation.
+
+### Race position unchanged
+
+CP claim stays at R224 multi-seed mean **0.0338** (LLNL alone). No further headroom available on the post-hoc-knob axis at this atlas. Next CP lift would require an architecture change (different state-space encoding, learned post-hoc knobs, or a fundamentally new generation policy).
+
+### Next move
+
+Pivot to tencent ceiling. R228: adj re-sweep on tencent ext-bins atlas (R222 closed-NEGATIVE on the extbins switch but kept R206's adj=0.075; the same stale-lock logic that worked for CP-R224 applies). If adj shifts on tencent ext-bins, possibly close some of the LANL-tied gap.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: brief delivered; R38 unfix.
