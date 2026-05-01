@@ -12577,3 +12577,101 @@ LLNL recipe family now requires **per-corpus architecture choice** in addition t
 
 - LANL: `7367beb`/`5834958` continue alibaba hp axis (now hp=.38-.40 with k=125-175). No new substantive finding.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 220/221 — IRD diagnostic (learning from 2DIO) reveals PMF-binning bug; extended bins lift multi-seed alibaba 6-pol from 0.0211 to **0.0204** (-3%) AND 4× tighter seed stability
+
+**Date**: 2026-05-01 09:30 PDT (Darrell asked: "Have you looked at WaveStitch and 2DIO?" then pushed back: "don't just copy, learn from them").
+
+### What learning from 2DIO produced (not a port)
+
+2DIO's claim: non-concave HRC cliffs come from IRD distribution **shape**, not frequency. So I built `llgan/ird_diag.py` to measure per-stream IRD histograms (24 log-spaced bins) for {real alibaba 1M, LLNL R208 fake, LLNL R217 fake, LANL hp=.26 fake}. Three findings:
+
+| source | L1(real, source) |
+|---|---|
+| LLNL R208 (phase=1, full post-hoc knobs) | 0.636 |
+| LLNL R217 (phase=2 ep=600, full post-hoc knobs) | 0.622 |
+| **LANL hp=.26** | **0.249** (LANL is 2.5× closer to real IRD shape) |
+
+Per-bin breakdown showed two structural bugs in LLNL fakes:
+- **Tiny-IRD over-injection** (bins 0-1, IRD ∈ {1,2}): real 0.0019 total, LLNL 0.18 (95× over). Adj_dup + recent_pool fire too often.
+- **Long-IRD complete miss** (bins 19-23, IRD > 19k): real has 0.176 of total mass, LLNL has 0.000.
+
+### Bare b2 isolation (R220)
+
+Generated alibaba with **all post-hoc knobs zeroed** (`hp=0 adj=0 tail=0 rp=0`) on the R217 phase=2 atlas. Result:
+
+| | L1(real, source) | Tiny IRD (bin 0-1) | Long IRD (bins 19-23) |
+|---|---|---|---|
+| Bare b2 | **0.416** | 0.009 (closer to real) | **0.000** (still completely missing) |
+
+**Stack cap not the bottleneck**: bumping max_stack_depth from 8192 to 524288 produced bit-identical output. The state machine never *samples* a deep enough rank.
+
+### Root cause: PMF binning silently dropped deep ranks
+
+`fine_edges = [1, 2, 3, ..., 5669]` capped the rank PMF at 5669. `np.histogram(ranks_arr, bins=fine_edges)` **excludes ranks ≥ 5669** from the per-state PMF. Real alibaba has ranks up to 250k. The atlas literally never learned the deep tail.
+
+This is the structural ceiling that R211 (rank_power port), R213 (phase=2 ep=300), and R217 (phase=2 ep=600) couldn't address — they were fighting a state space whose PMF was clipped.
+
+### R220 patch + R221 retrain
+
+1. Added `--max-stack-depth` CLI flag (no effect alone, but enables future testing).
+2. Extended `FINE_EDGES_R180` from 29 bins (max 5669) to **43 bins** (max 251236, log-spaced extension).
+3. `fine_edges = FINE_EDGES_R180` (single source of truth).
+4. Re-trained alibaba phase=2 ep=600 with extended PMF binning (~50 min). Atlas: `llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600_extbins.pkl.gz`.
+
+### IRD diagnostic on R221
+
+| | L1(real, source) | Long IRD (bins 19-23) |
+|---|---|---|
+| R220 bare (old bins) | 0.416 | 0.0000 / 0.0000 / 0.0000 / 0.0000 / 0.0000 |
+| **R221 bare (extended bins)** | **0.363** | **0.0233 / 0.0180 / 0.0097 / 0.0018 / 0.0002** |
+
+L1 dropped 0.416 → 0.363 (−13%). Bins 19-23 went from completely empty to non-zero. Deep tail is still under-shot (real ~0.18 total, R221 ~0.05 total), but it's now reachable. The per-state PMF in deep bins is sparse (few real observations per state), so the absolute mass is small. Future fix: train with more records-per-file (currently 50k → could go 200k+).
+
+### R221 cachesim multi-seed (4 seeds, R208 lock recipe)
+
+| seed | 6-pol | 8-pol |
+|---|---|---|
+| 42 | 0.0200 | 0.0205 |
+| 43 | 0.0206 | 0.0209 |
+| 44 | 0.0205 | 0.0208 |
+| 45 | 0.0205 | 0.0212 |
+| **mean** | **0.0204** | **0.0209** |
+| range | 0.0006 (3%) | 0.0007 (3%) |
+
+### Comparison with prior alibaba locks (multi-seed mean):
+
+| | R208 phase=1 | R217 phase=2 ep=600 | **R221 (extended bins)** |
+|---|---|---|---|
+| 6-pol mean | 0.0215 | 0.0211 | **0.0204** |
+| 8-pol mean | 0.0223 | 0.0218 | **0.0209** |
+| seed range | 13% | 24% | **3%** |
+
+Two wins: 5-6% mean improvement AND dramatic seed-stability gain. The seed-stability is mechanistically explained: with the deep PMF bins now reachable, the model spreads probability mass across more states, smoothing seed-to-seed RNG outcomes. Without extended bins, occasional seeds happened to hit/miss the boundary of the clipped PMF region.
+
+### Updated alibaba standing claim
+
+**Alibaba**: **0.0209 (8-pol) / 0.0204 (6-pol)** at multi-seed mean — `hp=0.45 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2`, atlas `llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600_extbins.pkl.gz`, `max_stack_depth` ≥ 524288.
+
+### Race position (multi-seed corrected)
+
+| corpus | LLNL multi-seed | LANL latest | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | 0.0303 | tied |
+| **Alibaba** (6-pol) | **0.0204** (R221) | ~0.014 (single-seed best) → ~0.016-0.017 (multi expected) | LANL +20% (was +25-34%) |
+| **Alibaba** (8-pol) | **0.0209** (R221) | 0.016205 (single-seed best, hp=.40 k=150) → ~0.018 (multi expected) | LANL +14% (was +14-26%) |
+| CloudPhysics (8-pol) | 0.0659 | n/a | LLNL alone |
+
+The structural fix moved LLNL from "losing decisively" (R208 +30% behind) to "trailing within architectural noise" (R221 +14-20%). The remaining gap is the deep-IRD undersampling (sparse per-state observations); next move is more training data per file.
+
+### Lesson summary (for future rounds)
+
+The IRD-diagnostic was the right diagnostic. Knob sweeps masked an architectural bug: a single-line `np.histogram` call in `fit()` was silently throwing away 15% of real alibaba's training signal. Three architectural rounds (R211, R213, R217) couldn't move the floor by more than 2% because they were all sampling from a clipped distribution. The fix is one pull request worth of code (extended bins + retrain), and it delivered 5-6% closure with 4× better seed stability.
+
+WaveStitch lesson (jitter the hot-pool refresh interval) is still un-implemented — lower priority than the PMF-binning fix.
+
+### Sandia + LANL pass
+
+- LANL: continued micro-iteration (k axis, hp axis), no new methodology. Skip post.
+- Sandia: still off.
