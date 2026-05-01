@@ -10992,9 +10992,36 @@ In one tick: LANL leapfrogged us with hotpool050 (28% ahead), then we leapfrogge
 - LANL: no new altgan/ commits since `09303bb`. Their cron-driven 1M evals continue but RESULTS.md is stable. **No new REBUTTAL post warranted** — race-state speaks for itself in the 3-way panel.
 - Sandia: commit `60438cf` fixed the R25 critic-shape bug. No newgan/ training output since. **No new PEER-REVIEW post warranted.**
 
-### Active LLNL run
+### R187 tail-sweep complete — tail=0.10 is NEW LLNL BEST
 
-R187 tail-sweep continues (background `b3srf5w8i`); tail ∈ {0.10, 0.15, 0.20} pending.
+| tail | mean HRC-MAE | LLNL wins | notes |
+|---|---|---|---|
+| 0.05 | 0.0516 | 5/8 | initial lead |
+| **0.10** | **0.0503** | **6/8** | **best** |
+| 0.15 | 0.0619 | 4/8 | over-injects |
+| 0.20 | 0.0773 | 3/8 | far over |
+
+**LLNL R187 tail=0.10 final**: mean **0.0503** vs LANL `hotpool050` **0.0553** — **LLNL ahead 9.0%, wins 6/8 policies**.
+
+Per-policy at the new best:
+
+| policy | LLNL R187 tail=0.10 | LANL `hotpool050` | winner |
+|---|---|---|---|
+| LRU | **0.0248** | 0.0355 | **LLNL 1.43×** |
+| ARC | 0.0662 | 0.0660 | LANL (tied within noise) |
+| FIFO | **0.0165** | 0.0380 | **LLNL 2.30×** |
+| SIEVE | **0.0360** | 0.0396 | **LLNL 1.10×** |
+| SLRU | **0.0181** | 0.0486 | **LLNL 2.69×** |
+| **CAR** | **0.0620** | 0.0621 | **LLNL (essentially tied, +1)** |
+| LFU | **0.0671** | 0.0925 | **LLNL 1.38×** |
+| LIRS | 0.1120 | 0.0601 | LANL 1.86× (only LANL win) |
+
+LLNL flipped CAR from a LANL 1.06× lead to a tie (LLNL slight edge), and the FIFO/SLRU wins are now substantial (2.3–2.7× LLNL ahead).
+
+The only LANL win remaining is **LIRS** (1.86×) — the inter-reference recency policy. LIRS depends on the time between successive accesses to the same object; b2-light's i.i.d. PMF generation doesn't preserve that distribution. Per R183 strategy, IRR fidelity needs an autoregressive sequence model to fix structurally.
+
+### Active LLNL run: none
 
 Artifacts (vinge):
-- `/home/darrell/v_tencent_R187_tr0.05_1M.csv` (current LLNL best at mean 0.0516)
+- `/home/darrell/v_tencent_R187_tr0.10_1M.csv` (NEW LLNL BEST at mean 0.0503)
+- `/home/darrell/v_tencent_R187_tr0.05_1M.csv` (R187 first hit, 0.0516)
