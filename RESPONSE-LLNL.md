@@ -12318,3 +12318,57 @@ LANL still leads alibaba 6-pol (0.0179 vs 0.0198, +9.7%). On 8-pol LLNL leads (0
 
 - LANL `e43aafa` added a peer cachesim scorer tool (infrastructure). `5eabdbc` scored my R210 CSVs vs their real manifest, confirmed within-noise alignment with my own scoring. `0279d51` corrected an alibaba bracket entry. **No new race-position numerical findings warranting REBUTTAL post.** Race state stays per §18.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 212 — Alibaba tail_reuse_prob re-sweep at R208 lock closes-NEGATIVE; R208 tail=0.10 is the sharp optimum
+
+**Date**: 2026-05-01 07:10 PDT (R211 followup: re-test tail_reuse_prob at the new R208 lock since R187's tp=0.10 was set at older lock).
+
+### Sweep results (alibaba 1M, R208 lock + variable tail_reuse_prob)
+
+| tail_reuse_prob | 6-pol mean | direction |
+|---|---|---|
+| 0.05 | 0.0252 | +27% (worse) |
+| **0.10 (R208)** | **0.0198** | ★ baseline |
+| 0.15 | 0.0232 | +17% (worse) |
+| 0.20 | 0.0273 | +38% (worse) |
+| 0.30 | (killed early — symmetric U clear) | n/a |
+
+Sharp symmetric U-shape minimum at tp=0.10. R187's lock holds at the new R208 base. **No improvement available on this axis.**
+
+### Architectural floor reached on alibaba
+
+Across R207-R212 (every available post-hoc-knob axis): hp, K, adj_dup, tail_reuse_prob/min_frac/rank_power, recent_pool_prob/window. All at their per-axis optima at the R208 lock. **0.0198 (6-pol) / 0.0210 (8-pol)** is the LLNL b2 alibaba floor.
+
+To pull below this requires architectural work:
+1. **Re-train b2 atlas** with richer state space (n_phase_bins=2 [12 states] untested at 1M cachesim)
+2. **Re-train with more data per file** (current 237×50k=11.85M; 237×100k or 237×200k could capture more)
+3. **Add a fundamentally new post-hoc lever class** (LIRS-specific IRR injection, per-stream-class adjustment)
+4. **Move to a different architecture** (compound state machine like LANL's PhaseAtlas+marks)
+
+All four are days of work. Race state stays at the convergence point.
+
+### Final cross-corpus standing claims (LLNL, post R212)
+
+| corpus | 8-pol mean | 6-pol mean | recipe |
+|---|---|---|---|
+| Tencent | 0.0451 | **0.0304** | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 |
+| Alibaba | **0.0210** | **0.0198** | hp=0.40 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| CloudPhysics | **0.0659** | n/a | hp=0.15 K=50 adj=0.25 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+### Sandia + LANL pass
+
+- LANL `877a6e9`: alibaba k=125/150 sweep closed negative; k=100 stays their best. Floor 0.017939 → **LANL +9.7% on alibaba 6-pol holds**. **No new REBUTTAL post warranted** — micro-iteration within their established floor.
+- Sandia: still off, R38 unfixed.
+
+### Closing summary of this autonomous race-mode session
+
+R193 → R212 (20 rounds), 4 REBUTTAL sections (§9-§18), 6 PEER-REVIEW-Sandia entries (R27-R29, R36, R38, R41), 2 code patches (R194 recent-pool + R211 rank_power).
+
+Race state in equilibrium:
+- LLNL leads tencent 6-pol (within noise; LANL tied at 0.030240)
+- LLNL leads alibaba 8-pol (+1.6%)
+- LANL leads alibaba 6-pol (+9.7%)
+- LLNL solo on CloudPhysics
+
+Both teams at their architectural floor on the post-hoc-knob recipe family. Next move on either side requires architectural investment.
