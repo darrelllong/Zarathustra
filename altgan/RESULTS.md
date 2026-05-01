@@ -1221,7 +1221,7 @@ Artifacts:
 
 ---
 
-## LLNL R203 Tencent Cachesim Lead And LANL Clone Probe (2026-05-01)
+## LLNL R203/R206 Tencent Cachesim Lead And LANL Clone Probe (2026-05-01)
 
 LLNL's newer Tencent R203 k-axis beats LANL on the fixed Tencent 1M real
 manifest, even though it is still an atlas/reuse-shaping generator rather than
@@ -1235,8 +1235,22 @@ the old GAN path. The script `/tmp/tencent_k_sweep.sh` used
 | LLNL R203 | k100 | 0.047506 |
 | LLNL R203 | k150 | 0.059586 |
 | LLNL R203 | k200 | 0.070346 |
+| LLNL R206 | k50, adj `0.00` | 0.043287 |
+| LLNL R206 | k50, adj `0.02` | 0.032605 |
+| LLNL R206 | k50, adj `0.03` | 0.031474 |
+| LLNL R206 | k50, adj `0.05` | **0.030536** |
+| LLNL R206 | k50, adj `0.075` | **0.030360** |
+| LLNL R206 | k50, adj `0.10` | 0.030892 |
+| LLNL R206 | k50, adj `0.20` | 0.038093 |
+| LLNL R206 | k50, adj `0.25` | 0.044061 |
 | LANL | p39/window10000 fake seed 45 | 0.045573 |
 | LANL | p39/window10000 fake seed 46 | 0.045627 |
+| LANL | p38/window10000 fake seed 45 | 0.045614 |
+| LANL | p38/window10000 fake seed 46 | 0.045511 |
+| LANL | k25, adj `0.15`, no tail, fake seed 47 | 0.107924 |
+| LANL | k25, adj `0.15`, tail `0.10`, fake seed 48 | 0.055622 |
+| LANL | k50, adj `0.05`, tail `0.10`, fake seed 49 | 0.031461 |
+| LANL | k50, adj `0.00`, tail `0.10`, fake seed 50 | 0.031040 |
 
 The LLNL k25 trace has major trace-shape debt: top-100 share `0.347880`,
 top-1000 `0.356781`, adjacent duplicate rate `0.090773`, and `361014`
@@ -1244,17 +1258,42 @@ namespaced unique objects. The real Tencent fixed-manifest adjacent duplicate
 rate was previously measured near `0.00234`, so this is not yet evidence of a
 statistically indistinguishable long trace.
 
-LANL launched a direct cache-lever probe using the promoted Tencent checkpoint
-with `stack_hot_pool_prob=0.55`, `stack_hot_pool_k=25`,
-`stack_hot_pool_window=10000`, `stack_adj_dup_prob=0.15`, and the existing deep
-reuse boost. This is intentionally a shape-risk probe, not a clean promotion.
-LANL also added `stack_tail_reuse_*` and `stack_recent_pool_*` controls to
-`altgan.neural_atlas`/`evaluate_neural_atlas`, then launched the fuller R203
-tail variant (`stack_tail_reuse_prob=0.10`, min fraction `0.5`) as a second
-shape-risk probe.
+R206 changes the diagnosis: LLNL can get a plausible-adjacent row at adj `0.00`
+with adjacent duplicate rate `0.003165` versus real `0.002340`, but that row is
+only `0.043287` and has a bad SIEVE error (`0.072846`). Intermediate rows land
+at adj `0.02`/`0.03` with cache means `0.032605`/`0.031474` and adjacent
+duplicate rates `0.014690`/`0.020170`. The best visible R206 row is adj
+`0.075` at `0.030360`, with top-100 share `0.199928`, top-1000 `0.383674`,
+adjacent duplicate rate `0.045438`, and `362721` unique objects. That is a
+real cache-simulator lead, but not a clean long-trace match yet.
+
+LANL's first direct k25/adj `0.15` clone failed hard: evaluator HRC-MAE
+`0.079594`, six-policy cache mean `0.107924`, median `39` versus real `84`,
+p90 `17701` versus `29150`, top-100 share `0.384124`, and adjacent duplicate
+rate `0.116735`. The fuller k25 tail clone was better but still behind
+(`0.055622`, median `53`, adjdup `0.104617`). A closer R206-style pair on the
+promoted checkpoint transferred: k50/tail `0.10`/adj `0.05` scored `0.031461`
+with median `80`, p90 `33193`, top-100 `0.242851`, and adjdup `0.037806`;
+k50/tail `0.10`/adj `0.00` scored `0.031040` with median exactly `84`, p90
+`33923`, top-100 `0.241256`, and adjdup `0.004993`. The latter is much cleaner
+than LLNL's cache-best R206 row and within `0.00068` of it on mean cache MAE.
+LANL launched two next probes: adj `0.02` at tail `0.10`, and adj `0.00` at
+tail `0.08`.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k25_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k100_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k150_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k200_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.00_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.02_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.03_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.05_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.075_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.10_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.20_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r206_adj0.25_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k25w10000_adj015_reuseboost030_min32768_postdecode_faststack_fakeseed47_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k25w10000_adj015_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed48_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj005_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed49_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj000_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed50_realmanifest42_six_policy_caps.json`

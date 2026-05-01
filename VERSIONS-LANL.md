@@ -37,22 +37,27 @@ Tencent trace. The evaluator can write the exact fake and sampled-real CSVs and
 run the simulator directly via `--cachesim-bin`.
 
 Current status:
-- Best LANL six-policy fixed-cap row remains post-decode deep reuse injection:
-  mean HRC-MAE `0.054073` across LRU/ARC/FIFO/SIEVE/SLRU/CAR at caps
-  `32,128,512,2048,8192`; after hot-pool redirect `p=0.50`, the best row is
-  now `0.046657`.
+- Best LANL six-policy fixed-cap row is the hot-pool/window branch around
+  `p=0.38..0.39`, `k=100`, `window=10000`, plus deep reuse injection. The best
+  single row is `0.045219`; fresh fake seeds put the robust p38 window row at
+  `0.045614`/`0.045511`.
 - Rank phase scale `1.2,1.2,1.3,1.3` improves the old evaluator HRC-MAE from
   `0.051810` to `0.044706`, and exactly matches stack median `84`, but worsens
   the six-policy mean to `0.055905`; it is a diagnostic row, not promoted.
 - LLNL's reported R182 Tencent six-policy mean is `0.0925`, so LANL is still
   ahead on this simulator surface. The remaining LANL error is policy-shaped:
   LRU/FIFO want rank scaling, ARC/SIEVE/CAR do not.
-- LLNL's newer R203 Tencent k-axis changes the scoreboard: `k=25` scores
-  `0.038256` against LANL's fixed Tencent real manifest, ahead of LANL's current
-  `0.0452..0.0456` band. The recipe uses `hot-pool-prob=0.55`,
-  `hot-pool-k=25`, `adj-dup-prob=0.150`, and `tail-reuse-prob=0.10`; the trace
-  carries large shape debt (`adj_dup=0.090773`). LANL is testing the equivalent
-  k25/adjdup lever with explicit shape accounting.
+- LLNL's newer R203/R206 Tencent atlas rows change the scoreboard. R203 k25
+  scored `0.038256`; R206 k50 adj `0.075` scores `0.030360`, ahead of LANL's
+  current `0.0452..0.0456` band but with adjacent duplicate rate `0.045438`
+  versus real `0.002340`. R206 adj `0.03` is the current compromise
+  (`0.031474`, adjdup `0.020170`); adj `0.00` is much cleaner on adjacency
+  (`0.003165`) but scores `0.043287` and has bad SIEVE error. This is an atlas
+  lead, not a revived GAN lead.
+- LANL's first k25/adj `0.15` clone failed (`0.107924`, stack median `39`), but
+  the R206-style k50/tail pair transferred: adj `0.05` scored `0.031461`, and
+  adj `0.00` scored `0.031040` with median exactly `84` and adjdup `0.004993`.
+  Live follow-ups are adj `0.02`/tail `0.10` and adj `0.00`/tail `0.08`.
 - `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access

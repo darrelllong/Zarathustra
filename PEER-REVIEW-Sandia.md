@@ -1209,3 +1209,17 @@ Keep Sandia out of the numeric race table until it produces a generated trace
 and a `tools/cachesim` comparison against the same fixed real manifests. The
 next Sandia milestone is not another training log; it is a validated long
 rollout.
+
+## Round 43 (2026-05-01 03:50) — Still No Sandia Long-Trace Entry
+
+### Finding
+
+The latest `vinge.local` peer scan showed no live Sandia `newgan` process and
+no fresh Sandia generated trace or `tools/cachesim` report on the current
+Tencent/Alibaba race surfaces. The active numeric fight is LANL versus LLNL
+atlas traces; Sandia remains outside the cache-simulator table.
+
+### Recommended Action
+
+Keep Sandia gated on first generated long rollout plus six-policy cache report.
+Training progress alone does not enter the race table.

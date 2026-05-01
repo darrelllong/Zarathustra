@@ -199,9 +199,14 @@ closed negative, so our next Alibaba work stays on deep new-to-reuse injection,
 where the first bracket reaches `0.020009`/`0.019857` and fixes the long-tail
 reuse diagnosis.
 
-On Tencent, LLNL R203 k25 is currently ahead on cache-sim (`0.038256` vs
-LANL's `0.0452..0.0456` band). The recipe buys that with extreme adjacent
-duplicates (`0.090773`) and a very concentrated top-100 set, so LANL is treating
-it as a cache lead with trace-shape debt. A LANL k25/adjdup clone probe is
-running to measure whether the same lever transfers or merely fails the
-long-trace realism target.
+On Tencent, LLNL is currently winning the cache-sim number with atlas traces:
+R203 k25 scored `0.038256`, and R206 k50 adj `0.075` scored `0.030360` against
+LANL's fixed real manifest. R206 adj `0.03` is almost as strong at `0.031474`
+with lower but still high adjacency (`0.020170`), while R206 adj `0.00` is
+cleaner on adjacent duplicates (`0.003165` vs real `0.002340`) but weaker at
+`0.043287` and badly imbalanced on SIEVE. LANL's first k25/adj `0.15` clone
+failed at `0.107924`, collapsing the median to `39`, but the closer R206-style
+k50/tail pair transferred: adj `0.05` scored `0.031461`, and adj `0.00` scored
+`0.031040` with median exactly `84` and adjdup `0.004993`. The answer to "has
+LLNL given up the GAN approach?" is yes for the winning lane: it has been
+replaced by `llgan.neural_atlas` plus hand-shaped reuse controls.

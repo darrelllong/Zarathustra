@@ -258,8 +258,9 @@ Important knobs:
   `window=40000` lost at `0.045855`. Current promotion is `window=10000`.
   Probability recheck at that window moved the seed-44 best to `p=.39`
   (`0.045219`), but fake seeds `45`/`46` came back weaker at
-  `0.045573`/`0.045627`. Do not promote `p=.39` yet; active checks are
-  `p=.38,window=10000` on fake seeds `45`/`46`.
+  `0.045573`/`0.045627`. Do not promote `p=.39` yet. The p38/window10000
+  variance pair landed at `0.045614`/`0.045511`, so the robust LANL Tencent
+  band remains roughly `0.0455..0.0456`.
 - Alibaba 1M cache gate is now open on
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`.
   Control is the existing `alibaba_phaseatlas_marks_e20.pkl.gz` checkpoint with
@@ -281,9 +282,14 @@ Important knobs:
   Alibaba R204 k-axis scores `0.050148`, `0.033206`, and `0.029747` for
   k25/k75/k100 against LANL's fixed Alibaba real manifest; LANL remains ahead
   on that simulator surface. On Tencent, LLNL R203 k25 scores `0.038256` and
-  currently beats LANL's cache mean, but it does so with large adjacent-duplicate
-  shape debt (`0.090773`). Sandia has no visible fresh trace/cachesim artifact
-  in the latest scan.
+  LLNL R206 k50 adj `0.075` scores `0.030360`; adj `0.03` is close at
+  `0.031474` with lower but still high adjacent duplicates, and R206 adj `0.00`
+  scores `0.043287` with realistic adjacent duplicates but poor SIEVE. LANL's direct
+  k25/adj `0.15` clone failed at `0.107924`, but the k50 tail clone worked:
+  adj `0.05` scored `0.031461`, and adj `0.00` scored `0.031040` with median
+  exactly `84` and adjdup `0.004993`. Live LANL follow-ups are adj `0.02` at
+  tail `0.10` and adj `0.00` at tail `0.08`. Sandia has no visible fresh
+  trace/cachesim artifact in the latest scan.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

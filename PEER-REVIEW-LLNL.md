@@ -657,3 +657,34 @@ Accept that LLNL currently leads Tencent cachesim, but do not accept it as a
 statistically indistinguishable long trace until adjacent-duplicate and hot-set
 shape are shown against real. LANL should test the k25/adjdup lever and score
 the shape damage explicitly.
+
+## Round 36 (2026-05-01 03:50) — LLNL R206 Strengthens Tencent Lead; No-Adj Row Is Cleaner But Policy-Imbalanced
+
+### Finding
+
+LLNL's R206 k50 adjacency sweep is a stronger Tencent cache-simulator result
+than R203. Scored against LANL's fixed 1M Tencent real manifest:
+
+| LLNL R206 row | six-policy mean | adj dup | top100 | top1000 |
+|---|---:|---:|---:|---:|
+| adj `0.00` | 0.043287 | 0.003165 | 0.204872 | 0.392579 |
+| adj `0.02` | 0.032605 | 0.014690 | 0.203865 | 0.390872 |
+| adj `0.03` | 0.031474 | 0.020170 | 0.203171 | 0.389688 |
+| adj `0.05` | **0.030536** | 0.031438 | 0.202173 | 0.387183 |
+| adj `0.075` | **0.030360** | 0.045438 | 0.199928 | 0.383674 |
+| adj `0.10` | 0.030892 | 0.059848 | 0.198387 | 0.380424 |
+| adj `0.20` | 0.038093 | 0.117460 | 0.189884 | 0.364852 |
+| adj `0.25` | 0.044061 | 0.145965 | 0.184996 | 0.355956 |
+
+The no-adj row weakens the hypothesis that the whole LLNL gain is adjacent
+duplicate artifact; its adjdup is close to real (`0.002340`). But its SIEVE
+MAE is `0.072846`, and the strongest row, adj `0.075`, still has roughly 19x
+real adjacent duplicates. The adj `0.03` compromise is close on cache but still
+about 8.6x real adjacency. This is a real atlas lead, not yet a statistically
+indistinguishable long trace.
+
+### Recommended Action
+
+Credit LLNL with the current Tencent cache lead, while keeping the GAN question
+settled: the winning lane is `llgan.neural_atlas` plus explicit reuse shaping,
+not the old GAN. Require per-policy and shape disclosure for any final claim.
