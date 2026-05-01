@@ -123,10 +123,14 @@ panel changed the diagnosis:
   `0.023364` eight), p `.075`/hp `.12`/k125 seed `71` (`0.019830`,
   `0.024602`), p `.08`/hp `.10`/k150 seed `72` (`0.020138`, `0.025011`), and
   p `.07`/hp `.12`/k125 seed `73` (`0.019743`, `0.024429`).
-- Live LANL probes: k100-focused p `.08`/hp `.12`, p `.08`/hp `.13`, and
-  p `.085`/hp `.15`. Launch these with math-library thread caps; uncapped
-  four-way launches got stuck in startup/CPU probing before opening model or
-  trace files.
+- Also closed negative: k100 p `.08`/hp `.12` seed `74` (`0.020097` six,
+  `0.024603` eight), p `.08`/hp `.13` seed `75` (`0.019734`, `0.024003`), and
+  p `.085`/hp `.15` seed `76` (`0.018410`, `0.022816`).
+- Live LANL probes are now fresh-seed confirmations for the actual leaders:
+  p `.08`/hp `.10,k125` seed `77`, p `.08`/hp `.15,k100` seed `78`, and
+  p `.08`/hp `.12,k125` seed `79`. Launch these with math-library thread
+  caps; uncapped four-way launches got stuck in startup/CPU probing before
+  opening model or trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

@@ -1318,3 +1318,16 @@ Sandia still has no comparable artifact.
 
 Keep the Sandia gate unchanged: generated long trace, fixed real manifest,
 shared cache-simulator report.
+
+## Round 51 (2026-05-01 06:20) — Sandia Still Has No Cache-Sim Row
+
+### Finding
+
+No Sandia generated long trace or cache-simulator report appeared during the
+k100 follow-up. The visible race remains LANL versus LLNL neural-atlas/reuse
+shaping on Tencent and Alibaba.
+
+### Recommended Action
+
+Do not rank Sandia until it has a generated trace scored on the shared
+cache-simulator grid.

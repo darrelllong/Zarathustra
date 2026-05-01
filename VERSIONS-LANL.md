@@ -493,3 +493,10 @@ and p `.07`/hp `.12`/k125 scored `0.019743`/`0.024429`. The next live bracket
 returns to k100: p `.08`/hp `.12`, p `.08`/hp `.13`, and p `.085`/hp `.15`,
 all launched with math-library thread caps after uncapped four-way launches
 stalled in startup.
+
+The k100 follow-up also closed negative: p `.08`/hp `.12,k100` scored
+`0.020097`/`0.024603`, p `.08`/hp `.13,k100` scored `0.019734`/`0.024003`,
+and p `.085`/hp `.15,k100` scored `0.018410`/`0.022816`. The active work is
+now fresh-seed confirmation of the two actual leaders and the bridge:
+p `.08`/hp `.10,k125` seed `77`, p `.08`/hp `.15,k100` seed `78`, and
+p `.08`/hp `.12,k125` seed `79`.

@@ -244,3 +244,10 @@ scored `0.019743`/`0.024429`. The active follow-up is back on k100:
 p `.08`/hp `.12`, p `.08`/hp `.13`, and p `.085`/hp `.15`, launched with
 thread caps so the runner spends time generating traces rather than spinning
 up numeric-library workers.
+
+Update after the k100 follow-up: hp `.12`, hp `.13`, and reuse `.085` do not
+beat the existing leaders. p `.08`/hp `.12,k100` scored `0.020097`/`0.024603`;
+p `.08`/hp `.13,k100` scored `0.019734`/`0.024003`; p `.085`/hp `.15,k100`
+scored `0.018410`/`0.022816`. I launched fresh-seed confirmations for the two
+leaders and the bridge: p `.08`/hp `.10,k125` seed `77`,
+p `.08`/hp `.15,k100` seed `78`, and p `.08`/hp `.12,k125` seed `79`.

@@ -846,3 +846,20 @@ but still leave LLNL R208 behind the visible LANL target.
 Keep LLNL's target unchanged for now: beat LANL p `.08`/hp `.10,k125` on
 six-policy and p `.08`/hp `.15,k100` on eight-policy. The live LANL follow-up
 has moved back to k100.
+
+## Round 44 (2026-05-01 06:20) — k100 Follow-Up Also Misses; Target Moves To Confirmation
+
+### Finding
+
+LANL's k100 follow-up did not improve the visible target either:
+p `.08`/hp `.12,k100` scored six/eight `0.020097`/`0.024603`,
+p `.08`/hp `.13,k100` scored `0.019734`/`0.024003`, and
+p `.085`/hp `.15,k100` scored `0.018410`/`0.022816`. These miss the existing
+LANL p `.08`/hp `.10,k125` six-policy row and p `.08`/hp `.15,k100`
+eight-policy row, while still staying ahead of LLNL R208.
+
+### Recommended Action
+
+Treat LANL's current Alibaba target as a confirmation problem, not a wider
+k-axis search. LLNL still needs to beat the two p `.08` leader rows on the
+fixed LANL manifest.
