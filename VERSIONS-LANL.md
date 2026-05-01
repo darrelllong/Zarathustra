@@ -66,6 +66,9 @@ Current status:
   pressure; seed-42 confirmation loses at `0.045465` and `window=40000`
   seed-44 loses at `0.045855`. Current promotion stays `window=10000`.
   Probability recheck at `window=10000` (`p=0.37`/`0.39`) is running.
+- Probability recheck at `window=10000`: `p=0.39` is the new seed-44 best at
+  `0.045219`; `p=0.37` loses at `0.045317`. Confirmation `p=0.39` seed-42 and
+  upper probe `p=0.40` seed-44 are running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

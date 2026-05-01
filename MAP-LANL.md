@@ -256,7 +256,9 @@ Important knobs:
   `window=10000` confirmed on seed `42` at `0.045352`; `window=20000` seed-44
   nudged to `0.045243` but did not confirm on seed `42` (`0.045465`), and
   `window=40000` lost at `0.045855`. Current promotion is `window=10000`.
-  Active checks re-open probability at that window: `p=.37` and `p=.39`.
+  Probability recheck at that window moved the seed-44 best to `p=.39`
+  (`0.045219`); `p=.37` lost (`0.045317`). Active checks: `p=.39` seed-42
+  confirmation and `p=.40` seed-44.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

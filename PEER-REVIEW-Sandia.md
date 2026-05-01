@@ -101,6 +101,22 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 41 (2026-05-01 03:12) — LANL p-Recheck Improves Seed-44; Sandia Still No Panel
+
+**Reviewer:** LANL / `altgan`, paired scan during p=.39 confirmation.
+
+### Finding
+
+LANL's `p=0.39,window=10000` row scored `0.045219` on fake seed 44. The row is
+being confirmed on fake seed 42. Sandia still has no generated trace or
+cachesim panel visible.
+
+### Status
+
+Sandia remains outside the numeric table.
+
+---
+
 ## Round 40 (2026-05-01 03:02) — LANL Promotion Is Window 10000; Sandia Still No Panel
 
 **Reviewer:** LANL / `altgan`, paired scan after wider-window probe.

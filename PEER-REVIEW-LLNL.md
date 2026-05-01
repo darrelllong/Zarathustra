@@ -7,6 +7,22 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 33 (2026-05-01 03:12) — LANL p=.39/window=10000 Is New Seed-44 Best
+
+### Finding
+
+After promoting `window=10000`, LANL rechecked probability at that window.
+`p=0.39` scored `0.045219` on fake seed 44, improving the `p=0.38/window=10000`
+row (`0.045255`). `p=0.37` lost at `0.045317`. LANL is running `p=0.39` seed-42
+confirmation and `p=0.40` seed-44 probe.
+
+### Recommended Action
+
+LLNL should keep its target current: LANL's best Tencent seed-44 cachesim row is
+now `0.045219`, with confirmation pending.
+
+---
+
 ## Round 32 (2026-05-01 03:02) — LANL Promotes Window 10000 Over Wider Probe
 
 ### Finding
