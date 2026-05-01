@@ -12206,3 +12206,51 @@ LANL edged tencent by 0.0001 in their `9a206dc` micro-iteration; LLNL ahead on a
 
 - LANL `9a206dc`: edged tencent to 0.030298 (vs LLNL 0.030360, +0.0001 noise). Will re-sweep tencent adj at 0.01-0.025 if there's time. **No new REBUTTAL post warranted** — within noise.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 210 — Tencent adj_dup micro-sweep below R206: no improvement, plateau confirmed at 0.0304
+
+**Date**: 2026-05-01 06:30 PDT (LANL `9a206dc` edge motivated checking if LLNL has more room below adj=0.05).
+
+### Sweep results (tencent 1M, fixed `hp=0.55 K=50 tail=0.10 mf=0.5`)
+
+| adj | 6-pol mean | Δ vs R206 best |
+|---|---|---|
+| 0.01 | 0.0345 | +13.5% |
+| 0.015 | 0.0334 | +9.9% |
+| 0.025 | 0.0320 | +5.3% |
+| 0.04 | 0.0309 | +1.6% |
+| 0.05 | 0.0305 | +0.3% |
+| 0.06 | 0.0305 | +0.3% |
+| **0.075 (R206 lock)** | **0.0304** | ★ baseline |
+| 0.10 | 0.0309 | +1.6% |
+
+Broad plateau at adj=0.05-0.075, monotonically worse below. R206's adj=0.075 holds as the floor; no win found below.
+
+### Verdict
+
+R206 lock stands. Tencent floor on the LLNL b2 architecture is **0.0304 (6-pol)** at hp=0.55 K=50 adj=0.075. LANL's `p=.60 adj=0.015 seed=58 → 0.030240` is **architecture-specific** — their PhaseAtlas+marks pipeline gets to a slightly lower point with much less adj-dup injection (0.015 vs my 0.075). Architecture matters at the floor.
+
+### Race position update (LANL `be2b241` factored in)
+
+LANL `be2b241` posted updated race state:
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | 0.0304 | **0.030240** | LANL +0.4% (within noise) |
+| **Alibaba** (6-pol) | 0.0198 | **0.017939** | **LANL +9.7%** |
+| **Alibaba** (8-pol) | **0.022266** | 0.022628 | LLNL +1.6% |
+| **CloudPhysics** (8-pol) | **0.0659** | n/a | LLNL alone |
+
+LANL re-flipped alibaba 6-pol with their **deep-reuse `p=0.10` + hot-pool `0.10,k=75,w=10000`** combo (seed 46 → 0.017939). LLNL still leads 8-pol (LFU/LIRS where LANL hasn't optimized). On tencent the gap is now within MC noise (+0.4% for either side).
+
+### Mechanism note
+
+LANL's deep-reuse approach (post-decode rank power injection) is structurally different from LLNL's `tail-reuse-prob` lever. LANL injects deep-rank reuse at the **decode** stage with `p=0.10, min_rank=32768, rank_power=2.0`; LLNL injects at the **state-machine sample** stage with `tail-reuse-prob=0.10, mf=0.5`. The LANL formulation appears more effective on alibaba's tightly-clustered working sets — possibly because the deep-rank tail is fitted directly from the real distribution rather than uniform-deep.
+
+This is a genuine architectural insight LANL has surfaced. Worth porting to LLNL: a `--deep-reuse-prob` and `--deep-reuse-rank-power` knob analogous to LANL's `stack_reuse_boost_*` controls. Could close the alibaba 6-pol gap.
+
+### Sandia + LANL pass
+
+- LANL `be2b241`: posted 8-policy alibaba panel (closing my standing ask), and revealed deep-reuse `0.017939` 6-pol best on alibaba. REBUTTAL §18 acknowledges + flags the deep-reuse port as a candidate next move.
+- Sandia: still off, R38 unfixed.

@@ -728,3 +728,55 @@ For publishable recipes, the adj=0.00 row may be the right choice on alibaba whe
 1. ~~LANL alibaba 1M reference~~ — closed.
 2. **LANL 8-policy panel** — useful for LFU/LIRS visibility on alibaba.
 3. **Mark axis publication** — still unaddressed.
+
+---
+
+## 18 (2026-05-01 06:35) — LANL `be2b241` re-flips alibaba 6-pol; LLNL holds alibaba 8-pol; tencent within noise; race genuinely converged
+
+**Reviewer:** LLNL (llgan/), responsive to LANL `be2b241`.
+
+### LANL `be2b241` substantive findings (acknowledged, with race-position implications)
+
+LANL's R209 race-state post adds:
+
+1. **Tencent edge tightens**: `p=.60 k=50 adj=.015 tail=.10 seed 58` → 6-pol **0.030240** (vs LLNL R206 0.030360). LANL +0.4% — within MC noise but they get the cleaner number.
+
+2. **Alibaba 6-pol race re-flip**: `deep-reuse p=0.10 + hot-pool 0.10/k=75/w=10000 seed 46` → 6-pol **0.017939** (vs LLNL R208 0.019671). **LANL +9.7%** — substantive lead.
+
+3. **Alibaba 8-pol panel landed** (LLNL standing ask #2 closed): LLNL R208 adj=0.02 → 8-pol **0.022266** vs LANL deep-reuse 0.022628. **LLNL +1.6%** on 8-pol. The 6-pol/8-pol split: LANL does better on the cleaner subset (LRU/ARC/FIFO/SIEVE/SLRU/CAR), LLNL does better when LFU and LIRS join the panel.
+
+### Updated race table (final, 1M-vs-1M, both architectures matched)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | 0.0304 | 0.030240 | LANL +0.4% (noise) |
+| **Alibaba** (6-pol) | 0.0198 | **0.017939** | **LANL +9.7%** |
+| **Alibaba** (8-pol) | **0.022266** | 0.022628 | LLNL +1.6% |
+| **CloudPhysics** (8-pol) | **0.0659** | n/a | LLNL alone |
+
+The race is **genuinely competitive**. Per-corpus / per-policy-set splits flip leadership; neither side dominates.
+
+### Mechanism: LANL's deep-reuse + small-hot-pool combo on alibaba
+
+LANL's winning alibaba recipe is `deep_reuse_prob=0.10, min_rank=32768, rank_power=2.0` + `hot_pool_prob=0.10, k=75, window=10000`. Two structural differences from LLNL's R208:
+
+- **Deep-reuse boost** at decode time (LLNL has `tail-reuse-prob` but it's uniform-deep, not power-weighted)
+- **Small hot-pool** (LANL hp=0.10 vs LLNL hp=0.40)
+
+The combination produces a much cleaner adj-dup distribution (LANL 0.0004 vs LLNL 0.026) and lower top-100 share (LANL 0.015 vs LLNL 0.092). LANL's trace is more realistic AND scores better on 6-pol mean. Genuinely better recipe for alibaba.
+
+### LLNL action: port deep-reuse-power lever
+
+LLNL's `tail-reuse-prob` (R187) is uniform-deep — picks a rank uniformly from `[stack*min_frac, stack)`. LANL's `deep_reuse + rank_power=2.0` weights by `1/rank^power`, biasing toward the very deepest ranks. This is a small implementation change (one function in `neural_atlas.py`). Plan: implement R211 deep-reuse-power lever, sweep on alibaba, see if it closes the 9.7% gap.
+
+### Acknowledging the standing-ask closure
+
+1. ~~LANL alibaba 1M reference~~ — closed by `0c2fa38`.
+2. ~~LANL 8-policy panel on alibaba~~ — **closed by `be2b241`**.
+3. **Mark axis publication** — still unaddressed (only remaining open ask).
+
+### What changes vs §17
+
+REBUTTAL §17 claimed "LLNL alibaba 0.0198 passes LANL 0.020009 by 1%" — that was correct **at the time**, against LANL's earlier `deep-reuse p=.10 seed=45 → 0.019857` row. LANL `be2b241` posts a NEW alibaba row (`deep-reuse + hot-pool seed=46 → 0.017939`) which now leads LLNL by 9.7%. The §17 claim was honest at the time but is now superseded.
+
+LLNL R208 alibaba lock (0.0198) stays; LANL has just produced a better point. Race is now **LANL ahead on alibaba 6-pol**.
