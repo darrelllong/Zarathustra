@@ -102,6 +102,7 @@ class NeuralAtlasModel:
         mark_feedback_numeric_blend: float | None = None,
         mark_feedback_numeric_blend_space: str = "log",
         mark_feedback_numeric_fields: str = "both",
+        progress_interval: int = 0,
     ):
         import pandas as pd
         import torch
@@ -143,6 +144,7 @@ class NeuralAtlasModel:
             raise ValueError("mark_feedback_numeric_fields must be 'both', 'dt', or 'size'")
         if mark_categorical_source not in {"neural", "reservoir"}:
             raise ValueError("mark_categorical_source must be 'neural' or 'reservoir'")
+        progress_interval = max(int(progress_interval), 0)
         mark_runtime = None
         mark_model = getattr(self, "mark_model", None)
         if mark_model is not None:
@@ -357,6 +359,14 @@ class NeuralAtlasModel:
                             del hot_counts[old_obj]
                     hot_window.append(int(obj_id))
                     hot_counts[int(obj_id)] += 1
+                if progress_interval > 0 and (pos + 1) % progress_interval == 0:
+                    print(
+                        "[altgan.neural_atlas] "
+                        f"stream={stream_id + 1}/{n_streams} "
+                        f"pos={pos + 1}/{per_stream} "
+                        f"rows={len(rows)} stack={len(stack)}",
+                        flush=True,
+                    )
                 prev_obj = int(obj_id)
                 state = self._next_state(
                     reservoir,

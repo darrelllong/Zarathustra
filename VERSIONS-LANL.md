@@ -55,6 +55,8 @@ Code changes:
 - `altgan.neural_atlas` replaces list-backed LRU generation with
   `_RankedLRUStack`; verified locally with randomized list-equivalence tests and
   `py_compile`.
+- `altgan.evaluate_neural_atlas` adds `--progress-interval` so long 1M
+  confirmations can emit per-stream generation progress into their logs.
 
 ---
 

@@ -1040,6 +1040,8 @@ LRU stack becoming the hot path for deep rank moves and hot-object lookup.
 `altgan.neural_atlas` now uses `_RankedLRUStack`, an implicit treap with
 deterministic priorities, to keep rank lookup/move semantics but avoid O(n)
 list scans. Local randomized tests compare it against the old list behavior.
+The evaluator also has `--progress-interval` now so future confirmations do not
+look hung while generating.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`

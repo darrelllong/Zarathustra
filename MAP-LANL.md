@@ -236,6 +236,9 @@ Important knobs:
   logarithmic instead of scanning/moving a Python list across hundreds of
   thousands of objects. Randomized equivalence tests compare it against the old
   list behavior before using it for the next confirmation runs.
+- `--progress-interval`: evaluator/generator logging knob for long 1M runs.
+  Use it on confirmation launches so a silent log means startup or failure, not
+  merely "still inside generation."
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

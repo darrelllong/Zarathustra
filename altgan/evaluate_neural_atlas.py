@@ -109,6 +109,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated cache sizes for --cachesim-bin.")
     p.add_argument("--cachesim-policies", default="lru,arc,fifo,sieve,slru,car",
                    help="Comma-separated cachesim policies for --cachesim-bin.")
+    p.add_argument("--progress-interval", type=int, default=0,
+                   help="Print generation progress every N records per stream; 0 disables.")
     return p.parse_args()
 
 
@@ -170,6 +172,7 @@ def main() -> int:
         mark_feedback_numeric_blend=args.mark_feedback_numeric_blend,
         mark_feedback_numeric_blend_space=args.mark_feedback_numeric_blend_space,
         mark_feedback_numeric_fields=args.mark_feedback_numeric_fields,
+        progress_interval=args.progress_interval,
     )
     if args.disable_neural_marks:
         model.mark_model = saved_mark_model
@@ -234,6 +237,7 @@ def main() -> int:
         "mark_feedback_numeric_blend_space": args.mark_feedback_numeric_blend_space,
         "mark_feedback_numeric_fields": args.mark_feedback_numeric_fields,
         "uses_neural_marks": saved_mark_model is not None and not args.disable_neural_marks,
+        "progress_interval": args.progress_interval,
         "source_traces": source_names,
         "fake": fake_m,
         "real": real_m,
