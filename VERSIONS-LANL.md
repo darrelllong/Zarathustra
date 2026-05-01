@@ -485,3 +485,11 @@ LLNL R208 remains behind on both visible Alibaba panels: adj `.00` six-policy
 duplicate debt than LANL. New explicit-decimal probes are live for
 p `.08`/hp `.15`/k125, p `.075`/hp `.12`/k125, p `.08`/hp `.10`/k150, and
 p `.07`/hp `.12`/k125.
+
+Those explicit-decimal probes closed negative: p `.08`/hp `.15`/k125 scored
+six/eight `0.018845`/`0.023364`; p `.075`/hp `.12`/k125 scored
+`0.019830`/`0.024602`; p `.08`/hp `.10`/k150 scored `0.020138`/`0.025011`;
+and p `.07`/hp `.12`/k125 scored `0.019743`/`0.024429`. The next live bracket
+returns to k100: p `.08`/hp `.12`, p `.08`/hp `.13`, and p `.085`/hp `.15`,
+all launched with math-library thread caps after uncapped four-way launches
+stalled in startup.

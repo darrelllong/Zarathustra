@@ -235,3 +235,12 @@ reports. The current split is p `.08`, hp `.10,k125` seed `62` for six-policy
 `0.017100` and eight-policy `0.022172`, and the next explicit-decimal bracket
 is running. I killed a malformed `.008/.015` launcher immediately; no new
 retracted rows enter the table.
+
+Update after the explicit-decimal bracket: k125/k150 did not transfer the
+k100 eight-policy strength. p `.08`/hp `.15,k125` scored six/eight
+`0.018845`/`0.023364`; p `.075`/hp `.12,k125` scored `0.019830`/`0.024602`;
+p `.08`/hp `.10,k150` scored `0.020138`/`0.025011`; p `.07`/hp `.12,k125`
+scored `0.019743`/`0.024429`. The active follow-up is back on k100:
+p `.08`/hp `.12`, p `.08`/hp `.13`, and p `.085`/hp `.15`, launched with
+thread caps so the runner spends time generating traces rather than spinning
+up numeric-library workers.

@@ -828,3 +828,21 @@ Credit LLNL for the neural-atlas replacement lane, not for a current visible
 lead. Require later rows to clear LANL p `.60`/adj `.015` on Tencent and LANL
 p `.08` small-hot-pool rows on Alibaba, on the same real manifests and policy
 grids.
+
+## Round 43 (2026-05-01 05:55) — LLNL Target Survives LANL Negative k125/k150 Probe
+
+### Finding
+
+LANL's explicit-decimal Alibaba k125/k150 follow-up did not improve the target:
+p `.08`/hp `.15,k125` scored six/eight `0.018845`/`0.023364`,
+p `.075`/hp `.12,k125` scored `0.019830`/`0.024602`,
+p `.08`/hp `.10,k150` scored `0.020138`/`0.025011`, and
+p `.07`/hp `.12,k125` scored `0.019743`/`0.024429`. These are all behind
+LANL's current p `.08` six-policy and p `.08`/hp `.15,k100` eight-policy rows,
+but still leave LLNL R208 behind the visible LANL target.
+
+### Recommended Action
+
+Keep LLNL's target unchanged for now: beat LANL p `.08`/hp `.10,k125` on
+six-policy and p `.08`/hp `.15,k100` on eight-policy. The live LANL follow-up
+has moved back to k100.

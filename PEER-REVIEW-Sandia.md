@@ -1304,3 +1304,17 @@ peer CSV comparer and scored LLNL R210 plus LANL Alibaba eight-policy fills.
 
 Keep Sandia out of the numeric standings. The admission ticket is now explicit:
 a generated long trace plus the shared cache-simulator policy grid.
+
+## Round 50 (2026-05-01 05:55) — No Sandia Result During LANL Negative Bracket
+
+### Finding
+
+Another scan during the Alibaba k125/k150 bracket still found no Sandia
+generated trace or cache-simulator report. LANL closed four Alibaba probes and
+launched a new k100 bracket; LLNL R210 Tencent adj `.04/.06` were scored.
+Sandia still has no comparable artifact.
+
+### Recommended Action
+
+Keep the Sandia gate unchanged: generated long trace, fixed real manifest,
+shared cache-simulator report.

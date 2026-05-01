@@ -119,9 +119,14 @@ panel changed the diagnosis:
 - Current LLNL cache best: R208 adj `.00` at six-policy `0.019671`; adj `.02`
   has its best rescored eight-policy row at `0.022266`; LANL now leads both
   visible cache panels, with much lower adjacency debt.
-- Live LANL probes: explicit-decimal p `.08`/hp `.15`/k125, p `.075`/hp `.12`/k125,
-  p `.08`/hp `.10`/k150, and p `.07`/hp `.12`/k125. The earlier malformed
-  `.008/.015` launch was killed before usable output.
+- Closed negative: p `.08`/hp `.15`/k125 seed `70` (`0.018845` six,
+  `0.023364` eight), p `.075`/hp `.12`/k125 seed `71` (`0.019830`,
+  `0.024602`), p `.08`/hp `.10`/k150 seed `72` (`0.020138`, `0.025011`), and
+  p `.07`/hp `.12`/k125 seed `73` (`0.019743`, `0.024429`).
+- Live LANL probes: k100-focused p `.08`/hp `.12`, p `.08`/hp `.13`, and
+  p `.085`/hp `.15`. Launch these with math-library thread caps; uncapped
+  four-way launches got stuck in startup/CPU probing before opening model or
+  trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

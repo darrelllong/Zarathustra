@@ -1447,6 +1447,22 @@ The first attempt at this bracket accidentally encoded decimal strings as
 `.008/.015`; it was killed immediately and no output from that malformed launch
 is admitted to the results table.
 
+The corrected bracket closed negative:
+
+| Row | evaluator HRC | six-policy | eight-policy | fake reuse | fake med | fake p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| p `.08`, hp `.15,k125`, seed `70` | 0.012186 | 0.018845 | 0.023364 | 0.321426 | 263 | 59924 |
+| p `.075`, hp `.12,k125`, seed `71` | 0.011165 | 0.019830 | 0.024602 | 0.317472 | 256 | 56291 |
+| p `.08`, hp `.10,k150`, seed `72` | 0.012037 | 0.020138 | 0.025011 | 0.322236 | 259 | 60315 |
+| p `.07`, hp `.12,k125`, seed `73` | 0.011150 | 0.019743 | 0.024429 | 0.313971 | 250 | 51976 |
+
+k125/k150 are not the path: they worsen SIEVE/LFU/LIRS enough to lose both
+policy panels. The next live bracket returns to k100 with p `.08`/hp `.12`,
+p `.08`/hp `.13`, and p `.085`/hp `.15`. These launches must set
+`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+NUMEXPR_NUM_THREADS=1`; the first uncapped four-way launch burned minutes in
+numeric-library startup before opening model or trace files.
+
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p04_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p06_vs_lanl_realmanifest42_six_policy_caps.json`
@@ -1454,3 +1470,7 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp015k100_seed61_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp012k125_seed68_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p007hp010k125_seed64_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost008_hotpool015k125w10000_p008hp015k125_seed70_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0075_hotpool012k125w10000_p0075hp012k125_seed71_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost008_hotpool010k150w10000_p008hp010k150_seed72_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost007_hotpool012k125w10000_p007hp012k125_seed73_realmanifest42_eight_policy_caps.json`
