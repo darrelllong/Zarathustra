@@ -62,8 +62,10 @@ Current status:
   `0.00` scored `0.031040` with median exactly `84` and adjdup `0.004993`, and
   adj `0.02` improved to `0.030632` with adjdup `0.018330`. Tail `0.08` closed
   negative at `0.032613`; adj `0.03`/`0.04` also closed slightly worse
-  (`0.030802`/`0.030963`). Current LANL compromise is adj `0.02`; live
-  follow-ups are adj `0.015` and hot-pool `0.60`/adj `0.02`.
+  (`0.030802`/`0.030963`). Hot-pool `0.60`/adj `0.02` now scores `0.030298`,
+  edging LLNL's visible `0.030360` while carrying less adjacent-duplicate debt.
+  Live follow-ups are a same-recipe confirmation and hot-pool `0.60`/adj
+  `0.015`.
 - `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access

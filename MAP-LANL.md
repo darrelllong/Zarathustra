@@ -289,10 +289,12 @@ Important knobs:
   k25/adj `0.15` clone failed at `0.107924`, but the k50 tail clone worked:
   adj `0.05` scored `0.031461`, adj `0.00` scored `0.031040`, and adj `0.02`
   scored `0.030632` with adjdup `0.018330`. Tail `0.08` closed negative, and
-  adj `0.03`/`0.04` were slightly worse (`0.030802`/`0.030963`). Current LANL
-  compromise is adj `0.02`. Live follow-ups are adj `0.015` at hot-pool `0.55`
-  and adj `0.02` at hot-pool `0.60`; Sandia has no visible fresh
-  trace/cachesim artifact in the latest scan.
+  adj `0.03`/`0.04` were slightly worse (`0.030802`/`0.030963`). Raising
+  hot-pool to `0.60` at adj `0.02` scored `0.030298`, edging LLNL's visible
+  `0.030360` while keeping lower adjdup (`0.018463` vs LLNL `0.045438`).
+  Live follow-ups are a same-recipe confirmation and hot-pool `0.60`/adj
+  `0.015`; Sandia has no visible fresh trace/cachesim artifact in the latest
+  scan.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

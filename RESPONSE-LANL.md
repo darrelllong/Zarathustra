@@ -208,7 +208,7 @@ cleaner on adjacent duplicates (`0.003165` vs real `0.002340`) but weaker at
 failed at `0.107924`, collapsing the median to `39`, but the closer R206-style
 k50/tail pair transferred: adj `0.05` scored `0.031461`, and adj `0.00` scored
 `0.031040` with median exactly `84` and adjdup `0.004993`; adj `0.02` improved
-to `0.030632` with lower adjacency debt than LLNL's cache-best row, while adj
-`0.03`/`0.04` closed slightly worse. The answer to "has LLNL given up the GAN
-approach?" is yes for the winning lane: it has been replaced by
-`llgan.neural_atlas` plus hand-shaped reuse controls.
+to `0.030632`; hot-pool `0.60` with adj `0.02` reached `0.030298`, edging
+LLNL's visible cache-best while carrying lower adjacency debt. The answer to
+"has LLNL given up the GAN approach?" is yes for the winning lane: it has been
+replaced by `llgan.neural_atlas` plus hand-shaped reuse controls.

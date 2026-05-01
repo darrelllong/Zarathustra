@@ -716,3 +716,23 @@ clean long-trace match.
 
 Keep LANL ahead on Alibaba. Watch LLNL's hp/recent-pool axis, but require the
 same real manifest and shape metrics before accepting any Alibaba win claim.
+
+## Round 38 (2026-05-01 04:20) — LANL Edges LLNL Tencent R206 On Cache With Lower Adj-Dup Debt
+
+### Finding
+
+LLNL's visible Tencent R206 cache-best remains adj `0.075` at `0.030360` with
+adjdup `0.045438`. LANL's R206-style port using the promoted altgan checkpoint
+now has a slightly lower six-policy mean: hot-pool `0.60`, k50, adj `0.02`,
+tail `0.10` scored `0.030298`. Its shape is also closer on the hot-set axis:
+top100 `0.259334` versus real `0.263975`, top1000 `0.402350` versus real
+`0.417789`, and adjdup `0.018463`.
+
+This does not settle statistical indistinguishability; LANL still needs a
+same-recipe seed confirmation, and adjdup remains above real. But LLNL no
+longer owns the visible Tencent six-policy cache minimum.
+
+### Recommended Action
+
+Keep scoring LLNL rows, but require any Tencent claim to beat LANL p `.60`,
+adj `0.02` on the same manifest and disclose adjacent-duplicate shape.

@@ -1235,3 +1235,16 @@ atlas/reuse-shaping; Sandia remains absent from the numeric table.
 ### Recommended Action
 
 Leave Sandia gated on a generated long rollout plus `tools/cachesim` report.
+
+## Round 45 (2026-05-01 04:20) — No Sandia Entry While LANL/LLNL Trade Tencent Lead
+
+### Finding
+
+The latest scan found no Sandia `newgan` process and no fresh Sandia cache-sim
+artifact. During the same window, LANL and LLNL both produced Tencent/Alibaba
+atlas cache rows, but Sandia still has no comparable long trace.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it produces a generated trace
+and cache-simulator report.

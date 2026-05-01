@@ -1274,6 +1274,8 @@ the old GAN path. The script `/tmp/tencent_k_sweep.sh` used
 | LANL | k50, adj `0.00`, tail `0.08`, fake seed 52 | 0.032613 |
 | LANL | k50, adj `0.03`, tail `0.10`, fake seed 53 | 0.030802 |
 | LANL | k50, adj `0.04`, tail `0.10`, fake seed 54 | 0.030963 |
+| LANL | p `.55`, k50, adj `0.015`, tail `0.10`, fake seed 55 | 0.030563 |
+| LANL | p `.60`, k50, adj `0.02`, tail `0.10`, fake seed 56 | **0.030298** |
 
 The LLNL k25 trace has major trace-shape debt: top-100 share `0.347880`,
 top-1000 `0.356781`, adjacent duplicate rate `0.090773`, and `361014`
@@ -1303,7 +1305,11 @@ cache mean to `0.030632` with median `82`, p90 `33513`, top-100 `0.245119`,
 and adjdup `0.018330`; this is within `0.00027` of LLNL's cache-best R206 row
 while carrying much less adjacency debt. Tail `0.08` closed negative at
 `0.032613`. Adj `0.03` and `0.04` also closed slightly worse at `0.030802` and
-`0.030963`; the current LANL cache/shape compromise is adj `0.02`.
+`0.030963`. Lowering adj to `0.015` at p `.55` scored `0.030563`. Increasing
+hot-pool probability to p `.60` while keeping adj `0.02` produced the current
+LANL best: `0.030298`, with median `81`, p90 `33698`, top-100 `0.259334`,
+top-1000 `0.402350`, and adjdup `0.018463`. This edges LLNL R206 adj `0.075`
+on cache while keeping much lower adjacent-duplicate debt.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k25_vs_lanl_realmanifest42_six_policy_caps.json`
@@ -1326,3 +1332,5 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj000_tail008_reuseboost030_min32768_postdecode_faststack_fakeseed52_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj003_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed53_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj004_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed54_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp055k50w10000_adj0015_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed55_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp060k50w10000_adj002_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed56_realmanifest42_six_policy_caps.json`
