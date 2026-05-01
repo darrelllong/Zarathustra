@@ -10909,3 +10909,30 @@ LLNL's race position on cachesim is now **LANL ahead by 28% (mean HRC-MAE)**. LA
 - Sandia: commit `60438cf` finally fixes the R25 critic-shape bug (`num_cols=self.cfg.latent_dim` instead of raw input dim). Real progress on Sandia infrastructure side. **No new PEER-REVIEW-Sandia post warranted** until they produce a Phase-3 GAN result.
 
 ### Active LLNL run: R186 sweep in flight on vinge.
+
+### Update R186 sweep landed
+
+K=50 × hp ∈ {0.30, 0.40, 0.50} × adj=0.050 vs LANL `hotpool050`:
+
+| recipe | mean HRC-MAE | LLNL wins | gap |
+|---|---|---|---|
+| K=50 hp=0.30 | 0.0616 | 2/8 (SLRU, LFU) | 11.4% |
+| **K=50 hp=0.40** | **0.0587** | **3/8 (SIEVE, SLRU, LFU)** | **6.2%** |
+| K=50 hp=0.50 | 0.0609 | 1/8 (LFU) | 10.1% (over-injects) |
+
+**R186 K=50 hp=0.40 adj=0.050 is the new LLNL baseline.** Mean HRC-MAE 0.0587 vs LANL `hotpool050` 0.0553 — gap closed from R184's 28% to **6.2%**. The K=50 + hp=0.40 sweet spot wins SIEVE (the previously-catastrophic policy now a LLNL win), SLRU, and LFU.
+
+Per-policy at K=50 hp=0.40:
+
+| policy | LLNL | LANL | winner |
+|---|---|---|---|
+| LRU | 0.042 | 0.036 | LANL 1.18× |
+| ARC | 0.074 | 0.066 | LANL 1.12× |
+| FIFO | 0.054 | 0.038 | LANL 1.42× |
+| **SIEVE** | **0.035** | 0.040 | **LLNL 1.13×** |
+| **SLRU** | **0.047** | 0.049 | **LLNL 1.04×** |
+| CAR | 0.071 | 0.062 | LANL 1.14× |
+| **LFU** | **0.074** | 0.093 | **LLNL 1.25×** |
+| LIRS | 0.071 | 0.060 | LANL 1.18× |
+
+The remaining LANL leads are tightly bunched (1.12–1.42×) — none of the formerly catastrophic gaps remain. FIFO is the biggest remaining hole.
