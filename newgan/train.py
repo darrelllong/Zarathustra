@@ -216,7 +216,7 @@ class SandiaTrainer:
             timestep=self.cfg.timestep
         ).to(self.device)
         self.C = Critic(
-            num_cols=num_cols,
+            num_cols=self.cfg.latent_dim,
             hidden_size=self.cfg.hidden_size,
             use_spectral_norm=True,
             sn_lstm=True,

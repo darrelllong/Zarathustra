@@ -720,11 +720,21 @@ def generate(
             # sliding window). Closes the "fake is too uniform" failure mode
             # diagnosed in llgan/diag_hrc.py: real top-100 share = 35% on
             # tencent vs fake 1.7% before this fix.
+            #
+            # R184: scale window with per_stream and use exponential decay so
+            # 1M-record runs don't exhaust + refresh the pool every 25 steps
+            # (which was killing SIEVE at 1M, R182 corrective).
             from collections import Counter, deque
             hot_counts: Counter = Counter()
-            hot_window: deque = deque(maxlen=int(hot_pool_window))
+            # Decay-weighted: floats not ints
+            hot_freq: Dict[int, float] = {}
+            effective_window = max(int(hot_pool_window), per_stream // 4)
+            hot_window: deque = deque(maxlen=effective_window)
             hot_pool_list: List[int] = []
             hot_pool_refresh_every = 200
+            # R184 decay: each new access multiplies all counts by decay,
+            # then adds 1.0 to the new id. Half-life ≈ ln(0.5)/ln(decay) steps.
+            hot_decay = 0.9999  # half-life ~6900 steps
 
             for step in range(per_stream):
                 # Decode current state to (phase, dist_state) → action
@@ -830,17 +840,24 @@ def generate(
                     "tenant": 0,
                 })
 
-                # R181: maintain sliding-window hot pool
+                # R184: decay-weighted hot pool — scales to 1M-record streams
+                # without the R181 sliding-window exhaustion issue. Counts
+                # are multiplied by decay each step then incremented by 1.0
+                # for the new access. Top-K is computed from current weights.
                 if hot_pool_prob > 0.0:
-                    if len(hot_window) == hot_window.maxlen:
-                        evicted = hot_window[0]
-                        hot_counts[evicted] -= 1
-                        if hot_counts[evicted] <= 0:
-                            del hot_counts[evicted]
-                    hot_window.append(int(obj_id))
-                    hot_counts[int(obj_id)] += 1
+                    oid_int = int(obj_id)
+                    # Lazy decay: scan dict only on refresh to bound cost
+                    hot_freq[oid_int] = hot_freq.get(oid_int, 0.0) + 1.0
                     if step % hot_pool_refresh_every == 0:
-                        hot_pool_list = [o for o, _ in hot_counts.most_common(hot_pool_k)]
+                        # Apply decay (compound for refresh_every steps) and
+                        # rebuild top-K. Drop entries below 0.01 to bound size.
+                        decay_factor = hot_decay ** hot_pool_refresh_every
+                        hot_freq = {k: v * decay_factor for k, v in hot_freq.items()
+                                    if v * decay_factor >= 0.01}
+                        hot_pool_list = [
+                            k for k, _ in
+                            sorted(hot_freq.items(), key=lambda kv: -kv[1])[:hot_pool_k]
+                        ]
 
                 # Update running unique-rate phase
                 if n_phase_bins > 1 and phase_edges is not None:
