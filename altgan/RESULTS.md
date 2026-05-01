@@ -1030,7 +1030,8 @@ land in a useful window. The current promoted hot-pool row remains
 Seed-43 confirmation of that row also made unbounded hot-object lookup look too
 expensive: it was killed after 40+ minutes with no fake CSV. The rerun uses
 `--stack-hot-pool-max-search 8192`, falling back to the sampled rank if the hot
-object is deeper than the bounded prefix.
+object is deeper than the bounded prefix. That run was also killed after 40+
+minutes with no fake CSV; `max_search=512` is running.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`

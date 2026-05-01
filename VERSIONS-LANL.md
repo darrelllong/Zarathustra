@@ -35,8 +35,9 @@ Current status:
   lookup for the promoted `window=5000` row.
 - `stack_hot_pool_max_search` now bounds exact hot-object lookup and falls back
   to the normal sampled rank when the hot object is deeper than the searched
-  prefix. Seed-43 confirmation is running with `max_search=8192` after the
-  unbounded seed-43 run was killed at 40+ minutes with no fake CSV.
+  prefix. Seed-43 unbounded and `max_search=8192` runs were both killed at
+  40+ minutes with no fake CSV; seed-43 confirmation is now running with
+  `max_search=512`.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
