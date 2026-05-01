@@ -13127,3 +13127,51 @@ Cost: extra 600-epoch training pass on top of cond-trans, total fit ~60-90 min.
 
 - LANL: same micro-iteration.
 - Sandia: brief delivered; awaiting R38 fix for first artifact.
+
+## Round 230 — Alibaba `--rank-ar` (R180 flag): closes-NEGATIVE; learned PMF replacement overfits like R225 more-data
+
+**Date**: 2026-05-01 15:50 PDT.
+
+### Hypothesis tested
+
+R180 flag `--rank-ar` trains a small AR rank network (cond, dist_state, prev_rank → next_rank_bin) to replace the empirical rank-PMF lookup at generate time. Per source docstring: "Targets the b2-light i.i.d. PMF ceiling." Same fit data as R221 (50k, phase=2, ep=600, hidden=96), plus rank-AR head (hidden=96, epochs=600).
+
+### Result
+
+| atlas | seed=42 6-pol | seed=42 8-pol | vs R221 |
+|---|---|---|---|
+| R221 (multi-seed mean) | 0.0204 | 0.0209 | — |
+| **R230 (rank-AR added)** | **0.1780** | **0.1856** | **+8.7× / +8.9×** |
+
+Catastrophic regression. Same atlas data, only addition is the rank-AR head replacing empirical PMF at generate time.
+
+### Pattern
+
+Three independent attempts to add learned capacity to the alibaba pipeline all regressed catastrophically:
+
+| round | change | result vs R221 |
+|---|---|---|
+| R225 | 50k → 100k records-per-file (h=96 ep=600) | +12× regression |
+| R225b | 50k → 100k records-per-file (h=64 ep=300) | +8× regression |
+| R230 | --rank-ar (h=96 ep=600 added head) | +9× regression |
+
+**Common signature:** training loss descends cleanly; long-rollout generation drifts catastrophically. The empirical PMF lookup is providing regularization that learned replacements break — likely because cond-MLP outputs at generate time hit out-of-training-distribution conditional vectors, and the learned PMF extrapolates badly while the empirical lookup falls back gracefully.
+
+### Diagnostic R230b (launching)
+
+Minimal-capacity rank-AR: hidden=32, epochs=200. If this also regresses, the rank-AR architecture is fundamentally wrong for the cond-vector distribution shift between training and long-rollout generation, regardless of capacity. If it recovers near R221, the failure is hyperparameter-tuning, not architecture.
+
+### Standing claims unchanged
+
+| corpus | claim | round |
+|---|---|---|
+| Tencent | 0.0305 (6-pol, multi-seed) | R206 |
+| Alibaba | 0.0204 (6-pol, multi-seed) | R221 |
+| CloudPhysics | 0.0338 (8-pol, multi-seed) | R224 |
+
+R225 through R230 represent 7 consecutive closed-NEGATIVE attempts to lift any standing claim. The current claims are now thoroughly defended through capacity, knob, binning, and post-hoc-net axes. Real lift requires substantive architecture change (WaveStitch-style jitter, learned post-hoc knobs, hierarchical cond features, per-stream atlas) — research-grade work, deferred from race-mode tick.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: brief delivered; awaiting R38 fix.
