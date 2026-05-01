@@ -270,7 +270,8 @@ Important knobs:
   `rank_power=2.0`). Hot-pool concentration over-compresses the reuse tail.
   `p=0.10` is the current cache best (`0.019857`/`0.019892`), while `p=0.06`
   is the trace-shape compromise (`0.020009`/`0.020072`) because it matches
-  reuse and p90 much more closely.
+  reuse and p90 much more closely. LLNL R207 hp `0.40` narrowed Alibaba to
+  `0.025387` but still trails LANL and carries adjdup `0.058331`.
 - `stack_tail_reuse_prob`, `stack_tail_reuse_min_frac`,
   `stack_recent_pool_prob`, and `stack_recent_pool_window`: LANL-side ports of
   the LLNL R203 reuse-shaping levers. Tail reuse redirects sampled reuses into
@@ -286,9 +287,11 @@ Important knobs:
   `0.031474` with lower but still high adjacent duplicates, and R206 adj `0.00`
   scores `0.043287` with realistic adjacent duplicates but poor SIEVE. LANL's direct
   k25/adj `0.15` clone failed at `0.107924`, but the k50 tail clone worked:
-  adj `0.05` scored `0.031461`, and adj `0.00` scored `0.031040` with median
-  exactly `84` and adjdup `0.004993`. Live LANL follow-ups are adj `0.02` at
-  tail `0.10` and adj `0.00` at tail `0.08`. Sandia has no visible fresh
+  adj `0.05` scored `0.031461`, adj `0.00` scored `0.031040`, and adj `0.02`
+  scored `0.030632` with adjdup `0.018330`. Tail `0.08` closed negative, and
+  adj `0.03`/`0.04` were slightly worse (`0.030802`/`0.030963`). Current LANL
+  compromise is adj `0.02`. Live follow-ups are adj `0.015` at hot-pool `0.55`
+  and adj `0.02` at hot-pool `0.60`; Sandia has no visible fresh
   trace/cachesim artifact in the latest scan.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`

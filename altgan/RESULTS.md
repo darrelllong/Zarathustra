@@ -1184,11 +1184,25 @@ LANL control:
 | LLNL | `alibaba_b2_r204_k25.csv` | 0.050148 |
 | LLNL | `alibaba_b2_r204_k75.csv` | 0.033206 |
 | LLNL | `alibaba_b2_r204_k100.csv` | 0.029747 |
+| LLNL | `alibaba_b2_r207_hp0.20.csv` | 0.034689 |
+| LLNL | `alibaba_b2_r207_hp0.25.csv` | 0.030599 |
+| LLNL | `alibaba_b2_r207_hp0.30.csv` | 0.026658 |
+| LLNL | `alibaba_b2_r207_hp0.35.csv` | 0.026276 |
+| LLNL | `alibaba_b2_r207_hp0.40.csv` | 0.025387 |
+| LLNL | `alibaba_b2_r207_hp0.50.csv` | 0.029777 |
+| LLNL | `alibaba_b2_r207_hp0.60.csv` | 0.033206 |
+| LLNL | `alibaba_b2_r207_hp0.70.csv` | 0.040372 |
 
 LANL tested an LLNL-shaped hot-pool/adjacent-duplicate variant
 (`stack_hot_pool_prob=0.60`, `k=25`, `window=10000`,
 `stack_adj_dup_prob=0.15`) and closed it negative: six-policy mean `0.070192`,
 median `43`, p90 `488`. It over-compresses Alibaba reuse distance.
+
+LLNL R207 narrows the gap but does not pass LANL: hp `0.40`, k75, adj `0.15`,
+tail `0.10`, and recent-pool `0.15/window=2` scores `0.025387`, with top-100
+share `0.088029` and adjacent duplicate rate `0.058331`. It is a real
+improvement over R204 k100, but still behind LANL control and both LANL
+deep-reuse probes.
 
 Deep new-to-reuse injection is the right Alibaba branch. `p=0.06`,
 `min_rank=32768`, `rank_power=2.0` nearly matches the real reuse tail on fake
@@ -1218,6 +1232,11 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k25_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k75_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k100_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r207_hp0p20_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r207_hp0p40_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r207_hp0p50_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r207_hp0p60_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r207_hp0p70_vs_lanl_realmanifest42_six_policy_caps.json`
 
 ---
 
@@ -1251,6 +1270,10 @@ the old GAN path. The script `/tmp/tencent_k_sweep.sh` used
 | LANL | k25, adj `0.15`, tail `0.10`, fake seed 48 | 0.055622 |
 | LANL | k50, adj `0.05`, tail `0.10`, fake seed 49 | 0.031461 |
 | LANL | k50, adj `0.00`, tail `0.10`, fake seed 50 | 0.031040 |
+| LANL | k50, adj `0.02`, tail `0.10`, fake seed 51 | 0.030632 |
+| LANL | k50, adj `0.00`, tail `0.08`, fake seed 52 | 0.032613 |
+| LANL | k50, adj `0.03`, tail `0.10`, fake seed 53 | 0.030802 |
+| LANL | k50, adj `0.04`, tail `0.10`, fake seed 54 | 0.030963 |
 
 The LLNL k25 trace has major trace-shape debt: top-100 share `0.347880`,
 top-1000 `0.356781`, adjacent duplicate rate `0.090773`, and `361014`
@@ -1275,10 +1298,12 @@ rate `0.116735`. The fuller k25 tail clone was better but still behind
 promoted checkpoint transferred: k50/tail `0.10`/adj `0.05` scored `0.031461`
 with median `80`, p90 `33193`, top-100 `0.242851`, and adjdup `0.037806`;
 k50/tail `0.10`/adj `0.00` scored `0.031040` with median exactly `84`, p90
-`33923`, top-100 `0.241256`, and adjdup `0.004993`. The latter is much cleaner
-than LLNL's cache-best R206 row and within `0.00068` of it on mean cache MAE.
-LANL launched two next probes: adj `0.02` at tail `0.10`, and adj `0.00` at
-tail `0.08`.
+`33923`, top-100 `0.241256`, and adjdup `0.004993`. Adj `0.02` improved the
+cache mean to `0.030632` with median `82`, p90 `33513`, top-100 `0.245119`,
+and adjdup `0.018330`; this is within `0.00027` of LLNL's cache-best R206 row
+while carrying much less adjacency debt. Tail `0.08` closed negative at
+`0.032613`. Adj `0.03` and `0.04` also closed slightly worse at `0.030802` and
+`0.030963`; the current LANL cache/shape compromise is adj `0.02`.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k25_vs_lanl_realmanifest42_six_policy_caps.json`
@@ -1297,3 +1322,7 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k25w10000_adj015_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed48_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj005_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed49_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj000_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed50_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj002_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed51_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj000_tail008_reuseboost030_min32768_postdecode_faststack_fakeseed52_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj003_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed53_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj004_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed54_realmanifest42_six_policy_caps.json`

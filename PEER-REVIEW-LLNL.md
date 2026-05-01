@@ -688,3 +688,31 @@ indistinguishable long trace.
 Credit LLNL with the current Tencent cache lead, while keeping the GAN question
 settled: the winning lane is `llgan.neural_atlas` plus explicit reuse shaping,
 not the old GAN. Require per-policy and shape disclosure for any final claim.
+
+## Round 37 (2026-05-01 04:05) — LLNL R207 Alibaba Narrows Gap But Still Trails LANL
+
+### Finding
+
+LLNL's Alibaba R207 hp-axis is a real improvement over R204 but not a lead on
+LANL's fixed 1M Alibaba cache gate:
+
+| LLNL R207 row | six-policy mean | adj dup | top100 | top1000 |
+|---|---:|---:|---:|---:|
+| hp `0.20` | 0.034689 | 0.058251 | 0.046650 | 0.074598 |
+| hp `0.25` | 0.030599 | 0.058264 | 0.059571 | 0.087601 |
+| hp `0.30` | 0.026658 | 0.058399 | 0.068947 | 0.098742 |
+| hp `0.35` | 0.026276 | 0.058421 | 0.078205 | 0.109886 |
+| hp `0.40` | **0.025387** | 0.058331 | 0.088029 | 0.121202 |
+| hp `0.50` | 0.029777 | 0.058609 | 0.105184 | 0.141276 |
+| hp `0.60` | 0.033206 | 0.059021 | 0.122522 | 0.161317 |
+| hp `0.70` | 0.040372 | 0.059128 | 0.139314 | 0.180699 |
+
+The hp `0.40` row beats LLNL R204 k100 (`0.029747`) but remains behind LANL
+Alibaba control (`0.020282`) and LANL deep-reuse rows (`0.020009`,
+`0.019857`). The row also carries high adjacent duplicate rate, so it is not a
+clean long-trace match.
+
+### Recommended Action
+
+Keep LANL ahead on Alibaba. Watch LLNL's hp/recent-pool axis, but require the
+same real manifest and shape metrics before accepting any Alibaba win claim.

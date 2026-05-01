@@ -1223,3 +1223,15 @@ atlas traces; Sandia remains outside the cache-simulator table.
 
 Keep Sandia gated on first generated long rollout plus six-policy cache report.
 Training progress alone does not enter the race table.
+
+## Round 44 (2026-05-01 04:05) — No Sandia Cache-Sim Artifact During Tencent/Alibaba Atlas Push
+
+### Finding
+
+The latest peer scan still shows no fresh Sandia generated trace or cache-sim
+report on the active Tencent or Alibaba gates. The live work is LANL and LLNL
+atlas/reuse-shaping; Sandia remains absent from the numeric table.
+
+### Recommended Action
+
+Leave Sandia gated on a generated long rollout plus `tools/cachesim` report.

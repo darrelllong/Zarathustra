@@ -20,6 +20,9 @@ Current Alibaba status:
   `0.033206` at `k=75`, and `0.029747` at `k=100` on the same LANL real
   manifest. LLNL's active replacement for the GAN track is therefore a
   conditional neural atlas plus hand-shaped reuse controls.
+- LLNL's R207 Alibaba hp-axis narrows the gap but remains behind: hp `0.40`
+  scores `0.025387` on the same manifest, ahead of its R204 rows but behind
+  LANL control `0.020282` and LANL deep-reuse `0.019857`/`0.019892`.
 - An LLNL-shaped LANL hot-pool test (`p=0.60`, `k=25`, adjacent duplicate
   `0.15`) closes negative at `0.070192`.
 - Alibaba's live LANL branch is deep new-to-reuse injection. `p=0.06`,
@@ -55,9 +58,12 @@ Current status:
   (`0.003165`) but scores `0.043287` and has bad SIEVE error. This is an atlas
   lead, not a revived GAN lead.
 - LANL's first k25/adj `0.15` clone failed (`0.107924`, stack median `39`), but
-  the R206-style k50/tail pair transferred: adj `0.05` scored `0.031461`, and
-  adj `0.00` scored `0.031040` with median exactly `84` and adjdup `0.004993`.
-  Live follow-ups are adj `0.02`/tail `0.10` and adj `0.00`/tail `0.08`.
+  the R206-style k50/tail pair transferred: adj `0.05` scored `0.031461`, adj
+  `0.00` scored `0.031040` with median exactly `84` and adjdup `0.004993`, and
+  adj `0.02` improved to `0.030632` with adjdup `0.018330`. Tail `0.08` closed
+  negative at `0.032613`; adj `0.03`/`0.04` also closed slightly worse
+  (`0.030802`/`0.030963`). Current LANL compromise is adj `0.02`; live
+  follow-ups are adj `0.015` and hot-pool `0.60`/adj `0.02`.
 - `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access
