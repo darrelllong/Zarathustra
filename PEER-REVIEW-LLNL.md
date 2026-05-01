@@ -736,3 +736,51 @@ longer owns the visible Tencent six-policy cache minimum.
 
 Keep scoring LLNL rows, but require any Tencent claim to beat LANL p `.60`,
 adj `0.02` on the same manifest and disclose adjacent-duplicate shape.
+
+## Round 39 (2026-05-01 04:35) — LLNL R208 Re-Passes Alibaba; LANL Re-Passes Tencent
+
+### Finding
+
+LLNL's R208 Alibaba adj sweep is valid on the LANL 1M manifest. Rescored with
+namespaced object ids, the best visible row is adj `0.00` at six-policy
+`0.019671`; adj `0.05` is `0.019812`. Those beat LANL's p `.10` deep-reuse
+row (`0.019857`) and also beat LANL on the eight-policy panel (`0.022266` to
+`0.022604` for LLNL versus LANL p `.10` at `0.024774`). Credit LLNL with the
+current Alibaba cache lead.
+
+The realism caveat is still material: real Alibaba adjacent duplicates are
+`0.000200`, LANL p `.10` is `~0.00045`, while LLNL R208 ranges from `0.021` to
+`0.034`. LLNL's top100/top1000 are closer to real than LANL's, so this is a
+real tradeoff, not a simple rejection.
+
+On Tencent, LLNL should update its target again: LANL p `.60`, k50, tail `.10`,
+adj `.015`, seed `58` scored `0.030240`, below LLNL R206 adj `.075`
+(`0.030360`) with lower adjdup (`0.015475` vs `0.045438`).
+
+### Recommended Action
+
+Keep LLNL ahead on Alibaba eight-policy cache and behind on Tencent cache until
+the live LANL confirmation/neighbor runs close. Require all claims to carry
+six-policy, eight-policy where available, top100/top1000, and
+adjacent-duplicate shape.
+
+## Round 40 (2026-05-01 04:45) — LANL R209 Re-Passes Alibaba Six-Policy Without Adj-Dup Debt
+
+### Finding
+
+LANL answered R208 with p `.10` deep-reuse plus a small hot pool
+(`hot_pool_prob=0.10,k=75,window=10000`). The first row scored six-policy
+`0.017939`, beating LLNL R208 adj `.00` (`0.019671`) and adj `.05`
+(`0.019812`). Eight-policy is `0.022628`, still slightly behind LLNL's best
+rescored eight-policy row (`0.022266`).
+
+The shape tradeoff is now clear: LANL R209 has adjdup `0.000433` versus real
+`0.000200`, while LLNL R208 ranges `0.021..0.034`. LLNL is closer on top100
+and top1000; LANL is much cleaner on immediate duplication and now stronger on
+the six-policy cache objective.
+
+### Recommended Action
+
+Do not let LLNL claim a clean all-surface Alibaba lead. The honest current
+state is LANL leads six-policy Alibaba and Tencent; LLNL leads Alibaba
+eight-policy pending LANL R209 confirmation/neighbors.

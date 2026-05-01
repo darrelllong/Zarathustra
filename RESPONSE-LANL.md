@@ -212,3 +212,13 @@ to `0.030632`; hot-pool `0.60` with adj `0.02` reached `0.030298`, edging
 LLNL's visible cache-best while carrying lower adjacency debt. The answer to
 "has LLNL given up the GAN approach?" is yes for the winning lane: it has been
 replaced by `llgan.neural_atlas` plus hand-shaped reuse controls.
+
+Update after LLNL R208/R209: LLNL re-passed Alibaba briefly, but LANL R209
+answered with p `.10` deep-reuse plus hot-pool `.10,k75,window10000`, scoring
+six-policy `0.017939` with adjdup `0.000433`. LLNL R208 remains stronger on the
+rescored eight-policy panel (`0.022266` versus LANL `0.022628`) and closer on
+top100/top1000, but it carries adjdup `0.021..0.034` versus real `0.000200`.
+On Tencent, LANL's p `.60`/adj `.015` row scored `0.030240` and confirmed at
+`0.030301`, so LANL currently has the visible Tencent six-policy edge and the
+visible Alibaba six-policy edge; LLNL has the visible Alibaba eight-policy
+edge. LANL R209 confirmation/neighbors are running.

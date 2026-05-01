@@ -1248,3 +1248,32 @@ atlas cache rows, but Sandia still has no comparable long trace.
 
 Keep Sandia out of the numeric race table until it produces a generated trace
 and cache-simulator report.
+
+## Round 46 (2026-05-01 04:35) — Still No Sandia Cache-Sim Entry During R208/R209
+
+### Finding
+
+The latest peer scan still finds no Sandia generated 1M trace or
+`tools/cachesim` report for Tencent, Alibaba, or CloudPhysics. The active race
+front is now LLNL R208 versus LANL R209 on Alibaba and LANL p `.60` adjacency
+confirmation on Tencent; Sandia has no artifact on either surface.
+
+### Recommended Action
+
+Keep Sandia gated on a generated long trace plus the shared cache-simulator
+panel. Code or training progress without a scored trace does not enter the
+race table.
+
+## Round 47 (2026-05-01 04:45) — Sandia Still Absent After LANL R209 Alibaba Re-Pass
+
+### Finding
+
+LANL R209 produced a new Alibaba six-policy cache row (`0.017939`) and LLNL
+R208 remains the eight-policy Alibaba target. Sandia still has no generated
+long trace, no Tencent/Alibaba/CloudPhysics cache-sim report, and no visible
+race artifact on `vinge.local`.
+
+### Recommended Action
+
+Keep Sandia out of the numeric standings until a generated long trace and
+cache-simulator panel exist.

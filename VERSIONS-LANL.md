@@ -5,6 +5,44 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
+## R208/R209 Race State: Tencent Edge, Alibaba Re-Flip (2026-05-01)
+
+LLNL's R208 Alibaba adj-dup re-sweep is a real cache-sim advance. LANL rescored
+the visible `/home/darrell/alibaba_b2_r208_adj*.csv` rows against the same
+LANL 1M Alibaba real manifest and the same fixed caps:
+
+- LLNL R208 adj `0.00`: six-policy `0.019671`, eight-policy `0.022604`.
+- LLNL R208 adj `0.02`: six-policy `0.019844`, eight-policy `0.022266`.
+- LLNL R208 adj `0.05`: six-policy `0.019812`, eight-policy `0.022357`.
+- LANL Alibaba p `0.10` deep-reuse remains `0.019857`/`0.019892` six-policy
+  and `0.024774`/`0.024839` eight-policy.
+- LANL R209 p `0.10` deep-reuse plus hot-pool `0.10,k75,window10000` scored
+  `0.017939` six-policy and `0.022628` eight-policy with adjdup `0.000433`.
+  This was a strong single-seed re-pass on the six-policy gate without buying
+  LLNL's adjacency debt. The hot-set is still low: top100 `0.014995` versus
+  real `0.042228`.
+- The first follow-up bracket shows variance: same hp `.10` at seed `49`
+  scored `0.019727`, hp `.05` scored `0.019613`, hp `.15` scored `0.019368`,
+  hp `.20` scored `0.019217`, hp `.25` scored `0.019202`, and p `.08`/hp
+  `.10` scored `0.019602`. All are adjacency-clean, but the hot-pool rows also
+  collapse p90 to roughly `1.8k..2.0k` versus real `44829`, so they are cache
+  wins rather than indistinguishable traces.
+- The realism caveat now cuts both ways: real Alibaba adjdup is `0.000200`,
+  LANL R209 is `0.000433`, and LLNL R208 is `0.021..0.034`. LLNL's top100 is
+  closer to real, while LANL is much cleaner on immediate duplication.
+- LANL launched R209 follow-ups with tail reuse added to hp `.20/.25`, plus
+  an hp `.30` no-tail probe, to recover the long tail while preserving the
+  cache win.
+
+Tencent moved the other way. LANL p `.60`, k50, tail `.10`, adj `.015`, fake
+seed `58` scored a new visible Tencent best: six-policy `0.030240`, evaluator
+HRC `0.008832`, median `81`, p90 `33757`, top100 `0.260899`, top1000
+`0.402591`, adjdup `0.015475`. This beats LLNL R206 adj `.075` (`0.030360`)
+with lower adjacent-duplicate debt. Confirmation seed `59` and lower-adj
+neighbor adj `.010` seed `60` are running.
+
+---
+
 ## Alibaba 1M Cachesim Gate Opened (2026-05-01)
 
 LANL opened a 1M Alibaba cache-simulator gate with a fixed real manifest:

@@ -1334,3 +1334,67 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool055k50w10000_adj004_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed54_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp055k50w10000_adj0015_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed55_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp060k50w10000_adj002_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed56_realmanifest42_six_policy_caps.json`
+
+---
+
+## R208/R209 Cache-Sim Race Update (2026-05-01)
+
+Tencent: LANL's p `.60`, k50, tail `.10`, adj `.015` row on fake seed `58`
+is the new visible LANL best and edges LLNL R206 on the same six-policy gate:
+
+| Source | Variant | six-policy mean | top100 | top1000 | adjdup |
+|---|---|---:|---:|---:|---:|
+| LANL | p `.60`, k50, adj `.015`, tail `.10`, seed `58` | **0.030240** | 0.260899 | 0.402591 | 0.015475 |
+| LANL | p `.60`, k50, adj `.02`, tail `.10`, seed `56` | 0.030298 | 0.259334 | 0.402350 | 0.018463 |
+| LANL | p `.60`, k50, adj `.02`, tail `.10`, seed `57` | 0.030555 | 0.260502 | 0.402462 | 0.018487 |
+| LLNL | R206 k50, adj `.075` | 0.030360 | 0.199928 | 0.383674 | 0.045438 |
+
+Confirmation is running for p `.60`/adj `.015` seed `59`, alongside a lower
+adj `.010` neighbor seed `60`.
+
+Alibaba: LLNL R208's adj re-tune was a cache win until LANL R209 added a small
+hot pool to the deep-reuse branch. LANL rescored the R208 CSVs with namespaced
+object ids against the LANL 1M real manifest and added the requested
+eight-policy panel:
+
+| Source | Variant | six-policy mean | eight-policy mean | top100 | top1000 | adjdup |
+|---|---|---:|---:|---:|---:|---:|
+| LLNL | R208 adj `.00` | **0.019671** | 0.022604 | 0.092879 | 0.127450 | 0.021021 |
+| LLNL | R208 adj `.02` | 0.019844 | **0.022266** | 0.091976 | 0.126735 | 0.026106 |
+| LLNL | R208 adj `.05` | 0.019812 | 0.022357 | 0.091154 | 0.125557 | 0.033662 |
+| LANL | deep-reuse p `.10` + hot-pool `.10,k75,w10000`, seed `46` | **0.017939** | 0.022628 | 0.014995 | 0.047568 | 0.000433 |
+| LANL | deep-reuse p `.10` + hot-pool `.25,k75,w10000`, seed `55` | 0.019202 | pending | pending | pending | pending |
+| LANL | deep-reuse p `.10` + hot-pool `.20,k75,w10000`, seed `54` | 0.019217 | pending | pending | pending | pending |
+| LANL | deep-reuse p `.10` + hot-pool `.15,k75,w10000`, seed `51` | 0.019368 | 0.025016 | 0.003400 | 0.021013 | 0.000426 |
+| LANL | deep-reuse p `.10` + hot-pool `.05,k75,w10000`, seed `50` | 0.019613 | 0.025146 | 0.002900 | 0.019046 | 0.000462 |
+| LANL | deep-reuse p `.08` + hot-pool `.10,k75,w10000`, seed `52` | 0.019602 | 0.025206 | 0.003095 | 0.019838 | 0.000414 |
+| LANL | deep-reuse p `.10` + hot-pool `.10,k75,w10000`, seed `49` | 0.019727 | 0.025270 | 0.003072 | 0.020083 | 0.000445 |
+| LANL | deep-reuse p `.10`, seed `45` | 0.019857 | 0.024774 | 0.002650 | 0.018336 | 0.000451 |
+| LANL | deep-reuse p `.10`, seed `42` | 0.019892 | 0.024839 | 0.002492 | 0.017974 | 0.000435 |
+| Real | fixed manifest | n/a | n/a | 0.042228 | 0.123983 | 0.000200 |
+
+LANL has the best single Alibaba six-policy row, but seed-46 is not yet a
+robust promotion. The follow-up bracket says hp `.20-.25` is the better center
+(`0.019217`/`0.019202`) and still beats LLNL R208 adj `.00`; hp `.05`, hp
+`.15`, and p `.08`/hp `.10` also land around LLNL's cache-best. The cost is
+p90 collapse to about `1.8k..2.0k` versus real `44829`, so LANL launched tail
+reuse variants next. LLNL still has the best rescored eight-policy row. The
+shape split is not settled: LLNL's
+top100/top1000 are closer, but its adjacent duplicates are roughly 105x to
+168x the real manifest, while LANL R209 stays close on adjacency and still
+under-shoots the real hot set. The p `.10` + recent-pool `.05,w2` probe closed
+negative at `0.025133` and adjdup `0.008977`; p `.08` without hot pool scored
+`0.019731`. LANL R209 hp `.20/.25` + tail `.10` follow-ups are live.
+
+New artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp060k50w10000_adj002_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed57_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp060k50w10000_adj0015_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed58_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p00_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p00_vs_lanl_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p02_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p02_vs_lanl_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p05_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r208_adj0p05_vs_lanl_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/lanl_alibaba_reuseboost010_seed45_vs_lanl_realmanifest42_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost010_hotpool010k75w10000_seed46_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/lanl_alibaba_reuseboost010_hotpool010k75w10000_seed46_vs_lanl_realmanifest42_eight_policy_caps.json`
