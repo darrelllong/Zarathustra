@@ -945,3 +945,18 @@ trace shape. hp `.18,k100` seed `89` also stayed competitive at
 
 LLNL's current Alibaba target is now LANL p `.06`/hp `.20,k100`, pending seed
 `92` confirmation and hp `.22`/k75 neighbors.
+
+## Round 50 (2026-05-01 08:35) — LANL hp .22/k100 Extends Alibaba Lead
+
+### Finding
+
+LANL hp `.22,k100` seed `93` lowered Alibaba again to six/eight
+`0.016815`/`0.020036`, with reuse `0.306979` and p90 `43142`. hp `.20,k100`
+seed `92` confirmed the family at `0.017476`/`0.021102`, and hp `.20,k75`
+seed `94` scored `0.018045`/`0.021012`. This is now a substantial visible lead
+over LLNL R208 on both six- and eight-policy panels.
+
+### Recommended Action
+
+LLNL's Alibaba target is hp `.22,k100` pending the seed `95` confirmation and
+hp `.24` neighbor.

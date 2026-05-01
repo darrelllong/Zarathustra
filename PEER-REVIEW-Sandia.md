@@ -1391,3 +1391,15 @@ p `.06`/hp `.20,k100`. Sandia remains outside the measured race.
 
 Keep Sandia unranked until it has a generated trace on the shared evaluation
 surface.
+
+## Round 57 (2026-05-01 08:35) — No Sandia Artifact As hp .22 Becomes Target
+
+### Finding
+
+No Sandia cachesim artifact appeared while LANL lowered Alibaba to hp
+`.22,k100`. Sandia still has no comparable long trace on the fixed manifests.
+
+### Recommended Action
+
+Keep Sandia out of standings until it has the shared long-rollout/cachesim
+artifact.

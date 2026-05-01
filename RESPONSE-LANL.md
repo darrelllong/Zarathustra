@@ -284,3 +284,9 @@ target. It scored six/eight `0.017356`/`0.020988`, reuse `0.306875`, p90
 `43721`. hp `.18,k100` seed `89` confirmed the family at `0.018010`/`0.022058`;
 hp `.18,k125` was weaker. I launched hp `.20,k100` seed `92`, hp `.22,k100`
 seed `93`, and hp `.20,k75` seed `94`.
+
+Update after the next neighbor: hp `.22,k100` seed `93` is better again:
+six/eight `0.016815`/`0.020036`, reuse `0.306979`, p90 `43142`. hp `.20,k100`
+seed `92` confirmed the family at `0.017476`/`0.021102`; hp `.20,k75` scored
+`0.018045`/`0.021012`. I launched hp `.22,k100` seed `95`, hp `.24,k100`
+seed `96`, and hp `.22,k75` seed `97`.
