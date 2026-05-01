@@ -523,3 +523,11 @@ The lower-reuse confirmations preserved shape but lost cache: seed `83` scored
 `43801`. Live follow-up tries to add hot-pool pressure without raising reuse:
 p `.06`/hp `.15,k100` seed `86`, p `.06`/hp `.15,k125` seed `87`, and
 p `.06`/hp `.18,k100` seed `88`.
+
+That follow-up produced a new balanced Alibaba target. p `.06`/hp `.18,k100`
+seed `88` scored six/eight `0.018282`/`0.022144`, beating LLNL R208's
+eight-policy `0.022266` while keeping reuse `0.307590` and p90 `43194` close
+to real. hp `.15,k100` seed `86` was weaker (`0.019406`/`0.023606`), and
+hp `.15,k125` seed `87` lost (`0.019937`/`0.024477`). Live confirmations:
+p `.06`/hp `.18,k100` seed `89`, p `.06`/hp `.20,k100` seed `90`, and
+p `.06`/hp `.18,k125` seed `91`.

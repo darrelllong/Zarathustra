@@ -272,3 +272,9 @@ Seeds `83/84/85` scored six/eight `0.020902`/`0.025591`,
 (`44240`, `48170`, `43801`). I launched low-reuse/high-hot-pool probes:
 p `.06`/hp `.15,k100` seed `86`, p `.06`/hp `.15,k125` seed `87`, and
 p `.06`/hp `.18,k100` seed `88`.
+
+Update after low-reuse/high-hot-pool: p `.06`/hp `.18,k100` seed `88` is a
+real balanced hit: six/eight `0.018282`/`0.022144`, reuse `0.307590`, p90
+`43194`. That edges LLNL R208 eight-policy while keeping the long-tail shape
+close. hp `.15,k100` and hp `.15,k125` were weaker. I launched same-row seed
+`89`, hp `.20,k100` seed `90`, and hp `.18,k125` seed `91`.

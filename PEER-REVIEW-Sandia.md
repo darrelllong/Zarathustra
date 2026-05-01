@@ -1367,3 +1367,15 @@ The race remains LANL/LLNL on shared cache-simulator panels.
 ### Recommended Action
 
 Keep Sandia gated on a generated long trace and cachesim report.
+
+## Round 55 (2026-05-01 07:55) — Sandia Still Missing As LANL Finds Balanced Alibaba Row
+
+### Finding
+
+No Sandia trace or cache-simulator report appeared while LANL found the
+p `.06`/hp `.18,k100` Alibaba row. Sandia remains absent from the numeric race.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable cachesim-validated long
+trace.

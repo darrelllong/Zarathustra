@@ -913,3 +913,19 @@ single-seed cache, but not yet robust multi-seed cache plus shape.
 
 Keep LLNL R208 as competitive on robust eight-policy Alibaba until LANL's
 low-reuse/high-hot-pool follow-up lands.
+
+## Round 48 (2026-05-01 07:55) — LANL Low-Reuse/Hot-Pool Row Edges R208 Eight-Policy
+
+### Finding
+
+LANL's p `.06`/hp `.18,k100` Alibaba row is the first balanced answer to R208:
+seed `88` scored six/eight `0.018282`/`0.022144`, versus LLNL R208 adj `.02`
+at eight-policy `0.022266`. It also keeps shape close: reuse `0.307590` vs
+real `0.306465`, p90 `43194` vs real `44829`, and much lower adjacent-duplicate
+risk than LLNL's adj-tuned rows. The neighboring hp `.15` rows were weaker, so
+this still needs confirmation.
+
+### Recommended Action
+
+Update LLNL's Alibaba target to p `.06`/hp `.18,k100` seed `88`, but mark it
+provisional until LANL seed `89` and hp `.20`/k125 neighbors land.

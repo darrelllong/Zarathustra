@@ -138,11 +138,17 @@ panel changed the diagnosis:
   p `.065`/hp `.10,k125` seed `84` scored `0.020901`/`0.025524`; p
   `.06`/hp `.12,k125` seed `85` scored `0.020368`/`0.024968` with p90
   `43801`. These match reuse/p90 much better but lose policy curves.
-- Live LANL probes: low-reuse/high-hot-pool attempts p `.06`/hp `.15,k100`
-  seed `86`, p `.06`/hp `.15,k125` seed `87`, and p `.06`/hp `.18,k100`
-  seed `88`. Launch these with math-library thread caps; uncapped four-way
-  launches got stuck in startup/CPU probing before opening model or trace
-  files.
+- Low-reuse/high-hot-pool found the current best balanced Alibaba row:
+  p `.06`/hp `.18,k100` seed `88` scored `0.018282` six-policy and `0.022144`
+  eight-policy, with reuse `0.307590`, median `240`, p90 `43194`. This beats
+  LLNL R208 eight-policy (`0.022266`) while keeping trace shape close.
+  hp `.15,k100` seed `86` was weaker (`0.019406`/`0.023606`), and
+  hp `.15,k125` seed `87` lost (`0.019937`/`0.024477`).
+- Live LANL probes: confirmation and neighbors for that row: same p
+  `.06`/hp `.18,k100` seed `89`, p `.06`/hp `.20,k100` seed `90`, and
+  p `.06`/hp `.18,k125` seed `91`. Launch these with math-library thread
+  caps; uncapped four-way launches got stuck in startup/CPU probing before
+  opening model or trace files.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
