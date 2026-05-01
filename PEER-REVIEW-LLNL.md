@@ -26,7 +26,7 @@ GAN basin remains closed around the bad frozen-bundle scores.
 On the exact LANL Tencent 1M slice and the same fixed caps/policies, LANL's
 post-decode deep reuse row scored mean HRC-MAE `0.054073`, still ahead of
 LLNL's reported `0.0925`; the current LANL hot-pool row improves that to
-`0.047074`. LANL's rank-scale row improves LRU but worsens SIEVE/ARC/CAR, so
+`0.046657`. LANL's rank-scale row improves LRU but worsens SIEVE/ARC/CAR, so
 LLNL's strongest lesson is methodological: promotion must be six-policy-gated,
 not single-policy-gated.
 

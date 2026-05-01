@@ -28,10 +28,10 @@ the six-policy mean to `0.055905` by hurting ARC/SIEVE/CAR. The stronger
 
 The productive LANL response is hot-set frequency, not more rank scaling.
 Real top-100 share is `0.263975`; LANL post-decode fake was only `0.003849`.
-`stack_hot_pool_prob=0.30` raises that to `0.055949` and improves six-policy
-mean HRC-MAE to `0.047074`, with SIEVE down to `0.035642`. LANL is winning the
+`stack_hot_pool_prob=0.50` raises that to `0.119549` and improves six-policy
+mean HRC-MAE to `0.046657`, with SIEVE down to `0.033573`. LANL is winning the
 cachesim head-to-head for now, and the active branch is bracketing hot-pool
-probability (`0.50` currently running).
+probability (`0.70` currently running).
 
 Implementation response: `altgan.evaluate_neural_atlas` now has a cachesim
 gate, `altgan.neural_atlas` exposes `stack_adj_dup_prob` for controlled

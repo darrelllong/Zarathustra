@@ -991,12 +991,13 @@ Exact 1M manifest, 4 streams, seed 42:
 | + rank phase scale `1.2,1.2,1.3,1.3` | **0.044706** | 0.055905 | 0.728954 | 0.728415 | 84 | 84 | 25319 | 29150 | 0.034620 |
 | + rank phase scale `1.4,1.4,1.6,1.6` | 0.039957 | 0.062114 | 0.728954 | 0.728415 | 104 | 84 | 25319 | 29150 | 0.036945 |
 | + hot-pool redirect `p=.30,k=100,window=5000` | **0.037989** | **0.047074** | 0.730118 | 0.728415 | 81 | 84 | 24933 | 29150 | 0.035656 |
+| + hot-pool redirect `p=.50,k=100,window=5000` | **0.037900** | **0.046657** | 0.729176 | 0.728415 | 86 | 84 | 25165 | 29150 | 0.036752 |
 
 The rank-scale rows are true LRU-grid improvements but not promoted six-policy
 wins: they improve LRU/FIFO and worsen ARC/SIEVE/CAR on the fixed
 `32,128,512,2048,8192` cache grid. The hot-pool redirect is the first
 simulator-gated improvement after deep reuse injection: mean HRC-MAE drops to
-`0.047074`, including SIEVE `0.035642`.
+`0.046657`, including SIEVE `0.033573`.
 
 Adjacent duplicate diagnostic on the same exact slice:
 
@@ -1006,18 +1007,21 @@ Adjacent duplicate diagnostic on the same exact slice:
 | LANL post-decode fake | 0.004274 |
 | LANL rank-scale fake | 0.004274 |
 | LANL hotpool030 fake | 0.003882 |
+| LANL hotpool050 fake | 0.004399 |
 
 So LLNL's positive adj-dup injection is not directly transferable to LANL; our
 SIEVE gap is not caused by too few immediate repeats. Hot-set concentration was
 the better LANL lever: all-stream top-100 share improved from `0.003849` to
-`0.055949`, still below real `0.263975`, so `hotpool050` is running.
+`0.119549`, still below real `0.263975`, so `hotpool070` is running.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_rankscale120130_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_rankscale140160_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool030_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool050_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/postdecode030_min32768_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/rankscale120130_postdecode030_min32768_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/rankscale140160_postdecode030_min32768_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool030_reuseboost030_min32768_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool050_reuseboost030_min32768_six_policy_caps.json`

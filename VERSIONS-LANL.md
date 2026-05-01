@@ -14,8 +14,8 @@ run the simulator directly via `--cachesim-bin`.
 Current status:
 - Best LANL six-policy fixed-cap row remains post-decode deep reuse injection:
   mean HRC-MAE `0.054073` across LRU/ARC/FIFO/SIEVE/SLRU/CAR at caps
-  `32,128,512,2048,8192`; after hot-pool redirect `p=0.30`, the best row is
-  now `0.047074`.
+  `32,128,512,2048,8192`; after hot-pool redirect `p=0.50`, the best row is
+  now `0.046657`.
 - Rank phase scale `1.2,1.2,1.3,1.3` improves the old evaluator HRC-MAE from
   `0.051810` to `0.044706`, and exactly matches stack median `84`, but worsens
   the six-policy mean to `0.055905`; it is a diagnostic row, not promoted.
@@ -24,9 +24,9 @@ Current status:
   LRU/FIFO want rank scaling, ARC/SIEVE/CAR do not.
 - `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
-- `stack_hot_pool_prob` is now the live branch. `p=0.30` raises top-100 access
-  share from `0.003849` to `0.055949` and cuts SIEVE HRC-MAE to `0.035642`;
-  `p=0.50` is running to bracket the remaining hot-set gap.
+- `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access
+  share from `0.003849` to `0.119549` and cuts SIEVE HRC-MAE to `0.033573`;
+  `p=0.70` is running to bracket the remaining hot-set gap.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

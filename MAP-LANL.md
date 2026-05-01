@@ -217,10 +217,10 @@ Important knobs:
   diagnostic knob, not a promoted fix.
 - `stack_hot_pool_prob`, `stack_hot_pool_k`, `stack_hot_pool_window`,
   `stack_hot_pool_weight_power`: redirects ordinary sampled reuses, not deep
-  injected reuses, toward the recent hot set. Current evidence: `p=0.30,k=100`
-  improves six-policy mean HRC-MAE from `0.054073` to `0.047074`, mainly by
-  fixing SIEVE/FIFO/LRU, while top-100 share remains low (`0.0559` vs real
-  `0.2640`). `p=0.50` is running.
+  injected reuses, toward the recent hot set. Current evidence: `p=0.50,k=100`
+  improves six-policy mean HRC-MAE from `0.054073` to `0.046657`, mainly by
+  fixing SIEVE/FIFO/LRU, while top-100 share remains low (`0.1195` vs real
+  `0.2640`). `p=0.70` is running.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
