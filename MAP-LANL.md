@@ -220,7 +220,8 @@ Important knobs:
   injected reuses, toward the recent hot set. Current evidence: `p=0.50,k=100`
   improves six-policy mean HRC-MAE from `0.054073` to `0.046657`, mainly by
   fixing SIEVE/FIFO/LRU, while top-100 share remains low (`0.1195` vs real
-  `0.2640`). `p=0.70` overshot SIEVE/SLRU; `p=0.60` is running.
+  `0.2640`). `p=0.60`/`0.70` both lost to `p=0.50`; the live branch keeps
+  `p=0.50` and raises frequency weight power to `2.0`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
