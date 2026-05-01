@@ -27,7 +27,9 @@ Current status:
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access
   share from `0.003849` to `0.119549` and cuts SIEVE HRC-MAE to `0.033573`;
   `p=0.60` and `p=0.70` both lost to `p=0.50`, so the live branch keeps
-  `p=0.50` and raises frequency weight power to `2.0`.
+  `p=0.50`. Frequency weight power `2.0` is closed negative; it collapsed
+  stack median to `14` and raised adjacent duplicates to `0.116900`. The live
+  branch now widens the hot window to `50000`.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

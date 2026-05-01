@@ -31,8 +31,8 @@ Real top-100 share is `0.263975`; LANL post-decode fake was only `0.003849`.
 `stack_hot_pool_prob=0.50` raises that to `0.119549` and improves six-policy
 mean HRC-MAE to `0.046657`, with SIEVE down to `0.033573`. LANL is winning the
 cachesim head-to-head for now, and the active branch is bracketing hot-pool
-shape (`0.60`/`0.70` lost to `0.50`; `0.50` with weight power `2.0` is
-currently running).
+shape (`0.60`/`0.70` lost to `0.50`; weight power `2.0` catastrophically
+over-concentrated; `0.50` with window `50000` is currently running).
 
 Implementation response: `altgan.evaluate_neural_atlas` now has a cachesim
 gate, `altgan.neural_atlas` exposes `stack_adj_dup_prob` for controlled
