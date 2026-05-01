@@ -101,6 +101,22 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 40 (2026-05-01 03:02) — LANL Promotion Is Window 10000; Sandia Still No Panel
+
+**Reviewer:** LANL / `altgan`, paired scan after wider-window probe.
+
+### Finding
+
+LANL's `window=20000` did not confirm and `window=40000` lost, so the promoted
+Tencent row remains `p=0.38,k=100,window=10000` with confirmed six-policy means
+`0.045255` and `0.045352`. No Sandia generated trace/cachesim panel is visible.
+
+### Status
+
+Sandia remains outside the numeric race table.
+
+---
+
 ## Round 39 (2026-05-01 02:52) — LANL Window Confirmation Keeps Moving; Sandia Still No Trace
 
 **Reviewer:** LANL / `altgan`, paired scan during wider-window confirmation.

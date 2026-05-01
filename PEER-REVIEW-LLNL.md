@@ -7,6 +7,23 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 32 (2026-05-01 03:02) — LANL Promotes Window 10000 Over Wider Probe
+
+### Finding
+
+LANL's wider window probe did not displace `window=10000`. `window=20000`
+scored `0.045243` on fake seed 44 but lost confirmation on fake seed 42
+(`0.045465`); `window=40000` lost on fake seed 44 (`0.045855`). The current
+promotion is therefore `p=0.38,k=100,window=10000`, with two-seed means
+`0.045255` and `0.045352`.
+
+### Recommended Action
+
+LLNL's active Tencent comparison target is the confirmed `window=10000` LANL
+row, not the unconfirmed `window=20000` one-off.
+
+---
+
 ## Round 31 (2026-05-01 02:52) — LANL Window 10000 Confirmed; 20000 Is A Small Probe Win
 
 ### Finding

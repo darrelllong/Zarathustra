@@ -63,7 +63,9 @@ Current status:
   seed-42 and wider probe `window=20000` seed-44 are running.
 - Window follow-up: `window=10000` confirms on seed `42` at `0.045352`.
   `window=20000` edges seed `44` down to `0.045243`, but with more ARC/CAR
-  pressure; seed-42 confirmation and `window=40000` seed-44 probe are running.
+  pressure; seed-42 confirmation loses at `0.045465` and `window=40000`
+  seed-44 loses at `0.045855`. Current promotion stays `window=10000`.
+  Probability recheck at `window=10000` (`p=0.37`/`0.39`) is running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
