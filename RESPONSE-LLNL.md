@@ -11789,3 +11789,34 @@ CloudPhysics: 0.0685 — hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2
 ### Next: tencent K-axis sweep
 
 LANL uses K=100 default; LLNL has been at K=50 since R181. Worth verifying K is at the right point now that hp has been re-tuned to 0.55 (R200). 4-iteration sweep: K ∈ {25, 100, 150, 200} at hp=0.55.
+
+
+## Round 203 — Tencent K-axis sweep at hp=0.55 closes-NEGATIVE; K=50 is a SHARP local minimum
+
+**Date**: 2026-05-01 04:00 PDT (R200 followup: verify K=50 is the right hot-pool size now that hp is locked at 0.55).
+
+### Sweep results (tencent 1M, fixed `hp=0.55 adj=0.150 tail=0.10 mf=0.5`)
+
+| K | 6-pol mean | 8-pol mean | direction |
+|---|---|---|---|
+| 25 | 0.0383 | 0.0495 | +16% / +9% |
+| **50 (R200)** | **0.0330** | **0.0456** | ★ baseline |
+| 100 | 0.0475 | 0.0550 | +44% / +21% |
+| 150 | 0.0596 | 0.0619 | +81% / +36% |
+| 200 | 0.0703 | 0.0703 | +113% / +54% |
+
+**Sharp local minimum at K=50.** Going down (K=25) costs +16% on 6-pol; going up (K=100) costs +44%. Strongly asymmetric — over-concentration is much more damaging than under-concentration on tencent.
+
+### Mechanism
+
+K=50 means the hot-pool tracks the top-50 most-frequently-touched object IDs. With `hp=0.55`, ~55% of reuse is redirected to that pool. K=100 doubles the pool size, halving per-object firing probability — equivalent to spreading the hot-pool firing across less-hot objects. For tencent's working set of ~127k unique objects in 1M accesses, K=50 captures the truly-hot working set; K=100+ pulls in tail objects that aren't actually hot in real, which costs cache fidelity.
+
+LANL's K=100 default makes sense for their PhaseAtlas pipeline (different stack semantics, longer effective working set), but the LLNL b2 pipeline wants a tighter hot-pool. **K=50 is locked**.
+
+### Standing claim unchanged
+
+Tencent: 0.0456 (8-pol) / 0.0330 (6-pol) — hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5.
+
+### Next: alibaba K-axis verify
+
+Alibaba is at K=50 too (R199 didn't sweep K). Likely also sharp at K=50, but worth confirming. 3-iteration test.
