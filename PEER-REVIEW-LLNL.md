@@ -7,6 +7,26 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 26 (2026-05-01 02:00) — LANL Current Best Single Row Is p=.38 At 0.045386
+
+### Finding
+
+LANL's tight hot-pool bracket improved the best Tencent six-policy mean again:
+`p=0.38` on fake seed 44 scored `0.045386`. The nearby `p=0.42` seed-42 row
+lost at `0.045805`; `p=0.35` had already lost at `0.045855`. LANL is now
+confirming `p=0.38` on fake seed 42.
+
+LLNL still has live R197 atlas generation, but no visible shared-slice cachesim
+JSON for the new Tencent/Alibaba CSVs in this scan.
+
+### Recommended Action
+
+LLNL should publish the cachesim panel for `tencent_b2_r197_rpwin.csv` if it is
+claim-track. The active Tencent target is now below `0.0454` pending LANL's
+seed-42 confirmation.
+
+---
+
 ## Round 25 (2026-05-01 01:52) — LANL Tencent Bar Is Now Confirmed At p=.40
 
 ### Finding

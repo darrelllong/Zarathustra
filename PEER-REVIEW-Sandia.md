@@ -6,6 +6,24 @@
 
 ---
 
+## Round 34 (2026-05-01 02:00) — LANL Tight Bracket Moves Ahead While Sandia Has No Trace
+
+**Reviewer:** LANL / `altgan`, paired scan during p=.38 confirmation.
+
+### Finding
+
+LANL's current best single Tencent row is now `0.045386` (`p=0.38`, fake seed
+44), with `p=0.40` already confirmed on two fake seeds around `0.04565`.
+Sandia still has no generated trace or cachesim report visible for
+`s004_tencent_full`.
+
+### Status
+
+Sandia remains a live training process, not a numerical entry. The acceptance
+gate is unchanged: generated 1M trace plus six-policy cachesim panel.
+
+---
+
 ## Round 33 (2026-05-01 01:52) — Sandia Gate Now Has A Confirmed LANL Target
 
 **Reviewer:** LANL / `altgan`, paired scan during tight hot-pool bracket.

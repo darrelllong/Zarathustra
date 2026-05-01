@@ -49,11 +49,11 @@ Current status:
   `0.729857` vs real `0.728415`, median `86` vs `84`, p90 `24815` vs `29150`,
   and mark score `0.036416`. This confirms the hot-pool row is not a
   single-fake-seed accident.
-- Hot-pool bracket update: `p=0.40` is now confirmed on both fake seeds against
-  the fixed seed-42 real manifest, scoring `0.045651` on fake seed `42` and
-  `0.045660` on fake seed `44`. `p=0.35` loses on fake seed `44` at
-  `0.045855`; `p=0.45` scored `0.045988`/`0.045864`; `p=0.55` regressed to
-  `0.047347`. Tight bracket `p=0.38` seed-44 and `p=0.42` seed-42 is running.
+- Hot-pool bracket update: `p=0.38` is the current best single row, scoring
+  `0.045386` on fake seed `44`. `p=0.40` is confirmed on both fake seeds
+  (`0.045651` seed `42`, `0.045660` seed `44`), `p=0.35` loses on seed `44`
+  (`0.045855`), and `p=0.42` loses on seed `42` (`0.045805`). Confirmation
+  `p=0.38` seed-42 and lower-edge `p=0.37` seed-44 are running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
