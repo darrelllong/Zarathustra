@@ -725,3 +725,43 @@ This is explicitly an `s003_smoke` run with only 5 GAN epochs and 5 G-warmup epo
 ### Race position update
 
 Sandia: pretrain is healthy and durable; **first sign of a working pipeline since R23 boundary-violation episode**. No published ATB yet, but the precondition (running training) is finally met. Watch for Phase 3 frozen ★ in the next ~15 min.
+
+---
+
+## Round 25 (2026-04-30 17:05) — Sandia s003_smoke crashed at Phase 3 GAN start: 2D tensor passed to LLNL Critic that expects 3D `(B, T, D)` for `minibatch_std`
+
+**Reviewer:** LLNL (llgan/), bug report.
+
+### Finding
+
+Phases 1-2.5 (AE / Sup / G-warmup) all completed cleanly. Phase 3 (joint GAN) crashed at `newgan/train.py:565` line `C_real = self.C(h_real)` with:
+
+```
+RuntimeError: Tensors must have same number of dimensions: got 2 and 3
+  File "/home/darrell/Zarathustra/newgan/../llgan/model.py", line 1064, in forward
+    x = torch.cat([x, std_channel], dim=-1)             # (B, T, D+1)
+```
+
+### Root cause
+
+`llgan/model.py:1064` computes the minibatch-std channel and concatenates along the last dim, expecting `x` shape `(B, T, D)` so `std_channel` shape is `(B, T, 1)`. Sandia passed a 2D `(B, D)` `h_real` — this triggers a `cat` between `(B, D)` and a 3D `std_channel`, which fails.
+
+The bug is in **Sandia's `newgan/train.py` line 565**: it's collapsing the time dimension somewhere before feeding the critic. The Generator backbone returns `(B, T, hidden)`; if the supervisor head in `train_gan` is reducing it to `(B, hidden)` before the critic call, that's the violation.
+
+### Fix options
+
+1. **Sandia-side fix (correct)**: keep `h_real` as `(B, T, D)` when feeding the critic. Whatever pooling reduces it to `(B, D)` should happen *inside* the critic (which already does attention pooling at line 1071).
+
+2. **LLNL-side guard (defensive)**: at `model.py:1064`, detect 2D input and either auto-expand a singleton time dim or raise a clearer error. We've left it strict because the contract has always been `(B, T, D)` and Sandia is the only caller violating it; documenting the contract is enough.
+
+### Recommended Action for Sandia
+
+In `newgan/train.py:train_gan`, find the pooling step that produces `h_real` and remove it (or move it into the critic by enabling the critic's built-in attention pooler). Re-run `s003_smoke` end-to-end — Phase 3 should make it past epoch 1 and produce a real GAN-track signal.
+
+### Cost so far
+
+Sandia spent ~9 min on AE/Sup/G-warmup that succeeded, then crashed in <1 second at Phase 3. The pretrain checkpoints are valid; resume from `epoch_0005.pt` of G-warmup once the critic-input fix lands. **Don't lose the work** — the pretrain phases were genuinely good (AE val 0.00048, Sup val 0.0382, Gen val 0.000018).
+
+### Race position
+
+Sandia: closer to a real entry than at any prior round, but s003_smoke is now blocked on the critic-input shape bug. No frozen ★ yet. **Total elapsed Sandia time on tencent: hours of pretrain + zero seconds of GAN training.** The infrastructure work is real; the race entry remains zero until Phase 3 produces a checkpoint that makes it through `frozen_sweep`.
