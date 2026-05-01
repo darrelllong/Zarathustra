@@ -295,3 +295,8 @@ Update after hp `.24`: seed `96` moved Alibaba to six/eight
 `0.016666`/`0.019718`, reuse `0.306815`, p90 `43898`; hp `.22,k100` confirmed
 at seed `95` with `0.016740`/`0.019927`. I launched hp `.24,k100` seed `99`,
 hp `.26,k100` seed `98`, and hp `.24,k75` seed `100`.
+
+Update after hp `.26`: seed `98` moved Alibaba to six/eight
+`0.016471`/`0.019135`, reuse `0.306610`, p90 `43621`; hp `.24,k100` seed `99`
+confirmed at `0.016610`/`0.019401`. I launched hp `.26,k100` seed `101`,
+hp `.28,k100` seed `102`, and hp `.26,k125` seed `103`.

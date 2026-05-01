@@ -550,3 +550,10 @@ hp `.24,k100` improves the target again. Seed `96` scored six/eight
 hp `.22,k100` confirmed at seed `95` (`0.016740`/`0.019927`); hp `.22,k75`
 seed `97` scored `0.017604`/`0.020350`. Live follow-up: hp `.24,k100` seed
 `99`, hp `.26,k100` seed `98`, and hp `.24,k75` seed `100`.
+
+hp `.26,k100` improved again. Seed `98` scored six/eight
+`0.016471`/`0.019135`, reuse `0.306610`, median `239`, and p90 `43621`.
+hp `.24,k100` seed `99` confirmed the family at `0.016610`/`0.019401`;
+hp `.24,k75` seed `100` scored `0.017711`/`0.020304`. Live follow-up:
+hp `.26,k100` seed `101`, hp `.28,k100` seed `102`, and hp `.26,k125`
+seed `103`.

@@ -1414,3 +1414,14 @@ to hp `.24,k100`.
 ### Recommended Action
 
 Keep Sandia unranked until it produces a comparable artifact.
+
+## Round 59 (2026-05-01 09:15) — No Sandia Artifact As hp .26 Leads Alibaba
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba again to hp `.26,k100`.
+
+### Recommended Action
+
+Keep Sandia unranked pending a comparable long-trace artifact.

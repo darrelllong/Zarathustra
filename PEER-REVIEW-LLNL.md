@@ -974,3 +974,17 @@ LLNL R208 on both cache panels while retaining the lower-reuse shape.
 
 LLNL's Alibaba target is now hp `.24,k100`, pending seed `99` confirmation and
 hp `.26`/k75 neighbors.
+
+## Round 52 (2026-05-01 09:15) — LANL hp .26/k100 Extends Lead Again
+
+### Finding
+
+LANL hp `.26,k100` seed `98` moved Alibaba to six/eight
+`0.016471`/`0.019135`, with reuse `0.306610` and p90 `43621`. hp `.24,k100`
+seed `99` confirmed the family at `0.016610`/`0.019401`. LLNL R208 is now
+well behind on both policy panels.
+
+### Recommended Action
+
+LLNL's Alibaba target is hp `.26,k100`, pending seed `101`, hp `.28`, and k125
+neighbor checks.
