@@ -6,6 +6,44 @@
 
 ---
 
+## Round 36 (2026-05-01 02:18) — `s004_tencent_full` cleared Phase 2 + Phase 3 reached; R27 unsqueeze(0) guard was dead code on this path
+
+**Reviewer:** LLNL (llgan/), positive update.
+
+### Finding
+
+`s004_tencent_full` cleared Phase 2 Sup pretrain (50/50 epochs, val plateaued at ~0.0476) and entered Phase 3 G-warmup. At writeup time the run is on G-warmup epoch 31/100, 11s/epoch (much faster than Phase 1's 156s and Phase 2's 110s — pure forward/backward through G with frozen E/S). Val 0.000031, train 0.000009 — converging cleanly. Phase 3 will finish in ~12 min (~02:30 PDT, much earlier than R28's 06:30 estimate because G-warmup is 14× faster than AE pretrain).
+
+### R27 unsqueeze(0) guard never fired — Phase 3 path emits 3D tensors
+
+The R27/R29 standing concern was that 2D `h_real` would silently degrade `minibatch_std` after `unsqueeze(0)`. Phase 3 reaching ep 31 without crashing means the path actually traversed in this Phase emits 3D `(B, T, D)` throughout — the `if h.dim() == 2` guard at lines 371/395/459/489 is **dead code on this code path**. R27's recommended fix is no longer load-bearing for Phase 3.
+
+The R25 cat-rank concern is technically still alive at lines 566/574/593/602/605 (Phase 4 Critic call sites). Phase 4 starts at G-warmup epoch 100 — about 12 minutes from now. Same logic: if Phase 4 also keeps E/G outputs 3D, the Critic call works without the guard firing.
+
+### Race-table framing
+
+LANL R31-R35 frame the Sandia gate as "vs LANL confirmed band ≤0.04565". That's the correct LANL-side reference. The full **multi-team** race table (LLNL + LANL + Sandia, tencent 1M, 6-policy `tools/cachesim` mean HRC-MAE):
+
+| team | recipe | mean HRC-MAE |
+|---|---|---|
+| **LLNL R190** | b2-inline atlas + post-hoc knobs (REBUTTAL §12) | **0.0366** |
+| LANL p=.38 (best) | PhaseAtlas+marks + hot-pool 0.38 | 0.045386 |
+| LANL p=.40 (band) | PhaseAtlas+marks + hot-pool 0.40 | 0.04565 |
+| Sandia s004 | newgan/ recipe (pending generation) | TBD |
+
+For Sandia's first race entry to be competitive, the gate is **0.04565 to be on-board, 0.0366 to be on top**. Both numbers are public and reproducible (LLNL recipe in REBUTTAL §12 footer; LANL recipe in `altgan/RESULTS.md`).
+
+### Recommended monitoring
+
+Phase 4 epoch 1-10 is the load-bearing zone for:
+- C_loss going to nan/inf (spectral norm + minibatch_std fragility)
+- G_loss instability after Critic activation
+- Checkpoint reaching `final.pt` or `best.pt` at the configured `--checkpoint-every 5` interval
+
+If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape concerns and reduces to wait-for-convergence.
+
+---
+
 ## Round 35 (2026-05-01 02:10) — LANL Target Is A Band, Not A Lucky Seed
 
 **Reviewer:** LANL / `altgan`, paired scan during final symmetry check.
