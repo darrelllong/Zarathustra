@@ -13175,3 +13175,101 @@ R225 through R230 represent 7 consecutive closed-NEGATIVE attempts to lift any s
 
 - LANL: same micro-iteration.
 - Sandia: brief delivered; awaiting R38 fix.
+
+## Round 231 — WaveStitch jitter implementation + multi-seed probe: closes-NEGATIVE; tencent unaffected, alibaba +10% regression
+
+**Date**: 2026-05-01 16:35 PDT.
+
+### Implementation
+
+Added `--hot-pool-refresh-jitter` flag (default off → bit-identical to prior code; verified by md5sum on tencent_b2_r206_seed43 reference CSV). When on, hot-pool refresh interval drawn from Poisson(200) instead of fixed 200. `last_refresh_step = -hot_pool_refresh_every` initialization keeps the step-0 decay factor at `decay^200` (matches old fixed-interval semantic exactly). Advocatus Diaboli pass caught a step-0 decay-factor regression in the first commit; fix applied and re-verified.
+
+### Multi-seed probes (4 seeds each, all other knobs at corpus lock)
+
+**Tencent** (R206 lock, hp=0.55 highest hot-pool dependence):
+
+| seed | jitter=OFF (R206) | jitter=ON (R231) |
+|---|---|---|
+| 42 | (existing claim) | 0.0304 |
+| 43 | 0.0305 (R206) | 0.0306 |
+| 44 | (existing claim) | 0.0306 |
+| 45 | (existing claim) | 0.0305 |
+| **mean** | **0.0305** | **0.0305** |
+
+Identical multi-seed mean. **Jitter has zero effect on tencent.**
+
+**Alibaba** (R221 lock, hp=0.45):
+
+| seed | R221 (jitter=OFF) | R231 (jitter=ON) | Δ |
+|---|---|---|---|
+| 42 | 0.0211 | 0.0210 | −0.5% |
+| 43 | 0.0210 | 0.0232 | **+10%** |
+| 44 | 0.0202 | 0.0245 | **+21%** |
+| 45 | 0.0203 | 0.0211 | +4% |
+| **mean** | **0.0204** | **0.0225** | **+10%** |
+| range | ~0.0009 | 0.0035 | **4× wider** |
+
+**Jitter actively hurts alibaba: +10% mean regression and 4× wider seed range.**
+
+### Reading
+
+WaveStitch jitter introduces variance in *which* objects populate the top-K hot pool at any given time. Two regimes:
+- **Tencent (hp_prob=0.55, frequent hot-pool hits):** the jitter averages out across many hot-pool draws per stream. Mean unchanged; seed range unchanged.
+- **Alibaba (hp_prob=0.45, longer streams to higher IRDs):** longer streams → fewer-but-deeper hot-pool refresh cycles → each Poisson draw matters more. The Poisson timing aligns differently with the real-trace IRD shape on different seeds → seed-stability collapses.
+
+The fixed-200 refresh wasn't a periodic *artifact* — it was a *stabilizer*. Removing the periodicity exposes second-order sensitivity to refresh alignment that the deterministic schedule masked.
+
+### Skipping CP probe
+
+Both higher-hp corpora showed the pattern (no help on tencent, hurts on alibaba). CP at hp=0.15 has weakest hot-pool dependence; jitter effect would be even smaller. Standing claim 0.0338 not at risk; CP probe skipped to conserve sweep budget.
+
+### Implementation kept (default off)
+
+`--hot-pool-refresh-jitter` flag remains in the CLI for completeness and future research. Default off; existing R206/R221/R224 claims unaffected.
+
+### Session summary (R225 → R231: 9 consecutive closes-NEGATIVE)
+
+| round | hypothesis | result |
+|---|---|---|
+| R225  | alibaba 50k → 100k records-per-file (h=96 ep=600) | +12× regression |
+| R225b | alibaba 100k records-per-file (h=64 ep=300) | +8× regression (capacity-tune partial recovery, not fix) |
+| R226  | CP hp re-sweep at R224 adj=0.35 lock | hp=0.15 invariant |
+| R227  | CP tail-reuse + recent-pool re-sweep at R224 lock | both invariant |
+| R228  | tencent ext-bins adj re-sweep (any adj) | +48% best vs original-bins |
+| R229  | alibaba adj re-sweep on R221 atlas | adj=0.05 invariant |
+| R230  | alibaba --rank-ar (h=96 ep=600 head replacing PMF) | +9× regression |
+| R230b | alibaba --rank-ar minimal capacity (h=32 ep=200) | +7× regression |
+| R231  | WaveStitch hot-pool refresh jitter | tencent unaffected, alibaba +10% |
+
+**Standing claims definitively defended.** Three-way knob audit (CP completed; alibaba adj checked; tencent invariant on its lock) plus capacity, binning, post-hoc-net, and refresh-schedule axes all produced no improvement.
+
+### Three load-bearing findings of the R225-R231 session
+
+1. **Empirical PMF lookup is a regularizer.** All "more learned capacity" attempts (R225 more-data, R225b smaller-cap-more-data, R230 rank-AR, R230b small-rank-AR) catastrophically regress. The empirical-PMF fallback handles out-of-distribution cond vectors at generate time; learned replacements extrapolate badly.
+2. **Stale-lock playbook is corpus-conditional.** It paid off on CP (R224 +24%) because CP's R209 lock was set on original-bins. On alibaba and tencent, the locks were already on the new architecture, so re-tuning had nothing to recover. Mechanism: only adj cross-couples with binning; hp/tail-reuse/recent-pool target corpus-intrinsic properties.
+3. **Periodic refresh is a stabilizer, not an artifact.** WaveStitch jitter (Poisson(200)) had no benefit and a measurable cost on alibaba. The fixed-200 schedule was masking second-order sensitivity that becomes visible under jitter.
+
+### Race position (post-R231)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 (R206 multi-seed) | ~0.0303 multi-seed | tied |
+| Alibaba (6-pol) | 0.0204 (R221 multi-seed) | ~0.014 single-seed best | LANL +20% multi-seed |
+| CloudPhysics (8-pol) | **0.0338** (R224 multi-seed) | n/a | **LLNL alone (−49% vs R209 baseline this session)** |
+
+R193-R231 net session ledger: CP −49% (largest LLNL improvement of the campaign), Tencent unchanged, Alibaba unchanged. The R220 IRD diagnostic plus R224 stale-lock retune are this session's highest-impact contributions.
+
+### Next move
+
+Race-mode sweep budget exhausted on existing axes. Real lift requires research-grade architecture work:
+- New cond features (hierarchical, retrieval-memory, learned per-stream embeddings)
+- Per-stream atlas (vs global)
+- Cache-aware fit loss (target HRC-MAE directly during training, not just transition NLL)
+- Trace generation policy that learns post-hoc knob settings rather than using fixed lookups
+
+Deferring further race-mode tick until user steers the next big swing.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: brief delivered.
