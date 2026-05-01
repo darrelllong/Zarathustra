@@ -11663,3 +11663,75 @@ Tencent re-sweep is cheapest and most likely to yield a refinement on the headli
 
 - LANL: commits `0344222`, `b5a9cbb`, `dcec6e8` refine hot-pool prob band (now 0.0454-0.0457 across p=.37-.40, K-axis sweep negative). LLNL R190 6-policy 0.0366 still **21% ahead**. **No rebuttal post** — LANL micro-iterating, no methodology change.
 - Sandia: `s004_tencent_full` **CRASHED at Phase 4 epoch 1** with two distinct bugs (R38 posted): minibatch_std degeneracy from `unsqueeze(0)` (R27 confirmed for Phase 4 path) + cudnn RNN backward through eval-mode S. Off race table; G-warmup checkpoint durable; resume path documented in R38.
+
+
+## Round 200 — Tencent hp re-sweep finds a HIGHER optimum at hp=0.55: 8-pol 0.0456 / 6-pol 0.0330 (-7.3% / -9.8% on R190 lock); LANL gap widens to 27%
+
+**Date**: 2026-05-01 03:05 PDT (R199 alibaba result motivated re-checking tencent's hp axis above the prior R190 0.40 lock).
+
+### Why this sweep
+
+R190 had locked tencent at `hp=0.40` based on **adj-dup** sweep saturation (R189-R190), but never explicitly swept hp itself. R199 found alibaba peaks at hp=0.60 (much higher than tencent's locked 0.40). Cross-corpus consistency check: does tencent also have an unfound higher-hp optimum?
+
+Test design: hold all other knobs at R190 lock (`K=50 adj=0.150 tail=0.10 mf=0.5`, no recent-pool). Sweep `hp ∈ {0.45, 0.50, 0.55, 0.60}`. Real ref: same `tencent_phaseatlas_marks_e20_catw025_real_manifest_seed42_1M_eval_real.csv` LANL uses.
+
+### Results
+
+| hp | 8-pol mean | 6-pol mean | direction |
+|---|---|---|---|
+| 0.40 (R190) | 0.0492 | 0.0366 | (R190 baseline) |
+| 0.45 | 0.0471 | 0.0344 | -4.3% / -6.0% |
+| 0.50 | 0.0461 | 0.0331 | -6.3% / -9.6% |
+| **0.55** | **0.0456** | **0.0330** | **-7.3% / -9.8%** ★ |
+| 0.60 | 0.0464 | 0.0335 | -5.7% / -8.5% |
+
+Clean U-shape minimum at hp=0.55 (or possibly hp=0.50; difference of 0.0001 on 6-pol is within MC noise — both significantly better than R190's 0.40).
+
+### Updated tencent standing claim
+
+| metric | R190 (hp=0.40) | **R200 (hp=0.55)** |
+|---|---|---|
+| 8-policy mean | 0.0492 | **0.0456** |
+| 6-policy mean (LANL gate) | 0.0366 | **0.0330** |
+| Gap to LANL `p=.38 window=10000 → 0.045255` | 19.0% ahead | **27.1% ahead** |
+
+R200 promotes tencent to `hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5` (no recent-pool).
+
+### Cross-corpus hp peak: spectrum confirmed
+
+| corpus | optimal hp | 8-policy mean |
+|---|---|---|
+| **CloudPhysics** | **0.15** | 0.0685 |
+| **Tencent** | **0.55** | 0.0456 |
+| **Alibaba** | **0.60** | 0.0231 |
+
+The R199 hypothesis (corpora form a burst-density spectrum) tightens. Tencent and alibaba both want high hot-pool concentration (0.55 vs 0.60 — within 9% of each other), separating clearly from CloudPhysics' scan-like profile (hp=0.15). The two block-storage corpora are similar; CloudPhysics is the outlier.
+
+### Final cross-corpus standing claim
+
+| corpus | mean HRC-MAE (8-pol) | recipe |
+|---|---|---|
+| **Tencent** | **0.0456** (8-pol) / **0.0330** (6-pol) | hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| **Alibaba** | **0.0231** | hp=0.60 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| **CloudPhysics** | **0.0685** | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+**All three corpora at sub-0.07 mean HRC-MAE, with all three winning their respective race surfaces** (LANL ahead by 27% on tencent gate, no peer competitor on alibaba/CloudPhysics).
+
+### Per-policy at tencent R200 hp=0.55 (8-policy panel)
+
+(Awaiting per-policy capture from sweep log; mean already locked)
+
+The 8-pol 0.0456 mean implies **LFU and LIRS large-cap drift is now the dominant residual error** (other 6 policies average ~0.033, but LFU/LIRS pull the 8-pol up). Same pattern as alibaba R199 — the structural LIRS gap is the remaining frontier.
+
+### Next moves
+
+1. **Test recent-pool on tencent at hp=0.55** — R197 found recent-pool hurt tencent at hp=0.40, but the dynamics may differ at hp=0.55. Cheap to verify.
+2. **CloudPhysics hp re-sweep** — R193 picked hp=0.15 *without* recent-pool, but R196 added recent-pool. Joint-optimum may differ.
+3. **LIRS structural improvement** — still the largest single-policy gap.
+
+Most cost-effective next: option 1 (one-iteration test).
+
+### Sandia + LANL pass
+
+- LANL: commits `b5a9cbb`, `0344222`, `dcec6e8`, `477cdfc` push K and window axes. New LANL best: `p=.38 window=10000 seed=44 → 0.045255` 6-pol. **LLNL R200 0.0330 still 27% ahead.** No rebuttal post — LANL methodology unchanged.
+- Sandia: still off (R38 crash unfixed).
