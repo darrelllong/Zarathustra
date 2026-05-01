@@ -11764,3 +11764,28 @@ Tencent's native adj-dup rate (~0.0023) and burst structure are already well-mat
 ### Next: CloudPhysics joint hp re-sweep at rp lock
 
 R193 swept hp at rp=0 (before recent-pool feature existed). R196 swept rp at the R193 hp=0.15 lock. Joint optimum may differ — hp could shift now that rp is non-zero. 4-iteration test.
+
+
+## Round 202 — CloudPhysics joint sweep confirms R196 hp=0.15 is the right point at rp lock; no shift
+
+**Date**: 2026-05-01 03:35 PDT (R201 followup: re-sweep CP hp at the rp=0.10 win=2 lock).
+
+### Sweep results (CloudPhysics 1M, 8-policy mean HRC-MAE; rp=0.10 win=2 fixed)
+
+| hp | mean | direction |
+|---|---|---|
+| 0.10 | 0.0723 | +5.5% |
+| **0.15 (R196 lock)** | **0.0685** | ★ baseline |
+| 0.20 | 0.0703 | +2.6% |
+| 0.25 | 0.0715 | +4.4% |
+| 0.30 | 0.0739 | +7.9% |
+
+Clean U-shape with minimum at hp=0.15. R196 lock confirmed at joint optimum. No shift from R193's hp peak when recent-pool is active.
+
+### Standing claim unchanged
+
+CloudPhysics: 0.0685 — hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2.
+
+### Next: tencent K-axis sweep
+
+LANL uses K=100 default; LLNL has been at K=50 since R181. Worth verifying K is at the right point now that hp has been re-tuned to 0.55 (R200). 4-iteration sweep: K ∈ {25, 100, 150, 200} at hp=0.55.
