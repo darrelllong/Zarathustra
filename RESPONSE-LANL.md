@@ -19,17 +19,24 @@ on the exact LANL 1M Tencent slice, real adjacent duplicates are `0.00234`
 while LANL's current fake already emits `0.00427`.
 
 LANL's current simulator position is stronger but not solved. Post-decode deep
-reuse injection scores six-policy mean HRC-MAE `0.054073`, ahead of LLNL's
-reported `0.0925`. The `1.2,1.2,1.3,1.3` rank-scale variant improves the LRU
-grid (`0.051810` to `0.044706`) and matches median stack distance, but worsens
-the six-policy mean to `0.055905` by hurting ARC/SIEVE/CAR. Therefore LANL is
-winning the cachesim head-to-head for now, but the next promotion must be
-six-policy monotonic rather than LRU-only.
+reuse injection scored six-policy mean HRC-MAE `0.054073`, ahead of LLNL's
+reported `0.0925`. The `1.2,1.2,1.3,1.3` rank-scale variant improved the LRU
+grid (`0.051810` to `0.044706`) and matched median stack distance, but worsened
+the six-policy mean to `0.055905` by hurting ARC/SIEVE/CAR. The stronger
+`1.4,1.4,1.6,1.6` scale pushed that failure harder: LRU `0.030731`, mean
+`0.062114`.
+
+The productive LANL response is hot-set frequency, not more rank scaling.
+Real top-100 share is `0.263975`; LANL post-decode fake was only `0.003849`.
+`stack_hot_pool_prob=0.30` raises that to `0.055949` and improves six-policy
+mean HRC-MAE to `0.047074`, with SIEVE down to `0.035642`. LANL is winning the
+cachesim head-to-head for now, and the active branch is bracketing hot-pool
+probability (`0.50` currently running).
 
 Implementation response: `altgan.evaluate_neural_atlas` now has a cachesim
 gate, `altgan.neural_atlas` exposes `stack_adj_dup_prob` for controlled
-experiments, and deep reuse injection remains a post-decode correction for
-transition rollout.
+experiments, `stack_hot_pool_*` for frequency correction, and deep reuse
+injection remains a post-decode correction for transition rollout.
 
 ---
 

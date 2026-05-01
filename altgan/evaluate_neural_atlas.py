@@ -60,6 +60,14 @@ def _parse_args() -> argparse.Namespace:
                    help="Power shaping for injected reuse ranks; values >1 favor deeper ranks.")
     p.add_argument("--stack-adj-dup-prob", type=float, default=0.0,
                    help="Probability that a sampled reuse emits the current MRU object.")
+    p.add_argument("--stack-hot-pool-prob", type=float, default=0.0,
+                   help="Probability of redirecting an ordinary sampled reuse to the recent hot pool.")
+    p.add_argument("--stack-hot-pool-k", type=int, default=100,
+                   help="Number of recent hot objects eligible for hot-pool reuse.")
+    p.add_argument("--stack-hot-pool-window", type=int, default=5000,
+                   help="Sliding window length used to estimate hot-pool frequency.")
+    p.add_argument("--stack-hot-pool-weight-power", type=float, default=1.0,
+                   help="Power applied to hot-pool frequency weights.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -144,6 +152,10 @@ def main() -> int:
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
         stack_adj_dup_prob=args.stack_adj_dup_prob,
+        stack_hot_pool_prob=args.stack_hot_pool_prob,
+        stack_hot_pool_k=args.stack_hot_pool_k,
+        stack_hot_pool_window=args.stack_hot_pool_window,
+        stack_hot_pool_weight_power=args.stack_hot_pool_weight_power,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
@@ -202,6 +214,10 @@ def main() -> int:
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
         "stack_adj_dup_prob": args.stack_adj_dup_prob,
+        "stack_hot_pool_prob": args.stack_hot_pool_prob,
+        "stack_hot_pool_k": args.stack_hot_pool_k,
+        "stack_hot_pool_window": args.stack_hot_pool_window,
+        "stack_hot_pool_weight_power": args.stack_hot_pool_weight_power,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,

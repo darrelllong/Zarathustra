@@ -11,6 +11,7 @@ Tencent's HRC shape work.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections import Counter, deque
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 import gzip
@@ -85,6 +86,10 @@ class NeuralAtlasModel:
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
         stack_adj_dup_prob: float = 0.0,
+        stack_hot_pool_prob: float = 0.0,
+        stack_hot_pool_k: int = 100,
+        stack_hot_pool_window: int = 5000,
+        stack_hot_pool_weight_power: float = 1.0,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -119,6 +124,10 @@ class NeuralAtlasModel:
         stack_reuse_boost_min_rank = max(int(stack_reuse_boost_min_rank), 0)
         stack_reuse_boost_rank_power = max(float(stack_reuse_boost_rank_power), 1e-6)
         stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
+        stack_hot_pool_prob = float(np.clip(stack_hot_pool_prob, 0.0, 1.0))
+        stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
+        stack_hot_pool_window = max(int(stack_hot_pool_window), 1)
+        stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
             mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
@@ -177,8 +186,13 @@ class NeuralAtlasModel:
             next_new_id = self.max_obj_id + 1 + stream_id * (per_stream + 1_000_003)
             prev_obj = next_new_id
             ts = 0.0
+            hot_counts: Counter[int] = Counter()
+            hot_window: deque[int] = deque()
+            hot_pool: list[tuple[int, int]] = []
 
             for pos in range(per_stream):
+                if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
+                    hot_pool = hot_counts.most_common(stack_hot_pool_k)
                 phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                 if force_phase_schedule and self.n_phase_bins > 1:
                     state = _state_with_phase(state, phase, base_span)
@@ -195,6 +209,18 @@ class NeuralAtlasModel:
                 if wants_reuse and stack:
                     if stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
                         rank = 0
+                    elif (
+                        not boosted_reuse
+                        and stack_hot_pool_prob > 0.0
+                        and hot_pool
+                        and rng.random() < stack_hot_pool_prob
+                    ):
+                        hot_obj = _sample_hot_pool_obj(
+                            hot_pool,
+                            weight_power=stack_hot_pool_weight_power,
+                            rng=rng,
+                        )
+                        rank = stack.index(hot_obj) if hot_obj in in_stack else 0
                     elif boosted_reuse:
                         rank = _boosted_reuse_rank(
                             stack_len=len(stack),
@@ -302,6 +328,14 @@ class NeuralAtlasModel:
                     "stack_distance": effective_stack_distance,
                     "action_class": effective_action_class,
                 })
+                if stack_hot_pool_prob > 0.0:
+                    if len(hot_window) >= stack_hot_pool_window:
+                        old_obj = hot_window.popleft()
+                        hot_counts[old_obj] -= 1
+                        if hot_counts[old_obj] <= 0:
+                            del hot_counts[old_obj]
+                    hot_window.append(int(obj_id))
+                    hot_counts[int(obj_id)] += 1
                 prev_obj = int(obj_id)
                 state = self._next_state(
                     reservoir,
@@ -708,6 +742,19 @@ def _boosted_reuse_rank(
     u = float(rng.random())
     offset = int(np.floor((u ** (1.0 / max(float(rank_power), 1e-6))) * span))
     return min(lo + offset, int(stack_len) - 1)
+
+
+def _sample_hot_pool_obj(
+    hot_pool: Sequence[tuple[int, int]],
+    *,
+    weight_power: float,
+    rng: np.random.Generator,
+) -> int:
+    ids = np.array([int(obj_id) for obj_id, _ in hot_pool], dtype=np.int64)
+    weights = np.array([max(int(count), 1) for _, count in hot_pool], dtype=np.float64)
+    weights = np.power(weights, max(float(weight_power), 1e-6))
+    weights = weights / max(float(weights.sum()), 1e-12)
+    return int(ids[int(rng.choice(len(ids), p=weights))])
 
 
 def _power_probs(probs: np.ndarray, power: float) -> np.ndarray:
