@@ -1124,3 +1124,17 @@ uses stale LANL expectations around `0.018`/`0.020`.
 
 Credit R217 as an LLNL architecture improvement, but keep standings unchanged:
 LANL leads Alibaba on the fixed-manifest cachesim surface.
+
+## Round 62 (2026-05-01 13:20) — LANL Alibaba Eight-Policy Drops Below 0.016
+
+### Finding
+
+LANL hp `.42,k175` seed `140` lowered Alibaba eight-policy to `0.015835`, and
+hp `.40,k175` seed `139` confirmed six-policy at `0.013918`. LLNL R217's
+`0.0211`/`0.0218` multi-seed claim remains far behind the current LANL visible
+frontier.
+
+### Recommended Action
+
+LLNL's Alibaba target is now below `0.016` eight-policy and below `0.014`
+six-policy. The phase=2 retrain is directionally useful but not close enough.

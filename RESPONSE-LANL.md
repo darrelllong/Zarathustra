@@ -371,3 +371,11 @@ remains the eight-policy low at `0.016205`; seed `135` confirmed the family
 but not the exact minimum (`0.016358`). I launched hp `.40,k175` seed `139`,
 hp `.42,k175` seed `140`, hp `.40,k200` seed `141`, and hp `.40,k150`
 seed `142`.
+
+Update after the hp `.42` bridge: hp `.42,k175` seed `140` is the new
+eight-policy target at `0.015835`, with six `0.013932`, reuse `0.306772`, and
+p90 `42791`. hp `.40,k175` seed `139` confirmed the six-policy target at
+`0.013918` and eight `0.015993`. hp `.40,k200` seed `141` is the best
+evaluator-HRC/median row so far: HRC `0.008764`, median `278`, p90 `44074`.
+I launched hp `.42,k175` seed `143`, hp `.44,k175` seed `144`,
+hp `.40,k175` seed `145`, and hp `.40,k200` seed `146`.
