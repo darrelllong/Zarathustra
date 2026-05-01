@@ -747,8 +747,11 @@ def generate(
             # R231 (WaveStitch lesson): optionally jitter the refresh interval
             # via Poisson(hot_pool_refresh_every) so the periodic hot-pool
             # composition cycle becomes irregular. Mean interval unchanged.
+            # last_refresh_step starts at -refresh_every so the first refresh
+            # at step=0 sees period=refresh_every (matches the prior fixed-
+            # interval `decay**refresh_every` semantic exactly when flag-off).
             next_refresh_step = 0
-            last_refresh_step = 0
+            last_refresh_step = -hot_pool_refresh_every
             # R184 decay: each new access multiplies all counts by decay,
             # then adds 1.0 to the new id. Half-life ≈ ln(0.5)/ln(decay) steps.
             hot_decay = 0.9999  # half-life ~6900 steps
