@@ -11820,3 +11820,57 @@ Tencent: 0.0456 (8-pol) / 0.0330 (6-pol) — hp=0.55 K=50 adj=0.150 tail=0.10 mf
 ### Next: alibaba K-axis verify
 
 Alibaba is at K=50 too (R199 didn't sweep K). Likely also sharp at K=50, but worth confirming. 3-iteration test.
+
+
+## Round 204 — Alibaba K-axis sweep WINS at K=75: 0.0212 (-8.2% on R199, total -37.6% on R191 untuned)
+
+**Date**: 2026-05-01 04:15 PDT (R203 followup: verify K on alibaba; tencent peaked sharp at K=50, alibaba may differ).
+
+### Sweep results (alibaba 1M, fixed `hp=0.60 adj=0.150 tail=0.10 mf=0.5 rp=0.15 win=2`)
+
+| K | mean HRC-MAE | direction |
+|---|---|---|
+| 25 | 0.0288 | +24.6% |
+| 50 (R199 lock) | 0.0231 | (R199 baseline) |
+| **75** | **0.0212** | **−8.2%** ★ |
+| 100 | 0.0215 | −6.9% |
+
+Alibaba K-axis is **flatter than tencent's** with peak at K=75 (K=100 within 0.0003 = noise). Different from tencent's sharp K=50.
+
+### Cross-corpus K-peak split
+
+| corpus | optimal K | optimal hp | optimal rp |
+|---|---|---|---|
+| **CloudPhysics** | 50 (default, untested) | 0.15 | 0.10 win=2 |
+| **Tencent** | **50** (sharp, R203) | 0.55 | 0 |
+| **Alibaba** | **75** (plateau, R204) | 0.60 | 0.15 win=2 |
+
+Alibaba's wider working set (per stream reuse rate spans 3-90%, R196 manifest) explains the higher optimal K — more "hot" objects participate in real reuse, so the synthetic hot-pool tracks more of them.
+
+### Updated alibaba standing claim
+
+Alibaba: **0.0212** — `hp=0.60 K=75 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2`.
+
+Improvement chain on alibaba (cumulative):
+| round | recipe | mean | Δ from R191 |
+|---|---|---|---|
+| R191 (untuned recipe transfer) | hp=0.40 K=50 | 0.0340 | — |
+| R197 (rp=0.10 win=2) | + rp | 0.0276 | −18.8% |
+| R198 (rp=0.15 win=2) | rp tune | 0.0275 | −19.1% |
+| R199 (hp=0.60) | hp tune | 0.0231 | −32.1% |
+| **R204 (K=75)** | **K tune** | **0.0212** | **−37.6%** |
+
+### Final cross-corpus standing
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| **Tencent** | **0.0456** (8-pol) / **0.0330** (6-pol) | hp=0.55 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| **Alibaba** | **0.0212** | hp=0.60 K=75 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| CloudPhysics | 0.0685 | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+Alibaba is now 2.2× better than tencent on 8-pol, 3.2× better than CloudPhysics. The cleanest race surface in the family.
+
+### Sandia + LANL pass
+
+- LANL: commit `06783dd` more p/window probes; band remains 0.0452-0.0457. **LLNL R200 0.0330 still 27% ahead** on tencent 6-pol gate.
+- Sandia: still off, R38 unfixed.
