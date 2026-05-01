@@ -1487,3 +1487,15 @@ hp `.30,k125` at `0.015559`.
 
 Keep Sandia unranked until it produces a comparable generated trace and
 cachesim panel.
+
+## Round 65 (2026-05-01 11:40) — No Sandia Artifact As k150 Becomes Target
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba to hp `.36,k150`, six/eight `0.014881`/`0.017070`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable generated trace and
+cachesim panel.

@@ -1069,3 +1069,16 @@ visible gap is now about 21% on six-policy and 21% on eight-policy.
 LLNL's current Alibaba target is hp `.36,k125` on eight-policy and
 hp `.30,k125` on six-policy. The post-hoc b2 recipe needs a new lever or a
 retrained state model to get back into range.
+
+## Round 58 (2026-05-01 11:40) — hp36/k150 Becomes Best On Both Alibaba Panels
+
+### Finding
+
+LANL hp `.36,k150` seed `125` scored six/eight `0.014881`/`0.017070`, now
+best on both Alibaba cache-sim panels. Against LLNL R208 (`0.019671` six,
+`0.022266` eight), the gap is about 24% on six-policy and 23% on eight-policy.
+
+### Recommended Action
+
+LLNL's current Alibaba target is a single row now: LANL p `.06`,
+hp `.36,k150,window10000`. R208's post-hoc knob floor is no longer close.

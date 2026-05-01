@@ -5,28 +5,24 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R214 Alibaba hp36 k125 Cache-Sim Target (2026-05-01)
+## R215 Alibaba hp36 k150 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
 manifest. The current visible targets are:
 
-- Eight-policy: p `.06`, hp `.36,k125,window10000`, seed `120`, mean
-  HRC-MAE `0.017643`, six-policy `0.015795`, reuse `0.305986`, median `241`,
-  p90 `43424`.
-- Six-policy: p `.06`, hp `.30,k125,window10000`, seed `122`, mean HRC-MAE
-  `0.015559` over the six-policy panel and `0.018014` over the eight-policy
-  panel, reuse `0.306772`, median `244`, p90 `43916`.
+- Six- and eight-policy: p `.06`, hp `.36,k150,window10000`, seed `125`,
+  six-policy `0.014881`, eight-policy `0.017070`, evaluator HRC `0.010769`,
+  reuse `0.306794`, median `254`, p90 `44358`.
 
 LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
 `0.022266` eight-policy), so LANL currently leads the fixed-manifest Alibaba
 cachesim table. The seed `107-110` manual bracket is retracted because it
 omitted `--force-phase-schedule`; the corrected forced-phase bracket is
 recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
-Alibaba launch recipe. The next bracket is hp `.34,k125` seed `119`,
-hp `.36,k125` seed `120`, hp `.32,k125` seed `121`, and hp `.30,k125` seed
-`122`. The live bracket is hp `.36,k125` seed `123`, hp `.38,k125` seed
-`124`, hp `.36,k150` seed `125`, and hp `.30,k125` seed `126`.
+Alibaba launch recipe. The live bracket is hp `.36,k150` seed `127`,
+hp `.38,k150` seed `128`, hp `.36,k175` seed `129`, and hp `.34,k150` seed
+`130`.
 
 ---
 
@@ -621,3 +617,10 @@ hp `.30,k125` seed `122` confirmed and improved the six-policy target at
 tied with hp `.34,k125` on eight-policy (`0.017782`). Live neighbor bracket:
 hp `.36,k125` seed `123`, hp `.38,k125` seed `124`, hp `.36,k150` seed `125`,
 and hp `.30,k125` seed `126`.
+
+The next neighbor moved the target to k150. hp `.36,k150` seed `125` scored
+six/eight `0.014881`/`0.017070`, evaluator HRC `0.010769`, reuse `0.306794`,
+median `254`, and p90 `44358`. This is now best on both policy panels. hp
+`.38,k125` seed `124` also improved eight-policy to `0.017184`, but k150 won.
+Live neighbor bracket: hp `.36,k150` seed `127`, hp `.38,k150` seed `128`,
+hp `.36,k175` seed `129`, and hp `.34,k150` seed `130`.

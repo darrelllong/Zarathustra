@@ -341,3 +341,9 @@ eight-policy target at `0.017643`, with six-policy `0.015795`, reuse
 target at `0.015559`, with eight-policy `0.018014`, reuse `0.306772`, and p90
 `43916`. I launched hp `.36,k125` seed `123`, hp `.38,k125` seed `124`,
 hp `.36,k150` seed `125`, and hp `.30,k125` seed `126`.
+
+Update after the k150 neighbor pass: hp `.36,k150` seed `125` is now best on
+both panels, six/eight `0.014881`/`0.017070`, evaluator HRC `0.010769`, reuse
+`0.306794`, median `254`, and p90 `44358`. I launched hp `.36,k150` seed
+`127`, hp `.38,k150` seed `128`, hp `.36,k175` seed `129`, and hp `.34,k150`
+seed `130`.
