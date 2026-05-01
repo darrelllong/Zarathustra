@@ -11537,3 +11537,52 @@ Hypothesis: tencent has lower native double-access density (real adj-dup ≈ 0.0
 
 - LANL: commits `f9cdede` (treap-LRU, addresses §11 wall) and `a262d54` (seed-44 confirm 6-policy mean 0.046945). REBUTTAL §12 already posted with LLNL R190 6-policy 0.0366 head-to-head; LANL R23 cites stale R182 0.0925 — they should update the comparison reference to my §12.
 - Sandia: continuing Phase 2. R29/R30 stand.
+
+
+## Round 198 — Alibaba recent-pool optimum sweep: rp=0.15 win=2 marginal (-0.4%) over R197 lock; alibaba effectively at saturation
+
+**Date**: 2026-05-01 02:05 PDT (R197 followup: confirm whether the CloudPhysics-default `(rp=0.10, win=2)` is alibaba's optimum or whether alibaba wants different settings).
+
+### Sweep results (alibaba 1M, 8-policy mean HRC-MAE; R191 lock + recent-pool variant)
+
+| (rp, win) | mean | direction |
+|---|---|---|
+| R191 lock (no rp) | 0.0340 | (R191 baseline) |
+| **(0.15, 2)** | **0.0275** | ★ marginal best (−0.4% vs R197) |
+| (0.10, 2) | 0.0276 | (R197 lock) |
+| (0.20, 2) | 0.0284 | +3.3% from R198 best |
+| (0.10, 5) | 0.0292 | +6.2% from R198 best |
+| (0.05, 2) | 0.0296 | +7.6% from R198 best |
+
+The 0.0275 vs 0.0276 difference at rp=0.15 vs rp=0.10 is **within MC noise** (single-seed runs). Alibaba is at saturation around 0.0275-0.0276.
+
+Cross-corpus rp peak comparison:
+- **CloudPhysics**: peak at rp=0.10 (R196)
+- **Alibaba**: peak at rp=0.15 (R198) — slightly higher tolerance for recent-pool concentration
+
+Interpretation: alibaba has more native double-access density than CloudPhysics, so it tolerates higher rp before over-concentration regression sets in.
+
+### Updated standing claim (alibaba)
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| Tencent | 0.0492 (8-pol) / 0.0366 (6-pol) | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| **Alibaba** | **0.0275** | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 + **rp=0.15 win=2** |
+| CloudPhysics | 0.0685 | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+Promoting R198's `rp=0.15` to the alibaba lock; marginal but consistent with the sweep direction.
+
+### Next moves
+
+The recent-pool axis is exhausted on all three corpora. Diminishing returns at <1% per iteration. Higher-leverage candidates:
+
+1. **Alibaba hp sweep** — R197/R198 used `hp=0.40` (tencent-inherited). CloudPhysics needed hp=0.15. Alibaba may also want lower; one sweep to check.
+2. **LIRS structural improvement** on CloudPhysics (LIRS still 0.0860 there, the worst single policy across all 3 corpora). Requires IRR-aware reuse-rank reshape, not just probability knob.
+3. **Bigger architecture moves** (IDEA #22-25 from IDEAS-LLNL.md): hierarchical generation, long-term memory attention, cache-aware loss, boundary alignment. Each is days of work.
+
+Plan: launch alibaba hp sweep (option 1) — cheap to test, may close another small gap. Then assess.
+
+### Sandia + LANL pass
+
+- LANL: commits `4eabd26`, `6cf7727` refine hot-pool prob bracket. New LANL best: `p=.38 seed=44 → 0.045386` 6-policy. **LLNL R190 still 19.4% ahead** at 0.0366. Iterative refinement on their side; **no rebuttal post warranted** until they cross 0.040 or change methodology.
+- Sandia: `s004_tencent_full` Phase 2 ep 46/50; **Phase 3 (G-warmup) starts in ~10 min** — the R27 rank-bug load-bearing test.
