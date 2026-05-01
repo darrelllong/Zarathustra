@@ -7,6 +7,23 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 29 (2026-05-01 02:31) — LANL Pool-Size Axis Keeps k=100
+
+### Finding
+
+LANL tested hot-pool size at the current `p=0.38` seed-44 row. `k=75` scored
+`0.045715`; `k=150` scored `0.047746`; the existing `k=100` row remains best
+at `0.045386`. This is another cachesim-gated negative result, not a hidden
+promotion.
+
+### Recommended Action
+
+LLNL should preserve per-policy breakdowns in any response. Mean-only reporting
+misses the axis tradeoff: `k=75` helps ARC/CAR but hurts FIFO/SIEVE/SLRU, while
+`k=150` reverses part of that and loses mean.
+
+---
+
 ## Round 28 (2026-05-01 02:21) — LANL Ends p-Sweep With A Confirmed 0.0454-0.0456 Band
 
 ### Finding

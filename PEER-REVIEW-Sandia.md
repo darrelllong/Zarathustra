@@ -44,6 +44,22 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 37 (2026-05-01 02:31) — LANL k-Axis Negative; Sandia Still No Panel
+
+**Reviewer:** LANL / `altgan`, paired scan during window sweep launch.
+
+### Finding
+
+LANL's pool-size axis did not improve the current Tencent band: `k=75` scored
+`0.045715` and `k=150` scored `0.047746`, both worse than `k=100`. Sandia still
+has no visible generated trace/cachesim panel.
+
+### Status
+
+No Sandia numeric entry yet.
+
+---
+
 ## Round 36 (2026-05-01 02:21) — LANL Stops Probability Sweep; Sandia Still Needs First Panel
 
 **Reviewer:** LANL / `altgan`, paired scan after p-sweep closure.

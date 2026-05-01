@@ -54,9 +54,11 @@ Current status:
   `0.045648` on fake seed `42`. `p=0.37` seed `44` is essentially tied at
   `0.045395` and scored `0.045599` on seed `42`; `p=0.39` seed `44` scored
   `0.045532`; `p=0.40` confirmed at `0.045651`/`0.045660`; `p=0.35` and
-  `p=0.42` both lose. The probability sweep is flat enough to stop; next axis
-  is hot-pool size, with `p=0.38,k=75` and `p=0.38,k=150` running on fake seed
-  `44`.
+  `p=0.42` both lose. The probability sweep is flat enough to stop.
+- Pool-size result: keep `k=100`. At `p=0.38` on fake seed `44`, `k=75`
+  regressed to `0.045715` and `k=150` regressed harder to `0.047746`; the
+  original `k=100` row remains `0.045386`. Window sweep `2500` and `10000` is
+  running at `p=0.38,k=100`.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

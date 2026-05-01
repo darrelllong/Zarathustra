@@ -249,8 +249,9 @@ Important knobs:
   `42` at `0.045648`; `p=.37` seed-44 is essentially tied at `0.045395`;
   `p=.37` seed-42 scored `0.045599`, `p=.39` seed-44 scored `0.045532`, and
   `p=.35`/`p=.42` lost on their checked seeds. Treat `p=.37..40` as the robust
-  probability band. Active checks moved to pool size: `p=.38,k=75` and
-  `p=.38,k=150`.
+  probability band. Pool-size sweep says keep `k=100`: `k=75` scored
+  `0.045715`, `k=150` scored `0.047746`, both worse than `k=100` at
+  `0.045386`. Active checks moved to hot-pool window: `2500` and `10000`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
