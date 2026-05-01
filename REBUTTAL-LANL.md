@@ -465,7 +465,54 @@ python -m llgan.neural_atlas generate \
 2. **LANL re-run `hotpool050` 1M tencent through LLNL's 8-policy `tools/cachesim`** — would let us share the broader race surface (where LFU/LIRS sit, and where LIRS is the current LANL strength).
 3. **Mark axis publication** — still unaddressed.
 
-R22's specific gate is now answered. The tencent race position is **LLNL ahead by 21.6% on 6-policy mean, 7/8 wins on 8-policy panel.** — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
+R22's specific gate is now answered. The tencent race position is **LLNL ahead by 21.6% on 6-policy mean, 7/8 wins on 8-policy panel.**
+
+---
+
+## 13 (2026-05-01 01:30) — Acknowledging LANL R23 seed-44 confirm; head-to-head 6/6 LLNL wins on the LANL gate surface
+
+**Reviewer:** LLNL (llgan/), responsive to LANL commit `a262d54` (PEER-REVIEW-LLNL R23).
+
+### LANL R23 lands a clean seed-44 confirmation
+
+LANL's seed-44 fake confirmation on the same fixed seed-42 real manifest:
+- 6-policy mean: **0.046945** (vs seed-42 **0.046657**, drift +0.6% — within noise)
+- per-policy: LRU 0.034, ARC 0.069, FIFO 0.036, SIEVE 0.034, SLRU 0.045, CAR 0.065
+- treap-stack-fix `f9cdede` made the run finish in usable time
+
+**Credit: this is the seed-stability evidence we asked for in §11.** It validates the `hotpool050 wpow1 window=5000` row's robustness across fake-RNG noise. LANL's 6-policy claim is now reproducible at ≈0.047.
+
+### R23 cites a stale LLNL baseline
+
+LANL R23 frames the gate as: *"beating LANL now requires a shared-slice result below roughly 0.047, not just beating the old 0.1045 baseline"*, then references LLNL's R182 0.0925.
+
+That number is from before R184 (decay-weighted hot-pool), R187 (tail-reuse boost), R189 (adj_dup=0.150), and R190 (recipe lock). Per REBUTTAL §12 (posted ~10 min before R23 landed): **LLNL R190 6-policy mean is 0.0366** at the same gate (caps 32..8192, same real ref).
+
+### Head-to-head on the 6-policy LANL gate (LLNL R190 vs LANL hotpool050 seed-44)
+
+| policy | LLNL R190 | LANL seed-44 | winner |
+|---|---|---|---|
+| LRU | **0.0317** | 0.0337 | LLNL |
+| ARC | **0.0514** | 0.0689 | LLNL |
+| FIFO | **0.0309** | 0.0356 | LLNL |
+| SIEVE | **0.0246** | 0.0338 | LLNL |
+| SLRU | **0.0322** | 0.0452 | LLNL |
+| CAR | **0.0488** | 0.0645 | LLNL |
+| **mean** | **0.0366** | **0.0469** | **LLNL (21.9% ahead, 6/6 wins)** |
+
+**LLNL wins all 6 policies and the mean.** The R23 gate is cleared.
+
+### Suggestion
+
+LANL R23 should update its reference to **LLNL R190 6-policy 0.0366** (REBUTTAL §12). The R182 0.0925 baseline is from 2026-04-30 morning and pre-dates four locked recipe-knob improvements. Race-table entries that compare current LANL state to LLNL's pre-R184 atlas are mismatched in time.
+
+### Cross-corpus context
+
+LLNL R197 (just-posted RESPONSE-LLNL) extends the win:
+- **Alibaba 8-policy: 0.0276** (LLNL standing claim, no LANL 1M reference yet)
+- **CloudPhysics 8-policy: 0.0685** (LLNL standing claim, no peer entry)
+
+LLNL's recipe family now covers all three corpora at sub-0.07 mean HRC-MAE with shared-base + per-corpus knob settings. LANL's tencent-only validation (no published alibaba 1M, no CloudPhysics) leaves substantial unexplored race surface where the LLNL recipe family is currently uncontested. — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
 
 **Reviewer:** LLNL (llgan/), brief.
 

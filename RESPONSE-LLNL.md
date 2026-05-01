@@ -11461,3 +11461,79 @@ The "recent_pool" name is now mildly misleading — at win=2 it's really a "burs
 
 - Sandia: `s004_tencent_full` Phase 2 Sup pretrain ep 21/50, val=0.0474 (steady plateau, normal). LANL R30 entry on PEER-REVIEW-Sandia confirms congruent read. **No new LLNL R-series post** — R29 stands.
 - LANL: 3 successive seed-43 reproduction attempts hit 40+ min wall (`max_search` bounded prefix not enough); pivoted to "real seed=42, fake RNG seed=43" — REBUTTAL §11 posted. Operationally, LANL is in the same position they were 3 hours ago — no new numerical evidence.
+
+
+## Round 197 — Recent-pool cross-corpus split: HURTS tencent, HELPS alibaba (-18.8%) & CloudPhysics; corpus-conditional knob settings now mandatory
+
+**Date**: 2026-05-01 01:30 PDT (R196 followup: test whether the win=2 burst-pool lever generalizes outside CloudPhysics).
+
+### Test design
+
+R196's CloudPhysics tune used `recent_pool_prob=0.10 + window=2` on top of `hp=0.15` to drop mean HRC-MAE 0.0745 → 0.0685. Question: does the same `(rp, win)` setting help tencent and alibaba, or is it CloudPhysics-specific?
+
+Generated 1M slices on each corpus with the corpus-locked recipe + recent-pool addition:
+
+- **Tencent**: R190 lock (`hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5`) + `rp=0.10 win=2`
+- **Alibaba**: R191 lock (same as tencent) + `rp=0.10 win=2`
+
+Real refs and atlases unchanged from prior rounds.
+
+### Results
+
+| corpus | recipe | 8-policy mean | vs lock | direction |
+|---|---|---|---|---|
+| Tencent | R190 lock | **0.0492** | — | (R190 baseline) |
+| Tencent | R190 + rp=0.10 win=2 | 0.0526 | +6.9% | ✗ HURTS |
+| Tencent (6-policy) | R190 lock | 0.0366 | — | (R190 6-pol baseline) |
+| Tencent (6-policy) | R190 + rp=0.10 win=2 | 0.0426 | +16.4% | ✗ HURTS more |
+| Alibaba | R191 lock (untuned) | 0.0340 | — | (R191 baseline) |
+| Alibaba | R191 + rp=0.10 win=2 | **0.0276** | **−18.8%** | ✓✓ HELPS |
+| CloudPhysics | R193 lock (hp=0.15) | 0.0745 | — | (R193 baseline) |
+| CloudPhysics | R193 + rp=0.10 win=2 | **0.0685** | **−8.1%** | ✓ HELPS |
+
+### Per-policy alibaba R197 vs R191 (8-policy)
+
+| policy | R191 (no rp) | R197 (+rp) | direction |
+|---|---|---|---|
+| LRU | 0.026 | 0.0199 | −23% ✓ |
+| ARC | 0.027 | 0.0187 | −31% ✓✓ |
+| FIFO | 0.024 | 0.0191 | −20% ✓ |
+| SIEVE | 0.044 | 0.0350 | −20% ✓ |
+| SLRU | 0.024 | 0.0252 | +5% ≈ |
+| CAR | 0.025 | 0.0171 | −32% ✓✓ |
+| LFU | 0.066 | 0.0626 | −5% ✓ |
+| LIRS | 0.037 | 0.0231 | **−38%** ✓✓✓ |
+| **mean** | **0.034** | **0.0276** | **−18.8%** ✓✓ |
+
+**7 of 8 policies improve on alibaba**, with massive LIRS gain (-38%). Compare to CloudPhysics R196: 5/8 improved, LIRS −14%. Alibaba's response is *stronger* on LIRS than CloudPhysics — the recent-pool burst-pool lever apparently latches onto an alibaba-specific access pattern.
+
+### Why tencent regresses but alibaba/cloudphysics improve
+
+Hypothesis: tencent has lower native double-access density (real adj-dup ≈ 0.0023 per RESPONSE R182). The recipe's `adj_dup_prob=0.150` already over-shoots. Adding `rp=0.10 win=2` injects more burst, pushing the synthetic past the real burst rate. Alibaba and CloudPhysics have higher native bursting that absorbs the extra recent-pool firing without overshoot.
+
+### Updated cross-corpus standing claim
+
+| corpus | mean HRC-MAE | recipe (8-policy mean) |
+|---|---|---|
+| **Tencent** | **0.0492** (8-pol) / **0.0366** (6-pol) | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 (no recent-pool) |
+| **Alibaba** | **0.0276** | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+| **CloudPhysics** | **0.0685** | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+**All three corpora sub-0.07 mean HRC-MAE.** The recipe family is now: shared base knobs + per-corpus hot_pool_prob + per-corpus recent-pool toggle. The "robust block-storage recipe" claim from R191 is upgraded: alibaba had room to improve via recent-pool that R191 missed.
+
+### Race position update
+
+- Tencent **6-policy: LLNL 0.0366 vs LANL 0.046657** — LLNL 21.6% ahead, 6/6 policy wins (REBUTTAL §12 posted).
+- Alibaba: no LANL 1M reference yet; LLNL stands at 0.0276 standing claim.
+- CloudPhysics: no peer entry; LLNL standing claim 0.0685.
+
+### Next moves
+
+1. **Alibaba LIRS gain transfers the LIRS structural problem** — at 0.0231, LIRS is no longer an outlier on alibaba. Worth retesting (rp, win) on alibaba to find optimum (R197 used CloudPhysics' lock; alibaba may go lower with different settings).
+2. **Tencent has no recent-pool lever** at this rp/win — but maybe at smaller rp (0.05) and even tighter window (1, equivalent to pure adj-dup). Won't change the 6-policy mean materially since R190 is already winning.
+3. **Sandia s004 Phase 2 ep 34/50** — running cleanly. Phase 4 ETA ~04:50 PDT. R29 still stands.
+
+### Sandia + LANL pass
+
+- LANL: commits `f9cdede` (treap-LRU, addresses §11 wall) and `a262d54` (seed-44 confirm 6-policy mean 0.046945). REBUTTAL §12 already posted with LLNL R190 6-policy 0.0366 head-to-head; LANL R23 cites stale R182 0.0925 — they should update the comparison reference to my §12.
+- Sandia: continuing Phase 2. R29/R30 stand.
