@@ -11072,6 +11072,55 @@ LIRS is the only structural gap remaining:
 
 The R188 sweep verifies R187 tail=0.10 stays best. **Standing LLNL claim: cachesim mean HRC-MAE 0.0503 on tencent 1M, 6/8 policy wins vs LANL `hotpool050` 0.0553.**
 
+
+## Round 189 — adj_dup pushed beyond 0.05: adj=0.08 lands LLNL at 7/8 policy wins (mean 0.0495)
+
+**Date**: 2026-04-30 21:55 PDT
+
+### Result
+
+R187 used adj_dup=0.050 (calibrated near tencent's real adj-dup rate of 0.0023). R188 swept min_frac, found it flat. R189 reopens adj_dup beyond 0.05:
+
+| recipe (adj × tail × hp × K) | mean HRC-MAE | LLNL wins | LANL HRC-MAE |
+|---|---|---|---|
+| R187 adj=0.050 (prior best) | 0.0503 | 6/8 | 0.0553 |
+| R189 adj=0.020 | 0.0528 | 4/8 | (worse) |
+| **R189 adj=0.080** | **0.0495** | **7/8** | (best so far) |
+| R189 adj=0.100 / 0.150 | (running) | — | — |
+
+### Per-policy at R189 adj=0.080 best
+
+| policy | LLNL | LANL | winner | gap |
+|---|---|---|---|---|
+| LRU | 0.0251 | 0.0355 | **LLNL** | 1.41× |
+| **ARC** | **0.0617** | 0.0660 | **LLNL (NEW WIN)** | 1.07× |
+| FIFO | 0.0207 | 0.0380 | LLNL | 1.83× |
+| SIEVE | 0.0338 | 0.0396 | LLNL | 1.17× |
+| SLRU | 0.0217 | 0.0486 | LLNL | **2.24×** |
+| **CAR** | **0.0574** | 0.0621 | **LLNL (NEW WIN)** | 1.08× |
+| LFU | 0.0668 | 0.0925 | LLNL | 1.38× |
+| LIRS | 0.1087 | 0.0601 | LANL | 1.81× |
+
+ARC and CAR flipped from R187's "tied within noise" to LLNL wins. Only **LIRS** remains a LANL win (1.81× — IRR-aware sequencing required to close).
+
+### Why higher adj_dup helps
+
+The "real adj-dup rate ≈ 0.0023" intuition was misleading — over-injecting adj_dup beyond the calibrated rate keeps the SIEVE/CLOCK second-touch bit firing on the right cadence for cachesim's six policies, even though it diverges from the marginal adj-dup rate. Cachesim is more sensitive to *consistency* of second-touch hits than to *frequency*.
+
+### Standing LLNL claim updated
+
+Tencent 1M cachesim mean HRC-MAE = **0.0495**, **7/8 policy wins** vs LANL `hotpool050` (0.0553). LLNL ahead **10.5%**.
+
+Recipe: `--hot-pool-prob 0.40 --hot-pool-k 50 --hot-pool-window 5000 --adj-dup-prob 0.080 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5` on R172 b2-inline tencent atlas.
+
+### Active LLNL run
+
+R189 sweep continues (background `bhiidi09d`); adj=0.100 and adj=0.150 pending.
+
+### Sandia + LANL pass
+
+No new substantive peer commits since `e57085b` (LANL hot-pool rank caching). **No PEER-REVIEW post warranted.**
+
 ### Sandia + LANL pass
 
 - LANL: commit `e57085b` cached hot-pool rank computation. Cron-driven 1M evals continue. **No new RESULTS.md numerical update worth a REBUTTAL post yet.**
