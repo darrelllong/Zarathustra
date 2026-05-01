@@ -13032,3 +13032,51 @@ Pivot to tencent ceiling. R228: adj re-sweep on tencent ext-bins atlas (R222 clo
 
 - LANL: same micro-iteration.
 - Sandia: brief delivered; R38 unfix.
+
+## Round 228 — Tencent ext-bins adj re-sweep: closes-NEGATIVE at every adj; ext-bins fundamentally wrong for tencent
+
+**Date**: 2026-05-01 15:20 PDT.
+
+### Hypothesis tested
+
+R222 closed-NEGATIVE on tencent ext-bins atlas using R206's adj=0.075 (stale lock from original-bins landscape). The same stale-lock logic that gave −24% on CP (R224) might also give a recovery on tencent — if the adj knob is the only one that cross-couples with binning (per the R226/R227 finding), then re-tuning adj could close the ext-bins penalty.
+
+### Result (single-seed=42, 6-pol, others at R206 lock: hp=0.55 K=50 tail=0.10 mf=0.5)
+
+| adj | 6-pol HRC-MAE | vs R206 lock 0.0305 |
+|---|---|---|
+| 0.05 | 0.0628 | +106% |
+| 0.10 | 0.0547 | +79% |
+| 0.15 | 0.0485 | +59% |
+| **0.20** | **0.0450** | **+48% (min)** |
+| 0.25 | 0.0465 | +52% |
+| 0.30 | 0.0505 | +66% |
+
+Clean inverted-U with peak at adj=0.20. **Even the best ext-bins point is +48% worse than R206 original-bins.** No adj setting recovers the ext-bins switch cost.
+
+### Reading
+
+The CP-R224 cross-coupling rescue (adj retuned 0.25→0.35) does NOT generalize to tencent. Per R220's corpus-conditional finding:
+- CloudPhysics: 15% of IRDs >19k → ext-bins captures real signal → adj retune compounds the gain
+- Alibaba: 15% of IRDs >19k → ext-bins helps marginally (R221 +5%); adj re-sweep open question
+- Tencent: only 6.7% of IRDs >19k → ext-bins forces the network to model deep-tail mass that the corpus barely produces → cond-MLP allocates capacity wastefully → core PMF degrades
+
+The corpus-conditional architecture choice from R222 is now confirmed at the *post-hoc-knob-tuned* level: not a recipe-tuning issue, fundamentally an atlas-architecture mismatch.
+
+### Tencent ceiling status
+
+Standing claim still **0.0305** (R206, 4-seed multi-seed, original-bins). Tied with LANL at ~0.0303. No path forward from existing knob/binning axes. Real lift on tencent requires either:
+- New cond features (hierarchical, retrieval-memory style)
+- Per-stream rather than global atlas
+- Cache-aware loss term during fit
+
+These are research-grade architecture changes, not sweep-grade work. Deferring; pivoting back to alibaba.
+
+### Next move (R229)
+
+Alibaba adj re-sweep on R221 atlas. R221 set adj=0.05 (very low) at initial tuning; never systematically swept on the ext-bins landscape. Same stale-lock logic that worked for CP-R224. Cheap probe; if adj shifts, may close some of the LANL +20% gap.
+
+### Sandia + LANL pass
+
+- LANL: continued same iteration.
+- Sandia: brief delivered.
