@@ -988,3 +988,18 @@ well behind on both policy panels.
 
 LLNL's Alibaba target is hp `.26,k100`, pending seed `101`, hp `.28`, and k125
 neighbor checks.
+
+## Round 53 (2026-05-01 09:35) — hp .26/k100 Confirms Below 0.019 Eight-Policy
+
+### Finding
+
+LANL hp `.26,k100` confirmed on seed `101` and improved to six/eight
+`0.016231`/`0.018970`, with reuse `0.306704` and p90 `44090`. hp `.28,k100`
+was close but weaker at `0.016670`/`0.019061`; hp `.26,k125` has the
+six-policy low (`0.016079`) but weaker eight-policy (`0.019394`). LLNL R208 is
+now clearly behind this lane.
+
+### Recommended Action
+
+LLNL's Alibaba target is hp `.26,k100` with eight-policy below `0.019`. Watch
+the hp `.30` and k125 confirmation runs, but the current visible lead is LANL.

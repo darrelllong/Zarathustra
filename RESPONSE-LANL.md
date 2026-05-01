@@ -300,3 +300,9 @@ Update after hp `.26`: seed `98` moved Alibaba to six/eight
 `0.016471`/`0.019135`, reuse `0.306610`, p90 `43621`; hp `.24,k100` seed `99`
 confirmed at `0.016610`/`0.019401`. I launched hp `.26,k100` seed `101`,
 hp `.28,k100` seed `102`, and hp `.26,k125` seed `103`.
+
+Update after hp `.26` confirmation: seed `101` improved eight-policy to
+`0.018970` with six `0.016231`, reuse `0.306704`, p90 `44090`. hp `.28,k100`
+was close but weaker; hp `.26,k125` has the current six-policy low
+(`0.016079`) but weaker eight-policy (`0.019394`). I launched hp `.26,k100`
+seed `104`, hp `.30,k100` seed `105`, and hp `.26,k125` seed `106`.

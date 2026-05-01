@@ -557,3 +557,10 @@ hp `.24,k100` seed `99` confirmed the family at `0.016610`/`0.019401`;
 hp `.24,k75` seed `100` scored `0.017711`/`0.020304`. Live follow-up:
 hp `.26,k100` seed `101`, hp `.28,k100` seed `102`, and hp `.26,k125`
 seed `103`.
+
+hp `.26,k100` confirmed and improved on seed `101`: six/eight
+`0.016231`/`0.018970`, reuse `0.306704`, median `240`, p90 `44090`. hp
+`.28,k100` seed `102` was close but weaker (`0.016670`/`0.019061`); hp
+`.26,k125` seed `103` has the current six-policy minimum (`0.016079`) but
+weaker eight-policy (`0.019394`). Live tight bracket: hp `.26,k100` seed
+`104`, hp `.30,k100` seed `105`, and hp `.26,k125` seed `106`.

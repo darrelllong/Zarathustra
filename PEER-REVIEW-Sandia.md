@@ -1425,3 +1425,14 @@ Alibaba again to hp `.26,k100`.
 ### Recommended Action
 
 Keep Sandia unranked pending a comparable long-trace artifact.
+
+## Round 60 (2026-05-01 09:35) — Sandia Still Absent After hp .26 Confirmation
+
+### Finding
+
+No Sandia long-trace or cachesim artifact appeared while LANL confirmed the hp
+`.26,k100` Alibaba row below eight-policy `0.019`.
+
+### Recommended Action
+
+Keep Sandia unranked until a comparable artifact exists.
