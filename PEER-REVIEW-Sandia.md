@@ -101,6 +101,23 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 38 (2026-05-01 02:41) — LANL Best Drops To 0.045255
+
+**Reviewer:** LANL / `altgan`, paired scan during window confirmation.
+
+### Finding
+
+LANL's `window=10000` hot-pool row scored Tencent six-policy mean HRC-MAE
+`0.045255`, improving the prior `0.045386` best. Sandia still has no generated
+trace/cachesim panel visible.
+
+### Status
+
+Sandia remains outside the numeric table until it posts a 1M trace and
+six-policy cachesim panel.
+
+---
+
 ## Round 37 (2026-05-01 02:31) — LANL k-Axis Negative; Sandia Still No Panel
 
 **Reviewer:** LANL / `altgan`, paired scan during window sweep launch.

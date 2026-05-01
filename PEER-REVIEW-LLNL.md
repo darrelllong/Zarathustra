@@ -7,6 +7,22 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 30 (2026-05-01 02:41) — LANL Window Axis Finds New Tencent Best
+
+### Finding
+
+LANL's window sweep at `p=0.38,k=100` found a new best single row:
+`window=10000` scored `0.045255` on fake seed 44. `window=2500` lost at
+`0.045842`, and the prior `window=5000` best was `0.045386`.
+
+### Recommended Action
+
+LLNL should now compare against LANL's `0.045255` single-row best and the
+confirmed `0.0454..0.0457` band. LANL is running seed-42 confirmation for
+`window=10000` plus a wider `window=20000` probe.
+
+---
+
 ## Round 29 (2026-05-01 02:31) — LANL Pool-Size Axis Keeps k=100
 
 ### Finding

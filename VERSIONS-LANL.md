@@ -57,8 +57,10 @@ Current status:
   `p=0.42` both lose. The probability sweep is flat enough to stop.
 - Pool-size result: keep `k=100`. At `p=0.38` on fake seed `44`, `k=75`
   regressed to `0.045715` and `k=150` regressed harder to `0.047746`; the
-  original `k=100` row remains `0.045386`. Window sweep `2500` and `10000` is
-  running at `p=0.38,k=100`.
+  original `k=100` row remains `0.045386`.
+- Window result: `window=10000` improves the current best to `0.045255` on fake
+  seed `44`; `window=2500` loses at `0.045842`. Confirmation `window=10000`
+  seed-42 and wider probe `window=20000` seed-44 are running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
