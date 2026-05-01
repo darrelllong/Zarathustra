@@ -10854,3 +10854,58 @@ P=0.20 is the cross-policy mean optimum. P=0.30 is SIEVE-only optimum.
 Artifacts (vinge):
 - `/home/darrell/v_tencent_R184_hp0.20_adj0.050_1M.csv` (best R184 1M tencent)
 - `/home/darrell/v_tencent_R184_hp0.30_adj0.050_1M.csv` (SIEVE-leaning variant)
+
+
+## Round 185-186 — K=50 single-knob win then immediate LANL leapfrog; race position re-flips
+
+**Date**: 2026-04-30 20:35 PDT
+
+### R185 — `hot-pool-k=50` lands LLNL ahead on cachesim mean
+
+Sweep on `hot-pool-k` ∈ {50, 100, 250, 500, 1000} at hp=0.20 adj=0.050. Smaller K concentrates the hot pool on the ~50 most-frequently-accessed objects, matching real tencent's heavy-tailed Zipfian head better.
+
+| K | mean HRC-MAE (1M tencent, 8 policies) |
+|---|---|
+| **50** | **0.0712** |
+| 100 (R184 baseline) | 0.0768 |
+| 250 | 0.0904 (regression) |
+
+R185 K=50 vs LANL `_postdecode_seed42_` 0.0762 → **LLNL takes the lead by 6.6% on cachesim mean**. LLNL still wins 3-of-8 policies (LRU, FIFO, LFU); LANL wins the other 5 but gaps narrowed.
+
+### R186 — LANL leapfrogs with their own hot-pool
+
+Within hours of LLNL's R184/R185 hot-pool track shipping, LANL committed (`83784b6`–`09303bb`) parallel hot-pool experiments and published `hotpool050` (`p=0.50, k=100, window=5000`). Their cachesim numbers (computed by LLNL's `cachesim_3way` harness):
+
+| metric | LLNL R185 K=50 | LANL `hotpool050` | winner |
+|---|---|---|---|
+| **mean HRC-MAE** | 0.0712 | **0.0553** | **LANL ↑28%** |
+| LRU | 0.041 | 0.036 | LANL |
+| ARC | 0.072 | 0.066 | LANL |
+| FIFO | 0.056 | 0.038 | LANL |
+| SIEVE | 0.070 | 0.040 | LANL |
+| SLRU | 0.050 | 0.049 | LANL (tied) |
+| CAR | 0.073 | 0.062 | LANL |
+| LFU | 0.110 | 0.093 | LANL |
+| LIRS | 0.098 | 0.060 | LANL |
+| **wins** | 0/8 | **8/8** | LANL sweeps |
+
+LANL beats LLNL on every policy. The 28% mean gap is bigger than the 17% R182 1M gap — same direction, LANL caught up + passed.
+
+LANL note (their RESULTS.md): "LLNL's positive adj-dup injection is not directly transferable to LANL; our SIEVE gap is not caused by too few immediate repeats. Hot-set concentration was the better LANL lever." They confirm the architectural-difference observation (R182).
+
+### Honest accounting
+
+LLNL's race position on cachesim is now **LANL ahead by 28% (mean HRC-MAE)**. LANL's underlying generator (PhaseAtlas + neural marks + tb=0.575 + lp=0.70 + reuseboost030 + min32768 + postdecode) is structurally stronger than LLNL's b2 conditional transition net; adding hot-pool to LANL gave more headroom than adding hot-pool to LLNL.
+
+### What LLNL has left
+
+1. **K=50 × higher hp**: try hp=0.30/0.40/0.50 with K=50 (running in background `bhyycgr3c`). Should claw back some of the loss.
+2. **Stack a tail-rank boost** (LANL has `min32768` for deep-rank reuses; LLNL doesn't). Adding this would directly target the small-cap over-miss that drives ARC/SIEVE/CAR gaps.
+3. **Architectural pivot**: per R183 strategy, autoregressive transformer over stack-distance is the longer-term lever. LANL's improvements show that capacity / mechanism stacking can keep moving the cachesim number; LLNL's b2-light has saturated on the post-hoc-fix pattern.
+
+### Sandia + LANL pass
+
+- LANL: 5 new commits (`83784b6` `96af67a` `3d29a60` `ddf958c` `09303bb`) — hot-pool experimental track. LANL also acknowledged in their RESULTS.md that LLNL's adj-dup injection helped LLNL but not LANL (architectural difference). **No new REBUTTAL post warranted** — the public race-state in LANL's RESULTS and our 3-way panel speaks for itself.
+- Sandia: commit `60438cf` finally fixes the R25 critic-shape bug (`num_cols=self.cfg.latent_dim` instead of raw input dim). Real progress on Sandia infrastructure side. **No new PEER-REVIEW-Sandia post warranted** until they produce a Phase-3 GAN result.
+
+### Active LLNL run: R186 sweep in flight on vinge.
