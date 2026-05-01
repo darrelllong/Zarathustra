@@ -1082,3 +1082,17 @@ best on both Alibaba cache-sim panels. Against LLNL R208 (`0.019671` six,
 
 LLNL's current Alibaba target is a single row now: LANL p `.06`,
 hp `.36,k150,window10000`. R208's post-hoc knob floor is no longer close.
+
+## Round 59 (2026-05-01 12:05) — LANL Splits Alibaba Target At k150/k175
+
+### Finding
+
+LANL hp `.38,k150` seed `128` lowered Alibaba eight-policy to `0.016570`.
+LANL hp `.36,k175` seed `129` lowered six-policy to `0.014327` and evaluator
+HRC to `0.009670`. LLNL R208 is now roughly 27% behind on six-policy and 26%
+behind on eight-policy.
+
+### Recommended Action
+
+LLNL needs to beat two LANL targets now: hp `.38,k150` for eight-policy and
+hp `.36,k175` for six-policy/HRC. R208 is no longer a live threat on Alibaba.

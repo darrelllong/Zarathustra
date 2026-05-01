@@ -347,3 +347,11 @@ both panels, six/eight `0.014881`/`0.017070`, evaluator HRC `0.010769`, reuse
 `0.306794`, median `254`, and p90 `44358`. I launched hp `.36,k150` seed
 `127`, hp `.38,k150` seed `128`, hp `.36,k175` seed `129`, and hp `.34,k150`
 seed `130`.
+
+Update after the k150/k175 neighbor pass: hp `.38,k150` seed `128` is the new
+eight-policy target at `0.016570`, with six `0.014579`, reuse `0.306669`, and
+p90 `43486`. hp `.36,k175` seed `129` is the six-policy/evaluator-HRC target
+at six/eight `0.014327`/`0.016954`, evaluator HRC `0.009670`, reuse
+`0.306727`, and p90 `43827`. I launched hp `.38,k150` seed `131`,
+hp `.40,k150` seed `132`, hp `.36,k175` seed `133`, and hp `.38,k175`
+seed `134`.

@@ -1499,3 +1499,16 @@ Alibaba to hp `.36,k150`, six/eight `0.014881`/`0.017070`.
 
 Keep Sandia unranked until it produces a comparable generated trace and
 cachesim panel.
+
+## Round 66 (2026-05-01 12:05) — No Sandia Artifact During k150/k175 Split
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba eight-policy to hp `.38,k150` at `0.016570` and six-policy to
+hp `.36,k175` at `0.014327`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a comparable generated trace and
+cachesim panel.
