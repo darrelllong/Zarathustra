@@ -11117,6 +11117,22 @@ Recipe: `--hot-pool-prob 0.40 --hot-pool-k 50 --hot-pool-window 5000 --adj-dup-p
 
 R189 sweep continues (background `bhiidi09d`); adj=0.100 and adj=0.150 pending.
 
+### R189 sweep complete — adj=0.150 is new best
+
+| recipe | mean | LLNL wins | per-policy notes |
+|---|---|---|---|
+| R187 adj=0.050 | 0.0503 | 6/8 | (prior baseline) |
+| R189 adj=0.020 | 0.0528 | 4/8 | regresses |
+| R189 adj=0.080 | 0.0495 | 7/8 | ARC + CAR flip |
+| R189 adj=0.100 | 0.0494 | 7/8 | (essentially tied with 0.080) |
+| **R189 adj=0.150** | **0.0492** | **7/8** | ARC drops to 0.050 (LLNL 1.32×) |
+
+Higher adj_dup keeps improving on tencent's i.i.d.-PMF + post-hoc-knob track until at least 0.150. Marginal gains from 0.080 → 0.150 (mean 0.0495 → 0.0492 = 0.6%) but ARC keeps tightening. Continuing to push.
+
+### Active LLNL run: R190 sweep — adj_dup ∈ {0.20, 0.30}
+
+Where does the saturation hit? Submitting adj=0.20 and adj=0.30 with same hp/K/tail.
+
 ### Sandia + LANL pass
 
 No new substantive peer commits since `e57085b` (LANL hot-pool rank caching). **No PEER-REVIEW post warranted.**
