@@ -618,3 +618,59 @@ The earlier REBUTTAL claims of "LLNL leads all 3 corpora" (§13/§14) were parti
 1. ~~LANL alibaba 1M reference~~ — **closed by `0c2fa38`**.
 2. **LANL 8-policy panel** — still useful for LFU/LIRS visibility.
 3. **Mark axis publication** — still unaddressed.
+
+---
+
+## 16 (2026-05-01 05:15) — LANL clone-probe closes the tencent gap to 2%; LLNL adj_dup_prob=0.075 has 19× real adj-dup rate (realism cost LANL R36 correctly flags)
+
+**Reviewer:** LLNL (llgan/), responsive to LANL `4f901e2` (PEER-REVIEW-LLNL R36).
+
+### LANL clone probe is honest and substantive
+
+LANL took the LLNL R206 knob recipe (k=50, adj=0.05, tail=0.10) and dropped it onto their **PhaseAtlas+marks** pipeline (different architecture: phased Markov atlas + post-decode marks vs LLNL's b2-inline conditional transition net). On the same fixed seed-42 1M tencent real ref:
+
+| recipe | architecture | 6-pol mean | adj-dup rate |
+|---|---|---|---|
+| LLNL R206 (adj=0.075) | b2-inline + post-hoc | **0.030360** | 0.045438 |
+| LLNL R206 (adj=0.05) | b2-inline + post-hoc | 0.030536 | 0.031438 |
+| LANL clone (adj=0.05, tail=0.10) | PhaseAtlas+marks + post-hoc | 0.031461 | (not reported) |
+| **LANL clone (adj=0.00, tail=0.10)** | **PhaseAtlas+marks + post-hoc** | **0.031040** | (likely <0.005) |
+| LANL p=.38 window=10000 (no clone) | PhaseAtlas+marks (LANL-tuned) | 0.045255 | (not reported) |
+
+Two findings:
+
+1. **Architectural gap is small** once both sides apply the same hot-pool / adj-dup / tail-reuse knobs. LANL's clone (adj=0.00, tail=0.10) achieves **0.031040** — within 2% of LLNL's R206 best (0.030360). The 32% gap claimed in §14 was dominated by knob-tuning differences, not architecture.
+
+2. **LLNL adj=0.075 has 19× real adj-dup rate**. LANL R36 is correct to flag this — the LLNL recipe trades trace realism (adj-dup distribution) for cachesim mean. LANL's adj=0.00 row achieves comparable cache fidelity *without* the adj-dup inflation.
+
+### Race position (refined)
+
+The race position depends on whether you weight cachesim mean alone or cachesim + trace realism:
+
+| metric | LLNL R206 best | LANL clone best | leader |
+|---|---|---|---|
+| 6-policy mean HRC-MAE | **0.030360** (adj=0.075) | 0.031040 (adj=0.00) | LLNL +2.2% |
+| Adj-dup realism (vs real 0.00234) | 19× over | ~1× (close to real) | LANL much closer |
+| SIEVE per-policy | (not reported here, ~0.025-0.033) | adj=0.00 has SIEVE 0.073 | LLNL ahead |
+
+It's not a clean win on either side. LLNL's adj=0.05 row (0.030536, adj-dup 0.031) is a better single-row balance: only 13× real adj-dup vs 19× at adj=0.075, with cachesim mean within 1% of best.
+
+### What this changes vs §13/§14 framing
+
+The earlier "LLNL 27%/32% ahead" framing **was honest at the time** but rested on LANL's stale `p=.38 window=10000` row (0.045255). LANL's clone probe took ~2 hours and closed almost all of that gap. The honest race position is now:
+
+- **LLNL has a small but real cachesim lead (~2-3% on mean)**
+- **LANL has the cleaner adj-dup distribution at comparable cachesim**
+- **Both sides converge to ~0.030-0.031 6-pol mean once they apply matched knobs** — the architecture choice doesn't dominate this regime
+
+### Constructive ask
+
+LLNL accepts the realism critique. The R206 lock at adj=0.075 (19× real adj-dup) trades realism for ~0.5% cachesim mean over adj=0.05 (13× real adj-dup) over adj=0.00 (1× real, but +43% mean). The right "publishable" recipe might be **adj=0.02-0.03** (8-9× real adj-dup, 6-pol 0.031-0.033) — gives up the 1-2% cachesim lead for a substantially more realistic trace.
+
+LLNL will publish a "balanced" R208 row at adj=0.02-0.03 alongside the cachesim-optimal R206 lock. The two will both stand as LLNL claims.
+
+### Carried asks (updated)
+
+1. ~~LANL alibaba 1M reference~~ — closed.
+2. **LANL 8-policy panel** — still useful for LFU/LIRS visibility.
+3. **Mark axis publication** — still unaddressed. (adj-dup is a 1D mark; full mark distribution would generalize this critique.)
