@@ -12912,13 +12912,26 @@ Catastrophic regression. Same recipe, only the fit atlas changed.
 - **Memorization of high-frequency states.** With more transitions per state, the softmax sharpens around training-set ranks. At long-rollout generation the rank-PMF lookup hits states whose true next-rank distribution differs from the heavily-memorized training distribution → cache replay drifts.
 - This is consistent with the empirical pattern of R220-era atlases: the network's job is to *generalize* across condition vectors, not to perfectly fit per-state rank distributions. More data + same capacity made the trade go the wrong way.
 
-### Diagnostic launched (R225b)
+### Diagnostic R225b — overfit hypothesis disproven
 
-Launching R225b: same 100k atlas data, but **hidden=64 epochs=300** (R209-tier capacity, half the training budget). If this recovers near R221's 0.020-tier, overfit confirmed. If still bad, more-data is the wrong axis for this corpus.
+Same 100k atlas data, **hidden=64 epochs=300** (R209-tier capacity, half training budget). Final trans_loss=1.1783 (vs R225's 1.1534 — higher floor as expected for smaller model).
+
+| atlas | seed=42 6-pol | seed=42 8-pol |
+|---|---|---|
+| R221 (50k, h=96, ep=600) | 0.0204 (multi-seed) | 0.0209 |
+| R225  (100k, h=96, ep=600) | 0.2423 | 0.2534 |
+| R225b (100k, h=64, ep=300) | **0.1600** | **0.1648** |
+
+R225b is better than R225 (smaller model = less memorization) but still **~8× worse** than R221. Capacity-budget tuning recovered some ground but the fundamental more-data direction is wrong for alibaba at this atlas architecture.
 
 ### Lesson
 
-The R220 IRD diagnostic identified deep-tail PMF clipping as the alibaba ceiling. R225 tests whether *populating* those bins helps — and the answer at this recipe is no. The ceiling appears to live elsewhere (capacity-budget calibration, or the deep-tail PMF really is fundamentally hard to recover from training even with more samples). R226 (CP hp re-sweep on the new R224 atlas) is now the higher-EV next move.
+The R220 IRD diagnostic identified deep-tail PMF clipping as the alibaba ceiling. R225/R225b test whether *populating* those bins helps — and the answer is no, regardless of capacity tune. Possible reasons:
+- 12 states × ~13 deep-tail bins is sparse even at 23.7M transitions; per-cell density still too low to learn smooth conditional PMFs.
+- Doubling records-per-file shifts the *training* condition vector distribution (more late-trace states with more rare-rank events) away from the *generation*-time condition distribution, breaking the cond-MLP's learned mapping.
+- More fundamentally: the alibaba ceiling may be a cond-encoding limit, not a sample-density limit.
+
+Drop more-data axis. R226 (CP hp re-sweep on the new R224 atlas) is now the higher-EV next move.
 
 ### Sandia + LANL pass
 
