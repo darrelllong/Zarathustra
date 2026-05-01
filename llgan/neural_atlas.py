@@ -639,6 +639,8 @@ def generate(
     adj_dup_prob: float = 0.0,
     tail_reuse_prob: float = 0.0,
     tail_reuse_min_frac: float = 0.5,
+    recent_pool_prob: float = 0.0,
+    recent_pool_window: int = 200,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -737,6 +739,11 @@ def generate(
             # R184 decay: each new access multiplies all counts by decay,
             # then adds 1.0 to the new id. Half-life ≈ ln(0.5)/ln(decay) steps.
             hot_decay = 0.9999  # half-life ~6900 steps
+            # R194: short-window recency pool — addresses LIRS/SIEVE which need
+            # recency-clustered concentration (IRR-aware) that the long-term
+            # frequency hot pool washes out. Sample uniformly from last N emitted
+            # obj_ids when recent_pool_prob > 0.
+            recent_window: deque = deque(maxlen=max(int(recent_pool_window), 1))
 
             for step in range(per_stream):
                 # Decode current state to (phase, dist_state) → action
@@ -771,6 +778,24 @@ def generate(
                     # already at rank 0; do not re-insert
                     if rank_net is not None:
                         prev_rank_bin = 0
+                elif (recent_pool_prob > 0.0
+                      and len(recent_window) > 0
+                      and rng.random() < recent_pool_prob):
+                    # R194: recency-clustered redirect — pick uniformly from
+                    # last N emitted obj_ids. LIRS uses IRR (Inter-Reference
+                    # Recency) to classify low-IRR vs high-IRR objects; SIEVE
+                    # uses referenced-bit dynamics that depend on temporal
+                    # proximity. The long-term freq hot pool (R181/R184)
+                    # smooths over both. recent_window preserves the burst
+                    # structure that policies-with-recency need.
+                    rec_idx = int(rng.integers(0, len(recent_window)))
+                    obj_id = recent_window[rec_idx]
+                    if obj_id in stack:
+                        rank = stack.index(obj_id)
+                        del stack[rank]
+                    stack.insert(0, obj_id)
+                    if rank_net is not None:
+                        prev_rank_bin = N_RANK_BINS  # sentinel: recent-pool isn't a sampled rank
                 elif (hot_pool_prob > 0.0
                       and len(hot_pool_list) > 0
                       and rng.random() < hot_pool_prob):
@@ -856,6 +881,11 @@ def generate(
                     "opcode": op_sampled,
                     "tenant": 0,
                 })
+
+                # R194: append every emitted obj_id to the short-window
+                # recency deque. Cheap (deque maxlen auto-evicts oldest).
+                if recent_pool_prob > 0.0:
+                    recent_window.append(int(obj_id))
 
                 # R184: decay-weighted hot pool — scales to 1M-record streams
                 # without the R181 sliding-window exhaustion issue. Counts
@@ -961,6 +991,14 @@ def main():
     pgen.add_argument("--tail-reuse-min-frac", type=float, default=0.5,
                       help="R187: lower bound for tail-reuse rank as a "
                            "fraction of stack size (default 0.5 = deep half).")
+    pgen.add_argument("--recent-pool-prob", type=float, default=0.0,
+                      help="R194: prob of redirecting a reuse to a uniform "
+                           "pick from the last N emitted obj_ids. Targets "
+                           "LIRS/SIEVE which need recency-clustered (IRR-aware) "
+                           "concentration that the long-term freq hot pool "
+                           "washes out.")
+    pgen.add_argument("--recent-pool-window", type=int, default=200,
+                      help="R194: deque size for recent-pool sampling.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -982,6 +1020,8 @@ def main():
             adj_dup_prob=args.adj_dup_prob,
             tail_reuse_prob=args.tail_reuse_prob,
             tail_reuse_min_frac=args.tail_reuse_min_frac,
+            recent_pool_prob=args.recent_pool_prob,
+            recent_pool_window=args.recent_pool_window,
         )
 
 
