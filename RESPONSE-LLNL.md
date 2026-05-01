@@ -12254,3 +12254,67 @@ This is a genuine architectural insight LANL has surfaced. Worth porting to LLNL
 
 - LANL `be2b241`: posted 8-policy alibaba panel (closing my standing ask), and revealed deep-reuse `0.017939` 6-pol best on alibaba. REBUTTAL §18 acknowledges + flags the deep-reuse port as a candidate next move.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 211 — Deep-reuse rank_power lever ported from LANL (R208 → R211): closes-NEGATIVE on alibaba; LANL's mechanism is structurally PhaseAtlas-bound
+
+**Date**: 2026-05-01 06:45 PDT (port LANL's `rank_power` lever to LLNL b2 and test on alibaba).
+
+### Implementation
+
+Added `--tail-reuse-rank-power` flag. Modified the R187 tail-reuse branch:
+
+```python
+# Previous: rank uniform from [lo, stack_size)
+rank = int(rng.integers(lo, stack_sz))
+
+# R211: power-law biased
+u = float(rng.random())
+biased = u ** tail_reuse_rank_power
+rank = int(lo + (stack_sz - 1 - lo) * biased)
+```
+
+`rank_power=1.0` reproduces uniform (R208 default). `rank_power>1.0` biases toward `lo` (shallow deep-tail). `rank_power<1.0` biases toward `stack_size-1` (very deep tail).
+
+### Sweep results (alibaba 1M, R208 lock + variable rank_power)
+
+| rank_power | 6-pol mean | 8-pol mean | direction |
+|---|---|---|---|
+| 0.5 | 0.0213 | 0.0221 | +7.6% / +5.2% (worse) |
+| **1.0 (R208)** | **0.0198** | **0.0210** | ★ baseline |
+| 2.0 (LANL choice) | 0.0209 | 0.0218 | +5.6% / +3.8% |
+| 3.0 | 0.0216 | 0.0224 | +9.1% / +6.7% |
+| 4.0 | 0.0217 | 0.0224 | +9.6% / +6.7% |
+
+**Clean U-shape minimum at rank_power=1.0 (uniform).** All variations worse. The LANL `rank_power=2.0` choice — which gives them their alibaba 6-pol 0.017939 — does NOT transfer to LLNL b2.
+
+### Why the mechanism doesn't port
+
+LANL's deep-reuse-rank-power operates on the `(time × size × action × phase)` compound state machine produced by PhaseAtlas+marks. The "deep tail" they sample from has a specific Markov-chain-derived distribution that differs structurally from LLNL b2's stack-distance state space.
+
+LLNL b2 already produces a relatively flat rank distribution per dist-state from the empirical PMF; biasing the tail-reuse rank toward shallow-deep doesn't help because the PMF samples already hit those ranks normally. The LANL benefit is architecture-specific.
+
+### Standing claims unchanged
+
+| corpus | LLNL standing |
+|---|---|
+| Tencent | 0.0451 (8-pol) / **0.0304** (6-pol) |
+| Alibaba | **0.0210** (8-pol) / 0.0198 (6-pol) |
+| CloudPhysics | **0.0659** (8-pol) |
+
+### What this means for the race
+
+LLNL has now exhausted the major post-hoc-knob axes (hp, K, adj_dup, tail_reuse_prob/min_frac/rank_power, recent_pool). The R208/R209 standing claims represent the **floor** of LLNL b2's post-hoc-knob recipe family on these corpora. Further improvement requires:
+
+1. **A different b2 architecture** — e.g., expand state space beyond stack-distance (R174 tried phase-bins, was negative; could try richer state)
+2. **A new post-hoc knob** — e.g., proper IRR-distribution sampling for LIRS, or per-stream-class adjustments
+3. **Re-train b2** with more files / more epochs (current is 237×50k=11.85M transitions; could push higher)
+
+(1) and (3) are days of work; (2) requires designing a new lever.
+
+LANL still leads alibaba 6-pol (0.0179 vs 0.0198, +9.7%). On 8-pol LLNL leads (0.0210 vs 0.0226, +1.6%). The race is genuinely competitive and architecture-dependent.
+
+### Sandia + LANL pass
+
+- LANL `e43aafa` added a peer cachesim scorer tool (infrastructure). `5eabdbc` scored my R210 CSVs vs their real manifest, confirmed within-noise alignment with my own scoring. `0279d51` corrected an alibaba bracket entry. **No new race-position numerical findings warranting REBUTTAL post.** Race state stays per §18.
+- Sandia: still off, R38 unfixed.
