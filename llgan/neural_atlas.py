@@ -636,6 +636,7 @@ def generate(
     hot_pool_prob: float = 0.0,
     hot_pool_k: int = 100,
     hot_pool_window: int = 5_000,
+    adj_dup_prob: float = 0.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -733,6 +734,16 @@ def generate(
                     next_new_id += 1
                     stack.insert(0, obj_id)
                     prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
+                elif (adj_dup_prob > 0.0 and len(stack) > 0
+                      and rng.random() < adj_dup_prob):
+                    # R182: back-to-back duplicate of the most-recently-emitted
+                    # obj_id (rank=0). Real adj-dup rate is ~0.3% on tencent;
+                    # b2-light's i.i.d. PMF emits 0% which costs SIEVE/CLOCK
+                    # policies catastrophically (see R181 corrective).
+                    obj_id = stack[0]
+                    # already at rank 0; do not re-insert
+                    if rank_net is not None:
+                        prev_rank_bin = 0
                 elif (hot_pool_prob > 0.0
                       and len(hot_pool_list) > 0
                       and rng.random() < hot_pool_prob):
@@ -903,6 +914,11 @@ def main():
                       help="R181: hot-pool size (top-K by sliding-window count).")
     pgen.add_argument("--hot-pool-window", type=int, default=5_000,
                       help="R181: sliding window size for hot-pool counting.")
+    pgen.add_argument("--adj-dup-prob", type=float, default=0.0,
+                      help="R182: prob of emitting back-to-back duplicate "
+                           "(rank=0) instead of sampling. Calibrate to corpus "
+                           "real adj-dup rate (~0.003 tencent). Fixes the "
+                           "SIEVE catastrophic gap diagnosed in R181 corrective.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -921,6 +937,7 @@ def main():
             n_records=args.n, seed=args.seed, temperature=args.temperature,
             hot_pool_prob=args.hot_pool_prob, hot_pool_k=args.hot_pool_k,
             hot_pool_window=args.hot_pool_window,
+            adj_dup_prob=args.adj_dup_prob,
         )
 
 

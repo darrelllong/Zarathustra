@@ -760,7 +760,7 @@ def cmd_eval_csv_hrc(args):
     gap = _gap(gen_m, real_m)
 
     print(f"manifest : {args.manifest}")
-    print(f"HRC-MAE  : {gap['hrc_mae']:.6f}")
+    print(f"HRC-MAE  : {gap['hrc_mae']:.6f}  (Python eval-csv-hrc — surface-only)")
     print(f"reuse    : {gen_m['reuse_access_rate']:.4f} "
           f"(real {real_m['reuse_access_rate']:.4f})")
     print(f"P50      : {gen_m['stack_distance_median']} "
@@ -769,6 +769,31 @@ def cmd_eval_csv_hrc(args):
           f"(real {real_m['stack_distance_p90']})")
     print(f"footprint: {gen_m['footprint_mean_per_stream']:.0f} "
           f"(real {real_m['footprint_mean_per_stream']:.0f})")
+
+    # R182: cachesim is now part of the standard LLNL eval. Per Darrell's
+    # callout (R181 corrective): the Python eval-csv-hrc surface above is
+    # mis-calibrated relative to real cache simulators. Always emit cachesim
+    # 6-policy HRC-MAE alongside so we don't chase pookahs.
+    if not getattr(args, "skip_cachesim", False):
+        try:
+            # Need a real-CSV file for cachesim. Materialize from real_df.
+            import tempfile, os as _os, pandas as _pd2
+            real_csv_tmp = tempfile.NamedTemporaryFile(
+                suffix=".csv", delete=False
+            ).name
+            real_df.to_csv(real_csv_tmp, index=False)
+            try:
+                from llgan import cachesim_eval
+                report = cachesim_eval.evaluate(args.csv, real_csv_tmp)
+                print()
+                print("CACHESIM (the policy-relevant metric):")
+                cachesim_eval.print_report(report)
+            finally:
+                _os.unlink(real_csv_tmp)
+        except FileNotFoundError as e:
+            print(f"\n[cachesim] skipped: {e}")
+        except Exception as e:
+            print(f"\n[cachesim] error: {e}")
 
 
 def cmd_calibrate_from_json(args):
@@ -876,6 +901,11 @@ def main():
                            help="Long-rollout HRC-MAE eval of a generated CSV against a real manifest")
     peval.add_argument("--csv", required=True, help="Generated CSV path")
     peval.add_argument("--manifest", required=True, help="long_rollout_manifest JSON path")
+    peval.add_argument("--skip-cachesim", action="store_true",
+                       help="Skip the cachesim 6-policy HRC-MAE block. By "
+                            "default, cachesim is run alongside the Python "
+                            "eval to avoid mis-calibrated headline numbers "
+                            "(R182, per Darrell's pookah-avoidance directive).")
 
     args = p.parse_args()
     if args.cmd == "fit":

@@ -691,3 +691,37 @@ evaluation artifact visible under the Sandia checkpoint tree.
 Keep Sandia out of the numeric race table. The next acceptance gate is not
 another pretrain checkpoint; it is a generated trace plus cache/object metrics
 from the same long-rollout panel LANL and LLNL are now using.
+
+---
+
+## Round 24 (2026-04-30 16:25) — Sandia Back On The Board: `s003_smoke` Phase 1 Clean
+
+**Reviewer:** LLNL (llgan/), positive observation.
+
+### Finding
+
+`newgan/train.py` is alive again as `s003_smoke` (PID 2650648, launched ~16:18 PDT). Recipe: tencent / 3 AE + 3 Sup + 5 G-warm pretrain + 5 Phase-3 GAN epochs / batch 64 / hidden 256 / files-per-epoch 12 / records-per-file 20k / cond-drop 0.25 / seed 42.
+
+**Phase 1 (AE pretrain) completed cleanly in 7.4 min:**
+
+| epoch | train_loss | val_loss |
+|---|---|---|
+| 1 | 0.012744 | 0.000782 |
+| 2 | 0.000586 | 0.000506 |
+| 3 | 0.000480 | 0.000482 |
+
+train→val ratio 0.99 at ep3, no overfit. Phase 2 (Supervisor) now starting. **No nan, no collapse, durable train.log via `tee` (Round 22 fix landed).**
+
+### Observation — recipe is sized for smoke validation, not race claim
+
+This is explicitly an `s003_smoke` run with only 5 GAN epochs and 5 G-warmup epochs — not enough to reach the v229-style ★≈0.039 basin. The point is to verify the post-`a543893` fix sequence (tensor-dim, supervisor collation, etc.) survives an end-to-end pass. Don't expect a competitive frozen ★ from this one.
+
+### What's needed for a real Sandia race entry
+
+1. After s003_smoke completes Phase 3 (~10-15 min from now), check `frozen_sweep.json` and `long_rollout_*.json` artifacts in the checkpoint dir.
+2. If smoke passes, scale to v229-equivalent recipe: 50 AE + 50 Sup + 100 G-warm + 200 GAN.
+3. Eval on `tencent_stackatlas` 4-stream manifest (the same 100k surface LLNL/LANL use). Run `tools/cachesim` for the 6-policy HRC-MAE breakdown.
+
+### Race position update
+
+Sandia: pretrain is healthy and durable; **first sign of a working pipeline since R23 boundary-violation episode**. No published ATB yet, but the precondition (running training) is finally met. Watch for Phase 3 frozen ★ in the next ~15 min.
