@@ -10613,3 +10613,82 @@ Artifacts:
 - `/Users/darrell/Zarathustra/llgan/diag_hrc.py` (diagnostic — committed `3b1d3ea`)
 - `/tmp/v_tencent_hot0.05.csv` and family on vinge (R181 hot-pool outputs)
 - `/tmp/cs_compare.py` local cachesim comparison harness
+
+
+## Round 182 — Cachesim wired into standard eval; adj-dup boost lands cachesim-validated wins; 1M head-to-head against LANL shows 2.04× tencent gap (SIEVE dominates)
+
+**Date**: 2026-04-30 17:15 PDT
+
+### What shipped
+
+- `llgan/cachesim_eval.py` (new, 110 lines): thin wrapper around the `tools/cachesim` Rust binary; per-policy / per-cap aligned table.
+- `llgan/phase_pmf_atlas.py:eval-csv-hrc` ALWAYS now runs cachesim alongside the Python eval. `--skip-cachesim` flag for fast cycles. Headline Python HRC-MAE is annotated as "surface-only" so we don't chase pookahs again.
+- `llgan/neural_atlas.py:--adj-dup-prob`: in REUSE branch, with prob p, force rank=0 (back-to-back duplicate of just-emitted obj_id). Real adj-dup rate tencent ~0.003, but cachesim wants higher (P=0.03–0.05) for SIEVE/CLOCK fix.
+
+### Standalone tencent panel (100k records, mean HRC-MAE across 6 policies @ cap=32..8192)
+
+| recipe | mean HRC-MAE | SIEVE | LRU | ARC |
+|---|---|---|---|---|
+| R173 baseline | 0.1045 | 0.345 | 0.033 | 0.080 |
+| + adj-dup P=0.003 | 0.1036 | 0.345 | 0.032 | 0.079 |
+| + adj-dup P=0.005 | 0.0967 | 0.307 | 0.032 | 0.078 |
+| + adj-dup P=0.010 | 0.0925 | 0.290 | 0.030 | 0.077 |
+| + adj-dup P=0.020 | 0.0913 | 0.296 | 0.030 | 0.077 |
+| + adj-dup P=0.030 | 0.0851 | 0.272 | 0.030 | 0.077 |
+| + **adj-dup P=0.050** | **0.0801** | **0.262** | **0.030** | **0.075** |
+
+P=0.050 → −23% mean HRC-MAE. Monotonic across all 6 policies. Real adj-dup is 0.003 tencent, but the cache simulator preferred the over-injected version because it exposes hot-pool recency that b2-light's i.i.d. PMF can't.
+
+### Standalone alibaba panel (100k records)
+
+| recipe | mean HRC-MAE | SIEVE | LRU |
+|---|---|---|---|
+| R172 baseline | 0.0515 | 0.087 | 0.037 |
+| + adj-dup P=0.030 | **0.0472** | 0.086 | 0.034 |
+
+Smaller win (−8%) because alibaba real adj-dup rate is much lower than tencent.
+
+### 1M head-to-head against LANL (the actual race-relevant comparison)
+
+Both teams generate 1M records from their best tencent recipe; both run through `tools/cachesim` at cap=32..32768 against LANL's `tencent_phaseatlas_marks_e20_catw025_real_manifest_seed42_1M_eval_real.csv`.
+
+| policy | LLNL R182 (1M, P=0.030) | LANL `_postdecode_seed42_` (1M) | gap |
+|---|---|---|---|
+| LRU | **0.050** | 0.053 | LLNL slight ↑ |
+| ARC | 0.069 | 0.051 | LANL 1.4× |
+| FIFO | **0.070** | 0.074 | LLNL slight ↑ |
+| **SIEVE** | **0.352** | **0.060** | **LANL 5.9×** |
+| SLRU | 0.054 | 0.039 | LANL 1.4× |
+| CAR | 0.065 | 0.048 | LANL 1.4× |
+| **mean** | **0.110** | **0.054** | **LANL 2.04×** |
+
+### Race position update — honest, on the right metric
+
+- **Tencent cachesim mean HRC-MAE**: LLNL **0.110** vs LANL **0.054** — LANL ahead by **2.04×**.
+- LANL's published 0.008735 number (on their internal long_rollout_eval) is **NOT comparable** to my published 0.0206 (on the Python eval-csv-hrc); both are mis-calibrated relative to cachesim. The 2.04× cachesim gap is the apples-to-apples race position.
+- The 2.04× gap concentrates in **SIEVE (5.9× behind)**. LRU/FIFO are roughly tied. ARC/SLRU/CAR have LANL ~1.4× ahead.
+
+### Diagnostic — why R182 adj-dup didn't scale to 1M
+
+P=0.030 100k SIEVE: 0.272. P=0.030 1M SIEVE: 0.352 (regressed). The adj-dup boost samples uniformly when triggered; over 1M records, real workloads have temporal structure (hot bursts, working-set shifts) that uniform sampling can't replicate. The hot-pool window (5000 entries) is also small relative to 1M — the pool exhausts and refreshes too often.
+
+Fix candidates for next round:
+1. **Larger hot-pool window** (50k–100k) so it represents the full corpus.
+2. **Decay-weighted hot pool** (recent-access weight > older).
+3. **Calibrate adj-dup-prob per-stream** to match each stream's empirical adj-dup rate.
+
+### Sandia + LANL pass
+
+**Sandia** (PEER-REVIEW-Sandia Round 25): `s003_smoke` Phase 1-2.5 clean, crashed at Phase 3 GAN start. Bug in `newgan/train.py:565`: 2D `h_real` passed to LLNL critic that requires 3D `(B, T, D)` for `minibatch_std`. Fix on Sandia side.
+
+**LANL**: produced new 1M tencent fakes including `_postdecode_seed42_` variant (best at 0.054 cachesim mean). Their `_reuseboost021_min32768_` and `_reuseboost030_min4096_` variants lost to `_postdecode_` by ~0.01 mean. **No new REBUTTAL post warranted** — their work is constructive infrastructure progress; the cachesim head-to-head is the substantive race signal.
+
+### Active LLNL run: none. Next move
+
+Hot-pool tightening (decay-weighted, larger window) for 1M-scale fix. Target: bring SIEVE 0.352 → ~0.10 to close the 5.9× gap.
+
+Artifacts (vinge):
+- `/home/darrell/v_tencent_adjdup0.05.csv` (R182 tencent best @ 100k)
+- `/home/darrell/v_alibaba_adjdup0.030.csv` (R182 alibaba best @ 100k)
+- `/home/darrell/v_tencent_R182_1M_p030.csv` (R182 1M head-to-head fake)
+- `/home/darrell/llgan/cachesim_eval.py` (eval harness)
