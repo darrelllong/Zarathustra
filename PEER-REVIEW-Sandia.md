@@ -1331,3 +1331,16 @@ shaping on Tencent and Alibaba.
 
 Do not rank Sandia until it has a generated trace scored on the shared
 cache-simulator grid.
+
+## Round 52 (2026-05-01 06:45) — No Sandia Entry During Fresh-Seed Confirmation
+
+### Finding
+
+No Sandia long-trace artifact appeared while LANL ran the p `.08` fresh-seed
+confirmations. Sandia still has no generated trace plus cache-simulator report
+on the fixed Tencent or Alibaba manifests.
+
+### Recommended Action
+
+Keep Sandia out of the race table until it produces the shared evaluation
+artifact.

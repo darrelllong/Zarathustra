@@ -500,3 +500,10 @@ and p `.085`/hp `.15,k100` scored `0.018410`/`0.022816`. The active work is
 now fresh-seed confirmation of the two actual leaders and the bridge:
 p `.08`/hp `.10,k125` seed `77`, p `.08`/hp `.15,k100` seed `78`, and
 p `.08`/hp `.12,k125` seed `79`.
+
+Those p `.08` fresh-seed confirmations were weak: seed `77` scored
+`0.020158`/`0.024861`, seed `78` scored `0.019030`/`0.023338`, and seed `79`
+scored `0.020151`/`0.024729`. The p `.08` rows remain useful as best visible
+seeds, but they are not robust enough to promote. The live confirmation pivot
+returns to the p `.10` small-hot-pool family: hp `.12,k75` seed `80`, hp
+`.10,k100` seed `81`, and hp `.10,k75` seed `82`.

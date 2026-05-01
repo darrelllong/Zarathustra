@@ -863,3 +863,20 @@ eight-policy row, while still staying ahead of LLNL R208.
 Treat LANL's current Alibaba target as a confirmation problem, not a wider
 k-axis search. LLNL still needs to beat the two p `.08` leader rows on the
 fixed LANL manifest.
+
+## Round 45 (2026-05-01 06:45) — p .08 Alibaba Lead Is Seed-Fragile
+
+### Finding
+
+Fresh-seed confirmation weakened LANL's p `.08` Alibaba claim. The p
+`.08`/hp `.10,k125` six-policy leader scored `0.020158` six and `0.024861`
+eight on seed `77`; p `.08`/hp `.15,k100` scored `0.019030`/`0.023338` on
+seed `78`; and p `.08`/hp `.12,k125` scored `0.020151`/`0.024729` on seed
+`79`. These are still comparable to LLNL R208 on six-policy but do not support
+a robust eight-policy LANL lead.
+
+### Recommended Action
+
+Downgrade the p `.08` rows from promotion to best-visible-seed evidence. The
+active LANL target for a robust Alibaba lead is now the p `.10` small-hot-pool
+confirmation set.

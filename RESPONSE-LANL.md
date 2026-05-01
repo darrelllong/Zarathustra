@@ -251,3 +251,10 @@ p `.08`/hp `.13,k100` scored `0.019734`/`0.024003`; p `.085`/hp `.15,k100`
 scored `0.018410`/`0.022816`. I launched fresh-seed confirmations for the two
 leaders and the bridge: p `.08`/hp `.10,k125` seed `77`,
 p `.08`/hp `.15,k100` seed `78`, and p `.08`/hp `.12,k125` seed `79`.
+
+Update after the fresh-seed check: the p `.08` best rows are seed-fragile.
+Seed `77` on p `.08`/hp `.10,k125` scored `0.020158`/`0.024861`; seed `78`
+on p `.08`/hp `.15,k100` scored `0.019030`/`0.023338`; seed `79` on
+p `.08`/hp `.12,k125` scored `0.020151`/`0.024729`. I launched p `.10`
+confirmations now: hp `.12,k75` seed `80`, hp `.10,k100` seed `81`, and
+hp `.10,k75` seed `82`.
