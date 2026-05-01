@@ -6,6 +6,25 @@
 
 ---
 
+## Round 32 (2026-05-01 01:42) — Sandia Still Before Generation; LANL Best Is Now ~0.0457
+
+**Reviewer:** LANL / `altgan`, paired scan during hot-pool bracket.
+
+### Finding
+
+`s004_tencent_full` is still in Supervisor pretraining (latest visible epoch
+33/50), with no generated trace or cachesim panel. Meanwhile LANL's hot-pool
+bracket lowered the Tencent six-policy surface to `0.045660` on fake seed 44,
+with `p=0.45` confirmed on fake seed 42 at `0.045988`.
+
+### Status
+
+Sandia remains live operationally but not on the numeric race table. The first
+valid Sandia comparison must include a generated 1M trace and six-policy
+`tools/cachesim` result; pretrain loss alone is not a race artifact.
+
+---
+
 ## Round 31 (2026-05-01 01:22) — Sandia Still Training While LANL Moves The Cachesim Bar
 
 **Reviewer:** LANL / `altgan`, paired scan during hot-pool confirmation.

@@ -1050,7 +1050,19 @@ reuse `0.729857` vs real `0.728415`, median `86` vs `84`, p90 `24815` vs
 `0.068861`, FIFO `0.035623`, SIEVE `0.033782`, SLRU `0.045185`, CAR
 `0.064527`. Hot-shape diagnostics: top-100 share `0.123185`, top-1000
 `0.384067`, adjacent duplicate rate `0.004372`, unique namespaced objects
-`270143`. The current bracket runs `p=.45` and `p=.55` on fake seed `44`.
+`270143`.
+
+Bracket results:
+
+| Variant | fake seed | evaluator HRC-MAE | six-policy cachesim mean | fake reuse | fake med | fake p90 | mark | top100 | top1000 | adj dup |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| hot-pool `p=.45` | 44 | 0.037309 | **0.045864** | 0.728974 | 85 | 25128 | 0.036310 | 0.101801 | 0.345525 | 0.004186 |
+| hot-pool `p=.55` | 44 | 0.038566 | 0.047347 | 0.729636 | 86 | 24797 | 0.036845 | 0.137561 | 0.414682 | 0.004462 |
+| hot-pool `p=.45` | 42 | 0.037703 | **0.045988** | 0.729630 | 85 | 25142 | 0.036395 | 0.103650 | 0.347998 | 0.004159 |
+| hot-pool `p=.40` | 44 | 0.036725 | **0.045660** | 0.728511 | 84 | 25309 | 0.036029 | 0.086761 | 0.309028 | 0.004097 |
+
+Current interpretation: the optimum is below `p=.50`; `p=.55` overconcentrates
+and loses SIEVE/SLRU. `p=.40` seed-42 and `p=.35` seed-44 are running.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
@@ -1071,3 +1083,9 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool050_wpow2_reuseboost030_min32768_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool050_reuseboost030_min32768_postdecode_faststack_progress_fakeseed44_realmanifest42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool050_reuseboost030_min32768_faststack_progress_fakeseed44_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool045_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool045_reuseboost030_min32768_faststack_fakeseed44_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool045_reuseboost030_min32768_postdecode_faststack_seed42_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool045_reuseboost030_min32768_faststack_seed42_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool040_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool040_reuseboost030_min32768_faststack_fakeseed44_realmanifest42_six_policy_caps.json`

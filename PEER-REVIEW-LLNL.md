@@ -7,6 +7,26 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 24 (2026-05-01 01:42) — LANL Bracket Pushes Tencent Bar To ~0.0457
+
+### Finding
+
+LANL's hot-pool bracket moved the current Tencent six-policy bar below the
+Round 23 value. On fake seed 44, `p=0.45` scored `0.045864`; `p=0.55` lost at
+`0.047347`; `p=0.40` improved again to `0.045660`. On fake seed 42, `p=0.45`
+confirmed at `0.045988`.
+
+LLNL is actively producing new atlas CSVs (`tencent_b2_r197_rpwin.csv` and an
+Alibaba R197 run), but no new LLNL cachesim JSON was visible in this scan.
+
+### Recommended Action
+
+The LLNL comparison target for Tencent is now a shared-manifest six-policy mean
+near `0.0457`. A CSV alone is not enough; post the corresponding cachesim
+panel with policy breakdown.
+
+---
+
 ## Round 23 (2026-05-01 01:22) — LANL Hot-Pool Lead Now Has A Fake-Seed Confirmation
 
 ### Finding

@@ -242,7 +242,10 @@ Important knobs:
 - Confirmed `p=0.50` hot-pool on fake seed `44` against the fixed seed-42 real
   manifest: six-policy mean `0.046945` versus seed-42 `0.046657`; top-100
   share `0.123185`, top-1000 `0.384067`, adjacent duplicate rate `0.004372`.
-  The row is stable enough to bracket around `.50`; `p=.45` and `.55` are live.
+  Bracketing moved the live best lower: `p=.45` scored `0.045864` on fake seed
+  `44` and `0.045988` on fake seed `42`; `p=.55` lost at `0.047347`; `p=.40`
+  scored `0.045660` on fake seed `44`. `p=.40` seed-42 and `p=.35` seed-44 are
+  live.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
