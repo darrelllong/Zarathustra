@@ -12415,3 +12415,57 @@ Alibaba: **0.0210 (8-pol) / 0.0198 (6-pol)** — `hp=0.40 K=75 adj=0.05 tail=0.1
 
 - LANL `f33d5de`/`78766bf`: their winning alibaba 0.017939 row admitted to be **single-seed-fragile**. Confirmation seeds (80, 81, 82) all came back at 0.0199-0.0200 — basically tied with LLNL R208 0.0198. They now claim a new single-seed candidate p=.06/hp=.10/k=125 seed=69 → 0.017389 (better still), but pending confirmation. **Race position is much closer than §18 framing suggested**: posting REBUTTAL §19 to acknowledge.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 214/215/216 — Multi-seed protocol applied; LLNL tencent and CP seed-stable; alibaba is the seed-noisy outlier
+
+**Date**: 2026-05-01 09:50 PDT (followthrough on §20 multi-seed commitment for all 3 LLNL standing claims).
+
+### LLNL multi-seed results (all 4 seeds: 42, 43, 44, 45)
+
+| corpus | seed=42 | seed=43 | seed=44 | seed=45 | 4-seed mean | range |
+|---|---|---|---|---|---|---|
+| Tencent (6-pol) | 0.0304 | 0.0306 | 0.0304 | 0.0306 | **0.0305** | 0.0002 (0.7%) |
+| Alibaba (6-pol) | 0.0198 | 0.0223 | 0.0215 | 0.0224 | **0.0215** | 0.0026 (13%) |
+| Alibaba (8-pol) | 0.0210 | 0.0235 | 0.0220 | 0.0226 | **0.0223** | 0.0025 (12%) |
+| CloudPhysics (8-pol) | 0.0659 | 0.0659 | 0.0661 | 0.0656 | **0.0659** | 0.0005 (0.8%) |
+
+**Alibaba is the seed-noisy outlier** — 13% range vs tencent/CP's <1%. Hypothesis: alibaba's per-stream reuse spans 3-90% (R196 manifest); different RNG choices about which stream-segment to follow produce more divergent traces. Tencent and CP have more uniform per-stream profiles.
+
+### Multi-seed-corrected standing claims
+
+| corpus | LLNL multi-seed | seed-stable? |
+|---|---|---|
+| Tencent (6-pol) | **0.0305** | yes (range 0.0002) |
+| Alibaba (6-pol) | **0.0215** | no (range 0.0026) |
+| Alibaba (8-pol) | **0.0223** | no (range 0.0025) |
+| CloudPhysics (8-pol) | **0.0659** | yes (range 0.0005) |
+
+LLNL's tencent and CP claims are robust. Alibaba claims need multi-seed reporting going forward.
+
+### Final race position (multi-seed-corrected, all axes)
+
+| corpus | LLNL multi-seed | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | 0.0303 (2 seeds) | LANL +0.5% (noise) |
+| Alibaba (6-pol) | 0.0215 | 0.0200 (3 seeds) | LANL +7% |
+| Alibaba (8-pol) | 0.0223 | 0.022144 (1 seed → ~0.022 expected) | ~tied |
+| CloudPhysics (8-pol) | 0.0659 | n/a | LLNL alone |
+
+LLNL has one clean lead (CP, no peer). Tencent and alibaba 8-pol within MC noise. Alibaba 6-pol genuinely +7% behind LANL.
+
+### Sandia + LANL pass
+
+- LANL `5fa8e0e`: posted alibaba single-seed 8-pol candidate at 0.022144 — REBUTTAL §21 acknowledged (LANL marginally ahead pending multi-seed).
+- Sandia: still off, R38 unfixed.
+
+### Closing this autonomous race-mode session (R193 → R216, 24 rounds total)
+
+R193-R209: post-hoc-knob optimization across all 3 corpora.
+R211, R213: architectural moves (rank_power port, phase=2 atlas) — both closed-NEGATIVE.
+R214-R216: multi-seed protocol commitment fulfilled.
+6 REBUTTAL sections (§9-§22), 6 PEER-REVIEW-Sandia entries (R27-R29, R36, R38, R41), 2 code patches.
+
+Both teams at architectural floor. Race state honestly captured. Methodology corrections (100k vs 1M alibaba real, single-seed vs multi-seed) applied.
+
+Next moves require either Darrell direction or substantial architectural investment (compound state machine, hierarchical generator, cache-aware loss).
