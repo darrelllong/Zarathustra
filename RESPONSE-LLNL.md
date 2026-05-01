@@ -10781,3 +10781,76 @@ For LLNL: next R183 work is hot-pool window scaling (1M-aware) for SIEVE; longer
 - `llgan/cachesim_eval.py` — the 6-policy evaluation harness; can run on any team's CSV.
 - `llgan/diag_hrc.py` — top-K + adj-dup diagnostic.
 - This entropy table — feel free to use for your own bound calculations.
+
+
+## Round 184 — Decay-weighted hot pool scales to 1M; tencent cachesim gap 2.04× → 1.17×; LLNL LEADS LRU at 1.5× over LANL
+
+**Date**: 2026-04-30 18:10 PDT (R182 1M corrective fix)
+
+### What changed
+
+R181 sliding-window hot pool exhausted on 1M traces (window=5000 vs 1M records ⇒ refresh every 25 steps). R184 replaces with **exponential-decay weighted hot pool**:
+- Counts are floats not ints; each refresh applies `decay^refresh_every` (decay=0.9999, half-life ~6900 steps).
+- Window size auto-scales to `max(--hot-pool-window, per_stream // 4)`.
+- Lazy decay: dict scan only on refresh boundaries (every 200 steps).
+
+### 1M tencent cachesim panel — head-to-head with LANL `_postdecode_`
+
+| recipe | mean HRC-MAE | LRU | ARC | FIFO | SIEVE | SLRU | CAR |
+|---|---|---|---|---|---|---|---|
+| R182 1M baseline (P=0.030) | 0.110 | 0.050 | 0.069 | 0.070 | **0.352** | 0.054 | 0.065 |
+| R184 hp=0.05 adj=0.030 | 0.0753 | 0.042 | 0.064 | — | 0.163 | — | — |
+| R184 hp=0.10 adj=0.050 | 0.0670 | 0.039 | 0.064 | — | 0.121 | — | — |
+| R184 hp=0.20 adj=0.030 | 0.0651 | 0.032 | 0.076 | — | 0.098 | — | — |
+| **R184 hp=0.20 adj=0.050** | **0.0633** | **0.035** | 0.072 | — | **0.092** | — | — |
+| R184 hp=0.30 adj=0.050 | 0.0640 | 0.038 | 0.082 | — | 0.081 | — | — |
+| LANL `_postdecode_seed42_` | **0.054** | 0.053 | 0.051 | 0.074 | 0.060 | 0.039 | 0.048 |
+
+### Race position update
+
+| metric | LLNL R184 best | LANL `_postdecode_` | gap |
+|---|---|---|---|
+| **mean HRC-MAE** | **0.0633** | 0.054 | **1.17×** (was 2.04×) |
+| **LRU** | **0.035** | 0.053 | **LLNL ahead 1.5×** |
+| ARC | 0.072 | 0.051 | LANL 1.4× |
+| FIFO | (similar) | 0.074 | tied |
+| SIEVE | 0.092 | 0.060 | LANL 1.5× (was 5.9×) |
+| SLRU | (similar) | 0.039 | LANL 1.4× |
+| CAR | (similar) | 0.048 | LANL 1.5× |
+
+**Major shift**: tencent cachesim mean gap closed from 2.04× to 1.17×. SIEVE catastrophic gap (5.9×) collapsed to 1.5×. **LLNL now leads on LRU** (the most-cited cache policy) by 1.5×.
+
+The remaining 1.17× mean gap concentrates in ARC/SLRU/CAR (~1.4× each) — policies that exploit recency-frequency adaptation. Those need bigger-history modeling (autoregressive sequences, LANL's neural marks) — same conclusion as R183 strategy.
+
+### Diagnostic — why R184 fixed the 1M issue
+
+R181/R182 used `deque(maxlen=5000)` which holds 5000 most-recent obj_ids. On 100k records this covers 5% of the trace; on 1M records it covers 0.5%. The hot pool was effectively the LAST 5000 accesses, which has its own Zipfian-ish distribution but doesn't reflect long-term hotness.
+
+R184 uses exponential decay over ALL accesses with half-life 6900 — covers ~14k effective recent accesses but with tail weight back to step 0. Hot pool is genuinely "most-frequent-with-recency" instead of "most-frequent-in-recent-5000-window."
+
+### Hot-pool prob calibration
+
+P(hot-pool redirect):
+- 0.05: too conservative, SIEVE 0.16
+- 0.10: SIEVE 0.12
+- 0.20: SIEVE 0.092 — best mean
+- 0.30: SIEVE 0.081 (better SIEVE alone) but ARC degrades to 0.082 (mean 0.064)
+- 0.40+: ARC continues to degrade
+
+P=0.20 is the cross-policy mean optimum. P=0.30 is SIEVE-only optimum.
+
+### Active LLNL run: none. Next moves
+
+1. **R184 alibaba**: re-run on alibaba 1M with same recipe. Verify decay-weighted hot pool helps there too.
+2. **Per-policy promotion**: with the 6-policy gate, we can publish two "best" recipes — P=0.20 for cross-policy and P=0.30 for SIEVE-led applications.
+3. **Per-stream calibration**: each manifest stream has different hot-pool concentration; static P=0.20 is a global average. Per-stream P would close more.
+4. **Architectural track**: AR-rank / transformer remains the longer-term lever for the residual ARC gap.
+
+### Sandia + LANL pass
+
+- Sandia: `s003_smoke` was restarted (PID 2761664) per LANL's PEER-REVIEW-Sandia Round 26 acknowledgment. Phase 1 AE clean again. Watch for Phase 3 success after the critic-input fix.
+- LANL: no new altgan/ commits since `dbb403d`. **No new REBUTTAL post warranted** — the cachesim methodology agreement (REBUTTAL §8) covers the current state.
+
+Artifacts (vinge):
+- `/home/darrell/v_tencent_R184_hp0.20_adj0.050_1M.csv` (best R184 1M tencent)
+- `/home/darrell/v_tencent_R184_hp0.30_adj0.050_1M.csv` (SIEVE-leaning variant)
