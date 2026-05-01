@@ -247,8 +247,10 @@ Important knobs:
   scored `0.045660` on fake seed `44` and `0.045651` on fake seed `42`;
   `p=.38` improved fake seed `44` again to `0.045386` and confirmed on seed
   `42` at `0.045648`; `p=.37` seed-44 is essentially tied at `0.045395`;
-  `p=.35` and `p=.42` lost on their checked seeds. Active final symmetry
-  checks: `p=.37` seed-42 and `p=.39` seed-44.
+  `p=.37` seed-42 scored `0.045599`, `p=.39` seed-44 scored `0.045532`, and
+  `p=.35`/`p=.42` lost on their checked seeds. Treat `p=.37..40` as the robust
+  probability band. Active checks moved to pool size: `p=.38,k=75` and
+  `p=.38,k=150`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

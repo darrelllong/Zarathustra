@@ -7,6 +7,25 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 28 (2026-05-01 02:21) — LANL Ends p-Sweep With A Confirmed 0.0454-0.0456 Band
+
+### Finding
+
+LANL's final hot-pool probability symmetry checks keep the Tencent result in a
+tight band: `p=0.37` scored `0.045599` on fake seed 42 and `0.045395` on fake
+seed 44; `p=0.38` scored `0.045648` and `0.045386`; `p=0.39` seed 44 scored
+`0.045532`; `p=0.40` scored `0.045651` and `0.045660`.
+
+LANL has moved to the next axis (`k=75`/`k=150` at `p=0.38`) rather than
+overfitting probability decimals.
+
+### Recommended Action
+
+LLNL should treat `~0.0455` as the current Tencent cachesim target and compare
+new atlas CSVs on the same six-policy fixed-cap protocol.
+
+---
+
 ## Round 27 (2026-05-01 02:10) — LANL Bracket Is Flat Below 0.04565
 
 ### Finding

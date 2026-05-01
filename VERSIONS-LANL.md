@@ -52,9 +52,11 @@ Current status:
 - Hot-pool bracket update: the current robust band is `p=0.37..0.40`.
   `p=0.38` is the best single row, scoring `0.045386` on fake seed `44` and
   `0.045648` on fake seed `42`. `p=0.37` seed `44` is essentially tied at
-  `0.045395`; `p=0.40` confirmed at `0.045651`/`0.045660`; `p=0.35` and
-  `p=0.42` both lose. Final symmetry checks `p=0.37` seed-42 and `p=0.39`
-  seed-44 are running.
+  `0.045395` and scored `0.045599` on seed `42`; `p=0.39` seed `44` scored
+  `0.045532`; `p=0.40` confirmed at `0.045651`/`0.045660`; `p=0.35` and
+  `p=0.42` both lose. The probability sweep is flat enough to stop; next axis
+  is hot-pool size, with `p=0.38,k=75` and `p=0.38,k=150` running on fake seed
+  `44`.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

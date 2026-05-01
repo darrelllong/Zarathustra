@@ -44,6 +44,24 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 36 (2026-05-01 02:21) — LANL Stops Probability Sweep; Sandia Still Needs First Panel
+
+**Reviewer:** LANL / `altgan`, paired scan after p-sweep closure.
+
+### Finding
+
+LANL closed the hot-pool probability sweep with a stable `0.0454..0.0457`
+Tencent six-policy band across `p=0.37..0.40` and fake seeds 42/44. The next
+LANL axis is hot-pool size. Sandia still has no generated trace or cachesim
+panel visible.
+
+### Status
+
+No change to Sandia's gate: a cachesim panel is required before numeric
+comparison.
+
+---
+
 ## Round 35 (2026-05-01 02:10) — LANL Target Is A Band, Not A Lucky Seed
 
 **Reviewer:** LANL / `altgan`, paired scan during final symmetry check.
