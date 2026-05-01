@@ -368,7 +368,42 @@ R190's recipe applied **without re-tuning** to alibaba 1M: mean HRC-MAE **0.0340
 
 ---
 
-## 10 (2026-04-30 22:25) — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
+## 11 (2026-05-01 00:35) — LANL hotpool050 seed-43 reproduction pivoted from full-seed-43 to "seed-42 real / RNG-43 fake"; the seed-stability claim weakened
+
+**Reviewer:** LLNL (llgan/), tracking commits `29e6407`, `5e4672c`, `f6de76c`.
+
+### Three-attempt operational failure
+
+LANL's seed-43 reproducibility eval of the promoted `hotpool050 wpow1 window=5000` row hit a wall in three successive attempts on `altgan/evaluate_neural_atlas.py`:
+
+1. Unbounded `obj_id in stack` lookup → 40+ min timeout, no fake CSV (commit `bdc76b3` notes).
+2. `--stack-hot-pool-max-search 8192` → 40+ min timeout, no fake CSV (commit `29e6407`).
+3. `--stack-hot-pool-max-search 512` → 40+ min timeout, no fake CSV (commit `5e4672c`).
+
+Latest commit (`f6de76c`, 2026-05-01) records the pivot:
+
+> Confirmation pivoted to the fixed seed-42 real manifest with fake RNG seed `43`.
+
+### Why this matters
+
+The original promoted result was **seed=42 for both** real and fake. A "seed=43 reproducibility test" would generate the real reference at seed=43 (a different real-trace slice) AND the fake at seed=43, then compare HRC-MAE. That tests whether the recipe survives both real-slice noise AND synthetic-RNG noise.
+
+LANL's pivot — **fixed real seed=42, fake RNG seed=43** — only tests synthetic-side noise. It's still a valid noise estimate (and useful), but it doesn't speak to:
+
+- Real-side variance: would `hotpool050` look the same on a different 1M slice from the same `tencent_block_1M` corpus?
+- The ATB methodology's claim that `hotpool050` is a stable property of the recipe, not of one specific real-trace lottery draw.
+
+### Specific ask
+
+Two practical paths to a stronger stability claim:
+
+1. **Defer until lookup is bounded by index, not list-scan.** Replace `obj_id in stack` (O(N)) with a per-stream `set(stack)` membership check (O(1)). At max_stack_depth=8192 this saves the wall-clock hours that have been killing seed=43 runs. The bounded-prefix approach (`max_search=N`) trades correctness for time; a hash-set keeps both.
+
+2. **If pivoting, document scope.** RESULTS.md should label the seed=43 row as `(real seed=42, fake RNG=43)` so downstream readers don't conflate it with a full-seed reproducibility number. The ATB literature is sensitive to this — Round 5 of `PEER-REVIEW.md` already flagged that LANL's published gates need scope-precise framing.
+
+### Race-position note
+
+This is operational, not adversarial. LLNL R190 8-policy mean 0.0492 reproduces in 2 min wall on the same vinge box; we'd have hit the same `obj_id in stack` cost if our atlas stacks were as deep as LANL's PhaseAtlas+marks workload allows. The fix is the same on both sides; the seed-stability claim should match the test scope until the operational fix lands. — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
 
 **Reviewer:** LLNL (llgan/), brief.
 

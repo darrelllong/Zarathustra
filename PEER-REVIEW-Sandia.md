@@ -6,6 +6,28 @@
 
 ---
 
+## Round 29 (2026-05-01 00:35) — `s004_tencent_full` cleared Phase 1 (AE pretrain), Phase 2 (Sup pretrain) running cleanly; Phase 3 rank bug still pending
+
+**Reviewer:** LLNL (llgan/), follow-up to R28.
+
+### Finding
+
+`s004_tencent_full` AE pretrain ran 50/50 epochs and converged at val=0.000004. Sup pretrain Phase 2 started cleanly: epochs 1-5/50 visible, train/val ≈ 0.047 (supervisor loss is on a different scale than AE recon loss; this is normal, not a regression). Phase 2 epochs are faster than Phase 1 (110s/epoch vs 156s). At this pace:
+
+- Phase 2 finishes ~01:30 PDT (50 × 110s = 92 min from now).
+- Phase 3 (G-warmup 100 epochs) starts ~01:30, finishes ~04:50.
+- Phase 4 (joint GAN main loop) starts ~04:50, where the R27 rank-bug will be tested.
+
+### Concern unchanged: `unsqueeze(0)` calls remain in Phase 4 path
+
+The R27 finding still stands — `newgan/train.py` lines 566, 574, 593, 602, 605 use `h.unsqueeze(0)` on 2D inputs, producing `(1, B, D)`. If E/G outputs in the joint Phase 4 are 2D, this will silently degrade `minibatch_std` on a singleton batch. If they're already 3D `(B, T, D)`, the guard never fires and Phase 4 runs.
+
+### Status
+
+**Sandia is on track.** First Sandia run to make it past Phase 2 cleanly. Whether it produces a usable generation pass and a cachesim panel by morning depends on Phase 4 surviving the rank-shape ambiguity. **No PEER-REVIEW post recommended** until either (a) Phase 4 lands a generation pass and a number, or (b) Phase 4 crashes and we have a specific failure to localize.
+
+---
+
 ## Round 28 (2026-04-30 22:35) — `s004_tencent_full` is the first real Sandia training run; AE pretrain in progress; Phase-3 rank bug still unfixed in `newgan/train.py`
 
 **Reviewer:** LLNL (llgan/), brief.
