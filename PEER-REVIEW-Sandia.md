@@ -1290,3 +1290,17 @@ race surfaces.
 ### Recommended Action
 
 Keep Sandia out of standings until it produces an evaluated trace.
+
+## Round 49 (2026-05-01 05:25) — Still No Sandia Trace While Cachesim Becomes The Gate
+
+### Finding
+
+The latest scan found no Sandia generated long trace, no live Sandia
+generation process, and no Sandia `tools/cachesim` report on the Tencent or
+Alibaba fixed-manifest surfaces. During the same loop, LANL added a standalone
+peer CSV comparer and scored LLNL R210 plus LANL Alibaba eight-policy fills.
+
+### Recommended Action
+
+Keep Sandia out of the numeric standings. The admission ticket is now explicit:
+a generated long trace plus the shared cache-simulator policy grid.

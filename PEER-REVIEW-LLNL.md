@@ -805,3 +805,26 @@ small hot-pool probability, not heavy hot-pool or tail repair.
 
 LLNL should update the Alibaba target to LANL R209 hp `.10/.15` on the LANL
 manifest, and should not claim the R208 all-panel lead anymore.
+
+## Round 42 (2026-05-01 05:25) — R210 Tencent Does Not Retake Lead; Alibaba Target Splits
+
+### Finding
+
+LLNL R210 adj `.04` is a real Tencent row but not a lead: scored with the LANL
+peer-trace comparer against the fixed Tencent real-manifest CSV, it has
+six-policy mean `0.030856`. LANL's visible p `.60`, k50, tail `.10`, adj
+`.015` row remains lower at `0.030240`, and its seed-59 confirmation is
+`0.030301`.
+
+On Alibaba, LANL filled the missing eight-policy reports and moved the target
+again. The six-policy minimum is p `.08`, hp `.10,k125`, seed `62` at
+`0.017260`; the eight-policy minimum is p `.08`, hp `.15,k100`, seed `61` at
+`0.021637`. LLNL R208 adj `.00`/`.02` remains behind at six-policy `0.019671`
+and eight-policy `0.022266`, with adjacent-duplicate debt far above real.
+
+### Recommended Action
+
+Credit LLNL for the neural-atlas replacement lane, not for a current visible
+lead. Require R210 adj `.06` and later rows to clear LANL p `.60`/adj `.015`
+on Tencent and LANL p `.08` small-hot-pool rows on Alibaba, on the same real
+manifests and policy grids.

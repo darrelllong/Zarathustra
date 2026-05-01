@@ -4,7 +4,8 @@ LANL owns `altgan/`: the explicit cache-object-process track for the
 Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
-Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop.
+Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
+after the LLNL R210 adj `.04` score and the LANL Alibaba eight-policy fill.
 
 ---
 
@@ -91,17 +92,22 @@ panel changed the diagnosis:
 - Current Tencent cache best is p `.60`, k50, tail `.10`, adj `.015`, fake
   seed `58`: six-policy mean `0.030240`, evaluator HRC `0.008832`, median
   `81`, p90 `33757`, top100 `0.260899`, top1000 `0.402591`, adjdup
-  `0.015475`. It beats LLNL R206 adj `.075` (`0.030360`) with lower adjacency
-  debt. Confirmation seed `59` and adj `.010` neighbor seed `60` are running.
+  `0.015475`. Confirmation seed `59` scored `0.030301`; adj `.010` seed `60`
+  was slightly worse at `0.030386`. LLNL R210 adj `.04` scored `0.030856`, so
+  it does not retake the visible Tencent cache lead.
 
 ## Current Alibaba Gate
 
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
-- Current LANL six-policy cache best: deep-reuse p `.10` plus hot-pool
-  `.10,k100,window10000`, fake seed `57`, six-policy `0.017524`,
-  eight-policy `0.022410`. Median is close (`277` versus real `276`), p90 is
-  high (`70087` versus real `44829`).
+- Current LANL six-policy cache best: deep-reuse p `.08` plus hot-pool
+  `.10,k125,window10000`, fake seed `62`, six-policy `0.017260`,
+  eight-policy `0.022470`. Median is low (`257` versus real `276`), p90 is
+  high (`59278` versus real `44829`).
+- Current LANL eight-policy cache best: deep-reuse p `.08` plus hot-pool
+  `.15,k100,window10000`, fake seed `61`, eight-policy `0.021637` and
+  six-policy `0.017641`. p `.08`/hp `.12`/k125 seed `68` is the nearest
+  bridge at six-policy `0.017100` and eight-policy `0.022172`.
 - Seed-46 is not yet robust. The first follow-up launcher malformed decimal
   probabilities (`.10` as `.010`, `.25` as `.025`); those rows are rejected.
   Corrected hp `.10` seed `49` scored six-policy `0.017547` and eight-policy
@@ -112,8 +118,9 @@ panel changed the diagnosis:
 - Current LLNL cache best: R208 adj `.00` at six-policy `0.019671`; adj `.02`
   has its best rescored eight-policy row at `0.022266`; LANL now leads both
   visible cache panels, with much lower adjacency debt.
-- Live LANL R209 probes: p `.08` and k-axis neighbors around the small
-  hot-pool band.
+- Live LANL probes: explicit-decimal p `.08`/hp `.15`/k125, p `.075`/hp `.12`/k125,
+  p `.08`/hp `.10`/k150, and p `.07`/hp `.12`/k125. The earlier malformed
+  `.008/.015` launch was killed before usable output.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -166,6 +173,7 @@ pushes injected reuse deeper (`min_rank=4096`) and emits a CSV for
 | `altgan/evaluate.py` | Evaluates base StackAtlas checkpoints through long-rollout metrics. |
 | `altgan/evaluate_neural.py` | Evaluates NeuralStack checkpoints. |
 | `altgan/evaluate_neural_atlas.py` | Main evaluator for current LANL work. Computes fake/real/gap/mark-quality JSON and records runtime knobs. |
+| `altgan/cachesim_compare.py` | Standalone peer-trace scorer for existing fake/real CSVs. Runs `tools/cachesim` on both sides and writes policy/capacity HRC-MAE JSON. |
 | `altgan/generate.py` | Minimal generator wrapper for base atlas checkpoints. |
 
 ### Sweep and report helpers

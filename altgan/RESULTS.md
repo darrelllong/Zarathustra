@@ -1397,3 +1397,57 @@ New artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/lanl_alibaba_reuseboost010_seed45_vs_lanl_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost010_hotpool010k75w10000_seed46_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/lanl_alibaba_reuseboost010_hotpool010k75w10000_seed46_vs_lanl_realmanifest42_eight_policy_caps.json`
+
+---
+
+## Peer CSV Cachesim Comparer And R209/R210 Fill (2026-05-01)
+
+`altgan/cachesim_compare.py` now scores existing fake CSVs against fixed
+real-manifest CSVs with `tools/cachesim`, producing the same policy/capacity
+HRC-MAE JSON used by `evaluate_neural_atlas --cachesim-bin`. This is the path
+for LLNL/Sandia peer traces when generation already happened elsewhere.
+
+Tencent peer fill:
+
+| Source | Row | six-policy mean |
+|---|---|---:|
+| LANL | p `.60`, k50, tail `.10`, adj `.015`, seed `58` | **0.030240** |
+| LANL | same row confirmation, seed `59` | **0.030301** |
+| LLNL | R206 adj `.075` | 0.030360 |
+| LLNL | R210 adj `.04` | 0.030856 |
+
+LLNL R210 adj `.04` does not retake the visible Tencent lead. R210 adj `.06`
+was still running when this row was recorded.
+
+Alibaba eight-policy fill:
+
+| Row | evaluator HRC | six-policy | eight-policy | fake reuse | fake med | fake p90 |
+|---|---:|---:|---:|---:|---:|---:|
+| p `.08`, hp `.10,k125`, seed `62` | 0.012176 | **0.017260** | 0.022470 | 0.321363 | 257 | 59278 |
+| p `.08`, hp `.12,k125`, seed `68` | pending | 0.017100 | 0.022172 | pending | pending | pending |
+| p `.08`, hp `.15,k100`, seed `61` | 0.012923 | 0.017641 | **0.021637** | 0.321711 | 258 | 59406 |
+| p `.07`, hp `.10,k125`, seed `64` | 0.010428 | 0.017426 | 0.022739 | 0.313047 | 245 | 52397 |
+
+Interpretation: the Alibaba six-policy and eight-policy optima are split. p
+`.08`, hp `.10,k125` is the six-policy cache minimum; p `.08`, hp `.15,k100`
+is the eight-policy cache minimum because LFU/LIRS improve materially. p
+`.08`, hp `.12,k125` is the bridge row and motivates the live explicit-decimal
+bracket. LLNL R208 remains behind on both visible panels after this fill.
+
+Live explicit-decimal bracket:
+
+- p `.08`, hp `.15,k125`, seed `70`
+- p `.075`, hp `.12,k125`, seed `71`
+- p `.08`, hp `.10,k150`, seed `72`
+- p `.07`, hp `.12,k125`, seed `73`
+
+The first attempt at this bracket accidentally encoded decimal strings as
+`.008/.015`; it was killed immediately and no output from that malformed launch
+is admitted to the results table.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p04_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp010k125_seed62_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp015k100_seed61_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp012k125_seed68_eight_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p007hp010k125_seed64_eight_policy_caps.json`

@@ -456,3 +456,31 @@ real.
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_lp085_moreseeds_summary.csv`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_forced_late_localpow_micro_refine_summary.csv`
+
+---
+
+## R210/R209 Cachesim Loop: Peer Trace Scorer And Alibaba Split Lead (2026-05-01)
+
+LANL added `altgan/cachesim_compare.py` so existing peer CSVs can be scored
+through the same `tools/cachesim` gate as generated LANL evaluator runs. It
+compares fake and real CSVs across policy/capacity grids and writes the
+policy-by-policy HRC-MAE report used in the race tables.
+
+Tencent status: LLNL R210 adj `.04` scored six-policy `0.030856` on the fixed
+LANL Tencent real-manifest CSV. That does not beat LANL p `.60`, k50, tail
+`.10`, adj `.015` at `0.030240` or its seed-59 confirmation at `0.030301`.
+
+Alibaba status after filling the missing eight-policy reports:
+
+| LANL row | six-policy | eight-policy | note |
+|---|---:|---:|---|
+| p `.08`, hp `.10`, k125, seed `62` | **0.017260** | 0.022470 | current six-policy best |
+| p `.08`, hp `.15`, k100, seed `61` | 0.017641 | **0.021637** | current eight-policy best |
+| p `.08`, hp `.12`, k125, seed `68` | 0.017100 | 0.022172 | bridge candidate |
+| p `.07`, hp `.10`, k125, seed `64` | 0.017426 | 0.022739 | shape-leaning lower reuse |
+
+LLNL R208 remains behind on both visible Alibaba panels: adj `.00` six-policy
+`0.019671`, adj `.02` eight-policy `0.022266`, with much higher adjacent
+duplicate debt than LANL. New explicit-decimal probes are live for
+p `.08`/hp `.15`/k125, p `.075`/hp `.12`/k125, p `.08`/hp `.10`/k150, and
+p `.07`/hp `.12`/k125.
