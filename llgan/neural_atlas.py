@@ -637,6 +637,8 @@ def generate(
     hot_pool_k: int = 100,
     hot_pool_window: int = 5_000,
     adj_dup_prob: float = 0.0,
+    tail_reuse_prob: float = 0.0,
+    tail_reuse_min_frac: float = 0.5,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -744,6 +746,21 @@ def generate(
                     next_new_id += 1
                     stack.insert(0, obj_id)
                     prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
+                elif (tail_reuse_prob > 0.0 and len(stack) > 0
+                      and rng.random() < tail_reuse_prob):
+                    # R187: deep-rank reuse injection (LANL-style min-rank boost).
+                    # Pick a rank uniformly from the deep half of the stack
+                    # (tail_reuse_min_frac of stack_size). Closes FIFO/LIRS
+                    # small-cap over-miss without architectural change.
+                    stack_sz = len(stack)
+                    lo = max(int(stack_sz * tail_reuse_min_frac), stack_sz // 2)
+                    lo = min(lo, stack_sz - 1)
+                    rank = int(rng.integers(lo, stack_sz))
+                    obj_id = stack[rank]
+                    del stack[rank]
+                    stack.insert(0, obj_id)
+                    if rank_net is not None:
+                        prev_rank_bin = N_RANK_BINS - 1
                 elif (adj_dup_prob > 0.0 and len(stack) > 0
                       and rng.random() < adj_dup_prob):
                     # R182: back-to-back duplicate of the most-recently-emitted
@@ -936,6 +953,14 @@ def main():
                            "(rank=0) instead of sampling. Calibrate to corpus "
                            "real adj-dup rate (~0.003 tencent). Fixes the "
                            "SIEVE catastrophic gap diagnosed in R181 corrective.")
+    pgen.add_argument("--tail-reuse-prob", type=float, default=0.0,
+                      help="R187: prob of redirecting a reuse to a uniform "
+                           "deep-rank pick (rank in [stack*tail_min_frac, stack)). "
+                           "Closes the FIFO/LIRS small-cap over-miss without "
+                           "architectural change.")
+    pgen.add_argument("--tail-reuse-min-frac", type=float, default=0.5,
+                      help="R187: lower bound for tail-reuse rank as a "
+                           "fraction of stack size (default 0.5 = deep half).")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -955,6 +980,8 @@ def main():
             hot_pool_prob=args.hot_pool_prob, hot_pool_k=args.hot_pool_k,
             hot_pool_window=args.hot_pool_window,
             adj_dup_prob=args.adj_dup_prob,
+            tail_reuse_prob=args.tail_reuse_prob,
+            tail_reuse_min_frac=args.tail_reuse_min_frac,
         )
 
 
