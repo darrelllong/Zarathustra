@@ -28,11 +28,11 @@ Current status:
   share from `0.003849` to `0.119549` and cuts SIEVE HRC-MAE to `0.033573`;
   `p=0.60` and `p=0.70` both lost to `p=0.50`, so the live branch keeps
   `p=0.50`. Frequency weight power `2.0` is closed negative; it collapsed
-  stack median to `14` and raised adjacent duplicates to `0.116900`. The live
-  branch now widens the hot window to `50000`.
-- The first `window=50000` run was killed after 40+ minutes with no fake CSV.
-  `altgan.neural_atlas` now caches hot-object ranks at hot-pool refresh time
-  and samples cached ranks instead of calling `stack.index()` on every redirect.
+  stack median to `14` and raised adjacent duplicates to `0.116900`.
+- `window=50000` is closed operationally negative for now: exact lookup ran
+  40+ minutes with no fake CSV, and the cached-rank experiment also failed to
+  land in a useful window. The implementation was reverted to exact hot-object
+  lookup for the promoted `window=5000` row.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

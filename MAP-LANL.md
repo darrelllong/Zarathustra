@@ -221,11 +221,10 @@ Important knobs:
   improves six-policy mean HRC-MAE from `0.054073` to `0.046657`, mainly by
   fixing SIEVE/FIFO/LRU, while top-100 share remains low (`0.1195` vs real
   `0.2640`). `p=0.60`/`0.70` both lost to `p=0.50`; frequency weight power
-  `2.0` catastrophically over-concentrated and is closed negative. The live
-  branch keeps `p=0.50,wpow=1` and widens the hot window to `50000`.
-  Wide-window with exact per-event object lookup was killed as pathological
-  after 40+ minutes with no fake CSV; hot-pool refresh now caches ranks every
-  512 steps and samples cached ranks.
+  `2.0` catastrophically over-concentrated and is closed negative. Wide-window
+  `50000` attempts were killed as pathological under both exact lookup and a
+  cached-rank experiment. Current promoted hot-pool row remains
+  `p=0.50,k=100,window=5000,wpow=1`.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

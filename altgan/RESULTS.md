@@ -1022,9 +1022,10 @@ the better LANL lever: all-stream top-100 share improved from `0.003849` to
 despite improving ARC/CAR, and `hotpool060` also lost to `hotpool050`.
 Frequency weight power `2.0` is closed negative: it overshoots top100 to
 `0.310561`, collapses stack median to `14`, and raises adjacent duplicates to
-`0.116900`. The live follow-up keeps `p=.50,wpow=1` and widens the hot window
-to `50000`. The first exact-lookup wide-window run was killed after 40+ minutes
-with no fake CSV; `rankcache` is the optimized rerun.
+`0.116900`. Wide-window `50000` is operationally closed for now: exact lookup
+ran 40+ minutes with no fake CSV, and a cached-rank experiment also failed to
+land in a useful window. The current promoted hot-pool row remains
+`p=.50,k=100,window=5000,wpow=1`.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
