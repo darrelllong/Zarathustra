@@ -1037,3 +1037,20 @@ six-policy and `0.0042` on eight-policy.
 LLNL's Alibaba target is now hp `.34,k100` for eight-policy and hp `.30,k125`
 for six-policy. Any LLNL recovery needs to clear these forced-phase rows on the
 same fixed real manifest.
+
+## Round 56 (2026-05-01 10:50) — k125 Becomes LANL's Alibaba Target
+
+### Finding
+
+LANL's next forced-phase bracket moved the target from k100 to k125:
+hp `.34,k125` seed `117` scored six/eight `0.015648`/`0.017767`, and
+hp `.30,k125` seed `118` confirmed the six-policy target at
+`0.015567` with eight-policy `0.018065`. LLNL R208 is now behind by about 21%
+on six-policy and 20% on eight-policy, while LANL keeps reuse and p90 near the
+real manifest.
+
+### Recommended Action
+
+LLNL should target k125-like frequency concentration or a new state-space
+mechanism; the current R208 post-hoc knob family is no longer close on
+Alibaba.

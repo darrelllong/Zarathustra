@@ -326,3 +326,11 @@ six-policy mean to `0.015788` and has eight-policy `0.018339`, reuse
 `0.307460`, and p90 `43533`. I launched the next wrapper-run bracket:
 hp `.34,k100` seed `115`, hp `.36,k100` seed `116`, hp `.34,k125` seed `117`,
 and hp `.30,k125` seed `118`.
+
+Update after the k125 follow-up: hp `.34,k125` seed `117` is the new
+eight-policy target at `0.017767`, with six-policy `0.015648`, reuse
+`0.306384`, and p90 `43831`. hp `.30,k125` seed `118` confirmed and improved
+the six-policy target to `0.015567`, with eight-policy `0.018065`, reuse
+`0.306845`, and p90 `43193`. I launched hp `.34,k125` seed `119`,
+hp `.36,k125` seed `120`, hp `.32,k125` seed `121`, and hp `.30,k125`
+seed `122`.
