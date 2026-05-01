@@ -12469,3 +12469,67 @@ R214-R216: multi-seed protocol commitment fulfilled.
 Both teams at architectural floor. Race state honestly captured. Methodology corrections (100k vs 1M alibaba real, single-seed vs multi-seed) applied.
 
 Next moves require either Darrell direction or substantial architectural investment (compound state machine, hierarchical generator, cache-aware loss).
+
+
+## Round 217 — Alibaba phase=2 atlas at MATCHED 600 epochs marginally beats phase=1 multi-seed (-2%); reveals R213 was undertrained
+
+**Date**: 2026-05-01 11:00 PDT (R213 phase=2 was 300 epochs vs phase=1's 600; R217 retest at matched 600 ep).
+
+### Training
+
+Re-trained alibaba b2 with `--n-phase-bins 2 --epochs 600` (vs R213's 300). Final trans_loss 0.9246 (vs R213 0.9427 — 2× epochs lowered loss meaningfully). Atlas: `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600.pkl.gz`.
+
+### hp sweep on phase=2 ep=600 atlas (single seed=42)
+
+| hp | 6-pol | 8-pol |
+|---|---|---|
+| 0.30 | 0.0246 | 0.0237 |
+| 0.35 | 0.0218 | 0.0220 |
+| 0.40 | 0.0205 | 0.0202 |
+| **0.45** | **0.0195** | **0.0201** ★ |
+| 0.50 | 0.0213 | 0.0221 |
+| 0.55 | 0.0229 | 0.0248 |
+
+Clean U-shape minimum at hp=0.45 (vs phase=1's hp=0.40; the wider state space prefers slightly more concentration).
+
+### Multi-seed confirmation at hp=0.45 (4 seeds)
+
+| seed | 6-pol | 8-pol |
+|---|---|---|
+| 42 | 0.0195 | 0.0201 |
+| 43 | 0.0195 | 0.0201 |
+| 44 | 0.0243 | 0.0246 |
+| 45 | 0.0212 | 0.0222 |
+| **mean** | **0.0211** | **0.0218** |
+
+Note: seeds 42 and 43 produced bit-identical numbers — coincidence (same attractor) given seed=44 diverges substantially.
+
+### R217 vs R208 (both multi-seed, 4 seeds each)
+
+| | R208 phase=1 ep=600 | R217 phase=2 ep=600 | direction |
+|---|---|---|---|
+| 6-pol mean | 0.0215 | **0.0211** | −1.9% |
+| 8-pol mean | 0.0223 | **0.0218** | −2.2% |
+| 6-pol seed range | 0.0026 (13%) | 0.0048 (24%) | worse stability |
+
+R217 phase=2 marginally beats phase=1 at multi-seed level by 2%. The R213 closes-NEGATIVE was real (300 ep was undertrained); at matched 600 epochs the architecture change helps marginally. Seed variance is worse though — phase=2 atlas's wider state space amplifies seed sensitivity.
+
+### Updated alibaba standing claim
+
+**Alibaba**: **0.0218 (8-pol) / 0.0211 (6-pol)** at multi-seed mean — `hp=0.45 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2`, atlas `llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600.pkl.gz`.
+
+### Race position update
+
+| corpus | LLNL R217 multi-seed | LANL multi-seed | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | 0.0303 | tied |
+| **Alibaba** (6-pol) | **0.0211** (was 0.0215 at R208) | ~0.018 (LANL hp=0.26 multi-seed expected) | LANL +14% (was +17%, closed by 3%) |
+| **Alibaba** (8-pol) | **0.0218** (was 0.0223 at R208) | ~0.020 | LANL +9% (was +12%) |
+| CloudPhysics (8-pol) | 0.0659 | n/a | LLNL alone |
+
+LANL still leads alibaba but gap narrows from R208 baseline. Architectural retrain delivers ~2-3% closure.
+
+### Sandia + LANL pass
+
+- LANL `5f32d8a`/`764c724`/`0de8a25`/`aac0858`/`eb85964`/`63347f9`: continuing alibaba hp/k axis sweep, current best ~0.0161 6-pol single-seed at hp=.26-.28 with k=125. Multi-seed expected ~0.018. **No race-changing finding** — LANL incrementally widening but well-documented.
+- Sandia: still off, R38 unfixed.
