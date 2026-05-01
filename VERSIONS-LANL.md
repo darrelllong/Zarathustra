@@ -26,7 +26,7 @@ Current status:
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access
   share from `0.003849` to `0.119549` and cuts SIEVE HRC-MAE to `0.033573`;
-  `p=0.70` is running to bracket the remaining hot-set gap.
+  `p=0.70` overshot SIEVE/SLRU, and `p=0.60` is running to bracket the peak.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
