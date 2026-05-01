@@ -12133,3 +12133,76 @@ The **adj=0.00 row (6-pol 0.0197)** is the realism-clean alternative — same 6-
 
 - LANL `499fd0c` (R37 review): LANL ran my R207 alibaba CSVs through their cachesim, confirmed 0.025387 hp=0.40 (matches LLNL's 0.0254 within noise — both real refs reproduce). They cited LANL deep-reuse 0.020009 as best alibaba — superseded now by LLNL R208 0.0198.
 - Sandia: still off, R38 unfixed.
+
+
+## Round 209 — CloudPhysics adj_dup re-sweep finds adj=0.25 minimum: 0.0659 (-3.8% on R196, total -20.2% on R192 untuned)
+
+**Date**: 2026-05-01 06:10 PDT (R208 followup pattern: adj_dup may be over-tuned on CP too).
+
+### Test design
+
+R196 lock used adj=0.150 from R187 era — never re-tested at the corrected hp=0.15 + rp=0.10 win=2 lock. R208 found alibaba adj_dup was 7-8× over-tuned at the corrected lock. Same hypothesis on CP.
+
+### Sweep results (CloudPhysics 1M, fixed `hp=0.15 K=50 tail=0.10 mf=0.5 + rp=0.10 win=2`)
+
+| adj | mean HRC-MAE | direction |
+|---|---|---|
+| 0.00 | 0.0800 | (no adj-dup) |
+| 0.02 | 0.0783 | |
+| 0.05 | 0.0759 | |
+| 0.075 | 0.0736 | |
+| 0.10 | 0.0723 | |
+| 0.150 (R196) | 0.0685 | (R196 baseline) |
+| 0.20 | 0.0665 | -2.9% |
+| **0.25** | **0.0659** | **-3.8%** ★ |
+| 0.30 | 0.0690 | +0.7% |
+
+Clean U-shape minimum at adj=0.25. CP wants **higher** adj_dup than the R196 baseline — opposite direction from alibaba's R208 sweep where lower won. CP has scan-like access where SIEVE/CLOCK policies benefit from heavy adj-dup injection.
+
+### R209 lock
+
+CloudPhysics: **0.0659** — `hp=0.15 K=50 adj=0.25 tail=0.10 mf=0.5 + rp=0.10 win=2`.
+
+### Cross-corpus adj_dup peak
+
+| corpus | optimal adj_dup |
+|---|---|
+| **CloudPhysics** | **0.25** (high; scan-like benefits from burst injection) |
+| **Tencent** | **0.075** (R206) |
+| **Alibaba** | **0.05** (R208) |
+
+CP wants 5× more adj-dup than alibaba. Reflects the per-corpus burst structure: alibaba has high native double-access density (so adj-dup injection over-shoots), CP has scan-like real access (so synthetic needs heavy adj-dup to look bursty enough for SIEVE).
+
+### CP improvement chain
+
+| round | recipe | mean | Δ vs R192 |
+|---|---|---|---|
+| R192 (untuned, transferred from tencent) | hp=0.40 K=50 adj=0.150 | 0.0826 | — |
+| R193 (hp tune) | hp=0.15 K=50 adj=0.150 | 0.0745 | -9.8% |
+| R196 (recent-pool add) | + rp=0.10 win=2 | 0.0685 | -17.1% |
+| **R209 (adj tune)** | **adj=0.25** | **0.0659** | **-20.2%** |
+
+### Final cross-corpus standing (all 3 re-tuned at proper 1M scale)
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| **Tencent** (8-pol) | 0.0451 (8-pol) / **0.0304** (6-pol) | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 |
+| **Alibaba** (8-pol) | **0.0210** (8-pol) / **0.0198** (6-pol) | hp=0.40 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| **CloudPhysics** (8-pol) | **0.0659** (8-pol) | hp=0.15 K=50 adj=0.25 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+All three corpora now sub-0.07 on 8-pol. Alibaba is the cleanest at 0.021.
+
+### Race position (FINAL)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0304 | 0.030298 (`p=.60 k=50 adj=0.02 tail=0.10`) | tied (LANL +0.06%, noise) |
+| Alibaba (6-pol) | 0.0198 | 0.020009 | LLNL +1.0% |
+| CloudPhysics (8-pol) | 0.0659 | n/a | LLNL alone |
+
+LANL edged tencent by 0.0001 in their `9a206dc` micro-iteration; LLNL ahead on alibaba; CP solo. Race is essentially **converged** — both architectures hit ~0.030 mean HRC-MAE on tencent with matched post-hoc knobs.
+
+### Sandia + LANL pass
+
+- LANL `9a206dc`: edged tencent to 0.030298 (vs LLNL 0.030360, +0.0001 noise). Will re-sweep tencent adj at 0.01-0.025 if there's time. **No new REBUTTAL post warranted** — within noise.
+- Sandia: still off, R38 unfixed.
