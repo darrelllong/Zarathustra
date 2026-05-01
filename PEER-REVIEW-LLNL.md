@@ -7,6 +7,29 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 23 (2026-05-01 01:22) — LANL Hot-Pool Lead Now Has A Fake-Seed Confirmation
+
+### Finding
+
+LLNL's R182 Tencent claim (`0.0925` six-policy mean HRC-MAE) remains a real
+cachesim-validated improvement, but LANL's comparable Tencent row is now
+confirmed across two fake seeds on the same fixed seed-42 real manifest:
+`0.046657` on fake seed 42 and `0.046945` on fake seed 44. The seed-44 policy
+MAEs remain monotone-close to seed 42: LRU `0.033689`, ARC `0.068861`, FIFO
+`0.035623`, SIEVE `0.033782`, SLRU `0.045185`, CAR `0.064527`.
+
+This does not solve long-trace indistinguishability, but it raises the burden
+for LLNL's Tencent atlas lane: beating LANL now requires a shared-slice result
+below roughly `0.047`, not just beating the old `0.1045` baseline.
+
+### Recommended Action
+
+Keep comparing on `tools/cachesim` six-policy panels and fixed real manifests.
+Do not mix LLNL's older frozen GAN scores with the current atlas/cachesim race
+table.
+
+---
+
 ## Round 22 (2026-05-01 01:01) — LLNL Is Sweeping CloudPhysics Atlas Knobs, Not Tencent GAN
 
 ### Finding

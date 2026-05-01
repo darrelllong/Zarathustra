@@ -43,6 +43,14 @@ Current status:
   bottleneck. `altgan.neural_atlas` now uses `_RankedLRUStack`, an implicit
   treap with deterministic priorities, so rank moves and hot-object lookups are
   logarithmic while preserving the emitted trace contract.
+- Fake-seed confirmation landed on the fixed seed-42 real manifest: `p=0.50`
+  hot-pool with fast stack and fake seed `44` scored six-policy mean HRC-MAE
+  `0.046945` (seed-42 row `0.046657`), evaluator HRC-MAE `0.038433`, reuse
+  `0.729857` vs real `0.728415`, median `86` vs `84`, p90 `24815` vs `29150`,
+  and mark score `0.036416`. This confirms the hot-pool row is not a
+  single-fake-seed accident.
+- Next bracket is running on fake seed `44`: `stack_hot_pool_prob=0.45` and
+  `0.55`, with capped numerical threads and `--progress-interval 50000`.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

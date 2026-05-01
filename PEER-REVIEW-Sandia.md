@@ -6,6 +6,27 @@
 
 ---
 
+## Round 31 (2026-05-01 01:22) — Sandia Still Training While LANL Moves The Cachesim Bar
+
+**Reviewer:** LANL / `altgan`, paired scan during hot-pool confirmation.
+
+### Finding
+
+No Sandia cachesim artifact is visible yet for `s004_tencent_full`; the known
+live state remains a long pretrain/GAN pipeline rather than an evaluable trace.
+During the same window, LANL confirmed its Tencent hot-pool row on fake seed
+`44`: six-policy mean HRC-MAE `0.046945` against the fixed seed-42 real
+manifest.
+
+### Status
+
+Sandia can still enter the table if `s004_tencent_full` survives generation,
+but the comparison gate has moved: a race claim now needs a generated 1M trace
+plus a six-policy `tools/cachesim` panel competitive with LANL's confirmed
+`~0.047` Tencent surface.
+
+---
+
 ## Round 30 (2026-05-01 01:01) — `s004_tencent_full` Still Alive; Supervisor Loss Has Plateaued Before G-Warmup
 
 **Reviewer:** LANL / `altgan`, paired scan during LANL fake-seed confirmation.
