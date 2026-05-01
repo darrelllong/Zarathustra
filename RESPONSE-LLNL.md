@@ -13080,3 +13080,50 @@ Alibaba adj re-sweep on R221 atlas. R221 set adj=0.05 (very low) at initial tuni
 
 - LANL: continued same iteration.
 - Sandia: brief delivered.
+
+## Round 229 — Alibaba adj re-sweep on R221 ext-bins atlas: closes-NEGATIVE; lock at adj=0.05 holds
+
+**Date**: 2026-05-01 15:30 PDT.
+
+### Setup
+
+R221 set `adj-dup-prob=0.05` from initial tuning; never systematically swept since the binning fix. Same stale-lock logic used on CP-R224 (which gave −24%). All other knobs at R221 lock (hp=0.45 K=75 tail=0.10 mf=0.5 rp=0.15 win=2). Single-seed=42.
+
+### Result (6-pol)
+
+| adj | 6-pol HRC-MAE | vs lock |
+|---|---|---|
+| 0.025 | 0.0233 | +14% |
+| **0.05 (R221 lock)** | **0.0200** | — (single-seed; matches R221 multi-seed mean 0.0204) |
+| 0.10 | 0.0233 | +14% |
+| 0.15 | 0.0324 | +62% |
+| 0.20 | 0.0410 | +101% |
+| 0.25 | 0.0436 | +114% |
+| 0.30 | 0.0502 | +147% |
+
+Sharp asymmetric inverted-U with peak at adj=0.05. **Alibaba adj-knob optimum is invariant to the binning shift.**
+
+### Cross-corpus adj behavior summary
+
+| corpus | original lock (orig-bins atlas) | optimum on ext-bins | shift |
+|---|---|---|---|
+| Tencent | 0.075 (R206) | n/a (R228 closes-NEGATIVE at every adj) | architectural mismatch |
+| Alibaba | 0.05 (R221 ext-bins; was already on ext-bins) | 0.05 (R229) | invariant |
+| CloudPhysics | 0.25 (R209 orig-bins → R223 ext-bins) | 0.35 (R224) | **+0.10** |
+
+CP is the unique case where adj cross-coupled with binning. On alibaba, the original tuning happened *on* the ext-bins atlas (R221 was the post-binning recipe), so there's no cross-coupling to recover from.
+
+### Lesson
+
+The stale-lock playbook only pays off when the architecture changed *between* the lock and the audit. CP's R209 lock was set on original-bins → R220 changed bins → R224 retune found the new optimum. Alibaba's R221 lock was set *on* the ext-bins atlas, so the lock is already aligned. On tencent, ext-bins itself is wrong — no retune helps.
+
+### Next move (R230)
+
+Alibaba `--rank-ar` (R180 flag, fully wired through fit/generate, never validated in race-mode). Trains a small autoregressive rank network that replaces empirical PMF lookup at generate time. Per the source-doc: "Targets the b2-light i.i.d. PMF ceiling." That's the dedicated alibaba-ceiling lever. Higher EV than further post-hoc-knob audits.
+
+Cost: extra 600-epoch training pass on top of cond-trans, total fit ~60-90 min.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: brief delivered; awaiting R38 fix for first artifact.
