@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -56,6 +58,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum LRU rank for injected new-to-reuse events.")
     p.add_argument("--stack-reuse-boost-rank-power", type=float, default=1.0,
                    help="Power shaping for injected reuse ranks; values >1 favor deeper ranks.")
+    p.add_argument("--stack-adj-dup-prob", type=float, default=0.0,
+                   help="Probability that a sampled reuse emits the current MRU object.")
     p.add_argument("--stack-rank-phase-scales", default="",
                    help="Comma-separated per-phase stack-rank scales; overrides the global scale.")
     p.add_argument("--stack-rank-phase-maxes", default="",
@@ -85,6 +89,16 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--output", default="")
     p.add_argument("--fake-output", default="",
                    help="Optional CSV path for the generated fake trace.")
+    p.add_argument("--real-output", default="",
+                   help="Optional CSV path for the sampled real manifest trace.")
+    p.add_argument("--cachesim-bin", default="",
+                   help="Optional tools/cachesim binary; when set, run fake and real through cachesim.")
+    p.add_argument("--cachesim-output", default="",
+                   help="Optional JSON path for the cachesim comparison report.")
+    p.add_argument("--cachesim-cache-sizes", default="32,128,512,2048,8192",
+                   help="Comma-separated cache sizes for --cachesim-bin.")
+    p.add_argument("--cachesim-policies", default="lru,arc,fifo,sieve,slru,car",
+                   help="Comma-separated cachesim policies for --cachesim-bin.")
     return p.parse_args()
 
 
@@ -129,6 +143,7 @@ def main() -> int:
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
+        stack_adj_dup_prob=args.stack_adj_dup_prob,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
         mark_temperature=args.mark_temperature,
@@ -148,6 +163,11 @@ def main() -> int:
         fake_out.parent.mkdir(parents=True, exist_ok=True)
         fake_df.to_csv(fake_out, index=False)
         print(f"[altgan.evaluate_neural_atlas] wrote fake trace {fake_out}")
+    if args.real_output:
+        real_out = Path(args.real_output)
+        real_out.parent.mkdir(parents=True, exist_ok=True)
+        real_df.to_csv(real_out, index=False)
+        print(f"[altgan.evaluate_neural_atlas] wrote real trace {real_out}")
 
     if args.cache_sizes:
         cache_sizes = np.array([int(x) for x in args.cache_sizes.split(",") if x.strip()],
@@ -162,6 +182,7 @@ def main() -> int:
     real_m = _metrics_for_stream(real_df, cache_sizes)
     gap_m = _gap(fake_m, real_m)
     mark_m = mark_quality(fake_df, real_df)
+    out_path = Path(args.output) if args.output else Path(args.model).with_suffix("").with_suffix(".neural_atlas_eval.json")
     result = {
         "model": args.model,
         "trace_dir": args.trace_dir,
@@ -180,6 +201,7 @@ def main() -> int:
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
+        "stack_adj_dup_prob": args.stack_adj_dup_prob,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),
         "mark_temperature": args.mark_temperature,
@@ -199,11 +221,24 @@ def main() -> int:
         "mark_quality": mark_m,
         "real_manifest": real_manifest,
     }
-    out_path = Path(args.output) if args.output else Path(args.model).with_suffix("").with_suffix(".neural_atlas_eval.json")
+    if args.cachesim_bin:
+        cachesim_output = (
+            Path(args.cachesim_output)
+            if args.cachesim_output
+            else out_path.with_suffix(".cachesim.json")
+        )
+        result["cachesim"] = _run_cachesim_comparison(
+            fake_df,
+            real_df,
+            binary=Path(args.cachesim_bin),
+            cache_sizes=args.cachesim_cache_sizes,
+            policies=args.cachesim_policies,
+            output=cachesim_output,
+        )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2))
     print(f"[altgan.evaluate_neural_atlas] wrote {out_path}")
-    print(json.dumps({
+    summary = {
         "hrc_mae": gap_m["hrc_mae"],
         "fake_reuse_access": fake_m["reuse_access_rate"],
         "real_reuse_access": real_m["reuse_access_rate"],
@@ -212,7 +247,10 @@ def main() -> int:
         "fake_stack_p90": fake_m["stack_distance_p90"],
         "real_stack_p90": real_m["stack_distance_p90"],
         "mark_score": mark_m["mark_score"],
-    }, indent=2))
+    }
+    if "cachesim" in result:
+        summary["cachesim_mean_hrc_mae"] = result["cachesim"]["mean_hrc_mae"]
+    print(json.dumps(summary, indent=2))
     return 0
 
 
@@ -239,6 +277,116 @@ def _lookup_cond(cond_lookup: dict, name_or_path: str, cond_dim: int) -> np.ndar
                 arr = np.pad(arr, (0, cond_dim - len(arr)))
             return arr[:cond_dim]
     raise KeyError(f"no characterization vector for {name_or_path}")
+
+
+def _run_cachesim_comparison(
+    fake_df,
+    real_df,
+    *,
+    binary: Path,
+    cache_sizes: str,
+    policies: str,
+    output: Path,
+) -> dict:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    stem = output.with_suffix("")
+    fake_csv = stem.parent / f"{stem.name}.fake_namespaced.csv"
+    real_csv = stem.parent / f"{stem.name}.real_namespaced.csv"
+    _write_namespaced_csv(fake_df, fake_csv)
+    _write_namespaced_csv(real_df, real_csv)
+
+    fake_rows = _run_cachesim(binary, fake_csv, cache_sizes, policies)
+    real_rows = _run_cachesim(binary, real_csv, cache_sizes, policies)
+    report = _compare_cachesim_rows(fake_rows, real_rows, cache_sizes, policies)
+    report.update({
+        "fake_trace": str(fake_csv),
+        "real_trace": str(real_csv),
+        "binary": str(binary),
+    })
+    output.write_text(json.dumps(report, indent=2))
+    print(f"[altgan.evaluate_neural_atlas] wrote cachesim report {output}")
+    return report
+
+
+def _write_namespaced_csv(df, path: Path) -> None:
+    out = df.copy()
+    if "stream_id" in out.columns:
+        out["obj_id"] = (
+            out["stream_id"].astype("int64") * 10_000_000_000_000
+            + out["obj_id"].astype("int64")
+        )
+    out.to_csv(path, index=False)
+
+
+def _run_cachesim(binary: Path, trace: Path, cache_sizes: str, policies: str) -> list[dict]:
+    proc = subprocess.run(
+        [
+            str(binary),
+            "--trace", str(trace),
+            "--format", "csv",
+            "--policy", policies,
+            "--cache-sizes", cache_sizes,
+            "--out", "-",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"cachesim failed for {trace}: {proc.stderr or proc.stdout}")
+    match = re.search(r"(\[\s*\{.*\}\s*\])", proc.stdout, re.DOTALL)
+    if not match:
+        raise RuntimeError(f"cachesim produced no JSON for {trace}: {proc.stdout[:500]}")
+    return json.loads(match.group(1))
+
+
+def _compare_cachesim_rows(
+    fake_rows: list[dict],
+    real_rows: list[dict],
+    cache_sizes: str,
+    policies: str,
+) -> dict:
+    fake = _group_cachesim_rows(fake_rows)
+    real = _group_cachesim_rows(real_rows)
+    requested_policies = [p.strip() for p in policies.split(",") if p.strip()]
+    requested_sizes = [int(s.strip()) for s in cache_sizes.split(",") if s.strip()]
+    by_policy = {}
+    maes = []
+    for policy in requested_policies:
+        fake_policy = fake.get(policy, {})
+        real_policy = real.get(policy, {})
+        deltas = []
+        fake_miss = []
+        real_miss = []
+        for size in requested_sizes:
+            f = fake_policy[size]
+            r = real_policy[size]
+            fake_miss.append(f)
+            real_miss.append(r)
+            deltas.append(f - r)
+        mae = float(sum(abs(d) for d in deltas) / max(len(deltas), 1))
+        maes.append(mae)
+        by_policy[policy] = {
+            "fake_miss_ratio": fake_miss,
+            "real_miss_ratio": real_miss,
+            "delta": deltas,
+            "hrc_mae": mae,
+        }
+    return {
+        "cache_sizes": requested_sizes,
+        "policies": requested_policies,
+        "by_policy": by_policy,
+        "mean_hrc_mae": float(sum(maes) / max(len(maes), 1)),
+    }
+
+
+def _group_cachesim_rows(rows: list[dict]) -> dict[str, dict[int, float]]:
+    grouped: dict[str, dict[int, float]] = {}
+    for row in rows:
+        policy = row["policy"]
+        for cache_row in row.get("per_cache_size", []):
+            grouped.setdefault(policy, {})[int(cache_row["size"])] = float(cache_row["miss_ratio"])
+    return grouped
 
 
 def _parse_float_list(text: str) -> list[float]:

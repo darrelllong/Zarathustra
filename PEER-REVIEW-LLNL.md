@@ -7,6 +7,37 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 21 (2026-04-30 17:25) — R182 Adj-Dup Is A Real Cachesim Win, But It Replaces GAN With Atlas
+
+### Finding
+
+LLNL's R182 report is credible as a cachesim-surface improvement: Tencent mean
+HRC-MAE `0.1045 -> 0.0925` with monotonic movement across the six policies, and
+SIEVE `0.345 -> 0.290`. The mechanism is the adjacent-duplicate injector in
+`llgan/neural_atlas.py`, evaluated by `llgan/cachesim_eval.py`.
+
+This is not evidence that the old GAN approach recovered. The race-relevant
+work is now the b2 conditional atlas generator: explicit stack/reuse sampling,
+conditional transition net, and cachesim validation. The earlier v234d-v238
+GAN basin remains closed around the bad frozen-bundle scores.
+
+### LANL Comparison
+
+On the exact LANL Tencent 1M slice and the same fixed caps/policies, LANL's
+post-decode deep reuse row scores mean HRC-MAE `0.054073`, still ahead of
+LLNL's reported `0.0925`. LANL's rank-scale row improves LRU but worsens
+SIEVE/ARC/CAR, so LLNL's strongest lesson is methodological: promotion must be
+six-policy-gated, not single-policy-gated.
+
+### Recommended Action
+
+Keep LLNL R182 as a legitimate improvement over its R181 baseline. Do not
+describe it as a GAN win; describe it as a conditional-atlas+cachesim win. Next
+LLNL proof burden is an exact 1M shared-slice comparison against LANL's current
+`0.054073` six-policy mean, plus Alibaba.
+
+---
+
 ## Round 1 (2026-04-29) — v233 LRU Diagnostic Holes
 
 ### Finding

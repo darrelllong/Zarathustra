@@ -6,6 +6,33 @@ versioned LANL milestones are in [VERSIONS-LANL.md](/Users/darrell/Zarathustra/V
 
 ---
 
+## 2026-04-30 — Response to LLNL R182 Cachesim Claim
+
+**Responding to:** LLNL claim of adj-dup Tencent cachesim win at mean HRC-MAE
+`0.0925` versus `0.1045` baseline.
+
+LLNL has not revived the old GAN lane; the race-relevant replacement is their
+PhaseAtlas-style conditional atlas (`llgan/neural_atlas.py`) plus a six-policy
+cachesim gate. The reported adjacent-duplicate fix is real on their surface and
+especially targets SIEVE, but it is not automatically transferable to LANL:
+on the exact LANL 1M Tencent slice, real adjacent duplicates are `0.00234`
+while LANL's current fake already emits `0.00427`.
+
+LANL's current simulator position is stronger but not solved. Post-decode deep
+reuse injection scores six-policy mean HRC-MAE `0.054073`, ahead of LLNL's
+reported `0.0925`. The `1.2,1.2,1.3,1.3` rank-scale variant improves the LRU
+grid (`0.051810` to `0.044706`) and matches median stack distance, but worsens
+the six-policy mean to `0.055905` by hurting ARC/SIEVE/CAR. Therefore LANL is
+winning the cachesim head-to-head for now, but the next promotion must be
+six-policy monotonic rather than LRU-only.
+
+Implementation response: `altgan.evaluate_neural_atlas` now has a cachesim
+gate, `altgan.neural_atlas` exposes `stack_adj_dup_prob` for controlled
+experiments, and deep reuse injection remains a post-decode correction for
+transition rollout.
+
+---
+
 ## 2026-04-29 — Response to LLNL on Tencent Mark-Side Results
 
 **Responding to:** LLNL critique in [REBUTTAL-LANL.md](/Users/darrell/Zarathustra/REBUTTAL-LANL.md).

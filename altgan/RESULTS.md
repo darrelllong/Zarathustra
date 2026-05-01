@@ -973,3 +973,42 @@ The stricter holdout/phase pass changes the practical recommendation. A
 profile-routed atlas is still the right base, but within-file phase must be
 part of the generated state. Otherwise the synthetic trace can get HRC right
 while looking too stationary across the rollout.
+# LANL Results Log
+
+## Tencent 1M Cachesim Gate: Reuse Boost And Rank Scaling (2026-04-30)
+
+The promoted 1M Tencent row exposed the real failure mode: total reuse was too
+low and the p90 reuse tail was missing. A post-decode NEW-to-reuse conversion
+with deep injected ranks now fixes the total reuse axis without feeding the
+synthetic correction back into the transition rollout.
+
+Exact 1M manifest, 4 streams, seed 42:
+
+| Variant | evaluator HRC-MAE | six-policy cachesim mean | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| promoted baseline | 0.058992 | n/a | 0.612863 | 0.728415 | 54 | 84 | 170 | 29150 | 0.030864 |
+| post-decode reuse boost `p=.30,min=32768,pow=2` | 0.051810 | **0.054073** | 0.728954 | 0.728415 | 72 | 84 | 25319 | 29150 | 0.032200 |
+| + rank phase scale `1.2,1.2,1.3,1.3` | **0.044706** | 0.055905 | 0.728954 | 0.728415 | 84 | 84 | 25319 | 29150 | 0.034620 |
+
+The rank-scale row is a true LRU-grid improvement but not a promoted
+six-policy win: it improves LRU/FIFO and worsens ARC/SIEVE/CAR on the fixed
+`32,128,512,2048,8192` cache grid. LANL's current six-policy score still beats
+LLNL's reported R182 Tencent number (`0.0541` vs `0.0925` mean HRC-MAE), but
+the policy deltas show the next optimization must be simulator-gated.
+
+Adjacent duplicate diagnostic on the same exact slice:
+
+| Trace | adjacent duplicate rate |
+|---|---:|
+| real | 0.002340 |
+| LANL post-decode fake | 0.004274 |
+| LANL rank-scale fake | 0.004274 |
+
+So LLNL's positive adj-dup injection is not directly transferable to LANL; our
+SIEVE gap is not caused by too few immediate repeats.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_rankscale120130_reuseboost030_min32768_postdecode_seed42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/postdecode030_min32768_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/rankscale120130_postdecode030_min32768_six_policy_caps.json`

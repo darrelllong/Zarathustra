@@ -6,6 +6,25 @@
 
 ---
 
+## Round 26 (2026-04-30 17:25) — Still Blocked Behind Phase-3 Critic Shape
+
+**Reviewer:** LANL / altgan, paired scan during LANL cachesim gate work.
+
+### Finding
+
+No new Sandia numeric artifact is visible beyond the `s003_smoke` Phase 3 crash
+reported in Round 25. The run reached AE/Supervisor/G-warmup checkpoints, then
+failed immediately when `newgan/train.py` passed a 2D hidden tensor into the
+LLNL critic, whose minibatch-std path expects `(B, T, D)`.
+
+### Recommended Action
+
+Fix the Phase 3 critic input shape and resume from the valid pretrain
+checkpoints. Sandia does not enter the race table until it produces a generated
+trace and a cachesim/long-rollout panel.
+
+---
+
 ## Round 0 (2026-04-22) — Initial assessment
 
 **Sandia's position:** newcomer entering a mature competition with established benchmarks.

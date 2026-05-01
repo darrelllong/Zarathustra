@@ -84,6 +84,7 @@ class NeuralAtlasModel:
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
+        stack_adj_dup_prob: float = 0.0,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -117,6 +118,7 @@ class NeuralAtlasModel:
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
         stack_reuse_boost_min_rank = max(int(stack_reuse_boost_min_rank), 0)
         stack_reuse_boost_rank_power = max(float(stack_reuse_boost_rank_power), 1e-6)
+        stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
             mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
@@ -191,7 +193,9 @@ class NeuralAtlasModel:
                 if boosted_reuse:
                     wants_reuse = True
                 if wants_reuse and stack:
-                    if boosted_reuse:
+                    if stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
+                        rank = 0
+                    elif boosted_reuse:
                         rank = _boosted_reuse_rank(
                             stack_len=len(stack),
                             min_rank=stack_reuse_boost_min_rank,
@@ -224,14 +228,14 @@ class NeuralAtlasModel:
                     )
                     stack.insert(0, obj_id)
                     in_stack.add(obj_id)
-                effective_state = _state_with_action(state, effective_action_class)
+                mark_state = _state_with_action(state, effective_action_class)
 
                 mark = ev
                 if mark_runtime is not None:
                     neural_mark = mark_runtime.sample(
                         stream_id=stream_id,
                         cond=conds[stream_id],
-                        state=effective_state,
+                        state=mark_state,
                         action_class=effective_action_class,
                         stack_distance=effective_stack_distance,
                         stride=ev.stride,
@@ -301,8 +305,8 @@ class NeuralAtlasModel:
                 prev_obj = int(obj_id)
                 state = self._next_state(
                     reservoir,
-                    effective_state,
-                    trans_probs[stream_id, effective_state],
+                    state,
+                    trans_probs[stream_id, state],
                     transition_blend,
                     local_prob_power,
                     rng,

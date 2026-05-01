@@ -206,9 +206,15 @@ Important knobs:
 - `stack_reuse_boost_prob`, `stack_reuse_boost_min_rank`,
   `stack_reuse_boost_rank_power`: converts some sampled NEW events into reuse
   events and samples the injected rank from the live LRU stack. Current
-  evidence: `prob=0.30,min_rank=84,power=2` matches total reuse but adds too
-  much low/mid-cache hit mass. The code now advances mark/transition state
-  using the emitted action after conversion; the deeper-rank bracket is running.
+  evidence: `prob=0.30,min_rank=32768,power=2` fixes total reuse and much of
+  the long tail when applied as a post-decode correction. The emitted action is
+  passed to the mark runtime, but transition rollout stays on the originally
+  sampled state; feeding injected reuses back into transition state amplified
+  the wrong reuse cascade.
+- `stack_adj_dup_prob`: optional rank-0 reuse injection for SIEVE/CLOCK style
+  probes. Current Tencent 1M exact-slice diagnostic says LANL fake already has
+  more adjacent duplicates than real (`0.00427` vs `0.00234`), so this is a
+  diagnostic knob, not a promoted fix.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
@@ -228,8 +234,9 @@ Important knobs:
    missing long-reuse tail and missing total reuse.
 6. Feedback-only mark blending must be recorded separately from emitted numeric
    blending.
-7. `--fake-output` should be used on 1M probes that need `tools/cachesim`
-   comparison.
+7. `--fake-output`, `--real-output`, and `--cachesim-bin` should be used on 1M
+   probes that need `tools/cachesim` comparison. The simulator gate is now part
+   of the evaluator path, not a separate afterthought.
 8. Do not sync stale local code over vinge without compiling and checking CLI
    flags.
 
@@ -284,7 +291,13 @@ ssh vinge.local 'cd /home/darrell/Zarathustra && python3 -m altgan.evaluate_neur
   --mark-feedback-numeric-blend-space log \
   --mark-feedback-numeric-fields size \
   --force-phase-schedule \
-  --stack-rank-phase-scales 1.0,1.0,1.1,1.1'
+  --stack-rank-phase-scales 1.2,1.2,1.3,1.3 \
+  --stack-reuse-boost-prob 0.30 \
+  --stack-reuse-boost-min-rank 32768 \
+  --stack-reuse-boost-rank-power 2.0 \
+  --fake-output /tiamat/zarathustra/altgan-output/current_fake.csv \
+  --real-output /tiamat/zarathustra/altgan-output/current_real.csv \
+  --cachesim-bin tools/cachesim/target/release/cachesim'
 ```
 
 ---

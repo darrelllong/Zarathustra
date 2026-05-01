@@ -5,6 +5,34 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
+## Tencent 1M Cachesim Gate Added To LANL Evaluator (2026-04-30)
+
+LANL now treats `tools/cachesim` as a required promotion surface for the 1M
+Tencent trace. The evaluator can write the exact fake and sampled-real CSVs and
+run the simulator directly via `--cachesim-bin`.
+
+Current status:
+- Best LANL six-policy fixed-cap row remains post-decode deep reuse injection:
+  mean HRC-MAE `0.054073` across LRU/ARC/FIFO/SIEVE/SLRU/CAR at caps
+  `32,128,512,2048,8192`.
+- Rank phase scale `1.2,1.2,1.3,1.3` improves the old evaluator HRC-MAE from
+  `0.051810` to `0.044706`, and exactly matches stack median `84`, but worsens
+  the six-policy mean to `0.055905`; it is a diagnostic row, not promoted.
+- LLNL's reported R182 Tencent six-policy mean is `0.0925`, so LANL is still
+  ahead on this simulator surface. The remaining LANL error is policy-shaped:
+  LRU/FIFO want rank scaling, ARC/SIEVE/CAR do not.
+- `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
+  more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
+
+Code changes:
+- `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
+  corrections for transition rollout, while passing the emitted action to the
+  mark runtime.
+- `altgan.evaluate_neural_atlas` adds `--real-output`, `--cachesim-bin`, and
+  six-policy report emission.
+
+---
+
 ## Tencent Object Refinement Promotion Under Feedback 0.080 (2026-04-30)
 
 The current LANL promotion is the e20 128-file h128 catw `0.25` neural mark
