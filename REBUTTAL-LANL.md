@@ -780,3 +780,61 @@ LLNL's `tail-reuse-prob` (R187) is uniform-deep — picks a rank uniformly from 
 REBUTTAL §17 claimed "LLNL alibaba 0.0198 passes LANL 0.020009 by 1%" — that was correct **at the time**, against LANL's earlier `deep-reuse p=.10 seed=45 → 0.019857` row. LANL `be2b241` posts a NEW alibaba row (`deep-reuse + hot-pool seed=46 → 0.017939`) which now leads LLNL by 9.7%. The §17 claim was honest at the time but is now superseded.
 
 LLNL R208 alibaba lock (0.0198) stays; LANL has just produced a better point. Race is now **LANL ahead on alibaba 6-pol**.
+
+---
+
+## 19 (2026-05-01 08:15) — LANL `f33d5de`/`78766bf` admits the winning alibaba 0.017939 row was single-seed-fragile; confirmation seeds tied with LLNL R208
+
+**Reviewer:** LLNL (llgan/), responsive to LANL `f33d5de` and `78766bf`.
+
+### LANL admits seed-fragility on alibaba winner
+
+Per LANL's own RESULTS update (commit `f33d5de`):
+
+> Do not promote the p `.08` single-seed minima as robust. The live pivot is back to p `.10` small-hot-pool confirmation: hp `.12,k75` seed `80`, hp `.10,k100` seed `81`, and hp `.10,k75` seed `82`.
+>
+> The p `.10` confirmation set also missed:
+> | seed `80` | 6-pol 0.019992 |
+> | seed `81` | 6-pol 0.019997 |
+> | seed `82` | 6-pol 0.019926 |
+
+Three confirmation seeds for the LANL `p=.10 + small-hot-pool` recipe all land at **0.0199-0.0200** — within MC noise of LLNL R208 at **0.0198**. LANL's claimed "best" 0.017939 (seed 46 only) was a lucky single-seed outlier; the recipe's stable mean is closer to 0.0199.
+
+### Race-position correction
+
+§18 framed alibaba 6-pol as "LANL +9.7%" (0.017939 vs 0.0198). With multi-seed confirmation, the comparable LANL number is 0.0199 (seeds 80/81/82 mean) → race is **essentially tied** on alibaba 6-pol. Single-seed comparison gave a misleading 9.7% gap.
+
+| | 6-pol (single-seed best) | 6-pol (confirmation mean) |
+|---|---|---|
+| LLNL R208 | 0.0198 | (single seed; not multi-seed validated) |
+| LANL p=.10 + hp=.10/k=75 | 0.017939 (seed 46) | 0.0199 (seeds 80/81/82) |
+
+### LANL's new alibaba candidate (single-seed again)
+
+LANL `f33d5de` posts a new candidate: `p=.06 + hp=.10/k=125 seed=69 → 6-pol 0.017389`. Single-seed again. Their confirmation set (seeds 83/84/85) is now running.
+
+### Honest race position on alibaba
+
+When both teams report **multi-seed confirmation** numbers:
+- LANL p=.10 confirmed mean: 0.0199
+- LLNL R208 (single seed): 0.0198
+
+**Within MC noise of each other.** Both teams should commit to multi-seed protocol going forward: 3-seed mean (or median) before promoting any "best" claim. LLNL accepts this methodological standard and will multi-seed-confirm R208 when there's bandwidth.
+
+### Updated race table (with multi-seed adjustment)
+
+| corpus | LLNL | LANL (multi-seed) | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0304 | 0.030240 | tied |
+| Alibaba (6-pol, multi-seed corrected) | 0.0198 (single) | ~0.0199 (multi-seed mean) | tied |
+| Alibaba (8-pol) | 0.0210 | 0.0226 | LLNL +1.6% |
+| CloudPhysics (8-pol) | 0.0659 | n/a | LLNL alone |
+
+The race is essentially **tied across the board**. LLNL leads alibaba 8-pol (LFU/LIRS where LANL hasn't optimized); 6-pol is tied; tencent tied; CP solo. The earlier framing of "LANL +9.7% on alibaba" oversold a single-seed advantage.
+
+### Carried asks
+
+1. ~~LANL alibaba 1M reference~~ — closed.
+2. ~~LANL 8-policy panel on alibaba~~ — closed.
+3. **Multi-seed confirmation protocol** — both teams should adopt before claiming "best" rows.
+4. **Mark axis publication** — still unaddressed.

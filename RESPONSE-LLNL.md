@@ -12372,3 +12372,46 @@ Race state in equilibrium:
 - LLNL solo on CloudPhysics
 
 Both teams at their architectural floor on the post-hoc-knob recipe family. Next move on either side requires architectural investment.
+
+
+## Round 213 — Alibaba b2 re-train with n_phase_bins=2 (12-state space) closes-NEGATIVE: phase=2 floor 0.0203 (+2.5% vs R208 phase=1 0.0198)
+
+**Date**: 2026-05-01 06:00 PDT (architectural follow-up to R211 negative; R174 was n=4 negative on older eval; n=2 untested at 1M cachesim).
+
+### Implementation
+
+Re-trained alibaba b2 atlas with `--n-phase-bins 2 --hidden 96 --epochs 300 --max-files 237 --records-per-file 50000` against `/tiamat/zarathustra/traces/alibaba`. Output: `/home/darrell/llnl_neural_atlas_alibaba_237f_inline_50k_phase2.pkl.gz`. Final losses: init_loss 0.0001, trans_loss 0.9427.
+
+### hp sweep on phase=2 atlas (1M, R208 lock except hp varies)
+
+| hp | 6-pol mean | direction |
+|---|---|---|
+| 0.30 | 0.0226 | +14% |
+| 0.35 | 0.0220 | +11% |
+| **0.40** | **0.0203** | ★ phase=2 minimum (+2.5% vs R208 phase=1) |
+| 0.45 | 0.0207 | +5% |
+| 0.50 | 0.0265 | +34% |
+
+Plateau at hp=0.40-0.45, but still worse than phase=1 R208's 0.0198.
+
+### Why the architectural change didn't help
+
+Three plausible reasons:
+1. **Undertrained** — phase=2 was 300 epochs vs phase=1's 600. The 12-state space has 2× the parameters; equal-time training likely hits a different point on the loss surface.
+2. **Phase quartile mis-binning** — `n_phase_bins=2` uses the unique-rate phase quartiles fitted on training data. For alibaba's working-set-clustered access, the quartile boundaries may not align with the actual phase shifts.
+3. **6-state space is sufficient** — alibaba's transition structure may genuinely fit in 6 dist-states; expansion adds noise without information.
+
+Without more training time / different binning strategy, can't disambiguate.
+
+### Architectural floor confirmed
+
+R211 (rank_power port from LANL): NEGATIVE. R213 (state-space expansion to phase=2): NEGATIVE. Both architectural moves available without re-engineering closed in the wrong direction. The R208 lock stands as LLNL b2's alibaba floor.
+
+### Standing claim unchanged
+
+Alibaba: **0.0210 (8-pol) / 0.0198 (6-pol)** — `hp=0.40 K=75 adj=0.05 tail=0.10 mf=0.5 + rp=0.15 win=2` (phase=1 atlas, 600-epoch training).
+
+### Sandia + LANL pass
+
+- LANL `f33d5de`/`78766bf`: their winning alibaba 0.017939 row admitted to be **single-seed-fragile**. Confirmation seeds (80, 81, 82) all came back at 0.0199-0.0200 — basically tied with LLNL R208 0.0198. They now claim a new single-seed candidate p=.06/hp=.10/k=125 seed=69 → 0.017389 (better still), but pending confirmation. **Race position is much closer than §18 framing suggested**: posting REBUTTAL §19 to acknowledge.
+- Sandia: still off, R38 unfixed.
