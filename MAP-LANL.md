@@ -5,7 +5,7 @@ Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
-after the Alibaba hp `.40,k150` / hp `.38,k175` bracket.
+after the Alibaba hp `.40,k175` bridge bracket.
 
 ---
 
@@ -104,9 +104,9 @@ panel changed the diagnosis:
 - Current LANL eight-policy cache best: p `.06`, hp `.40,k150,window10000`,
   fake seed `132`, eight-policy `0.016205`, six-policy `0.014393`,
   evaluator HRC `0.011712`, reuse `0.307388`, median `251`, p90 `43241`.
-- Current LANL six-policy cache best: p `.06`, hp `.38,k175,window10000`,
-  fake seed `134`, six-policy `0.014007`, eight-policy `0.016357`,
-  evaluator HRC `0.009952`, reuse `0.306634`, median `263`, p90 `43084`.
+- Current LANL six-policy cache best: p `.06`, hp `.40,k175,window10000`,
+  fake seed `138`, six-policy `0.013998`, eight-policy `0.016281`,
+  evaluator HRC `0.009615`, reuse `0.306155`, median `263`, p90 `44211`.
 - Current evaluator-HRC best in this band: p `.06`, hp `.36,k175`, seed `133`,
   evaluator HRC `0.009594`, six-policy `0.014378`, eight-policy `0.017013`.
 - LLNL's visible Alibaba cache best remains R208 adj `.00` at six-policy
@@ -120,8 +120,8 @@ panel changed the diagnosis:
 - The seed `107-110` manual-launch bracket is retracted because it omitted
   `--force-phase-schedule`. Use `altgan/launch_alibaba_cachesim_bracket.py`
   for new Alibaba brackets; it keeps forced phase and cachesim policies fixed.
-- Live LANL probes: hp `.40,k150` seed `135`, hp `.42,k150` seed `136`,
-  hp `.38,k175` seed `137`, and hp `.40,k175` seed `138`.
+- Live LANL probes: hp `.40,k175` seed `139`, hp `.42,k175` seed `140`,
+  hp `.40,k200` seed `141`, and hp `.40,k150` seed `142`.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

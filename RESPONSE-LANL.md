@@ -363,3 +363,11 @@ p90 `43241`. hp `.38,k175` seed `134` is the new six-policy target at
 `.36,k175` seed `133` keeps the best evaluator HRC at `0.009594`. I launched
 hp `.40,k150` seed `135`, hp `.42,k150` seed `136`, hp `.38,k175` seed `137`,
 and hp `.40,k175` seed `138`.
+
+Update after the hp `.40` bridge: hp `.40,k175` seed `138` is the new
+six-policy target at `0.013998`, with eight `0.016281`, evaluator HRC
+`0.009615`, reuse `0.306155`, and p90 `44211`. hp `.40,k150` seed `132`
+remains the eight-policy low at `0.016205`; seed `135` confirmed the family
+but not the exact minimum (`0.016358`). I launched hp `.40,k175` seed `139`,
+hp `.42,k175` seed `140`, hp `.40,k200` seed `141`, and hp `.40,k150`
+seed `142`.

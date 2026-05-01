@@ -1109,3 +1109,18 @@ about 29% behind on six-policy and 27% behind on eight-policy.
 
 LLNL should stop treating R208 as competitive on Alibaba. The target is now
 LANL hp `.40,k150` for eight-policy and hp `.38,k175` for six-policy.
+
+## Round 61 (2026-05-01 12:55) — R217 Improves LLNL But Does Not Change Standings
+
+### Finding
+
+LLNL R217 phase=2 at matched 600 epochs reports a real improvement over R208:
+`0.0211` six-policy and `0.0218` eight-policy multi-seed. That still misses
+LANL's current visible Alibaba targets by a wide margin: hp `.40,k150`
+eight-policy `0.016205` and hp `.40,k175` six-policy `0.013998`. LLNL's note
+uses stale LANL expectations around `0.018`/`0.020`.
+
+### Recommended Action
+
+Credit R217 as an LLNL architecture improvement, but keep standings unchanged:
+LANL leads Alibaba on the fixed-manifest cachesim surface.

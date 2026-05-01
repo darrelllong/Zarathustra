@@ -5,7 +5,7 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R217 Alibaba hp40/hp38 Cache-Sim Target (2026-05-01)
+## R218 Alibaba hp40 k175 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
@@ -14,9 +14,9 @@ manifest. The current visible targets are:
 - Eight-policy: p `.06`, hp `.40,k150,window10000`, seed `132`,
   eight-policy `0.016205`, six-policy `0.014393`, evaluator HRC `0.011712`,
   reuse `0.307388`, median `251`, p90 `43241`.
-- Six-policy: p `.06`, hp `.38,k175,window10000`, seed `134`, six-policy
-  `0.014007`, eight-policy `0.016357`, evaluator HRC `0.009952`, reuse
-  `0.306634`, median `263`, p90 `43084`.
+- Six-policy: p `.06`, hp `.40,k175,window10000`, seed `138`, six-policy
+  `0.013998`, eight-policy `0.016281`, evaluator HRC `0.009615`, reuse
+  `0.306155`, median `263`, p90 `44211`.
 - Evaluator-HRC: p `.06`, hp `.36,k175,window10000`, seed `133`, HRC
   `0.009594`, six-policy `0.014378`, eight-policy `0.017013`.
 
@@ -25,9 +25,11 @@ LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
 cachesim table. The seed `107-110` manual bracket is retracted because it
 omitted `--force-phase-schedule`; the corrected forced-phase bracket is
 recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
-Alibaba launch recipe. The live bracket is hp `.40,k150` seed `135`,
-hp `.42,k150` seed `136`, hp `.38,k175` seed `137`, and hp `.40,k175` seed
-`138`.
+Alibaba launch recipe. LLNL R217 phase=2 reports `0.0211` six-policy and
+`0.0218` eight-policy multi-seed, a real LLNL improvement but still behind
+LANL's current visible rows. The live bracket is hp `.40,k175` seed `139`,
+hp `.42,k175` seed `140`, hp `.40,k200` seed `141`, and hp `.40,k150` seed
+`142`.
 
 ---
 
@@ -646,3 +648,11 @@ lowered six-policy to `0.014007` with eight-policy `0.016357`, reuse
 best evaluator HRC at `0.009594`. Live bracket: hp `.40,k150` seed `135`,
 hp `.42,k150` seed `136`, hp `.38,k175` seed `137`, and hp `.40,k175`
 seed `138`.
+
+The bridge bracket moved the six-policy target to hp `.40,k175`: seed `138`
+scored six/eight `0.013998`/`0.016281`, evaluator HRC `0.009615`, reuse
+`0.306155`, median `263`, and p90 `44211`. hp `.40,k150` seed `135` confirmed
+the family but did not beat seed `132` on eight-policy (`0.016358`), and
+hp `.42,k150` seed `136` was weaker (`0.016348`). Live bracket: hp `.40,k175`
+seed `139`, hp `.42,k175` seed `140`, hp `.40,k200` seed `141`, and
+hp `.40,k150` seed `142`.
