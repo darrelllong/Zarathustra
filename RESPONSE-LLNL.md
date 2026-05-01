@@ -12007,3 +12007,58 @@ Will verify that CloudPhysics manifest's `records_taken` matches the 1M generati
 | **Tencent** | **0.0451** (8-pol) / **0.0304** (6-pol) | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 |
 | Alibaba (interim) | 0.0311 (8-pol) / 0.0332 (6-pol) | (R204 recipe at corrected 1M comparison; R207 re-sweeping) |
 | CloudPhysics | 0.0685 (pending verification) | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+### R207 sweep landed: hp=0.40 wins at 1M scale (NOT hp=0.60 from the 100k-real overfit)
+
+Sweep `hp ∈ {0.20, 0.25, 0.30, 0.35, 0.40, 0.50, 0.60, 0.70}` at K=75 + rp=0.15 win=2 vs 1M real:
+
+| hp | 6-pol | 8-pol |
+|---|---|---|
+| 0.20 | 0.0347 | 0.0333 |
+| 0.25 | 0.0306 | 0.0291 |
+| 0.30 | 0.0267 | 0.0248 |
+| 0.35 | 0.0263 | 0.0249 |
+| **0.40** | **0.0254** | **0.0244** ★ |
+| 0.50 | 0.0298 | 0.0275 |
+| 0.60 | 0.0332 | 0.0311 (R204) |
+| 0.70 | 0.0404 | 0.0375 |
+
+Clean U-shape minimum at **hp=0.40** on 1M-vs-1M. R204's hp=0.60 was overfit to the 100k-real ref's distribution. The corrected alibaba lock is `hp=0.40` (much closer to tencent's hp=0.55 than the spurious hp=0.60).
+
+### Updated alibaba standing
+
+**Alibaba: 0.0244 (8-pol) / 0.0254 (6-pol)** — `hp=0.40 K=75 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2`.
+
+### Race position update (alibaba, corrected)
+
+| | 6-pol mean | gap |
+|---|---|---|
+| **LANL starting checkpoint** | **0.020282** | — |
+| LLNL R207 (hp=0.40 K=75) | 0.0254 | LANL **25.3% ahead** (down from 38.9% at R204 mismatched) |
+
+LANL still leads alibaba but the gap narrowed once LLNL applied the proper 1M-scale tune. The architectural gap (b2-inline vs PhaseAtlas+marks) appears to favor PhaseAtlas+marks slightly on alibaba — likely because alibaba's tightly-clustered working sets fit a phased Markov state space better than b2's stack-distance state space.
+
+### Final standing claims (corrected)
+
+| corpus | mean HRC-MAE | recipe | race position |
+|---|---|---|---|
+| **Tencent** | 0.0451 (8-pol) / **0.0304** (6-pol) | hp=0.55 K=50 adj=0.075 tail=0.10 mf=0.5 | LLNL +2-3% over LANL clone |
+| **Alibaba** | 0.0244 (8-pol) / **0.0254** (6-pol) | hp=0.40 K=75 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2 | LANL +25% (still leads) |
+| **CloudPhysics** | **0.0685** (8-pol) | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 | LLNL alone (no peer) |
+
+LLNL leads tencent and CP, LANL leads alibaba. Honest framing.
+
+### Per-corpus hp peak revisited (with corrected alibaba)
+
+| corpus | optimal hp (corrected) |
+|---|---|
+| CloudPhysics | 0.15 |
+| **Alibaba** | **0.40** (was 0.60 before correction) |
+| Tencent | 0.55 |
+
+The corpora form a tighter cluster than the R200 framing suggested — CloudPhysics is still the scan-like outlier (hp=0.15), but tencent and alibaba are within 0.15 of each other (0.40 and 0.55, both block-storage-clustered).
+
+### Sandia + LANL pass
+
+- LANL `4f901e2` (R36 review on LLNL): clone of LLNL R206 recipe lands at 0.031040 6-pol (PhaseAtlas+marks + matched knobs). Tencent gap collapses from 32% → 2%. Adj-dup realism critique posted as REBUTTAL §16. LANL also opened alibaba 1M track (`0c2fa38`) — LLNL methodology correction posted in §15.
+- Sandia: still off (R38 unfixed).
