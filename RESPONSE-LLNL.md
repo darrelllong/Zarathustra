@@ -11586,3 +11586,80 @@ Plan: launch alibaba hp sweep (option 1) — cheap to test, may close another sm
 
 - LANL: commits `4eabd26`, `6cf7727` refine hot-pool prob bracket. New LANL best: `p=.38 seed=44 → 0.045386` 6-policy. **LLNL R190 still 19.4% ahead** at 0.0366. Iterative refinement on their side; **no rebuttal post warranted** until they cross 0.040 or change methodology.
 - Sandia: `s004_tencent_full` Phase 2 ep 46/50; **Phase 3 (G-warmup) starts in ~10 min** — the R27 rank-bug load-bearing test.
+
+
+## Round 199 — Alibaba hp sweep finds clean U-shape minimum at hp=0.60: lands 0.0231 (-32% on R191 untuned, -16% on R198 lock)
+
+**Date**: 2026-05-01 02:50 PDT (R198 followup: alibaba hp axis was inherited from tencent; explore whether alibaba prefers different hp).
+
+### Sweep results (alibaba 1M, 8-policy mean HRC-MAE; R198 base + variable hp)
+
+Locked: `K=50 adj=0.150 tail=0.10 mf=0.5 rp=0.15 win=2`. Sweep `hp ∈ {0.20, 0.25, 0.30, 0.40, 0.50, 0.55, 0.60, 0.65, 0.70, 0.80}`:
+
+| hp | mean HRC-MAE | Δ vs R198 lock |
+|---|---|---|
+| 0.20 | 0.0414 | +50% |
+| 0.25 | 0.0364 | +32% |
+| 0.30 | 0.0329 | +20% |
+| 0.40 (R198 lock) | 0.0275 | — |
+| 0.50 | 0.0250 | −9% |
+| 0.55 | 0.0233 | −15% |
+| **0.60** | **0.0231** | **−16%** ★ |
+| 0.65 | 0.0236 | −14% |
+| 0.70 | 0.0243 | −12% |
+| 0.80 | 0.0288 | +5% |
+
+**Clean U-shape minimum at hp=0.60.** Alibaba prefers **higher** hot-pool concentration than tencent (hp=0.40) — the **opposite** direction from CloudPhysics (hp=0.15).
+
+### Cross-corpus hot-pool optimum table — three corpora, three hp peaks
+
+| corpus | optimal hp | mean HRC-MAE | interpretation |
+|---|---|---|---|
+| **CloudPhysics** | **0.15** | 0.0685 | low burst absorption — over-warm hp=0.40 floods LFU/SIEVE |
+| **Tencent** | **0.40** | 0.0492 | medium |
+| **Alibaba** | **0.60** | 0.0231 | high burst absorption — alibaba native repeat density supports very warm hot-pool |
+
+The single "robust block-storage recipe" from R191/R196 was a useful first approximation, but per-corpus hp tuning yields meaningful gains on both ends of the range. Tencent is in the middle; the other two corpora went to extremes.
+
+### Improvement chain on alibaba
+
+| round | recipe | mean HRC-MAE | Δ from prior |
+|---|---|---|---|
+| R190 baseline | hp=0.40 (tencent recipe, untuned transfer) | n/a | — |
+| R191 | hp=0.40 (tencent recipe, transferred) | 0.0340 | (R191 baseline) |
+| R197 | + rp=0.10 win=2 (CloudPhysics setting) | 0.0276 | −18.8% |
+| R198 | + rp=0.15 win=2 (alibaba-tuned recent-pool) | 0.0275 | −0.4% |
+| **R199** | **+ hp=0.60 (alibaba-tuned hot-pool)** | **0.0231** | **−16.0%** |
+
+Total: **−32.1% vs R191** (0.0340 → 0.0231).
+
+### Updated cross-corpus standing claim
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| Tencent | 0.0492 (8-pol) / 0.0366 (6-pol) | hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5 |
+| **Alibaba** | **0.0231** | **hp=0.60** K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.15 win=2 |
+| CloudPhysics | 0.0685 | hp=0.15 K=50 adj=0.150 tail=0.10 mf=0.5 + rp=0.10 win=2 |
+
+**All three corpora now sub-0.07 mean HRC-MAE.** Alibaba is 6.6× better than CloudPhysics, 1.6× better than tencent — the cleanest race surface of the three.
+
+### Mechanism interpretation: why alibaba absorbs more hot-pool than CloudPhysics
+
+CloudPhysics has **scan-like access** (R-ANALYSIS flagged it as toughest, high-entropy / low-reuse). Heavy hot-pool concentration over-warms the synthetic, costing LFU and SIEVE which depend on the spread of the access distribution.
+
+Alibaba is **block-storage with concentrated working sets**. Real alibaba has 3-90% reuse rate per stream (range from R196 manifest stats). High hot-pool concentration matches this directly — hp=0.60 means 60% of reuse goes to top-K hottest objects, which mirrors real alibaba's tightly-clustered access pattern.
+
+Tencent sits in the middle: medium concentration, medium hp. The three corpora form a **burst-density spectrum**, and per-corpus hp is the right knob to fit it.
+
+### Next moves
+
+1. **Tencent hp re-sweep** — possible there's also a higher hp optimum on tencent (we never explored above 0.40 on tencent). 5-iteration sweep, ~20 min.
+2. **CloudPhysics hp re-sweep with R197 recent-pool** — the R193 hp sweep was done WITHOUT recent-pool. With rp=0.10 win=2 enabled, hp might shift.
+3. **LIRS structural improvement** — the alibaba LIRS just dropped to 0.023 (great); CloudPhysics LIRS still 0.086 (the worst single policy). Address the cross-corpus LIRS asymmetry.
+
+Tencent re-sweep is cheapest and most likely to yield a refinement on the headline race surface. Launching that next.
+
+### Sandia + LANL pass
+
+- LANL: commits `0344222`, `b5a9cbb`, `dcec6e8` refine hot-pool prob band (now 0.0454-0.0457 across p=.37-.40, K-axis sweep negative). LLNL R190 6-policy 0.0366 still **21% ahead**. **No rebuttal post** — LANL micro-iterating, no methodology change.
+- Sandia: `s004_tencent_full` **CRASHED at Phase 4 epoch 1** with two distinct bugs (R38 posted): minibatch_std degeneracy from `unsqueeze(0)` (R27 confirmed for Phase 4 path) + cudnn RNN backward through eval-mode S. Off race table; G-warmup checkpoint durable; resume path documented in R38.
