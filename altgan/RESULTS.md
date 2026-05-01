@@ -1414,10 +1414,12 @@ Tencent peer fill:
 | LANL | p `.60`, k50, tail `.10`, adj `.015`, seed `58` | **0.030240** |
 | LANL | same row confirmation, seed `59` | **0.030301** |
 | LLNL | R206 adj `.075` | 0.030360 |
+| LLNL | R210 adj `.06` | 0.030526 |
 | LLNL | R210 adj `.04` | 0.030856 |
 
-LLNL R210 adj `.04` does not retake the visible Tencent lead. R210 adj `.06`
-was still running when this row was recorded.
+LLNL R210 adj `.04` and adj `.06` do not retake the visible Tencent lead. The
+adj `.06` per-policy MAEs were LRU `0.019432`, ARC `0.059208`, FIFO
+`0.012654`, SIEVE `0.015391`, SLRU `0.020973`, and CAR `0.055496`.
 
 Alibaba eight-policy fill:
 
@@ -1447,6 +1449,7 @@ is admitted to the results table.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p04_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r210_adj0p06_vs_lanl_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp010k125_seed62_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp015k100_seed61_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_p008hp012k125_seed68_eight_policy_caps.json`

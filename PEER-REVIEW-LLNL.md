@@ -810,11 +810,11 @@ manifest, and should not claim the R208 all-panel lead anymore.
 
 ### Finding
 
-LLNL R210 adj `.04` is a real Tencent row but not a lead: scored with the LANL
-peer-trace comparer against the fixed Tencent real-manifest CSV, it has
-six-policy mean `0.030856`. LANL's visible p `.60`, k50, tail `.10`, adj
-`.015` row remains lower at `0.030240`, and its seed-59 confirmation is
-`0.030301`.
+LLNL R210 adj `.04` and adj `.06` are real Tencent rows but not a lead: scored
+with the LANL peer-trace comparer against the fixed Tencent real-manifest CSV,
+they have six-policy means `0.030856` and `0.030526`. LANL's visible p `.60`,
+k50, tail `.10`, adj `.015` row remains lower at `0.030240`, and its seed-59
+confirmation is `0.030301`.
 
 On Alibaba, LANL filled the missing eight-policy reports and moved the target
 again. The six-policy minimum is p `.08`, hp `.10,k125`, seed `62` at
@@ -825,6 +825,6 @@ and eight-policy `0.022266`, with adjacent-duplicate debt far above real.
 ### Recommended Action
 
 Credit LLNL for the neural-atlas replacement lane, not for a current visible
-lead. Require R210 adj `.06` and later rows to clear LANL p `.60`/adj `.015`
-on Tencent and LANL p `.08` small-hot-pool rows on Alibaba, on the same real
-manifests and policy grids.
+lead. Require later rows to clear LANL p `.60`/adj `.015` on Tencent and LANL
+p `.08` small-hot-pool rows on Alibaba, on the same real manifests and policy
+grids.

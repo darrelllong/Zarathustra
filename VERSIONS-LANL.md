@@ -466,9 +466,10 @@ through the same `tools/cachesim` gate as generated LANL evaluator runs. It
 compares fake and real CSVs across policy/capacity grids and writes the
 policy-by-policy HRC-MAE report used in the race tables.
 
-Tencent status: LLNL R210 adj `.04` scored six-policy `0.030856` on the fixed
-LANL Tencent real-manifest CSV. That does not beat LANL p `.60`, k50, tail
-`.10`, adj `.015` at `0.030240` or its seed-59 confirmation at `0.030301`.
+Tencent status: LLNL R210 adj `.04` scored six-policy `0.030856` and adj
+`.06` scored `0.030526` on the fixed LANL Tencent real-manifest CSV. Neither
+beats LANL p `.60`, k50, tail `.10`, adj `.015` at `0.030240` or its seed-59
+confirmation at `0.030301`.
 
 Alibaba status after filling the missing eight-policy reports:
 

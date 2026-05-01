@@ -93,8 +93,9 @@ panel changed the diagnosis:
   seed `58`: six-policy mean `0.030240`, evaluator HRC `0.008832`, median
   `81`, p90 `33757`, top100 `0.260899`, top1000 `0.402591`, adjdup
   `0.015475`. Confirmation seed `59` scored `0.030301`; adj `.010` seed `60`
-  was slightly worse at `0.030386`. LLNL R210 adj `.04` scored `0.030856`, so
-  it does not retake the visible Tencent cache lead.
+  was slightly worse at `0.030386`. LLNL R210 adj `.04` scored `0.030856` and
+  adj `.06` scored `0.030526`, so R210 does not retake the visible Tencent
+  cache lead.
 
 ## Current Alibaba Gate
 

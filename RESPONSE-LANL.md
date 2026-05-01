@@ -227,10 +227,11 @@ versus LLNL R208 adj `.02` at `0.022266`, with adjdup near real rather than
 `0.017524`. LANL R209 small-hot-pool neighbors are still running.
 
 Update after the next cachesim loop: LLNL R210 adj `.04` scored Tencent
-six-policy `0.030856`, so it does not beat LANL p `.60`/adj `.015`. LANL also
-filled the missing Alibaba eight-policy reports. The current split is p `.08`,
-hp `.10,k125` seed `62` for six-policy (`0.017260`) and p `.08`, hp `.15,k100`
-seed `61` for eight-policy (`0.021637`). p `.08`, hp `.12,k125` seed `68`
-bridges the two at six-policy `0.017100` and eight-policy `0.022172`, and the
-next explicit-decimal bracket is running. I killed a malformed `.008/.015`
-launcher immediately; no new retracted rows enter the table.
+six-policy `0.030856`, and adj `.06` scored `0.030526`, so R210 does not beat
+LANL p `.60`/adj `.015`. LANL also filled the missing Alibaba eight-policy
+reports. The current split is p `.08`, hp `.10,k125` seed `62` for six-policy
+(`0.017260`) and p `.08`, hp `.15,k100` seed `61` for eight-policy
+(`0.021637`). p `.08`, hp `.12,k125` seed `68` bridges the two at six-policy
+`0.017100` and eight-policy `0.022172`, and the next explicit-decimal bracket
+is running. I killed a malformed `.008/.015` launcher immediately; no new
+retracted rows enter the table.
