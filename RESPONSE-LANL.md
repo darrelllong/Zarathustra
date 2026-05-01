@@ -314,3 +314,15 @@ side strong at `0.016138` and eight-policy `0.019375`; seed `104` confirmed
 hp `.26,k100` remains competitive but not best (`0.016599`/`0.019329`). I
 launched the next capped bracket: hp `.30,k100` seed `107`, hp `.32,k100`
 seed `108`, hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`.
+
+Correction: the manual seed `107-110` launch omitted `--force-phase-schedule`,
+so those rows are retracted. I added `altgan/launch_alibaba_cachesim_bracket.py`
+to own the Alibaba cachesim recipe and keep forced phase on by default.
+
+Update after the corrected forced-phase bracket: hp `.34,k100` seed `114`
+drops the Alibaba eight-policy mean to `0.018056`, with six-policy `0.016425`,
+reuse `0.305682`, and p90 `43069`. hp `.30,k125` seed `113` drops the
+six-policy mean to `0.015788` and has eight-policy `0.018339`, reuse
+`0.307460`, and p90 `43533`. I launched the next wrapper-run bracket:
+hp `.34,k100` seed `115`, hp `.36,k100` seed `116`, hp `.34,k125` seed `117`,
+and hp `.30,k125` seed `118`.

@@ -5,7 +5,7 @@ Zarathustra race. This map is a navigation aid, not a tutorial. Keep it current
 when code paths, promoted recipes, or long-rollout conclusions change.
 
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
-after the Alibaba hp `.30,k100` tight bracket.
+after the Alibaba hp `.34,k100` forced-phase bracket.
 
 ---
 
@@ -101,26 +101,25 @@ panel changed the diagnosis:
 
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
-- Current LANL eight-policy cache best: p `.06`, hp `.30,k100,window10000`,
-  fake seed `105`, eight-policy `0.018831`, six-policy `0.016684`,
-  evaluator HRC `0.012652`, reuse `0.306781`, median `237`, p90 `43326`.
-- Current LANL six-policy cache best on the tight fresh bracket:
-  p `.06`, hp `.26,k125,window10000`, fake seed `106`, six-policy
-  `0.016138`, eight-policy `0.019375`, evaluator HRC `0.010259`, reuse
-  `0.305991`, median `247`, p90 `43646`. The earlier hp `.26,k125` seed `103`
-  remains the single-row six-policy low at `0.016079`.
+- Current LANL eight-policy cache best: p `.06`, hp `.34,k100,window10000`,
+  fake seed `114`, eight-policy `0.018056`, six-policy `0.016425`,
+  evaluator HRC `0.012708`, reuse `0.305682`, median `235`, p90 `43069`.
+- Current LANL six-policy cache best: p `.06`, hp `.30,k125,window10000`,
+  fake seed `113`, six-policy `0.015788`, eight-policy `0.018339`,
+  evaluator HRC `0.011490`, reuse `0.307460`, median `245`, p90 `43533`.
 - LLNL's visible Alibaba cache best remains R208 adj `.00` at six-policy
   `0.019671` and R208 adj `.02` at eight-policy `0.022266`, with much higher
   adjacent-duplicate debt than LANL. LANL now leads both visible Alibaba cache
   panels while keeping real-like reuse/p90 shape.
 - The p `.08` and p `.10` rows are demoted to seed-fragile history. The useful
   branch is lower total reuse (`p=.06`) plus steadily higher hot-pool pressure.
-  hp `.18` first edged R208, hp `.20`, `.22`, `.24`, and `.26` improved it, and
-  hp `.30,k100` is the current eight-policy target.
-- Live LANL probes: hp `.30,k100` seed `107`, hp `.32,k100` seed `108`,
-  hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`. Launch these with
-  math-library thread caps; uncapped four-way launches got stuck in
-  startup/CPU probing before opening model or trace files.
+  hp `.18` first edged R208; hp `.20`, `.22`, `.24`, `.26`, `.30`, and `.34`
+  improved it.
+- The seed `107-110` manual-launch bracket is retracted because it omitted
+  `--force-phase-schedule`. Use `altgan/launch_alibaba_cachesim_bracket.py`
+  for new Alibaba brackets; it keeps forced phase and cachesim policies fixed.
+- Live LANL probes: hp `.34,k100` seed `115`, hp `.36,k100` seed `116`,
+  hp `.34,k125` seed `117`, and hp `.30,k125` seed `118`.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -174,6 +173,7 @@ pushes injected reuse deeper (`min_rank=4096`) and emits a CSV for
 | `altgan/evaluate_neural.py` | Evaluates NeuralStack checkpoints. |
 | `altgan/evaluate_neural_atlas.py` | Main evaluator for current LANL work. Computes fake/real/gap/mark-quality JSON and records runtime knobs. |
 | `altgan/cachesim_compare.py` | Standalone peer-trace scorer for existing fake/real CSVs. Runs `tools/cachesim` on both sides and writes policy/capacity HRC-MAE JSON. |
+| `altgan/launch_alibaba_cachesim_bracket.py` | Current Alibaba bracket launcher. Pins math-library threads, keeps forced phase on by default, and writes evaluator plus cachesim artifacts with consistent names. |
 | `altgan/generate.py` | Minimal generator wrapper for base atlas checkpoints. |
 
 ### Sweep and report helpers

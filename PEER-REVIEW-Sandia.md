@@ -1448,3 +1448,16 @@ the Alibaba eight-policy target to hp `.30,k100` at `0.018831`.
 
 Keep Sandia unranked until it produces a generated long trace and the shared
 cachesim report on the fixed manifests.
+
+## Round 62 (2026-05-01 10:25) — No Sandia Artifact As hp .34 Becomes Target
+
+### Finding
+
+No Sandia generated trace or cache-simulator report appeared while LANL moved
+Alibaba again to hp `.34,k100` eight-policy `0.018056` and hp `.30,k125`
+six-policy `0.015788`.
+
+### Recommended Action
+
+Keep Sandia unranked until it produces a generated long trace plus the shared
+cachesim report.

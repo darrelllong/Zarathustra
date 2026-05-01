@@ -5,24 +5,27 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
-## R211 Alibaba hp30 Cache-Sim Target (2026-05-01)
+## R212 Alibaba hp34 Cache-Sim Target (2026-05-01)
 
 LANL's active Alibaba lane is now lower-reuse PhaseAtlas plus higher hot-pool
 pressure, evaluated through `tools/cachesim` on the fixed 1M Alibaba real
 manifest. The current visible targets are:
 
-- Eight-policy: p `.06`, hp `.30,k100,window10000`, seed `105`, mean
-  HRC-MAE `0.018831`, six-policy `0.016684`, reuse `0.306781`, median `237`,
-  p90 `43326`.
-- Six-policy: p `.06`, hp `.26,k125,window10000`, seed `106`, mean
-  HRC-MAE `0.016138` over the six-policy panel and `0.019375` over the
-  eight-policy panel, reuse `0.305991`, median `247`, p90 `43646`.
+- Eight-policy: p `.06`, hp `.34,k100,window10000`, seed `114`, mean
+  HRC-MAE `0.018056`, six-policy `0.016425`, reuse `0.305682`, median `235`,
+  p90 `43069`.
+- Six-policy: p `.06`, hp `.30,k125,window10000`, seed `113`, mean HRC-MAE
+  `0.015788` over the six-policy panel and `0.018339` over the eight-policy
+  panel, reuse `0.307460`, median `245`, p90 `43533`.
 
 LLNL R208 remains the best visible LLNL Alibaba row (`0.019671` six-policy,
 `0.022266` eight-policy), so LANL currently leads the fixed-manifest Alibaba
-cachesim table. The next capped bracket is hp `.30,k100` seed `107`,
-hp `.32,k100` seed `108`, hp `.30,k125` seed `109`, and hp `.34,k100` seed
-`110`.
+cachesim table. The seed `107-110` manual bracket is retracted because it
+omitted `--force-phase-schedule`; the corrected forced-phase bracket is
+recorded here. `altgan/launch_alibaba_cachesim_bracket.py` now owns the
+Alibaba launch recipe. The next bracket is hp `.34,k100` seed `115`,
+hp `.36,k100` seed `116`, hp `.34,k125` seed `117`, and hp `.30,k125` seed
+`118`.
 
 ---
 
@@ -591,5 +594,12 @@ seed `105` scored six/eight `0.016684`/`0.018831`, reuse `0.306781`, median
 `237`, and p90 `43326`. The fresh hp `.26,k125` seed `106` kept the
 six-policy side strong at `0.016138`/`0.019375`. LANL now leads LLNL R208 on
 Alibaba by a wide cache-sim margin while retaining the lower-reuse shape. The
-live capped follow-up is hp `.30,k100` seed `107`, hp `.32,k100` seed `108`,
-hp `.30,k125` seed `109`, and hp `.34,k100` seed `110`.
+first seed `107-110` follow-up is retracted because it omitted
+`--force-phase-schedule`.
+
+The corrected forced-phase follow-up improved both targets. hp `.34,k100` seed
+`114` scored six/eight `0.016425`/`0.018056`, reuse `0.305682`, median `235`,
+and p90 `43069`. hp `.30,k125` seed `113` scored the six-policy low at
+`0.015788` and eight-policy `0.018339`, with reuse `0.307460` and p90 `43533`.
+Live follow-up through the launcher: hp `.34,k100` seed `115`, hp `.36,k100`
+seed `116`, hp `.34,k125` seed `117`, and hp `.30,k125` seed `118`.

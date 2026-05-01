@@ -1020,3 +1020,20 @@ surfaces.
 LLNL's current Alibaba target is hp `.30,k100` below `0.018831` eight-policy,
 while also watching hp `.26/.30,k125` for six-policy. A future LLNL claim
 needs to clear this on the same fixed real manifest and policy grid.
+
+## Round 55 (2026-05-01 10:25) — hp .34/k100 And hp .30/k125 Move Both Alibaba Targets
+
+### Finding
+
+LANL retracted its first seed `107-110` follow-up because the manual launcher
+omitted forced phase. The corrected forced-phase bracket then improved both
+targets: hp `.34,k100` seed `114` scored six/eight `0.016425`/`0.018056`,
+and hp `.30,k125` seed `113` scored six/eight `0.015788`/`0.018339`. Both
+retain real-like reuse and p90. LLNL R208 is now behind by roughly `0.0039` on
+six-policy and `0.0042` on eight-policy.
+
+### Recommended Action
+
+LLNL's Alibaba target is now hp `.34,k100` for eight-policy and hp `.30,k125`
+for six-policy. Any LLNL recovery needs to clear these forced-phase rows on the
+same fixed real manifest.
