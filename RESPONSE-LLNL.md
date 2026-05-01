@@ -12887,3 +12887,40 @@ CP improvement compounding across this session: original-bins R209 0.0659 → ex
 
 - LANL: still micro-iterating alibaba hp/k axis (PEER-REVIEW-Sandia rounds 64-71). No new methodology.
 - Sandia: still off (R38 unfixed; user reissuing startup prompt this session for the Qwen instance).
+
+## Round 225 — Alibaba more-data retrain (50k→100k records/file): closes-NEGATIVE; 12× regression points to overfit on transition memorization
+
+**Date**: 2026-05-01 14:10 PDT.
+
+### Hypothesis tested
+
+R221 alibaba uses 50k records-per-file × 237 files = 11.85M transitions. Sparse deep-bin PMFs were the suspected ceiling (per R220 IRD diagnostic). Doubling to 100k records-per-file (23.7M transitions) at the same training recipe (hidden=96, epochs=600, lr=2e-3, n-phase-bins=2, ext-bins) should populate the deep tail and lift HRC-MAE.
+
+### Result
+
+| atlas | seed=42 6-pol | seed=42 8-pol | vs R221 |
+|---|---|---|---|
+| R221 (50k, multi-seed mean) | 0.0204 | 0.0209 | — |
+| **R225 (100k, seed=42)** | **0.2423** | **0.2534** | **+11.9× / +12.1×** |
+
+Catastrophic regression. Same recipe, only the fit atlas changed.
+
+### Root-cause read
+
+`trans_loss` descended monotonically through all 600 epochs without inflection (final 1.1534, descending steadily from ~1.18 over the last 200 epochs). The training-loss plot has no overfitting signature in itself — but the network has 2× more transitions to memorize at the same hidden=96 capacity. Suspected mechanism:
+
+- **Memorization of high-frequency states.** With more transitions per state, the softmax sharpens around training-set ranks. At long-rollout generation the rank-PMF lookup hits states whose true next-rank distribution differs from the heavily-memorized training distribution → cache replay drifts.
+- This is consistent with the empirical pattern of R220-era atlases: the network's job is to *generalize* across condition vectors, not to perfectly fit per-state rank distributions. More data + same capacity made the trade go the wrong way.
+
+### Diagnostic launched (R225b)
+
+Launching R225b: same 100k atlas data, but **hidden=64 epochs=300** (R209-tier capacity, half the training budget). If this recovers near R221's 0.020-tier, overfit confirmed. If still bad, more-data is the wrong axis for this corpus.
+
+### Lesson
+
+The R220 IRD diagnostic identified deep-tail PMF clipping as the alibaba ceiling. R225 tests whether *populating* those bins helps — and the answer at this recipe is no. The ceiling appears to live elsewhere (capacity-budget calibration, or the deep-tail PMF really is fundamentally hard to recover from training even with more samples). R226 (CP hp re-sweep on the new R224 atlas) is now the higher-EV next move.
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration; no new methodology.
+- Sandia: user issuing fresh Qwen startup prompt this session (LLNL→Sandia handoff brief drafted; competition still 3-way).
