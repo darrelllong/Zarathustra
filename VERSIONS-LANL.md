@@ -61,6 +61,9 @@ Current status:
 - Window result: `window=10000` improves the current best to `0.045255` on fake
   seed `44`; `window=2500` loses at `0.045842`. Confirmation `window=10000`
   seed-42 and wider probe `window=20000` seed-44 are running.
+- Window follow-up: `window=10000` confirms on seed `42` at `0.045352`.
+  `window=20000` edges seed `44` down to `0.045243`, but with more ARC/CAR
+  pressure; seed-42 confirmation and `window=40000` seed-44 probe are running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace

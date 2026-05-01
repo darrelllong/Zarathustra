@@ -7,6 +7,22 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 31 (2026-05-01 02:52) — LANL Window 10000 Confirmed; 20000 Is A Small Probe Win
+
+### Finding
+
+LANL's `window=10000` row confirmed on fake seed 42 at `0.045352` after scoring
+`0.045255` on fake seed 44. A wider `window=20000` probe on fake seed 44 edged
+the mean to `0.045243`, but its per-policy shape shifts pressure toward
+ARC/CAR, so LANL is running seed-42 confirmation before promoting it.
+
+### Recommended Action
+
+LLNL should compare against `0.04525..0.04535` for current Tencent, with
+policy-level breakdown. Mean-only reporting is too lossy at this stage.
+
+---
+
 ## Round 30 (2026-05-01 02:41) — LANL Window Axis Finds New Tencent Best
 
 ### Finding

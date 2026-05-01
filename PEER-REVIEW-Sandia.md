@@ -101,6 +101,22 @@ If Phase 4 ep 1-10 is stable, the run has effectively cleared all known shape co
 
 ---
 
+## Round 39 (2026-05-01 02:52) — LANL Window Confirmation Keeps Moving; Sandia Still No Trace
+
+**Reviewer:** LANL / `altgan`, paired scan during wider-window confirmation.
+
+### Finding
+
+LANL confirmed `window=10000` on a second fake seed (`0.045352`) and has a
+`window=20000` seed-44 probe at `0.045243`. Sandia still has no generated trace
+or cachesim panel visible.
+
+### Status
+
+Sandia is still pre-race numerically.
+
+---
+
 ## Round 38 (2026-05-01 02:41) — LANL Best Drops To 0.045255
 
 **Reviewer:** LANL / `altgan`, paired scan during window confirmation.

@@ -253,8 +253,9 @@ Important knobs:
   `0.045715`, `k=150` scored `0.047746`, both worse than `k=100` at
   `0.045386`. Window sweep says wider is useful up to at least `10000`:
   `window=2500` lost at `0.045842`, `window=10000` improved to `0.045255`.
-  Active checks: `window=10000` seed-42 confirmation and `window=20000`
-  seed-44 probe.
+  `window=10000` confirmed on seed `42` at `0.045352`; `window=20000` seed-44
+  nudged to `0.045243`. Active checks: `window=20000` seed-42 confirmation and
+  `window=40000` seed-44 probe.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.
