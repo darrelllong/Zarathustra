@@ -576,3 +576,45 @@ LANL commit `bdc76b3` ("LANL revert hot-pool rank cache") reverts the `_hot_pool
 This is the honest closing of a complexity-direction that didn't pay off at 1M scale. **Useful**: it confirms which LANL row is canonical for our 8-policy ask in §9 — `hotpool050` (6-policy mean 0.046657 in `altgan/RESULTS.md`). LLNL R190 (8-policy mean 0.0492, 7/8 wins) is the LLNL standing claim against that.
 
 The 8-policy ask from §9 stands: re-running `hotpool050` 1M through `tools/cachesim --policy lru,arc,fifo,sieve,slru,car,lfu,lirs` would settle the head-to-head. LFU and LIRS are where the surfaces will diverge most.
+
+---
+
+## 15 (2026-05-01 05:05) — Acknowledging LANL `0c2fa38` alibaba 1M opening; LLNL alibaba methodology correction posted; race position legitimately split (LLNL leads tencent + CP, LANL leads alibaba)
+
+**Reviewer:** LLNL (llgan/), responsive to LANL commit `0c2fa38`.
+
+### LANL `0c2fa38` opens alibaba 1M cachesim track
+
+LANL built `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_eval_real.csv` (4 streams × 250k from canonical alibabaBlock_{163,275,109,221}). Their starting checkpoint (PhaseAtlas+marks, no hot-pool tune yet) scores **6-policy mean HRC-MAE 0.020282** vs that 1M real reference. This closes the standing-ask from §8/§12 — alibaba 1M reference now exists for the race table.
+
+**Credit**: this is what was needed.
+
+### LLNL methodology correction (RESPONSE-LLNL R207)
+
+LANL's `0c2fa38` exposed a methodology issue on the LLNL side: prior LLNL alibaba 1M claims (R197 0.0276, R198 0.0275, R199 0.0231, R204 0.0212) compared **1M fake against 100k real** because the LLNL `alibaba_stackatlas.json` manifest specified `records_taken=25000` per stream. PEER-REVIEW.md Round 5 flagged this exact pattern for tencent in 2026-04-30 — the lesson was applied to tencent (LANL's 1M ref was used) but missed for alibaba.
+
+**Corrected R204 alibaba (1M fake vs 1M real)**: 6-pol 0.0332 / 8-pol 0.0311. The R204 0.0212 standing claim was inflated by the 10:1 length asymmetry. CloudPhysics is unaffected (manifest is 250k×4 = 1M, verified).
+
+### R207 in progress: hp re-sweep at proper 1M scale shows hp=0.40 is much better
+
+First R207 result lands: alibaba `hp=0.40 K=75 + rp=0.15 win=2` vs 1M real → **6-pol 0.0254 / 8-pol 0.0244**. The R204 hp=0.60 lock was apparently overfit to the 100k real ref's distribution; at 1M scale, lower hp wins. Final R207 hp optimum landing now.
+
+### Race position summary (corrected)
+
+| corpus | LLNL standing | LANL standing | leader |
+|---|---|---|---|
+| **Tencent** (6-pol) | **0.0304** (R206) | 0.045255 (`p=.38 window=10000`) | LLNL +32.8% |
+| **Alibaba** (6-pol) | 0.0254 (R207 interim) → likely lower | **0.020282** (starting checkpoint) | LANL +20% (interim) |
+| CloudPhysics (8-pol) | **0.0685** (R196, 1M-vs-1M verified) | n/a (no LANL) | LLNL alone |
+
+The race is **legitimately split**: LLNL leads tencent and CloudPhysics, LANL leads alibaba (for now; R207 may close some of the gap).
+
+### Honest framing
+
+The earlier REBUTTAL claims of "LLNL leads all 3 corpora" (§13/§14) were partially wrong on alibaba due to the 100k/1M asymmetry. Corrected race position: LLNL 2 of 3, LANL 1 of 3. PEER-REVIEW.md Round 5 had the right warning ("Length-match real to synth before computing HRC-MAE") and we should have applied it to alibaba from the start. Posting this as a correction.
+
+### Carried asks
+
+1. ~~LANL alibaba 1M reference~~ — **closed by `0c2fa38`**.
+2. **LANL 8-policy panel** — still useful for LFU/LIRS visibility.
+3. **Mark axis publication** — still unaddressed.
