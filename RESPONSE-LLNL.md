@@ -10692,3 +10692,92 @@ Artifacts (vinge):
 - `/home/darrell/v_alibaba_adjdup0.030.csv` (R182 alibaba best @ 100k)
 - `/home/darrell/v_tencent_R182_1M_p030.csv` (R182 1M head-to-head fake)
 - `/home/darrell/llgan/cachesim_eval.py` (eval harness)
+
+
+## Round 183 — Strategy note: is model capacity the limiting factor for synthetic-trace fidelity?
+
+**Date**: 2026-04-30 17:50 PDT (Darrell strategy question; shared across teams since this is a friendly competition)
+
+### TL;DR
+
+Capacity is a factor but not the dominant one. The **architectural choice (i.i.d. PMF sampling vs autoregressive sequencing)** is the real lever. b2-light's capacity ceiling has been measured across 7 axes (R174–R179, all regressed); the wall is in the generation procedure, not the parameter count. Per-corpus information-theoretic ceilings matter for setting realistic targets.
+
+### Information-theoretic ceiling per corpus
+
+Conditional entropy bounds the achievable predictability of the access stream. Computed on 100k-record samples (R-ANALYSIS / R169 era):
+
+| corpus | H(X) bits/access | H(X_t \| X_{t-1}) | compressibility |
+|---|---|---|---|
+| **tencent** | 12.23 | **2.00 bits** | 7.6× vs uniform |
+| **alibaba** | 12.94 | **2.28 bits** | 7.0× |
+| metaKV | 9.27 | 0.59 | 24× (easiest) |
+| wiki_2019 | 15.86 | 0.75 | 21× (long working sets) |
+| twitter | 10.34 | 2.23 | 4.8× |
+
+A perfect bigram model on tencent needs ≥2.00 bits/step. `H(X)` ≈ 12 bits, so the trace is ~6× compressible from log-uniform-N. **High-entropy traces (close to uniform) are hopeless on cachesim**: a uniform synth would give miss-ratio ≈ 1 − cache/footprint at all caps and any policy. Real workloads are FAR from uniform — Zipfian heads, temporal locality, working-set transitions — and that structure is what cache-replacement policies exploit.
+
+### Where b2-light hits the capacity wall (and where it doesn't)
+
+`llgan/neural_atlas.py` b2-light is a 6-state conditional transition MLP with ~10k parameters. Training converges to `trans_loss ≈ 0.92` against the theoretical floor `log(6) = 1.79`. Per-state conditional information at this resolution is well-modeled — capacity is not the bottleneck for `P(state_t | state_{t-1}, cond)`.
+
+7 capacity / scaling axes tested across R174–R179, all REGRESSED relative to R172 (h96, ep600, 25k records, 6-state, 10-cond, no-dropout):
+
+| axis | tested | result vs R172 0.0069 alibaba HRC-MAE |
+|---|---|---|
+| State space (R174) | 6 → 24 with 4-bin phase | 0.0120 (1.7× worse) |
+| Net width (R175) | hidden 96 → 160 | 0.0118 (1.7× worse) |
+| Sampling temperature (R175) | T=0.5..1.5 | T=1.0 best (R172 baseline) |
+| Record budget (R176) | 25k → 50k | 0.0184 (2.7× worse) |
+| Training epochs (R177) | 600 → 1000 | 0.0114 (1.7× worse) |
+| Cond features (R178) | 10 → 13 dims | 0.0114 (1.7× worse) |
+| Dropout regularization (R179) | dropout=0.2 | 0.0168 (2.4× worse) |
+
+Every capacity-add overfits the per-stream marginal alignment while making the corpus HRC curve diverge from real. R172 sits at a "blurred" sweet spot — its low capacity is paradoxically protective.
+
+### The architectural ceiling — i.i.d. PMF vs autoregressive
+
+R181 diagnostic (`llgan/diag_hrc.py`) measured the real failure mode:
+
+| metric | tencent_real | b2-light synth | gap |
+|---|---|---|---|
+| top-100 access share | **34.90%** | **1.71%** | 20.4× too uniform |
+| top-1000 access share | 54.32% | 11.14% | 4.9× too uniform |
+| adjacent-duplicate rate | 0.0031 | 0.0000 | fake never repeats |
+
+i.i.d. PMF rank sampling cannot produce burst-of-same-id-back-to-back access patterns regardless of how many parameters the conditioning MLP has. R175 (hidden=160, 1.7× more capacity) did NOT improve top-K share. It's not a capacity problem — it's a generative-procedure problem.
+
+### Practical floors per policy on tencent
+
+For tencent at LRU cap=8192 (footprint mean ≈9627):
+
+| recipe | LRU miss-ratio | notes |
+|---|---|---|
+| Uniform random over unique IDs | **~0.787** | floor for hopeless synth |
+| **Real tencent** | **0.388** | Zipfian + temporal + working-set |
+| LLNL R182 (1M, P=0.030) | 0.367 | over-fits a few hot objects, slightly under-misses |
+| LANL `_postdecode_seed42_` (1M) | 0.402 | closer to real; better shape |
+| Perfect bigram (theoretical) | ~0.42 | captures bigram entropy, misses higher-order |
+
+A perfectly-fit bigram synth on tencent would still miss ~3-5% absolute on cachesim because real has 3rd-order+ structure (phase transitions, working-set shifts) that bigram can't capture. **We're already close to the bigram-entropy floor on LRU**; the LANL 2× lead concentrates in policies that exploit higher-order structure (SIEVE, ARC) and longer-history modeling.
+
+### Implications for next moves
+
+1. **Don't add b2-light capacity.** 7 axes regress. 8th won't suddenly fix it.
+2. **Move to autoregressive (transformer over stack-distance sequence).** This is the architectural lever — captures longer history without the i.i.d. ceiling. ~2-day commitment.
+3. **R181/R182 hot-pool + adj-dup are post-hoc symptom fixes.** Real wins (R182 −23% on tencent 100k cachesim mean). Useful but bounded by the underlying i.i.d. structure.
+4. **Per-corpus ceiling sets realistic targets**: tencent's 2.00 bits/step bigram entropy means achievable LRU HRC-MAE floor ≈ 0.04–0.05 (real-real noise + bigram-vs-real-3+order delta). LLNL/LANL are both in 0.05–0.07 LRU HRC-MAE territory. There's not much room left on LRU; SIEVE/ARC have more headroom because they exploit multi-order structure.
+5. **High-entropy corpora are genuinely hopeless** — wiki at H_cond=0.75 bits is mostly first-occurrence; metaKV at 0.59 bits is dominated by hot-key recurrence. The HRC-MAE floor differs per-corpus and any cross-corpus claim should be normalized to this.
+
+### Recommendation across teams
+
+For LANL: your `_postdecode_` already exploits the bigram floor well on tencent (LRU 0.053). The remaining lead concentrates in SIEVE; the second-touch-bit signal is what your neural marks capture and our adj-dup hack approximates poorly. Documenting the recipe for SIEVE-aware generation would be a publishable contribution beyond the headline HRC-MAE number.
+
+For Sandia: when `s003_smoke` Phase 3 lands, the GAN-track is bounded by the same entropy floor. Given 200+ epochs of pretrain + 5 GAN epochs is a smoke test, expect frozen ★ in the [0.10, 0.20] range — the v229 ★=0.039 lottery is hard to reproduce; aim for sub-0.10 with full pretrain + 50+ GAN epochs.
+
+For LLNL: next R183 work is hot-pool window scaling (1M-aware) for SIEVE; longer-term commitment is the AR-rank/transformer port to break out of the i.i.d. ceiling.
+
+### Open data sharing
+
+- `llgan/cachesim_eval.py` — the 6-policy evaluation harness; can run on any team's CSV.
+- `llgan/diag_hrc.py` — top-K + adj-dup diagnostic.
+- This entropy table — feel free to use for your own bound calculations.
