@@ -91,6 +91,10 @@ class NeuralAtlasModel:
         stack_hot_pool_window: int = 5000,
         stack_hot_pool_weight_power: float = 1.0,
         stack_hot_pool_max_search: int = 0,
+        stack_tail_reuse_prob: float = 0.0,
+        stack_tail_reuse_min_frac: float = 0.5,
+        stack_recent_pool_prob: float = 0.0,
+        stack_recent_pool_window: int = 200,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
         mark_temperature: float | None = None,
@@ -131,6 +135,10 @@ class NeuralAtlasModel:
         stack_hot_pool_window = max(int(stack_hot_pool_window), 1)
         stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
         stack_hot_pool_max_search = max(int(stack_hot_pool_max_search), 0)
+        stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
+        stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
+        stack_recent_pool_prob = float(np.clip(stack_recent_pool_prob, 0.0, 1.0))
+        stack_recent_pool_window = max(int(stack_recent_pool_window), 1)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
             mark_feedback_numeric_blend = float(np.clip(mark_feedback_numeric_blend, 0.0, 1.0))
@@ -193,6 +201,7 @@ class NeuralAtlasModel:
             hot_counts: Counter[int] = Counter()
             hot_window: deque[int] = deque()
             hot_pool: list[tuple[int, int]] = []
+            recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
 
             for pos in range(per_stream):
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
@@ -211,8 +220,33 @@ class NeuralAtlasModel:
                 if boosted_reuse:
                     wants_reuse = True
                 if wants_reuse and stack:
-                    if stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
+                    if stack_tail_reuse_prob > 0.0 and rng.random() < stack_tail_reuse_prob:
+                        lo = max(int(len(stack) * stack_tail_reuse_min_frac), len(stack) // 2)
+                        lo = min(max(lo, 0), len(stack) - 1)
+                        rank = int(rng.integers(lo, len(stack)))
+                    elif stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
                         rank = 0
+                    elif (
+                        stack_recent_pool_prob > 0.0
+                        and recent_window
+                        and rng.random() < stack_recent_pool_prob
+                    ):
+                        recent_obj = int(recent_window[int(rng.integers(0, len(recent_window)))])
+                        try:
+                            rank = stack.index(recent_obj)
+                        except ValueError:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
                     elif (
                         not boosted_reuse
                         and stack_hot_pool_prob > 0.0
@@ -359,6 +393,8 @@ class NeuralAtlasModel:
                             del hot_counts[old_obj]
                     hot_window.append(int(obj_id))
                     hot_counts[int(obj_id)] += 1
+                if stack_recent_pool_prob > 0.0:
+                    recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
                     print(
                         "[altgan.neural_atlas] "

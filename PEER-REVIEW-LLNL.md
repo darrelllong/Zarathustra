@@ -593,3 +593,67 @@ Keep R172/R173 as LLNL's current atlas baselines until the R180 AR-rank run
 lands with a held-out HRC panel. Before promoting R180, patch the AR history
 bookkeeping so `prev_rank_bin` represents the emitted rank bin, not the sampled
 pre-clamp bin.
+
+---
+
+## Round 34 (2026-05-01 03:30) — LLNL R204 Alibaba Is Atlas, Not GAN, And Still Behind LANL Cache Gate
+
+### Finding
+
+LLNL has not revived the old GAN lane for the race-relevant results. The live
+artifact stream is `llgan.neural_atlas generate` producing b2 traces with
+hot-pool/recent/tail/adjacent-duplicate controls. The visible Alibaba R204
+k-axis produced `/home/darrell/alibaba_b2_r204_k25.csv`, `k75.csv`, and
+`k100.csv`.
+
+Scored with `tools/cachesim` against LANL's fixed 1M Alibaba real manifest,
+those rows are still behind LANL's Alibaba control:
+
+| Row | six-policy mean HRC-MAE |
+|---|---:|
+| LANL Alibaba tb `.20`, lp `.90`, reservoir control | **0.020282** |
+| LLNL R204 k25 | 0.050148 |
+| LLNL R204 k75 | 0.033206 |
+| LLNL R204 k100 | 0.029747 |
+
+LLNL's k100 is a real improvement over k25, but it is not yet a lead on the
+shared cache-simulator surface.
+
+### Recommended Action
+
+Treat LLNL as an atlas competitor, not a GAN competitor. Keep watching the
+R204/R205 k-axis, but require same-real-manifest cachesim before accepting any
+"Alibaba win" claim.
+
+---
+
+## Round 35 (2026-05-01 03:38) — LLNL R203 Takes Tencent Cachesim Lead, With Shape Debt
+
+### Finding
+
+LLNL's newer Tencent R203 k-axis is a real cachesim advance on the fixed LANL
+Tencent real manifest. The recipe in `/tmp/tencent_k_sweep.sh` uses
+`llgan.neural_atlas`, `hot-pool-prob=0.55`, `adj-dup-prob=0.150`,
+`tail-reuse-prob=0.10`, and varies `hot-pool-k`.
+
+Six-policy mean HRC-MAE:
+
+| LLNL R203 row | mean |
+|---|---:|
+| k25 | **0.038256** |
+| k100 | 0.047506 |
+| k150 | 0.059586 |
+| k200 | 0.070346 |
+
+The k25 row beats LANL's current Tencent cache rows. However, its trace shape
+is suspect: top-100 access share is `0.347880` and adjacent duplicate rate is
+`0.090773`, far above the fixed real Tencent adjacent duplicate rate previously
+measured near `0.00234`. This may be a simulator win that buys cache hits with
+unreal short repeats.
+
+### Recommended Action
+
+Accept that LLNL currently leads Tencent cachesim, but do not accept it as a
+statistically indistinguishable long trace until adjacent-duplicate and hot-set
+shape are shown against real. LANL should test the k25/adjdup lever and score
+the shape damage explicitly.

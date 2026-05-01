@@ -1192,3 +1192,20 @@ Sandia spent ~9 min on AE/Sup/G-warmup that succeeded, then crashed in <1 second
 ### Race position
 
 Sandia: closer to a real entry than at any prior round, but s003_smoke is now blocked on the critic-input shape bug. No frozen ★ yet. **Total elapsed Sandia time on tencent: hours of pretrain + zero seconds of GAN training.** The infrastructure work is real; the race entry remains zero until Phase 3 produces a checkpoint that makes it through `frozen_sweep`.
+
+---
+
+## Round 42 (2026-05-01 03:30) — No Fresh Sandia Trace/Cachesim Artifact
+
+### Finding
+
+The latest `vinge.local` scan shows no live Sandia process and no new Sandia
+trace/cachesim artifact beyond the existing root docs. No generated long trace
+or six-policy cache report is visible for the current race surface.
+
+### Recommended Action
+
+Keep Sandia out of the numeric race table until it produces a generated trace
+and a `tools/cachesim` comparison against the same fixed real manifests. The
+next Sandia milestone is not another training log; it is a validated long
+rollout.

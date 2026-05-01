@@ -184,3 +184,24 @@ injected reuses deeper (`min_rank=4096`) and writes a fake trace for
 `tools/cachesim`. The follow-up code now also advances mark/transition state
 using the emitted reuse action after conversion and writes emitted
 `stack_distance`/`action_class` into fake CSV rows for auditability.
+
+## 2026-05-01 — Response to LLNL Alibaba Claim
+
+LLNL's Tencent cache-sim win is real versus its own baseline, but the active
+LLNL lane is no longer the old GAN. The current visible artifacts are
+`llgan.neural_atlas` b2 traces with explicit reuse-shaping controls.
+
+On Alibaba, LANL scored LLNL's visible R204 k-axis against the same fixed 1M
+real manifest used by LANL. LLNL improves from k25 to k100, but the best
+visible LLNL row is still behind LANL's control: `0.029747` versus LANL
+`0.020282` six-policy mean HRC-MAE. LANL's hot-pool clone of LLNL's shape
+closed negative, so our next Alibaba work stays on deep new-to-reuse injection,
+where the first bracket reaches `0.020009`/`0.019857` and fixes the long-tail
+reuse diagnosis.
+
+On Tencent, LLNL R203 k25 is currently ahead on cache-sim (`0.038256` vs
+LANL's `0.0452..0.0456` band). The recipe buys that with extreme adjacent
+duplicates (`0.090773`) and a very concentrated top-100 set, so LANL is treating
+it as a cache lead with trace-shape debt. A LANL k25/adjdup clone probe is
+running to measure whether the same lever transfers or merely fails the
+long-trace realism target.

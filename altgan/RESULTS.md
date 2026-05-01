@@ -1157,3 +1157,104 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool037w10000_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_six_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_hotpool039w10000_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_eval_1M.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpool039w10000_reuseboost030_min32768_postdecode_faststack_fakeseed44_realmanifest42_six_policy_caps.json`
+
+---
+
+## Alibaba 1M Cachesim Bracket Versus LLNL R204 (2026-05-01)
+
+LANL created a 1M Alibaba real manifest at
+`/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
+using four 250k streams from `alibabaBlock_163`, `275`, `109`, and `221`.
+The paired real CSV is
+`/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_eval_real.csv`.
+
+The starting LANL row is the earlier Alibaba PhaseAtlas+marks checkpoint with
+reservoir marks, forced phase, `transition_blend=0.2`, and
+`local_prob_power=0.9`. On 1M/cachesim this control scores evaluator HRC-MAE
+`0.0169145` and six-policy mean `0.020282`, with reuse `0.263061` vs real
+`0.306465`, median `188` vs real `276`, and p90 `1481` vs real `44829`.
+
+LLNL's active Alibaba R204 k-axis is a neural-atlas generator, not the old GAN
+track. Scored against the same LANL real manifest, its visible rows are behind
+LANL control:
+
+| Source | Variant | six-policy cachesim mean |
+|---|---|---:|
+| LANL | tb `.20`, lp `.90`, reservoir control | **0.020282** |
+| LLNL | `alibaba_b2_r204_k25.csv` | 0.050148 |
+| LLNL | `alibaba_b2_r204_k75.csv` | 0.033206 |
+| LLNL | `alibaba_b2_r204_k100.csv` | 0.029747 |
+
+LANL tested an LLNL-shaped hot-pool/adjacent-duplicate variant
+(`stack_hot_pool_prob=0.60`, `k=25`, `window=10000`,
+`stack_adj_dup_prob=0.15`) and closed it negative: six-policy mean `0.070192`,
+median `43`, p90 `488`. It over-compresses Alibaba reuse distance.
+
+Deep new-to-reuse injection is the right Alibaba branch. `p=0.06`,
+`min_rank=32768`, `rank_power=2.0` nearly matches the real reuse tail on fake
+seed `44`: evaluator HRC-MAE `0.013060`, six-policy mean `0.020009`, reuse
+`0.307403`, median `228`, p90 `43892`. The same `p=0.06` on seed `42` scores
+`0.020072`, reuse `0.307216`, median `227`, p90 `43764`. `p=0.10` on fake
+seed `45` nudged the cache mean to `0.019857` but overshot reuse to `0.336242`
+and p90 to `70649`; the same knob on seed `42` scores `0.019892` with similar
+overshoot (`0.336428`, p90 `70838`). Same-seed upper checks on seed `42` show
+`p=0.12` (`0.020160`) and `p=0.16` (`0.020163`) are not improvements over the
+control. Current Alibaba cache best is `p=0.10`, but `p=0.06` is the better
+trace-shape compromise and needs a broader seed panel before promotion.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_seed42_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_seed42_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_hotpool060k25_adj015_seed43_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_hotpool060k25_adj015_seed43_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_reuseboost006_min32768_seed44_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost006_min32768_seed44_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_reuseboost010_min32768_seed45_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost010_min32768_seed45_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_reuseboost006_min32768_seed42_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost006_min32768_seed42_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reservoir_reuseboost010_min32768_seed42_realmanifest42_eval_1M.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_tb020_lp090_reservoir_reuseboost010_min32768_seed42_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k25_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k75_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_alibaba_b2_r204_k100_vs_lanl_realmanifest42_six_policy_caps.json`
+
+---
+
+## LLNL R203 Tencent Cachesim Lead And LANL Clone Probe (2026-05-01)
+
+LLNL's newer Tencent R203 k-axis beats LANL on the fixed Tencent 1M real
+manifest, even though it is still an atlas/reuse-shaping generator rather than
+the old GAN path. The script `/tmp/tencent_k_sweep.sh` used
+`hot-pool-prob=0.55`, `adj-dup-prob=0.150`, `tail-reuse-prob=0.10`, and varied
+`hot-pool-k`.
+
+| Source | Variant | six-policy cachesim mean |
+|---|---|---:|
+| LLNL R203 | k25 | **0.038256** |
+| LLNL R203 | k100 | 0.047506 |
+| LLNL R203 | k150 | 0.059586 |
+| LLNL R203 | k200 | 0.070346 |
+| LANL | p39/window10000 fake seed 45 | 0.045573 |
+| LANL | p39/window10000 fake seed 46 | 0.045627 |
+
+The LLNL k25 trace has major trace-shape debt: top-100 share `0.347880`,
+top-1000 `0.356781`, adjacent duplicate rate `0.090773`, and `361014`
+namespaced unique objects. The real Tencent fixed-manifest adjacent duplicate
+rate was previously measured near `0.00234`, so this is not yet evidence of a
+statistically indistinguishable long trace.
+
+LANL launched a direct cache-lever probe using the promoted Tencent checkpoint
+with `stack_hot_pool_prob=0.55`, `stack_hot_pool_k=25`,
+`stack_hot_pool_window=10000`, `stack_adj_dup_prob=0.15`, and the existing deep
+reuse boost. This is intentionally a shape-risk probe, not a clean promotion.
+LANL also added `stack_tail_reuse_*` and `stack_recent_pool_*` controls to
+`altgan.neural_atlas`/`evaluate_neural_atlas`, then launched the fuller R203
+tail variant (`stack_tail_reuse_prob=0.10`, min fraction `0.5`) as a second
+shape-risk probe.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k25_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k100_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k150_vs_lanl_realmanifest42_six_policy_caps.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/llnl_tencent_b2_r203_k200_vs_lanl_realmanifest42_six_policy_caps.json`

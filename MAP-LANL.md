@@ -257,8 +257,33 @@ Important knobs:
   nudged to `0.045243` but did not confirm on seed `42` (`0.045465`), and
   `window=40000` lost at `0.045855`. Current promotion is `window=10000`.
   Probability recheck at that window moved the seed-44 best to `p=.39`
-  (`0.045219`); `p=.37` lost (`0.045317`). Active checks: `p=.39` seed-42
-  confirmation and `p=.40` seed-44.
+  (`0.045219`), but fake seeds `45`/`46` came back weaker at
+  `0.045573`/`0.045627`. Do not promote `p=.39` yet; active checks are
+  `p=.38,window=10000` on fake seeds `45`/`46`.
+- Alibaba 1M cache gate is now open on
+  `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`.
+  Control is the existing `alibaba_phaseatlas_marks_e20.pkl.gz` checkpoint with
+  reservoir marks, forced phase, `transition_blend=0.2`, and
+  `local_prob_power=0.9`; it scores six-policy mean `0.020282`. The useful
+  Alibaba knob is deep new-to-reuse injection (`min_rank=32768`,
+  `rank_power=2.0`). Hot-pool concentration over-compresses the reuse tail.
+  `p=0.10` is the current cache best (`0.019857`/`0.019892`), while `p=0.06`
+  is the trace-shape compromise (`0.020009`/`0.020072`) because it matches
+  reuse and p90 much more closely.
+- `stack_tail_reuse_prob`, `stack_tail_reuse_min_frac`,
+  `stack_recent_pool_prob`, and `stack_recent_pool_window`: LANL-side ports of
+  the LLNL R203 reuse-shaping levers. Tail reuse redirects sampled reuses into
+  the deep half/tail of the live stack; recent-pool reuse redirects to the
+  latest emitted objects. Both are evaluated through the normal LANL fake/real
+  CSV and `tools/cachesim` path.
+- Peer map: LLNL's active race path has moved from GAN checkpoints to
+  `llgan.neural_atlas` b2 traces with hand-shaped reuse controls. Its visible
+  Alibaba R204 k-axis scores `0.050148`, `0.033206`, and `0.029747` for
+  k25/k75/k100 against LANL's fixed Alibaba real manifest; LANL remains ahead
+  on that simulator surface. On Tencent, LLNL R203 k25 scores `0.038256` and
+  currently beats LANL's cache mean, but it does so with large adjacent-duplicate
+  shape debt (`0.090773`). Sandia has no visible fresh trace/cachesim artifact
+  in the latest scan.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

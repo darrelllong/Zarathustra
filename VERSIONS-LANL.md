@@ -5,6 +5,31 @@ The detailed LANL result ledger remains [altgan/RESULTS.md](/Users/darrell/Zarat
 
 ---
 
+## Alibaba 1M Cachesim Gate Opened (2026-05-01)
+
+LANL opened a 1M Alibaba cache-simulator gate with a fixed real manifest:
+`/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`.
+The first LANL control uses the existing
+`alibaba_phaseatlas_marks_e20.pkl.gz` checkpoint with reservoir marks,
+`transition_blend=0.2`, `local_prob_power=0.9`, and forced phase.
+
+Current Alibaba status:
+- LANL control scores six-policy cachesim mean `0.020282` on the 1M Alibaba
+  manifest.
+- LLNL's visible R204 Alibaba neural-atlas k-axis scores `0.050148` at `k=25`,
+  `0.033206` at `k=75`, and `0.029747` at `k=100` on the same LANL real
+  manifest. LLNL's active replacement for the GAN track is therefore a
+  conditional neural atlas plus hand-shaped reuse controls.
+- An LLNL-shaped LANL hot-pool test (`p=0.60`, `k=25`, adjacent duplicate
+  `0.15`) closes negative at `0.070192`.
+- Alibaba's live LANL branch is deep new-to-reuse injection. `p=0.06`,
+  `min_rank=32768`, `rank_power=2.0` matches the real reuse tail closely and
+  scores `0.020009`/`0.020072` on fake seeds `44`/`42`; `p=0.10` scores
+  `0.019857`/`0.019892` on fake seeds `45`/`42` but overshoots reuse and p90.
+  Current cache best is `p=0.10`; current trace-shape compromise is `p=0.06`.
+
+---
+
 ## Tencent 1M Cachesim Gate Added To LANL Evaluator (2026-04-30)
 
 LANL now treats `tools/cachesim` as a required promotion surface for the 1M
@@ -22,6 +47,12 @@ Current status:
 - LLNL's reported R182 Tencent six-policy mean is `0.0925`, so LANL is still
   ahead on this simulator surface. The remaining LANL error is policy-shaped:
   LRU/FIFO want rank scaling, ARC/SIEVE/CAR do not.
+- LLNL's newer R203 Tencent k-axis changes the scoreboard: `k=25` scores
+  `0.038256` against LANL's fixed Tencent real manifest, ahead of LANL's current
+  `0.0452..0.0456` band. The recipe uses `hot-pool-prob=0.55`,
+  `hot-pool-k=25`, `adj-dup-prob=0.150`, and `tail-reuse-prob=0.10`; the trace
+  carries large shape debt (`adj_dup=0.090773`). LANL is testing the equivalent
+  k25/adjdup lever with explicit shape accounting.
 - `stack_adj_dup_prob` exists for controlled tests, but LANL fake already has
   more adjacent duplicates than real on this slice (`0.00427` vs `0.00234`).
 - `stack_hot_pool_prob` is now the live branch. `p=0.50` raises top-100 access
@@ -66,9 +97,10 @@ Current status:
   pressure; seed-42 confirmation loses at `0.045465` and `window=40000`
   seed-44 loses at `0.045855`. Current promotion stays `window=10000`.
   Probability recheck at `window=10000` (`p=0.37`/`0.39`) is running.
-- Probability recheck at `window=10000`: `p=0.39` is the new seed-44 best at
-  `0.045219`; `p=0.37` loses at `0.045317`. Confirmation `p=0.39` seed-42 and
-  upper probe `p=0.40` seed-44 are running.
+- Probability recheck at `window=10000`: `p=0.39` is the seed-44 best at
+  `0.045219`, but follow-up fake seeds `45`/`46` scored `0.045573`/`0.045627`.
+  The result is not a clean promotion over `p=0.38`; `p=0.38,window=10000`
+  same-seed checks on fake seeds `45`/`46` are running.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
@@ -83,6 +115,9 @@ Code changes:
   `py_compile`.
 - `altgan.evaluate_neural_atlas` adds `--progress-interval` so long 1M
   confirmations can emit per-stream generation progress into their logs.
+- `altgan.neural_atlas` and `altgan.evaluate_neural_atlas` add
+  `stack_tail_reuse_*` and `stack_recent_pool_*` controls so LANL can test the
+  useful LLNL atlas levers inside the LANL evaluator and cache-sim path.
 
 ---
 
