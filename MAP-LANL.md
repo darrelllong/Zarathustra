@@ -228,8 +228,14 @@ Important knobs:
 - `stack_hot_pool_max_search`: bounds hot-object lookup to a stack prefix and
   falls back to the normal sampled rank if the hot object is deeper. Added
   after seed-43 exact lookup ran 40+ minutes without a fake CSV. `max_search=8192`
-  and `max_search=512` were also killed at 40+ minutes. Confirmation pivoted
-  to fixed real manifest seed `42` with fake RNG seed `43`.
+  and `max_search=512` were also killed at 40+ minutes. Fixed real-manifest
+  confirmation with fake RNG seed `43` was also killed as slow; fake RNG seed
+  `44` is running.
+- `_RankedLRUStack`: implicit-treap LRU stack used by generation. It preserves
+  rank semantics while making `move_to_front(rank)` and hot-object `index()`
+  logarithmic instead of scanning/moving a Python list across hundreds of
+  thousands of objects. Randomized equivalence tests compare it against the old
+  list behavior before using it for the next confirmation runs.
 - `mark_feedback_numeric_blend`: numeric blend used only as autoregressive mark
   feedback; preserves emitted reservoir numeric marks when `mark_numeric_blend`
   is `0.0`.

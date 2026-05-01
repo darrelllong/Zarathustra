@@ -6,6 +6,35 @@
 
 ---
 
+## Round 30 (2026-05-01 01:01) — `s004_tencent_full` Still Alive; Supervisor Loss Has Plateaued Before G-Warmup
+
+**Reviewer:** LANL / `altgan`, paired scan during LANL fake-seed confirmation.
+
+### Finding
+
+`s004_tencent_full` remains live as PID `2980075`. Phase 1 completed all 50 AE
+epochs, best val `0.000004` at epoch 47, and durable checkpoints exist in both
+`/home/darrell/checkpoints/s004_tencent_full/` and
+`/tiamat/zarathustra/checkpoints/s004_tencent_full/`. Phase 2 has reached at
+least epoch 19/50; supervisor train/val is essentially flat around
+`0.0470/0.0473`.
+
+### Risk
+
+The run is operationally healthier than earlier Sandia attempts, but it still
+has no generated trace and no cachesim panel. The flat supervisor curve means
+the next meaningful gate is not another pretrain-loss minute; it is whether
+G-warmup and the joint GAN path survive the known rank/critic shape ambiguity
+and produce an evaluable artifact.
+
+### Status
+
+Sandia is live but still off the numeric race table. Require a generated 1M
+trace plus `tools/cachesim` six-policy comparison before treating this as a
+competitor to LANL/LLNL atlas rows.
+
+---
+
 ## Round 29 (2026-05-01 00:35) — `s004_tencent_full` cleared Phase 1 (AE pretrain), Phase 2 (Sup pretrain) running cleanly; Phase 3 rank bug still pending
 
 **Reviewer:** LLNL (llgan/), follow-up to R28.

@@ -37,8 +37,12 @@ Current status:
   to the normal sampled rank when the hot object is deeper than the searched
   prefix. Seed-43 unbounded and `max_search=8192` runs were both killed at
   40+ minutes with no fake CSV; `max_search=512` was also killed at 40+
-  minutes. Confirmation pivoted to fixed real manifest seed `42` with fake RNG
-  seed `43`.
+  minutes. Confirmation pivoted to fixed real manifest seed `42`; fake RNG seed
+  `43` was also killed as slow, and fake RNG seed `44` is running.
+- Hot-pool confirmations exposed the Python-list LRU stack as the runtime
+  bottleneck. `altgan.neural_atlas` now uses `_RankedLRUStack`, an implicit
+  treap with deterministic priorities, so rank moves and hot-object lookups are
+  logarithmic while preserving the emitted trace contract.
 
 Code changes:
 - `altgan.neural_atlas` keeps deep reuse boosts as post-decode trace
@@ -48,6 +52,9 @@ Code changes:
   six-policy report emission.
 - `altgan.neural_atlas` adds `stack_hot_pool_*` controls for frequency-shape
   correction.
+- `altgan.neural_atlas` replaces list-backed LRU generation with
+  `_RankedLRUStack`; verified locally with randomized list-equivalence tests and
+  `py_compile`.
 
 ---
 

@@ -7,6 +7,30 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 22 (2026-05-01 01:01) — LLNL Is Sweeping CloudPhysics Atlas Knobs, Not Tencent GAN
+
+### Finding
+
+The current `vinge.local` LLNL process is `python3 -m llgan.neural_atlas generate`
+against `/home/darrell/cloudphysics_b2_inline.pkl`, producing
+`cloudphysics_b2_r196_rp0.05_w10.csv`. It is part of a visible CloudPhysics
+sequence (`rp0.10_w50`, `rp0.20_w50`, `rp0.30_w50`, `rp0.05_w50`,
+`rp0.10_w20`, `rp0.10_w100`, `rp0.10_w10`, `rp0.10_w5`, `rp0.10_w30`,
+`rp0.10_w2`, `rp0.10_w3`) rather than a Tencent GAN restart.
+
+This reinforces the Round 21 read: LLNL's live race-relevant effort is now an
+atlas/post-processing generator with cache-surface validation. That may be a
+good engineering pivot, but it is not evidence that the older GAN basin
+reopened.
+
+### Recommended Action
+
+Credit LLNL for moving fast on cachesim-driven atlas sweeps. For Tencent, keep
+the comparison pinned to published six-policy means until LLNL posts a shared
+1M Tencent slice at or below LANL's current `0.046657`.
+
+---
+
 ## Round 21 (2026-04-30 17:25) — R182 Adj-Dup Is A Real Cachesim Win, But It Replaces GAN With Atlas
 
 ### Finding

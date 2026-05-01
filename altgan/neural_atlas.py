@@ -183,7 +183,7 @@ class NeuralAtlasModel:
                 local_prob_power,
             )
             state = int(rng.choice(self.n_states, p=init_p))
-            stack: List[int] = []
+            stack = _RankedLRUStack()
             in_stack: set[int] = set()
             next_new_id = self.max_obj_id + 1 + stream_id * (per_stream + 1_000_003)
             prev_obj = next_new_id
@@ -266,16 +266,14 @@ class NeuralAtlasModel:
                         )
                     effective_stack_distance = int(rank)
                     effective_action_class = _action_class(effective_stack_distance)
-                    obj_id = stack[rank]
-                    del stack[rank]
-                    stack.insert(0, obj_id)
+                    obj_id = stack.move_to_front(rank)
                 else:
                     effective_stack_distance = int(ev.stack_distance)
                     effective_action_class = int(ev.action_class)
                     obj_id, next_new_id = StackAtlasModel._new_object_id(
                         prev_obj, next_new_id, int(ev.stride), in_stack
                     )
-                    stack.insert(0, obj_id)
+                    stack.insert_front(obj_id)
                     in_stack.add(obj_id)
                 mark_state = _state_with_action(state, effective_action_class)
 
@@ -778,6 +776,168 @@ def _sample_hot_pool_obj(
     weights = np.power(weights, max(float(weight_power), 1e-6))
     weights = weights / max(float(weights.sum()), 1e-12)
     return int(ids[int(rng.choice(len(ids), p=weights))])
+
+
+class _RankedLRUNode:
+    __slots__ = ("obj_id", "priority", "size", "left", "right", "parent")
+
+    def __init__(self, obj_id: int):
+        self.obj_id = int(obj_id)
+        self.priority = _stable_priority(self.obj_id)
+        self.size = 1
+        self.left = None
+        self.right = None
+        self.parent = None
+
+
+class _RankedLRUStack:
+    """LRU stack with O(log n) rank lookup and move-to-front operations."""
+
+    def __init__(self):
+        self._root: _RankedLRUNode | None = None
+        self._nodes: dict[int, _RankedLRUNode] = {}
+
+    def __len__(self) -> int:
+        return _node_size(self._root)
+
+    def insert_front(self, obj_id: int) -> None:
+        obj_id = int(obj_id)
+        if obj_id in self._nodes:
+            self.move_obj_to_front(obj_id)
+            return
+        node = _RankedLRUNode(obj_id)
+        self._nodes[obj_id] = node
+        self._root = _treap_merge(node, self._root)
+        if self._root is not None:
+            self._root.parent = None
+
+    def index(self, obj_id: int, start: int = 0, stop: int | None = None) -> int:
+        if start != 0:
+            raise ValueError("_RankedLRUStack.index only supports start=0")
+        node = self._nodes.get(int(obj_id))
+        if node is None:
+            raise ValueError(obj_id)
+        rank = _node_rank(node)
+        if stop is not None and rank >= int(stop):
+            raise ValueError(obj_id)
+        return rank
+
+    def move_to_front(self, rank: int) -> int:
+        rank = int(rank)
+        size = len(self)
+        if rank < 0 or rank >= size:
+            raise IndexError(rank)
+        if rank == 0:
+            node = _node_at(self._root, 0)
+            if node is None:
+                raise IndexError(rank)
+            return int(node.obj_id)
+        left, rest = _treap_split(self._root, rank)
+        node, right = _treap_split(rest, 1)
+        if node is None:
+            raise IndexError(rank)
+        self._root = _treap_merge(node, _treap_merge(left, right))
+        if self._root is not None:
+            self._root.parent = None
+        return int(node.obj_id)
+
+    def move_obj_to_front(self, obj_id: int) -> None:
+        self.move_to_front(self.index(obj_id))
+
+
+def _node_size(node: _RankedLRUNode | None) -> int:
+    return 0 if node is None else int(node.size)
+
+
+def _refresh_node(node: _RankedLRUNode | None) -> None:
+    if node is None:
+        return
+    node.size = 1 + _node_size(node.left) + _node_size(node.right)
+    if node.left is not None:
+        node.left.parent = node
+    if node.right is not None:
+        node.right.parent = node
+
+
+def _treap_merge(
+    left: _RankedLRUNode | None,
+    right: _RankedLRUNode | None,
+) -> _RankedLRUNode | None:
+    if left is None:
+        if right is not None:
+            right.parent = None
+        return right
+    if right is None:
+        left.parent = None
+        return left
+    if left.priority < right.priority:
+        left.right = _treap_merge(left.right, right)
+        _refresh_node(left)
+        left.parent = None
+        return left
+    right.left = _treap_merge(left, right.left)
+    _refresh_node(right)
+    right.parent = None
+    return right
+
+
+def _treap_split(
+    root: _RankedLRUNode | None,
+    left_size: int,
+) -> tuple[_RankedLRUNode | None, _RankedLRUNode | None]:
+    if root is None:
+        return None, None
+    if _node_size(root.left) >= left_size:
+        left, new_left = _treap_split(root.left, left_size)
+        root.left = new_left
+        _refresh_node(root)
+        if left is not None:
+            left.parent = None
+        root.parent = None
+        return left, root
+    new_right, right = _treap_split(
+        root.right,
+        left_size - _node_size(root.left) - 1,
+    )
+    root.right = new_right
+    _refresh_node(root)
+    root.parent = None
+    if right is not None:
+        right.parent = None
+    return root, right
+
+
+def _node_rank(node: _RankedLRUNode) -> int:
+    rank = _node_size(node.left)
+    cur = node
+    while cur.parent is not None:
+        parent = cur.parent
+        if cur is parent.right:
+            rank += 1 + _node_size(parent.left)
+        cur = parent
+    return int(rank)
+
+
+def _node_at(root: _RankedLRUNode | None, rank: int) -> _RankedLRUNode | None:
+    cur = root
+    rank = int(rank)
+    while cur is not None:
+        left_size = _node_size(cur.left)
+        if rank < left_size:
+            cur = cur.left
+        elif rank == left_size:
+            return cur
+        else:
+            rank -= left_size + 1
+            cur = cur.right
+    return None
+
+
+def _stable_priority(obj_id: int) -> int:
+    value = (int(obj_id) + 0x9E3779B97F4A7C15) & 0xFFFFFFFFFFFFFFFF
+    value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9 & 0xFFFFFFFFFFFFFFFF
+    value = (value ^ (value >> 27)) * 0x94D049BB133111EB & 0xFFFFFFFFFFFFFFFF
+    return int(value ^ (value >> 31))
 
 
 def _power_probs(probs: np.ndarray, power: float) -> np.ndarray:

@@ -1032,8 +1032,14 @@ expensive: it was killed after 40+ minutes with no fake CSV. The rerun uses
 `--stack-hot-pool-max-search 8192`, falling back to the sampled rank if the hot
 object is deeper than the bounded prefix. That run was also killed after 40+
 minutes with no fake CSV, and `max_search=512` was likewise killed after 40+
-minutes. Confirmation pivoted to the fixed seed-42 real manifest with fake RNG
-seed `43`.
+minutes. Confirmation pivoted to the fixed seed-42 real manifest; fake RNG seed
+`43` was also killed as slow, and fake RNG seed `44` is running.
+
+Engineering follow-up: the slow confirmations were caused by the list-backed
+LRU stack becoming the hot path for deep rank moves and hot-object lookup.
+`altgan.neural_atlas` now uses `_RankedLRUStack`, an implicit treap with
+deterministic priorities, to keep rank lookup/move semantics but avoid O(n)
+list scans. Local randomized tests compare it against the old list behavior.
 
 Artifacts:
 - `/tiamat/zarathustra/altgan-output/tencent_phaseatlas_marks_e20_catw025_promoted_tb575_lp070_reuseboost030_min32768_pow2_postdecode_seed42_eval_1M.json`
