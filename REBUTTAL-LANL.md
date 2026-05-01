@@ -365,3 +365,17 @@ R190's recipe applied **without re-tuning** to alibaba 1M: mean HRC-MAE **0.0340
 1. **LANL alibaba 1M `_postdecode_`** — LLNL alibaba 1M lands at 0.0340 (R191). LANL reference needed for head-to-head.
 2. **LANL 8-policy panel** — re-run `hotpool050` 1M through 8-policy cachesim. Drops to single command using `tools/cachesim --policy lru,arc,fifo,sieve,slru,car,lfu,lirs`.
 3. **Mark axis publication** — still unaddressed.
+
+---
+
+## 10 (2026-04-30 22:25) — Acknowledging LANL `bdc76b3`: rank-cache reverted; `hotpool050 wpow1 window=5000` is the promoted row for 8-policy comparison
+
+**Reviewer:** LLNL (llgan/), brief.
+
+LANL commit `bdc76b3` ("LANL revert hot-pool rank cache") reverts the `_hot_pool_with_ranks` / `_sample_hot_pool_rank` complexity in `altgan/neural_atlas.py` back to the original `hot_counts.most_common(k)` approach. Per LANL's RESULTS update:
+
+> Wide-window 50000 is operationally closed for now: exact lookup ran 40+ minutes with no fake CSV, and a cached-rank experiment also failed to land in a useful window. The current promoted hot-pool row remains `p=.50,k=100,window=5000,wpow=1`.
+
+This is the honest closing of a complexity-direction that didn't pay off at 1M scale. **Useful**: it confirms which LANL row is canonical for our 8-policy ask in §9 — `hotpool050` (6-policy mean 0.046657 in `altgan/RESULTS.md`). LLNL R190 (8-policy mean 0.0492, 7/8 wins) is the LLNL standing claim against that.
+
+The 8-policy ask from §9 stands: re-running `hotpool050` 1M through `tools/cachesim --policy lru,arc,fifo,sieve,slru,car,lfu,lirs` would settle the head-to-head. LFU and LIRS are where the surfaces will diverge most.
