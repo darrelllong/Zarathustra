@@ -6,6 +6,28 @@
 
 ---
 
+## Round 28 (2026-04-30 22:35) — `s004_tencent_full` is the first real Sandia training run; AE pretrain in progress; Phase-3 rank bug still unfixed in `newgan/train.py`
+
+**Reviewer:** LLNL (llgan/), brief.
+
+### Finding
+
+First substantive Sandia training run is live: PID `2980075` since 22:14:56, `s004_tencent_full`, seed=42, full recipe (`hidden=256 latent=24 timestep=12 batch=64 ae=50 sup=50 g=100 main=200 lr-g=lr-d=1e-4 n-critic=5 w-stop=7.0`). Phase 1 (AE pretrain) at epoch 7/50, 156s/epoch — Phase 3 (joint GAN) ETA ≈ 22:14 + (50 ae + 50 sup + 100 g)·156s ≈ 30,000s ≈ **8 hours from launch (ETA ~06:30 PDT 2026-05-01)**. Currently val=0.000470 at ep7; fast convergence.
+
+Checkpoint state: `ae_pretrain_best.pt` already written to `/home/darrell/checkpoints/s004_tencent_full/s004_tencent_full/`.
+
+### Standing concern: Phase-3 rank bug not fixed in this train.py
+
+`newgan/train.py` still contains 9 unsqueeze(0) calls (lines 371, 395, 459, 489, 566, 574, 593, 602, 605) — same pattern from R27. If the LLNL Encoder/Generator outputs are 3D `(B, T, D)`, the `dim() == 2` guard never fires and the runs work. If any path emits 2D, `unsqueeze(0)` produces `(1, B, D)` — collapsing the batch dim into a singleton time dim — and the LLNL Critic's `minibatch_std` will silently degenerate (std over a 1-sample axis is zero broadcast), dragging C_loss toward `-G_loss` mirror without information. Worse: the original R25 cat-rank crash will still fire if any path remains 2D.
+
+**Risk:** Phase 3 transition (in ~6 hours from this writeup) is the load-bearing test. Recommend Sandia operator preemptively run a 32-sample dry batch through the full E→G→C path to confirm shapes before Phase 3 lands at 06:30. If `h_real.dim() == 3` everywhere, the unsqueeze branch is dead code and Phase 3 will pass.
+
+### Race-table impact
+
+Sandia is **not yet on the race table** but has cleared the launch barrier. If Phase 3 lands and produces a `s004_tencent_full` generation pass, LLNL will run it through `tools/cachesim --policy lru,arc,fifo,sieve,slru,car,lfu,lirs` and post the result alongside R190's 0.0492 / LANL's 0.046657 (6-policy).
+
+---
+
 ## Round 27 (2026-04-30 22:10) — Sandia commit `60438cf` lands a `num_cols` fix but the Phase-3 rank bug remains
 
 **Reviewer:** LLNL (llgan/), follow-up to Round 25.
