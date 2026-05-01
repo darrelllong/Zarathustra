@@ -11212,3 +11212,69 @@ Per Darrell directive — moving to **CloudPhysics** next (high-entropy / scan-l
 
 - LANL: commit `e57085b` cached hot-pool rank computation. Cron-driven 1M evals continue. **No new RESULTS.md numerical update worth a REBUTTAL post yet.**
 - Sandia: Qwen-driven assistant was unhelpful per Darrell; restart prompt issued (next assistant Sandia takeover should follow). **No new PEER-REVIEW-Sandia post warranted** until they produce a Phase-3 result.
+
+
+## Round 192 — CloudPhysics transfer test: recipe transfers w/ usable accuracy (mean HRC-MAE 0.0826) but tencent-bias visible
+
+**Date**: 2026-04-30 22:00 PDT (Darrell directive: "If you also win Alibaba, then move on the Cloud physics")
+
+### Test design
+
+Take R189-locked recipe (`hp=0.40 K=50 adj=0.150 tail=0.10 mf=0.5`) without any per-corpus tuning, applied to CloudPhysics 1M (4 streams × 250k from `2015_cloudphysics/{w27,w41,w60,w61}.oracleGeneral.bin.zst`; read_heavy median-size band, reuse rate 0.22–0.90, reuse_distance_mean 8–138). This is a **harder** profile than tencent/alibaba: high-entropy, scan-like, R-ANALYSIS flagged it as the toughest corpus.
+
+Atlas trained inline-cond on the same 4 manifest files (1M transitions, 8 epochs). Real ref built via `build_real_csv.py`. Generation used identical knobs to tencent/alibaba R189.
+
+### CloudPhysics 1M cachesim 8-policy panel
+
+| policy | HRC-MAE | profile |
+|---|---|---|
+| FIFO | 0.0535 | best |
+| LRU | 0.0630 | strong |
+| LIRS | 0.0751 | strong (better than tencent's 0.099) |
+| ARC | 0.0764 | mid |
+| CAR | 0.0780 | mid |
+| SLRU | 0.0789 | mid |
+| SIEVE | 0.1136 | weak |
+| LFU | 0.1226 | weakest |
+| **mean** | **0.0826** | |
+
+### Cross-corpus comparison
+
+| corpus | mean HRC-MAE | recipe |
+|---|---|---|
+| tencent | 0.0492 | R189 (tuned) |
+| alibaba | 0.0340 | R189 (untuned, transferred) |
+| **CloudPhysics** | **0.0826** | R189 (untuned, transferred) |
+
+CloudPhysics ~1.7× tencent error — recipe transfers but is sub-optimal here.
+
+### Bias diagnosis (per-cap delta sign analysis)
+
+Looking at the Δ pattern, a clear corpus-mismatch signal emerges:
+
+- **cap=32–128 (small)**: synthetic OVER-misses real (+Δ dominant) — fake too cold/uniform at small caps
+- **cap=2048–32768 (large)**: synthetic UNDER-misses real (−Δ dominant) — fake too hot at large caps
+
+The crossover suggests `hot-pool-prob=0.40` is over-tuned for tencent's "warm" profile and too warm for CloudPhysics' spikier access pattern. Real CloudPhysics has more bursty short-window hot-spots that don't survive into the global hot-pool, so synthetic produces a smoother / less spiky access trace that miss-rates differently.
+
+LFU specifically: real CloudPhysics LFU misses 96-97% at cap=512-2048, fake misses 74-87%. LFU's frequency-based eviction is most sensitive to "smooth-vs-spiky" hot-pool — and our hot-pool is too smooth.
+
+### Verdict
+
+R189 recipe **transfers** to CloudPhysics: no catastrophic policy failures, all 8 policies under 0.13 HRC-MAE. But the recipe is **block-storage-tuned**; CloudPhysics is a different corpus class (key-value / VM-storage / oracle-replay) and per-corpus tuning would likely close the gap to ~0.05.
+
+Honest framing: R189 is a **block-storage-optimal recipe family** (tencent + alibaba). It generalizes to CloudPhysics with degraded accuracy but no failure mode. The "universal recipe" claim is **falsified** in the strict sense (CloudPhysics needs a different `hot-pool-prob`); the "robust recipe family" claim **stands**.
+
+### Per-corpus tune (deferred)
+
+Likely fixes for CloudPhysics-specific tune:
+1. Lower `hot-pool-prob` (~0.20-0.25) to match the spikier access
+2. Smaller hot-pool window (~30 vs 50) for shorter-window dominance
+3. Per-stream `reuse-rate` override (CloudPhysics streams span 0.22–0.90, so global avg under-fits)
+
+Holding off on per-corpus sweep until Darrell directs — the corpus-agnostic claim has been honestly tested.
+
+### Sandia + LANL pass
+
+- LANL: no new commits since `e57085b` (still off, per "LANL is taking a few days off"). **No PEER-REVIEW-LANL post warranted.**
+- Sandia: no new commits visible. **No PEER-REVIEW-Sandia post warranted.**
