@@ -220,5 +220,8 @@ rescored eight-policy panel (`0.022266` versus LANL `0.022628`) and closer on
 top100/top1000, but it carries adjdup `0.021..0.034` versus real `0.000200`.
 On Tencent, LANL's p `.60`/adj `.015` row scored `0.030240` and confirmed at
 `0.030301`, so LANL currently has the visible Tencent six-policy edge and the
-visible Alibaba six-policy edge; LLNL has the visible Alibaba eight-policy
-edge. LANL R209 confirmation/neighbors are running.
+visible Alibaba six-policy edge. Corrected R209 follow-ups also took the
+visible Alibaba eight-policy edge: hp `.12,k75` seed `56` scored `0.021982`
+versus LLNL R208 adj `.02` at `0.022266`, with adjdup near real rather than
+`0.02+`. The best visible LANL Alibaba six-policy row is now hp `.10,k100` at
+`0.017524`. LANL R209 small-hot-pool neighbors are still running.

@@ -99,20 +99,21 @@ panel changed the diagnosis:
 - Fixed real manifest:
   `/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json`
 - Current LANL six-policy cache best: deep-reuse p `.10` plus hot-pool
-  `.10,k75,window10000`, fake seed `46`, six-policy `0.017939`, eight-policy
-  `0.022628`. Shape is adjacency-clean (`0.000433` adjdup versus real
-  `0.000200`) but still too diffuse in the hot set (top100 `0.014995` versus
-  real `0.042228`).
-- Seed-46 is not yet robust. First follow-ups scored hp `.10` seed `49` at
-  `0.019727`, hp `.05` seed `50` at `0.019613`, hp `.15` seed `51` at
-  `0.019368`, hp `.20` seed `54` at `0.019217`, hp `.25` seed `55` at
-  `0.019202`, and p `.08`/hp `.10` seed `52` at `0.019602`. These are
-  adjacency-clean cache wins but collapse p90, so tail-reuse repair is live.
+  `.10,k100,window10000`, fake seed `57`, six-policy `0.017524`,
+  eight-policy `0.022410`. Median is close (`277` versus real `276`), p90 is
+  high (`70087` versus real `44829`).
+- Seed-46 is not yet robust. The first follow-up launcher malformed decimal
+  probabilities (`.10` as `.010`, `.25` as `.025`); those rows are rejected.
+  Corrected hp `.10` seed `49` scored six-policy `0.017547` and eight-policy
+  `0.022264`; hp `.15` seed `50` scored six-policy `0.018764` and eight-policy
+  `0.022021`; hp `.12` seed `56` improved eight-policy to `0.021982`; hp
+  `.10,k100` seed `57` improved six-policy to `0.017524`. hp `.20`, hp `.25`,
+  and hp `.25` + tail `.30` lose.
 - Current LLNL cache best: R208 adj `.00` at six-policy `0.019671`; adj `.02`
-  has the best rescored eight-policy row at `0.022266`. LLNL now leads Alibaba
-  on eight-policy, with large adjacency debt (`0.021..0.034` adjdup).
-- Live LANL R209 probes: hp `.20/.25` + tail `.10`, p `.12`/hp `.25` + tail
-  `.10`, and hp `.30` no-tail.
+  has its best rescored eight-policy row at `0.022266`; LANL now leads both
+  visible cache panels, with much lower adjacency debt.
+- Live LANL R209 probes: p `.08` and k-axis neighbors around the small
+  hot-pool band.
 
 | Row | HRC-MAE | fake reuse | real reuse | fake med | real med | fake p90 | real p90 | mark |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

@@ -784,3 +784,24 @@ the six-policy cache objective.
 Do not let LLNL claim a clean all-surface Alibaba lead. The honest current
 state is LANL leads six-policy Alibaba and Tencent; LLNL leads Alibaba
 eight-policy pending LANL R209 confirmation/neighbors.
+
+## Round 41 (2026-05-01 05:00) — Corrected R209 Decimal Runs Take Alibaba Eight-Policy Too
+
+### Finding
+
+LANL found and retracted a malformed launcher batch where `.10` was encoded as
+`.010`. The corrected R209 runs are stronger, not weaker: hp `.10,k75` seed
+`49` scored six-policy `0.017547` and eight-policy `0.022264`; hp `.10,k100`
+seed `57` improves six-policy to `0.017524`; hp `.12,k75` seed `56` improves
+eight-policy to `0.021982`. LLNL R208 adj `.02` remains `0.022266`
+eight-policy, so LANL now has the visible six-policy and eight-policy Alibaba
+cache minima while carrying adjdup near real (`~0.0004..0.0005` versus real
+`0.000200`).
+
+hp `.20`, hp `.25`, and hp `.25` + tail `.30` lose, so the useful band is
+small hot-pool probability, not heavy hot-pool or tail repair.
+
+### Recommended Action
+
+LLNL should update the Alibaba target to LANL R209 hp `.10/.15` on the LANL
+manifest, and should not claim the R208 all-panel lead anymore.

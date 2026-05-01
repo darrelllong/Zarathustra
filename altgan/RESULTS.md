@@ -1363,28 +1363,27 @@ eight-policy panel:
 | LLNL | R208 adj `.02` | 0.019844 | **0.022266** | 0.091976 | 0.126735 | 0.026106 |
 | LLNL | R208 adj `.05` | 0.019812 | 0.022357 | 0.091154 | 0.125557 | 0.033662 |
 | LANL | deep-reuse p `.10` + hot-pool `.10,k75,w10000`, seed `46` | **0.017939** | 0.022628 | 0.014995 | 0.047568 | 0.000433 |
-| LANL | deep-reuse p `.10` + hot-pool `.25,k75,w10000`, seed `55` | 0.019202 | pending | pending | pending | pending |
-| LANL | deep-reuse p `.10` + hot-pool `.20,k75,w10000`, seed `54` | 0.019217 | pending | pending | pending | pending |
-| LANL | deep-reuse p `.10` + hot-pool `.15,k75,w10000`, seed `51` | 0.019368 | 0.025016 | 0.003400 | 0.021013 | 0.000426 |
-| LANL | deep-reuse p `.10` + hot-pool `.05,k75,w10000`, seed `50` | 0.019613 | 0.025146 | 0.002900 | 0.019046 | 0.000462 |
-| LANL | deep-reuse p `.08` + hot-pool `.10,k75,w10000`, seed `52` | 0.019602 | 0.025206 | 0.003095 | 0.019838 | 0.000414 |
-| LANL | deep-reuse p `.10` + hot-pool `.10,k75,w10000`, seed `49` | 0.019727 | 0.025270 | 0.003072 | 0.020083 | 0.000445 |
+| LANL | deep-reuse p `.10` + hot-pool `.10,k75,w10000`, seed `49` | **0.017547** | 0.022264 | 0.016599 | 0.048234 | 0.000404 |
+| LANL | deep-reuse p `.10` + hot-pool `.15,k75,w10000`, seed `50` | 0.018764 | **0.022021** | 0.028194 | 0.064300 | 0.000494 |
+| LANL | deep-reuse p `.10` + hot-pool `.12,k75,w10000`, seed `56` | 0.017879 | **0.021982** | 0.020651 | 0.055308 | 0.000452 |
+| LANL | deep-reuse p `.10` + hot-pool `.10,k100,w10000`, seed `57` | **0.017524** | 0.022410 | 0.011921 | 0.045719 | 0.000402 |
 | LANL | deep-reuse p `.10`, seed `45` | 0.019857 | 0.024774 | 0.002650 | 0.018336 | 0.000451 |
 | LANL | deep-reuse p `.10`, seed `42` | 0.019892 | 0.024839 | 0.002492 | 0.017974 | 0.000435 |
 | Real | fixed manifest | n/a | n/a | 0.042228 | 0.123983 | 0.000200 |
 
-LANL has the best single Alibaba six-policy row, but seed-46 is not yet a
-robust promotion. The follow-up bracket says hp `.20-.25` is the better center
-(`0.019217`/`0.019202`) and still beats LLNL R208 adj `.00`; hp `.05`, hp
-`.15`, and p `.08`/hp `.10` also land around LLNL's cache-best. The cost is
-p90 collapse to about `1.8k..2.0k` versus real `44829`, so LANL launched tail
-reuse variants next. LLNL still has the best rescored eight-policy row. The
-shape split is not settled: LLNL's
+LANL has now re-passed both Alibaba cache panels on visible rows. A first
+follow-up launcher malformed decimal probabilities (`.10` became `.010`,
+`.25` became `.025`), so those rows are explicitly retracted from the R209
+bracket. Corrected hp `.10,k75` confirms the six-policy win (`0.017547`), hp
+`.10,k100` improves it to `0.017524`, and hp `.12,k75` gives the current LANL
+eight-policy best (`0.021982`). hp `.20`, hp `.25`, and hp `.25` + tail `.30`
+lose (`0.020120`, `0.022097`, `0.038220`).
+The shape split is not settled: LLNL's
 top100/top1000 are closer, but its adjacent duplicates are roughly 105x to
 168x the real manifest, while LANL R209 stays close on adjacency and still
 under-shoots the real hot set. The p `.10` + recent-pool `.05,w2` probe closed
 negative at `0.025133` and adjdup `0.008977`; p `.08` without hot pool scored
-`0.019731`. LANL R209 hp `.20/.25` + tail `.10` follow-ups are live.
+`0.019731`.
 
 New artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/hotpoolp060k50w10000_adj002_tail010_reuseboost030_min32768_postdecode_faststack_fakeseed57_realmanifest42_six_policy_caps.json`

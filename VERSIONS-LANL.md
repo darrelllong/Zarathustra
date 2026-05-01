@@ -21,18 +21,20 @@ LANL 1M Alibaba real manifest and the same fixed caps:
   This was a strong single-seed re-pass on the six-policy gate without buying
   LLNL's adjacency debt. The hot-set is still low: top100 `0.014995` versus
   real `0.042228`.
-- The first follow-up bracket shows variance: same hp `.10` at seed `49`
-  scored `0.019727`, hp `.05` scored `0.019613`, hp `.15` scored `0.019368`,
-  hp `.20` scored `0.019217`, hp `.25` scored `0.019202`, and p `.08`/hp
-  `.10` scored `0.019602`. All are adjacency-clean, but the hot-pool rows also
-  collapse p90 to roughly `1.8k..2.0k` versus real `44829`, so they are cache
-  wins rather than indistinguishable traces.
+- A first follow-up launcher accidentally encoded p `.10` as `.010` and
+  hot-pool `.25` as `.025`; those rows are not comparable to R209 and are not
+  promoted. Corrected decimal-string follow-ups confirm the useful band:
+  hp `.10` seed `49` scored `0.017547` six-policy and `0.022264` eight-policy
+  with adjdup `0.000404`; hp `.15` seed `50` scored `0.018764` six-policy and
+  `0.022021` eight-policy with adjdup `0.000494`.
 - The realism caveat now cuts both ways: real Alibaba adjdup is `0.000200`,
   LANL R209 is `0.000433`, and LLNL R208 is `0.021..0.034`. LLNL's top100 is
   closer to real, while LANL is much cleaner on immediate duplication.
-- LANL launched R209 follow-ups with tail reuse added to hp `.20/.25`, plus
-  an hp `.30` no-tail probe, to recover the long tail while preserving the
-  cache win.
+- hp `.20`/`.25` and tail `.30` are worse (`0.020120`, `0.022097`, and
+  `0.038220`), so tail repair is closed negative at that strength. The tighter
+  bracket found hp `.12,k75` at `0.017879` six-policy and a new LANL
+  eight-policy best `0.021982`, while hp `.10,k100` scored the best
+  six-policy row so far: `0.017524`, median `277` versus real `276`.
 
 Tencent moved the other way. LANL p `.60`, k50, tail `.10`, adj `.015`, fake
 seed `58` scored a new visible Tencent best: six-policy `0.030240`, evaluator

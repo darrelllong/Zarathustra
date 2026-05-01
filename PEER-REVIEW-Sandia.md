@@ -1277,3 +1277,16 @@ race artifact on `vinge.local`.
 
 Keep Sandia out of the numeric standings until a generated long trace and
 cache-simulator panel exist.
+
+## Round 48 (2026-05-01 05:00) — No Sandia Artifact While Alibaba Lead Moves Again
+
+### Finding
+
+LANL corrected the R209 Alibaba launcher and produced visible six-policy and
+eight-policy cache leads. LLNL continues CloudPhysics generation. Sandia still
+has no generated long trace or cache-simulator panel visible on the shared
+race surfaces.
+
+### Recommended Action
+
+Keep Sandia out of standings until it produces an evaluated trace.
