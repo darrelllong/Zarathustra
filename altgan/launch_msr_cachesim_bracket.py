@@ -22,6 +22,10 @@ class Spec:
     seed: int = 42
     transition_blend: float = 0.2
     local_prob_power: float = 0.9
+    rank_scale: float = 1.0
+    rank_max: int = -1
+    rank_tail_pivot: int = -1
+    rank_tail_scale: float = 1.0
     adj_dup_prob: float = 0.40
     hot_pool_prob: float = 0.45
     hot_pool_k: int = 75
@@ -57,6 +61,10 @@ def _parse_spec(text: str) -> Spec:
     aliases = {
         "tb": "transition_blend",
         "lp": "local_prob_power",
+        "rank": "rank_scale",
+        "rankmax": "rank_max",
+        "tailpivot": "rank_tail_pivot",
+        "tailscale": "rank_tail_scale",
         "adj": "adj_dup_prob",
         "hp": "hot_pool_prob",
         "k": "hot_pool_k",
@@ -91,7 +99,9 @@ def _parse_spec(text: str) -> Spec:
 def _auto_name(spec: Spec) -> str:
     return (
         f"seed{spec.seed}_tb{_tag(spec.transition_blend)}"
-        f"_lp{_tag(spec.local_prob_power)}_adj{_tag(spec.adj_dup_prob)}"
+        f"_lp{_tag(spec.local_prob_power)}_rank{_tag(spec.rank_scale)}"
+        f"max{spec.rank_max}_tailp{spec.rank_tail_pivot}"
+        f"s{_tag(spec.rank_tail_scale)}_adj{_tag(spec.adj_dup_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
         f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
         f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
@@ -164,6 +174,14 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.local_prob_power),
         "--temperature",
         "1.0",
+        "--stack-rank-scale",
+        str(spec.rank_scale),
+        "--stack-rank-max",
+        str(spec.rank_max),
+        "--stack-rank-tail-pivot",
+        str(spec.rank_tail_pivot),
+        "--stack-rank-tail-scale",
+        str(spec.rank_tail_scale),
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
         "--stack-reuse-boost-prob",
