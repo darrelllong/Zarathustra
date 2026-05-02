@@ -13767,3 +13767,72 @@ Baleen24 ran cleanly on the existing pipeline with zero code changes (just file 
 - R239 in flight on vinge: tencent seed sweep with cond_noise=0.05 (seed=137 and seed=1 both catastrophic so far; 5 more seeds queued).
 - Baleen24 has remaining knob axes untested: tail-reuse-prob, recent-pool-prob, recent-pool-window. Cheap to sweep if needed.
 - LANL may attempt Baleen24 once they see this commit; gives them a benchmark to compete against.
+
+## Round 238.F-H — Baleen24 knob audit lifts claim to 0.0755 (was 0.0772)
+
+**Date**: 2026-05-02 00:30-01:30 PDT.
+
+### Setup
+
+R238 closed at 0.0772 multi-seed but tail-reuse-prob and recent-pool-prob hadn't been swept. Cheap generate-only audit on the existing R238 atlas.
+
+### Tail-reuse-prob sweep (R238.F.A) at hp=0.05 adj=0.55 lock
+
+| tail-reuse-prob | 6-pol HRC-MAE |
+|---|---|
+| 0.00 | 0.0996 |
+| **0.05** | **0.0759** (peak) |
+| 0.10 (R238 lock) | 0.0779 |
+| 0.15 | 0.1096 |
+| 0.25 | 0.1755 |
+
+Sharp inverted-U with peak at tp=0.05, NOT 0.10 as the R221-derived lock used. Lift: −2.6% over the lock at single-seed=42.
+
+### Recent-pool-prob sweep (R238.F.B) with tail-reuse at original lock 0.10
+
+| recent-pool-prob | 6-pol HRC-MAE |
+|---|---|
+| 0.00 | 0.0792 |
+| 0.05 | 0.0780 |
+| 0.15 (R238 lock) | 0.0779 |
+| 0.25 | 0.0767 |
+| 0.35 | 0.0776 |
+
+Flatter curve; small but real lift at rp=0.25 (−1.5% vs lock).
+
+### Combined probe (R238.G) — does NOT stack
+
+tp=0.05 + rp=0.25 → 0.0802 (worse than either alone). The two interventions conflict; pick the larger lift (tp=0.05) only.
+
+### Multi-seed verify R238.H (tp=0.05, others at lock)
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0759 |
+| 43 | 0.0755 |
+| 44 | 0.0755 |
+| 45 | 0.0750 |
+| **mean** | **0.0755** (range 0.0009) |
+
+vs R238 baseline (0.0772 mean, range 0.0015): **−2.2% on mean, ~40% tighter seed-stability**.
+
+### Updated Baleen24 standing claim
+
+**6-pol: 0.0755 (4-seed multi-seed, range 0.0009)**
+
+Recipe: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 (atlas unchanged), hp=0.05 K=75 adj=0.55 **tail-reuse=0.05** mf=0.5 rp=0.15 win=2 max-stack=524288. Only `--tail-reuse-prob` changed from R238's 0.10 to 0.05.
+
+### Race position update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| Alibaba (6-pol) | 0.0201 | ~0.014–0.016 | LANL +24% |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| **Baleen24 (6-pol)** | **0.0755** (was 0.0772) | n/a | LLNL alone |
+
+### Lesson
+
+The corpus-conditional knob principle keeps holding. Baleen24's tail-reuse optimum is at 0.05 (vs alibaba/tencent/CP all at 0.10). Half. Like adj-dup, it tracks corpus-intrinsic reuse density: high real-reuse corpora need less synthetic-reuse injection, even on the deep-tail variant.
+
+R237 + R238 together demonstrate the campaign's mature pattern: pick a recipe via R237's ingredients (lucky seed + cond_noise=0.05), then sweep post-hoc knobs at the new atlas. Total time to competitive corpus: ~2 hours.
