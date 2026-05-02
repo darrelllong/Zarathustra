@@ -39,6 +39,7 @@ class Spec:
     reuse_boost_prob: float = 0.0
     reuse_boost_min_rank: int = 32768
     reuse_boost_rank_power: float = 2.0
+    reuse_drop_prob: float = 0.0
 
 
 def _parse_spec(text: str) -> Spec:
@@ -78,6 +79,8 @@ def _parse_spec(text: str) -> Spec:
         "reuse": "reuse_boost_prob",
         "reuse_min": "reuse_boost_min_rank",
         "reuse_power": "reuse_boost_rank_power",
+        "drop": "reuse_drop_prob",
+        "reuse_drop": "reuse_drop_prob",
     }
     fields = {field.name: field.type for field in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs = {"name": defaults.name}
@@ -106,7 +109,7 @@ def _auto_name(spec: Spec) -> str:
         f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
         f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
-        f"mf{_tag(spec.tail_reuse_min_frac)}"
+        f"mf{_tag(spec.tail_reuse_min_frac)}_drop{_tag(spec.reuse_drop_prob)}"
     )
 
 
@@ -186,6 +189,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.reuse_boost_min_rank),
         "--stack-reuse-boost-rank-power",
         str(spec.reuse_boost_rank_power),
+        "--stack-reuse-drop-prob",
+        str(spec.reuse_drop_prob),
         "--stack-hot-pool-prob",
         str(spec.hot_pool_prob),
         "--stack-hot-pool-k",
