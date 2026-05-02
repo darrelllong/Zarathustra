@@ -62,14 +62,21 @@ def _prob_from_tag(tag: str) -> float:
     return int(text) / scale
 
 
-def _artifact_base(spec: Spec) -> str:
+def _artifact_base(spec: Spec, *, hot_pool_weight_power: float = 1.0) -> str:
+    weight_tag = ""
+    if abs(float(hot_pool_weight_power) - 1.0) > 1e-12:
+        weight_tag = f"_hpwp{_decimal_tag(hot_pool_weight_power)}"
     return (
         "alibaba_phaseatlas_marks_tb020_lp090_"
         f"reuseboost{spec.reuse_tag}_"
-        f"hotpool{spec.hot_tag}k{spec.hot_k}w10000_"
+        f"hotpool{spec.hot_tag}k{spec.hot_k}w10000{weight_tag}_"
         f"p{spec.reuse_tag}hp{spec.hot_tag}k{spec.hot_k}_"
         f"seed{spec.seed}_realmanifest42"
     )
+
+
+def _decimal_tag(value: float) -> str:
+    return f"{float(value):g}".replace("-", "m").replace(".", "p")
 
 
 def _command(args: argparse.Namespace, spec: Spec, base: str) -> list[str]:
@@ -115,7 +122,7 @@ def _command(args: argparse.Namespace, spec: Spec, base: str) -> list[str]:
         "--stack-hot-pool-window",
         "10000",
         "--stack-hot-pool-weight-power",
-        "1.0",
+        str(args.hot_pool_weight_power),
         "--stack-hot-pool-max-search",
         "0",
         "--n-records",
@@ -186,6 +193,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--cachesim-policies", default="lru,arc,fifo,sieve,slru,car,lfu,lirs"
     )
+    parser.add_argument(
+        "--hot-pool-weight-power",
+        type=float,
+        default=1.0,
+        help="Power applied to hot-pool frequency weights during generation.",
+    )
     parser.add_argument("--progress-interval", type=int, default=50000)
     parser.add_argument(
         "--no-force-phase-schedule",
@@ -203,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.output_root, "cachesim_lanl").mkdir(parents=True, exist_ok=True)
     env = _env()
     for spec in args.spec:
-        base = _artifact_base(spec)
+        base = _artifact_base(spec, hot_pool_weight_power=args.hot_pool_weight_power)
         cmd = _command(args, spec, base)
         log_path = Path(args.output_root) / f"{base}.log"
         if args.dry_run:
