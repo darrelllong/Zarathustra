@@ -14299,3 +14299,105 @@ The R244 pattern (interaction-driven knob shifts after a fit-recipe change) is c
 
 - LANL: continued same micro-iteration.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 248 — Alibaba claim 0.0131; LLNL OVERTAKES LANL on alibaba
+
+**Date**: 2026-05-02 04:00-04:30 PDT.
+
+### Setup
+
+R244 left alibaba at 0.0166 multi-seed (~tied LANL). Two axes had still not been audited at the new lock: `recent-pool-window` (locked at 2 since R194) and `tail-reuse-min-frac` (locked at 0.5).
+
+### R248.A recent-pool-window sweep at hp=0.45 + adj=0 lock
+
+| win | 6-pol HRC-MAE |
+|---|---|
+| 1 | 0.0172 |
+| 2 (R244 lock) | 0.0167 |
+| 3 | 0.0165 |
+| 5 | 0.0161 |
+| 8 | 0.0155 |
+| **16** | **0.0124 (peak)** |
+| 32 | 0.0142 |
+| 64 | 0.0155 |
+| 128 | 0.0174 |
+| 256 | 0.0198 |
+| 512 | 0.0215 |
+
+Clean inverted-U with peak at win=16 — **8× higher than the R244/R221 lock of win=2**. Single-seed lift: −26% vs R244.
+
+### R248.B tail-reuse-min-frac sweep — closes-NEGATIVE
+
+| mf | 6-pol HRC-MAE |
+|---|---|
+| 0.3 | 0.0167 |
+| 0.4 | 0.0167 |
+| 0.5 (lock) | 0.0167 |
+| 0.6 | 0.0165 |
+| 0.7 | 0.0164 |
+| 0.8 | 0.0160 |
+
+Marginal lift toward higher mf (~−4%) but small enough to ignore. Sticking with mf=0.5.
+
+### Multi-seed verify (R248.D) at hp=0.45 + adj=0 + win=16
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0124 |
+| 43 | 0.0133 |
+| 44 | 0.0135 |
+| 45 | 0.0132 |
+| **mean** | **0.0131** (range 0.0011, 8.4%) |
+
+vs R244 (0.0166 / range 0.0003): **−21% on mean**, range slightly wider but still tight.
+
+### Updated alibaba standing claim
+
+**6-pol: 0.0131 (4-seed multi-seed)** — was 0.0166 (R244), 0.0204 (R221).
+
+Recipe: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 (atlas unchanged from R237), generate with hp=0.45 K=75 adj=0.0 tail=0.10 mf=0.5 + rp=0.15 **win=16** max-stack=524288. Compared to R244, only `--recent-pool-window` changed from 2 to 16.
+
+### Cumulative session arc on alibaba (no atlas re-fits since R237)
+
+| round | recipe change | mean HRC-MAE | vs R221 | vs LANL ~0.014-0.016 |
+|---|---|---|---|---|
+| R221 | base (unseeded init) | 0.0204 | — | LANL +27% |
+| R237 | seed=137 + cond_noise=0.05 | 0.0201 | −1.5% | LANL +25% |
+| R242 | hp 0.45 → 0.35 | 0.0188 | −7.8% | LANL +17.5% |
+| R243 | adj 0.05 → 0.0 | 0.0176 | −13.7% | LANL +10% |
+| R244 | hp 0.35 → 0.45 (with adj=0) | 0.0166 | −18.6% | ~tied |
+| **R248** | **win 2 → 16** | **0.0131** | **−35.8%** | **LLNL +6-21% lead** |
+
+### Race position update — LANL ALIBABA LEAD COLLAPSED
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| **Alibaba (6-pol)** | **0.0131** (was 0.0166, 0.0188, 0.0201, 0.0204) | ~0.014–0.016 multi-seed | **LLNL +6 to +21%** (was LANL +27%) |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0438 | n/a | LLNL alone |
+
+**First round of the campaign where LLNL leads LANL on alibaba.** Conservative reading (assuming LANL multi-seed = 0.014 best-case): LLNL +6% better. Aggressive reading (assuming LANL multi-seed = 0.016 expected): LLNL +21% better.
+
+### What happened
+
+Five sequential rounds of generate-only knob audits on the SAME R237 atlas, no re-fits, ~30 min each. R242→R248: hp shifted, then adj shifted, then hp shifted back, then win shifted by 8×. Each shift unlocked the next via interaction effects.
+
+The recent-pool-window axis was the sleeper. R194 set it to 2 originally for cache-replay-window reasons; alibaba's new R237 atlas can absorb a much longer window (16) and use it productively. This is the largest single-axis lift in the alibaba arc.
+
+### Lesson reinforced
+
+Knob interaction effects under R237 recipe changes are not just "find the new optimum on each axis once." They cascade: shifting one axis opens new optima on others. Full sweep cycle takes 4-5 rounds before all axes converge.
+
+Practical rule: after a fit-recipe change, plan for **5 rounds of generate-only knob audits**, each multi-seed verified. Total cost ~5 hours, total lift typically 20-40%.
+
+### Open work
+
+- R248.B mf axis showed marginal lift toward mf=0.8. Could verify at the new win=16 lock.
+- Apply R248-style win sweep to Baleen24 R245 lock — possibly more lift there too.
+- Apply to CP if R244 audit didn't unlock (already did R247 — closed-NEGATIVE on adj/tp).
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration; **does not appear to have responded to recent LLNL alibaba moves**. If LANL's multi-seed alibaba is the assumed 0.014-0.016, LLNL is now in front.
+- Sandia: gpt-oss on baase; first artifact pending.
