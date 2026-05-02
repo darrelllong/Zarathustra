@@ -800,18 +800,29 @@ def generate(
                     if (reuse_boost_prob > 0.0 and len(stack) > 0
                             and rng.random() < reuse_boost_prob):
                         # R258: LANL-style reuse-boost — flip a NEW into a reuse
-                        # by sampling a rank near-uniformly across the stack.
-                        # Port of altgan's stack_reuse_boost_* (their Baleen24 win).
+                        # by sampling a rank across the stack.
+                        # Port of altgan's _boosted_reuse_rank (Baleen24 win at
+                        # prob=0.60 min_rank=0 rank_power=0.1). Math matches
+                        # altgan/neural_atlas.py exactly:
+                        #   span   = stack_len - lo
+                        #   offset = floor(u^(1/p) * span)
+                        #   rank   = min(lo + offset, stack_len - 1)
+                        # rank_power < 1 → exponent 1/p > 1 → u^(1/p) biased toward 0
+                        # → rank biased toward lo (shallow). LANL's 0.1 = shallow-bias.
                         # Default off (prob=0.0) → bit-identical to pre-R258.
                         stack_sz = len(stack)
-                        lo = min(max(int(reuse_boost_min_rank), 0), stack_sz - 1)
-                        if reuse_boost_rank_power == 1.0:
-                            rank = int(rng.integers(lo, stack_sz))
+                        if stack_sz <= 1:
+                            rank = 0
                         else:
-                            u = float(rng.random())
-                            biased = u ** max(reuse_boost_rank_power, 1e-6)
-                            rank = int(lo + (stack_sz - 1 - lo) * biased)
-                            rank = max(lo, min(rank, stack_sz - 1))
+                            lo = min(max(int(reuse_boost_min_rank), 0), stack_sz - 1)
+                            span = stack_sz - lo
+                            if span <= 1:
+                                rank = lo
+                            else:
+                                u = float(rng.random())
+                                inv_p = 1.0 / max(float(reuse_boost_rank_power), 1e-6)
+                                offset = int(np.floor((u ** inv_p) * span))
+                                rank = min(lo + offset, stack_sz - 1)
                         obj_id = stack[rank]
                         del stack[rank]
                         stack.insert(0, obj_id)
@@ -1121,8 +1132,10 @@ def main():
                            "0 (default) allows boosting from rank 0 (front of stack).")
     pgen.add_argument("--reuse-boost-rank-power", type=float, default=1.0,
                       help="R258: power-law weight for reuse-boost rank sampling. "
-                           "1.0 = uniform; <1.0 biases toward deep ranks "
-                           "(LANL's 0.1 = near-uniform with slight deep bias).")
+                           "Matches altgan _boosted_reuse_rank: offset = "
+                           "floor(u^(1/p) * span). 1.0 = uniform; <1.0 → exponent "
+                           ">1 → u^(1/p) biased toward 0 → rank biased toward lo "
+                           "(shallow). LANL's 0.1 = strong shallow-bias.")
 
     args = p.parse_args()
     if args.cmd == "fit":
