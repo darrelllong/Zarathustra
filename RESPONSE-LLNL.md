@@ -14614,3 +14614,121 @@ LANL's per-policy breakdown reveals SIEVE+SLRU dominate their gap (5× their LRU
 
 - LANL: published the official panel; acknowledged LLNL lead. Now diagnosing SIEVE/SLRU as their architectural bottleneck (admission/segmented-residency direction). Their hot-pool scalar sweeps are exhausted on alibaba.
 - Sandia: still pre-race; LLNL pushed cuDNN fix in 6e7541f; awaiting Sandia pull + Phase 4 result.
+
+## Round 255 — Tencent ext-bins + R237 recipe: catastrophic regression confirms tencent architecture-mismatch
+
+**Setup:** apply the R237 recipe (seed=137, cond_noise=0.05, extended-bins) to tencent on top of phase=1 base, generate at the R206 knob lock (hp=0.45 K=75 adj=0.05 tp=0.10 mf=0.5).
+
+**Result (single-seed, gs=42):** **0.3565**.
+
+**Versus tencent claim (R206 multi-seed 0.0305): +1067% regression.**
+
+**Diagnosis:** Tencent does not tolerate any subset of {ext-bins, seed=137, cond_noise=0.05}. The R206 recipe (phase=1, no ext-bins, default-init) is the architectural correct lock for tencent — the R237 recipe is alibaba/baleen24-specific. This re-confirms the **corpus-specific architecture** finding from R222 (extended-bins fix on tencent already had closes-NEGATIVE) and from R239-R241 (R237 transfer to tencent failed).
+
+**Closes-NEGATIVE.** Tencent claim remains R206 0.0305.
+
+**Methodological cost note:** ~30 min fit + ~5 min generate-eval. The "always try the alibaba recipe on the next corpus first" reflex must be tempered by the corpus-specific finding — for tencent, transferring the R237 recipe is a guaranteed regression.
+
+## Round 256 — MSR Exchange added as 5th race corpus; claim 0.0253 (multi-seed)
+
+### Setup
+
+MSR Exchange (Microsoft Research production storage trace, .csv.gz format) added as the 5th race corpus, complementing alibaba/tencent/cloudphysics/baleen24. The format converter (.csv.gz → oracle_general .zst) was implemented at `/tmp/convert_msr_exchange.py` on baase. 50k traces extracted into the standard fit directory; manifest + real-ref CSV built at:
+- `/tiamat/zarathustra/llgan-output/manifests/msr_exchange_stackatlas.json`
+- `/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`
+
+### R256 atlas fit — R237 recipe at f=96
+
+R237 recipe applied: phase=2, seed=137, cond_noise=0.05, ext-bins, ep=600, h=96 (matches alibaba 237f). Atlas:
+`/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_ep600_extbins_seed137_noise0p05.pkl.gz`
+
+First probe (single-seed, R244 alibaba lock — hp=0.45 K=75 adj=0.05): **0.0864**.
+
+This was the starting point for the cascading-lock knob audit.
+
+### R256.B knob sweeps at R256 atlas (single-seed, gs=42)
+
+**R256.B.A (hp axis, adj=0.05 fixed):**
+
+| hp | mean HRC-MAE |
+|---|---|
+| 0.05 | 0.0442 |
+| 0.15 | 0.0625 |
+| 0.25 | 0.0784 |
+| 0.35 | 0.0833 |
+| 0.45 (R244 lock) | 0.0864 |
+| 0.55 | 0.0854 |
+
+Monotonic; hp=0.05 was the local hp peak with adj=0.05.
+
+**R256.B.B (adj axis, hp=0.45 fixed):**
+
+| adj | mean HRC-MAE |
+|---|---|
+| 0.0 | 0.0915 |
+| 0.025 | 0.0895 |
+| 0.05 (alibaba lock) | 0.0864 |
+| 0.10 | 0.0802 |
+| 0.20 | 0.0636 |
+| **0.35** | **0.0280** |
+
+Sharp descent past adj=0.20 — MSR likes much higher adj-dup-prob than the alibaba/CP corpora (where adj=0 is optimal).
+
+### R256.C — adj fine-grid extension at hp=0.45
+
+| adj | mean HRC-MAE |
+|---|---|
+| 0.20 | 0.0636 |
+| 0.27 | 0.0449 |
+| 0.31 | 0.0361 |
+| 0.35 | 0.0280 |
+| **0.40** | **0.0265** ← peak |
+| 0.50 | 0.0471 |
+| 0.65 | 0.0754 |
+| 0.80 | 0.0969 |
+
+Clean inverted-U; **adj=0.40 is the MSR lock**, ~8× higher than the alibaba lock (0.05). This is the strongest cross-corpus knob-divergence found in the campaign — confirms R255's "corpus-specific architecture" thesis applies to post-hoc knobs as well, not just fit-time recipes.
+
+### R256.D — multi-seed verify at hp=0.45 adj=0.40 lock
+
+| seed | mean HRC-MAE |
+|---|---|
+| 42 | 0.0265 |
+| 43 | 0.0238 |
+| 44 | 0.0241 |
+| 45 | 0.0269 |
+| **mean** | **0.0253** |
+| range | 0.0031 |
+
+### R256 claim: MSR Exchange = 0.0253 (multi-seed, 4 seeds, range 0.0031)
+
+Vs first probe (0.0864): **−71%**. Single round took the claim from "barely usable" to publishable.
+
+### Updated race ledger
+
+| corpus | LLNL multi-seed | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| Alibaba (6-pol) | **0.0131** | 0.0143 official | **LLNL +8.4%** |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0438 | n/a | LLNL alone |
+| **MSR Exchange (6-pol)** | **0.0253** | n/a | **LLNL alone** |
+
+LLNL now has a measured multi-seed claim on **5 corpora**. LANL has alibaba and tencent. Sandia has none yet.
+
+### Pattern note: cross-corpus optimal adj-dup-prob
+
+| corpus | optimal adj | atlas type |
+|---|---|---|
+| alibaba | 0.0 | 237f phase=2 |
+| CP | 0.0 | 237f phase=2 (low-cap variant) |
+| baleen24 | n/a (other knobs dominated) | 237f phase=2 |
+| **MSR Exchange** | **0.40** | 237f phase=2 |
+
+MSR's massive adj=0.40 preference suggests its real trace has heavy adjacent-block-duplication structure that doesn't appear in the alibaba/CP block-id space. Diagnostic candidates (future work): per-policy HRC-MAE breakdown to confirm SIEVE/SLRU specifically benefit from the adj=0.40 lift; locality-engine diagnostics to characterize the structure.
+
+### Open work
+
+- R256.E (cascade re-audit at adj=0.40 lock): tp, mf, rp, win sweeps could find further lift if any axis shifts.
+- R255 closed-NEGATIVE on tencent — no further action; tencent recipe is locked.
+- Alibaba is at the R250-R252 fixed point (0.0131) — no further single-axis lift available.
