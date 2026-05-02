@@ -116,10 +116,7 @@ def main() -> int:
 
 
 def _lookup_cond(cond_lookup: dict, path: Path, cond_dim: int) -> np.ndarray | None:
-    keys = [path.name]
-    for suffix in (".zst", ".gz"):
-        if path.name.endswith(suffix):
-            keys.append(path.name[: -len(suffix)])
+    keys = _cond_lookup_keys(path.name)
     for key in keys:
         val = cond_lookup.get(key)
         if val is not None:
@@ -128,6 +125,36 @@ def _lookup_cond(cond_lookup: dict, path: Path, cond_dim: int) -> np.ndarray | N
                 arr = np.pad(arr, (0, cond_dim - len(arr)))
             return arr[:cond_dim]
     return None
+
+
+def _cond_lookup_keys(name_or_path: str) -> list[str]:
+    name = Path(name_or_path).name
+    keys = [name]
+    for suffix in (".zst", ".gz"):
+        if name.endswith(suffix):
+            keys.append(name[: -len(suffix)])
+    msr_raw = _msr_exchange_raw_name(name)
+    if msr_raw:
+        keys.append(msr_raw)
+        if msr_raw.endswith(".gz"):
+            keys.append(msr_raw[: -len(".gz")])
+    return list(dict.fromkeys(keys))
+
+
+def _msr_exchange_raw_name(name: str) -> str | None:
+    stem = name
+    if stem.endswith(".zst"):
+        stem = stem[: -len(".zst")]
+    if not stem.endswith(".oracleGeneral"):
+        return None
+    stem = stem[: -len(".oracleGeneral")]
+    if not stem.startswith("Exchange_"):
+        return None
+    rest = stem[len("Exchange_"):]
+    if "_" not in rest:
+        return None
+    date, time = rest.split("_", 1)
+    return f"Exchange.{date}.{time}.trace.csv.gz"
 
 
 def _manifest_source_names(manifest_path: str) -> set[str]:

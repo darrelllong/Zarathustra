@@ -21,6 +21,7 @@ from llgan.long_rollout_eval import _gap, _metrics_for_stream, _per_stream_obj_i
 
 from .mark_quality import mark_quality  # noqa: E402
 from .neural_atlas import NeuralAtlasModel  # noqa: E402
+from .train_neural_atlas import _cond_lookup_keys  # noqa: E402
 
 
 def _parse_args() -> argparse.Namespace:
@@ -308,11 +309,7 @@ def _source_names_from_manifest(manifest: dict) -> list[str]:
 
 
 def _lookup_cond(cond_lookup: dict, name_or_path: str, cond_dim: int) -> np.ndarray:
-    name = Path(name_or_path).name
-    keys = [name]
-    for suffix in (".zst", ".gz"):
-        if name.endswith(suffix):
-            keys.append(name[: -len(suffix)])
+    keys = _cond_lookup_keys(name_or_path)
     for key in keys:
         val = cond_lookup.get(key)
         if val is not None:
