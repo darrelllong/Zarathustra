@@ -13338,3 +13338,61 @@ R232 makes 10 consecutive closes-NEGATIVE (R225-R232). Standing claims defended 
 
 - LANL: same micro-iteration.
 - Sandia: gpt-oss is up on baase per user; first artifact pending.
+
+## Round 233 — Phase-bin granularity probes (alibaba phase=4, CP phase=2): both close-NEGATIVE; per-state-density rule confirmed across corpora
+
+**Date**: 2026-05-01 20:00-20:30 PDT.
+
+### Setup
+
+The `--n-phase-bins` axis (state-space granularity) had not been swept since R220. R221 alibaba uses phase=2 (12 states); R224 CP uses phase=1 (6 states); R206 tencent uses phase=1 (6 states). Tested raising granularity:
+- **R233.A on baase** (parallelized over the new 200Gb fabric NFS): alibaba phase=**4** (24 states), keeping all R221 lock knobs.
+- **R233.B on vinge**: CP phase=**2** (12 states), keeping all R224 lock knobs.
+
+### Results
+
+| corpus | atlas | seed=42 result | vs lock |
+|---|---|---|---|
+| Alibaba | R221 phase=2 (12 states) baseline | 0.0211 / 0.0209 (6/8-pol) | — |
+| **Alibaba R233.A phase=4 (24 states)** | **0.2386 / 0.2448** | **+12× regression** |
+| CloudPhysics | R224 phase=1 (6 states) baseline | 0.0337 (8-pol) | — |
+| **CloudPhysics R233.B phase=2 (12 states)** | **0.1518** | **+350% regression** |
+
+### Per-state-density rule (now established across two axes)
+
+R233 reinforces what R225/R225b/R230/R230b suggested: any architectural change that **multiplies the cond_mlp's effective output cardinality without proportional data growth** catastrophically regresses long-rollout HRC. Mechanism:
+
+1. **R225/R225b: more data, same state space.** Per-state density goes UP, but training-time cond distribution shifts (more late-trace states with rare-rank events) AWAY from generation-time cond distribution → cond_mlp overfits to training conds.
+
+2. **R230/R230b: same state space + rank-AR head replacing empirical PMF.** Per-state-conditioned rank distribution becomes learned (smooth) instead of empirical (sparse). Empirical PMF was acting as a regularizer; learned PMF extrapolates badly.
+
+3. **R233: same data, more states.** Per-state density goes DOWN, sparsifying per-cell PMFs. cond_mlp can fit each cell precisely on training data, but generation-time conds hit cells whose true distribution differs from the heavily-memorized training distribution.
+
+All three share the common pathology: **the cond_mlp's softmax over distance-state at generate time hits cells outside the training cond manifold, and any of (more capacity / more states / learned PMF replacement) makes the extrapolation worse.**
+
+The empirical PMF-lookup table on the 6/12-state space at the originally-tuned size is in a **stable basin**. The basin is corpus-conditional (R220 binning fix helped CP +33% / alibaba +5% / tencent −17%), but for each corpus the basin is shallow — moving in any direction (up in capacity, up in states, up in data, up in learned smoothing) regresses.
+
+### What this means for race lift
+
+Real headroom must come from changes that **don't** increase the cond_mlp's effective output cardinality. Cheap probes still untested in this direction:
+- Phase=1 alibaba (REDUCE states 12→6, MORE per-state density) — opposite direction from R233
+- Hidden=64 alibaba ep=300 with phase=2 (less capacity, R225b's tune-down applied to R221's data)
+- Different cond features (same cardinality, different inductive bias)
+- Two-stage generation (factor object identity from temporal locality)
+
+Launching the first two as R234 in parallel.
+
+### Standing claims unchanged
+
+| corpus | claim | round |
+|---|---|---|
+| Tencent | 0.0305 (6-pol, multi-seed) | R206 |
+| Alibaba | 0.0204 (6-pol, multi-seed) | R221 |
+| CloudPhysics | 0.0338 (8-pol, multi-seed) | R224 |
+
+R225-R233 = 11 consecutive closes-NEGATIVE.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: still pending first artifact (gpt-oss "cogitating" per user).
