@@ -1831,6 +1831,10 @@ Artifacts:
 
 ## Alibaba Official-Reference Cachesim Confirmation (2026-05-02)
 
+**Superseded/corrected by the cooldown panel below.** This section used
+`stack_reuse_boost_prob=0.006` after misreading the historical `006` tag as a
+literal probability. Keep it only as a process-defect record.
+
 The race metric is `python3 -m llgan.cachesim_eval` against the official
 Alibaba reference
 `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
@@ -1859,3 +1863,31 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed80_realmanifest42_official6_ref97d005.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed81_realmanifest42_official6_ref97d005.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed82_realmanifest42_official6_ref97d005.json`
+
+## Alibaba Hot-Pool Cooldown Official Overtake (2026-05-02)
+
+Implemented `--stack-hot-pool-min-age` to keep recently emitted hot-pool
+objects ineligible for immediate hot-pool reuse. This is an admission/segment
+residency mechanism aimed at the SIEVE/SLRU gap.
+
+Confirmed recipe: `alibaba_phaseatlas_marks_e20.pkl.gz`, forced phase,
+`transition_blend=0.2`, `local_prob_power=0.9`, reuse boost `.06` from rank
+`32768` with power `2.0`, hot pool `.44`, k `200`, window `10000`,
+hot-pool min age `16`, 1M rows, 4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| 80 | `mean HRC-MAE across policies: 0.0123` | 0.0122872667 |
+| 81 | `mean HRC-MAE across policies: 0.0117` | 0.0116597667 |
+| 82 | `mean HRC-MAE across policies: 0.0120` | 0.0120387333 |
+
+Four-seed mean: `0.0118763500` (display `0.0119`), range `0.0007676333`.
+This beats LLNL R248/R250-R252 `0.0131138583` by `9.4%` under the official
+six-policy Alibaba cachesim surface.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed42_officialref97d005_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed80_officialref97d005_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed81_officialref97d005_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed82_officialref97d005_official6_ref97d005.json`

@@ -394,6 +394,11 @@ seed `154`.
 
 ## 2026-05-02 -- Official Alibaba Cachesim Multi-Seed
 
+**Superseded/corrected below.** This panel accidentally used
+`stack_reuse_boost_prob=0.006` because the historical `006` filename tag was
+misread as the literal probability. The launcher now rejects that mismatch.
+The race-eligible LANL Alibaba claim is the cooldown panel in the next section.
+
 The claim surface is now explicit: cachesim is the race metric. Diagnostic
 numbers from `altgan.evaluate_neural_atlas` remain tuning scaffolding only.
 The panel below uses:
@@ -437,3 +442,53 @@ mean per-policy HRC-MAE is LRU `0.0055393000`, ARC `0.0087930000`, FIFO
 that preserves the current ARC/CAR curve while fixing SIEVE/SLRU small-cache
 behavior; continuing scalar hot-pool sweeps is not the main route to Tiger
 Blood.
+
+## 2026-05-02 -- Alibaba Hot-Pool Cooldown Overtake
+
+The decimal correction alone (`stack_reuse_boost_prob=0.06`) produced a
+four-seed official mean `0.0135334417`, close but still behind LLNL R248
+`0.0131138583`. The architectural fix is a new `altgan` hot-pool cooldown:
+`--stack-hot-pool-min-age 16`, which separates hot-set membership from
+immediate re-emission eligibility. This targets the SIEVE/SLRU admission
+failure directly.
+
+Command surface remains:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+with md5 `97d0054230348d07aef2021ec15f6fd8`.
+
+Recipe: `alibaba_phaseatlas_marks_e20.pkl.gz`, forced phase,
+`transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_reuse_boost_prob=0.06`, `stack_reuse_boost_min_rank=32768`,
+`stack_reuse_boost_rank_power=2.0`, `stack_hot_pool_prob=0.44`,
+`stack_hot_pool_k=200`, `stack_hot_pool_window=10000`,
+`stack_hot_pool_min_age=16`, 1M rows, 4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed42_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed80_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0123` | 0.0122872667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed81_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0117` | 0.0116597667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed82_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0120` | 0.0120387333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0118763500` (race display `0.0119`;
+range `0.0007676333`). This overtakes LLNL R248/R250-R252
+`0.0131138583` by `9.4%` under the same official reference and
+`llgan.cachesim_eval` invocation.
+
+Four-seed mean per-policy HRC-MAE: LRU `0.0076028000`, ARC `0.0088458500`,
+FIFO `0.0044157500`, SIEVE `0.0222799500`, SLRU `0.0197465000`, CAR
+`0.0083672500`. Compared with the non-cooldown corrected recipe, the win comes
+from SIEVE/SLRU, not scalar reuse matching: cooldown cuts SIEVE
+`0.0287625500 -> 0.0222799500` and SLRU
+`0.0246951000 -> 0.0197465000` while keeping ARC/CAR/LRU within the winning
+budget.
