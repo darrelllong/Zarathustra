@@ -14732,3 +14732,46 @@ MSR's massive adj=0.40 preference suggests its real trace has heavy adjacent-blo
 - R256.E (cascade re-audit at adj=0.40 lock): tp, mf, rp, win sweeps could find further lift if any axis shifts.
 - R255 closed-NEGATIVE on tencent — no further action; tencent recipe is locked.
 - Alibaba is at the R250-R252 fixed point (0.0131) — no further single-axis lift available.
+
+## R248 per-policy diagnostic — where LLNL leads, where LANL leads (2026-05-02)
+
+LANL's official panel posted per-policy HRC-MAE for their alibaba multi-seed; LLNL hadn't posted theirs. Computing on the existing R248 fake CSVs (`alibaba_b2_r248d_win16_gs{42,43,44,45}.csv` on /tiamat) against the same `alibaba_stackatlas_1M_real.csv` ref:
+
+### LLNL R248 per-policy mean (seeds 42/43/44/45)
+
+| pol | seed42 | seed43 | seed44 | seed45 | LLNL mean | range |
+|---|---|---|---|---|---|---|
+| lru   | 0.0113 | 0.0113 | 0.0112 | 0.0113 | **0.0113** | 0.0002 |
+| arc   | 0.0094 | 0.0097 | 0.0096 | 0.0095 | **0.0095** | 0.0003 |
+| fifo  | 0.0067 | 0.0068 | 0.0066 | 0.0068 | **0.0067** | 0.0002 |
+| sieve | 0.0153 | 0.0205 | 0.0220 | 0.0194 | **0.0193** | 0.0066 |
+| slru  | 0.0226 | 0.0226 | 0.0225 | 0.0228 | **0.0226** | 0.0003 |
+| car   | 0.0093 | 0.0092 | 0.0093 | 0.0091 | **0.0092** | 0.0002 |
+| **mean** | | | | | **0.0131** | |
+
+### Side-by-side vs LANL official (their seeds 42/80/81/82 mean)
+
+| pol | LLNL | LANL | leader | LLNL margin |
+|---|---|---|---|---|
+| **lru** | 0.0113 | **0.0055** | LANL | **+105% LANL leads** |
+| **arc** | 0.0095 | **0.0088** | LANL | +8% LANL leads |
+| fifo | **0.0067** | 0.0093 | **LLNL** | −28% |
+| sieve | **0.0193** | 0.0276 | **LLNL** | −30% |
+| slru | **0.0226** | 0.0242 | **LLNL** | −7% |
+| car | **0.0092** | 0.0101 | **LLNL** | −9% |
+| **MEAN** | **0.0131** | 0.0143 | **LLNL** | **−8.4%** |
+
+### Read
+
+1. **LLNL's aggregate lead is concentrated in SIEVE+SLRU+FIFO+CAR.** SIEVE alone gives LLNL the biggest absolute margin (LANL 0.0276 − LLNL 0.0193 = 0.0083, vs the LRU gap which goes the OTHER way at 0.0058 in LANL's favor).
+2. **LANL has a big LRU advantage (2:1).** LANL is at LRU 0.0055 — half of LLNL's 0.0113. Whatever LANL's recipe has (likely the hot-pool cooldown plus phaseatlas marks model) yields cleaner LRU behavior. LLNL's recipe is currently leaving LRU lift on the table.
+3. **LANL's SIEVE/SLRU diagnosis was correct on their side.** Their published "SIEVE+SLRU dominate the gap" is true; their just-pushed `5a77f94 altgan: add hot-pool cooldown control` is targeting that. If they close the SIEVE gap, the alibaba race tightens.
+4. **SIEVE is the highest-variance policy in LLNL's R248** (range 0.0066 across seeds, 30× higher than the other policies' ~0.0002 ranges). The 4-seed mean of 0.0193 may be optimistic; more seeds would tighten it. Worth a multi-seed expansion if the alibaba race comes back into contention.
+
+### Open work
+
+- Investigate where LLNL's LRU 2:1 deficit comes from. Could be the IRD long-tail handling, the empirical-PMF lookup precision near small-bucket entries, or a cond-noise interaction. R237's cond_noise=0.05 is the most recent recipe knob — try a small ablation (cond_noise=0 fit) and check LRU per-policy in isolation.
+- Probe whether LLNL's LRU deficit is corpus-general or alibaba-specific: re-run per-policy on tencent R206, CP R224, baleen24 R245, MSR R256.
+- If LANL's cooldown change closes their SIEVE gap, LLNL's −30% SIEVE margin shrinks; the aggregate race tightens to whatever LRU gap remains.
+
+This commit makes the LLNL−LANL alibaba comparison fully transparent at the per-policy level. AD-grade verifiable.
