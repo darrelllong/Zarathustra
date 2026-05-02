@@ -32,7 +32,34 @@ def _parse_spec(text: str) -> Spec:
         raise argparse.ArgumentTypeError(
             "--spec must be reuse_prob,hot_prob,hot_k,seed,reuse_tag,hot_tag"
         )
-    return Spec(*parts)
+    spec = Spec(*parts)
+    _validate_prob_tag(spec.reuse_prob, spec.reuse_tag, "reuse")
+    _validate_prob_tag(spec.hot_prob, spec.hot_tag, "hot-pool")
+    return spec
+
+
+def _validate_prob_tag(prob_text: str, tag: str, label: str) -> None:
+    prob = float(prob_text)
+    tag_prob = _prob_from_tag(tag)
+    if abs(prob - tag_prob) > 1e-9:
+        raise argparse.ArgumentTypeError(
+            f"{label} probability {prob_text!r} does not match tag {tag!r} "
+            f"(tag decodes to {tag_prob:g}); use {tag_prob:g} or choose "
+            "an unambiguous tag"
+        )
+
+
+def _prob_from_tag(tag: str) -> float:
+    text = tag.strip().lower().replace("p", "")
+    if not text.isdigit():
+        raise argparse.ArgumentTypeError(f"probability tag must be digits, got {tag!r}")
+    # Historical LANL tags use 3 digits for percentages: 006 -> 0.06,
+    # 044 -> 0.44. Four-digit tags cover sub-percent steps: 0075 -> 0.075.
+    if len(text) <= 3:
+        scale = 100.0
+    else:
+        scale = 1000.0
+    return int(text) / scale
 
 
 def _artifact_base(spec: Spec) -> str:
