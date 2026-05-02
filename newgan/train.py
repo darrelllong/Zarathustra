@@ -529,8 +529,8 @@ class SandiaTrainer:
         # cuDNN RNN backward error.  We now explicitly set ``S.train()``.
         self.E.eval()
         self.R.eval()
+        torch.backends.cudnn.enabled = False
         self.S.train()
-        for p in self.S.parameters():
             p.requires_grad_(False)
         self.G.train()
         self.C.train()
