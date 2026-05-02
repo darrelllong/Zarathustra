@@ -70,6 +70,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Power applied to hot-pool frequency weights.")
     p.add_argument("--stack-hot-pool-max-search", type=int, default=0,
                    help="Optional maximum stack prefix searched for hot-pool objects; 0 searches full stack.")
+    p.add_argument("--stack-hot-pool-min-age", type=int, default=0,
+                   help="Minimum stream positions since last emission before a hot-pool object can be reused.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-min-frac", type=float, default=0.5,
@@ -169,6 +171,7 @@ def main() -> int:
         stack_hot_pool_window=args.stack_hot_pool_window,
         stack_hot_pool_weight_power=args.stack_hot_pool_weight_power,
         stack_hot_pool_max_search=args.stack_hot_pool_max_search,
+        stack_hot_pool_min_age=args.stack_hot_pool_min_age,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
         stack_recent_pool_prob=args.stack_recent_pool_prob,
@@ -237,6 +240,7 @@ def main() -> int:
         "stack_hot_pool_window": args.stack_hot_pool_window,
         "stack_hot_pool_weight_power": args.stack_hot_pool_weight_power,
         "stack_hot_pool_max_search": args.stack_hot_pool_max_search,
+        "stack_hot_pool_min_age": args.stack_hot_pool_min_age,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
         "stack_recent_pool_prob": args.stack_recent_pool_prob,

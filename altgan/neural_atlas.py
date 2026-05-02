@@ -91,6 +91,7 @@ class NeuralAtlasModel:
         stack_hot_pool_window: int = 5000,
         stack_hot_pool_weight_power: float = 1.0,
         stack_hot_pool_max_search: int = 0,
+        stack_hot_pool_min_age: int = 0,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_min_frac: float = 0.5,
         stack_recent_pool_prob: float = 0.0,
@@ -135,6 +136,7 @@ class NeuralAtlasModel:
         stack_hot_pool_window = max(int(stack_hot_pool_window), 1)
         stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
         stack_hot_pool_max_search = max(int(stack_hot_pool_max_search), 0)
+        stack_hot_pool_min_age = max(int(stack_hot_pool_min_age), 0)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
         stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
         stack_recent_pool_prob = float(np.clip(stack_recent_pool_prob, 0.0, 1.0))
@@ -199,6 +201,7 @@ class NeuralAtlasModel:
             prev_obj = next_new_id
             ts = 0.0
             hot_counts: Counter[int] = Counter()
+            hot_last_pos: dict[int, int] = {}
             hot_window: deque[int] = deque()
             hot_pool: list[tuple[int, int]] = []
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
@@ -253,21 +256,41 @@ class NeuralAtlasModel:
                         and hot_pool
                         and rng.random() < stack_hot_pool_prob
                     ):
-                        hot_obj = _sample_hot_pool_obj(
+                        eligible_hot_pool = _eligible_hot_pool(
                             hot_pool,
-                            weight_power=stack_hot_pool_weight_power,
-                            rng=rng,
+                            last_pos=hot_last_pos,
+                            current_pos=pos,
+                            min_age=stack_hot_pool_min_age,
                         )
-                        try:
-                            if stack_hot_pool_max_search > 0:
-                                rank = stack.index(
-                                    hot_obj,
-                                    0,
-                                    min(len(stack), stack_hot_pool_max_search),
+                        if eligible_hot_pool:
+                            hot_obj = _sample_hot_pool_obj(
+                                eligible_hot_pool,
+                                weight_power=stack_hot_pool_weight_power,
+                                rng=rng,
+                            )
+                            try:
+                                if stack_hot_pool_max_search > 0:
+                                    rank = stack.index(
+                                        hot_obj,
+                                        0,
+                                        min(len(stack), stack_hot_pool_max_search),
+                                    )
+                                else:
+                                    rank = stack.index(hot_obj)
+                            except ValueError:
+                                phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                                phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                                if phase_rank_max is not None and phase_rank_max < 0:
+                                    phase_rank_max = None
+                                rank = _calibrated_stack_rank(
+                                    ev.stack_distance,
+                                    stack_rank_scale=phase_rank_scale,
+                                    stack_rank_max=phase_rank_max,
+                                    stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                    stack_rank_tail_scale=stack_rank_tail_scale,
+                                    stack_len=len(stack),
                                 )
-                            else:
-                                rank = stack.index(hot_obj)
-                        except ValueError:
+                        else:
                             phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                             if phase_rank_max is not None and phase_rank_max < 0:
@@ -391,8 +414,10 @@ class NeuralAtlasModel:
                         hot_counts[old_obj] -= 1
                         if hot_counts[old_obj] <= 0:
                             del hot_counts[old_obj]
+                            hot_last_pos.pop(old_obj, None)
                     hot_window.append(int(obj_id))
                     hot_counts[int(obj_id)] += 1
+                    hot_last_pos[int(obj_id)] = pos
                 if stack_recent_pool_prob > 0.0:
                     recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
@@ -822,6 +847,24 @@ def _sample_hot_pool_obj(
     weights = np.power(weights, max(float(weight_power), 1e-6))
     weights = weights / max(float(weights.sum()), 1e-12)
     return int(ids[int(rng.choice(len(ids), p=weights))])
+
+
+def _eligible_hot_pool(
+    hot_pool: Sequence[tuple[int, int]],
+    *,
+    last_pos: dict[int, int],
+    current_pos: int,
+    min_age: int,
+) -> Sequence[tuple[int, int]]:
+    if min_age <= 0:
+        return hot_pool
+    current = int(current_pos)
+    age = int(min_age)
+    return [
+        (int(obj_id), int(count))
+        for obj_id, count in hot_pool
+        if current - int(last_pos.get(int(obj_id), -age)) >= age
+    ]
 
 
 class _RankedLRUNode:
