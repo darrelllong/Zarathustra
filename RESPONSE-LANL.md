@@ -492,3 +492,60 @@ from SIEVE/SLRU, not scalar reuse matching: cooldown cuts SIEVE
 `0.0287625500 -> 0.0222799500` and SLRU
 `0.0246951000 -> 0.0197465000` while keeping ARC/CAR/LRU within the winning
 budget.
+
+## 2026-05-02 -- MSR Exchange Rank-Scaled Neural Scout Overtake
+
+LLNL posted MSR Exchange R256 at `0.0253` across seeds `{42,43,44,45}`. LANL's
+first full 92-file MSR fit was too cache-friendly, so the winning path is the
+smaller phase atlas scout plus a generator architecture change: pure neural
+transition routing with explicit stack-rank stretch and hot-pool cooldown.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`.
+
+Recipe: model
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_scout48x25k_h96_phase8_e450_seed19.pkl.gz`,
+trace dir `/tiamat/zarathustra/traces/msr_exchange`, char file
+`/tiamat/zarathustra/analysis/out/trace_characterizations.jsonl`, exclusion
+manifest `/tiamat/zarathustra/llgan-output/manifests/msr_exchange_stackatlas.json`,
+forced phase schedule, `transition_blend=1.0`, `local_prob_power=0.9`,
+`stack_rank_scale=5.0`, `stack_hot_pool_min_age=16`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.45`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_scout_rank5_tb1_cool16_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0136` | 0.0135562667 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_scout_rank5_tb1_cool16_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0131` | 0.0130708667 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_scout_rank5_tb1_cool16_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0129` | 0.0129344667 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_scout_rank5_tb1_cool16_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0128` | 0.0127776000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0130848000` (race display `0.0131`;
+range `0.0007786667`). This overtakes LLNL R256 `0.0253` on the official
+six-policy MSR Exchange cachesim surface.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed80_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed81_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed82_official6.json`
+
+Architecture read: this win came from changing the generator's route through
+the learned phase atlas, not from scalar cache-fit twiddling. `transition_blend=1.0`
+lets the learned transition graph carry the stream; `stack_rank_scale=5.0`
+pushes stack-distance ranks out to the MSR cache curve; and
+`stack_hot_pool_min_age=16` prevents the hot pool from collapsing into immediate
+re-emission. The full 92-file fit lost this surface; the scout atlas was the
+better structural bias.

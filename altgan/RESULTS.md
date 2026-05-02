@@ -1891,3 +1891,40 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed80_officialref97d005_official6_ref97d005.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed81_officialref97d005_official6_ref97d005.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed82_officialref97d005_official6_ref97d005.json`
+
+## MSR Exchange Official Cachesim Overtake (2026-05-02)
+
+Confirmed against the official six-policy surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Recipe: scout model
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_scout48x25k_h96_phase8_e450_seed19.pkl.gz`,
+forced phase, `transition_blend=1.0`, `local_prob_power=0.9`,
+`stack_rank_scale=5.0`, `stack_hot_pool_min_age=16`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.45`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0136` | 0.0135562667 |
+| 80 | `mean HRC-MAE across policies: 0.0131` | 0.0130708667 |
+| 81 | `mean HRC-MAE across policies: 0.0129` | 0.0129344667 |
+| 82 | `mean HRC-MAE across policies: 0.0128` | 0.0127776000 |
+
+Four-seed mean: `0.0130848000` (display `0.0131`), range `0.0007786667`.
+This beats LLNL R256 `0.0253` on MSR Exchange.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed80_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed81_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed82_official6.json`
