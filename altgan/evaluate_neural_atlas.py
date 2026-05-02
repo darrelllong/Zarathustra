@@ -16,12 +16,11 @@ _LLGAN = _ROOT / "llgan"
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_LLGAN))
 
-from llgan.dataset import load_file_characterizations  # noqa: E402
 from llgan.long_rollout_eval import _gap, _metrics_for_stream, _per_stream_obj_ids, _sample_real_stream  # noqa: E402
 
 from .mark_quality import mark_quality  # noqa: E402
 from .neural_atlas import NeuralAtlasModel  # noqa: E402
-from .train_neural_atlas import _cond_lookup_keys  # noqa: E402
+from .train_neural_atlas import _cond_lookup_keys, _load_file_characterizations  # noqa: E402
 
 
 def _parse_args() -> argparse.Namespace:
@@ -129,7 +128,7 @@ def main() -> int:
     args = _parse_args()
     model = NeuralAtlasModel.load(args.model)
 
-    cond_lookup = load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
+    cond_lookup = _load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
     source_names = [s.strip() for s in args.source_traces.split(",") if s.strip()]
 
     real_df, real_manifest = _sample_real_stream(

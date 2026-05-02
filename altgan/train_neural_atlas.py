@@ -9,13 +9,18 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import torch
 
 _ROOT = Path(__file__).resolve().parents[1]
 _LLGAN = _ROOT / "llgan"
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_LLGAN))
 
-from llgan.dataset import _READERS, load_file_characterizations  # noqa: E402
+from llgan.dataset import (  # noqa: E402
+    _READERS,
+    load_file_characterizations as _llgan_load_file_characterizations,
+    profile_to_cond_vector,
+)
 
 from .neural_atlas import fit_neural_atlas  # noqa: E402
 from .train import _collect_files  # noqa: E402
@@ -51,7 +56,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     reader = _READERS[args.fmt]
-    cond_lookup = load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
+    cond_lookup = _load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
 
     if args.trace:
         paths = [Path(args.trace)]
@@ -130,7 +135,7 @@ def _lookup_cond(cond_lookup: dict, path: Path, cond_dim: int) -> np.ndarray | N
 def _cond_lookup_keys(name_or_path: str) -> list[str]:
     name = Path(name_or_path).name
     keys = [name]
-    for suffix in (".zst", ".gz"):
+    for suffix in (".oracleGeneral.bin.zst", ".oracleGeneral.zst", ".zst", ".gz"):
         if name.endswith(suffix):
             keys.append(name[: -len(suffix)])
     msr_raw = _msr_exchange_raw_name(name)
@@ -138,6 +143,49 @@ def _cond_lookup_keys(name_or_path: str) -> list[str]:
         keys.append(msr_raw)
         if msr_raw.endswith(".gz"):
             keys.append(msr_raw[: -len(".gz")])
+    baleen_raw = _baleen24_raw_rel_path(name)
+    if baleen_raw:
+        keys.extend([
+            baleen_raw,
+            f"/tiamat/zarathustra/traces/{baleen_raw}",
+            Path(baleen_raw).name,
+        ])
+    cp_raws = _cloudphysics_raw_names(name)
+    keys.extend(cp_raws)
+    return list(dict.fromkeys(keys))
+
+
+def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
+    lookup = _llgan_load_file_characterizations(jsonl_path, cond_dim=cond_dim)
+    with open(jsonl_path) as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            profile = row.get("profile")
+            if not profile:
+                continue
+            rel = row.get("rel_path", "")
+            path = row.get("path", "")
+            if not rel and not path:
+                continue
+            vec = torch.tensor(profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
+            for key in _char_row_keys(rel, path):
+                lookup[key] = vec
+    return lookup
+
+
+def _char_row_keys(rel_path: str, abs_path: str) -> list[str]:
+    keys = []
+    for raw in (rel_path, abs_path):
+        if not raw:
+            continue
+        p = Path(raw)
+        keys.extend([raw, p.name])
+        for suffix in (".zst", ".gz"):
+            if p.name.endswith(suffix):
+                keys.append(p.name[: -len(suffix)])
     return list(dict.fromkeys(keys))
 
 
@@ -155,6 +203,37 @@ def _msr_exchange_raw_name(name: str) -> str | None:
         return None
     date, time = rest.split("_", 1)
     return f"Exchange.{date}.{time}.trace.csv.gz"
+
+
+def _baleen24_raw_rel_path(name: str) -> str | None:
+    stem = name
+    if stem.endswith(".zst"):
+        stem = stem[: -len(".zst")]
+    for suffix in (".oracleGeneral.bin", ".oracleGeneral"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    parts = stem.split("__")
+    if len(parts) < 4 or not parts[0].startswith("storage"):
+        return None
+    return "Baleen24/extracted/" + "/".join(parts[:-1]) + f"/{parts[-1]}.trace"
+
+
+def _cloudphysics_raw_names(name: str) -> list[str]:
+    stem = name
+    if stem.endswith(".zst"):
+        stem = stem[: -len(".zst")]
+    for suffix in (".oracleGeneral.bin", ".oracleGeneral"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    if not stem.startswith("w") or not stem[1:].isdigit():
+        return []
+    keys = []
+    for disk in ("vscsi1", "vscsi2"):
+        raw = f"s3-cache-datasets/cache_dataset_lcs/cloudphysics/{stem}_{disk}.vscsitrace.lcs.zst"
+        keys.extend([raw, Path(raw).name, Path(raw).name[: -len(".zst")]])
+    return keys
 
 
 def _manifest_source_names(manifest_path: str) -> set[str]:
