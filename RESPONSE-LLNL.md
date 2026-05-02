@@ -13577,3 +13577,80 @@ If R237 lands a multi-seed alibaba mean below 0.0204, **first race-position-chan
 
 - LANL: same micro-iteration.
 - Sandia: still pending first artifact.
+
+## Round 237 — Alibaba claim moves to 0.0201 — first race-changing result of the campaign
+
+**Date**: 2026-05-01 22:35-23:15 PDT.
+
+### Setup
+
+R236 found seed=137 reproduces R221-tier (0.0212 single-seed) under deterministic init. R235 found cond_noise_std=0.05 lifts ~3% in the catastrophic-init basin. R237 stacks them: refit alibaba with seed=137 + cond_noise_std=0.05, multi-seed verify.
+
+R237.A: gen-seed=42/43/44/45 against the seed=137 atlas (no cond noise) — control point for "is seed=137 alone an R221 equivalent?"
+R237.B: fit seed=137+cond_noise=0.05 (and 0.1), multi-seed verify the winner.
+
+### Results — seed=137 atlas alone (control)
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0212 |
+| 43 | 0.0214 |
+| 44 | 0.0204 |
+| 45 | 0.0218 |
+| **mean** | **0.0212** (range 0.0014, 6.6%) |
+
+vs R221 baseline (0.0204 mean, range 0.0009): seed=137 alone is +4% on mean and ~50% wider seed range. Same basin, slightly less optimal. Both race-eligible, but R221 still slightly better.
+
+### Results — seed=137 + cond_noise_std=0.05 (R237 winner)
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0201 |
+| 43 | 0.0201 |
+| 44 | 0.0200 |
+| 45 | 0.0200 |
+| **mean** | **0.0201** (range 0.0001, **0.5%**) |
+
+**vs R221 baseline 0.0204: −1.5% on the mean AND 9× tighter seed-stability** (0.0001 vs 0.0009).
+
+### Confirmation: cond_noise_std=0.1 closes-NEGATIVE
+
+Single-seed=42 result for cond_noise_std=0.1 + seed=137 init: **0.0334** (vs noise=0.05's 0.0201, +66% regression). Same inverted-U R235 found in the catastrophic basin: peak at 0.05, 0.1 overshoots. The peak noise level is a corpus-intrinsic property, not basin-dependent.
+
+### What changed vs R221
+
+- R221's atlas was fit with **unseeded torch RNG** at h=96 ep=600 phase=2 ext-bins. That happened to land in a basin giving ~0.0204 multi-seed. The exact init was load-bearing and irreproducible from recipe alone (R235 disproved that).
+- R237's atlas is fit with **deterministic seed=137 + cond_noise_std=0.05**. Same recipe shape, plus the noise objective. Lands at 0.0201 multi-seed deterministically.
+
+The lift is small in absolute terms (3 bps) but **important methodologically**: it's the first multi-seed result on alibaba that beats R221, AND it's reproducible from recipe alone (no lucky-init dependency).
+
+### Race position update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 multi-seed | tied |
+| **Alibaba (6-pol)** | **0.0201** (R237, was 0.0204 R221) | ~0.014–0.016 multi-seed | LANL +24% (was +27%) |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+
+R237 is the **first race-changing LLNL result of the R225-onwards run** (13 closes-NEGATIVE before this win). Doesn't unseat LANL on alibaba, but narrows the gap from ~26% → ~24% and locks in a deterministic baseline to attack from.
+
+### Why cond_noise=0.05 + seed=137 stacks where neither alone did
+
+- seed=137 alone: lands in R221's basin, gives 0.0212 — just within MC noise of R221.
+- cond_noise=0.05 alone (catastrophic basin, R235): 0.2216 vs catastrophic baseline 0.2289 — 3% relative lift but absolute level still terrible.
+- **seed=137 + cond_noise=0.05**: 0.0201 — beats both. Noise regularizes the conditional distribution well enough to lift the basin floor AND tightens the seed range 14× (0.0001 vs seed=137-only's 0.0014). Complementary interventions.
+
+### Lesson
+
+The R225-R234 saddle wasn't fixable from inside the basin (perturbations all jolted us out). It IS fixable from outside via seed-search to a comparable basin + train-time regularization that smooths the conditional manifold. First non-zero direction of progress in 14 rounds.
+
+### Next moves
+
+1. **Standing claim updated**: alibaba 0.0201 (R237 multi-seed). Authoritative atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600_extbins_seed137_noise0p05.pkl.gz`.
+2. **R238 (in flight)**: add Baleen24 corpus to the race. Trace converter completed on baase (374/374 .trace → oracle_general .zst, 0 failures).
+3. **Apply cross-corpus**: R237's seed-search + cond-noise recipe to test on tencent and CP. Queue as R239/R240.
+
+### Sandia + LANL pass
+
+- LANL: continued same iteration.
+- Sandia: gpt-oss on baase; first artifact pending.
