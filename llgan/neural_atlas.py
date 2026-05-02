@@ -678,6 +678,9 @@ def generate(
     recent_pool_window: int = 200,
     tail_reuse_rank_power: float = 1.0,
     hot_pool_refresh_jitter: bool = False,
+    reuse_boost_prob: float = 0.0,
+    reuse_boost_min_rank: int = 0,
+    reuse_boost_rank_power: float = 1.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -794,10 +797,30 @@ def generate(
                 # Decode current state to (phase, dist_state) → action
                 dist_state = state % N_DIST_STATES
                 if dist_state == STATE_NEW:
-                    obj_id = next_new_id
-                    next_new_id += 1
-                    stack.insert(0, obj_id)
-                    prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
+                    if (reuse_boost_prob > 0.0 and len(stack) > 0
+                            and rng.random() < reuse_boost_prob):
+                        # R258: LANL-style reuse-boost — flip a NEW into a reuse
+                        # by sampling a rank near-uniformly across the stack.
+                        # Port of altgan's stack_reuse_boost_* (their Baleen24 win).
+                        # Default off (prob=0.0) → bit-identical to pre-R258.
+                        stack_sz = len(stack)
+                        lo = min(max(int(reuse_boost_min_rank), 0), stack_sz - 1)
+                        if reuse_boost_rank_power == 1.0:
+                            rank = int(rng.integers(lo, stack_sz))
+                        else:
+                            u = float(rng.random())
+                            biased = u ** max(reuse_boost_rank_power, 1e-6)
+                            rank = int(lo + (stack_sz - 1 - lo) * biased)
+                            rank = max(lo, min(rank, stack_sz - 1))
+                        obj_id = stack[rank]
+                        del stack[rank]
+                        stack.insert(0, obj_id)
+                        prev_rank_bin = N_RANK_BINS  # sentinel: not from PMF
+                    else:
+                        obj_id = next_new_id
+                        next_new_id += 1
+                        stack.insert(0, obj_id)
+                        prev_rank_bin = N_RANK_BINS  # sentinel: no prev rank after NEW
                 elif (tail_reuse_prob > 0.0 and len(stack) > 0
                       and rng.random() < tail_reuse_prob):
                     # R187: deep-rank reuse injection (LANL-style min-rank boost).
@@ -1088,6 +1111,18 @@ def main():
                            "interval as Poisson(200) instead of fixed 200 steps. "
                            "Mean unchanged; breaks the periodic refresh artifact "
                            "in generated traces.")
+    pgen.add_argument("--reuse-boost-prob", type=float, default=0.0,
+                      help="R258: prob of converting a STATE_NEW emission into "
+                           "a reuse, with rank sampled near-uniformly across "
+                           "the stack. Port of LANL altgan stack_reuse_boost_prob "
+                           "(their Baleen24 win at prob=0.60 min_rank=0 power=0.1).")
+    pgen.add_argument("--reuse-boost-min-rank", type=int, default=0,
+                      help="R258: minimum rank for reuse-boost sampling. "
+                           "0 (default) allows boosting from rank 0 (front of stack).")
+    pgen.add_argument("--reuse-boost-rank-power", type=float, default=1.0,
+                      help="R258: power-law weight for reuse-boost rank sampling. "
+                           "1.0 = uniform; <1.0 biases toward deep ranks "
+                           "(LANL's 0.1 = near-uniform with slight deep bias).")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1115,6 +1150,9 @@ def main():
             tail_reuse_rank_power=args.tail_reuse_rank_power,
             max_stack_depth=args.max_stack_depth,
             hot_pool_refresh_jitter=args.hot_pool_refresh_jitter,
+            reuse_boost_prob=args.reuse_boost_prob,
+            reuse_boost_min_rank=args.reuse_boost_min_rank,
+            reuse_boost_rank_power=args.reuse_boost_rank_power,
         )
 
 
