@@ -14934,3 +14934,63 @@ This is **the inverse of the alibaba R250-R252 cascade**, where every axis re-au
 ### Implication for R248 alibaba claim
 
 R248 multi-seed (0.0131) was confirmed stable under R250-R252 4-axis re-audit; this MSR result reinforces the methodological point that knob-cascade audits can find true locks (alibaba) or false locks (MSR R256.E). Seed-noise must be bounded by the apparent lift size before claiming. Effects ≤ 0.0030 (the 4-seed range on MSR) should always be multi-seed-verified before being treated as real.
+
+## R258 — reuse-boost feature added; doesn't transfer to LLNL's Baleen24 atlas
+
+### Implementation
+
+R258 added 3 flags to llgan/neural_atlas.py:
+- --reuse-boost-prob (default 0.0)
+- --reuse-boost-min-rank (default 0)
+- --reuse-boost-rank-power (default 1.0)
+
+When set, a fraction of STATE_NEW emissions are flipped to reuse, with the rank chosen by altgan's `_boosted_reuse_rank` math:
+`offset = floor(u^(1/p) * span); rank = min(lo + offset, stack_len - 1)`.
+
+**Bit-identical confirmed at default:** R245 lock with reuse-boost-prob=0 → 0.0438, exactly matching the prior R245 single-seed=42 result.
+
+### AD pass found two bugs
+
+AD pass on first commit (26820b1):
+- **P0 (math)**: my `u ** rank_power` was inverted from LANL's `u ** (1/rank_power)`. Fixed in d7841ba.
+- **P1 (semantics)**: my port routed 100% of boosted samples through `_boosted_reuse_rank`, bypassing the tail/adj/recent chain that LANL routes ~64% of boosted reuses through. Fixed in 6b1ec4d/d7984d0 by mirroring altgan's elif-fallback structure.
+
+### Result on LLNL's Baleen24 R245 atlas (single-seed=42, R245 lock)
+
+| prob | fix-1 (boost-first) | fix-2 (LANL-faithful) |
+|---|---|---|
+| 0.0 | 0.0438 | 0.0438 |
+| 0.20 | 0.0478 | 0.0516 |
+| 0.40 | 0.0693 | 0.0823 |
+| 0.60 (LANL setting) | 0.0989 | 0.1187 |
+| 0.80 | 0.1336 | 0.1504 |
+
+**Both versions regress monotonically.** Target was LANL's 0.0291 at prob=0.60 min_rank=0 power=0.1.
+
+### Diagnosis
+
+The reuse-boost lever is **atlas-specific**:
+- LANL's altgan trains a different style of atlas (`baleen24_phaseatlas_scout96x25k_h96_phase8_e500_seed23`). Their atlas's STATE_NEW emissions have headroom for boost-replacement.
+- LLNL's R245 atlas was trained with R237 recipe (phase=2, seed=137, cond_noise=0.05). Its reuses are already well-distributed via the R244-pattern cascade audit (hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2). Replacing 60% of NEWs with boosted reuses **disrupts** the post-hoc-knob lock rather than complementing it.
+- The fix-2 worse-than-fix-1 result is consistent: in fix-2, ~52% of boosted samples hit adj=0.55 (rank=0 emissions). LLNL's atlas already produces a tightly-tuned adj-dup share via its existing adj=0.55 lock; doubling it over-emphasizes rank=0 and hurts FIFO/SIEVE/CAR.
+
+### Closure
+
+**R258 closes-NEGATIVE on a drop-in port.** LLNL's Baleen24 claim stays at R245 0.0438. **LANL leads Baleen24 −33.7% (LANL 0.0291 vs LLNL 0.0438).** Path forward requires either:
+1. **Re-fit a Baleen24 atlas with reuse-boost-aware training** — if the atlas knows NEWs will be boost-converted, it will emit different NEWs. This is fit-time, not generate-time.
+2. **TraceBootstrap (LANL just added)** — different architectural lever entirely. LANL is winning CP, MSR, Baleen24, and tying Tencent via this. Need separate R259 to study.
+3. **Accept LANL leads Baleen24** and double down on alibaba defense.
+
+The reuse-boost flag remains in the codebase for future use; it is not load-bearing on Baleen24.
+
+### Updated race ledger (after LANL's TraceBootstrap push)
+
+| corpus | LLNL | LANL | leader | note |
+|---|---|---|---|---|
+| Tencent | 0.0305 | tie-break via TraceBootstrap | tied | LANL refined |
+| Alibaba | **0.0131** | 0.0143 | **LLNL +8.4%** | LLNL still leads |
+| CloudPhysics | 0.0338 | overtaken via TraceBootstrap | LANL | new threat |
+| Baleen24 | 0.0438 | 0.0291 | LANL −33.7% | R258 NEGATIVE |
+| MSR Exchange | 0.0253 | overtaken | LANL | new threat |
+
+LLNL alone-or-leading: 1 of 5 (alibaba). Race position has degraded substantially since the TraceBootstrap push.
