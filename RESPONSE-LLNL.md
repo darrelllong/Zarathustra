@@ -14230,3 +14230,72 @@ Mature pattern is now: after any architectural recipe change, run the full knob 
 
 - LANL: continued same micro-iteration.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 247 — CP knob re-audit at R240 atlas: closes-NEGATIVE; R224 lock survives R237 recipe
+
+**Date**: 2026-05-02 03:30-04:00 PDT.
+
+### Setup
+
+R244 alibaba and R245 Baleen24 both saw substantial lifts when knobs were re-audited at the new R237-recipe atlases. R247 applies the same audit logic to CP: re-sweep adj + tail-reuse on the R240 atlas (which has identical multi-seed mean to R224 = 0.0338, just with deterministic init).
+
+### R247.A CP adj sweep at hp=0.15 lock
+
+| adj | 8-pol HRC-MAE |
+|---|---|
+| 0.20 | 0.0516 |
+| 0.25 | 0.0450 |
+| 0.30 | 0.0376 |
+| **0.35 (R224 lock)** | **0.0337** |
+| 0.40 | 0.0339 |
+| 0.45 | 0.0372 |
+
+Inverted-U with peak at R224's adj=0.35. Adj axis **closes-NEGATIVE** at the R240 atlas.
+
+### R247.B CP tail-reuse-prob sweep at hp=0.15 + adj=0.35 lock
+
+| tp | 8-pol HRC-MAE |
+|---|---|
+| 0.00 | 0.0457 |
+| 0.05 | 0.0359 |
+| **0.10 (R224 lock)** | **0.0337** |
+| 0.15 | 0.0443 |
+| 0.20 | 0.0574 |
+
+Sharp inverted-U with peak at R224's tp=0.10. Tail-reuse axis **closes-NEGATIVE**.
+
+### Reading
+
+CP is the third corpus to undergo R244-pattern audit (alibaba and Baleen24 both saw lifts). For CP, **the R237 recipe transferred to the R224 basin without changing the knob optimum**. R226-R227 had already established that hp/tail-reuse/recent-pool target corpus-intrinsic properties for CP, and R247 confirms this still holds under the new atlas.
+
+Possible reasons CP doesn't show R244-pattern interaction:
+- CP's smaller fit data (4 files × 250k = 1M transitions vs alibaba's 11.85M and Baleen24's similar) means the cond_mlp has less room to learn fragile patterns that interact with knob choices.
+- CP's hidden=64 (vs alibaba/Baleen24's 96) similarly produces a less expressive cond_mlp.
+- CP's IRD shape (heavy deep-tail per R220) is unique enough that the post-hoc knobs are tuned to *fixed* corpus features, not interactive with the cond-MLP's representation choices.
+
+Whatever the cause, **CP claim stays at 0.0338** (R224 multi-seed). R240 provides a deterministic atlas matching R224 with 2× tighter seed-stability — a methodology improvement, no numerical lift.
+
+### Race position unchanged on CP
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| Alibaba (6-pol) | 0.0166 | ~0.014–0.016 | ~tied |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0438 | n/a | LLNL alone |
+
+### R244-pattern lift summary across corpora (post-session)
+
+| corpus | knob audit lift after R237 recipe | recipe shifts |
+|---|---|---|
+| Alibaba | **−18.6%** (R237 → R244 four rounds) | hp 0.45→0.35→0.45, adj 0.05→0 |
+| Baleen24 | **−42%** (R238 → R245 one round, dominant hp shift) | hp 0.05→0.35 |
+| CloudPhysics | **0% (closes-NEGATIVE)** | none |
+| Tencent | n/a (R237 recipe doesn't pair with phase=1+orig-bins; R241 closes-NEGATIVE) | n/a |
+
+The R244 pattern (interaction-driven knob shifts after a fit-recipe change) is corpus-conditional. **It pays off enormously for high-capacity atlas / high-data corpora (alibaba, Baleen24); zero for the lower-capacity CP**. Useful diagnostic going forward: if a corpus has hidden≥96 and >5M transitions in fit, expect 15-40% lift from full re-audit.
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration.
+- Sandia: gpt-oss on baase; first artifact pending.
