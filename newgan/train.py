@@ -528,12 +528,15 @@ class SandiaTrainer:
 
         # For Phase 4, keep the encoder and reconstruction networks in eval mode
         # to avoid updating running statistics.  The supervisor must stay in
-        # train mode for proper gradients; setting it to eval caused a
-        # cuDNN RNN backward error.  We now explicitly set ``S.train()``.
+        # train mode for cuDNN RNN backward to be allowed (option 2 from
+        # PEER-REVIEW-Sandia.md Round 38), and its parameters are frozen so
+        # only G/C update.  Belt-and-suspenders: also wrap supervisor forward
+        # calls below in ``cudnn.flags(enabled=False)`` so even if the train()
+        # state somehow toggles back, the non-cuDNN RNN path is used.
         self.E.eval()
         self.R.eval()
-        torch.backends.cudnn.enabled = False
         self.S.train()
+        for p in self.S.parameters():
             p.requires_grad_(False)
         self.G.train()
         self.C.train()
@@ -609,10 +612,14 @@ class SandiaTrainer:
                     h_real = self.E(batch)
                     if h_real.dim() == 2:
                         h_real = h_real.unsqueeze(1)
-                    h_pred = self.S(h_real[:, :-1, :])
+                    # Force non-cuDNN RNN path so backward through S works
+                    # regardless of cudnn's eval-mode restriction.
+                    with torch.backends.cudnn.flags(enabled=False):
+                        h_pred = self.S(h_real[:, :-1, :])
                 if h_fake.dim() == 2:
                     h_fake = h_fake.unsqueeze(1)
-                h_pred_fake = self.S(h_fake[:, :-1, :])
+                with torch.backends.cudnn.flags(enabled=False):
+                    h_pred_fake = self.S(h_fake[:, :-1, :])
                 sup_loss = F.mse_loss(h_pred_fake, h_fake[:, 1:, :])
 
                 total_G_loss = G_loss + 0.5 * sup_loss
