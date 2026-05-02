@@ -14775,3 +14775,89 @@ LANL's official panel posted per-policy HRC-MAE for their alibaba multi-seed; LL
 - If LANL's cooldown change closes their SIEVE gap, LLNL's −30% SIEVE margin shrinks; the aggregate race tightens to whatever LRU gap remains.
 
 This commit makes the LLNL−LANL alibaba comparison fully transparent at the per-policy level. AD-grade verifiable.
+
+## R256.E — MSR cascade re-audit at adj=0.40 lock; finds 4 marginal lifts
+
+Following the R250-R252 alibaba pattern: when one axis shifts (here adj 0.05 → 0.40), audit every other axis at the new lock. Goal: find whether the cascading-lock pattern lifts MSR further from R256.D 0.0253.
+
+### Five-axis sweep at hp=0.45 adj=0.40 (single-seed gs=42)
+
+**R256.E.A — tp axis** (lock candidate stays):
+
+| tp | mean HRC-MAE |
+|---|---|
+| 0.00 | 0.0670 |
+| 0.05 | 0.0481 |
+| **0.10** (lock) | **0.0265** |
+| 0.15 | 0.0360 |
+| 0.20 | (not run; 0.15 already past peak) |
+
+Sharp inverted-U; **tp=0.10 lock survives**.
+
+**R256.E.B — mf axis** (mf=1.0 marginal):
+
+| mf | mean HRC-MAE |
+|---|---|
+| 0.0 | 0.0265 |
+| 0.25 | 0.0265 |
+| 0.5 (lock) | 0.0265 |
+| 0.75 | 0.0264 |
+| **1.0** | **0.0248** |
+
+Knob non-binding 0.0–0.75 (tp=0.10 means tail-reuse rarely triggers); mf=1.0 gives a marginal 0.0017 drop. Effect size ≤ R256.D's seed range (0.0031), so could be noise. Pre-multi-seed.
+
+**R256.E.C — rp axis** (clear shift):
+
+| rp | mean HRC-MAE |
+|---|---|
+| 0.00 | 0.0361 |
+| 0.05 | 0.0288 |
+| **0.10** | **0.0242** |
+| 0.15 (lock) | 0.0265 |
+| 0.20 | 0.0315 |
+| 0.25 | 0.0404 |
+| 0.30 | 0.0475 |
+
+Clean inverted-U; **rp lock shifts 0.15 → 0.10** (−8.7%). Effect size 0.0023 is comparable to seed range; pre-multi-seed.
+
+**R256.E.D — win axis** (marginal lift):
+
+| win | mean HRC-MAE |
+|---|---|
+| 2 | 0.0282 |
+| 8 | 0.0273 |
+| 16 (lock) | 0.0265 |
+| **32** | **0.0260** |
+| 64 | 0.0260 |
+| 128 | 0.0285 |
+
+**win lock shifts 16 → 32** (−1.9%). Tiny — within seed-noise.
+
+**R256.E.E — hp re-sweep at adj=0.40** (cascade close):
+
+| hp | mean HRC-MAE |
+|---|---|
+| 0.30 | 0.0408 |
+| 0.40 | 0.0294 |
+| 0.45 (R256.D lock) | 0.0265 |
+| **0.50** | **0.0247** |
+| 0.55 | 0.0265 |
+| 0.65 | 0.0331 |
+
+**hp lock shifts 0.45 → 0.50** (−6.8%). Clean local minimum at 0.50, sharp drop. This is the cascade signal — confirms the alibaba R244 pattern (hp lock moves with adj lock).
+
+### R256.F multi-seed verify in flight
+
+Combined post-cascade lock: **hp=0.50 K=75 adj=0.40 tp=0.10 mf=1.0 rp=0.10 win=32**. Running seeds 42/43/44/45 on baase. If lifts are independent and additive, theoretical floor is around 0.0253 − Σ(individual lifts) ≈ 0.0202–0.0220. If they interact, could be much smaller — or could regress.
+
+R256.D 0.0253 is the conservative claim; R256.F result will replace it iff the multi-seed mean is materially below 0.0253 with comparable seed range.
+
+### Note on cascade pattern across corpora
+
+| corpus | cascade triggered by | knobs that shifted | net lift |
+|---|---|---|---|
+| Alibaba (R242-R252) | seed=137+cond_noise, then win 2→16 | hp 0.35→0.45; adj 0.05→0; win 2→16 | −35.8% R221→R248 |
+| Baleen24 (R245) | recipe transfer | hp, adj, mf | −42% one round |
+| **MSR (R256)** | first lock-finding | adj 0.05→0.40; hp 0.45→0.50; rp 0.15→0.10 (pending verify) | −71% R256-first → R256.D |
+
+The cascading-lock audit pattern is durable across corpora; magnitudes vary because corpora are at different distances from a generic alibaba lock.
