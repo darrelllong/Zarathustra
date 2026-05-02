@@ -78,6 +78,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-min-frac", type=float, default=0.5,
                    help="Minimum stack fraction for --stack-tail-reuse-prob redirects.")
+    p.add_argument("--stack-tail-reuse-rank-power", type=float, default=1.0,
+                   help="Power shaping for tail-reuse rank redirects; values <1 favor deeper tail ranks.")
     p.add_argument("--stack-recent-pool-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a recent emitted object.")
     p.add_argument("--stack-recent-pool-window", type=int, default=200,
@@ -177,6 +179,7 @@ def main() -> int:
         stack_hot_pool_min_age=args.stack_hot_pool_min_age,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
+        stack_tail_reuse_rank_power=args.stack_tail_reuse_rank_power,
         stack_recent_pool_prob=args.stack_recent_pool_prob,
         stack_recent_pool_window=args.stack_recent_pool_window,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
@@ -247,6 +250,7 @@ def main() -> int:
         "stack_hot_pool_min_age": args.stack_hot_pool_min_age,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
+        "stack_tail_reuse_rank_power": args.stack_tail_reuse_rank_power,
         "stack_recent_pool_prob": args.stack_recent_pool_prob,
         "stack_recent_pool_window": args.stack_recent_pool_window,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),

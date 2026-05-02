@@ -36,6 +36,7 @@ class Spec:
     recent_pool_window: int = 16
     tail_reuse_prob: float = 0.10
     tail_reuse_min_frac: float = 0.5
+    tail_reuse_rank_power: float = 1.0
     reuse_boost_prob: float = 0.0
     reuse_boost_min_rank: int = 32768
     reuse_boost_rank_power: float = 2.0
@@ -76,6 +77,8 @@ def _parse_spec(text: str) -> Spec:
         "win": "recent_pool_window",
         "tail": "tail_reuse_prob",
         "mf": "tail_reuse_min_frac",
+        "tail_power": "tail_reuse_rank_power",
+        "tpow": "tail_reuse_rank_power",
         "reuse": "reuse_boost_prob",
         "reuse_min": "reuse_boost_min_rank",
         "reuse_power": "reuse_boost_rank_power",
@@ -109,7 +112,8 @@ def _auto_name(spec: Spec) -> str:
         f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
         f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
-        f"mf{_tag(spec.tail_reuse_min_frac)}_drop{_tag(spec.reuse_drop_prob)}"
+        f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
+        f"_drop{_tag(spec.reuse_drop_prob)}"
     )
 
 
@@ -209,6 +213,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.tail_reuse_prob),
         "--stack-tail-reuse-min-frac",
         str(spec.tail_reuse_min_frac),
+        "--stack-tail-reuse-rank-power",
+        str(spec.tail_reuse_rank_power),
         "--n-records",
         str(args.n_records),
         "--n-streams",

@@ -95,6 +95,7 @@ class NeuralAtlasModel:
         stack_hot_pool_min_age: int = 0,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_min_frac: float = 0.5,
+        stack_tail_reuse_rank_power: float = 1.0,
         stack_recent_pool_prob: float = 0.0,
         stack_recent_pool_window: int = 200,
         stack_rank_phase_scales: Sequence[float] | None = None,
@@ -141,6 +142,7 @@ class NeuralAtlasModel:
         stack_hot_pool_min_age = max(int(stack_hot_pool_min_age), 0)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
         stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
+        stack_tail_reuse_rank_power = max(float(stack_tail_reuse_rank_power), 1e-6)
         stack_recent_pool_prob = float(np.clip(stack_recent_pool_prob, 0.0, 1.0))
         stack_recent_pool_window = max(int(stack_recent_pool_window), 1)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
@@ -236,7 +238,13 @@ class NeuralAtlasModel:
                     if stack_tail_reuse_prob > 0.0 and rng.random() < stack_tail_reuse_prob:
                         lo = max(int(len(stack) * stack_tail_reuse_min_frac), len(stack) // 2)
                         lo = min(max(lo, 0), len(stack) - 1)
-                        rank = int(rng.integers(lo, len(stack)))
+                        if stack_tail_reuse_rank_power == 1.0:
+                            rank = int(rng.integers(lo, len(stack)))
+                        else:
+                            u = float(rng.random())
+                            biased = u ** stack_tail_reuse_rank_power
+                            rank = int(lo + (len(stack) - 1 - lo) * biased)
+                            rank = max(lo, min(rank, len(stack) - 1))
                     elif stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
                         rank = 0
                     elif (
