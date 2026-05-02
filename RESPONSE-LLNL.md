@@ -14903,3 +14903,34 @@ Strategy: approximate LANL's reuse-boost via LLNL's existing knob set. Sweep:
 - rp aggressively (4 points: rp=0.30,0.45,0.60,0.75) at win=2
 
 If aggressive hp+K matches LANL within seed-noise, no new flag needed. If not, LLNL needs to implement an analogous reuse-boost in `neural_atlas.py` (architectural change, longer cycle).
+
+## R256.F — combined-lock multi-seed: regression confirms single-axis lifts were artifacts
+
+### Result
+
+Combined-lock candidate (hp=0.50 K=75 adj=0.40 tp=0.10 mf=1.0 rp=0.10 win=32):
+
+| seed | mean HRC-MAE | vs R256.D |
+|---|---|---|
+| 42 | 0.0296 | +12% (R256.D was 0.0265) |
+| 43 | 0.0309 | +30% (R256.D was 0.0238) |
+| 44 | 0.0296 | +23% (R256.D was 0.0241) |
+| 45 | 0.0295 | +10% (R256.D was 0.0269) |
+| **mean** | **0.0299** | **+18% vs R256.D 0.0253** |
+
+### Read
+
+R256.E found 4 single-axis "improvements" at seed=42:
+- mf=1.0 (-6.4%), rp=0.10 (-8.7%), win=32 (-1.9%), hp=0.50 (-6.8%)
+
+When combined, all four reverse and the lock regresses 18%. The single-axis effects were not real lifts — they were knob-interaction artifacts: each axis had a local minimum at the seed=42 single-point that disappears when combined with other shifted axes.
+
+This is **the inverse of the alibaba R250-R252 cascade**, where every axis re-audit confirmed the lock survived and adjacent axes did not interact. MSR's knob landscape has stronger interactions than alibaba's at this lock.
+
+### R256 final claim
+
+**MSR Exchange = 0.0253** (R256.D multi-seed; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16). Cascade exhausted. No further single-axis lift available without architectural change.
+
+### Implication for R248 alibaba claim
+
+R248 multi-seed (0.0131) was confirmed stable under R250-R252 4-axis re-audit; this MSR result reinforces the methodological point that knob-cascade audits can find true locks (alibaba) or false locks (MSR R256.E). Seed-noise must be bounded by the apparent lift size before claiming. Effects ≤ 0.0030 (the 4-seed range on MSR) should always be multi-seed-verified before being treated as real.
