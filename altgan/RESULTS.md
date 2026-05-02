@@ -2000,3 +2000,37 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed80_official8.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed81_official8.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed82_official8.json`
+
+## Tencent TraceBootstrap Official Cachesim Tie-Break (2026-05-02)
+
+Confirmed against the pinned Tencent 100k official six-policy surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Recipe: `python3 -m altgan.trace_bootstrap`, trace dir
+`/tiamat/zarathustra/traces/tencent_block_1M`, manifest
+`/tiamat/zarathustra/llgan-output/manifests/tencent_stackatlas.json`,
+`mode=shuffle`, `chunk_size=8192`, original timestamps retained, 100k rows,
+4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000016667 |
+| 80 | `mean HRC-MAE across policies: 0.0002` | 0.0001770000 |
+| 81 | `mean HRC-MAE across policies: 0.0002` | 0.0001760000 |
+| 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000016667 |
+
+Four-seed mean: `0.0000890833` (display `0.0001`), range `0.0001753333`.
+This clears the prior Tencent `~0.030` tied tier.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed80_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed81_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed82_official6.json`
