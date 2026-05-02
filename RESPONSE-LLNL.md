@@ -13654,3 +13654,116 @@ The R225-R234 saddle wasn't fixable from inside the basin (perturbations all jol
 
 - LANL: continued same iteration.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 238 — Baleen24 added to the race; first claim 0.0772 (6-pol multi-seed)
+
+**Date**: 2026-05-01 23:20 - 2026-05-02 00:30 PDT.
+
+### Setup
+
+R analysis flagged Baleen24 (Microsoft storage traces, ASPLOS '24) as the most race-friendly corpus outside the existing 3: Hurst 0.96 (very long-range structure), reuse_ratio 0.31 (vs alibaba's 0.0002, tencent's 0.004 — order-of-magnitude richer), heterogeneity 0.42, k=2, modes=8. User said "we have excess GPU" → add it to the race.
+
+### Bootstrap (one-time work)
+
+1. **Convert .trace → oracle_general .zst.** Baleen24 ships as space-separated text (`block_id io_offset io_size op_time op_name pipeline ...`). Wrote a converter on baase using `llgan/dataset.py:_read_baleen24` to read, then pack into 24-byte oracle_general records and zstd-compress. Two converter bugs fixed mid-bootstrap (int16 overflow on tenant field; basename collisions across region subdirs — fixed via path-mangled output names). Final: **374/374 .trace files converted, 0 failures**, ~300k records each into `/tiamat/zarathustra/traces/baleen24/*.oracleGeneral.zst`.
+2. **Manifest + real-trace ref CSV.** Picked 4 largest converted files (300k records each) → `/tiamat/zarathustra/llgan-output/manifests/baleen24_stackatlas.json` and 1M-row `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`. Same shape as alibaba/tencent/CP refs.
+
+### Fit (R238 first probe)
+
+Applied R237 lessons directly: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 + h=96 ep=600 + 50k records-per-file × 237 files. Fit on baase via /tiamat NFS. Final trans_loss=~1.1 (similar to alibaba R237).
+
+### Knob audit (R238.B / R238.C / R238.D / R238.E)
+
+R226-R227 found knobs are corpus-conditional. Started from R221 alibaba lock and swept:
+
+**R238.B hp sweep (R221 default knobs everywhere else)**:
+| hp | 6-pol |
+|---|---|
+| 0.00 | 0.1238 |
+| **0.05** | **0.1232** |
+| 0.15 | 0.1336 |
+| 0.25 | 0.1398 |
+| 0.35 | 0.1449 |
+| 0.45 (R221 alibaba lock) | 0.1488 |
+
+Peak at hp=0.05 (vs alibaba's 0.45, **9× lower**). Baleen24's 31% real reuse means injecting hot-pool top-K at 0.45 is over-correcting. Fits the R227 reading: hp targets corpus-intrinsic top-K access concentration; high-reuse corpora need less of it.
+
+**R238.C/D adj-dup sweep at hp=0.05 lock**:
+| adj | 6-pol |
+|---|---|
+| 0.00 | 0.1417 |
+| 0.05 | 0.1232 |
+| 0.10 | 0.1138 |
+| 0.15 | 0.1069 |
+| 0.25 | 0.0963 |
+| 0.35 | 0.0875 |
+| 0.45 | 0.0811 |
+| **0.55** | **0.0779** (peak) |
+| 0.65 | 0.0788 |
+| 0.75 | 0.0909 |
+| 0.85 | 0.1095 |
+
+Inverted-U with peak at adj=0.55 — **far higher than alibaba's 0.05 lock or CP's 0.35 lock**. Baleen24 needs aggressive adj-dup to match its high consecutive-reuse pattern.
+
+**Best single-seed=42 result: 0.0779** (hp=0.05 adj=0.55).
+
+### Multi-seed verify (R238.E)
+
+| gen-seed | 6-pol HRC-MAE | 8-pol HRC-MAE |
+|---|---|---|
+| 42 | 0.0779 | (not run) |
+| 43 | 0.0772 | 0.1461 |
+| 44 | 0.0773 | 0.1462 |
+| 45 | 0.0764 | 0.1455 |
+| **mean** | **0.0772** (range 0.0015) | **0.1459** (range 0.0007, 3-seed) |
+
+**Baleen24 multi-seed claim: 6-pol 0.0772, 8-pol 0.1459.** Tight seed range (0.5-2% relative) — same R237-tier seed-stability we got from cond_noise.
+
+### Cross-corpus knob landscape (now with Baleen24)
+
+| knob | Tencent (R206) | Alibaba (R237) | CloudPhysics (R224) | **Baleen24 (R238)** |
+|---|---|---|---|---|
+| n_phase_bins | 1 | 2 | 1 | 2 |
+| atlas bins | original | extended | extended | extended |
+| hp | 0.55 | 0.45 | 0.15 | **0.05** |
+| K | 50 | 75 | 50 | 75 |
+| adj | 0.075 | 0.05 | 0.35 | **0.55** |
+| tail-reuse | 0.10 | 0.10 | 0.10 | 0.10 |
+| recent-pool | 0 | 0.15 | 0.10 | 0.15 |
+| seed init | unseeded | 137 | unseeded | **137** |
+| cond_noise_std | 0 | 0.05 | 0 | **0.05** |
+
+Baleen24's profile (extreme-reuse) sits near CP's tail (15% deep-IRD) but pushes adj-dup even higher. The corpus-conditional architecture/knob principle from R220-R231 holds.
+
+### Race position update
+
+| corpus | LLNL | LANL | Sandia | leader |
+|---|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | n/a | tied |
+| Alibaba (6-pol) | 0.0201 (R237) | ~0.014–0.016 | n/a | LANL +24% |
+| CloudPhysics (8-pol) | 0.0338 | n/a | n/a | LLNL alone |
+| **Baleen24 (6-pol)** | **0.0772 (R238)** | n/a | n/a | **LLNL alone, first claim** |
+
+LLNL race-claims now span four corpora across very different IRD/reuse profiles, all using the same neural-atlas pipeline with corpus-conditional knob choices. Baleen24's 0.0772 is comfortably below 0.10 — the cachesim landscape is rich (31% real reuse means policies differentiate well) so this number is meaningful.
+
+### Lesson
+
+Baleen24 ran cleanly on the existing pipeline with zero code changes (just file format conversion). The R237 fit recipe (seed=137 + cond_noise=0.05) transferred directly — both interventions were corpus-agnostic in the right direction. The post-hoc knobs needed corpus-specific tuning (hp 9× lower, adj 11× higher than alibaba), which the existing knob-audit pattern handled in ~30 minutes of generate-only sweeps.
+
+### Authoritative artifacts
+
+- Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_baleen24_237f_inline_50k_phase2_ep600_extbins_seed137_noise0p05.pkl.gz`
+- Manifest: `/tiamat/zarathustra/llgan-output/manifests/baleen24_stackatlas.json`
+- Real-ref: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`
+- Generate command: `python3 -m llgan.neural_atlas generate --model <atlas> --manifest <manifest> --output <out> --n 1000000 --seed <gs> --hot-pool-prob 0.05 --hot-pool-k 75 --adj-dup-prob 0.55 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 2 --max-stack-depth 524288`
+
+### Sandia + LANL pass
+
+- LANL: continued same iteration; no Baleen24 attempt observed.
+- Sandia: gpt-oss on baase; first artifact pending.
+
+### Open work
+
+- R239 in flight on vinge: tencent seed sweep with cond_noise=0.05 (seed=137 and seed=1 both catastrophic so far; 5 more seeds queued).
+- Baleen24 has remaining knob axes untested: tail-reuse-prob, recent-pool-prob, recent-pool-window. Cheap to sweep if needed.
+- LANL may attempt Baleen24 once they see this commit; gives them a benchmark to compete against.
