@@ -799,33 +799,64 @@ def generate(
                 if dist_state == STATE_NEW:
                     if (reuse_boost_prob > 0.0 and len(stack) > 0
                             and rng.random() < reuse_boost_prob):
-                        # R258: LANL-style reuse-boost — flip a NEW into a reuse
-                        # by sampling a rank across the stack.
-                        # Port of altgan's _boosted_reuse_rank (Baleen24 win at
-                        # prob=0.60 min_rank=0 rank_power=0.1). Math matches
-                        # altgan/neural_atlas.py exactly:
-                        #   span   = stack_len - lo
-                        #   offset = floor(u^(1/p) * span)
-                        #   rank   = min(lo + offset, stack_len - 1)
-                        # rank_power < 1 → exponent 1/p > 1 → u^(1/p) biased toward 0
-                        # → rank biased toward lo (shallow). LANL's 0.1 = shallow-bias.
+                        # R258: LANL-style reuse-boost — flip a NEW into a reuse.
+                        # Port of altgan's boosted_reuse semantics: when boost fires,
+                        # route through the existing reuse-handling chain
+                        # (tail-reuse → adj-dup → recent-pool) with reuse-boost-rank
+                        # as the FALLBACK. Hot-pool is SKIPPED on boosted reuses
+                        # (matches altgan/neural_atlas.py:271 `not boosted_reuse` gate).
                         # Default off (prob=0.0) → bit-identical to pre-R258.
                         stack_sz = len(stack)
-                        if stack_sz <= 1:
-                            rank = 0
-                        else:
-                            lo = min(max(int(reuse_boost_min_rank), 0), stack_sz - 1)
-                            span = stack_sz - lo
-                            if span <= 1:
-                                rank = lo
+                        if (tail_reuse_prob > 0.0
+                                and rng.random() < tail_reuse_prob):
+                            lo = max(int(stack_sz * tail_reuse_min_frac), stack_sz // 2)
+                            lo = min(lo, stack_sz - 1)
+                            if tail_reuse_rank_power == 1.0:
+                                rank = int(rng.integers(lo, stack_sz))
                             else:
                                 u = float(rng.random())
-                                inv_p = 1.0 / max(float(reuse_boost_rank_power), 1e-6)
-                                offset = int(np.floor((u ** inv_p) * span))
-                                rank = min(lo + offset, stack_sz - 1)
-                        obj_id = stack[rank]
-                        del stack[rank]
-                        stack.insert(0, obj_id)
+                                biased = u ** tail_reuse_rank_power
+                                rank = int(lo + (stack_sz - 1 - lo) * biased)
+                                rank = max(lo, min(rank, stack_sz - 1))
+                            obj_id = stack[rank]
+                            del stack[rank]
+                            stack.insert(0, obj_id)
+                        elif (adj_dup_prob > 0.0
+                              and rng.random() < adj_dup_prob):
+                            obj_id = stack[0]
+                            # already at rank 0; do not re-insert
+                        elif (recent_pool_prob > 0.0
+                              and len(recent_window) > 0
+                              and rng.random() < recent_pool_prob):
+                            rec_idx = int(rng.integers(0, len(recent_window)))
+                            obj_id = recent_window[rec_idx]
+                            if obj_id in stack:
+                                rank = stack.index(obj_id)
+                                del stack[rank]
+                            stack.insert(0, obj_id)
+                        else:
+                            # Reuse-boost-rank fallback: sample a rank near-uniformly
+                            # across the stack. Math mirrors altgan _boosted_reuse_rank:
+                            #   span   = stack_len - lo
+                            #   offset = floor(u^(1/p) * span)
+                            #   rank   = min(lo + offset, stack_len - 1)
+                            if stack_sz <= 1:
+                                rank = 0
+                            else:
+                                lo = min(max(int(reuse_boost_min_rank), 0),
+                                         stack_sz - 1)
+                                span = stack_sz - lo
+                                if span <= 1:
+                                    rank = lo
+                                else:
+                                    u = float(rng.random())
+                                    inv_p = 1.0 / max(
+                                        float(reuse_boost_rank_power), 1e-6)
+                                    offset = int(np.floor((u ** inv_p) * span))
+                                    rank = min(lo + offset, stack_sz - 1)
+                            obj_id = stack[rank]
+                            del stack[rank]
+                            stack.insert(0, obj_id)
                         prev_rank_bin = N_RANK_BINS  # sentinel: not from PMF
                     else:
                         obj_id = next_new_id
