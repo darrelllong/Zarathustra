@@ -25,6 +25,8 @@ class Spec:
     adj_dup_prob: float = 0.40
     hot_pool_prob: float = 0.45
     hot_pool_k: int = 75
+    hot_pool_window: int = 10000
+    hot_pool_weight_power: float = 1.0
     hot_pool_min_age: int = 0
     recent_pool_prob: float = 0.15
     recent_pool_window: int = 16
@@ -58,6 +60,8 @@ def _parse_spec(text: str) -> Spec:
         "adj": "adj_dup_prob",
         "hp": "hot_pool_prob",
         "k": "hot_pool_k",
+        "hpwin": "hot_pool_window",
+        "hpwp": "hot_pool_weight_power",
         "minage": "hot_pool_min_age",
         "rp": "recent_pool_prob",
         "win": "recent_pool_window",
@@ -89,6 +93,7 @@ def _auto_name(spec: Spec) -> str:
         f"seed{spec.seed}_tb{_tag(spec.transition_blend)}"
         f"_lp{_tag(spec.local_prob_power)}_adj{_tag(spec.adj_dup_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
+        f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
         f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}"
@@ -172,7 +177,9 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         "--stack-hot-pool-k",
         str(spec.hot_pool_k),
         "--stack-hot-pool-window",
-        "10000",
+        str(spec.hot_pool_window),
+        "--stack-hot-pool-weight-power",
+        str(spec.hot_pool_weight_power),
         "--stack-hot-pool-min-age",
         str(spec.hot_pool_min_age),
         "--stack-recent-pool-prob",
