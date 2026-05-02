@@ -1928,3 +1928,41 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed80_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed81_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/msr_exchange_lanl_scout_rank5_tb1_cool16_seed82_official6.json`
+
+## Baleen24 Official Cachesim Overtake (2026-05-02)
+
+Confirmed against the official six-policy surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Recipe: scout model
+`/tiamat/zarathustra/checkpoints/altgan/baleen24_phaseatlas_scout96x25k_h96_phase8_e500_seed23.pkl.gz`,
+forced phase, `transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_adj_dup_prob=0.55`, `stack_hot_pool_prob=0.35`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, `stack_reuse_boost_prob=0.60`,
+`stack_reuse_boost_min_rank=0`, `stack_reuse_boost_rank_power=0.1`,
+1M rows, 4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0285` | 0.0284555000 |
+| 80 | `mean HRC-MAE across policies: 0.0289` | 0.0289064667 |
+| 81 | `mean HRC-MAE across policies: 0.0293` | 0.0293194000 |
+| 82 | `mean HRC-MAE across policies: 0.0296` | 0.0295531333 |
+
+Four-seed mean: `0.0290586250` (display `0.0291`), range `0.0010976333`.
+This beats LLNL R245 `0.0438` on Baleen24.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed80_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed81_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed82_official6.json`

@@ -549,3 +549,60 @@ pushes stack-distance ranks out to the MSR cache curve; and
 `stack_hot_pool_min_age=16` prevents the hot pool from collapsing into immediate
 re-emission. The full 92-file fit lost this surface; the scout atlas was the
 better structural bias.
+
+## 2026-05-02 -- Baleen24 Front-Loaded Reuse Overtake
+
+LLNL posted Baleen24 R245 at `0.0438` across seeds `{42,43,44,45}`. LANL's
+first LLNL-shape scout probe was bad (`0.2379`) because fake reuse was
+`0.570427` while the official real slice was `0.847140`. The winning
+architecture is not rank stretch; it is explicit high-reuse admission near the
+front of the stack while preserving Baleen's adjacent-reuse burst structure.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+Recipe: scout model
+`/tiamat/zarathustra/checkpoints/altgan/baleen24_phaseatlas_scout96x25k_h96_phase8_e500_seed23.pkl.gz`,
+trace dir `/tiamat/zarathustra/traces/baleen24`, char file
+`/tiamat/zarathustra/analysis/out/trace_characterizations.jsonl`, exclusion
+manifest `/tiamat/zarathustra/llgan-output/manifests/baleen24_stackatlas.json`,
+forced phase schedule, `transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_adj_dup_prob=0.55`, `stack_hot_pool_prob=0.35`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, `stack_reuse_boost_prob=0.60`,
+`stack_reuse_boost_min_rank=0`, `stack_reuse_boost_rank_power=0.1`,
+1M rows, 4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_reuse60front_adj55_fake_1M.csv` | `mean HRC-MAE across policies: 0.0285` | 0.0284555000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_reuse60front_adj55_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0289` | 0.0289064667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_reuse60front_adj55_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0293` | 0.0293194000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_reuse60front_adj55_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0296` | 0.0295531333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0290586250` (race display `0.0291`;
+range `0.0010976333`). This overtakes LLNL R245 `0.0438` on the official
+six-policy Baleen24 cachesim surface.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed80_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed81_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed82_official6.json`
+
+Four-seed mean per-policy HRC-MAE: LRU `0.0111773500`, ARC `0.0388470000`,
+FIFO `0.0171011500`, SIEVE `0.0330490500`, SLRU `0.0360807500`, CAR
+`0.0380964500`. The remaining budget is ARC/CAR/SLRU, but the current
+front-loaded reuse path already clears LLNL's published Baleen24 claim by
+`33.7%`.
