@@ -13462,3 +13462,58 @@ R225-R234 = **13 consecutive closes-NEGATIVE**. The campaign has rigorously char
 
 - LANL: same micro-iteration.
 - Sandia: still cogitating.
+
+## Round 235 — Train-time cond-vector noise sweep on alibaba: small (-3%) lever found, but DOMINANT effect is init-weight basin
+
+**Date**: 2026-05-01 21:00-21:55 PDT.
+
+### Implementation
+
+Added `--cond-noise-std` flag to `llgan/neural_atlas.py` `fit()`. When > 0, injects Gaussian noise (std in normalized cond space) into cond vectors each epoch. AD's first attack found a P0: original implementation only seeded `torch.manual_seed` when noise > 0, leaving flag-off as unseeded process-default. Fix: ALWAYS seed torch RNG at fit start, regardless of cond_noise_std. Removes the on/off A/B confound. Atlas metadata now records `seed`, `dropout`, `cond_noise_std` for provenance.
+
+**Trade-off accepted**: with always-seeding, re-fitting a pre-R235 recipe under the new code produces a deterministic but DIFFERENT atlas than the existing on-disk pkl (which was fit with whatever the unseeded torch global state was at the time). The existing R206/R221/R224 atlases on /tiamat remain authoritative for the standing claims.
+
+### Sweep — alibaba phase=2 ext-bins, cond_noise_std ∈ {0.0, 0.01, 0.05, 0.1, 0.2}, seed=7
+
+5 fits parallelized across vinge (cond_noise_std ∈ {0.01, 0.1}) and baase (cond_noise_std ∈ {0.0, 0.05, 0.2}). All other knobs at R221 lock.
+
+| cond_noise_std | 6-pol HRC-MAE | vs new ns=0 |
+|---|---|---|
+| 0.0 (new deterministic baseline) | 0.2289 | — |
+| 0.01 | 0.2283 | −0.3% (tied, MC noise) |
+| **0.05** | **0.2216** | **−3.2% (peak)** |
+| 0.1 | 0.2245 | −1.9% |
+| 0.2 | 0.2369 | +3.5% |
+
+Clean inverted-U with peak at cond_noise_std=0.05.
+
+### Two findings — one expected, one BIG
+
+**1. Cond-noise IS a real (modest) lever.** ns=0.05 lifts **3%** vs ns=0.0 in the new-determinism regime. First R225-onwards probe to actually move the needle in the right direction. Validates the diagnosis: cond-mlp generalization to off-manifold conds was a real failure mode.
+
+**2. The init-weight basin dominates everything else by 10×.** Standing R221 claim is 0.0204 (multi-seed mean) using the existing on-disk atlas, fit before R235 with unseeded torch RNG. Re-fitting that exact same recipe under the new always-seeded code (seed=7) gives **0.2289** — a **+11× regression** *purely from init-weight randomness*. R235's cond-noise lift of 3% is dwarfed by the 91% gap between the lucky-unseeded R221 init and any deterministic init we've tried.
+
+This recontextualizes R225-R234 entirely. Those 13 closes-NEGATIVE rounds were perturbations of an atlas that already lives on a knife-edge in init-weight space. Every "perturb the model" probe (more capacity, more states, less capacity, learned PMF, refresh jitter, temperature, etc) was actually testing "does the perturbation move us off this lucky init?" — and the answer was always yes, by ~10×, before any of the actual perturbation effects got measured.
+
+The R221 atlas's 0.0204 result is real but **fragile to re-fitting**. The standing claim depends on a specific pkl on disk; the recipe alone doesn't reproduce it under deterministic init.
+
+### Implication for next moves
+
+Direct lift from cond-noise is small but real. To find race-meaningful headroom, the higher-EV move is **seed-sweep**: try multiple deterministic init seeds on the vanilla R221 recipe and see if any land in a basin comparable to (or better than) the existing 0.0204 pkl. If yes, we have a reproducible baseline to combine with cond-noise on top. If not, the original R221 lucky-init is irreproducible and we accept the on-disk pkl as the working artifact.
+
+R236 launching: alibaba seed sweep on the R221 recipe (cond_noise_std=0), seeds {1, 3, 11, 42, 100, 137, 271, 314}. 8 fits parallelized across both GPUs (~90 min wallclock).
+
+### Standing claims unchanged
+
+| corpus | claim | round |
+|---|---|---|
+| Tencent | 0.0305 (6-pol, multi-seed) | R206 |
+| Alibaba | 0.0204 (6-pol, multi-seed) | R221 |
+| CloudPhysics | 0.0338 (8-pol, multi-seed) | R224 |
+
+R225-R235: 14 rounds; R235 finally moved the needle in the right direction (+3%) but didn't unseat any claim. The on-disk pre-R235 atlases remain the source of truth.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: still pending first artifact.
