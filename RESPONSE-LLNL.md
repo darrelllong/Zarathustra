@@ -13396,3 +13396,69 @@ R225-R233 = 11 consecutive closes-NEGATIVE.
 
 - LANL: same micro-iteration.
 - Sandia: still pending first artifact (gpt-oss "cogitating" per user).
+
+## Round 234 — Less-capacity probes (alibaba phase=1, h=64 ep=300): both close-NEGATIVE; R221 is a knife-edge optimum
+
+**Date**: 2026-05-01 20:30-20:55 PDT.
+
+### Setup
+
+R233 ruled out *more* capacity. R234 tests *less* capacity, in two parallel jobs:
+- **R234.A baase**: alibaba phase=**1** (6 states, more per-state density vs R221's phase=2 / 12 states), all other knobs at R221 lock.
+- **R234.B vinge**: alibaba phase=2 unchanged, but **hidden=64 ep=300** (R225b's tune-down applied at R221's data scale).
+
+### Results (single-seed=42)
+
+| atlas | 6-pol | 8-pol | vs R221 |
+|---|---|---|---|
+| R221 baseline (h=96 ep=600 phase=2) | 0.0211 | 0.0209 | — |
+| **R234.A** (h=96 ep=600 **phase=1**) | **0.2470** | **0.2604** | **+12× / +12×** |
+| **R234.B** (**h=64 ep=300** phase=2) | **0.2556** | **0.2647** | **+12× / +12×** |
+
+### The picture across 7 alibaba atlas perturbations
+
+| round | direction | 6-pol vs R221 |
+|---|---|---|
+| R225 | + more data (h=96 ep=600 100k) | +12× |
+| R225b | + data − capacity (h=64 ep=300 100k) | +8× |
+| R230 | + rank-AR head (h=96 ep=600 50k + AR) | +9× |
+| R230b | + rank-AR small (50k + AR small) | +7× |
+| R233.A | + more states (phase=4 24-state) | +12× |
+| **R234.A** | **− fewer states (phase=1 6-state)** | **+12×** |
+| **R234.B** | **− less capacity (h=64 ep=300 50k)** | **+12×** |
+
+**R221 is a knife-edge.** Every perturbation in every direction tested lands at +7-12× regression. There is no shallow basin — the configuration that works for alibaba is sharply isolated from its neighbors.
+
+### Mechanism (refined)
+
+The cond_mlp learns a mapping from `cond_vec ∈ R^13` to a per-state-rank distribution. R225-R234 all perturb the model in ways that change the implicit smoothness of this mapping:
+- More capacity / more states → tighter fit to training conds, sharper at OOD generation conds.
+- Less capacity → underfit; cond signal is collapsed across distinct generation-time conds.
+- Learned PMF replacement → smooth where empirical was sparse; smooth in the wrong direction.
+
+R221's specific (h=96, ep=600, phase=2, 50k) hits a Goldilocks point where the capacity is **exactly** sufficient to memorize training conds without enough leftover to extrapolate badly at generation, while the empirical PMF lookup provides the regularization that the cond_mlp doesn't.
+
+This isn't a basin we can extend by tuning. The lift has to come from changing what the cond_mlp is asked to do, not from changing how much it can do.
+
+### Real next move: train-time cond-vector augmentation
+
+Hypothesis: if we add Gaussian noise to cond vectors during fit, the cond_mlp learns a *smooth* conditional distribution that handles the off-manifold generation-time conds gracefully. Same model size, same state space — just a different training objective that targets the actual diagnosed failure mode.
+
+Implementation: one CLI flag `--cond-noise-std`, inject noise after cond normalization in the training loop. ~30 min code + fit on baase. Default 0.0 → bit-identical to current code.
+
+This is the first R225-onwards probe that targets the **diagnosed root cause** rather than poking the model in random directions. EV is meaningfully higher than the previous 13 probes.
+
+### Standing claims unchanged
+
+| corpus | claim | round |
+|---|---|---|
+| Tencent | 0.0305 (6-pol, multi-seed) | R206 |
+| Alibaba | 0.0204 (6-pol, multi-seed) | R221 |
+| CloudPhysics | 0.0338 (8-pol, multi-seed) | R224 |
+
+R225-R234 = **13 consecutive closes-NEGATIVE**. The campaign has rigorously characterized the basin around R221. Now to escape it with a targeted intervention.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: still cogitating.
