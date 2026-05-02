@@ -549,13 +549,21 @@ def fit(
     print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr}, "
           f"dropout={dropout}, cond_noise_std={cond_noise_std})")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # R235: seed torch RNGs so cond-noise injection is reproducible.
-    # Default cond_noise_std=0.0 produces no extra randn draws -> backward
-    # compatible (no torch RNG consumption); only seeded when noise > 0.
-    if cond_noise_std > 0.0:
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
+    # R235: ALWAYS seed torch RNGs (regardless of cond_noise_std), so
+    # (a) model init weights, (b) dropout patterns, and (c) cond-noise
+    # injection are all jointly reproducible from `seed`. This removes
+    # the on/off A/B confound AD flagged: when only flag-on seeded torch,
+    # a cond_noise > 0 vs cond_noise = 0 comparison conflated init-weight
+    # change with the noise objective. Now the only difference between
+    # the two paths is the noise term itself.
+    # Caveat: pre-R235 atlas pkls (R206, R221, R224) were fit with torch
+    # RNG in the unseeded process-default state, so re-fitting their
+    # exact recipes with this code will produce a DIFFERENT (but
+    # deterministic) atlas. The existing pkl files on /tiamat remain
+    # the source of truth for those standing claims.
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     net = make_net(COND_DIM, hidden, n_states, dropout=dropout).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
@@ -637,6 +645,9 @@ def fit(
             "records_per_file": records_per_file,
             "epochs": epochs,
             "lr": lr,
+            "seed": seed,
+            "dropout": dropout,
+            "cond_noise_std": cond_noise_std,
             "n_transitions": len(transitions),
             "inline_cond": inline_cond,
             "n_phase_bins": n_phase_bins,
@@ -1009,7 +1020,11 @@ def main():
                            "cond space) added to cond vectors each epoch. "
                            "Targets cond-mlp generalization failure to off-"
                            "manifold generation-time conds. 0.0 = no noise "
-                           "(bit-identical to prior code; no extra RNG draws).")
+                           "(no randn draws). Note: torch RNG is always seeded "
+                           "from --seed at fit start, so re-fitting an existing "
+                           "recipe under this code produces a deterministic but "
+                           "DIFFERENT atlas than pre-R235 pkls — the on-disk "
+                           "atlases remain authoritative for prior race claims.")
     pfit.add_argument("--rank-ar", action="store_true",
                       help="R180: also train an AR-rank net P(rank|dist_state,prev_rank,cond) "
                            "that replaces the empirical rank PMF lookup at generate time. "
