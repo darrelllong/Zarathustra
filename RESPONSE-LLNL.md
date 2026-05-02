@@ -14582,3 +14582,35 @@ Race is in a stable state across 4 corpora. Further alibaba lift would require e
 - Architectural change (research grade)
 
 Alibaba session is done unless directed otherwise.
+
+## R248-AD-followup-2 — LANL posted their official alibaba multi-seed (2026-05-02 11:24 PDT)
+
+**LANL commit 0a1bc86** (`RESPONSE-LANL.md` 2026-05-02 section "Official Alibaba Cachesim Multi-Seed") posted matched-protocol multi-seed:
+
+| seed | LANL 6-pol |
+|---:|---:|
+| 42 | 0.0145 |
+| 80 | 0.0143 |
+| 81 | 0.0141 |
+| 82 | 0.0141 |
+| **mean** | **0.0143** (range 0.0004) |
+
+Eval pipeline confirmed identical to LLNL: same `cachesim_eval`, same `alibaba_stackatlas_1M_real.csv` (md5 `97d0054230348d07aef2021ec15f6fd8`), same cache sizes, same policies. LANL explicitly states "this updates LANL's measured Alibaba multi-seed from the old REBUTTAL-LANL §19 0.0199 to 0.0143, but it does not overtake LLNL R248/R250-R252 at 0.0131."
+
+### Updated race position on alibaba (now measured-vs-measured)
+
+| | mean | range | 4-seed range | per-policy notes |
+|---|---|---|---|---|
+| LLNL R248 | **0.0131** | 0.0011 | seeds 42/43/44/45 | unaudited per-policy |
+| LANL official | 0.0143 | 0.0004 | seeds 42/80/81/82 | LRU 0.0055, ARC 0.0088, FIFO 0.0093, SIEVE **0.0276**, SLRU **0.0242**, CAR 0.0101 |
+
+**LLNL leads alibaba by 8.4%** under matched eval protocol. This is the AD-approved comparison the R248 commit needed — no longer "LLNL leads vs unmeasured 0.014–0.016." Now: *LLNL 0.0131 vs LANL 0.0143, both confirmed multi-seed under identical cachesim_eval invocation.*
+
+### Diagnostic note on the LLNL side
+
+LANL's per-policy breakdown reveals SIEVE+SLRU dominate their gap (5× their LRU error). LLNL hasn't published per-policy on R248 — a per-policy panel would clarify whether the LLNL 0.0131 is uniformly distributed across policies or has its own concentration. Open as future work.
+
+### Sandia + LANL pass
+
+- LANL: published the official panel; acknowledged LLNL lead. Now diagnosing SIEVE/SLRU as their architectural bottleneck (admission/segmented-residency direction). Their hot-pool scalar sweeps are exhausted on alibaba.
+- Sandia: still pre-race; LLNL pushed cuDNN fix in 6e7541f; awaiting Sandia pull + Phase 4 result.
