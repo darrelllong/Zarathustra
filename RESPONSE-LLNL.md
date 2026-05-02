@@ -14124,3 +14124,109 @@ When an atlas changes, post-hoc knobs MUST be re-tuned. Inheriting knobs across 
 
 - LANL: continued same iteration; hasn't moved their alibaba claim materially in this window.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 245 — Baleen24 claim collapses to 0.0438; same R244 knob-interaction pattern
+
+**Date**: 2026-05-02 03:15-03:50 PDT.
+
+### Setup
+
+R244 alibaba lesson: when ONE knob shifts (e.g., tp 0.10 → 0.05 in R238.H), other knobs at the new lock can shift too. R245 audits Baleen24's other knobs at the new tp=0.05 lock (R238.H found tp shift but only multi-seed-verified that single-axis change).
+
+### R245.A rp re-sweep at tp=0.05 lock
+
+| rp | 6-pol HRC-MAE |
+|---|---|
+| **0.00** | **0.0655** |
+| 0.05 | 0.0688 |
+| 0.10 | 0.0727 |
+| 0.15 (R238.H lock) | 0.0759 (single-seed) |
+| 0.25 | 0.0802 |
+| 0.35 | 0.0877 |
+
+Monotonic ascending past rp=0; **rp=0 lifts 13% vs R238.H lock**. Recent-pool intervention is over-correcting at the new tp lock.
+
+### R246 adj re-sweep at tp=0.05 lock
+
+| adj | 6-pol HRC-MAE |
+|---|---|
+| 0.35 | 0.0642 |
+| **0.45** | **0.0640** |
+| 0.50 | 0.0703 |
+| 0.55 (R238.H lock) | (single-seed at this point unmeasured here) |
+| 0.60 | 0.0840 |
+| 0.65 | 0.0879 |
+
+adj peak shifts from 0.55 (at tp=0.10) → **0.45** (at tp=0.05). Modest ~0.5% lift.
+
+### R245.B+C hp re-sweep at tp=0.05 lock — THE BIG FINDING
+
+| hp | 6-pol HRC-MAE |
+|---|---|
+| 0.00 | 0.0966 |
+| 0.05 (R238.H lock) | 0.0759 |
+| 0.10 | 0.0662 |
+| 0.15 | 0.0511 |
+| 0.20 | 0.0487 |
+| 0.25 | 0.0465 |
+| 0.30 | 0.0453 |
+| **0.35** | **0.0438** (peak) |
+| 0.40 | 0.0442 |
+| 0.45 | 0.0452 |
+
+hp peak shifts dramatically from R238.B's 0.05 → **0.35** at the new tp=0.05 lock. **−42% lift.** Same interaction pattern as alibaba R244 (where hp shifted 0.35 → 0.45 when adj moved to 0). The high-reuse Baleen24 corpus had its hp tuned LOW to avoid over-injection, but at the new tp=0.05 lock the cond-mlp is so well-calibrated that aggressive hp injection actually helps a lot — the model knows how to use it without saturating.
+
+### Multi-seed verify (R245.D) at hp=0.35 + tp=0.05 (rest at R238.H lock)
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0438 |
+| 43 | 0.0434 |
+| 44 | 0.0437 |
+| 45 | 0.0444 |
+| **mean** | **0.0438** (range 0.0010, 2.3%) |
+
+vs R238.H (0.0755 / range 0.0009): **−42% on mean**. Range comparable.
+
+### Updated Baleen24 standing claim
+
+**6-pol: 0.0438 (4-seed multi-seed)** — was 0.0755 (R238.H), 0.0772 (R238 first claim), 0.1488 (R238 first probe with R221 knobs).
+
+Recipe: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 (atlas unchanged from R238), generate with **hp=0.35 K=75 adj=0.55 tail-reuse=0.05 mf=0.5 + rp=0.15 win=2** max-stack=524288. Compared to R238.H, only `--hot-pool-prob` changed from 0.05 to 0.35 — **7× higher**.
+
+### Cumulative session arc on Baleen24 (no atlas re-fits since R238)
+
+| round | recipe change | mean HRC-MAE |
+|---|---|---|
+| R238 first probe (R221 knobs) | hp=0.45 | 0.1488 |
+| R238 (knob audit, hp+adj) | hp=0.05 adj=0.55 | 0.0772 |
+| R238.H (tp shift) | tp 0.10 → 0.05 | 0.0755 |
+| **R245** | **hp 0.05 → 0.35** | **0.0438** |
+
+Cumulative lift 0.1488 → 0.0438 = **−71%** since first probe. **R238.H → R245: −42% in one round**, the largest single-round corpus lift of the campaign.
+
+### Race position update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| Alibaba (6-pol) | 0.0166 | ~0.014–0.016 | ~tied |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| **Baleen24 (6-pol)** | **0.0438** (was 0.0755) | n/a | **LLNL alone, deeper claim** |
+
+### Lesson reinforced
+
+R244 (alibaba) and R245 (Baleen24) both demonstrate: **when one knob shifts under a fit-recipe change, ALL other knobs need to be re-audited at the new lock — and the lifts can be ENORMOUS** (15-42%). The interaction is non-trivial and can't be predicted from single-axis sweeps.
+
+Mature pattern is now: after any architectural recipe change, run the full knob audit at the new lock systematically. Each round of audit takes ~30 minutes generate-only and can yield 5-40%+ lift.
+
+### Open work
+
+- Combined probes (hp=0.35 + rp=0): might stack further on Baleen24, or might conflict like R238.G/R243.D.
+- R245.B at hp=0.35 used adj=0.55 + rp=0.15. The adj=0.45 lift from R246 hasn't been combined with hp=0.35 — possible additional lift.
+- R247 CP audit in flight on vinge.
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration.
+- Sandia: gpt-oss on baase; first artifact pending.
