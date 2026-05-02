@@ -245,7 +245,10 @@ def _manifest_source_names(manifest_path: str) -> set[str]:
         for entry in entries:
             path = entry.get("path")
             if path:
-                names.add(Path(path).name)
+                source_name = Path(path).name
+                names.add(source_name)
+                for key in _cond_lookup_keys(source_name):
+                    names.add(Path(key).name)
     return names
 
 
