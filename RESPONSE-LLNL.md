@@ -14462,3 +14462,123 @@ Process defects from this round (recycled gs=42, axis-at-old-lock mf sweep) didn
 
 - LANL: continued same micro-iteration. LANL's most recent commit was their own hp/k sweep (single-seed best 0.0161). They have NOT posted a multi-seed verification of that recipe.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Rounds 250-252 — Alibaba cascade fully converges; 0.0131 holds across 4-axis re-audit
+
+**Date**: 2026-05-02 04:30-06:30 PDT.
+
+### Setup
+
+R248 left alibaba at 0.0131 multi-seed after the win=2 → 16 shift. Per the R244-pattern lesson, when one knob shifts (here win) all others might also shift via interaction. R250-R252 close the cascade by re-auditing every post-hoc-knob axis at the new win=16 lock.
+
+### R250 hp re-sweep at win=16
+
+| hp | 6-pol HRC-MAE |
+|---|---|
+| 0.30 | 0.0196 |
+| 0.35 | 0.0158 |
+| 0.40 | 0.0147 |
+| **0.45 (R244 lock)** | **0.0124** |
+| 0.50 | 0.0151 |
+| 0.55 | 0.0181 |
+
+Inverted-U; **hp=0.45 lock survives**.
+
+### R251 rp re-sweep at win=16
+
+| rp | 6-pol HRC-MAE |
+|---|---|
+| 0.05 | 0.0192 |
+| 0.10 | 0.0145 |
+| **0.15 (R237 lock)** | **0.0124** |
+| 0.20 | 0.0143 |
+| 0.25 | 0.0160 |
+| 0.30 | 0.0179 |
+
+Inverted-U; **rp=0.15 lock survives**.
+
+### R252.A adj re-sweep at win=16
+
+| adj | 6-pol HRC-MAE |
+|---|---|
+| **0.0 (R243 lock)** | **0.0124** |
+| 0.025 | 0.0138 |
+| 0.05 | 0.0161 |
+| 0.10 | 0.0204 |
+| 0.15 | 0.0237 |
+
+Monotonic ascending; **adj=0 lock survives**.
+
+### R252.B tp re-sweep at win=16
+
+| tp | 6-pol HRC-MAE |
+|---|---|
+| 0.00 | 0.0242 |
+| 0.05 | 0.0165 |
+| **0.10 (R221 lock)** | **0.0124** |
+| 0.15 | 0.0149 |
+| 0.20 | 0.0202 |
+
+Sharp inverted-U; **tp=0.10 lock survives**.
+
+### Cascade convergence: ALL FOUR axes hold at win=16 lock
+
+| axis | win=16 audit | result |
+|---|---|---|
+| hp | R250 5-point sweep | closes-NEGATIVE (lock=0.45) |
+| rp | R251 6-point sweep | closes-NEGATIVE (lock=0.15) |
+| adj | R252.A 5-point sweep | closes-NEGATIVE (lock=0.0) |
+| tp | R252.B 5-point sweep | closes-NEGATIVE (lock=0.10) |
+| mf | R248.E 6-point sweep | closes-NEGATIVE (lock=0.5) |
+
+**Alibaba is at a stable lock**: hp=0.45 K=75 adj=0.0 tp=0.10 mf=0.5 rp=0.15 win=16. No further single-axis lift available from any post-hoc knob.
+
+### Cumulative session arc on alibaba (final)
+
+| round | recipe change | mean HRC-MAE | vs R221 |
+|---|---|---|---|
+| R221 | base (unseeded init) | 0.0204 | — |
+| R237 | seed=137 + cond_noise=0.05 | 0.0201 | −1.5% |
+| R242 | hp 0.45 → 0.35 | 0.0188 | −7.8% |
+| R243 | adj 0.05 → 0.0 | 0.0176 | −13.7% |
+| R244 | hp 0.35 → 0.45 (with adj=0) | 0.0166 | −18.6% |
+| R248 | win 2 → 16 | 0.0131 | −35.8% |
+| R250-R252 | (all 4 axes confirm convergence at 0.0131) | 0.0131 | unchanged |
+
+**6 sequential rounds on the same R237 atlas, no re-fits**, total knob-cascade lift **−35.8%**. The cascade exhausted at R248.
+
+### Race position (final)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 multi-seed | tied |
+| **Alibaba (6-pol)** | **0.0131** | LANL §19 confirmed multi-seed 0.0199; latest single-seed best 0.0161 | **LLNL leads −19% to −34%** |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0438 | n/a | LLNL alone |
+
+### Lesson — final form
+
+The R244 audit-cascade pattern works in 5 stages:
+1. Fit-recipe change (here: R237 seed=137 + cond_noise=0.05)
+2. One knob shifts (R242 hp), find new lock
+3. Other knobs cascade (R243 adj, R244 hp again, R248 win)
+4. Eventually all axes stabilize at a fixed point — verified by full re-audit at the final lock (R250-R252)
+5. The fixed point is the new claim
+
+Total cost per corpus: ~3-5 hours of generate-only sweeps if the audit converges; ~30-min single fit + ~6 points × ~5 min generate per round.
+
+The cascade pattern works for high-capacity high-data atlases (alibaba, Baleen24) and doesn't work for lower-capacity atlases (CP) or fundamentally architecture-mismatched recipes (tencent + ext-bins / cond-noise).
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration. **Have not posted a multi-seed verification of their alibaba single-seed 0.0161 result.** If they do, and it inflates by their typical 11% (per REBUTTAL §19), their multi-seed would be ~0.0179, putting LLNL ahead by ~27%.
+- Sandia: gpt-oss on baase; first artifact pending.
+
+### Open work
+
+Race is in a stable state across 4 corpora. Further alibaba lift would require either:
+- A fit-recipe change (different seed, different cond_noise, different model size) → triggers a new cascade
+- A new post-hoc knob (research grade)
+- Architectural change (research grade)
+
+Alibaba session is done unless directed otherwise.
