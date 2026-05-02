@@ -14026,3 +14026,101 @@ Three rounds, three lifts, no atlas re-fits required since R237. R242 + R243 are
 
 - LANL: continued same micro-iteration; no new methodology.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 244 — Alibaba claim 0.0166; LANL gap effectively closed
+
+**Date**: 2026-05-02 02:30-03:15 PDT.
+
+### Setup
+
+R243 found alibaba's adj knob shifted from R242's 0.05 lock to adj=0. R244 audits hp+K+other axes at the new adj=0 lock — knob interactions can shift further when one knob moves.
+
+### R244.A K (hot-pool size) sweep at hp=0.35 + adj=0 lock
+
+| K | 6-pol HRC-MAE |
+|---|---|
+| 25 | 0.0215 |
+| 50 | 0.0175 |
+| **75 (R243 lock)** | **0.0173** |
+| 100 | 0.0184 |
+| 150 | 0.0207 |
+| 200 | 0.0239 |
+
+Inverted-U with peak at K=75 (R221's original K). K-axis closes-NEGATIVE.
+
+### R244.B+C hp re-sweep at adj=0 (interaction probe)
+
+| hp | 6-pol HRC-MAE |
+|---|---|
+| 0.20 | 0.0270 |
+| 0.25 | 0.0223 |
+| 0.30 | 0.0194 |
+| 0.35 (R243 lock) | 0.0173 |
+| 0.40 | 0.0170 |
+| **0.45** | **0.0167 (peak)** |
+| 0.50 | 0.0186 |
+| 0.55 | 0.0228 |
+| 0.60 | 0.0259 |
+| 0.65 | 0.0303 |
+
+**Interaction effect**: at adj=0, hp peak shifts from 0.35 (R243) → **0.45** (R244). Removing adj-dup lets hp climb back to where R221/R237 originally had it (just with adj=0).
+
+### Multi-seed verify (R244.D) at hp=0.45 + adj=0
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0167 |
+| 43 | 0.0164 |
+| 44 | 0.0165 |
+| 45 | 0.0166 |
+| **mean** | **0.0166** (range 0.0003, 1.8%) |
+
+vs R243 (0.0176 mean / 0.0010 range): **−5.7% on mean, 3× tighter seed range**.
+
+### Updated alibaba standing claim
+
+**6-pol: 0.0166 (4-seed multi-seed)**
+
+Recipe: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 (atlas unchanged from R237); generate with **hp=0.45 K=75 adj=0.0** tail=0.10 mf=0.5 + rp=0.15 win=2 max-stack=524288. Compared to R237's recipe, only `--adj-dup-prob` changed from 0.05 to 0.0.
+
+### Cumulative session arc on alibaba (5 hours, no atlas re-fits since R237)
+
+| round | recipe change | mean HRC-MAE | vs R221 | vs LANL ~0.016 |
+|---|---|---|---|---|
+| R221 | base (unseeded init) | 0.0204 | — | +27% |
+| R237 | seed=137 + cond_noise=0.05 | 0.0201 | −1.5% | +25% |
+| R242 | hp 0.45 → 0.35 | 0.0188 | −7.8% | +17.5% |
+| R243 | adj 0.05 → 0.0 | 0.0176 | −13.7% | +10% |
+| **R244** | **hp 0.35 → 0.45 (with adj=0)** | **0.0166** | **−18.6%** | **~tied** |
+
+### Race position update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| **Alibaba (6-pol)** | **0.0166** (was 0.0176, 0.0188, 0.0201, 0.0204) | ~0.014–0.016 multi-seed | **~tied (was LANL +27%)** |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0755 | n/a | LLNL alone |
+
+**Alibaba race: gap collapsed to MC noise.** LLNL's 0.0166 is within range of LANL's expected ~0.016 multi-seed; depending on LANL's actual number it's either tied or slight lead either way.
+
+### What just happened
+
+Four sequential round-by-round generate-only knob audits on the same R237 atlas, no re-fits, ~30 min each. Each round found a knob axis that had shifted under the new architectural-coupling state, and lifted 5-10%. The cumulative effect collapsed a 27% LANL gap. The R237 lever (seed=137 + cond_noise=0.05) opened a new basin; R242-R244 walked the knob optimum across to find where it actually lives now.
+
+The cleanest summary: **R237 changed the atlas, then R242-R244 re-tuned the post-hoc knobs that were inherited from R221's tuning on the OLD atlas**. The lifts came from finding the new optimum, not from any new knob or architectural insight.
+
+### Lesson
+
+When an atlas changes, post-hoc knobs MUST be re-tuned. Inheriting knobs across architectural changes is the single highest-EV missed lever in the campaign — R237→R244 four-round arc shows it can be worth nearly 20% per corpus on a recipe change. This is now the established pattern.
+
+### Open work
+
+- R244 finished. Other untested axes at the new lock: tail-reuse-min-frac (locked at 0.5), recent-pool-window (locked at 2). Probably small-or-zero.
+- Apply the same audit logic to Baleen24 R238.H lock and CP R240 lock — already partly done but possibly more lift.
+- Tencent's R206 basin remains irreproducible from determ-init; tencent ceiling at 0.0305.
+
+### Sandia + LANL pass
+
+- LANL: continued same iteration; hasn't moved their alibaba claim materially in this window.
+- Sandia: gpt-oss on baase; first artifact pending.
