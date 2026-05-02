@@ -392,6 +392,7 @@ def fit(
     inline_cond: bool = False,
     n_phase_bins: int = 1,
     dropout: float = 0.0,
+    cond_noise_std: float = 0.0,
     rank_ar: bool = False,
     rank_ar_hidden: int = 96,
     rank_ar_epochs: int = 600,
@@ -545,8 +546,16 @@ def fit(
             rank_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
 
     # Train net
-    print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr}, dropout={dropout})")
+    print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr}, "
+          f"dropout={dropout}, cond_noise_std={cond_noise_std})")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # R235: seed torch RNGs so cond-noise injection is reproducible.
+    # Default cond_noise_std=0.0 produces no extra randn draws -> backward
+    # compatible (no torch RNG consumption); only seeded when noise > 0.
+    if cond_noise_std > 0.0:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
     net = make_net(COND_DIM, hidden, n_states, dropout=dropout).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
@@ -559,9 +568,18 @@ def fit(
     import torch.nn.functional as F
     for ep in range(epochs):
         opt.zero_grad()
-        init_logits = net.forward_init(init_conds)
+        # R235: train-time cond-vector augmentation. Noise is in normalized
+        # cond space (std 1 = one full cond-feature stdev). Targets the
+        # diagnosed cond-mlp generalization failure mode (R225-R234 saddle).
+        if cond_noise_std > 0.0:
+            init_in = init_conds + cond_noise_std * torch.randn_like(init_conds)
+            trans_in = trans_conds + cond_noise_std * torch.randn_like(trans_conds)
+        else:
+            init_in = init_conds
+            trans_in = trans_conds
+        init_logits = net.forward_init(init_in)
         init_loss = F.cross_entropy(init_logits, init_targets)
-        trans_logits = net.forward_trans(trans_conds, trans_prev)
+        trans_logits = net.forward_trans(trans_in, trans_prev)
         trans_loss = F.cross_entropy(trans_logits, trans_next)
         loss = init_loss + trans_loss
         loss.backward()
@@ -986,6 +1004,12 @@ def main():
                            "4 = 24 states with running-unique-rate phase quartiles.")
     pfit.add_argument("--dropout", type=float, default=0.0,
                       help="R179: dropout in cond_mlp + trans_head; regularizes overfitting.")
+    pfit.add_argument("--cond-noise-std", type=float, default=0.0,
+                      help="R235: train-time Gaussian noise (std in normalized "
+                           "cond space) added to cond vectors each epoch. "
+                           "Targets cond-mlp generalization failure to off-"
+                           "manifold generation-time conds. 0.0 = no noise "
+                           "(bit-identical to prior code; no extra RNG draws).")
     pfit.add_argument("--rank-ar", action="store_true",
                       help="R180: also train an AR-rank net P(rank|dist_state,prev_rank,cond) "
                            "that replaces the empirical rank PMF lookup at generate time. "
@@ -1058,6 +1082,7 @@ def main():
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
             inline_cond=args.inline_cond, n_phase_bins=args.n_phase_bins,
             dropout=args.dropout,
+            cond_noise_std=args.cond_noise_std,
             rank_ar=args.rank_ar, rank_ar_hidden=args.rank_ar_hidden,
             rank_ar_epochs=args.rank_ar_epochs,
         )
