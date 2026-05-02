@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import torch
+torch.backends.cudnn.enabled = False
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset, DataLoader, Dataset
