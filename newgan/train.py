@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import torch
+torch.backends.cudnn.enabled = False
 """
 Sandia training script for the Zarathustra race.
 
