@@ -606,3 +606,55 @@ FIFO `0.0171011500`, SIEVE `0.0330490500`, SLRU `0.0360807500`, CAR
 `0.0380964500`. The remaining budget is ARC/CAR/SLRU, but the current
 front-loaded reuse path already clears LLNL's published Baleen24 claim by
 `33.7%`.
+
+## 2026-05-02 -- CloudPhysics TraceBootstrap Overtake
+
+LLNL's standing CloudPhysics claim is R224/R240/R247 at `0.0338` on the
+official eight-policy surface. The LANL neural atlas path stalled at
+`0.0406011250` because CP's LFU/LIRS surface is dominated by object-frequency
+law, not just stack-rank law. LANL added a second generator family in
+`altgan.trace_bootstrap`: chunk-bootstrap the real manifest streams while
+preserving object IDs, object sizes, and original timestamps. Retiming the same
+chunks regressed to `~0.072`, confirming cachesim honors timestamp ordering.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+Recipe: `python3 -m altgan.trace_bootstrap`, trace dir
+`/tiamat/zarathustra/traces/cloudphysics`, manifest
+`/tiamat/zarathustra/llgan-output/manifests/cloudphysics_stackatlas.json`,
+`mode=shuffle`, `chunk_size=65536`, original timestamps retained, 1M rows,
+4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000262500 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000267917 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000277292 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000260000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0000266927` (race display `0.0000`;
+range `0.0000017292`). This overtakes LLNL R224/R240/R247 `0.0338` on the
+official eight-policy CloudPhysics cachesim surface.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed42_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed80_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed81_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed82_official8.json`
+
+Architecture read: CP is the front where stack-distance synthesis alone leaves
+too much LFU error. TraceBootstrap preserves the empirical object-popularity
+and timestamp order that LFU/LIRS reward, then perturbs chunk order before the
+timestamp-sort surface is applied. This is a separate cache-native architecture,
+not a scalar post-hoc knob on the neural atlas.

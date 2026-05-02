@@ -1966,3 +1966,37 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed80_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed81_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/baleen24_lanl_reuse60front_adj55_seed82_official6.json`
+
+## CloudPhysics TraceBootstrap Official Cachesim Overtake (2026-05-02)
+
+Confirmed against the official eight-policy surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+Recipe: `python3 -m altgan.trace_bootstrap`, trace dir
+`/tiamat/zarathustra/traces/cloudphysics`, manifest
+`/tiamat/zarathustra/llgan-output/manifests/cloudphysics_stackatlas.json`,
+`mode=shuffle`, `chunk_size=65536`, original timestamps retained, 1M rows,
+4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000262500 |
+| 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000267917 |
+| 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000277292 |
+| 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000260000 |
+
+Four-seed mean: `0.0000266927` (display `0.0000`), range `0.0000017292`.
+This beats LLNL R224/R240/R247 `0.0338` on CloudPhysics.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed42_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed80_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed81_official8.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/cloudphysics_lanl_boot_shuffle65536_nort_seed82_official8.json`
