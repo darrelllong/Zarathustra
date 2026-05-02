@@ -10,6 +10,8 @@ separate architecture that preserves that frequency surface.
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -54,7 +56,7 @@ def main() -> int:
         args.n_records,
         args.n_streams,
         args.seed,
-        manifest_path=args.real_manifest,
+        manifest_path=_resolved_manifest(args.real_manifest, args.trace_dir, args.output),
     )
     out_parts = []
     for stream_id in sorted(real_df["stream_id"].unique()):
@@ -102,6 +104,30 @@ def _chunk_order(n_chunks: int, mode: str, rng: np.random.Generator) -> list[int
                 order[i], order[i + 1] = order[i + 1], order[i]
         return order
     raise ValueError(f"unknown mode {mode!r}")
+
+
+def _resolved_manifest(manifest_path: str, trace_dir: str, output_path: str) -> str:
+    manifest_file = Path(manifest_path)
+    if not manifest_file.exists():
+        return manifest_path
+    manifest = json.loads(manifest_file.read_text())
+    changed = False
+    root = Path(trace_dir)
+    for entries in manifest.get("streams", []):
+        for entry in entries:
+            path = Path(entry.get("path", ""))
+            if path.exists():
+                continue
+            fallback = root / path.name
+            if fallback.exists():
+                entry["path"] = str(fallback)
+                changed = True
+    if not changed:
+        return manifest_path
+    out = Path(output_path)
+    resolved = out.with_suffix(out.suffix + f".manifest.{os.getpid()}.json")
+    resolved.write_text(json.dumps(manifest, indent=2))
+    return str(resolved)
 
 
 if __name__ == "__main__":
