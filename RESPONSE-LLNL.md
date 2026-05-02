@@ -13925,3 +13925,104 @@ R242 only audited hp; adj/tail-reuse/recent-pool axes haven't been re-swept at t
 
 - LANL: continued same iteration.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## Round 243 — Alibaba claim moves to 0.0176; LANL gap collapses to +10%
+
+**Date**: 2026-05-02 02:00-02:45 PDT.
+
+### Setup
+
+R242 found alibaba's hp axis had shifted under the R237 atlas (lift hp=0.45 → 0.35, claim 0.0201 → 0.0188). The other knobs (adj, tail-reuse, recent-pool) were still at R221's lock. Audit them at the new hp=0.35 lock — same 30-minute generate-only pattern that found the Baleen24 R238.H lift.
+
+### R243.A adj sweep (baase) at hp=0.35 lock
+
+| adj | 6-pol HRC-MAE (single-seed=42) |
+|---|---|
+| **0.00** | **0.0173 (peak)** |
+| 0.025 | 0.0180 |
+| 0.05 (R242 lock) | 0.0187 |
+| 0.075 | 0.0195 |
+| 0.10 | 0.0207 |
+| 0.15 | 0.0227 |
+| 0.25 | 0.0383 |
+
+Monotonic ascending past adj=0. **Lift: adj=0 → 0.0173 (single-seed −7.5% vs R242 lock).** Recipe drift from R221's adj=0.05 to NO adj-dup at all on the new R237 atlas — significant architectural-coupling shift.
+
+### R243.B tail-reuse + recent-pool sweeps (vinge) at hp=0.35 lock
+
+**Tail-reuse-prob axis** (rest at R242 lock):
+| tp | 6-pol |
+|---|---|
+| 0.00 | 0.0318 |
+| 0.05 | 0.0213 |
+| 0.10 (lock) | 0.0187 |
+| 0.15 | 0.0215 |
+| 0.20 | 0.0260 |
+
+Lock at tp=0.10 holds — tail-reuse axis closes-NEGATIVE.
+
+**Recent-pool-prob axis**:
+| rp | 6-pol |
+|---|---|
+| 0.00 | 0.0211 |
+| 0.05 | 0.0181 |
+| **0.10** | **0.0178 (peak)** |
+| 0.15 (R242 lock) | 0.0187 |
+| 0.25 | 0.0236 |
+
+Small-but-real lift on rp axis: 0.15 → 0.10 = −4.8% single-seed.
+
+### R243.D combined adj=0 + rp=0.10 probe — DOESN'T stack
+
+Single-seed=42 with both lifts: **0.0179** (worse than adj=0 alone's 0.0173, worse than rp=0.10 alone's 0.0178). Same conflict pattern as Baleen24 R238.G's tp+rp. Pick the larger single-axis lift only — **adj=0**.
+
+### Multi-seed verify (R243.C) at adj=0 (rest at lock)
+
+| gen-seed | 6-pol HRC-MAE |
+|---|---|
+| 42 | 0.0173 |
+| 43 | 0.0181 |
+| 44 | 0.0179 |
+| 45 | 0.0171 |
+| **mean** | **0.0176** (range 0.0010, 5.7%) |
+
+vs R242 (mean 0.0188, range 0.0003): **−6.4% on mean**, range slightly wider but well below MC noise.
+
+### Updated alibaba standing claim
+
+**6-pol: 0.0176 (4-seed multi-seed)**
+
+Recipe: phase=2 ext-bins + seed=137 + cond_noise_std=0.05 (atlas unchanged from R237), hp=0.35 K=75 **adj=0.0** tail=0.10 mf=0.5 + rp=0.15 win=2 max-stack=524288.
+
+### Cumulative session arc on alibaba
+
+| round | recipe change | mean HRC-MAE | vs R221 |
+|---|---|---|---|
+| R221 | base (unseeded init) | 0.0204 | — |
+| R237 | seed=137 + cond_noise=0.05 | 0.0201 | −1.5% |
+| R242 | hp 0.45 → 0.35 | 0.0188 | −7.8% |
+| **R243** | **adj 0.05 → 0.0** | **0.0176** | **−13.7%** |
+
+Three rounds, three lifts, no atlas re-fits required since R237. R242 + R243 are pure generate-only knob audits on the existing R237 atlas.
+
+### Race position update
+
+| corpus | LLNL | LANL | gap direction |
+|---|---|---|---|
+| Tencent (6-pol) | 0.0305 | ~0.0303 | tied |
+| **Alibaba (6-pol)** | **0.0176** (was 0.0188 R242, 0.0201 R237, 0.0204 R221) | ~0.014–0.016 | **LANL +10%** (was +17.5%, +24%, +27%) |
+| CloudPhysics (8-pol) | 0.0338 | n/a | LLNL alone |
+| Baleen24 (6-pol) | 0.0755 | n/a | LLNL alone |
+
+**Cumulative R237→R243 alibaba lift: −13.7%, narrowing the LANL gap by ~17 percentage points** (from +27% to +10%). LANL still leads, but well within striking distance.
+
+### Open work
+
+- R243 didn't probe further-extreme adj (e.g., negative? not meaningful). adj=0 is the natural floor.
+- Other axes that haven't been touched yet at the R237 atlas: K (hot-pool size), recent-pool-window. Possible incremental gains.
+- Tencent/CP haven't seen lifts; possibly different basin geometries make seed-search not work for them (per R239/R240/R241).
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration; no new methodology.
+- Sandia: gpt-oss on baase; first artifact pending.
