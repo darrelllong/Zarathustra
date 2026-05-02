@@ -13273,3 +13273,68 @@ Deferring further race-mode tick until user steers the next big swing.
 
 - LANL: same micro-iteration.
 - Sandia: brief delivered.
+
+## Round 232 — Generation-time temperature sweep across all 3 corpora: closes-NEGATIVE; T=1.0 default optimal everywhere
+
+**Date**: 2026-05-01 19:00-19:55 PDT.
+
+### Setup
+
+The `--temperature` flag (softmax temperature for state-transition sampling at generate time) defaults to 1.0 and was never swept across any standing claim. Cheap untouched lever; tested it on all three corpora at their locked recipes.
+
+Single-seed sweep across `T ∈ {0.70, 0.85, 1.00, 1.15, 1.30}` per corpus. Tencent on vinge, CP on vinge (sequential), alibaba on baase (parallelized via the new NFS export of /tiamat over the 200Gb fabric — first job to read/write artifacts directly from /tiamat instead of vinge-local NVMe).
+
+### Results — Tencent (R206 lock)
+
+| T | 6-pol HRC-MAE | vs T=1.0 |
+|---|---|---|
+| 0.70 | 0.0498 | +63% |
+| 0.85 | 0.0335 | +10% |
+| **1.00** | **0.0304** | — |
+| 1.15 | 0.0353 | +16% |
+| 1.30 | 0.0414 | +36% |
+
+### Results — Alibaba (R221 lock)
+
+| T | 6-pol HRC-MAE | vs T=1.0 |
+|---|---|---|
+| 0.70 | 0.0389 | +84% |
+| 0.85 | 0.0357 | +75% |
+| **1.00** | **0.0200** | — |
+| 1.15 | 0.0361 | +77% |
+| 1.30 | 0.0454 | +118% |
+
+### Results — CloudPhysics (R224 lock)
+
+| T | 8-pol HRC-MAE | vs T=1.0 |
+|---|---|---|
+| 0.70 | 0.0569 | +69% |
+| 0.85 | 0.0447 | +33% |
+| **1.00** | **0.0337** | — |
+| 1.15 | 0.0372 | +10% |
+| 1.30 | 0.0474 | +41% |
+
+### Reading
+
+Identical inverted-U pattern across all three corpora with peak exactly at T=1.0. The default temperature was already optimal **and the same optimum across alibaba, tencent, and cloudphysics — three corpora with very different IRD shapes**. That's a non-trivial finding: the cond_mlp's softmax distribution is well-calibrated for these traces; sharpening (low T) or smoothing (high T) the sampling makes it *worse* in a corpus-invariant way.
+
+This is the strongest cross-corpus invariance the campaign has surfaced — adj/hp/tail-reuse/recent-pool/binning are all corpus-conditional, but temperature is universally locked at 1.0.
+
+### Infrastructure side note
+
+This round was the first to use the post-cleanup artifact layout: `/tiamat/zarathustra/llgan-output/{atlases,refs,manifests,long_rollouts,evals}/`. Everything race-mode-related is now on /tiamat (NFS-exported to baase over the 200Gb fabric). NVMe `~/` on each machine holds only code (git checkout) and venv. Future launchers reference /tiamat paths directly; backward-compat symlinks under `~/` keep older scripts working.
+
+### Standing claims unchanged
+
+| corpus | claim | round |
+|---|---|---|
+| Tencent | 0.0305 (6-pol, multi-seed) | R206 |
+| Alibaba | 0.0204 (6-pol, multi-seed) | R221 |
+| CloudPhysics | 0.0338 (8-pol, multi-seed) | R224 |
+
+R232 makes 10 consecutive closes-NEGATIVE (R225-R232). Standing claims defended through capacity, knob, binning, post-hoc-net, refresh-schedule, AND temperature axes.
+
+### Sandia + LANL pass
+
+- LANL: same micro-iteration.
+- Sandia: gpt-oss is up on baase per user; first artifact pending.
