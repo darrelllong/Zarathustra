@@ -14861,3 +14861,45 @@ R256.D 0.0253 is the conservative claim; R256.F result will replace it iff the m
 | **MSR (R256)** | first lock-finding | adj 0.05→0.40; hp 0.45→0.50; rp 0.15→0.10 (pending verify) | −71% R256-first → R256.D |
 
 The cascading-lock audit pattern is durable across corpora; magnitudes vary because corpora are at different distances from a generic alibaba lock.
+
+## Baleen24 — LANL overtakes (commit b3ca36c, 2026-05-02 13:18 PDT)
+
+LANL posted a 4-seed Baleen24 multi-seed: **0.0291** (range 0.0011, seeds 42/80/81/82). This **overtakes LLNL R245's 0.0438 by −33.7%** under the matched 6-pol cachesim eval on `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+### LANL's recipe — what's different
+
+Critical knob LLNL doesn't have:
+- `stack_reuse_boost_prob = 0.60`
+- `stack_reuse_boost_min_rank = 0`
+- `stack_reuse_boost_rank_power = 0.1`
+
+This is "with prob 0.60, sample uniformly across the recently-emitted stack from rank 0." It's an **architectural feature in altgan** (front-loaded reuse admission across all ranks) that **LLNL's `llgan/neural_atlas.py` does not expose**. LLNL has analogous knobs but at smaller scale:
+- `--hot-pool-prob` × `--hot-pool-k` (rank-power weighting via `--hot-pool-weight-power`)
+- `--recent-pool-prob` × `--recent-pool-window`
+- `--tail-reuse-prob` × `--tail-reuse-min-frac` × `--tail-reuse-rank-power`
+
+Other LANL Baleen24 knobs are similar to LLNL R245: `stack_adj_dup_prob=0.55`, `stack_hot_pool_prob=0.35`, `stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`, `stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.05`. The reuse-boost is the load-bearing differentiator.
+
+### LANL per-policy breakdown
+LRU 0.0112, ARC 0.0388, FIFO 0.0171, SIEVE 0.0330, SLRU 0.0361, CAR 0.0381.
+
+### Race ledger update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| Tencent | 0.0305 | 0.0303 | tied |
+| Alibaba | **0.0131** | 0.0143 | LLNL +8.4% |
+| CloudPhysics | 0.0338 | n/a | LLNL alone |
+| **Baleen24** | 0.0438 | **0.0291** | **LANL +33.7%** |
+| MSR Exchange | 0.0253 | n/a | LLNL alone |
+
+LLNL/LANL split 1-1 on contested corpora. LLNL lead 4-1 on counted corpora.
+
+### R257 — LLNL counter-attack in flight (vinge)
+
+Strategy: approximate LANL's reuse-boost via LLNL's existing knob set. Sweep:
+- hp at K=200 (5 points: hp=0.35,0.45,0.55,0.65,0.75)
+- K at hp=0.55 (6 points: K=50,100,200,400,800,2000)
+- rp aggressively (4 points: rp=0.30,0.45,0.60,0.75) at win=2
+
+If aggressive hp+K matches LANL within seed-noise, no new flag needed. If not, LLNL needs to implement an analogous reuse-boost in `neural_atlas.py` (architectural change, longer cycle).
