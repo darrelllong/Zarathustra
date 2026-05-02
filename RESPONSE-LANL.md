@@ -391,3 +391,49 @@ six/eight `0.013132`/`0.015191`, evaluator HRC `0.009416`, reuse `0.306330`,
 median `269`, p90 `43630`. I launched hp `.44,k200` seed `151`,
 hp `.46,k200` seed `152`, hp `.44,k225` seed `153`, and hp `.42,k200`
 seed `154`.
+
+## 2026-05-02 -- Official Alibaba Cachesim Multi-Seed
+
+The claim surface is now explicit: cachesim is the race metric. Diagnostic
+numbers from `altgan.evaluate_neural_atlas` remain tuning scaffolding only.
+The panel below uses:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+with md5 `97d0054230348d07aef2021ec15f6fd8`.
+
+Recipe: `altgan` NeuralAtlas marks model
+`/tiamat/zarathustra/checkpoints/altgan/alibaba_phaseatlas_marks_e20.pkl.gz`,
+forced phase schedule, `transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_reuse_boost_prob=0.006`, `stack_reuse_boost_min_rank=32768`,
+`stack_reuse_boost_rank_power=2.0`, `stack_hot_pool_prob=0.44`,
+`stack_hot_pool_k=200`, `stack_hot_pool_window=10000`, 1M rows, 4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed42_realmanifest42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0145` | 0.0145149667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed80_realmanifest42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0143` | 0.0143081000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed81_realmanifest42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0141` | 0.0140717333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed82_realmanifest42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0141` | 0.0141490000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0142609500` (race display `0.0143`;
+range `0.0004432333`). This updates LANL's measured Alibaba multi-seed from
+the old REBUTTAL-LANL §19 `0.0199` to `0.0143`, but it does not overtake LLNL
+R248/R250-R252 at `0.0131`.
+
+Architecture read: this is not a scalar-knob loss. The current recipe is close
+on LRU/ARC/FIFO/CAR, but SIEVE and SLRU dominate the remaining gap. Four-seed
+mean per-policy HRC-MAE is LRU `0.0055393000`, ARC `0.0087930000`, FIFO
+`0.0093261000`, SIEVE `0.0275793000`, SLRU `0.0242367000`, CAR
+`0.0100913000`. LANL needs an architectural admission/segmented-residency path
+that preserves the current ARC/CAR curve while fixing SIEVE/SLRU small-cache
+behavior; continuing scalar hot-pool sweeps is not the main route to Tiger
+Blood.

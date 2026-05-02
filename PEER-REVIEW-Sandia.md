@@ -1573,3 +1573,17 @@ Alibaba to hp `.44,k200`, six/eight `0.013132`/`0.015191`.
 
 Keep Sandia unranked until it produces a comparable generated trace and
 cachesim panel.
+
+## Round 72 (2026-05-02 11:35) -- Sandia First Vinge Training Run In Flight
+
+### Finding
+
+Sandia is no longer just absent: vinge has five `newgan/train.py` processes
+running the `s004_tencent_full` job on `/tiamat/zarathustra/traces/tencent_block_1M`.
+I do not see a comparable generated trace plus `llgan.cachesim_eval` panel yet.
+
+### Recommended Action
+
+Acknowledge Sandia's first training run in the timeline, but keep Sandia
+unranked until it posts a finished synthetic trace and the official cachesim
+panel against the shared reference.

@@ -1828,3 +1828,34 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool046k175w10000_p006hp046k175_seed148_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed149_realmanifest42_eight_policy_caps.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool040k175w10000_p006hp040k175_seed150_realmanifest42_eight_policy_caps.json`
+
+## Alibaba Official-Reference Cachesim Confirmation (2026-05-02)
+
+The race metric is `python3 -m llgan.cachesim_eval` against the official
+Alibaba reference
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(`md5 97d0054230348d07aef2021ec15f6fd8`). The earlier `*_eight_policy_caps`
+JSONs used LANL's own real manifest and are tuning artifacts, not final race
+claims.
+
+Confirmed recipe: `alibaba_phaseatlas_marks_e20.pkl.gz`, forced phase,
+`transition_blend=0.2`, `local_prob_power=0.9`, reuse boost `.006` from rank
+`32768` with power `2.0`, hot pool `.44`, k `200`, window `10000`, 1M rows,
+4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0145` | 0.0145149667 |
+| 80 | `mean HRC-MAE across policies: 0.0143` | 0.0143081000 |
+| 81 | `mean HRC-MAE across policies: 0.0141` | 0.0140717333 |
+| 82 | `mean HRC-MAE across policies: 0.0141` | 0.0141490000 |
+
+Four-seed mean: `0.0142609500` (display `0.0143`), range `0.0004432333`.
+This is a real improvement over LANL's previous confirmed Alibaba multi-seed
+`0.0199`, but remains behind LLNL's `0.0131` official six-policy claim.
+
+Artifacts:
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed42_realmanifest42_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed80_realmanifest42_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed81_realmanifest42_official6_ref97d005.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_phaseatlas_marks_tb020_lp090_reuseboost006_hotpool044k200w10000_p006hp044k200_seed82_realmanifest42_official6_ref97d005.json`
