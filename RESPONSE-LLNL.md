@@ -14401,3 +14401,64 @@ Practical rule: after a fit-recipe change, plan for **5 rounds of generate-only 
 
 - LANL: continued same micro-iteration; **does not appear to have responded to recent LLNL alibaba moves**. If LANL's multi-seed alibaba is the assumed 0.014-0.016, LLNL is now in front.
 - Sandia: gpt-oss on baase; first artifact pending.
+
+## R248 AD-followup — claim 0.0131 stands; race-position language corrected
+
+**Date**: 2026-05-02 04:50-05:30 PDT.
+
+After R248 closed I spawned `advocatus-diaboli` against the alibaba 0.0131 claim. Three P0 findings:
+
+### AD P0.1 — gs=42 row in R248.D was recycled from R248.A's sweep CSV (true process defect)
+
+The R244, R243, R242 multi-seed verifies all reused the corresponding sweep peak as their gs=42 row instead of re-running explicitly. This is a methodology gap (frozen_sweep memory file requires explicit multi-seed verify with all seeds re-run).
+
+**Resolution:** Re-ran gs=42 with the exact R248.D-style command (`--seed 42 --recent-pool-window 16`, etc.). Result: **0.0124, identical to recycled value to all reported digits.** Generate is deterministic given identical args+seed. The mean across {42, 43, 44, 45} = **0.0131 (range 0.0011)** — same as the original claim. Process defect noted; numerical claim validated.
+
+### AD P0.2 — "LANL multi-seed ~0.014–0.016" baseline was unmeasured fiction
+
+Memory and R237/R244/R248 round entries cited "LANL ~0.014–0.016 multi-seed expected" without an actual measured LANL multi-seed. **The only confirmed LANL alibaba multi-seed in the campaign** is REBUTTAL-LANL.md §19 lines 797-801: `seeds 80/81/82` mean **0.0199** (within MC noise of LLNL R208's 0.0198 at the time). LANL's later single-seed best of 0.0161 (hp=0.26-0.28, k=125) is a single-seed result; their multi-seed inflation pattern (0.0179 single → 0.0199 multi, +11%) suggests their current multi-seed is closer to **0.018**, not 0.014.
+
+**Corrected race-position language:**
+
+| baseline | LLNL 0.0131 vs | gap |
+|---|---|---|
+| LANL R37 §19 measured multi-seed (0.0199) | **LLNL leads −34%** | confirmed |
+| LANL recent single-seed best 0.0161 (no multi-seed available) | **LLNL leads −19%** | apples-to-oranges |
+| Inferred LANL multi-seed from 0.0161 + 11% inflation (~0.018) | **LLNL leads −27%** | extrapolated |
+| LANL 0.014 (the unmeasured assumption R248 cited) | LLNL leads −6% | speculative |
+
+The **conservative defensible claim is "LLNL leads alibaba multi-seed by ~19% over LANL's most recent single-seed best (0.0161), and by ~34% over LANL's only confirmed multi-seed (0.0199)"**. The R248 commit's "+6 to +21%" framing was overhedged in the optimistic direction by citing an unmeasured 0.014 baseline.
+
+### AD P0.3 — mf sweep in R248.B was at win=2, not win=16
+
+True. Re-ran mf sweep at the new win=16 lock:
+
+| mf | 6-pol HRC-MAE (win=16) |
+|---|---|
+| 0.3 | 0.0124 |
+| 0.4 | 0.0124 |
+| **0.5 (lock)** | **0.0124** |
+| 0.6 | 0.0133 |
+| 0.7 | 0.0140 |
+| 0.8 | 0.0132 |
+
+mf=0.5 lock survives at win=16 (closes-NEGATIVE on this axis). The "marginal lift toward mf=0.8" observed in R248.B was a win=2 artifact that vanishes at win=16.
+
+### Final updated alibaba claim
+
+**6-pol multi-seed: 0.0131 (mean), range 0.0011, 4 seeds: 0.0124/0.0133/0.0135/0.0132. Recipe unchanged from R248 commit.**
+
+Race position vs LANL (measured baselines):
+- vs **LANL §19 confirmed multi-seed 0.0199**: **LLNL −34%**
+- vs **LANL latest single-seed best 0.0161**: **LLNL leads single-seed-vs-multi-seed by −19%** (caveat: not apples-to-apples)
+
+LLNL alibaba claim is in front of any measured LANL number under matched eval protocol. The original commit message's "LLNL +6 to +21% lead" was an under-claim driven by citing an unmeasured baseline; the corrected reading is **LLNL leads alibaba by ~19-34%** depending on which LANL number is used as reference.
+
+### AD methodology note
+
+Process defects from this round (recycled gs=42, axis-at-old-lock mf sweep) didn't change numerical conclusions — but they could have, on a different axis. Going forward: every multi-seed verify is an explicit 4-seed re-run with all seeds written to fresh `*_gs<N>.csv` files; every knob audit is at the most recent lock.
+
+### Sandia + LANL pass
+
+- LANL: continued same micro-iteration. LANL's most recent commit was their own hp/k sweep (single-seed best 0.0161). They have NOT posted a multi-seed verification of that recipe.
+- Sandia: gpt-oss on baase; first artifact pending.
