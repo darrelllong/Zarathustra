@@ -368,7 +368,7 @@ class SandiaTrainer:
                 # h should be (batch, T, latent_dim), but may be (T, latent_dim) if batch=1
                 # Add batch dimension if needed
                 if h.dim() == 2:
-                    h = h.unsqueeze(0)
+                    h = h.unsqueeze(1)
                 pred = self.S(h[:, :-1, :])
                 loss = F.mse_loss(pred, h[:, 1:, :])
 
@@ -392,7 +392,7 @@ class SandiaTrainer:
                         batch = batch.to(self.device)
                         h = self.E(batch)
                         if h.dim() == 2:
-                            h = h.unsqueeze(0)
+                            h = h.unsqueeze(1)
                         pred = self.S(h[:, :-1, :])
                         loss = F.mse_loss(pred, h[:, 1:, :])
                         val_loss += loss.item() * batch.size(0)
@@ -456,7 +456,7 @@ class SandiaTrainer:
                 with torch.no_grad():
                     h_real = self.E(batch)
                     if h_real.dim() == 2:
-                        h_real = h_real.unsqueeze(0)
+                        h_real = h_real.unsqueeze(1)
                     h_pred = self.S(h_real[:, :-1, :])
 
                 B, T, _ = h_pred.shape
@@ -486,7 +486,7 @@ class SandiaTrainer:
                         batch = batch.to(self.device)
                         h_real = self.E(batch)
                         if h_real.dim() == 2:
-                            h_real = h_real.unsqueeze(0)
+                            h_real = h_real.unsqueeze(1)
                         h_pred = self.S(h_real[:, :-1, :])
                         B, T, _ = h_pred.shape
                         z_global = torch.randn(B, self.cfg.noise_dim, device=self.device)
@@ -523,9 +523,15 @@ class SandiaTrainer:
         from torch.utils.data import ConcatDataset
         train_dataset = ConcatDataset(train_ds)
 
+        # For Phase 4, keep the encoder and reconstruction networks in eval mode
+        # to avoid updating running statistics.  The supervisor must stay in
+        # train mode for proper gradients; setting it to eval caused a
+        # cuDNN RNN backward error.  We now explicitly set ``S.train()``.
         self.E.eval()
         self.R.eval()
-        self.S.eval()
+        self.S.train()
+        for p in self.S.parameters():
+            p.requires_grad_(False)
         self.G.train()
         self.C.train()
 
@@ -563,7 +569,7 @@ class SandiaTrainer:
                     with torch.no_grad():
                         h_real = self.E(batch)
                     if h_real.dim() == 2:
-                        h_real = h_real.unsqueeze(0)
+                        h_real = h_real.unsqueeze(1)
                     C_real = self.C(h_real)
                     C_real_loss = -C_real.mean()
 
@@ -571,7 +577,7 @@ class SandiaTrainer:
                     z_local = torch.randn(B, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
                     h_fake = self.G(z_global, z_local)
                     if h_fake.dim() == 2:
-                        h_fake = h_fake.unsqueeze(0)
+                        h_fake = h_fake.unsqueeze(1)
                     C_fake = self.C(h_fake.detach())
                     C_fake_loss = C_fake.mean()
 
@@ -590,7 +596,7 @@ class SandiaTrainer:
                 z_local = torch.randn(B, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
                 h_fake = self.G(z_global, z_local)
                 if h_fake.dim() == 2:
-                    h_fake = h_fake.unsqueeze(0)
+                    h_fake = h_fake.unsqueeze(1)
                 C_fake = self.C(h_fake)
 
                 G_loss = -C_fake.mean()
@@ -599,10 +605,10 @@ class SandiaTrainer:
                 with torch.no_grad():
                     h_real = self.E(batch)
                     if h_real.dim() == 2:
-                        h_real = h_real.unsqueeze(0)
+                        h_real = h_real.unsqueeze(1)
                     h_pred = self.S(h_real[:, :-1, :])
                 if h_fake.dim() == 2:
-                    h_fake = h_fake.unsqueeze(0)
+                    h_fake = h_fake.unsqueeze(1)
                 h_pred_fake = self.S(h_fake[:, :-1, :])
                 sup_loss = F.mse_loss(h_pred_fake, h_fake[:, 1:, :])
 
@@ -673,8 +679,8 @@ class SandiaTrainer:
             z_local = torch.randn(128, self.cfg.timestep, self.cfg.noise_dim, device=self.device)
             h_fake = self.G(z_global, z_local)
             mmd = ((h_real.mean(0) - h_fake.mean(0)) ** 2).mean()
-            dist_real = ((h_real.unsqueeze(1) - h_real.unsqueeze(0)) ** 2).mean()
-            dist_fake = ((h_fake.unsqueeze(1) - h_fake.unsqueeze(0)) ** 2).mean()
+            dist_real = ((h_real.unsqueeze(1) - h_real.unsqueeze(1)) ** 2).mean()
+            dist_fake = ((h_fake.unsqueeze(1) - h_fake.unsqueeze(1)) ** 2).mean()
             diversity = 0.5 * (dist_real + dist_fake)
             combined = mmd + 0.1 * diversity
 
