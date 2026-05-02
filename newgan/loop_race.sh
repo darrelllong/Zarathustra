@@ -28,7 +28,7 @@ case "$current" in
   R224) echo "R225 alibaba more-data retrain" > next_moves.txt ;;
   R225) echo "R226 CP hp re-sweep" > next_moves.txt ;;
   R226) echo "R227 tencent ceiling experiments" > next_moves.txt ;;
-  *) echo "Unknown" > next_moves.txt ;;
+  *) echo "R224" > next_moves.txt ;;
 esac
 
 git add next_moves.txt
