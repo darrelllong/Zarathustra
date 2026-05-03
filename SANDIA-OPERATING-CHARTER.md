@@ -78,26 +78,52 @@ diverges the trees. If you find yourself wanting to rsync, you are
 probably doing something wrong — re-read this section.
 
 ## REPORTING
-After cachesim_eval emits its `mean HRC-MAE` line, append one row to
-`RESPONSE-Sandia.md`:
+After cachesim_eval emits its `mean HRC-MAE` line:
 
-```
-| <UTC timestamp> | <corpus> | <recipe one-liner> | <mean HRC-MAE> | <commit-sha> |
-```
+1. Append one row to `RESPONSE-Sandia.md`:
+   ```
+   | <UTC timestamp> | <corpus> | <recipe one-liner> | <mean HRC-MAE> | <commit-sha> |
+   ```
 
-Then:
-```
-cd ~/Sandia/Zarathustra
-git add RESPONSE-Sandia.md newgan/<any new files>
-git commit -m "Sandia: <corpus> <mean>"
-git push origin main
-```
+2. Write a claim manifest to the repo root at `.sandia-claim.json`:
+   ```json
+   {
+     "corpus": "msr_exchange",
+     "recipe": "newgan trainer ep20 + bootstrap shuffle, seed=42, n=1000000",
+     "claimed_mean": "0.0234",
+     "fake_csv": "/tiamat/zarathustra/sandia-output/sandia_msr_seed42.csv",
+     "real_csv": "/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv",
+     "cachesim_log": "/tmp/sandia_msr_seed42.log"
+   }
+   ```
+   The cachesim invocation must have written its full stdout to that
+   `cachesim_log` path (`python3 -m llgan.cachesim_eval ... 2>&1 | tee /tmp/sandia_msr_seed42.log`).
 
-Output to the human, on a single line, nothing else:
-`Sandia <corpus>: <mean> committed <short-sha>`
+3. Commit normally:
+   ```
+   cd ~/Sandia/Zarathustra
+   git add RESPONSE-Sandia.md newgan/<any new files>
+   git commit -m "Sandia: <corpus> <mean>"
+   ```
+   The pre-commit hook auto-runs SANDIA-AD on `.sandia-claim.json`.
+   - If AD passes (no defects / ship with caveats): commit completes,
+     post-commit hook deletes `.sandia-claim.json`.
+   - If AD blocks (do not commit): commit is rejected. Read the AD
+     report printed to stdout, fix the defects, regenerate the claim,
+     try again. Do NOT use `git commit --no-verify` — it bypasses AD
+     and the result will be invalid.
+
+4. Push: `git push origin main`.
+
+5. Output to the human, on a single line, nothing else:
+   `Sandia <corpus>: <mean> committed <short-sha>`
 
 That is the entire turn. Do not append commentary. Do not propose what to
 do next. The next turn will pick the next move.
+
+(Infra commits with no measured claim — code refactors, fixes, doc
+edits — should NOT write `.sandia-claim.json`. The pre-commit hook
+sees the absent file and lets the commit through unattacked.)
 
 ## START
 1. `cd ~/Sandia/Zarathustra && git pull --ff-only`
