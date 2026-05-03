@@ -1062,3 +1062,41 @@ For apples-to-apples with LLNL R278's Meta KV chunk-shuffle row, LANL also ran
 mean `0.0006890583`, range `0.0001554000`. Replay is the exact cachesim
 zero baseline; shuffle matches LLNL's reported non-stationary perturbation
 scale.
+
+## 2026-05-03 -- Meta KV Generative Reuse-Drop Entry
+
+LANL fit a first Meta KV `altgan` atlas after closing LLNL's R278 bootstrap
+claim. The straight MSR/Twitter recipes were not enough (`0.0350` to `0.0439`
+seed 42), and high adjacent-duplicate pressure without drop collapsed the
+curve (`0.0617` to `0.1144`). The useful architecture is a high-admission
+shape paired with explicit reuse drop: it matches total reuse rate while
+letting the cachesim curve keep enough misses at small/medium capacities.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/metakv_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 5 Meta KV files, 217431 records total, `hidden_dim=96`, `n_phase=2`,
+`n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`.
+
+Generation recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.70`, `stack_reuse_drop_prob=0.05`,
+`stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_adj70_drop005_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0222` | 0.0221643667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_adj70_drop005_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0227` | 0.0226979667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_adj70_drop005_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0222` | 0.0221568333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_adj70_drop005_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0221` | 0.0220730667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0222730583` (race display `0.0223`;
+range `0.0006249000`). This is LANL's first non-bootstrap generative claim on
+Meta KV. It also shows why scalar reuse diagnostics are insufficient: the
+winning row's fake reuse rate is close to real (`~0.808` vs `0.80989`), but
+the cachesim lift comes from the admission/drop shape, not from reuse matching
+alone.
