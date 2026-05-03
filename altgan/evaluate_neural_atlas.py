@@ -52,6 +52,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Leave scaled ranks at or below this pivot unchanged before tail stretch; negative disables.")
     p.add_argument("--stack-rank-tail-scale", type=float, default=1.0,
                    help="Scale only the excess above --stack-rank-tail-pivot.")
+    p.add_argument("--stack-rank-position-scales", default="",
+                   help="Comma-separated per-position-bin stack-rank scales.")
     p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
                    help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
     p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
@@ -64,8 +66,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated per-position-bin reuse-drop probabilities.")
     p.add_argument("--stack-adj-dup-prob", type=float, default=0.0,
                    help="Probability that a sampled reuse emits the current MRU object.")
+    p.add_argument("--stack-adj-dup-position-probs", default="",
+                   help="Comma-separated per-position-bin adjacent-duplicate probabilities.")
     p.add_argument("--stack-hot-pool-prob", type=float, default=0.0,
                    help="Probability of redirecting an ordinary sampled reuse to the recent hot pool.")
+    p.add_argument("--stack-hot-pool-position-probs", default="",
+                   help="Comma-separated per-position-bin hot-pool probabilities.")
     p.add_argument("--stack-hot-pool-k", type=int, default=100,
                    help="Number of recent hot objects eligible for hot-pool reuse.")
     p.add_argument("--stack-hot-pool-window", type=int, default=5000,
@@ -94,12 +100,16 @@ def _parse_args() -> argparse.Namespace:
                    help="Number of frequency-pool samples tried to satisfy age/rank filters.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
+    p.add_argument("--stack-tail-reuse-position-probs", default="",
+                   help="Comma-separated per-position-bin stack-tail reuse probabilities.")
     p.add_argument("--stack-tail-reuse-min-frac", type=float, default=0.5,
                    help="Minimum stack fraction for --stack-tail-reuse-prob redirects.")
     p.add_argument("--stack-tail-reuse-rank-power", type=float, default=1.0,
                    help="Power shaping for tail-reuse rank redirects; values <1 favor deeper tail ranks.")
     p.add_argument("--stack-recent-pool-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a recent emitted object.")
+    p.add_argument("--stack-recent-pool-position-probs", default="",
+                   help="Comma-separated per-position-bin recent-pool probabilities.")
     p.add_argument("--stack-recent-pool-window", type=int, default=200,
                    help="Number of emitted objects kept for --stack-recent-pool-prob redirects.")
     p.add_argument("--stack-rank-phase-scales", default="",
@@ -184,13 +194,16 @@ def main() -> int:
         stack_rank_max=None if args.stack_rank_max < 0 else args.stack_rank_max,
         stack_rank_tail_pivot=None if args.stack_rank_tail_pivot < 0 else args.stack_rank_tail_pivot,
         stack_rank_tail_scale=args.stack_rank_tail_scale,
+        stack_rank_position_scales=_parse_float_list(args.stack_rank_position_scales),
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
         stack_reuse_drop_prob=args.stack_reuse_drop_prob,
         stack_reuse_drop_position_probs=_parse_float_list(args.stack_reuse_drop_position_probs),
         stack_adj_dup_prob=args.stack_adj_dup_prob,
+        stack_adj_dup_position_probs=_parse_float_list(args.stack_adj_dup_position_probs),
         stack_hot_pool_prob=args.stack_hot_pool_prob,
+        stack_hot_pool_position_probs=_parse_float_list(args.stack_hot_pool_position_probs),
         stack_hot_pool_k=args.stack_hot_pool_k,
         stack_hot_pool_window=args.stack_hot_pool_window,
         stack_hot_pool_weight_power=args.stack_hot_pool_weight_power,
@@ -205,9 +218,11 @@ def main() -> int:
         stack_frequency_pool_max_rank=None if args.stack_frequency_pool_max_rank < 0 else args.stack_frequency_pool_max_rank,
         stack_frequency_pool_sample_attempts=args.stack_frequency_pool_sample_attempts,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
+        stack_tail_reuse_position_probs=_parse_float_list(args.stack_tail_reuse_position_probs),
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
         stack_tail_reuse_rank_power=args.stack_tail_reuse_rank_power,
         stack_recent_pool_prob=args.stack_recent_pool_prob,
+        stack_recent_pool_position_probs=_parse_float_list(args.stack_recent_pool_position_probs),
         stack_recent_pool_window=args.stack_recent_pool_window,
         stack_rank_phase_scales=_parse_float_list(args.stack_rank_phase_scales),
         stack_rank_phase_maxes=_parse_int_list(args.stack_rank_phase_maxes),
@@ -267,13 +282,16 @@ def main() -> int:
         "stack_rank_max": args.stack_rank_max,
         "stack_rank_tail_pivot": args.stack_rank_tail_pivot,
         "stack_rank_tail_scale": args.stack_rank_tail_scale,
+        "stack_rank_position_scales": _parse_float_list(args.stack_rank_position_scales),
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
         "stack_reuse_drop_prob": args.stack_reuse_drop_prob,
         "stack_reuse_drop_position_probs": _parse_float_list(args.stack_reuse_drop_position_probs),
         "stack_adj_dup_prob": args.stack_adj_dup_prob,
+        "stack_adj_dup_position_probs": _parse_float_list(args.stack_adj_dup_position_probs),
         "stack_hot_pool_prob": args.stack_hot_pool_prob,
+        "stack_hot_pool_position_probs": _parse_float_list(args.stack_hot_pool_position_probs),
         "stack_hot_pool_k": args.stack_hot_pool_k,
         "stack_hot_pool_window": args.stack_hot_pool_window,
         "stack_hot_pool_weight_power": args.stack_hot_pool_weight_power,
@@ -288,9 +306,11 @@ def main() -> int:
         "stack_frequency_pool_max_rank": args.stack_frequency_pool_max_rank,
         "stack_frequency_pool_sample_attempts": args.stack_frequency_pool_sample_attempts,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
+        "stack_tail_reuse_position_probs": _parse_float_list(args.stack_tail_reuse_position_probs),
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
         "stack_tail_reuse_rank_power": args.stack_tail_reuse_rank_power,
         "stack_recent_pool_prob": args.stack_recent_pool_prob,
+        "stack_recent_pool_position_probs": _parse_float_list(args.stack_recent_pool_position_probs),
         "stack_recent_pool_window": args.stack_recent_pool_window,
         "stack_rank_phase_scales": _parse_float_list(args.stack_rank_phase_scales),
         "stack_rank_phase_maxes": _parse_int_list(args.stack_rank_phase_maxes),

@@ -85,13 +85,16 @@ class NeuralAtlasModel:
         stack_rank_max: int | None = None,
         stack_rank_tail_pivot: int | None = None,
         stack_rank_tail_scale: float = 1.0,
+        stack_rank_position_scales: Sequence[float] | None = None,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
         stack_reuse_drop_prob: float = 0.0,
         stack_reuse_drop_position_probs: Sequence[float] | None = None,
         stack_adj_dup_prob: float = 0.0,
+        stack_adj_dup_position_probs: Sequence[float] | None = None,
         stack_hot_pool_prob: float = 0.0,
+        stack_hot_pool_position_probs: Sequence[float] | None = None,
         stack_hot_pool_k: int = 100,
         stack_hot_pool_window: int = 5000,
         stack_hot_pool_weight_power: float = 1.0,
@@ -106,9 +109,11 @@ class NeuralAtlasModel:
         stack_frequency_pool_max_rank: int | None = None,
         stack_frequency_pool_sample_attempts: int = 8,
         stack_tail_reuse_prob: float = 0.0,
+        stack_tail_reuse_position_probs: Sequence[float] | None = None,
         stack_tail_reuse_min_frac: float = 0.5,
         stack_tail_reuse_rank_power: float = 1.0,
         stack_recent_pool_prob: float = 0.0,
+        stack_recent_pool_position_probs: Sequence[float] | None = None,
         stack_recent_pool_window: int = 200,
         stack_rank_phase_scales: Sequence[float] | None = None,
         stack_rank_phase_maxes: Sequence[int] | None = None,
@@ -139,6 +144,7 @@ class NeuralAtlasModel:
         local_prob_power = max(float(local_prob_power), 0.0)
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
         stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
+        stack_rank_position_scales = _nonnegative_float_list(stack_rank_position_scales)
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -147,7 +153,9 @@ class NeuralAtlasModel:
         stack_reuse_drop_prob = float(np.clip(stack_reuse_drop_prob, 0.0, 1.0))
         stack_reuse_drop_position_probs = _clip_prob_list(stack_reuse_drop_position_probs)
         stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
+        stack_adj_dup_position_probs = _clip_prob_list(stack_adj_dup_position_probs)
         stack_hot_pool_prob = float(np.clip(stack_hot_pool_prob, 0.0, 1.0))
+        stack_hot_pool_position_probs = _clip_prob_list(stack_hot_pool_position_probs)
         stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
         stack_hot_pool_window = max(int(stack_hot_pool_window), 1)
         stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
@@ -166,9 +174,11 @@ class NeuralAtlasModel:
             stack_frequency_pool_max_rank = None
         stack_frequency_pool_sample_attempts = max(int(stack_frequency_pool_sample_attempts), 1)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
+        stack_tail_reuse_position_probs = _clip_prob_list(stack_tail_reuse_position_probs)
         stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
         stack_tail_reuse_rank_power = max(float(stack_tail_reuse_rank_power), 1e-6)
         stack_recent_pool_prob = float(np.clip(stack_recent_pool_prob, 0.0, 1.0))
+        stack_recent_pool_position_probs = _clip_prob_list(stack_recent_pool_position_probs)
         stack_recent_pool_window = max(int(stack_recent_pool_window), 1)
         mark_numeric_blend = float(np.clip(mark_numeric_blend, 0.0, 1.0))
         if mark_feedback_numeric_blend is not None:
@@ -251,6 +261,36 @@ class NeuralAtlasModel:
                     state = _state_with_phase(state, phase, base_span)
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
+                position_rank_scale = _position_value(
+                    stack_rank_position_scales,
+                    pos,
+                    per_stream,
+                    stack_rank_scale,
+                )
+                adj_dup_prob = _position_value(
+                    stack_adj_dup_position_probs,
+                    pos,
+                    per_stream,
+                    stack_adj_dup_prob,
+                )
+                hot_pool_prob = _position_value(
+                    stack_hot_pool_position_probs,
+                    pos,
+                    per_stream,
+                    stack_hot_pool_prob,
+                )
+                recent_pool_prob = _position_value(
+                    stack_recent_pool_position_probs,
+                    pos,
+                    per_stream,
+                    stack_recent_pool_prob,
+                )
+                tail_reuse_prob = _position_value(
+                    stack_tail_reuse_position_probs,
+                    pos,
+                    per_stream,
+                    stack_tail_reuse_prob,
+                )
                 reuse_drop_prob = _position_value(
                     stack_reuse_drop_position_probs,
                     pos,
@@ -274,7 +314,7 @@ class NeuralAtlasModel:
                 if boosted_reuse:
                     wants_reuse = True
                 if wants_reuse and stack:
-                    if stack_tail_reuse_prob > 0.0 and rng.random() < stack_tail_reuse_prob:
+                    if tail_reuse_prob > 0.0 and rng.random() < tail_reuse_prob:
                         lo = max(int(len(stack) * stack_tail_reuse_min_frac), len(stack) // 2)
                         lo = min(max(lo, 0), len(stack) - 1)
                         if stack_tail_reuse_rank_power == 1.0:
@@ -284,18 +324,18 @@ class NeuralAtlasModel:
                             biased = u ** stack_tail_reuse_rank_power
                             rank = int(lo + (len(stack) - 1 - lo) * biased)
                             rank = max(lo, min(rank, len(stack) - 1))
-                    elif stack_adj_dup_prob > 0.0 and rng.random() < stack_adj_dup_prob:
+                    elif adj_dup_prob > 0.0 and rng.random() < adj_dup_prob:
                         rank = 0
                     elif (
-                        stack_recent_pool_prob > 0.0
+                        recent_pool_prob > 0.0
                         and recent_window
-                        and rng.random() < stack_recent_pool_prob
+                        and rng.random() < recent_pool_prob
                     ):
                         recent_obj = int(recent_window[int(rng.integers(0, len(recent_window)))])
                         try:
                             rank = stack.index(recent_obj)
                         except ValueError:
-                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                             if phase_rank_max is not None and phase_rank_max < 0:
                                 phase_rank_max = None
@@ -329,7 +369,7 @@ class NeuralAtlasModel:
                         if rank_from_pool is not None:
                             rank = rank_from_pool
                         else:
-                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                             if phase_rank_max is not None and phase_rank_max < 0:
                                 phase_rank_max = None
@@ -343,9 +383,9 @@ class NeuralAtlasModel:
                             )
                     elif (
                         not boosted_reuse
-                        and stack_hot_pool_prob > 0.0
+                        and hot_pool_prob > 0.0
                         and hot_pool
-                        and rng.random() < stack_hot_pool_prob
+                        and rng.random() < hot_pool_prob
                     ):
                         eligible_hot_pool = _eligible_hot_pool(
                             hot_pool,
@@ -369,7 +409,7 @@ class NeuralAtlasModel:
                                 else:
                                     rank = stack.index(hot_obj)
                             except ValueError:
-                                phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                                phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                                 phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                                 if phase_rank_max is not None and phase_rank_max < 0:
                                     phase_rank_max = None
@@ -382,7 +422,7 @@ class NeuralAtlasModel:
                                     stack_len=len(stack),
                                 )
                         else:
-                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                             if phase_rank_max is not None and phase_rank_max < 0:
                                 phase_rank_max = None
@@ -402,7 +442,7 @@ class NeuralAtlasModel:
                             rng=rng,
                         )
                     else:
-                        phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                        phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                         phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                         if phase_rank_max is not None and phase_rank_max < 0:
                             phase_rank_max = None
@@ -502,7 +542,7 @@ class NeuralAtlasModel:
                     "stack_distance": effective_stack_distance,
                     "action_class": effective_action_class,
                 })
-                if stack_hot_pool_prob > 0.0:
+                if stack_hot_pool_prob > 0.0 or stack_hot_pool_position_probs:
                     if len(hot_window) >= stack_hot_pool_window:
                         old_obj = hot_window.popleft()
                         hot_counts[old_obj] -= 1
@@ -524,7 +564,7 @@ class NeuralAtlasModel:
                             if obj in freq_last_pos
                         }
                         freq_pool = freq_counts.most_common(stack_frequency_pool_k)
-                if stack_recent_pool_prob > 0.0:
+                if stack_recent_pool_prob > 0.0 or stack_recent_pool_position_probs:
                     recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
                     print(
@@ -1258,6 +1298,12 @@ def _clip_prob_list(values: Sequence[float] | None) -> list[float]:
     if not values:
         return []
     return [float(np.clip(float(v), 0.0, 1.0)) for v in values]
+
+
+def _nonnegative_float_list(values: Sequence[float] | None) -> list[float]:
+    if not values:
+        return []
+    return [max(float(v), 0.0) for v in values]
 
 
 def _blend_numeric_marks(

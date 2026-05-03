@@ -26,15 +26,20 @@ class Spec:
     rank_max: int = -1
     rank_tail_pivot: int = -1
     rank_tail_scale: float = 1.0
+    rank_position_scales: str = ""
     adj_dup_prob: float = 0.0
+    adj_dup_position_probs: str = ""
     hot_pool_prob: float = 0.45
+    hot_pool_position_probs: str = ""
     hot_pool_k: int = 75
     hot_pool_window: int = 10000
     hot_pool_weight_power: float = 1.0
     hot_pool_min_age: int = 0
     recent_pool_prob: float = 0.15
+    recent_pool_position_probs: str = ""
     recent_pool_window: int = 16
     tail_reuse_prob: float = 0.10
+    tail_reuse_position_probs: str = ""
     tail_reuse_min_frac: float = 0.5
     tail_reuse_rank_power: float = 1.0
     reuse_boost_prob: float = 0.0
@@ -68,15 +73,25 @@ def _parse_spec(text: str) -> Spec:
         "rankmax": "rank_max",
         "tailpivot": "rank_tail_pivot",
         "tailscale": "rank_tail_scale",
+        "rank_pos": "rank_position_scales",
+        "rankpos": "rank_position_scales",
         "adj": "adj_dup_prob",
+        "adj_pos": "adj_dup_position_probs",
+        "adjpos": "adj_dup_position_probs",
         "hp": "hot_pool_prob",
+        "hp_pos": "hot_pool_position_probs",
+        "hppos": "hot_pool_position_probs",
         "k": "hot_pool_k",
         "hpwin": "hot_pool_window",
         "hpwp": "hot_pool_weight_power",
         "minage": "hot_pool_min_age",
         "rp": "recent_pool_prob",
+        "rp_pos": "recent_pool_position_probs",
+        "rppos": "recent_pool_position_probs",
         "win": "recent_pool_window",
         "tail": "tail_reuse_prob",
+        "tail_pos": "tail_reuse_position_probs",
+        "tailpos": "tail_reuse_position_probs",
         "mf": "tail_reuse_min_frac",
         "tail_power": "tail_reuse_rank_power",
         "tpow": "tail_reuse_rank_power",
@@ -191,8 +206,12 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_tail_pivot),
         "--stack-rank-tail-scale",
         str(spec.rank_tail_scale),
+        "--stack-rank-position-scales",
+        spec.rank_position_scales,
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
+        "--stack-adj-dup-position-probs",
+        spec.adj_dup_position_probs,
         "--stack-reuse-boost-prob",
         str(spec.reuse_boost_prob),
         "--stack-reuse-boost-min-rank",
@@ -203,6 +222,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.reuse_drop_prob),
         "--stack-hot-pool-prob",
         str(spec.hot_pool_prob),
+        "--stack-hot-pool-position-probs",
+        spec.hot_pool_position_probs,
         "--stack-hot-pool-k",
         str(spec.hot_pool_k),
         "--stack-hot-pool-window",
@@ -213,10 +234,14 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.hot_pool_min_age),
         "--stack-recent-pool-prob",
         str(spec.recent_pool_prob),
+        "--stack-recent-pool-position-probs",
+        spec.recent_pool_position_probs,
         "--stack-recent-pool-window",
         str(spec.recent_pool_window),
         "--stack-tail-reuse-prob",
         str(spec.tail_reuse_prob),
+        "--stack-tail-reuse-position-probs",
+        spec.tail_reuse_position_probs,
         "--stack-tail-reuse-min-frac",
         str(spec.tail_reuse_min_frac),
         "--stack-tail-reuse-rank-power",
