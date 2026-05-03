@@ -43,6 +43,16 @@ class Spec:
     hot_pool_window: int = 10000
     hot_pool_weight_power: float = 1.0
     hot_pool_min_age: int = 0
+    frequency_pool_prob: float = 0.0
+    frequency_pool_k: int = 100
+    frequency_pool_max_candidates: int = 1000
+    frequency_pool_min_count_rank: int = 0
+    frequency_pool_max_count_rank: int = -1
+    frequency_pool_weight_power: float = 1.0
+    frequency_pool_min_age: int = 0
+    frequency_pool_min_rank: int = 0
+    frequency_pool_max_rank: int = -1
+    frequency_pool_sample_attempts: int = 8
     recent_pool_prob: float = 0.15
     recent_pool_position_probs: str = ""
     recent_pool_window: int = 16
@@ -118,6 +128,28 @@ def _parse_spec(text: str) -> Spec:
         "hpwin": "hot_pool_window",
         "hpwp": "hot_pool_weight_power",
         "minage": "hot_pool_min_age",
+        "fp": "frequency_pool_prob",
+        "freq": "frequency_pool_prob",
+        "fpk": "frequency_pool_k",
+        "fp_k": "frequency_pool_k",
+        "fpmaxcand": "frequency_pool_max_candidates",
+        "fp_max_candidates": "frequency_pool_max_candidates",
+        "fp_count_min": "frequency_pool_min_count_rank",
+        "fpmincount": "frequency_pool_min_count_rank",
+        "fpr_min": "frequency_pool_min_count_rank",
+        "fp_count_max": "frequency_pool_max_count_rank",
+        "fpmaxcount": "frequency_pool_max_count_rank",
+        "fpr_max": "frequency_pool_max_count_rank",
+        "fpwp": "frequency_pool_weight_power",
+        "fp_weight": "frequency_pool_weight_power",
+        "fpage": "frequency_pool_min_age",
+        "fp_min_age": "frequency_pool_min_age",
+        "fp_min_rank": "frequency_pool_min_rank",
+        "fpminrank": "frequency_pool_min_rank",
+        "fp_max_rank": "frequency_pool_max_rank",
+        "fpmaxrank": "frequency_pool_max_rank",
+        "fp_attempts": "frequency_pool_sample_attempts",
+        "fpattempts": "frequency_pool_sample_attempts",
         "rp": "recent_pool_prob",
         "rp_pos": "recent_pool_position_probs",
         "rppos": "recent_pool_position_probs",
@@ -165,7 +197,10 @@ def _auto_name(spec: Spec) -> str:
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
         f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
-        f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
+        f"_minage{spec.hot_pool_min_age}_fp{_tag(spec.frequency_pool_prob)}"
+        f"k{spec.frequency_pool_k}cr{spec.frequency_pool_min_count_rank}"
+        f"-{spec.frequency_pool_max_count_rank}"
+        f"_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
         f"_drop{_tag(spec.reuse_drop_prob)}"
@@ -282,6 +317,26 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.hot_pool_weight_power),
         "--stack-hot-pool-min-age",
         str(spec.hot_pool_min_age),
+        "--stack-frequency-pool-prob",
+        str(spec.frequency_pool_prob),
+        "--stack-frequency-pool-k",
+        str(spec.frequency_pool_k),
+        "--stack-frequency-pool-max-candidates",
+        str(spec.frequency_pool_max_candidates),
+        "--stack-frequency-pool-min-count-rank",
+        str(spec.frequency_pool_min_count_rank),
+        "--stack-frequency-pool-max-count-rank",
+        str(spec.frequency_pool_max_count_rank),
+        "--stack-frequency-pool-weight-power",
+        str(spec.frequency_pool_weight_power),
+        "--stack-frequency-pool-min-age",
+        str(spec.frequency_pool_min_age),
+        "--stack-frequency-pool-min-rank",
+        str(spec.frequency_pool_min_rank),
+        "--stack-frequency-pool-max-rank",
+        str(spec.frequency_pool_max_rank),
+        "--stack-frequency-pool-sample-attempts",
+        str(spec.frequency_pool_sample_attempts),
         "--stack-recent-pool-prob",
         str(spec.recent_pool_prob),
         "--stack-recent-pool-position-probs",

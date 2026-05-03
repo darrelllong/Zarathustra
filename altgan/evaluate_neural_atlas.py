@@ -104,6 +104,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Number of long-memory frequent objects eligible for frequency-pool reuse.")
     p.add_argument("--stack-frequency-pool-max-candidates", type=int, default=1000,
                    help="Maximum approximate frequency candidates retained before pruning to top-k.")
+    p.add_argument("--stack-frequency-pool-min-count-rank", type=int, default=0,
+                   help="Zero-based frequency rank to start frequency-pool candidates; skips hotter objects.")
+    p.add_argument("--stack-frequency-pool-max-count-rank", type=int, default=-1,
+                   help="Exclusive zero-based frequency rank where frequency-pool candidates stop; negative disables.")
     p.add_argument("--stack-frequency-pool-weight-power", type=float, default=1.0,
                    help="Power applied to long-memory frequency-pool counts.")
     p.add_argument("--stack-frequency-pool-min-age", type=int, default=0,
@@ -236,6 +240,12 @@ def main() -> int:
         stack_frequency_pool_prob=args.stack_frequency_pool_prob,
         stack_frequency_pool_k=args.stack_frequency_pool_k,
         stack_frequency_pool_max_candidates=args.stack_frequency_pool_max_candidates,
+        stack_frequency_pool_min_count_rank=args.stack_frequency_pool_min_count_rank,
+        stack_frequency_pool_max_count_rank=(
+            None
+            if args.stack_frequency_pool_max_count_rank < 0
+            else args.stack_frequency_pool_max_count_rank
+        ),
         stack_frequency_pool_weight_power=args.stack_frequency_pool_weight_power,
         stack_frequency_pool_min_age=args.stack_frequency_pool_min_age,
         stack_frequency_pool_min_rank=args.stack_frequency_pool_min_rank,
@@ -332,6 +342,8 @@ def main() -> int:
         "stack_frequency_pool_prob": args.stack_frequency_pool_prob,
         "stack_frequency_pool_k": args.stack_frequency_pool_k,
         "stack_frequency_pool_max_candidates": args.stack_frequency_pool_max_candidates,
+        "stack_frequency_pool_min_count_rank": args.stack_frequency_pool_min_count_rank,
+        "stack_frequency_pool_max_count_rank": args.stack_frequency_pool_max_count_rank,
         "stack_frequency_pool_weight_power": args.stack_frequency_pool_weight_power,
         "stack_frequency_pool_min_age": args.stack_frequency_pool_min_age,
         "stack_frequency_pool_min_rank": args.stack_frequency_pool_min_rank,

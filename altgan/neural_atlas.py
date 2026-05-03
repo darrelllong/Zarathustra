@@ -112,6 +112,8 @@ class NeuralAtlasModel:
         stack_frequency_pool_prob: float = 0.0,
         stack_frequency_pool_k: int = 100,
         stack_frequency_pool_max_candidates: int = 1000,
+        stack_frequency_pool_min_count_rank: int = 0,
+        stack_frequency_pool_max_count_rank: int | None = None,
         stack_frequency_pool_weight_power: float = 1.0,
         stack_frequency_pool_min_age: int = 0,
         stack_frequency_pool_min_rank: int = 0,
@@ -187,6 +189,29 @@ class NeuralAtlasModel:
             int(stack_frequency_pool_max_candidates),
             stack_frequency_pool_k,
         )
+        stack_frequency_pool_min_count_rank = max(
+            int(stack_frequency_pool_min_count_rank),
+            0,
+        )
+        if (
+            stack_frequency_pool_max_count_rank is not None
+            and stack_frequency_pool_max_count_rank < 0
+        ):
+            stack_frequency_pool_max_count_rank = None
+        if stack_frequency_pool_max_count_rank is not None:
+            stack_frequency_pool_max_count_rank = max(
+                int(stack_frequency_pool_max_count_rank),
+                stack_frequency_pool_min_count_rank,
+            )
+            stack_frequency_pool_max_candidates = max(
+                stack_frequency_pool_max_candidates,
+                stack_frequency_pool_max_count_rank,
+            )
+        elif stack_frequency_pool_min_count_rank > 0:
+            stack_frequency_pool_max_candidates = max(
+                stack_frequency_pool_max_candidates,
+                stack_frequency_pool_min_count_rank + stack_frequency_pool_k,
+            )
         stack_frequency_pool_weight_power = max(float(stack_frequency_pool_weight_power), 1e-6)
         stack_frequency_pool_min_age = max(int(stack_frequency_pool_min_age), 0)
         stack_frequency_pool_min_rank = max(int(stack_frequency_pool_min_rank), 0)
@@ -279,7 +304,12 @@ class NeuralAtlasModel:
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
                     hot_pool = hot_counts.most_common(stack_hot_pool_k)
                 if stack_frequency_pool_prob > 0.0 and pos % 512 == 0 and freq_counts:
-                    freq_pool = freq_counts.most_common(stack_frequency_pool_k)
+                    freq_pool = _frequency_rank_pool(
+                        freq_counts,
+                        pool_size=stack_frequency_pool_k,
+                        min_count_rank=stack_frequency_pool_min_count_rank,
+                        max_count_rank=stack_frequency_pool_max_count_rank,
+                    )
                 phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                 if force_phase_schedule and self.n_phase_bins > 1:
                     state = _state_with_phase(state, phase, base_span)
@@ -615,13 +645,23 @@ class NeuralAtlasModel:
                     freq_counts[freq_obj] += 1
                     freq_last_pos[freq_obj] = pos
                     if len(freq_counts) > stack_frequency_pool_max_candidates:
-                        freq_counts = Counter(dict(freq_counts.most_common(stack_frequency_pool_k)))
+                        keep_n = _frequency_rank_keep_count(
+                            stack_frequency_pool_k,
+                            stack_frequency_pool_min_count_rank,
+                            stack_frequency_pool_max_count_rank,
+                        )
+                        freq_counts = Counter(dict(freq_counts.most_common(keep_n)))
                         freq_last_pos = {
                             obj: freq_last_pos[obj]
                             for obj in freq_counts
                             if obj in freq_last_pos
                         }
-                        freq_pool = freq_counts.most_common(stack_frequency_pool_k)
+                        freq_pool = _frequency_rank_pool(
+                            freq_counts,
+                            pool_size=stack_frequency_pool_k,
+                            min_count_rank=stack_frequency_pool_min_count_rank,
+                            max_count_rank=stack_frequency_pool_max_count_rank,
+                        )
                 if stack_recent_pool_prob > 0.0 or stack_recent_pool_position_probs:
                     recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
@@ -972,7 +1012,7 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
         n_size_bins,
         n_dist_states,
     )
-    states = (phase_bins * (n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS)
+    states = (phase_bins * (n_time_bins * n_size_bins * n_dist_states)
               + base_states).astype(np.int64)
     opcodes = df["opcode"].to_numpy(dtype=object)
     tenants = df["tenant"].to_numpy(dtype=object)
@@ -1204,6 +1244,35 @@ def _eligible_hot_pool(
         for obj_id, count in hot_pool
         if current - int(last_pos.get(int(obj_id), -age)) >= age
     ]
+
+
+def _frequency_rank_keep_count(
+    pool_size: int,
+    min_count_rank: int,
+    max_count_rank: int | None,
+) -> int:
+    start = max(int(min_count_rank), 0)
+    size = max(int(pool_size), 1)
+    if max_count_rank is None:
+        return start + size
+    return max(int(max_count_rank), start + 1)
+
+
+def _frequency_rank_pool(
+    counts: Counter[int],
+    *,
+    pool_size: int,
+    min_count_rank: int,
+    max_count_rank: int | None,
+) -> list[tuple[int, int]]:
+    start = max(int(min_count_rank), 0)
+    stop = _frequency_rank_keep_count(pool_size, start, max_count_rank)
+    ranked = counts.most_common(stop)
+    pool = ranked[start:stop]
+    size = max(int(pool_size), 1)
+    if len(pool) > size:
+        return pool[:size]
+    return pool
 
 
 def _rank_from_object_pool(
