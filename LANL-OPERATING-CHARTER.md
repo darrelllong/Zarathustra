@@ -113,17 +113,28 @@ ledger format.
 Commit message format: `LANL: post <corpus> <lever> <overtake|tie-break|update>`
 or `altgan: <feature/fix>`.
 
-## CURRENT STATE (as of charter commit)
-- Alibaba: LLNL 0.0131 leads you 0.0143 by 8.4%. Diagnose: SIEVE+SLRU
-  dominate your gap (per your own per-policy panel). Cooldown control
-  shipped (5a77f94); next is admission control or scout integration.
-- Tencent: you ~0.0001 via TraceBootstrap. Holds.
-- CloudPhysics: you ~0.0000 via TraceBootstrap (8-pol). Holds.
+## CURRENT STATE (as of 2026-05-03 ledger correction)
+- Alibaba: LANL `0.0118763500` (display `0.0119`) via hot-pool cooldown
+  beats LLNL R248/R250-R252 `0.0131138583` by `9.4%`. The older LANL
+  `0.0142609500` panel was a superseded decimal-correction result; do not
+  route next work from that stale loss line. Defend the cooldown/admission
+  architecture and look for scout integration only if it preserves the
+  SIEVE/SLRU win.
+- Tencent: you ~0.0001 via TraceBootstrap. LLNL R259g ported the same
+  bootstrap architecture and reports bootstrap `0.0000`, so this is no longer
+  a differentiating generative lead unless the race explicitly accepts
+  trace-bootstrap methodology.
+- CloudPhysics: you ~0.0000 via TraceBootstrap (8-pol). LLNL R259g also
+  reports bootstrap `0.0000`, so CP is methodology-neutral until a
+  non-bootstrap generator claim lands.
 - Baleen24: you 0.0291 (scout atlas) leads LLNL 0.0438. Holds.
 - MSR Exchange: you 0.0131 (scout-rank, NOT bootstrap) leads LLNL 0.0253.
 
-Score 4-of-5 leading. Defend the bootstrap surfaces against an LLNL
-counter-bootstrap; press the alibaba gap to overtake.
+Generative ledger: LANL leads Alibaba, Baleen24, and MSR Exchange; Tencent is
+still contested around the old neural tier unless bootstrap is counted; CP
+needs a non-bootstrap claim. Bootstrap ledger was neutralized by LLNL R259g.
+Defend measured generative leads and press the next architectural front, not
+the stale Alibaba gap.
 
 ## START
 1. `cd ~/LANL/Zarathustra && git pull --rebase origin main`

@@ -2034,3 +2034,20 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed80_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed81_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed82_official6.json`
+
+## Alibaba Standing Ledger Correction (2026-05-03)
+
+The current official LANL Alibaba claim is the hot-pool cooldown panel, not the
+superseded decimal-correction panel. The stale standing was LANL
+`0.0142609500` behind LLNL `0.0131138583`; the measured current standing is:
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| 80 | `mean HRC-MAE across policies: 0.0123` | 0.0122872667 |
+| 81 | `mean HRC-MAE across policies: 0.0117` | 0.0116597667 |
+| 82 | `mean HRC-MAE across policies: 0.0120` | 0.0120387333 |
+
+Four-seed mean: `0.0118763500` (display `0.0119`), range `0.0007676333`.
+This beats LLNL R248/R250-R252 `0.0131138583` by `9.4%` under the official
+six-policy Alibaba cachesim surface.

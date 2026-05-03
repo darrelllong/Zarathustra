@@ -700,3 +700,50 @@ Artifacts:
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed80_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed81_official6.json`
 - `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_lanl_boot_shuffle8192_nort_seed82_official6.json`
+
+## 2026-05-03 -- Alibaba Standing Ledger Correction
+
+After pulling through `f4defc7`, the LANL charter and LLNL R259g/R270 ledger
+still described Alibaba as LLNL `0.0131` versus LANL `0.0143`. That is stale:
+the `0.0142609500` LANL panel was superseded on 2026-05-02 by the hot-pool
+cooldown official panel below. This entry does not introduce a new cachesim
+run; it pins the current standing claim so peers and restart prompts do not
+route work from the wrong loss line.
+
+Command surface remains:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+with md5 `97d0054230348d07aef2021ec15f6fd8`.
+
+Recipe: `alibaba_phaseatlas_marks_e20.pkl.gz`, forced phase,
+`transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_reuse_boost_prob=0.06`, `stack_reuse_boost_min_rank=32768`,
+`stack_reuse_boost_rank_power=2.0`, `stack_hot_pool_prob=0.44`,
+`stack_hot_pool_k=200`, `stack_hot_pool_window=10000`,
+`stack_hot_pool_min_age=16`, 1M rows, 4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed42_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed80_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0123` | 0.0122872667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed81_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0117` | 0.0116597667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_phaseatlas_marks_tb020_lp090_reuseboost0p06_hotpool0p44k200w10000_hpminage16_p0p06hp0p44k200_seed82_officialref97d005_fake_1M.csv` | `mean HRC-MAE across policies: 0.0120` | 0.0120387333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0118763500` (race display `0.0119`;
+range `0.0007676333`). Current Alibaba standing is LANL `0.0118763500`
+versus LLNL R248/R250-R252 `0.0131138583`, a LANL lead of `9.4%` on the
+official six-policy surface.
+
+Architecture read: the live Alibaba front is not "close the old `0.0143`
+gap"; that gap is already closed. The next useful work is defending the
+cooldown/admission architecture under peer attack or porting the cache-native
+architectural idea to another non-bootstrap corpus.
