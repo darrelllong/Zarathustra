@@ -640,6 +640,7 @@ def fit_neural_atlas(
     hidden_dim: int = 96,
     epochs: int = 800,
     lr: float = 2e-3,
+    cond_noise_std: float = 0.0,
     max_samples_per_state: int = 1024,
     seed: int = 7,
 ) -> NeuralAtlasModel:
@@ -732,20 +733,31 @@ def fit_neural_atlas(
     weight_arr = weight_arr / max(float(weight_arr.mean()), 1e-6)
 
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = _CondTransitionNet(cond_arr.shape[1], hidden_dim, n_states)
+    net.to(device)
     opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-4)
-    x_init = torch.tensor(cond_arr)
-    y_init = torch.tensor(init_arr)
-    x_trans = torch.tensor(trans_cond_arr)
-    state_trans = torch.tensor(trans_state_arr, dtype=torch.long)
-    y_trans = torch.tensor(trans_arr)
-    w_trans = torch.tensor(weight_arr)
+    x_init = torch.tensor(cond_arr, device=device)
+    y_init = torch.tensor(init_arr, device=device)
+    x_trans = torch.tensor(trans_cond_arr, device=device)
+    state_trans = torch.tensor(trans_state_arr, dtype=torch.long, device=device)
+    y_trans = torch.tensor(trans_arr, device=device)
+    w_trans = torch.tensor(weight_arr, device=device)
+    cond_noise_std = max(float(cond_noise_std), 0.0)
 
     losses = []
     for epoch in range(epochs):
         opt.zero_grad()
-        init_logits = net.forward_init(x_init)
-        trans_logits = net.forward_trans(x_trans, state_trans)
+        if cond_noise_std > 0.0:
+            init_in = x_init + cond_noise_std * torch.randn_like(x_init)
+            trans_in = x_trans + cond_noise_std * torch.randn_like(x_trans)
+        else:
+            init_in = x_init
+            trans_in = x_trans
+        init_logits = net.forward_init(init_in)
+        trans_logits = net.forward_trans(trans_in, state_trans)
         loss_init = F.kl_div(
             F.log_softmax(init_logits, dim=-1), y_init, reduction="batchmean"
         )
@@ -769,6 +781,8 @@ def fit_neural_atlas(
         "n_records": int(sum(len(df) for df in clean)),
         "epochs": epochs,
         "lr": lr,
+        "cond_noise_std": cond_noise_std,
+        "device": str(device),
         "loss_trace": losses,
         "seed": seed,
         "model": "NeuralAtlasModel",

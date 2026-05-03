@@ -45,6 +45,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--hidden-dim", type=int, default=96)
     p.add_argument("--epochs", type=int, default=800)
     p.add_argument("--lr", type=float, default=2e-3)
+    p.add_argument("--cond-noise-std", type=float, default=0.0,
+                   help="Train-time Gaussian noise added to conditioning vectors.")
     p.add_argument("--n-time-bins", type=int, default=4)
     p.add_argument("--n-size-bins", type=int, default=4)
     p.add_argument("--n-phase-bins", type=int, default=1,
@@ -105,6 +107,7 @@ def main() -> int:
         hidden_dim=args.hidden_dim,
         epochs=args.epochs,
         lr=args.lr,
+        cond_noise_std=args.cond_noise_std,
         max_samples_per_state=args.max_samples_per_state,
         seed=args.seed,
     )
@@ -113,6 +116,7 @@ def main() -> int:
         "char_file": args.char_file,
         "paths": [str(p) for p in paths],
         "records_per_file": args.records_per_file,
+        "cond_noise_std": args.cond_noise_std,
     })
     model.save(args.output)
     print(f"[altgan.train_neural_atlas] wrote {args.output}")
