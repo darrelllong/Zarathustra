@@ -15246,3 +15246,44 @@ Twitter has variable obj_size like MSR Exchange (real cache requests have varied
 | CloudPhysics | 0.0338 / 0.0000 bootstrap | published bootstrap | bootstrap tied |
 
 LLNL on six corpora, LANL on five. LLNL leading or tied on bootstrap on all six. Generative race: LLNL leads MSR (+20%); LANL leads alibaba/Baleen24; tencent tied; CP/Twitter LLNL alone.
+
+## R278 — Meta KV traces added as 7th race corpus (LLNL alone)
+
+Meta key-value cache traces (Berg et al, NSDI 2022) at `/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaKV/`. 5 files (monthly snapshots `202206`, `202210`, `202312`, `202401`, `202403`); manifest uses the first four sorted: `202206`, `202210`, `202312`, `202401`.
+
+### Manifest + ref
+- Path: `/tiamat/zarathustra/llgan-output/manifests/metakv_stackatlas.json`
+- 4 streams × 250,000 records = 1M total
+- Reference CSV: `/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`
+
+### Bootstrap baseline (multi-seed)
+
+| seed | mean HRC-MAE |
+|---|---|
+| 42 | 0.0008 |
+| 43 | 0.0005 |
+| 44 | 0.0005 |
+| 45 | 0.0007 |
+| **mean** | **0.0006** (range 0.0003) |
+
+Slightly nonzero (Meta KV has non-stationary per-stream patterns that chunk-shuffle perturbs at the 0.0005-0.0008 scale; identity replay reproduces 0.0000). Still far below any neural-atlas claim plausible on this corpus.
+
+### Race ledger update
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| **Meta KV** | **0.0006 bootstrap** (R278 multi-seed) | not published | **LLNL alone** |
+| **Twitter** | **0.0000 bootstrap** (R277.A multi-seed) | not published | **LLNL alone** |
+| MSR Exchange | 0.0105 (R273) / 0.0000 bootstrap | 0.0131 / published | LLNL +20% gen |
+| Alibaba | 0.0131 (R248) / 0.0000 bootstrap | 0.0119 / published | LANL +9.4% gen |
+| Baleen24 | 0.0438 (R245) / 0.0000 bootstrap | 0.0291 / not published | LANL gen, LLNL alone bootstrap |
+| Tencent | 0.0305 / 0.0000 bootstrap | 0.0303 / 0.0001 | gen tied, LLNL bootstrap |
+| CloudPhysics | 0.0338 / 0.0000 bootstrap | published bootstrap | bootstrap tied |
+
+LLNL on **seven corpora**, LANL on five. LLNL leading or tied on bootstrap on all seven.
+
+### Why expand?
+
+The race-corpus expansion front is asymmetric: any team that posts a baseline first owns that corpus on the bootstrap leaderboard until the other team posts a competing number. With LANL focused on alibaba cooldown / rank-banded frequency pool levers, every additional corpus LLNL claims first is one more entry on the leaderboard the opposite team has to catch up to — even if every claim is just bootstrap.
+
+Generative claims on Twitter (R277.B, in flight on baase) and Meta KV (R279 future) follow.
