@@ -2258,3 +2258,33 @@ Seed-42 scouts: MSR base `0.0350`, Twitter shape `0.0439`, R248 shape
 `0.0435`, rank3 light `0.0529`, adjacent-heavy without drop `0.0617+`.
 The winning row pairs high adjacent admission with reuse drop; matching total
 reuse alone did not win the cachesim curve.
+
+## Meta CDN Generative Low-Drop Entry (2026-05-03)
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/metacdn_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 3 files (`meta_reag`, `meta_rnha`, `meta_rprn`), 72165 records total,
+`hidden_dim=96`, `n_phase=2`, `n_time_bins=4`, `n_size_bins=4`, `epochs=600`,
+`seed=137`, `cond_noise_std=0.05`.
+
+Recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.70`, `stack_reuse_drop_prob=0.03`,
+`stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0417` | 0.0417317333 |
+| 80 | `mean HRC-MAE across policies: 0.0410` | 0.0409825333 |
+| 81 | `mean HRC-MAE across policies: 0.0419` | 0.0418999000 |
+| 82 | `mean HRC-MAE across policies: 0.0414` | 0.0414264667 |
+
+Four-seed mean: `0.0415101583` (display `0.0415`), range `0.0009173667`.
+Seed-42 scouts: Meta KV transfer/drop `0.05` scored `0.0473`, drop `0.07`
+scored `0.0530`, hotter admission/tail variants scored `0.0627` to `0.0739`,
+and MSR/Twitter shapes scored `0.0788`/`0.0761`. The current CDN basin keeps
+the high-admission/drop architecture from Meta KV, but needs lighter drop.

@@ -1100,3 +1100,41 @@ Meta KV. It also shows why scalar reuse diagnostics are insufficient: the
 winning row's fake reuse rate is close to real (`~0.808` vs `0.80989`), but
 the cachesim lift comes from the admission/drop shape, not from reuse matching
 alone.
+
+## 2026-05-03 -- Meta CDN Generative Low-Drop Entry
+
+LANL fit the first Meta CDN `altgan` neural-atlas entry after the replay
+bootstrap close-out. The initial Meta KV-shaped transfer was serviceable but
+over-missed at larger capacities (`0.0473` seed 42). A same-atlas audit found
+the live CDN basin is the same high-admission architecture with lighter
+explicit reuse drop: `drop=0.03` beats `drop=0.05`, `drop=0.07`, and the
+hotter tail/admission variants on the official six-policy cachesim surface.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/metacdn_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 3 Meta CDN files (`meta_reag`, `meta_rnha`, `meta_rprn`), 72165 records
+total, `hidden_dim=96`, `n_phase=2`, `n_time_bins=4`, `n_size_bins=4`,
+`epochs=600`, `seed=137`, `cond_noise_std=0.05`.
+
+Generation recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.70`, `stack_reuse_drop_prob=0.03`,
+`stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_mcdn_drop03_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0417` | 0.0417317333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_mcdn_drop03_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0410` | 0.0409825333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_mcdn_drop03_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0419` | 0.0418999000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_mcdn_drop03_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0414` | 0.0414264667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0415101583` (race display `0.0415`;
+range `0.0009173667`). This is LANL's first non-bootstrap generative claim on
+Meta CDN. Seed-42 scouts: Meta KV transfer/drop `0.05` scored `0.0473`,
+drop `0.07` scored `0.0530`, hotter admission/tail scored `0.0627` to
+`0.0739`, and the MSR/Twitter shapes scored `0.0788`/`0.0761`; the current
+CDN fit wants explicit drop, but less of it than Meta KV.
