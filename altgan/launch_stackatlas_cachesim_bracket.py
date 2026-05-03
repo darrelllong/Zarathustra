@@ -28,6 +28,7 @@ class Spec:
     rank_tail_scale: float = 1.0
     rank_position_scales: str = ""
     rank_pmf_prob: float = 0.0
+    rank_pmf_scale: float = 1.0
     adj_dup_prob: float = 0.0
     adj_dup_position_probs: str = ""
     adj_dup_min_rank: int = 0
@@ -97,6 +98,8 @@ def _parse_spec(text: str) -> Spec:
         "rankpos": "rank_position_scales",
         "rpmf": "rank_pmf_prob",
         "rank_pmf": "rank_pmf_prob",
+        "rpmfs": "rank_pmf_scale",
+        "rpmf_scale": "rank_pmf_scale",
         "adj": "adj_dup_prob",
         "adj_pos": "adj_dup_position_probs",
         "adjpos": "adj_dup_position_probs",
@@ -200,6 +203,7 @@ def _auto_name(spec: Spec) -> str:
         f"_lp{_tag(spec.local_prob_power)}_rank{_tag(spec.rank_scale)}"
         f"max{spec.rank_max}_tailp{spec.rank_tail_pivot}"
         f"s{_tag(spec.rank_tail_scale)}_rpmf{_tag(spec.rank_pmf_prob)}"
+        f"x{_tag(spec.rank_pmf_scale)}"
         f"_adj{_tag(spec.adj_dup_prob)}"
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
@@ -286,6 +290,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         spec.rank_position_scales,
         "--stack-rank-pmf-prob",
         str(spec.rank_pmf_prob),
+        "--stack-rank-pmf-scale",
+        str(spec.rank_pmf_scale),
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
         "--stack-adj-dup-position-probs",

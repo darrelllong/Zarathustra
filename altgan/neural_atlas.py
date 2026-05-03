@@ -96,6 +96,7 @@ class NeuralAtlasModel:
         stack_rank_tail_scale: float = 1.0,
         stack_rank_position_scales: Sequence[float] | None = None,
         stack_rank_pmf_prob: float = 0.0,
+        stack_rank_pmf_scale: float = 1.0,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -167,6 +168,7 @@ class NeuralAtlasModel:
         stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
         stack_rank_position_scales = _nonnegative_float_list(stack_rank_position_scales)
         stack_rank_pmf_prob = float(np.clip(stack_rank_pmf_prob, 0.0, 1.0))
+        stack_rank_pmf_scale = max(float(stack_rank_pmf_scale), 0.0)
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -551,6 +553,11 @@ class NeuralAtlasModel:
                                 stack_len=len(stack),
                                 rng=rng,
                             )
+                            if rank is not None:
+                                rank = min(
+                                    int(round(int(rank) * stack_rank_pmf_scale)),
+                                    len(stack) - 1,
+                                )
                         if rank is None:
                             phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)

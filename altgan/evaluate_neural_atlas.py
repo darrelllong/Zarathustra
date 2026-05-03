@@ -56,6 +56,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated per-position-bin stack-rank scales.")
     p.add_argument("--stack-rank-pmf-prob", type=float, default=0.0,
                    help="Probability of sampling fallback reuse ranks from fitted per-state rank PMFs.")
+    p.add_argument("--stack-rank-pmf-scale", type=float, default=1.0,
+                   help="Scale fitted rank-PMF samples before LRU lookup.")
     p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
                    help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
     p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
@@ -220,6 +222,7 @@ def main() -> int:
         stack_rank_tail_scale=args.stack_rank_tail_scale,
         stack_rank_position_scales=_parse_float_list(args.stack_rank_position_scales),
         stack_rank_pmf_prob=args.stack_rank_pmf_prob,
+        stack_rank_pmf_scale=args.stack_rank_pmf_scale,
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
@@ -324,6 +327,7 @@ def main() -> int:
         "stack_rank_tail_scale": args.stack_rank_tail_scale,
         "stack_rank_position_scales": _parse_float_list(args.stack_rank_position_scales),
         "stack_rank_pmf_prob": args.stack_rank_pmf_prob,
+        "stack_rank_pmf_scale": args.stack_rank_pmf_scale,
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
