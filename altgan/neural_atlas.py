@@ -31,6 +31,9 @@ from .model import (
     stack_distances,
 )
 
+_INT64_MAX = np.iinfo(np.int64).max
+_MAX_GENERATED_ID_BASE = 1_000_000_000_000_000
+
 
 @dataclass
 class AtlasReservoir:
@@ -223,7 +226,10 @@ class NeuralAtlasModel:
             state = int(rng.choice(self.n_states, p=init_p))
             stack = _RankedLRUStack()
             in_stack: set[int] = set()
-            next_new_id = self.max_obj_id + 1 + stream_id * (per_stream + 1_000_003)
+            id_base = int(self.max_obj_id)
+            if id_base > _MAX_GENERATED_ID_BASE:
+                id_base = 0
+            next_new_id = id_base + 1 + stream_id * (per_stream + 1_000_003)
             prev_obj = next_new_id
             ts = 0.0
             hot_counts: Counter[int] = Counter()
@@ -833,7 +839,7 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
                     n_phase_bins: int, n_states: int,
                     max_samples_per_state: int, rng: np.random.Generator):
     ts = df["ts"].to_numpy(dtype=np.float64)
-    obj_ids = df["obj_id"].to_numpy(dtype=np.int64)
+    obj_ids = _object_ids_for_stack(df["obj_id"])
     sizes = np.maximum(df["obj_size"].to_numpy(dtype=np.float64), 1.0)
     dt = _interarrival(ts)
     stack_d = stack_distances(obj_ids)
@@ -960,11 +966,30 @@ def _sample_hot_pool_obj(
     weight_power: float,
     rng: np.random.Generator,
 ) -> int:
-    ids = np.array([int(obj_id) for obj_id, _ in hot_pool], dtype=np.int64)
     weights = np.array([max(int(count), 1) for _, count in hot_pool], dtype=np.float64)
     weights = np.power(weights, max(float(weight_power), 1e-6))
     weights = weights / max(float(weights.sum()), 1e-12)
-    return int(ids[int(rng.choice(len(ids), p=weights))])
+    idx = int(rng.choice(len(hot_pool), p=weights))
+    return int(hot_pool[idx][0])
+
+
+def _object_ids_for_stack(column) -> np.ndarray:
+    raw = column.to_numpy()
+    if raw.size:
+        dtype = raw.dtype
+        if np.issubdtype(dtype, np.unsignedinteger) and int(raw.max()) > _INT64_MAX:
+            return _dense_object_ids(column)
+    try:
+        return column.to_numpy(dtype=np.int64)
+    except (OverflowError, ValueError):
+        return _dense_object_ids(column)
+
+
+def _dense_object_ids(column) -> np.ndarray:
+    import pandas as pd
+
+    codes, _ = pd.factorize(column, sort=False)
+    return np.maximum(codes.astype(np.int64) + 1, 0)
 
 
 def _eligible_hot_pool(

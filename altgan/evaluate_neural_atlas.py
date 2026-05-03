@@ -396,8 +396,8 @@ def _write_namespaced_csv(df, path: Path) -> None:
     out = df.copy()
     if "stream_id" in out.columns:
         out["obj_id"] = (
-            out["stream_id"].astype("int64") * 10_000_000_000_000
-            + out["obj_id"].astype("int64")
+            out["stream_id"].map(int) * 10_000_000_000_000
+            + out["obj_id"].map(int)
         )
     out.to_csv(path, index=False)
 
