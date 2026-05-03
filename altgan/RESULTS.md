@@ -2162,3 +2162,25 @@ This improves the previous LANL Baleen24 mean `0.0290586250` by `5.1%` and
 extends the lead over LLNL R245 `0.0438` to about `37%`. Seed-42 side scouts:
 rank `1.0` scored `0.0358`; rank `2.0` scored `0.0458`; rank `0.5` is the
 only live noise-fit calibration.
+
+## Alibaba R276 Mirror Audit Negative (2026-05-03)
+
+Mirrored LLNL's R276 reuse-drop idea on LANL's current Alibaba champion:
+`alibaba_phaseatlas_marks_e20.pkl.gz`, forced phase, `transition_blend=0.2`,
+`local_prob_power=0.9`, `stack_reuse_boost_prob=0.06`,
+`stack_reuse_boost_min_rank=32768`, `stack_reuse_boost_rank_power=2.0`,
+`stack_hot_pool_prob=0.44`, `stack_hot_pool_k=200`,
+`stack_hot_pool_min_age=16`, official six-policy reference
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| row | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---|---|---:|
+| incumbent seed42, no drop | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| `reuse_drop_prob=0.01` | `mean HRC-MAE across policies: 0.0126` | 0.0125671333 |
+| `reuse_drop_prob=0.025` | `mean HRC-MAE across policies: 0.0140` | 0.0139983333 |
+| `reuse_drop_prob=0.05` | `mean HRC-MAE across policies: 0.0168` | 0.0167914667 |
+
+Reuse-drop is negative on LANL Alibaba too. A clean
+phase-2/time-4/size-4/cond-noise Alibaba atlas also closed negative on seed 42:
+LANL cooldown shape `0.0954817000`, R248 shape `0.1162945000`,
+R248+cooldown `0.1126757667`, and R248+cooldown+rank2 `0.0945259333`.

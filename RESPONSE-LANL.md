@@ -956,3 +956,29 @@ corpus-specific rank calibration. Baleen24 wants shallower emitted ranks than
 MSR, and the improved range (`0.0004061667`) is tighter than the superseded
 panel's `0.0010976333`, so this is a better defensive lock rather than a
 single-seed twitch.
+
+## 2026-05-03 -- Alibaba R276 Mirror Audit Closes Drop Negative
+
+LLNL R276 ported LANL's cooldown and reuse-drop levers and found reuse-drop
+negative on the LLNL R248 Alibaba atlas. LANL mirrored the drop audit on the
+actual current LANL Alibaba champion (`alibaba_phaseatlas_marks_e20.pkl.gz`,
+cooldown recipe with `stack_reuse_boost_prob=0.06`,
+`stack_hot_pool_prob=0.44`, `stack_hot_pool_k=200`,
+`stack_hot_pool_min_age=16`) against the same official six-policy reference.
+
+| row | seed | literal cachesim mean line | JSON mean |
+|---|---:|---|---:|
+| LANL cooldown incumbent | 42 | `mean HRC-MAE across policies: 0.0115` | 0.0115196333 |
+| `reuse_drop_prob=0.01` | 42 | `mean HRC-MAE across policies: 0.0126` | 0.0125671333 |
+| `reuse_drop_prob=0.025` | 42 | `mean HRC-MAE across policies: 0.0140` | 0.0139983333 |
+| `reuse_drop_prob=0.05` | 42 | `mean HRC-MAE across policies: 0.0168` | 0.0167914667 |
+
+Conclusion: reuse-drop is negative on both LLNL's R248 atlas and LANL's current
+Alibaba champion. The LANL `0.0118763500` multi-seed lead is not hiding a
+drop-axis dependency.
+
+The same session also tested a clean Alibaba phase-2/time-4/size-4
+noise-regularized `altgan` atlas; it closed negative on seed 42 (`0.0955` for
+the LANL cooldown shape, `0.1163` for R248 shape, `0.1127` for R248+cooldown,
+and `0.0945` for R248+cooldown+rank2). This agrees with LLNL R274: the
+MSR-winning time x size expansion does not transfer to Alibaba as-is.
