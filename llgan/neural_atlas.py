@@ -53,8 +53,13 @@ STATE_REUSE_OFFSET = 1
 PHASE_WINDOW = 200  # records per running-unique-rate window
 
 
-def n_states_for(n_phase_bins: int) -> int:
-    return N_DIST_STATES * max(int(n_phase_bins), 1)
+def n_states_for(n_phase_bins: int, n_time_bins: int = 1, n_size_bins: int = 1) -> int:
+    """R270: state = phase × n_time × n_size × N_DIST_STATES.
+    Backwards-compat: n_time=n_size=1 reproduces pre-R270 encoding."""
+    return (max(int(n_phase_bins), 1)
+            * max(int(n_time_bins), 1)
+            * max(int(n_size_bins), 1)
+            * N_DIST_STATES)
 
 
 def _dist_state_from_sd(sd: int) -> int:
@@ -65,9 +70,25 @@ def _dist_state_from_sd(sd: int) -> int:
     return STATE_REUSE_OFFSET + min(bucket, len(STATE_BUCKET_EDGES) - 2)
 
 
-def state_from_sd(sd: int, phase_bin: int = 0) -> int:
-    """Encode (sd, phase_bin) to state index = phase_bin*N_DIST_STATES + dist_state."""
-    return int(phase_bin) * N_DIST_STATES + _dist_state_from_sd(sd)
+def state_from_sd(sd: int, phase_bin: int = 0,
+                  time_bin: int = 0, size_bin: int = 0,
+                  n_time_bins: int = 1, n_size_bins: int = 1) -> int:
+    """R270: encode (sd, phase, time, size) to state index.
+       state = ((phase * n_time + time) * n_size + size) * N_DIST_STATES + dist
+    Backwards-compat: time_bin=0, size_bin=0, n_time=1, n_size=1 reproduces
+    pre-R270 encoding (phase_bin*N_DIST_STATES + dist_state)."""
+    nt = max(int(n_time_bins), 1)
+    nz = max(int(n_size_bins), 1)
+    return (((int(phase_bin) * nt + int(time_bin)) * nz + int(size_bin))
+            * N_DIST_STATES + _dist_state_from_sd(sd))
+
+
+def _quantile_edges(values: np.ndarray, n_bins: int) -> np.ndarray:
+    """R270: corpus quantile edges for time/size binning. Mirrors altgan."""
+    if n_bins <= 1:
+        return np.array([], dtype=np.float64)
+    qs = np.linspace(0.0, 1.0, n_bins + 1)[1:-1]
+    return np.unique(np.quantile(values, qs)).astype(np.float64)
 
 
 # Backwards-compat: legacy 6-state tencent / alibaba models pickled in R170-173.
@@ -331,6 +352,21 @@ class NeuralAtlas:
     # rank_edges minus 1.
     rank_ar_state_dict: Optional[dict] = None
     rank_ar_hidden: int = 96
+    # R270: time × size × phase state binning (port of altgan's architecture).
+    # When n_time_bins>1 or n_size_bins>1, fit() expands the state space to
+    # n_phase × n_time × n_size × N_DIST_STATES. time_edges from log1p(dt)
+    # quantiles, size_edges from log(obj_size) quantiles. Per-state dt and
+    # size PMFs allow generate-time emission of realistic dt/size that match
+    # the chosen state's bin. Backwards-compat: defaults of 1 keep pre-R270
+    # encoding identical.
+    n_time_bins: int = 1
+    n_size_bins: int = 1
+    time_edges: Optional[np.ndarray] = None
+    size_edges: Optional[np.ndarray] = None
+    dt_pmf_per_state: Optional[Dict[int, np.ndarray]] = None
+    size_pmf_per_state: Optional[Dict[int, np.ndarray]] = None
+    dt_edges: Optional[np.ndarray] = None
+    size_edges_pmf: Optional[np.ndarray] = None  # PMF bin edges (separate from quantile state edges)
 
     def save(self, path: str) -> None:
         with gzip.open(path, "wb") as f:
@@ -378,6 +414,22 @@ def _read_oracle_general_obj_ids(path: str, max_records: int) -> np.ndarray:
     return np.array(out, dtype=np.int64)
 
 
+def _read_oracle_general_full(path: str, max_records: int):
+    """R270: read (ts, obj_id, obj_size) tuples from oracleGeneral .zst.
+    Returns three numpy arrays. Skips sentinel records (op=-1)."""
+    sys.path.insert(0, "/home/darrell/Zarathustra")
+    from llgan.phase_pmf_atlas import _read_trace
+    ts_l, oid_l, sz_l = [], [], []
+    for ev in _read_trace(path):
+        # ev = (ts, obj_id, obj_size, op_signed)
+        ts_l.append(ev[0]); oid_l.append(ev[1]); sz_l.append(ev[2])
+        if len(oid_l) >= max_records:
+            break
+    return (np.asarray(ts_l, dtype=np.float64),
+            np.asarray(oid_l, dtype=np.int64),
+            np.asarray(sz_l, dtype=np.int64))
+
+
 def fit(
     trace_dir: str,
     char_file: str,
@@ -391,6 +443,8 @@ def fit(
     seed: int = 7,
     inline_cond: bool = False,
     n_phase_bins: int = 1,
+    n_time_bins: int = 1,
+    n_size_bins: int = 1,
     dropout: float = 0.0,
     cond_noise_std: float = 0.0,
     rank_ar: bool = False,
@@ -401,13 +455,16 @@ def fit(
 
     When `inline_cond=True` (R172), compute cond features directly from the
     trace file at fit time. When `n_phase_bins>1` (R174), expand state space
-    to phase × dist bins (24 with n_phase_bins=4).
+    to phase × dist bins. When n_time_bins>1 or n_size_bins>1 (R270), further
+    expand to phase × time × size × dist (port of altgan architecture).
     """
     torch = _torch()
     rng = np.random.default_rng(seed)
     n_phase_bins = max(int(n_phase_bins), 1)
-    n_states = n_states_for(n_phase_bins)
-    print(f"State space: n_phase_bins={n_phase_bins} × {N_DIST_STATES} dist = {n_states} states")
+    n_time_bins = max(int(n_time_bins), 1)
+    n_size_bins = max(int(n_size_bins), 1)
+    n_states = n_states_for(n_phase_bins, n_time_bins, n_size_bins)
+    print(f"State space: n_phase={n_phase_bins} × n_time={n_time_bins} × n_size={n_size_bins} × {N_DIST_STATES} dist = {n_states} states")
 
     if inline_cond:
         print("Inline cond mode: features computed from trace files directly")
@@ -444,13 +501,42 @@ def fit(
             phase_edges = np.unique(np.percentile(ur, q))
             print(f"Phase edges (n={len(ur)} windows): {phase_edges.round(3).tolist()}")
 
+    # R270 Pass 0a: collect dt/size samples for time/size quantile edges.
+    # Mirrors altgan _quantile_edges over log1p(dt) and log(obj_size).
+    time_edges = np.array([], dtype=np.float64)
+    size_edges = np.array([], dtype=np.float64)
+    if n_time_bins > 1 or n_size_bins > 1:
+        all_dt_log: List[np.ndarray] = []
+        all_sz_log: List[np.ndarray] = []
+        for fpath in files:
+            ts, oid, sz = _read_oracle_general_full(fpath, records_per_file)
+            if len(ts) < 2:
+                continue
+            dt = np.diff(ts, prepend=ts[0])  # interarrival
+            dt = np.maximum(dt, 0.0)
+            all_dt_log.append(np.log1p(dt))
+            sz_clamped = np.maximum(sz.astype(np.float64), 1.0)
+            all_sz_log.append(np.log(sz_clamped))
+        if all_dt_log:
+            dt_log = np.concatenate(all_dt_log)
+            sz_log = np.concatenate(all_sz_log)
+            time_edges = _quantile_edges(dt_log, n_time_bins)
+            size_edges = _quantile_edges(sz_log, n_size_bins)
+            print(f"Time edges (n_time={n_time_bins}, log1p): {time_edges.round(3).tolist()}")
+            print(f"Size edges (n_size={n_size_bins}, log):   {size_edges.round(3).tolist()}")
+
     # Per-file: read records, compute stack distances, encode states, build cond.
     file_conds: Dict[str, np.ndarray] = {}
     transitions: List[Tuple[np.ndarray, int, int]] = []
     initial_states: List[Tuple[np.ndarray, int]] = []
     rank_observations: Dict[int, List[int]] = {s: [] for s in range(n_states)}
+    # R270: per-state dt and obj_size observations for generate-time emission.
+    dt_observations: Dict[int, List[float]] = {s: [] for s in range(n_states)}
+    size_observations: Dict[int, List[int]] = {s: [] for s in range(n_states)}
     # Round 180: rank-AR observations: (cond, dist_state, prev_rank_bin, next_rank_bin)
     rank_ar_obs: List[Tuple[np.ndarray, int, int, int]] = []
+
+    use_full_state = n_time_bins > 1 or n_size_bins > 1
 
     for fi, fpath in enumerate(files):
         nm = os.path.basename(fpath)
@@ -462,7 +548,11 @@ def fit(
             cond = cond_from_profile(chars[nm])
         file_conds[nm] = cond
 
-        obj_ids = _read_oracle_general_obj_ids(fpath, records_per_file)
+        if use_full_state:
+            ts, obj_ids, obj_sizes = _read_oracle_general_full(fpath, records_per_file)
+        else:
+            obj_ids = _read_oracle_general_obj_ids(fpath, records_per_file)
+            ts = obj_sizes = None
         if len(obj_ids) < 2:
             continue
         sd = _stack_distance(obj_ids)
@@ -482,8 +572,23 @@ def fit(
         else:
             phase_per_event = np.zeros(len(obj_ids), dtype=np.int64)
 
+        # R270: time/size bin per event from quantile edges
+        if use_full_state:
+            dt = np.maximum(np.diff(ts, prepend=ts[0]), 0.0)
+            time_per_event = np.searchsorted(time_edges, np.log1p(dt), side="right")
+            time_per_event = np.clip(time_per_event, 0, n_time_bins - 1)
+            sz_clamped = np.maximum(obj_sizes.astype(np.float64), 1.0)
+            size_per_event = np.searchsorted(size_edges, np.log(sz_clamped), side="right")
+            size_per_event = np.clip(size_per_event, 0, n_size_bins - 1)
+        else:
+            time_per_event = np.zeros(len(obj_ids), dtype=np.int64)
+            size_per_event = np.zeros(len(obj_ids), dtype=np.int64)
+            dt = None
+
         states = np.array([
-            state_from_sd(int(sd[i]), int(phase_per_event[i]))
+            state_from_sd(int(sd[i]), int(phase_per_event[i]),
+                          int(time_per_event[i]), int(size_per_event[i]),
+                          n_time_bins, n_size_bins)
             for i in range(len(sd))
         ], dtype=np.int64)
 
@@ -505,6 +610,12 @@ def fit(
                 prev_rank_bin = this_bin
             else:
                 prev_rank_bin = -1  # NEW or non-reuse resets
+
+        # R270: per-state dt and size observations
+        if use_full_state and ts is not None:
+            for i, s in enumerate(states):
+                dt_observations[int(s)].append(float(dt[i]))
+                size_observations[int(s)].append(int(obj_sizes[i]))
 
         if fi % 8 == 0:
             print(f"  pass {fi+1}/{len(files)}: {len(transitions):,} transitions accumulated")
@@ -544,6 +655,68 @@ def fit(
             rank_pmf_per_state[s] = np.ones(n_uniform) / n_uniform
         else:
             rank_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
+
+    # R270: build per-state dt and obj_size PMFs from observed events.
+    # Used at generate time to emit realistic dt/size matching the chosen
+    # state's bin (so that the next state computed from the emitted event
+    # is consistent with the model's transition target). Uses log-spaced
+    # bins. When n_time=n_size=1, these PMFs are unused; skip building.
+    dt_pmf_per_state: Optional[Dict[int, np.ndarray]] = None
+    size_pmf_per_state: Optional[Dict[int, np.ndarray]] = None
+    dt_edges_pmf: Optional[np.ndarray] = None
+    size_edges_pmf_arr: Optional[np.ndarray] = None
+    if use_full_state:
+        # Use 32 log-spaced bins for dt and size PMFs.
+        all_dt_obs = np.array(
+            [v for vs in dt_observations.values() for v in vs],
+            dtype=np.float64,
+        )
+        all_sz_obs = np.array(
+            [v for vs in size_observations.values() for v in vs],
+            dtype=np.float64,
+        )
+        if len(all_dt_obs) > 0:
+            dt_min = max(float(np.min(all_dt_obs)), 0.0)
+            dt_max = max(float(np.max(all_dt_obs)), dt_min + 1e-6)
+            dt_edges_pmf = np.geomspace(
+                max(dt_min, 1e-6), dt_max + 1e-6, num=33, dtype=np.float64
+            )
+            dt_edges_pmf = np.concatenate(([0.0], dt_edges_pmf[1:]))
+        else:
+            dt_edges_pmf = np.linspace(0.0, 1.0, 33, dtype=np.float64)
+        if len(all_sz_obs) > 0:
+            sz_min = max(float(np.min(all_sz_obs)), 1.0)
+            sz_max = max(float(np.max(all_sz_obs)), sz_min + 1.0)
+            size_edges_pmf_arr = np.geomspace(sz_min, sz_max, num=33, dtype=np.float64)
+        else:
+            size_edges_pmf_arr = np.linspace(1.0, 1024.0, 33, dtype=np.float64)
+        dt_pmf_per_state = {}
+        size_pmf_per_state = {}
+        for s in range(n_states):
+            dts = dt_observations.get(s, [])
+            szs = size_observations.get(s, [])
+            if dts:
+                arr = np.asarray(dts, dtype=np.float64)
+                counts, _ = np.histogram(arr, bins=dt_edges_pmf)
+                if counts.sum() > 0:
+                    dt_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
+                else:
+                    dt_pmf_per_state[s] = np.ones(len(dt_edges_pmf) - 1) / (len(dt_edges_pmf) - 1)
+            else:
+                dt_pmf_per_state[s] = np.ones(len(dt_edges_pmf) - 1) / (len(dt_edges_pmf) - 1)
+            if szs:
+                arr = np.asarray(szs, dtype=np.float64)
+                counts, _ = np.histogram(arr, bins=size_edges_pmf_arr)
+                if counts.sum() > 0:
+                    size_pmf_per_state[s] = counts.astype(np.float64) / counts.sum()
+                else:
+                    size_pmf_per_state[s] = np.ones(len(size_edges_pmf_arr) - 1) / (len(size_edges_pmf_arr) - 1)
+            else:
+                size_pmf_per_state[s] = np.ones(len(size_edges_pmf_arr) - 1) / (len(size_edges_pmf_arr) - 1)
+        print(f"R270: dt PMF over {len(dt_edges_pmf)-1} bins, "
+              f"size PMF over {len(size_edges_pmf_arr)-1} bins, "
+              f"per-state observations: dt={sum(len(v) for v in dt_observations.values()):,} "
+              f"size={sum(len(v) for v in size_observations.values()):,}")
 
     # Train net
     print(f"Training CondTransitionNet (hidden={hidden}, epochs={epochs}, lr={lr}, "
@@ -638,6 +811,14 @@ def fit(
         phase_edges=phase_edges if len(phase_edges) > 0 else None,
         rank_ar_state_dict=rank_ar_state_dict_out,
         rank_ar_hidden=rank_ar_hidden,
+        n_time_bins=n_time_bins,
+        n_size_bins=n_size_bins,
+        time_edges=time_edges if len(time_edges) > 0 else None,
+        size_edges=size_edges if len(size_edges) > 0 else None,
+        dt_pmf_per_state=dt_pmf_per_state,
+        size_pmf_per_state=size_pmf_per_state,
+        dt_edges=dt_edges_pmf,
+        size_edges_pmf=size_edges_pmf_arr,
         metadata={
             "trace_dir": trace_dir,
             "char_file": char_file,
@@ -1009,12 +1190,39 @@ def generate(
                     probs = [m.opcode_pmf[k] for k in keys]
                     op_sampled = int(np.random.choice(keys, p=probs))
 
-                ts += 1.0
+                # R270: emit realistic dt and obj_size from per-state PMFs.
+                # When dt_pmf_per_state is None (n_time_bins=n_size_bins=1
+                # atlases pre-R270), fall back to placeholder ts+=1.0 and
+                # obj_size=4096 — bit-identical to pre-R270 generate.
+                if (getattr(m, "dt_pmf_per_state", None) is not None
+                        and getattr(m, "size_pmf_per_state", None) is not None
+                        and getattr(m, "dt_edges", None) is not None
+                        and getattr(m, "size_edges_pmf", None) is not None):
+                    dt_pmf = m.dt_pmf_per_state.get(int(state))
+                    if dt_pmf is None:
+                        dt_emit = 1.0
+                    else:
+                        bin_idx = int(rng.choice(len(dt_pmf), p=dt_pmf))
+                        lo = float(m.dt_edges[bin_idx])
+                        hi = float(m.dt_edges[bin_idx + 1])
+                        dt_emit = float(rng.uniform(lo, max(hi, lo + 1e-9)))
+                    size_pmf = m.size_pmf_per_state.get(int(state))
+                    if size_pmf is None:
+                        size_emit = 4096
+                    else:
+                        bin_idx = int(rng.choice(len(size_pmf), p=size_pmf))
+                        lo = float(m.size_edges_pmf[bin_idx])
+                        hi = float(m.size_edges_pmf[bin_idx + 1])
+                        size_emit = int(rng.uniform(lo, max(hi, lo + 1.0)))
+                    ts += max(dt_emit, 0.0)
+                else:
+                    ts += 1.0
+                    size_emit = 4096
                 rows.append({
                     "stream_id": sid,
                     "ts": ts,
                     "obj_id": int(obj_id),
-                    "obj_size": 4096,
+                    "obj_size": int(size_emit),
                     "opcode": op_sampled,
                     "tenant": 0,
                 })
@@ -1067,10 +1275,16 @@ def generate(
                 state = int(rng.choice(m.n_states, p=trans_p))
                 # Force the phase component to track the running unique-rate so
                 # the sampled state's phase doesn't drift from the empirical phase.
+                # R270: with time/size axes, decode the inner state (time*size*dist)
+                # and only override the phase component.
                 if n_phase_bins > 1 and phase_edges is not None:
                     expected_pb = int(np.searchsorted(phase_edges, current_rate, side="right"))
                     expected_pb = min(expected_pb, n_phase_bins - 1)
-                    state = expected_pb * N_DIST_STATES + (state % N_DIST_STATES)
+                    nt = max(int(getattr(m, "n_time_bins", 1)), 1)
+                    nz = max(int(getattr(m, "n_size_bins", 1)), 1)
+                    n_inner = nt * nz * N_DIST_STATES
+                    inner = state % n_inner
+                    state = expected_pb * n_inner + inner
 
     df = pd.DataFrame(rows[:n_records])
     df.to_csv(output_path, index=False)
@@ -1096,6 +1310,12 @@ def main():
     pfit.add_argument("--n-phase-bins", type=int, default=1,
                       help="R174: state-space expansion. 1 (default) = 6-state R170-173 encoding; "
                            "4 = 24 states with running-unique-rate phase quartiles.")
+    pfit.add_argument("--n-time-bins", type=int, default=1,
+                      help="R270: time-axis state expansion. 1 (default) = no time bins. "
+                           "altgan default = 4 (log1p(dt) quartiles). State space grows by this factor.")
+    pfit.add_argument("--n-size-bins", type=int, default=1,
+                      help="R270: object-size axis state expansion. 1 (default) = no size bins. "
+                           "altgan default = 4 (log(obj_size) quartiles). State space grows by this factor.")
     pfit.add_argument("--dropout", type=float, default=0.0,
                       help="R179: dropout in cond_mlp + trans_head; regularizes overfitting.")
     pfit.add_argument("--cond-noise-std", type=float, default=0.0,
@@ -1208,6 +1428,7 @@ def main():
             max_files=args.max_files, records_per_file=args.records_per_file,
             hidden=args.hidden, epochs=args.epochs, lr=args.lr, seed=args.seed,
             inline_cond=args.inline_cond, n_phase_bins=args.n_phase_bins,
+            n_time_bins=args.n_time_bins, n_size_bins=args.n_size_bins,
             dropout=args.dropout,
             cond_noise_std=args.cond_noise_std,
             rank_ar=args.rank_ar, rank_ar_hidden=args.rank_ar_hidden,
