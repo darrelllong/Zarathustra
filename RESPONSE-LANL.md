@@ -1285,3 +1285,39 @@ scored `0.0368`; tail `0.05`/`0.15` scored `0.0417`/`0.0404`. The standing
 failure mode is now narrow: LFU wants less head concentration while LIRS wants
 the opposite, so the next CP lift needs a decoder that steepens LFU without
 blowing out LIRS.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Rank-PMF Quantiles and Exact-Stream Fits Close Negative
+
+LANL added an in-bin rank-PMF quantile-power decoder in `altgan` (`a893550`):
+`stack_rank_pmf_bin_power` changes where fitted PMF samples land inside each
+rank bin, and `stack_rank_pmf_tail_bin_power`/`stack_rank_pmf_tail_power_pivot`
+allow a different deep-tail in-bin power. This tested the live CP residual
+directly: LFU/LIRS improve when head and tail quantiles move, but the ordinary
+adaptive policies give back more than the LFU/LIRS gain.
+
+Seed-42 official 8-policy qpow probes on the standing LCS96 rank-PMF atlas:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| tail-deep qpow | `mean HRC-MAE across policies: 0.0357` | 0.0356516250 | 0.0973031667 | 0.0696691667 |
+| soft head/tail qpow | `mean HRC-MAE across policies: 0.0359` | 0.0359048958 | 0.0957675000 | 0.0676610000 |
+| strong head/tail qpow | `mean HRC-MAE across policies: 0.0361` | 0.0360976667 | 0.0939040000 | 0.0650830000 |
+| head-only qpow | `mean HRC-MAE across policies: 0.0366` | 0.0366248542 | 0.0858443333 | 0.0772668333 |
+
+The exact-stream hypothesis also closed negative. An oracleGeneral exact
+manifest-4 rank-PMF atlas trained cleanly on `w27/w41/w60/w61` at 250k records
+per file, but every decode was far behind the regularized LCS96 atlas:
+
+| exact-stream atlas scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| oracleGeneral manifest4, R224-style decode | `mean HRC-MAE across policies: 0.0900` | 0.0900156250 |
+| oracleGeneral manifest4 + rank-PMF | `mean HRC-MAE across policies: 0.0790` | 0.0789911875 |
+| oracleGeneral manifest4 + LANL rank-PMF recipe | `mean HRC-MAE across policies: 0.1208` | 0.1208424583 |
+| oracleGeneral manifest4 + LANL adj035 hybrid | `mean HRC-MAE across policies: 0.0937` | 0.0936548750 |
+| LCS manifest4, R224-style decode | `mean HRC-MAE across policies: 0.2652` | 0.2651890625 |
+
+Finally, the broad LCS96 rank-PMF atlas refit with `cond_noise_std=0.05`
+scored `mean HRC-MAE across policies: 0.0363` (JSON `0.0362662708`) under the
+standing LANL recipe, so LLNL's deterministic/noise stabilization does not
+transfer to this `altgan` branch. Current CP best remains the no-noise LCS96
+rank-PMF four-seed mean `0.0355223281`; LLNL still leads CP at `0.0338`.

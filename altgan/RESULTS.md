@@ -2373,3 +2373,37 @@ rank-PMF `0.75` unscaled rankstrong `0.0369`, scaled PMF x2/x3
 `0.0374`, hot-pool zero `0.0368`, and tail `0.05`/`0.15`
 `0.0417`/`0.0404`. The residual blocker is the LFU/LIRS trade-off: lowering
 head pressure helps LFU and damages LIRS; raising it does the reverse.
+
+## CloudPhysics Rank-PMF Quantile and Exact-Stream Negatives (2026-05-03)
+
+Added rank-PMF in-bin quantile controls in `a893550`:
+`stack_rank_pmf_bin_power`, `stack_rank_pmf_tail_bin_power`, and
+`stack_rank_pmf_tail_power_pivot`. These keep fitted PMF bin probabilities but
+change where samples land inside the bins. Seed-42 official 8-policy results
+on the standing LCS96 rank-PMF atlas:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| tail-deep qpow | `mean HRC-MAE across policies: 0.0357` | 0.0356516250 | 0.0973031667 | 0.0696691667 |
+| soft head/tail qpow | `mean HRC-MAE across policies: 0.0359` | 0.0359048958 | 0.0957675000 | 0.0676610000 |
+| strong head/tail qpow | `mean HRC-MAE across policies: 0.0361` | 0.0360976667 | 0.0939040000 | 0.0650830000 |
+| head-only qpow | `mean HRC-MAE across policies: 0.0366` | 0.0366248542 | 0.0858443333 | 0.0772668333 |
+
+The qpow branch can move LFU/LIRS in the desired direction, but not without
+overpaying in ordinary/adaptive policy error. It is a useful decoder lever, not
+a CP retake.
+
+Exact-stream fits closed negative:
+
+| atlas / decode | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| oracleGeneral manifest4, R224-style decode | `mean HRC-MAE across policies: 0.0900` | 0.0900156250 |
+| oracleGeneral manifest4 + rank-PMF | `mean HRC-MAE across policies: 0.0790` | 0.0789911875 |
+| oracleGeneral manifest4 + LANL rank-PMF recipe | `mean HRC-MAE across policies: 0.1208` | 0.1208424583 |
+| oracleGeneral manifest4 + LANL adj035 hybrid | `mean HRC-MAE across policies: 0.0937` | 0.0936548750 |
+| LCS manifest4, R224-style decode | `mean HRC-MAE across policies: 0.2652` | 0.2651890625 |
+| LCS96 h64 phase1 cond-noise0.05, standing recipe | `mean HRC-MAE across policies: 0.0363` | 0.0362662708 |
+
+Read: the broad no-noise LCS96 fit is regularizing CP in a way exact-stream
+fits do not. LLNL's four-stream/narrow-fit intuition does not port into the
+current `altgan` reservoir decoder, and cond-noise worsens the rank-PMF basin.
