@@ -26,6 +26,8 @@ def _collect_files(trace_dir: str, fmt: str) -> list[Path]:
         if p.is_file()
         and not p.name.startswith(".")
         and p.name.upper() not in {"README", "README.TXT"}
+        and not p.name.endswith(".profile.json")
+        and p.suffix not in {".json", ".jsonl"}
     ]
     if fmt in {"oracle_general", "lcs"}:
         files = [
