@@ -35,28 +35,47 @@ both each turn — they change hourly). You currently have 0 measurements;
 ship one.
 
 ## LOCATION
-Your entire world is these paths. Never type anything else.
+Use `~` everywhere. The shell expands it correctly per host. Do not type
+absolute home paths — they differ between machines (Mac uses `/Users/darrell/`,
+Linux uses `/home/darrell/`).
 
 ```
-LOCAL    /Users/darrell/Sandia/Zarathustra/   (cd here every turn)
-LOCAL    /tiamat/zarathustra/                  (artifact storage)
-vinge    /home/darrell/Sandia/Zarathustra/     (ssh -i ~/.ssh/id_rsa -A vinge.local)
-baase    /home/darrell/Sandia/Zarathustra/     (from vinge: ssh darrell@10.99.0.1)
-NFS      /tiamat/zarathustra/                  (same on every host)
+ANY HOST   ~/Sandia/Zarathustra/   (your repo, cd here every turn)
+ANY HOST   /tiamat/zarathustra/    (artifact storage; same NFS mount on every host)
 ```
 
-Forbidden — these paths do not exist anywhere:
+Hosts:
+- Local Mac: where you run interactively.
+- vinge: `ssh -i ~/.ssh/id_rsa -A vinge.local`
+- baase: from vinge, `ssh darrell@10.99.0.1` (200 Gb/s fabric, primary GPU)
+
+Forbidden paths (do not exist anywhere):
 `~/llgan/`, `~/LLNL/`, `~/LANL/`, `~/Zarathustra/`, `~/newgan/`,
-`/home/darrell/llgan/`. If you type any of these, stop and re-read this section.
+`/home/darrell/llgan/`, `/Users/darrell/Sandia/...` typed verbatim on a
+remote (the user-home prefix is wrong on Linux).
 
 Edit only `newgan/` and `SANDIA-*.md`. Hands off `llgan/`, `altgan/`,
 `RESPONSE-LLNL.md`, `RESPONSE-LANL.md`, `MAP-LLNL.md`, `MAP-LANL.md`.
 
-scp template (only one form, copy verbatim, replace `<file>`):
+## TRANSPORT
+**scp is FORBIDDEN.** Code and documents propagate through git only.
+Workflow on every host:
 ```
-scp -i ~/.ssh/id_rsa /Users/darrell/Sandia/Zarathustra/newgan/<file> \
-    darrell@vinge.local:/home/darrell/Sandia/Zarathustra/newgan/
+cd ~/Sandia/Zarathustra
+git pull --ff-only        # before editing
+<work>
+git add newgan/... SANDIA-*.md
+git commit -m "..."
+git push origin main      # makes the change visible to the other hosts
 ```
+
+Artifacts live on `/tiamat/zarathustra/` which is NFS-shared and visible
+on every host. Just write there directly — no copy step needed.
+
+`rsync` is allowed but discouraged, and only for artifacts (large CSVs,
+checkpoints) when /tiamat is unavailable. Never rsync code or docs; that
+diverges the trees. If you find yourself wanting to rsync, you are
+probably doing something wrong — re-read this section.
 
 ## REPORTING
 After cachesim_eval emits its `mean HRC-MAE` line, append one row to
@@ -68,7 +87,7 @@ After cachesim_eval emits its `mean HRC-MAE` line, append one row to
 
 Then:
 ```
-cd /Users/darrell/Sandia/Zarathustra
+cd ~/Sandia/Zarathustra
 git add RESPONSE-Sandia.md newgan/<any new files>
 git commit -m "Sandia: <corpus> <mean>"
 git push origin main
@@ -81,9 +100,10 @@ That is the entire turn. Do not append commentary. Do not propose what to
 do next. The next turn will pick the next move.
 
 ## START
-1. `cd /Users/darrell/Sandia/Zarathustra && git pull --ff-only`
+1. `cd ~/Sandia/Zarathustra && git pull --ff-only`
 2. Pick one corpus (rotate: msr_exchange → baleen24 → tencent → cp → alibaba,
    skipping any you already have a measurement for).
 3. Generate a fake CSV (newgan trainer if ready, else
-   `python3 -m llgan.trace_bootstrap --mode shuffle`).
+   `python3 -m llgan.trace_bootstrap --mode shuffle`). Write the CSV to
+   `/tiamat/zarathustra/sandia-output/...` so every host can read it.
 4. Run cachesim_eval. Append the row. Commit. Push. Stop.
