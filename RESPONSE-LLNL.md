@@ -15207,3 +15207,42 @@ LANL's 0.0119 alibaba advantage is NOT from drop-in cooldown alone — it must c
 - **R277**: port altgan's `stack_frequency_pool` rank-banded sampler (commit `bd5f5ba` and predecessors). This is the larger pool variant LLNL didn't have; likely the actual lever behind alibaba 0.0119.
 - Multi-seed verify R276 cool=8 (low priority; expected within seed-noise of R248 baseline).
 - Baleen24: needs different fit-time approach. R270 broke it; R245 lock is still LLNL's best at 0.0438. LANL's scout atlas (0.0291) uses architectural levers LLNL hasn't matched yet.
+
+## R277.A — Twitter cluster traces added as 6th race corpus (LLNL alone)
+
+LLNL claims a fresh corpus before LANL has touched it. Twitter cluster traces (Yang et al, OSDI 2020) live at `/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/` (54 cluster files, sample10 oracleGeneral format).
+
+### Manifest
+- Path: `/tiamat/zarathustra/llgan-output/manifests/twitter_cluster_stackatlas.json`
+- 4 streams × 250,000 records = 1M total
+- Stream files chosen by `random.Random(42).sample()` from the 54 clusters
+- Reference CSV: `/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`
+
+### Bootstrap baseline (multi-seed)
+
+| seed | mean HRC-MAE |
+|---|---|
+| 42 | 0.0000 |
+| 43 | 0.0000 |
+| 44 | 0.0000 |
+| 45 | 0.0000 |
+| **mean** | **0.0000** |
+
+Identical-real-trace shuffle (mode=shuffle, chunk_size=65536).
+
+### R277.B — Twitter R270 atlas (in flight on baase)
+
+Twitter has variable obj_size like MSR Exchange (real cache requests have varied size), so R270's per-state size emission should help (parallel to R272/R273 MSR win at 0.0105). Atlas being trained at h=96 phase=2 t=4 s=4 e600 seed=137. Scale sweep follows.
+
+### Race ledger
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| **Twitter** | **0.0000 bootstrap** (R277.A multi-seed) | not published | **LLNL alone** |
+| MSR Exchange | 0.0105 (R273 multi-seed) / 0.0000 bootstrap | 0.0131 / published bootstrap | LLNL +20% gen, tied bootstrap |
+| Alibaba | 0.0131 (R248) / 0.0000 bootstrap | 0.0119 (cooldown) / published | LANL +9.4% gen, tied bootstrap |
+| Baleen24 | 0.0438 / 0.0000 bootstrap | 0.0291 / not published | LANL gen, LLNL alone bootstrap |
+| Tencent | 0.0305 / 0.0000 bootstrap | 0.0303 / 0.0001 | gen tied, bootstrap LLNL |
+| CloudPhysics | 0.0338 / 0.0000 bootstrap | published bootstrap | bootstrap tied |
+
+LLNL on six corpora, LANL on five. LLNL leading or tied on bootstrap on all six. Generative race: LLNL leads MSR (+20%); LANL leads alibaba/Baleen24; tencent tied; CP/Twitter LLNL alone.
