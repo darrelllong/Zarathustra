@@ -681,6 +681,10 @@ def generate(
     reuse_boost_prob: float = 0.0,
     reuse_boost_min_rank: int = 0,
     reuse_boost_rank_power: float = 1.0,
+    stack_rank_scale: float = 1.0,
+    stack_rank_max: int = -1,
+    stack_rank_tail_pivot: int = -1,
+    stack_rank_tail_scale: float = 1.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -970,6 +974,20 @@ def generate(
                         lo_eff = min(lo, stack_sz - 1)
                         hi_eff = min(hi, stack_sz - 1)
                         rank = int(rng.integers(lo_eff, hi_eff + 1))
+                        # R263: scout-rank calibration (port from altgan
+                        # _calibrated_stack_rank). Defaults (scale=1.0,
+                        # max=-1, tail_pivot=-1) → bit-identical no-op.
+                        # LANL's MSR/Baleen24 wins use stack_rank_scale=5.0
+                        # to push raw ranks deeper.
+                        if (stack_rank_scale != 1.0 or stack_rank_max >= 0
+                                or stack_rank_tail_pivot >= 0):
+                            rank = int(round(max(rank, 0) * stack_rank_scale))
+                            if stack_rank_tail_pivot >= 0 and rank > stack_rank_tail_pivot:
+                                tail = rank - int(stack_rank_tail_pivot)
+                                rank = int(stack_rank_tail_pivot) + int(round(tail * stack_rank_tail_scale))
+                            if stack_rank_max >= 0:
+                                rank = min(rank, int(stack_rank_max))
+                            rank = min(max(rank, 0), stack_sz - 1)
                         obj_id = stack[rank]
                         del stack[rank]
                         stack.insert(0, obj_id)
@@ -1167,6 +1185,21 @@ def main():
                            "floor(u^(1/p) * span). 1.0 = uniform; <1.0 → exponent "
                            ">1 → u^(1/p) biased toward 0 → rank biased toward lo "
                            "(shallow). LANL's 0.1 = strong shallow-bias.")
+    pgen.add_argument("--stack-rank-scale", type=float, default=1.0,
+                      help="R263 (port of altgan _calibrated_stack_rank): "
+                           "multiply the PMF-sampled raw rank by this scale. "
+                           "scale > 1 pushes ranks deeper; scale < 1 compresses "
+                           "shallower. LANL's MSR scout uses scale=5.0.")
+    pgen.add_argument("--stack-rank-max", type=int, default=-1,
+                      help="R263: cap calibrated rank at this max (-1 = no cap). "
+                           "Prevents rank from exceeding stack diversity.")
+    pgen.add_argument("--stack-rank-tail-pivot", type=int, default=-1,
+                      help="R263: above this rank, apply tail-scale instead of "
+                           "global scale. -1 = no separate tail handling.")
+    pgen.add_argument("--stack-rank-tail-scale", type=float, default=1.0,
+                      help="R263: scale applied to ranks above tail-pivot. "
+                           "Compresses (<1) or stretches (>1) the deep tail "
+                           "independently of the bulk distribution.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1197,6 +1230,10 @@ def main():
             reuse_boost_prob=args.reuse_boost_prob,
             reuse_boost_min_rank=args.reuse_boost_min_rank,
             reuse_boost_rank_power=args.reuse_boost_rank_power,
+            stack_rank_scale=args.stack_rank_scale,
+            stack_rank_max=args.stack_rank_max,
+            stack_rank_tail_pivot=args.stack_rank_tail_pivot,
+            stack_rank_tail_scale=args.stack_rank_tail_scale,
         )
 
 
