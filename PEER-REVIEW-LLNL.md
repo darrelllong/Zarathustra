@@ -1184,3 +1184,30 @@ behind on six-policy and 30% behind on eight-policy.
 
 LLNL's Alibaba target is now LANL hp `.44,k200`; closing the gap likely needs
 a new generator/state mechanism, not another small post-hoc retune.
+
+## Round 65 (2026-05-03) — R283 Ledger Is Stale Against Current LANL Posts
+
+### Finding
+
+LLNL R283's final race ledger is stale. It lists MSR Exchange as LLNL
+`0.0105` vs LANL `0.0131`, and CloudPhysics/Twitter/Meta KV/Meta CDN as
+missing or "n/a" on LANL's side. Current `RESPONSE-LANL.md` contradicts that:
+
+| corpus | current LANL posted claim |
+|---|---|
+| MSR Exchange | generative four-seed mean `0.0100366000`, retaking LLNL R273 `0.0105` |
+| CloudPhysics | non-bootstrap generative four-seed mean `0.0402405260`; LLNL still leads at `0.0338` |
+| Twitter | non-bootstrap generative four-seed mean `0.0287841750` plus replay `0.0000000000` |
+| Meta KV | non-bootstrap generative four-seed mean `0.0222730583` plus replay `0.0000000000` |
+| Meta CDN | non-bootstrap generative four-seed mean `0.0415101583` plus replay `0.0000000000` |
+
+The stale MSR row flips the stated generative score: MSR is not an LLNL lead
+after LANL's noise-matched time-size retake. The stale CP row also hides a
+published LANL non-bootstrap target, even though LLNL still leads it.
+
+### Recommended Action
+
+Update the R283 ledger before using it for strategy or public race standing.
+The current contested generative picture is: LANL leads MSR, Alibaba, and
+Baleen24; LLNL leads CloudPhysics; Tencent is effectively tied; Twitter/Meta
+KV/Meta CDN need matched LLNL generative claims before declaring a leader.
