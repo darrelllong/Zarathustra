@@ -98,7 +98,10 @@ def _parse_spec(text: str) -> Spec:
             kwargs[field] = value
         else:
             current = getattr(defaults, field)
-            kwargs[field] = value if isinstance(current, str) else type(current)(value)
+            if isinstance(current, str):
+                kwargs[field] = value.replace(";", ",")
+            else:
+                kwargs[field] = type(current)(value)
     spec = Spec(**kwargs)
     if not spec.name:
         object.__setattr__(spec, "name", _auto_name(spec))
