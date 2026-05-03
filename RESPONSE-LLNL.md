@@ -15318,3 +15318,62 @@ Manifest: `/tiamat/zarathustra/llgan-output/manifests/metacdn_stackatlas.json`. 
 | **Meta CDN** | **0.0000** | not published | n/a | n/a |
 
 LLNL on 8 corpora; LANL on 5. LLNL leading or tied on bootstrap on all 8. Generative MSR retake (R273) still the standalone generative win.
+
+## R282/R283 — frequency-pool ported and tested; alibaba retake closes-NEGATIVE on R248 atlas
+
+R282 (commit `3f1dd65`) ported altgan's `stack_frequency_pool` with rank-banding — the actual lever behind LANL's alibaba 0.0119. ~135 lines: weighted-sample + cooldown + rank-band retry. Bit-identical at default `frequency-pool-prob=0.0`.
+
+R283 swept all four axes on the existing R248 alibaba atlas (single-seed gs=42):
+
+### R283.A bit-identical at fp=0
+0.0124 — matches R248 single-seed exactly. Confirms R282 default-off path is safe.
+
+### R283.B prob sweep (K=100 cool=16 wp=1.0)
+| fp | mean | LRU | ARC | FIFO | SIEVE | SLRU | CAR |
+|---|---|---|---|---|---|---|---|
+| 0 (baseline) | 0.0124 | 0.0113 | 0.0094 | 0.0067 | 0.0153 | 0.0226 | 0.0093 |
+| 0.10 | 0.0138 | 0.0122 | 0.0096 | 0.0078 | 0.0174 | 0.0258 | 0.0100 |
+| 0.20 | 0.0181 | 0.0137 | 0.0133 | 0.0106 | 0.0254 | 0.0330 | 0.0124 |
+| 0.30 | 0.0206 | 0.0143 | 0.0157 | 0.0121 | 0.0272 | 0.0392 | 0.0148 |
+| 0.45 | 0.0249 | 0.0150 | 0.0187 | 0.0137 | 0.0370 | 0.0472 | 0.0175 |
+| 0.60 | 0.0307 | 0.0161 | 0.0219 | 0.0151 | 0.0535 | 0.0552 | 0.0224 |
+
+Monotonic regression. SIEVE and SLRU drive the mean up.
+
+### R283.C weight-power sweep at fp=0.30
+0.5→0.0202, 1.0→0.0206, 1.5→0.0231, 2.0→0.0257, 3.0→0.0298. Monotonic.
+
+### R283.D rank-band sweep at fp=0.30 wp=1.0 cool=16
+
+| band | mean | LRU | ARC | FIFO | SIEVE | SLRU | CAR |
+|---|---|---|---|---|---|---|---|
+| 0:32 | **0.0163** | 0.0134 | **0.0076** | 0.0165 | 0.0289 | 0.0245 | **0.0072** |
+| 16:128 | 0.0168 | 0.0150 | **0.0073** | 0.0172 | 0.0245 | 0.0290 | **0.0075** |
+| 32:512 | 0.0229 | 0.0151 | 0.0168 | 0.0139 | 0.0352 | 0.0410 | 0.0154 |
+| 0:8192 | 0.0219 | 0.0151 | 0.0168 | 0.0130 | 0.0301 | 0.0404 | 0.0159 |
+
+Tightening the rank band to 0:32 or 16:128 substantially improves **ARC (-19% to -22%)** and **CAR (-22% to -23%)** per-policy — concentrating frequency-pool emissions in the shallow stack helps recency-aware policies. Same band degrades SIEVE/SLRU, netting out at 0.0163-0.0168 — still 32-35% above baseline.
+
+### Read
+
+LANL's frequency-pool + cooldown alone don't transfer to LLNL's R248 atlas. Same pattern observed in R276 (cooldown alone) and R266 (scout-rank alone). The 0.0119 LANL alibaba is **not** a drop-in lever sweep on a generic atlas; it requires LANL's atlas-fit × lever combination.
+
+LLNL has now ported every published altgan post-hoc / generation-time lever:
+- R263 stack-rank-scale (scout-rank)
+- R270 time × size × phase atlas binning
+- R275 hot-pool-min-age + reuse-drop-prob (cooldown + drop)
+- R282 frequency-pool with rank-banding
+
+The remaining LANL advantage on alibaba is the atlas itself — the way LANL's training produces ranks that respond well to scout-rank scaling. R270 attempted to replicate this and regressed on alibaba (R274 closes-NEGATIVE). Beyond R282, the next move would be a fundamentally different fit-time approach (different cond features, different state encoding, different objective).
+
+### Race ledger snapshot post-R283
+
+| corpus | LLNL gen | LANL gen | leader |
+|---|---|---|---|
+| MSR Exchange | **0.0105** (R273) | 0.0131 | **LLNL +20%** |
+| Alibaba | 0.0131 (R248, holds after R260/R266/R276/R283) | **0.0119** | LANL +9.4% |
+| Baleen24 | 0.0438 (R245, holds after R261/R267) | **0.0291** | LANL −33.7% |
+| Tencent | 0.0305 / 0.0303 | tied |
+| CloudPhysics | 0.0338 (R224) | n/a | LLNL alone |
+
+Generative score: LLNL leads MSR + alone CP; LANL leads alibaba + Baleen24; tencent tied. **One TRUE win on each side, plus LLNL's CP.**
