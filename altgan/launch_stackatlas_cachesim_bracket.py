@@ -31,6 +31,7 @@ class Spec:
     adj_dup_position_probs: str = ""
     adj_dup_min_rank: int = 0
     adj_dup_max_rank: int = 0
+    adj_dup_band_prob: float = 1.0
     hot_pool_prob: float = 0.45
     hot_pool_position_probs: str = ""
     hot_pool_k: int = 75
@@ -84,6 +85,8 @@ def _parse_spec(text: str) -> Spec:
         "adjmin": "adj_dup_min_rank",
         "adj_max": "adj_dup_max_rank",
         "adjmax": "adj_dup_max_rank",
+        "adj_band": "adj_dup_band_prob",
+        "adjband": "adj_dup_band_prob",
         "hp": "hot_pool_prob",
         "hp_pos": "hot_pool_position_probs",
         "hppos": "hot_pool_position_probs",
@@ -222,6 +225,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.adj_dup_min_rank),
         "--stack-adj-dup-max-rank",
         str(spec.adj_dup_max_rank),
+        "--stack-adj-dup-band-prob",
+        str(spec.adj_dup_band_prob),
         "--stack-reuse-boost-prob",
         str(spec.reuse_boost_prob),
         "--stack-reuse-boost-min-rank",

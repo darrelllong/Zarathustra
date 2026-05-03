@@ -72,6 +72,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum rank used by adjacent-duplicate redirects.")
     p.add_argument("--stack-adj-dup-max-rank", type=int, default=0,
                    help="Maximum rank used by adjacent-duplicate redirects.")
+    p.add_argument("--stack-adj-dup-band-prob", type=float, default=1.0,
+                   help="Probability of using the adjacent duplicate rank band when max-rank is positive.")
     p.add_argument("--stack-hot-pool-prob", type=float, default=0.0,
                    help="Probability of redirecting an ordinary sampled reuse to the recent hot pool.")
     p.add_argument("--stack-hot-pool-position-probs", default="",
@@ -208,6 +210,7 @@ def main() -> int:
         stack_adj_dup_position_probs=_parse_float_list(args.stack_adj_dup_position_probs),
         stack_adj_dup_min_rank=args.stack_adj_dup_min_rank,
         stack_adj_dup_max_rank=args.stack_adj_dup_max_rank,
+        stack_adj_dup_band_prob=args.stack_adj_dup_band_prob,
         stack_hot_pool_prob=args.stack_hot_pool_prob,
         stack_hot_pool_position_probs=_parse_float_list(args.stack_hot_pool_position_probs),
         stack_hot_pool_k=args.stack_hot_pool_k,
@@ -298,6 +301,7 @@ def main() -> int:
         "stack_adj_dup_position_probs": _parse_float_list(args.stack_adj_dup_position_probs),
         "stack_adj_dup_min_rank": args.stack_adj_dup_min_rank,
         "stack_adj_dup_max_rank": args.stack_adj_dup_max_rank,
+        "stack_adj_dup_band_prob": args.stack_adj_dup_band_prob,
         "stack_hot_pool_prob": args.stack_hot_pool_prob,
         "stack_hot_pool_position_probs": _parse_float_list(args.stack_hot_pool_position_probs),
         "stack_hot_pool_k": args.stack_hot_pool_k,
