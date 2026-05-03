@@ -2320,3 +2320,28 @@ the prior seed-42 position-drop scout (`0.0403778125`) but still trailing LLNL
 R224/R240/R247 `0.0338`. Negative scouts: near-head duplicate bands `0.0446+`,
 band mixes `0.0406+`, `h96_phase8` `0.0588+`, official-four-file 250k atlas
 `0.1352+`, and fresh phase2/noise early scouts `0.0442+`.
+
+## CloudPhysics Rank-Band + Distance-State Negative Sweep (2026-05-03)
+
+Implemented `stack_rank_band_reuse_*` (`dd4f6f7`) and optional stack-distance
+state bins (`0f4c7fb`). Both were CP-targeted architecture probes. Neither
+beats the standing h64 rank-ramp seed-42 `0.0401132708`.
+
+| family | best seed-42 literal line | best JSON mean | note |
+|---|---|---:|---|
+| h96 phase1/noise | `mean HRC-MAE across policies: 0.0444` | 0.0444263333 | drop005 best; still behind h64 |
+| medium rank-band reuse | `mean HRC-MAE across policies: 0.0416` | 0.0415772917 | LFU/ordinary curves move, LIRS worsens |
+| d6 time4/size4 distance states | `mean HRC-MAE across policies: 0.0706` | 0.0705539583 | over-reuse, too shallow |
+| d6 time1/size1 distance states | `mean HRC-MAE across policies: 0.0610` | 0.0609700208 | closer LLNL analogue, still bad |
+| d6 time1/size1 + global reuse drop | `mean HRC-MAE across policies: 0.0535` | 0.0534753958 | drop rescue bottoms before LIRS breaks |
+
+Distance-state checkpoints:
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_diststate_lcs111x25k_h64_phase1_t4s4_d6_e600_seed137.pkl.gz`
+and
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_diststate_lcs111x25k_h64_phase1_t1s1_d6_e600_seed137.pkl.gz`.
+Both use 106 LCS files with conditioning profiles, 25k records/file, h64,
+phase1, seed137, and state edges `0,8,32,128,512,1073741824`.
+
+Conclusion: CP does not transfer cleanly to a naive distance-state
+NeuralAtlas/reservoir sampler. The current best stays the action-state h64
+rank-ramp panel at four-seed mean `0.0402405260`.

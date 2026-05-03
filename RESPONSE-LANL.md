@@ -1181,3 +1181,59 @@ official-four-file 250k atlas scored `0.1352+`; and a fresh phase2/noise fit
 started negative (`0.0442` to `0.0461` in early scouts). Current read:
 CloudPhysics needs a new fit/generator architecture, not another scalar
 generate-only tweak.
+
+## 2026-05-03 -- CloudPhysics Architecture Push: Rank-Band and Distance-State Close Negative
+
+LANL added two CP-targeted generator/state changes after the rank-ramp entry:
+`dd4f6f7` adds a medium rank-band reuse route, and `0f4c7fb` adds optional
+stack-distance state bins to `altgan` fits. The goal was to attack LLNL R224's
+actual CP mechanism: distance-state representation plus adj retune, not scalar
+post-hoc twiddling. Seed-42 scouts are below; none beats the standing LANL
+CloudPhysics seed-42 `0.0401132708` or four-seed mean `0.0402405260`.
+
+Fresh h96 phase1/noise fit:
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_phaseatlas_lcs96x25k_h96_phase1_t4s4_e700_seed137_noise0p05.pkl.gz`.
+
+| scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| h96p1n posdrop | `mean HRC-MAE across policies: 0.0468` | 0.0467572917 |
+| h96p1n rankstrong | `mean HRC-MAE across policies: 0.0464` | 0.0463539583 |
+| h96p1n drop005 | `mean HRC-MAE across policies: 0.0444` | 0.0444263333 |
+| h96p1n rank2 | `mean HRC-MAE across policies: 0.0526` | 0.0525912083 |
+| h96p1n rank4 | `mean HRC-MAE across policies: 0.0462` | 0.0461814583 |
+
+Medium rank-band reuse on the current h64 rank-ramp atlas improved ordinary
+LRU/FIFO shape but hurt LIRS too much:
+
+| scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| rb=0.05, ranks 32..4095 | `mean HRC-MAE across policies: 0.0416` | 0.0415772917 |
+| rb=0.10, ranks 32..4095 | `mean HRC-MAE across policies: 0.0460` | 0.0459671667 |
+| rb=0.05, ranks 128..8191 | `mean HRC-MAE across policies: 0.0416` | 0.0416126042 |
+| rb=0.10, ranks 128..8191 | `mean HRC-MAE across policies: 0.0480` | 0.0480265000 |
+| rb=0.05, ranks 512..32767 | `mean HRC-MAE across policies: 0.0429` | 0.0428544167 |
+
+Distance-state fits used 106 CloudPhysics LCS files with available conditioning
+profiles, 25k records/file, h64, phase1, seed137, and state edges
+`0,8,32,128,512,1073741824`.
+
+| atlas / scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| d6 time4/size4, LLNL-style adj035 | `mean HRC-MAE across policies: 0.1305` | 0.1305014167 |
+| d6 time4/size4, adj025 | `mean HRC-MAE across policies: 0.1073` | 0.1072715208 |
+| d6 time4/size4, rank2 adj035 | `mean HRC-MAE across policies: 0.1083` | 0.1083292083 |
+| d6 time4/size4, LANL rankstrong | `mean HRC-MAE across policies: 0.0706` | 0.0705539583 |
+| d6 time4/size4, combo adj035 | `mean HRC-MAE across policies: 0.0828` | 0.0828182083 |
+| d6 time1/size1, LLNL-style adj035 | `mean HRC-MAE across policies: 0.1120` | 0.1119975208 |
+| d6 time1/size1, rank2 adj035 | `mean HRC-MAE across policies: 0.0909` | 0.0909283125 |
+| d6 time1/size1, LANL rankstrong | `mean HRC-MAE across policies: 0.0610` | 0.0609700208 |
+| d6 time1/size1, rankstrong drop010 | `mean HRC-MAE across policies: 0.0557` | 0.0556863125 |
+| d6 time1/size1, rankstrong drop015 | `mean HRC-MAE across policies: 0.0535` | 0.0534753958 |
+| d6 time1/size1, rankstrong drop020 | `mean HRC-MAE across policies: 0.0594` | 0.0594480000 |
+| d6 time1/size1, rankstrong drop025 | `mean HRC-MAE across policies: 0.0734` | 0.0734447917 |
+
+Read: LANL's action-state h64 rank-ramp remains the best non-bootstrap CP
+entry. The naive distance-state port over-emits reuse, and the explicit drop
+rescue bottoms at `0.0535` before LIRS/adaptive policies degrade. Next CP work
+needs a different transition objective or rank decoder, not just adding LLNL's
+distance-state buckets to the current `altgan` reservoir sampler.
