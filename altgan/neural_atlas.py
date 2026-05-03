@@ -32,6 +32,12 @@ from .model import (
 
 _INT64_MAX = np.iinfo(np.int64).max
 _MAX_GENERATED_ID_BASE = 1_000_000_000_000_000
+RANK_PMF_EDGES = np.array([
+    0, 1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167,
+    219, 288, 377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323,
+    5669, 7437, 9750, 12780, 16752, 21959, 28785, 37736, 49467, 64853,
+    85036, 111472, 146148, 191628, 251236, 1 << 30,
+], dtype=np.int64)
 
 
 @dataclass
@@ -66,6 +72,8 @@ class NeuralAtlasModel:
     global_samples_by_state: Dict[int, List[EventSample]]
     global_samples: List[EventSample]
     max_obj_id: int
+    rank_pmf_edges: np.ndarray | None = None
+    rank_pmf_by_state: Dict[int, np.ndarray] = field(default_factory=dict)
     rank_state_edges: np.ndarray | None = None
     n_dist_states: int = StackAtlasModel.N_ACTIONS
     mark_model: object | None = None
@@ -87,6 +95,7 @@ class NeuralAtlasModel:
         stack_rank_tail_pivot: int | None = None,
         stack_rank_tail_scale: float = 1.0,
         stack_rank_position_scales: Sequence[float] | None = None,
+        stack_rank_pmf_prob: float = 0.0,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -157,6 +166,7 @@ class NeuralAtlasModel:
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
         stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
         stack_rank_position_scales = _nonnegative_float_list(stack_rank_position_scales)
+        stack_rank_pmf_prob = float(np.clip(stack_rank_pmf_prob, 0.0, 1.0))
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -275,6 +285,8 @@ class NeuralAtlasModel:
         per_stream = int(np.ceil(n_records / n_streams))
         rows = []
         rank_state_edges = getattr(self, "rank_state_edges", None)
+        rank_pmf_edges = getattr(self, "rank_pmf_edges", None)
+        rank_pmf_by_state = getattr(self, "rank_pmf_by_state", {}) or {}
         n_dist_states = int(getattr(self, "n_dist_states", StackAtlasModel.N_ACTIONS))
         if rank_state_edges is None:
             n_dist_states = StackAtlasModel.N_ACTIONS
@@ -531,18 +543,27 @@ class NeuralAtlasModel:
                             rng=rng,
                         )
                     else:
-                        phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
-                        phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
-                        if phase_rank_max is not None and phase_rank_max < 0:
-                            phase_rank_max = None
-                        rank = _calibrated_stack_rank(
-                            ev.stack_distance,
-                            stack_rank_scale=phase_rank_scale,
-                            stack_rank_max=phase_rank_max,
-                            stack_rank_tail_pivot=stack_rank_tail_pivot,
-                            stack_rank_tail_scale=stack_rank_tail_scale,
-                            stack_len=len(stack),
-                        )
+                        rank = None
+                        if stack_rank_pmf_prob > 0.0 and rng.random() < stack_rank_pmf_prob:
+                            rank = _sample_rank_pmf(
+                                rank_pmf_edges,
+                                rank_pmf_by_state.get(int(state)),
+                                stack_len=len(stack),
+                                rng=rng,
+                            )
+                        if rank is None:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
                     effective_stack_distance = int(rank)
                     effective_action_class = _action_class(effective_stack_distance)
                     obj_id = stack.move_to_front(rank)
@@ -848,6 +869,7 @@ def fit_neural_atlas(
     trans_weights = []
     global_initial_counts: Dict[int, int] = {}
     global_transition_counts: Dict[int, Dict[int, int]] = {}
+    global_rank_counts_by_state: Dict[int, np.ndarray] = {}
     global_samples_by_state: Dict[int, List[EventSample]] = {}
     global_seen_by_state: Dict[int, int] = {}
     global_samples: List[EventSample] = []
@@ -855,7 +877,7 @@ def fit_neural_atlas(
     max_obj_id = 0
 
     for df, cond, name in zip(clean, clean_conds, clean_names):
-        reservoir, init_counts, transition_counts = _summarize_file(
+        reservoir, init_counts, transition_counts, rank_counts_by_state = _summarize_file(
             df,
             np.asarray(cond, dtype=np.float32),
             name,
@@ -899,6 +921,12 @@ def fit_neural_atlas(
                 _reservoir_add(global_samples, ev, global_seen, max_samples_per_state * 16, rng)
                 global_seen += 1
             global_seen_by_state[int(state)] = seen
+        for state, counts in rank_counts_by_state.items():
+            bucket = global_rank_counts_by_state.setdefault(
+                int(state),
+                np.zeros(len(RANK_PMF_EDGES) - 1, dtype=np.float64),
+            )
+            bucket += counts
 
     cond_arr = np.vstack(file_conds).astype(np.float32)
     init_arr = np.vstack(init_targets).astype(np.float32)
@@ -952,6 +980,7 @@ def fit_neural_atlas(
         state: _normalize_counts(counts)
         for state, counts in global_transition_counts.items()
     }
+    rank_pmf_by_state = _rank_pmfs(global_rank_counts_by_state)
     metadata = {
         "n_files": len(file_names),
         "n_records": int(sum(len(df) for df in clean)),
@@ -967,6 +996,7 @@ def fit_neural_atlas(
         "rank_state_edges": (
             None if rank_state_edges_arr is None else rank_state_edges_arr.tolist()
         ),
+        "rank_pmf_edges": RANK_PMF_EDGES.tolist(),
         "n_dist_states": int(n_dist_states),
     }
     return NeuralAtlasModel(
@@ -989,6 +1019,8 @@ def fit_neural_atlas(
         global_samples_by_state=global_samples_by_state,
         global_samples=global_samples,
         max_obj_id=max_obj_id,
+        rank_pmf_edges=RANK_PMF_EDGES.copy(),
+        rank_pmf_by_state=rank_pmf_by_state,
         rank_state_edges=rank_state_edges_arr,
         n_dist_states=n_dist_states,
         metadata=metadata,
@@ -1030,6 +1062,7 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
     transition_counts: Dict[int, Dict[int, int]] = {}
     samples_by_state: Dict[int, List[EventSample]] = {}
     seen_by_state: Dict[int, int] = {}
+    rank_counts_by_state: Dict[int, np.ndarray] = {}
 
     if len(states):
         initial_counts[int(states[0])] = 1
@@ -1054,6 +1087,12 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
         seen = seen_by_state.get(state_i, 0)
         _reservoir_add(bucket, ev, seen, max_samples_per_state, rng)
         seen_by_state[state_i] = seen + 1
+        if int(stack_d[i]) >= 0:
+            counts = rank_counts_by_state.setdefault(
+                state_i,
+                np.zeros(len(RANK_PMF_EDGES) - 1, dtype=np.float64),
+            )
+            counts[_rank_bin_index(int(stack_d[i]), RANK_PMF_EDGES)] += 1.0
 
     initial_states, initial_probs = _normalize_counts(initial_counts)
     transitions = {
@@ -1069,7 +1108,7 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
         samples_by_state=samples_by_state,
         max_obj_id=int(np.max(obj_ids)),
     )
-    return reservoir, initial_counts, transition_counts
+    return reservoir, initial_counts, transition_counts, rank_counts_by_state
 
 
 def _dense_counts(counts: Dict[int, int], n_states: int, alpha: float = 1e-4) -> np.ndarray:
@@ -1155,6 +1194,52 @@ def _calibrated_stack_rank(
     if stack_rank_max is not None and stack_rank_max >= 0:
         rank = min(rank, int(stack_rank_max))
     return min(max(rank, 0), int(stack_len) - 1)
+
+
+def _rank_bin_index(rank: int, edges: np.ndarray) -> int:
+    idx = int(np.searchsorted(edges[1:], max(int(rank), 0), side="right"))
+    return min(max(idx, 0), len(edges) - 2)
+
+
+def _rank_pmfs(
+    counts_by_state: Dict[int, np.ndarray],
+    alpha: float = 1e-4,
+) -> Dict[int, np.ndarray]:
+    out: Dict[int, np.ndarray] = {}
+    for state, counts in counts_by_state.items():
+        arr = np.asarray(counts, dtype=np.float64) + float(alpha)
+        total = float(arr.sum())
+        if total > 0.0 and np.isfinite(total):
+            out[int(state)] = arr / total
+    return out
+
+
+def _sample_rank_pmf(
+    edges: np.ndarray | None,
+    pmf: np.ndarray | None,
+    *,
+    stack_len: int,
+    rng: np.random.Generator,
+) -> int | None:
+    if edges is None or pmf is None or stack_len <= 0:
+        return None
+    probs = np.asarray(pmf, dtype=np.float64)
+    if len(edges) != len(probs) + 1:
+        return None
+    total = float(probs.sum())
+    if not np.isfinite(total) or total <= 0.0:
+        return None
+    if abs(total - 1.0) > 1e-6:
+        probs = probs / total
+    idx = int(rng.choice(len(probs), p=probs))
+    lo = int(edges[idx])
+    hi = int(edges[idx + 1]) - 1
+    if lo >= int(stack_len):
+        return int(stack_len) - 1
+    hi = min(max(hi, lo), int(stack_len) - 1)
+    if hi <= lo:
+        return max(lo, 0)
+    return int(rng.integers(max(lo, 0), hi + 1))
 
 
 def _boosted_reuse_rank(
