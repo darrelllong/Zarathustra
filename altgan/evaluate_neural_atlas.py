@@ -84,6 +84,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Power applied to long-memory frequency-pool counts.")
     p.add_argument("--stack-frequency-pool-min-age", type=int, default=0,
                    help="Minimum stream positions since last emission before a frequency-pool object can be reused.")
+    p.add_argument("--stack-frequency-pool-min-rank", type=int, default=0,
+                   help="Minimum current LRU stack rank for frequency-pool redirects.")
+    p.add_argument("--stack-frequency-pool-max-rank", type=int, default=-1,
+                   help="Maximum current LRU stack rank for frequency-pool redirects; negative disables.")
+    p.add_argument("--stack-frequency-pool-sample-attempts", type=int, default=8,
+                   help="Number of frequency-pool samples tried to satisfy age/rank filters.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-min-frac", type=float, default=0.5,
@@ -192,6 +198,9 @@ def main() -> int:
         stack_frequency_pool_max_candidates=args.stack_frequency_pool_max_candidates,
         stack_frequency_pool_weight_power=args.stack_frequency_pool_weight_power,
         stack_frequency_pool_min_age=args.stack_frequency_pool_min_age,
+        stack_frequency_pool_min_rank=args.stack_frequency_pool_min_rank,
+        stack_frequency_pool_max_rank=None if args.stack_frequency_pool_max_rank < 0 else args.stack_frequency_pool_max_rank,
+        stack_frequency_pool_sample_attempts=args.stack_frequency_pool_sample_attempts,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
         stack_tail_reuse_rank_power=args.stack_tail_reuse_rank_power,
@@ -268,6 +277,9 @@ def main() -> int:
         "stack_frequency_pool_max_candidates": args.stack_frequency_pool_max_candidates,
         "stack_frequency_pool_weight_power": args.stack_frequency_pool_weight_power,
         "stack_frequency_pool_min_age": args.stack_frequency_pool_min_age,
+        "stack_frequency_pool_min_rank": args.stack_frequency_pool_min_rank,
+        "stack_frequency_pool_max_rank": args.stack_frequency_pool_max_rank,
+        "stack_frequency_pool_sample_attempts": args.stack_frequency_pool_sample_attempts,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
         "stack_tail_reuse_rank_power": args.stack_tail_reuse_rank_power,

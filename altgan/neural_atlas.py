@@ -98,6 +98,9 @@ class NeuralAtlasModel:
         stack_frequency_pool_max_candidates: int = 1000,
         stack_frequency_pool_weight_power: float = 1.0,
         stack_frequency_pool_min_age: int = 0,
+        stack_frequency_pool_min_rank: int = 0,
+        stack_frequency_pool_max_rank: int | None = None,
+        stack_frequency_pool_sample_attempts: int = 8,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_min_frac: float = 0.5,
         stack_tail_reuse_rank_power: float = 1.0,
@@ -153,6 +156,10 @@ class NeuralAtlasModel:
         )
         stack_frequency_pool_weight_power = max(float(stack_frequency_pool_weight_power), 1e-6)
         stack_frequency_pool_min_age = max(int(stack_frequency_pool_min_age), 0)
+        stack_frequency_pool_min_rank = max(int(stack_frequency_pool_min_rank), 0)
+        if stack_frequency_pool_max_rank is not None and stack_frequency_pool_max_rank < 0:
+            stack_frequency_pool_max_rank = None
+        stack_frequency_pool_sample_attempts = max(int(stack_frequency_pool_sample_attempts), 1)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
         stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
         stack_tail_reuse_rank_power = max(float(stack_tail_reuse_rank_power), 1e-6)
@@ -298,8 +305,11 @@ class NeuralAtlasModel:
                             last_pos=freq_last_pos,
                             current_pos=pos,
                             min_age=stack_frequency_pool_min_age,
+                            min_rank=stack_frequency_pool_min_rank,
+                            max_rank=stack_frequency_pool_max_rank,
                             weight_power=stack_frequency_pool_weight_power,
                             max_search=0,
+                            sample_attempts=stack_frequency_pool_sample_attempts,
                             rng=rng,
                         )
                         if rank_from_pool is not None:
@@ -953,8 +963,11 @@ def _rank_from_object_pool(
     last_pos: dict[int, int],
     current_pos: int,
     min_age: int,
+    min_rank: int,
+    max_rank: int | None,
     weight_power: float,
     max_search: int,
+    sample_attempts: int,
     rng: np.random.Generator,
 ) -> int | None:
     eligible = _eligible_hot_pool(
@@ -965,17 +978,27 @@ def _rank_from_object_pool(
     )
     if not eligible:
         return None
-    obj_id = _sample_hot_pool_obj(
-        eligible,
-        weight_power=weight_power,
-        rng=rng,
-    )
-    try:
-        if max_search > 0:
-            return int(stack.index(obj_id, 0, min(len(stack), int(max_search))))
-        return int(stack.index(obj_id))
-    except ValueError:
-        return None
+    lo = max(int(min_rank), 0)
+    hi = None if max_rank is None else max(int(max_rank), lo)
+    for _ in range(max(int(sample_attempts), 1)):
+        obj_id = _sample_hot_pool_obj(
+            eligible,
+            weight_power=weight_power,
+            rng=rng,
+        )
+        try:
+            if max_search > 0:
+                rank = int(stack.index(obj_id, 0, min(len(stack), int(max_search))))
+            else:
+                rank = int(stack.index(obj_id))
+        except ValueError:
+            continue
+        if rank < lo:
+            continue
+        if hi is not None and rank > hi:
+            continue
+        return rank
+    return None
 
 
 class _RankedLRUNode:
