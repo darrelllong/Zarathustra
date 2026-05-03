@@ -49,6 +49,7 @@ class AtlasReservoir:
     transitions: Dict[int, Tuple[np.ndarray, np.ndarray]]
     samples_by_state: Dict[int, List[EventSample]]
     max_obj_id: int
+    rank_pmf_by_state: Dict[int, np.ndarray] = field(default_factory=dict)
 
 
 @dataclass
@@ -100,6 +101,7 @@ class NeuralAtlasModel:
         stack_rank_pmf_bin_power: float = 1.0,
         stack_rank_pmf_tail_bin_power: float | None = None,
         stack_rank_pmf_tail_power_pivot: int | None = None,
+        stack_rank_pmf_local_prob: float = 0.0,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -177,6 +179,7 @@ class NeuralAtlasModel:
             stack_rank_pmf_tail_bin_power = max(float(stack_rank_pmf_tail_bin_power), 1e-6)
         if stack_rank_pmf_tail_power_pivot is not None and stack_rank_pmf_tail_power_pivot < 0:
             stack_rank_pmf_tail_power_pivot = None
+        stack_rank_pmf_local_prob = float(np.clip(stack_rank_pmf_local_prob, 0.0, 1.0))
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -555,9 +558,15 @@ class NeuralAtlasModel:
                     else:
                         rank = None
                         if stack_rank_pmf_prob > 0.0 and rng.random() < stack_rank_pmf_prob:
+                            pmf = rank_pmf_by_state.get(int(state))
+                            if stack_rank_pmf_local_prob > 0.0 and rng.random() < stack_rank_pmf_local_prob:
+                                local_pmfs = getattr(reservoir, "rank_pmf_by_state", {}) or {}
+                                local_pmf = local_pmfs.get(int(state))
+                                if local_pmf is not None:
+                                    pmf = local_pmf
                             rank = _sample_rank_pmf(
                                 rank_pmf_edges,
-                                rank_pmf_by_state.get(int(state)),
+                                pmf,
                                 stack_len=len(stack),
                                 bin_power=stack_rank_pmf_bin_power,
                                 tail_bin_power=stack_rank_pmf_tail_bin_power,
@@ -1125,6 +1134,7 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
         transitions=transitions,
         samples_by_state=samples_by_state,
         max_obj_id=int(np.max(obj_ids)),
+        rank_pmf_by_state=_rank_pmfs(rank_counts_by_state),
     )
     return reservoir, initial_counts, transition_counts, rank_counts_by_state
 

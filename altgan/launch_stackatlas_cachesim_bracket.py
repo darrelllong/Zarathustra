@@ -32,6 +32,7 @@ class Spec:
     rank_pmf_bin_power: float = 1.0
     rank_pmf_tail_bin_power: float = -1.0
     rank_pmf_tail_power_pivot: int = -1
+    rank_pmf_local_prob: float = 0.0
     adj_dup_prob: float = 0.0
     adj_dup_position_probs: str = ""
     adj_dup_min_rank: int = 0
@@ -108,6 +109,8 @@ def _parse_spec(text: str) -> Spec:
         "rpmf_tailpow": "rank_pmf_tail_bin_power",
         "rpmf_tail_power": "rank_pmf_tail_bin_power",
         "rpmf_pivot": "rank_pmf_tail_power_pivot",
+        "rpmflocal": "rank_pmf_local_prob",
+        "rpmf_local": "rank_pmf_local_prob",
         "adj": "adj_dup_prob",
         "adj_pos": "adj_dup_position_probs",
         "adjpos": "adj_dup_position_probs",
@@ -213,6 +216,7 @@ def _auto_name(spec: Spec) -> str:
         f"s{_tag(spec.rank_tail_scale)}_rpmf{_tag(spec.rank_pmf_prob)}"
         f"x{_tag(spec.rank_pmf_scale)}pow{_tag(spec.rank_pmf_bin_power)}"
         f"tp{_tag(spec.rank_pmf_tail_bin_power)}piv{spec.rank_pmf_tail_power_pivot}"
+        f"loc{_tag(spec.rank_pmf_local_prob)}"
         f"_adj{_tag(spec.adj_dup_prob)}"
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
@@ -307,6 +311,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_pmf_tail_bin_power),
         "--stack-rank-pmf-tail-power-pivot",
         str(spec.rank_pmf_tail_power_pivot),
+        "--stack-rank-pmf-local-prob",
+        str(spec.rank_pmf_local_prob),
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
         "--stack-adj-dup-position-probs",
