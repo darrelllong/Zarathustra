@@ -2288,3 +2288,35 @@ Seed-42 scouts: Meta KV transfer/drop `0.05` scored `0.0473`, drop `0.07`
 scored `0.0530`, hotter admission/tail variants scored `0.0627` to `0.0739`,
 and MSR/Twitter shapes scored `0.0788`/`0.0761`. The current CDN basin keeps
 the high-admission/drop architecture from Meta KV, but needs lighter drop.
+
+## CloudPhysics Rank-Ramp Non-Bootstrap Update (2026-05-03)
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_phaseatlas_scout96x25k_h64_phase1_e600_seed137.pkl.gz`.
+Fit: 96 CloudPhysics LCS files, 25k records/file, `hidden_dim=64`,
+`n_phase=1`, `n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`.
+
+Recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=0.2`, `local_prob_power=0.9`, `stack_rank_scale=3.0`,
+`stack_rank_position_scales=6,5,4.5,3.5,3,2.5,2,2,2.3,2.8`,
+`stack_adj_dup_prob=0.25`, `stack_hot_pool_prob=0.05`,
+`stack_hot_pool_k=50`, `stack_recent_pool_prob=0.10`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`,
+`stack_reuse_drop_position_probs=0.1,0.08,0.06,0.04,0.03,0.02,0.01,0,0,0`,
+1M rows, 4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0401` | 0.0401132708 |
+| 80 | `mean HRC-MAE across policies: 0.0403` | 0.0403417500 |
+| 81 | `mean HRC-MAE across policies: 0.0401` | 0.0401375000 |
+| 82 | `mean HRC-MAE across policies: 0.0404` | 0.0403695833 |
+
+Four-seed mean: `0.0402405260` (display `0.0402`), range `0.0002563125`.
+This is LANL's current non-bootstrap CloudPhysics generative entry, improving
+the prior seed-42 position-drop scout (`0.0403778125`) but still trailing LLNL
+R224/R240/R247 `0.0338`. Negative scouts: near-head duplicate bands `0.0446+`,
+band mixes `0.0406+`, `h96_phase8` `0.0588+`, official-four-file 250k atlas
+`0.1352+`, and fresh phase2/noise early scouts `0.0442+`.

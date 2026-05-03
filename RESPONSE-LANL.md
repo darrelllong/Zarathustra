@@ -1138,3 +1138,46 @@ Meta CDN. Seed-42 scouts: Meta KV transfer/drop `0.05` scored `0.0473`,
 drop `0.07` scored `0.0530`, hotter admission/tail scored `0.0627` to
 `0.0739`, and the MSR/Twitter shapes scored `0.0788`/`0.0761`; the current
 CDN fit wants explicit drop, but less of it than Meta KV.
+
+## 2026-05-03 -- CloudPhysics Rank-Ramp Non-Bootstrap Update
+
+LANL's CloudPhysics replay rows remain exact cachesim zero, but the open
+generative fight is the non-bootstrap eight-policy surface where LLNL R224 is
+still ahead at `0.0338`. The previous LANL non-bootstrap seed-42 best was the
+position-drop scout at JSON `0.0403778125`. A new generator architecture added
+position-conditioned stack-rank scaling and improves that basin slightly, but
+does not close the LLNL gap.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_phaseatlas_scout96x25k_h64_phase1_e600_seed137.pkl.gz`.
+Fit: 96 CloudPhysics LCS files, 25k records/file, `hidden_dim=64`,
+`n_phase=1`, `n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`.
+
+Generation recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=0.2`, `local_prob_power=0.9`, `stack_rank_scale=3.0`,
+`stack_rank_position_scales=6,5,4.5,3.5,3,2.5,2,2,2.3,2.8`,
+`stack_adj_dup_prob=0.25`, `stack_hot_pool_prob=0.05`,
+`stack_hot_pool_k=50`, `stack_recent_pool_prob=0.10`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`,
+`stack_reuse_drop_position_probs=0.1,0.08,0.06,0.04,0.03,0.02,0.01,0,0,0`,
+1M rows, 4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rankstrong_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0401` | 0.0401132708 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rankstrong_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0403` | 0.0403417500 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rankstrong_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0401` | 0.0401375000 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rankstrong_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0404` | 0.0403695833 |
+
+Mean across seeds `{42,80,81,82}`: `0.0402405260` (race display `0.0402`;
+range `0.0002563125`). This improves the prior LANL seed-42 basin but is not
+a CloudPhysics win. Negative architecture reads from the same session:
+near-head duplicate bands improved LFU but damaged LIRS/adaptive policies
+(`0.0446` to `0.0615` seed 42); mixed bands were still negative (`0.0406` to
+`0.0412`); the older `h96_phase8` atlas scored `0.0588` to `0.0733`; the
+official-four-file 250k atlas scored `0.1352+`; and a fresh phase2/noise fit
+started negative (`0.0442` to `0.0461` in early scouts). Current read:
+CloudPhysics needs a new fit/generator architecture, not another scalar
+generate-only tweak.
