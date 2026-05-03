@@ -866,6 +866,8 @@ def generate(
     stack_rank_max: int = -1,
     stack_rank_tail_pivot: int = -1,
     stack_rank_tail_scale: float = 1.0,
+    hot_pool_min_age: int = 0,
+    reuse_drop_prob: float = 0.0,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -960,6 +962,11 @@ def generate(
             effective_window = max(int(hot_pool_window), per_stream // 4)
             hot_window: deque = deque(maxlen=effective_window)
             hot_pool_list: List[int] = []
+            # R275: per-stream cooldown tracking (port of altgan
+            # _eligible_hot_pool). Maps obj_id -> last step at which the
+            # obj was emitted via hot-pool. Filter `hot_pool_list` against
+            # this when --hot-pool-min-age > 0.
+            hot_last_pos: Dict[int, int] = {}
             hot_pool_refresh_every = 200
             # R231 (WaveStitch lesson): optionally jitter the refresh interval
             # via Poisson(hot_pool_refresh_every) so the periodic hot-pool
@@ -981,6 +988,13 @@ def generate(
             for step in range(per_stream):
                 # Decode current state to (phase, dist_state) → action
                 dist_state = state % N_DIST_STATES
+                # R275: reuse-drop — convert a model-emitted REUSE into a NEW.
+                # Inverse of reuse-boost. Closes over-reuse failure modes.
+                # Bit-identical at default 0.0 (Python `and` short-circuits).
+                if (reuse_drop_prob > 0.0
+                        and dist_state != STATE_NEW
+                        and rng.random() < reuse_drop_prob):
+                    dist_state = STATE_NEW
                 if dist_state == STATE_NEW:
                     if (reuse_boost_prob > 0.0 and len(stack) > 0
                             and rng.random() < reuse_boost_prob):
@@ -1106,12 +1120,31 @@ def generate(
                     # R181: redirect to hot-pool object — closes the top-K
                     # access-share gap (real concentrates 35% of tencent
                     # accesses on top-100 objects; fake spreads uniformly).
-                    hot_idx = int(rng.integers(0, len(hot_pool_list)))
-                    obj_id = hot_pool_list[hot_idx]
+                    # R275: cooldown filter (port of altgan _eligible_hot_pool).
+                    # When hot_pool_min_age > 0, exclude pool objects emitted
+                    # within the last min_age steps. LANL's alibaba 0.0143 →
+                    # 0.0119 lever. Bit-identical at default 0.
+                    if hot_pool_min_age > 0:
+                        eligible = [
+                            oid for oid in hot_pool_list
+                            if step - hot_last_pos.get(int(oid), -hot_pool_min_age) >= hot_pool_min_age
+                        ]
+                    else:
+                        eligible = hot_pool_list
+                    if eligible:
+                        hot_idx = int(rng.integers(0, len(eligible)))
+                        obj_id = eligible[hot_idx]
+                    else:
+                        # All entries cooling down; reuse first hot pool obj
+                        # to keep behaviour deterministic-ish (rare branch).
+                        hot_idx = int(rng.integers(0, len(hot_pool_list)))
+                        obj_id = hot_pool_list[hot_idx]
                     if obj_id in stack:
                         rank = stack.index(obj_id)
                         del stack[rank]
                     stack.insert(0, obj_id)
+                    if hot_pool_min_age > 0:
+                        hot_last_pos[int(obj_id)] = step
                     if rank_net is not None:
                         prev_rank_bin = N_RANK_BINS  # sentinel: hot-pool isn't a sampled rank
                 else:
@@ -1420,6 +1453,15 @@ def main():
                       help="R263: scale applied to ranks above tail-pivot. "
                            "Compresses (<1) or stretches (>1) the deep tail "
                            "independently of the bulk distribution.")
+    pgen.add_argument("--hot-pool-min-age", type=int, default=0,
+                      help="R275 (port of altgan _eligible_hot_pool): exclude "
+                           "hot-pool objects emitted within the last N steps. "
+                           "Closes SIEVE/SLRU over-emission. LANL alibaba "
+                           "0.0143 → 0.0119 lever.")
+    pgen.add_argument("--reuse-drop-prob", type=float, default=0.0,
+                      help="R275 (port of altgan stack_reuse_drop_prob): with "
+                           "this prob, convert a model-emitted REUSE into a "
+                           "NEW. Inverse of reuse-boost. Closes over-reuse.")
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1455,6 +1497,8 @@ def main():
             stack_rank_max=args.stack_rank_max,
             stack_rank_tail_pivot=args.stack_rank_tail_pivot,
             stack_rank_tail_scale=args.stack_rank_tail_scale,
+            hot_pool_min_age=args.hot_pool_min_age,
+            reuse_drop_prob=args.reuse_drop_prob,
         )
 
 
