@@ -10,3 +10,18 @@ generated*.csv
 
 # macOS
 .DS_Store
+
+# OpenClaw / Claude Code agent state (per-host, not shared)
+.openclaw/
+.claude/worktrees/
+
+# OpenClaw onboarding-generated workspace files (not race artifacts)
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+
+# Per-commit Sandia claim manifest (transient; never tracked)
+.sandia-claim.json
