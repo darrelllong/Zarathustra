@@ -15070,3 +15070,55 @@ corpora.
   bearing piece.
 - **R269** (in progress): multi-seed verify R265's MSR scale=2.0
   generative single-seed lift (-7%, 0.0246 single-seed). Bank or close.
+
+## 🎯 R270/R272/R273 — LLNL retakes MSR Exchange via time×size×phase architectural port
+
+### Architectural lever
+
+R267/R268 confirmed empirically that LANL's `scout` recipe params alone (h=96, phase=8, e500, seed=23) on LLNL's neural_atlas regress. The win was not in the hyperparameters — it was in altgan's **state-space encoding**: `n_states = n_phase × n_time × n_size × N_ACTIONS`. LLNL had only `n_phase × N_DIST_STATES` (no time, no size axes).
+
+**R270** (commit `7d3651d`) ports altgan's time×size×phase state encoding to `llgan/neural_atlas.py`:
+- New flags: `--n-time-bins`, `--n-size-bins` on the fit subcommand
+- New helper `state_from_sd()` accepting time/size args
+- Per-state dt and obj_size PMFs (32 log-spaced bins) emit realistic ts increments and obj_size values at generate time
+- Bit-identical at `n_time=n_size=1` defaults (existing R248/R245/R256.D atlases load and generate identically)
+
+### R272 — refit MSR Exchange with R270 + scale sweep
+
+Atlas: `n_phase=2 × n_time=4 × n_size=4 × N_DIST=6 = 192 states` (vs 12 in R256.D).
+Recipe: hidden=96 epochs=600 seed=137 cond_noise=0.05 records_per_file=50000.
+
+| scale | mean HRC-MAE | per-policy LRU/ARC/FIFO/SIEVE/SLRU/CAR |
+|---|---|---|
+| 1.0 | 0.0106 | 0.0077 / 0.0104 / 0.0065 / 0.0136 / 0.0137 / 0.0115 |
+| **2.0** | **0.0102** | 0.0057 / 0.0105 / 0.0045 / 0.0131 / 0.0166 / 0.0106 |
+| 3.0 | 0.0115 | 0.0071 / 0.0119 / 0.0046 / 0.0150 / 0.0186 / 0.0121 |
+| 5.0 (LANL setting) | 0.0162 | — |
+| 8.0 | 0.0245 | — |
+
+Clean inverted-U. **scale=2.0 is the LLNL-R270-atlas optimum** (different from LANL's scale=5.0 because the atlases produce different raw-rank distributions).
+
+**SIEVE per-policy collapse**: LLNL R256.D atlas SIEVE=0.0925 → LLNL R270 atlas SIEVE=0.0136 = **−85%**. The time×size binning was the entire SIEVE moat.
+
+### R273 — multi-seed verify of R272 winner
+
+| seed | mean HRC-MAE |
+|---|---|
+| 42 | 0.0102 |
+| 43 | 0.0106 |
+| 44 | 0.0102 |
+| 45 | 0.0108 |
+| **mean** | **0.0105** (range 0.0006) |
+
+### Race ledger update (MSR Exchange)
+
+| | mean | range | seeds |
+|---|---|---|---|
+| LANL official MSR (scout-rank h=96 phase=8 scale=5.0) | 0.0131 | 0.0008 | 42/80/81/82 |
+| **LLNL R273 (R270 architecture, scale=2.0)** | **0.0105** | 0.0006 | 42/43/44/45 |
+
+**LLNL leads MSR Exchange by −20% measured-vs-measured under matched cachesim eval protocol.** Atlas: `llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`. Reproducer: hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16 + `--stack-rank-scale 2.0`.
+
+Two more LLNL atlases pending the same treatment:
+- **R271** (in flight, baase): Baleen24 R270 fit + scale sweep. Goal: close LANL's 0.0291.
+- **R274** (queued): alibaba R270 fit + multi-seed verify (defense + per-policy LRU lift).
