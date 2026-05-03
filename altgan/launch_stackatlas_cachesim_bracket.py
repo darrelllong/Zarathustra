@@ -41,6 +41,7 @@ class Spec:
     reuse_boost_min_rank: int = 32768
     reuse_boost_rank_power: float = 2.0
     reuse_drop_prob: float = 0.0
+    reuse_drop_position_probs: str = ""
 
 
 def _parse_spec(text: str) -> Spec:
@@ -84,6 +85,8 @@ def _parse_spec(text: str) -> Spec:
         "reuse_power": "reuse_boost_rank_power",
         "drop": "reuse_drop_prob",
         "reuse_drop": "reuse_drop_prob",
+        "drop_pos": "reuse_drop_position_probs",
+        "reuse_drop_pos": "reuse_drop_position_probs",
     }
     fields = {field.name: field.type for field in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs = {"name": defaults.name}
@@ -95,7 +98,7 @@ def _parse_spec(text: str) -> Spec:
             kwargs[field] = value
         else:
             current = getattr(defaults, field)
-            kwargs[field] = type(current)(value)
+            kwargs[field] = value if isinstance(current, str) else type(current)(value)
     spec = Spec(**kwargs)
     if not spec.name:
         object.__setattr__(spec, "name", _auto_name(spec))
@@ -228,6 +231,11 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         "--progress-interval",
         str(args.progress_interval),
     ]
+    if spec.reuse_drop_position_probs:
+        cmd.extend([
+            "--stack-reuse-drop-position-probs",
+            spec.reuse_drop_position_probs,
+        ])
     if args.force_phase:
         cmd.insert(cmd.index("--stack-adj-dup-prob"), "--force-phase-schedule")
     return cmd

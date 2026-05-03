@@ -86,6 +86,7 @@ class NeuralAtlasModel:
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
         stack_reuse_drop_prob: float = 0.0,
+        stack_reuse_drop_position_probs: Sequence[float] | None = None,
         stack_adj_dup_prob: float = 0.0,
         stack_hot_pool_prob: float = 0.0,
         stack_hot_pool_k: int = 100,
@@ -141,6 +142,7 @@ class NeuralAtlasModel:
         stack_reuse_boost_min_rank = max(int(stack_reuse_boost_min_rank), 0)
         stack_reuse_boost_rank_power = max(float(stack_reuse_boost_rank_power), 1e-6)
         stack_reuse_drop_prob = float(np.clip(stack_reuse_drop_prob, 0.0, 1.0))
+        stack_reuse_drop_position_probs = _clip_prob_list(stack_reuse_drop_position_probs)
         stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
         stack_hot_pool_prob = float(np.clip(stack_hot_pool_prob, 0.0, 1.0))
         stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
@@ -243,10 +245,16 @@ class NeuralAtlasModel:
                     state = _state_with_phase(state, phase, base_span)
                 ev = self._sample_event(reservoir, state, rng)
                 wants_reuse = ev.action_class != StackAtlasModel.ACTION_NEW
+                reuse_drop_prob = _position_value(
+                    stack_reuse_drop_position_probs,
+                    pos,
+                    per_stream,
+                    stack_reuse_drop_prob,
+                )
                 dropped_reuse = (
                     wants_reuse
-                    and stack_reuse_drop_prob > 0.0
-                    and rng.random() < stack_reuse_drop_prob
+                    and reuse_drop_prob > 0.0
+                    and rng.random() < reuse_drop_prob
                 )
                 if dropped_reuse:
                     wants_reuse = False
@@ -1201,6 +1209,20 @@ def _phase_value(values: Sequence, phase: int, default):
         return default
     idx = min(max(int(phase), 0), len(values) - 1)
     return values[idx]
+
+
+def _position_value(values: Sequence[float] | None, pos: int, per_stream: int, default: float) -> float:
+    if not values:
+        return float(default)
+    idx = int(int(pos) * len(values) / max(int(per_stream), 1))
+    idx = min(max(idx, 0), len(values) - 1)
+    return float(values[idx])
+
+
+def _clip_prob_list(values: Sequence[float] | None) -> list[float]:
+    if not values:
+        return []
+    return [float(np.clip(float(v), 0.0, 1.0)) for v in values]
 
 
 def _blend_numeric_marks(

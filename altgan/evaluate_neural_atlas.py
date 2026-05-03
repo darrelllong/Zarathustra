@@ -60,6 +60,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Power shaping for injected reuse ranks; values >1 favor deeper ranks.")
     p.add_argument("--stack-reuse-drop-prob", type=float, default=0.0,
                    help="Probability of converting a sampled reuse into a new object.")
+    p.add_argument("--stack-reuse-drop-position-probs", default="",
+                   help="Comma-separated per-position-bin reuse-drop probabilities.")
     p.add_argument("--stack-adj-dup-prob", type=float, default=0.0,
                    help="Probability that a sampled reuse emits the current MRU object.")
     p.add_argument("--stack-hot-pool-prob", type=float, default=0.0,
@@ -186,6 +188,7 @@ def main() -> int:
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
         stack_reuse_drop_prob=args.stack_reuse_drop_prob,
+        stack_reuse_drop_position_probs=_parse_float_list(args.stack_reuse_drop_position_probs),
         stack_adj_dup_prob=args.stack_adj_dup_prob,
         stack_hot_pool_prob=args.stack_hot_pool_prob,
         stack_hot_pool_k=args.stack_hot_pool_k,
@@ -265,6 +268,7 @@ def main() -> int:
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
         "stack_reuse_drop_prob": args.stack_reuse_drop_prob,
+        "stack_reuse_drop_position_probs": _parse_float_list(args.stack_reuse_drop_position_probs),
         "stack_adj_dup_prob": args.stack_adj_dup_prob,
         "stack_hot_pool_prob": args.stack_hot_pool_prob,
         "stack_hot_pool_k": args.stack_hot_pool_k,
