@@ -93,6 +93,11 @@ class NeuralAtlasModel:
         stack_hot_pool_weight_power: float = 1.0,
         stack_hot_pool_max_search: int = 0,
         stack_hot_pool_min_age: int = 0,
+        stack_frequency_pool_prob: float = 0.0,
+        stack_frequency_pool_k: int = 100,
+        stack_frequency_pool_max_candidates: int = 1000,
+        stack_frequency_pool_weight_power: float = 1.0,
+        stack_frequency_pool_min_age: int = 0,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_min_frac: float = 0.5,
         stack_tail_reuse_rank_power: float = 1.0,
@@ -140,6 +145,14 @@ class NeuralAtlasModel:
         stack_hot_pool_weight_power = max(float(stack_hot_pool_weight_power), 1e-6)
         stack_hot_pool_max_search = max(int(stack_hot_pool_max_search), 0)
         stack_hot_pool_min_age = max(int(stack_hot_pool_min_age), 0)
+        stack_frequency_pool_prob = float(np.clip(stack_frequency_pool_prob, 0.0, 1.0))
+        stack_frequency_pool_k = max(int(stack_frequency_pool_k), 1)
+        stack_frequency_pool_max_candidates = max(
+            int(stack_frequency_pool_max_candidates),
+            stack_frequency_pool_k,
+        )
+        stack_frequency_pool_weight_power = max(float(stack_frequency_pool_weight_power), 1e-6)
+        stack_frequency_pool_min_age = max(int(stack_frequency_pool_min_age), 0)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
         stack_tail_reuse_min_frac = float(np.clip(stack_tail_reuse_min_frac, 0.0, 1.0))
         stack_tail_reuse_rank_power = max(float(stack_tail_reuse_rank_power), 1e-6)
@@ -208,11 +221,16 @@ class NeuralAtlasModel:
             hot_last_pos: dict[int, int] = {}
             hot_window: deque[int] = deque()
             hot_pool: list[tuple[int, int]] = []
+            freq_counts: Counter[int] = Counter()
+            freq_last_pos: dict[int, int] = {}
+            freq_pool: list[tuple[int, int]] = []
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
 
             for pos in range(per_stream):
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
                     hot_pool = hot_counts.most_common(stack_hot_pool_k)
+                if stack_frequency_pool_prob > 0.0 and pos % 512 == 0 and freq_counts:
+                    freq_pool = freq_counts.most_common(stack_frequency_pool_k)
                 phase = min((pos * self.n_phase_bins) // per_stream, self.n_phase_bins - 1)
                 if force_phase_schedule and self.n_phase_bins > 1:
                     state = _state_with_phase(state, phase, base_span)
@@ -256,6 +274,37 @@ class NeuralAtlasModel:
                         try:
                             rank = stack.index(recent_obj)
                         except ValueError:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
+                    elif (
+                        not boosted_reuse
+                        and stack_frequency_pool_prob > 0.0
+                        and freq_pool
+                        and rng.random() < stack_frequency_pool_prob
+                    ):
+                        rank_from_pool = _rank_from_object_pool(
+                            stack,
+                            freq_pool,
+                            last_pos=freq_last_pos,
+                            current_pos=pos,
+                            min_age=stack_frequency_pool_min_age,
+                            weight_power=stack_frequency_pool_weight_power,
+                            max_search=0,
+                            rng=rng,
+                        )
+                        if rank_from_pool is not None:
+                            rank = rank_from_pool
+                        else:
                             phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, stack_rank_scale)
                             phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
                             if phase_rank_max is not None and phase_rank_max < 0:
@@ -436,6 +485,18 @@ class NeuralAtlasModel:
                     hot_window.append(int(obj_id))
                     hot_counts[int(obj_id)] += 1
                     hot_last_pos[int(obj_id)] = pos
+                if stack_frequency_pool_prob > 0.0:
+                    freq_obj = int(obj_id)
+                    freq_counts[freq_obj] += 1
+                    freq_last_pos[freq_obj] = pos
+                    if len(freq_counts) > stack_frequency_pool_max_candidates:
+                        freq_counts = Counter(dict(freq_counts.most_common(stack_frequency_pool_k)))
+                        freq_last_pos = {
+                            obj: freq_last_pos[obj]
+                            for obj in freq_counts
+                            if obj in freq_last_pos
+                        }
+                        freq_pool = freq_counts.most_common(stack_frequency_pool_k)
                 if stack_recent_pool_prob > 0.0:
                     recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
@@ -883,6 +944,38 @@ def _eligible_hot_pool(
         for obj_id, count in hot_pool
         if current - int(last_pos.get(int(obj_id), -age)) >= age
     ]
+
+
+def _rank_from_object_pool(
+    stack,
+    pool: Sequence[tuple[int, int]],
+    *,
+    last_pos: dict[int, int],
+    current_pos: int,
+    min_age: int,
+    weight_power: float,
+    max_search: int,
+    rng: np.random.Generator,
+) -> int | None:
+    eligible = _eligible_hot_pool(
+        pool,
+        last_pos=last_pos,
+        current_pos=current_pos,
+        min_age=min_age,
+    )
+    if not eligible:
+        return None
+    obj_id = _sample_hot_pool_obj(
+        eligible,
+        weight_power=weight_power,
+        rng=rng,
+    )
+    try:
+        if max_search > 0:
+            return int(stack.index(obj_id, 0, min(len(stack), int(max_search))))
+        return int(stack.index(obj_id))
+    except ValueError:
+        return None
 
 
 class _RankedLRUNode:

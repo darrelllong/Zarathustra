@@ -74,6 +74,16 @@ def _parse_args() -> argparse.Namespace:
                    help="Optional maximum stack prefix searched for hot-pool objects; 0 searches full stack.")
     p.add_argument("--stack-hot-pool-min-age", type=int, default=0,
                    help="Minimum stream positions since last emission before a hot-pool object can be reused.")
+    p.add_argument("--stack-frequency-pool-prob", type=float, default=0.0,
+                   help="Probability of redirecting a sampled reuse to a long-memory frequent object.")
+    p.add_argument("--stack-frequency-pool-k", type=int, default=100,
+                   help="Number of long-memory frequent objects eligible for frequency-pool reuse.")
+    p.add_argument("--stack-frequency-pool-max-candidates", type=int, default=1000,
+                   help="Maximum approximate frequency candidates retained before pruning to top-k.")
+    p.add_argument("--stack-frequency-pool-weight-power", type=float, default=1.0,
+                   help="Power applied to long-memory frequency-pool counts.")
+    p.add_argument("--stack-frequency-pool-min-age", type=int, default=0,
+                   help="Minimum stream positions since last emission before a frequency-pool object can be reused.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-min-frac", type=float, default=0.5,
@@ -177,6 +187,11 @@ def main() -> int:
         stack_hot_pool_weight_power=args.stack_hot_pool_weight_power,
         stack_hot_pool_max_search=args.stack_hot_pool_max_search,
         stack_hot_pool_min_age=args.stack_hot_pool_min_age,
+        stack_frequency_pool_prob=args.stack_frequency_pool_prob,
+        stack_frequency_pool_k=args.stack_frequency_pool_k,
+        stack_frequency_pool_max_candidates=args.stack_frequency_pool_max_candidates,
+        stack_frequency_pool_weight_power=args.stack_frequency_pool_weight_power,
+        stack_frequency_pool_min_age=args.stack_frequency_pool_min_age,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
         stack_tail_reuse_rank_power=args.stack_tail_reuse_rank_power,
@@ -248,6 +263,11 @@ def main() -> int:
         "stack_hot_pool_weight_power": args.stack_hot_pool_weight_power,
         "stack_hot_pool_max_search": args.stack_hot_pool_max_search,
         "stack_hot_pool_min_age": args.stack_hot_pool_min_age,
+        "stack_frequency_pool_prob": args.stack_frequency_pool_prob,
+        "stack_frequency_pool_k": args.stack_frequency_pool_k,
+        "stack_frequency_pool_max_candidates": args.stack_frequency_pool_max_candidates,
+        "stack_frequency_pool_weight_power": args.stack_frequency_pool_weight_power,
+        "stack_frequency_pool_min_age": args.stack_frequency_pool_min_age,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
         "stack_tail_reuse_rank_power": args.stack_tail_reuse_rank_power,
