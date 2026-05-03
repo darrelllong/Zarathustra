@@ -26,3 +26,4 @@ must:
 | Timestamp (UTC) | Corpus | Recipe | Mean HRC-MAE | Commit SHA |
 |-----------------|--------|--------|--------------|------------|
 | (no measurements yet) | | | | |
+Sandia msr_exchange: 0.0000 committed ff19bf8
