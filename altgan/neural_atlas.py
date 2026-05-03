@@ -1204,6 +1204,9 @@ def _sample_hot_pool_obj(
     weight_power: float,
     rng: np.random.Generator,
 ) -> int:
+    if len(hot_pool) > 512 and weight_power <= 0.25:
+        idx = int(rng.integers(0, len(hot_pool)))
+        return int(hot_pool[idx][0])
     weights = np.array([max(int(count), 1) for _, count in hot_pool], dtype=np.float64)
     weights = np.power(weights, max(float(weight_power), 1e-6))
     weights = weights / max(float(weights.sum()), 1e-12)
@@ -1298,22 +1301,33 @@ def _rank_from_object_pool(
     sample_attempts: int,
     rng: np.random.Generator,
 ) -> int | None:
-    eligible = _eligible_hot_pool(
-        pool,
-        last_pos=last_pos,
-        current_pos=current_pos,
-        min_age=min_age,
-    )
-    if not eligible:
+    if not pool:
         return None
     lo = max(int(min_rank), 0)
     hi = None if max_rank is None else max(int(max_rank), lo)
+    sample_first = len(pool) > 512
+    eligible = pool
+    if not sample_first:
+        eligible = _eligible_hot_pool(
+            pool,
+            last_pos=last_pos,
+            current_pos=current_pos,
+            min_age=min_age,
+        )
+        if not eligible:
+            return None
     for _ in range(max(int(sample_attempts), 1)):
         obj_id = _sample_hot_pool_obj(
             eligible,
             weight_power=weight_power,
             rng=rng,
         )
+        if (
+            sample_first
+            and min_age > 0
+            and int(current_pos) - int(last_pos.get(int(obj_id), -int(min_age))) < int(min_age)
+        ):
+            continue
         try:
             if max_search > 0:
                 rank = int(stack.index(obj_id, 0, min(len(stack), int(max_search))))
