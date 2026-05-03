@@ -874,6 +874,15 @@ def generate(
     stack_rank_tail_scale: float = 1.0,
     hot_pool_min_age: int = 0,
     reuse_drop_prob: float = 0.0,
+    frequency_pool_prob: float = 0.0,
+    frequency_pool_k: int = 100,
+    frequency_pool_max_candidates: int = 1000,
+    frequency_pool_weight_power: float = 1.0,
+    frequency_pool_min_age: int = 0,
+    frequency_pool_min_rank: int = 0,
+    frequency_pool_max_rank: int = -1,
+    frequency_pool_sample_attempts: int = 8,
+    frequency_pool_refresh_every: int = 512,
 ) -> None:
     """Roll out per-stream state sequences via the trained net + decode."""
     torch = _torch()
@@ -973,6 +982,15 @@ def generate(
             # obj was emitted via hot-pool. Filter `hot_pool_list` against
             # this when --hot-pool-min-age > 0.
             hot_last_pos: Dict[int, int] = {}
+            # R282: per-stream frequency-pool tracking. Larger pool than
+            # hot-pool (default K=100, max_candidates=1000), separate counter,
+            # refreshes every N steps. Port of altgan stack_frequency_pool
+            # with rank-banding (min_rank/max_rank/sample_attempts) and
+            # weight-power sampling. LANL's actual alibaba 0.0119 lever.
+            freq_counts: Counter = Counter()
+            freq_pool: List[Tuple[int, int]] = []  # [(obj_id, count), ...]
+            freq_last_pos: Dict[int, int] = {}
+            freq_refresh = max(int(frequency_pool_refresh_every), 1)
             hot_pool_refresh_every = 200
             # R231 (WaveStitch lesson): optionally jitter the refresh interval
             # via Poisson(hot_pool_refresh_every) so the periodic hot-pool
@@ -1120,6 +1138,86 @@ def generate(
                     stack.insert(0, obj_id)
                     if rank_net is not None:
                         prev_rank_bin = N_RANK_BINS  # sentinel: recent-pool isn't a sampled rank
+                elif (frequency_pool_prob > 0.0
+                      and len(freq_pool) > 0
+                      and rng.random() < frequency_pool_prob):
+                    # R282: frequency-pool sampler with rank-banding (port of
+                    # altgan stack_frequency_pool). Bigger candidate set than
+                    # hot-pool (default K=100, max_candidates=1000), with
+                    # cooldown filter (freq_last_pos), weight-power sampling
+                    # (favors higher counts at p>1), and rank band filter
+                    # (only accept ranks in [min_rank, max_rank]; retry up to
+                    # sample_attempts times). LANL alibaba 0.0119 lever.
+                    # Cooldown filter:
+                    if frequency_pool_min_age > 0:
+                        eligible_pool = [
+                            (oid, cnt) for oid, cnt in freq_pool
+                            if step - freq_last_pos.get(int(oid), -frequency_pool_min_age) >= frequency_pool_min_age
+                        ]
+                    else:
+                        eligible_pool = freq_pool
+                    rank_from_pool = -1
+                    if eligible_pool:
+                        # Weighted sampling, retry on band miss
+                        weights = np.array([max(int(c), 1) for _, c in eligible_pool], dtype=np.float64)
+                        weights = np.power(weights, max(float(frequency_pool_weight_power), 1e-6))
+                        wsum = float(weights.sum())
+                        if wsum > 0:
+                            weights = weights / wsum
+                            lo = max(int(frequency_pool_min_rank), 0)
+                            hi = -1 if frequency_pool_max_rank < 0 else max(int(frequency_pool_max_rank), lo)
+                            for _ in range(max(int(frequency_pool_sample_attempts), 1)):
+                                idx = int(rng.choice(len(eligible_pool), p=weights))
+                                cand = int(eligible_pool[idx][0])
+                                try:
+                                    cand_rank = stack.index(cand)
+                                except ValueError:
+                                    continue
+                                if cand_rank < lo:
+                                    continue
+                                if hi >= 0 and cand_rank > hi:
+                                    continue
+                                rank_from_pool = cand_rank
+                                break
+                    if rank_from_pool >= 0:
+                        obj_id = stack[rank_from_pool]
+                        del stack[rank_from_pool]
+                        stack.insert(0, obj_id)
+                        if frequency_pool_min_age > 0:
+                            freq_last_pos[int(obj_id)] = step
+                        if rank_net is not None:
+                            prev_rank_bin = N_RANK_BINS
+                    else:
+                        # Pool didn't yield — fall through to hot-pool /
+                        # PMF by sampling rank from PMF inline (rare).
+                        if rank_net is not None:
+                            ds_t = torch.tensor([dist_state], dtype=torch.long, device=device)
+                            pr_t = torch.tensor([prev_rank_bin], dtype=torch.long, device=device)
+                            with torch.no_grad():
+                                r_logits = rank_net(cond_t, ds_t, pr_t)
+                                pmf_local = torch.softmax(r_logits / max(temperature, 1e-3), dim=-1).cpu().numpy()[0]
+                        else:
+                            pmf_local = m.rank_pmf_per_state.get(state, np.ones(len(m.rank_edges) - 1) / (len(m.rank_edges) - 1))
+                            if pmf_local.sum() > 0:
+                                pmf_local = pmf_local / pmf_local.sum()
+                            else:
+                                pmf_local = np.ones_like(pmf_local) / len(pmf_local)
+                        fine_i = int(rng.choice(len(pmf_local), p=pmf_local))
+                        lo_e = int(m.rank_edges[fine_i])
+                        hi_e = int(m.rank_edges[fine_i + 1]) - 1 if fine_i + 1 < len(m.rank_edges) else lo_e
+                        if len(stack) > 0:
+                            lo_eff = min(lo_e, len(stack) - 1)
+                            hi_eff = min(hi_e, len(stack) - 1)
+                            rank = int(rng.integers(lo_eff, hi_eff + 1))
+                            obj_id = stack[rank]
+                            del stack[rank]
+                            stack.insert(0, obj_id)
+                        else:
+                            obj_id = next_new_id
+                            next_new_id += 1
+                            stack.insert(0, obj_id)
+                        if rank_net is not None:
+                            prev_rank_bin = N_RANK_BINS
                 elif (hot_pool_prob > 0.0
                       and len(hot_pool_list) > 0
                       and rng.random() < hot_pool_prob):
@@ -1270,6 +1368,20 @@ def generate(
                 # recency deque. Cheap (deque maxlen auto-evicts oldest).
                 if recent_pool_prob > 0.0:
                     recent_window.append(int(obj_id))
+
+                # R282: update frequency counter and refresh pool every N steps.
+                # Bounded counter — periodically prune to max_candidates entries
+                # to keep memory under control on 1M-record streams.
+                if frequency_pool_prob > 0.0:
+                    freq_counts[int(obj_id)] += 1
+                    if (step + 1) % freq_refresh == 0 and freq_counts:
+                        # Take top max_candidates by raw count, then pool is
+                        # top-K by count. Both retained because the rank-band
+                        # filter may need to retry through more candidates.
+                        if len(freq_counts) > frequency_pool_max_candidates:
+                            top = freq_counts.most_common(frequency_pool_max_candidates)
+                            freq_counts = Counter(dict(top))
+                        freq_pool = freq_counts.most_common(frequency_pool_k)
 
                 # R184: decay-weighted hot pool — scales to 1M-record streams
                 # without the R181 sliding-window exhaustion issue. Counts
@@ -1468,6 +1580,20 @@ def main():
                       help="R275 (port of altgan stack_reuse_drop_prob): with "
                            "this prob, convert a model-emitted REUSE into a "
                            "NEW. Inverse of reuse-boost. Closes over-reuse.")
+    pgen.add_argument("--frequency-pool-prob", type=float, default=0.0,
+                      help="R282 (port of altgan stack_frequency_pool): "
+                           "redirect to a frequency-pool object with rank-banding. "
+                           "LANL alibaba 0.0119 lever.")
+    pgen.add_argument("--frequency-pool-k", type=int, default=100)
+    pgen.add_argument("--frequency-pool-max-candidates", type=int, default=1000)
+    pgen.add_argument("--frequency-pool-weight-power", type=float, default=1.0)
+    pgen.add_argument("--frequency-pool-min-age", type=int, default=0,
+                      help="R282: cooldown for frequency pool.")
+    pgen.add_argument("--frequency-pool-min-rank", type=int, default=0)
+    pgen.add_argument("--frequency-pool-max-rank", type=int, default=-1,
+                      help="R282: max rank accepted (-1 = no cap).")
+    pgen.add_argument("--frequency-pool-sample-attempts", type=int, default=8)
+    pgen.add_argument("--frequency-pool-refresh-every", type=int, default=512)
 
     args = p.parse_args()
     if args.cmd == "fit":
@@ -1505,6 +1631,15 @@ def main():
             stack_rank_tail_scale=args.stack_rank_tail_scale,
             hot_pool_min_age=args.hot_pool_min_age,
             reuse_drop_prob=args.reuse_drop_prob,
+            frequency_pool_prob=args.frequency_pool_prob,
+            frequency_pool_k=args.frequency_pool_k,
+            frequency_pool_max_candidates=args.frequency_pool_max_candidates,
+            frequency_pool_weight_power=args.frequency_pool_weight_power,
+            frequency_pool_min_age=args.frequency_pool_min_age,
+            frequency_pool_min_rank=args.frequency_pool_min_rank,
+            frequency_pool_max_rank=args.frequency_pool_max_rank,
+            frequency_pool_sample_attempts=args.frequency_pool_sample_attempts,
+            frequency_pool_refresh_every=args.frequency_pool_refresh_every,
         )
 
 
