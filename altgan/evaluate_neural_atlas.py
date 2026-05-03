@@ -235,17 +235,20 @@ def main() -> int:
         real_df.to_csv(real_out, index=False)
         print(f"[altgan.evaluate_neural_atlas] wrote real trace {real_out}")
 
+    metric_fake_df = _compact_metric_obj_ids(fake_df)
+    metric_real_df = _compact_metric_obj_ids(real_df)
+
     if args.cache_sizes:
         cache_sizes = np.array([int(x) for x in args.cache_sizes.split(",") if x.strip()],
                                dtype=np.int64)
     else:
-        real_streams = _per_stream_obj_ids(real_df)
+        real_streams = _per_stream_obj_ids(metric_real_df)
         footprint = int(np.mean([np.unique(s).size for s in real_streams])) if real_streams else 2
         cache_sizes = np.unique(np.geomspace(max(1, footprint // 1000), max(footprint, 2), 20)
                                 .astype(np.int64))
 
-    fake_m = _metrics_for_stream(fake_df, cache_sizes)
-    real_m = _metrics_for_stream(real_df, cache_sizes)
+    fake_m = _metrics_for_stream(metric_fake_df, cache_sizes)
+    real_m = _metrics_for_stream(metric_real_df, cache_sizes)
     gap_m = _gap(fake_m, real_m)
     mark_m = mark_quality(fake_df, real_df)
     out_path = Path(args.output) if args.output else Path(args.model).with_suffix("").with_suffix(".neural_atlas_eval.json")
@@ -361,6 +364,31 @@ def _lookup_cond(cond_lookup: dict, name_or_path: str, cond_dim: int) -> np.ndar
                 arr = np.pad(arr, (0, cond_dim - len(arr)))
             return arr[:cond_dim]
     raise KeyError(f"no characterization vector for {name_or_path}")
+
+
+def _compact_metric_obj_ids(df):
+    if "obj_id" not in df.columns:
+        return df
+    out = df.copy()
+    try:
+        out["obj_id"].astype(np.int64)
+        return out
+    except (OverflowError, ValueError):
+        pass
+
+    import pandas as pd
+
+    if "stream_id" in out.columns:
+        parts = []
+        for _, group in out.groupby("stream_id", sort=False):
+            g = group.copy()
+            codes, _ = pd.factorize(g["obj_id"], sort=False)
+            g["obj_id"] = codes.astype(np.int64) + 1
+            parts.append(g)
+        return pd.concat(parts, ignore_index=True)
+    codes, _ = pd.factorize(out["obj_id"], sort=False)
+    out["obj_id"] = codes.astype(np.int64) + 1
+    return out
 
 
 def _run_cachesim_comparison(

@@ -421,7 +421,10 @@ class NeuralAtlasModel:
                     effective_stack_distance = int(ev.stack_distance)
                     effective_action_class = int(ev.action_class)
                     obj_id, next_new_id = StackAtlasModel._new_object_id(
-                        prev_obj, next_new_id, int(ev.stride), in_stack
+                        prev_obj,
+                        next_new_id,
+                        _bounded_new_stride(ev.stride),
+                        in_stack,
                     )
                     stack.insert_front(obj_id)
                     in_stack.add(obj_id)
@@ -990,6 +993,13 @@ def _dense_object_ids(column) -> np.ndarray:
 
     codes, _ = pd.factorize(column, sort=False)
     return np.maximum(codes.astype(np.int64) + 1, 0)
+
+
+def _bounded_new_stride(stride: int) -> int:
+    stride_i = int(stride)
+    if abs(stride_i) > _MAX_GENERATED_ID_BASE:
+        return 0
+    return stride_i
 
 
 def _eligible_hot_pool(
