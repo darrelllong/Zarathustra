@@ -93,6 +93,8 @@ class NeuralAtlasModel:
         stack_reuse_drop_position_probs: Sequence[float] | None = None,
         stack_adj_dup_prob: float = 0.0,
         stack_adj_dup_position_probs: Sequence[float] | None = None,
+        stack_adj_dup_min_rank: int = 0,
+        stack_adj_dup_max_rank: int = 0,
         stack_hot_pool_prob: float = 0.0,
         stack_hot_pool_position_probs: Sequence[float] | None = None,
         stack_hot_pool_k: int = 100,
@@ -154,6 +156,8 @@ class NeuralAtlasModel:
         stack_reuse_drop_position_probs = _clip_prob_list(stack_reuse_drop_position_probs)
         stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
         stack_adj_dup_position_probs = _clip_prob_list(stack_adj_dup_position_probs)
+        stack_adj_dup_min_rank = max(int(stack_adj_dup_min_rank), 0)
+        stack_adj_dup_max_rank = max(int(stack_adj_dup_max_rank), stack_adj_dup_min_rank)
         stack_hot_pool_prob = float(np.clip(stack_hot_pool_prob, 0.0, 1.0))
         stack_hot_pool_position_probs = _clip_prob_list(stack_hot_pool_position_probs)
         stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
@@ -325,7 +329,12 @@ class NeuralAtlasModel:
                             rank = int(lo + (len(stack) - 1 - lo) * biased)
                             rank = max(lo, min(rank, len(stack) - 1))
                     elif adj_dup_prob > 0.0 and rng.random() < adj_dup_prob:
-                        rank = 0
+                        adj_lo = min(stack_adj_dup_min_rank, len(stack) - 1)
+                        adj_hi = min(stack_adj_dup_max_rank, len(stack) - 1)
+                        if adj_hi <= adj_lo:
+                            rank = adj_lo
+                        else:
+                            rank = int(rng.integers(adj_lo, adj_hi + 1))
                     elif (
                         recent_pool_prob > 0.0
                         and recent_window
