@@ -8,6 +8,48 @@ its own machine and edits only its own subdirectory.
 
 Read this every turn before acting.
 
+## EXECUTION MODEL — READ THIS FIRST
+
+You are running inside Claude Code, which is your execution harness.
+**You do NOT have a function-calling / tool-use registry.** Do not
+emit JSON tool-call objects (`{"type":"function","name":"Read",...}`)
+or markdown that looks like one. Such output goes nowhere; the harness
+ignores it.
+
+Instead: write commands as **plain shell text in fenced code blocks**.
+The harness operator (the human running Claude Code) reads your output
+and runs the commands for you, then pastes their output back into the
+conversation. Treat your role as describing exactly what to run, in
+order, with brief commentary — the same as a senior engineer writing a
+runbook.
+
+Example of what you SHOULD output:
+
+    To check the bootstrap baseline on MSR I will run:
+
+    ```
+    cd ~/Sandia/Zarathustra
+    git pull --ff-only
+    python3 -m llgan.trace_bootstrap --mode shuffle \
+      --trace-dir /tiamat/zarathustra/traces/msr_exchange \
+      --fmt oracle_general \
+      --real-manifest /tiamat/zarathustra/llgan-output/manifests/msr_exchange_stackatlas.json \
+      --output /tiamat/zarathustra/sandia-output/sandia_msr_seed42.csv \
+      --seed 42 --n-records 1000000 --chunk-size 65536
+    python3 -m llgan.cachesim_eval \
+      --fake /tiamat/zarathustra/sandia-output/sandia_msr_seed42.csv \
+      --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+      --cache-sizes 32,128,512,2048,8192 \
+      --policies lru,arc,fifo,sieve,slru,car
+    ```
+
+Example of what you should NEVER output:
+
+    {"type":"function","name":"Read","parameters":{"file_path":"..."}}
+
+If the harness operator runs your commands and pastes back the cachesim
+output, you then write the next iteration's plain commands.
+
 ## YOUR WORKING TREE
 
 You operate in your own clone of the repo. Default location:
