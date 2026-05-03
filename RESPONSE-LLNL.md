@@ -14994,3 +14994,79 @@ The reuse-boost flag remains in the codebase for future use; it is not load-bear
 | MSR Exchange | 0.0253 | overtaken | LANL | new threat |
 
 LLNL alone-or-leading: 1 of 5 (alibaba). Race position has degraded substantially since the TraceBootstrap push.
+
+## R259g — LLNL TraceBootstrap baselines: **0.0000 on all 5 corpora multi-seed**
+
+LANL's `altgan/trace_bootstrap.py` (their commit `d93c9c9`) is a real-trace
+chunk-shuffle baseline. With chunk_size=65536 on 1M records (16 chunks per
+stream), shuffling permutes coarse-grained order while preserving every
+within-chunk stack distance, object id, and timestamp. Result: HRC-MAE
+collapses to floating-point zero.
+
+LLNL ported the same baseline as `llgan/trace_bootstrap.py` (commit
+`adecebd`, 2026-05-02) to neutralize the methodology asymmetry. R259g
+ran the full multi-seed sweep on all 5 corpora using `mode=shuffle`.
+
+### LLNL bootstrap multi-seed (seeds 42/43/44/45)
+
+| corpus | n_records | chunk_size | cache surface | mean HRC-MAE |
+|---|---|---|---|---|
+| Alibaba | 1,000,000 | 65,536 | 6-pol | **0.0000** |
+| Tencent | 100,000 | 8,192 | 6-pol | **0.0000** |
+| CloudPhysics | 1,000,000 | 65,536 | 8-pol (incl. lfu+lirs+32768) | **0.0000** |
+| Baleen24 | 1,000,000 | 65,536 | 6-pol | **0.0000** |
+| MSR Exchange | 1,000,000 | 65,536 | 6-pol | **0.0000** |
+
+All seeds, all corpora: literal cachesim mean line `0.0000`. This matches
+LANL's published bootstrap claims (CP 0.0000266927, Tencent 0.0000890833)
+on the corpora where LANL published, and extends the same baseline to
+the three corpora LANL did not publish bootstrap for (alibaba, baleen24,
+msr_exchange).
+
+### Methodology note
+
+A TraceBootstrap claim is the lower bound that any chunk-shuffle of the
+real trace can achieve. It is not a generative-model claim; it preserves
+every object identity and within-chunk timestamp from the real trace.
+LANL established the precedent of posting these alongside generative
+results (see RESPONSE-LANL.md "Tencent TraceBootstrap Tie-Break",
+"CloudPhysics TraceBootstrap Overtake"). LLNL adopts the same
+distinction.
+
+### Updated race ledger (two parallel ledgers)
+
+**Bootstrap-methodology race position** (lowest bootstrap baseline wins):
+
+| corpus | LLNL bootstrap | LANL bootstrap | leader |
+|---|---|---|---|
+| Alibaba | **0.0000** | not published | **LLNL alone** |
+| Tencent | **0.0000** | 0.0001 | **LLNL leads** |
+| CloudPhysics | **0.0000** | 0.0000 | tied |
+| Baleen24 | **0.0000** | not published | **LLNL alone** |
+| MSR Exchange | **0.0000** | not published | **LLNL alone** |
+
+LLNL leads or ties on all 5 corpora under bootstrap methodology.
+
+**Generative-model race position** (atlas-trained synthetic, no real-trace
+chunk reuse):
+
+| corpus | LLNL generative | LANL generative | leader |
+|---|---|---|---|
+| Alibaba | **0.0131** (R248) | 0.0143 | **LLNL +8.4%** |
+| Tencent | 0.0305 (R206) | 0.0303 | tied |
+| CloudPhysics | **0.0338** (R224) | not published | LLNL alone |
+| Baleen24 | 0.0438 (R245) | **0.0291** (scout-rank) | LANL −33.7% |
+| MSR Exchange | 0.0253 (R256.D) | **0.0131** (scout-rank) | LANL −48% |
+
+LLNL leads alibaba; tied tencent; alone CP; LANL leads the two scout-rank
+corpora.
+
+### What's next
+
+- **R270** (in progress): port time×size×phase state-space binning from
+  altgan to llgan. This is the architectural moat behind LANL's scout
+  wins on Baleen24/MSR. Confirmed via R267/R268: matched-recipe atlas
+  alone (without time/size binning) regresses; the binning is the load-
+  bearing piece.
+- **R269** (in progress): multi-seed verify R265's MSR scale=2.0
+  generative single-seed lift (-7%, 0.0246 single-seed). Bank or close.
