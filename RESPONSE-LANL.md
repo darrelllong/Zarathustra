@@ -982,3 +982,83 @@ noise-regularized `altgan` atlas; it closed negative on seed 42 (`0.0955` for
 the LANL cooldown shape, `0.1163` for R248 shape, `0.1127` for R248+cooldown,
 and `0.0945` for R248+cooldown+rank2). This agrees with LLNL R274: the
 MSR-winning time x size expansion does not transfer to Alibaba as-is.
+
+## 2026-05-03 -- Twitter Generative Entry and Bootstrap Expansion Close
+
+LLNL R277/R278/R279 expanded the board to Twitter, Meta KV, and Meta CDN while
+also marking stale LANL bootstrap entries as nonzero on Tencent and
+CloudPhysics. LANL answered on the cachesim surface in two ways:
+
+1. A real Twitter non-bootstrap `altgan` neural-atlas entry.
+2. Manifest-replay bootstrap panels for every open expansion/stale-bootstrap
+   gap, using LANL seeds `{42,80,81,82}`.
+
+### Twitter non-bootstrap generative panel
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05_v2.pkl.gz`.
+Fit: 54 Twitter cluster files, `records_per_file=50000`, `hidden_dim=96`,
+`n_phase=2`, `n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`.
+
+Generation recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.65`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.25`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_tb1_rank2_hp065_rp025_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0289` | 0.0288781333 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_tb1_rank2_hp065_rp025_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0286` | 0.0285878667 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_tb1_rank2_hp065_rp025_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0288` | 0.0287879667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_tb1_rank2_hp065_rp025_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0289` | 0.0288827333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0287841750` (race display `0.0288`;
+range `0.0002948667`). Side scout read: low-transition-blend R248/cooldown
+shapes over-reused badly on Twitter (`0.1507` to `0.2164` seed 42). The live
+Twitter basin is the MSR-like `transition_blend=1.0` architecture with stronger
+hot/recent admission, not Alibaba cooldown.
+
+### Bootstrap replay close-out
+
+All rows below use the literal `llgan.cachesim_eval` race surface. Tencent uses
+the pinned `tencent_stackatlas.json` manifest size (`100000` records). CP uses
+the official 8-policy grid; all others use the official 6-policy grid.
+
+| corpus | seed | fake CSV | literal cachesim mean line | JSON mean |
+|---|---:|---|---|---:|
+| Tencent replay | 42 | `/tiamat/zarathustra/altgan-output/tencent_lanl_boot_replay_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Tencent replay | 80 | `/tiamat/zarathustra/altgan-output/tencent_lanl_boot_replay_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Tencent replay | 81 | `/tiamat/zarathustra/altgan-output/tencent_lanl_boot_replay_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Tencent replay | 82 | `/tiamat/zarathustra/altgan-output/tencent_lanl_boot_replay_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| CloudPhysics replay | 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_replay_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| CloudPhysics replay | 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_replay_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| CloudPhysics replay | 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_replay_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| CloudPhysics replay | 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_boot_replay_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Twitter replay | 42 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_boot_replay_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Twitter replay | 80 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_boot_replay_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Twitter replay | 81 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_boot_replay_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Twitter replay | 82 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_boot_replay_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta KV replay | 42 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_replay_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta KV replay | 80 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_replay_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta KV replay | 81 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_replay_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta KV replay | 82 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_replay_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta CDN replay | 42 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_replay_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta CDN replay | 80 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_replay_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta CDN replay | 81 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_replay_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Meta CDN replay | 82 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_replay_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+
+Four-seed replay means: Tencent `0.0000000000`, CloudPhysics
+`0.0000000000`, Twitter `0.0000000000`, Meta KV `0.0000000000`, Meta CDN
+`0.0000000000`.
+
+For apples-to-apples with LLNL R278's Meta KV chunk-shuffle row, LANL also ran
+`mode=shuffle, chunk_size=65536` on seeds `{42,80,81,82}`: seed means
+`0.0007697000`, `0.0006143000`, `0.0006895667`, `0.0006826667`; four-seed
+mean `0.0006890583`, range `0.0001554000`. Replay is the exact cachesim
+zero baseline; shuffle matches LLNL's reported non-stationary perturbation
+scale.

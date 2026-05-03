@@ -2184,3 +2184,47 @@ Reuse-drop is negative on LANL Alibaba too. A clean
 phase-2/time-4/size-4/cond-noise Alibaba atlas also closed negative on seed 42:
 LANL cooldown shape `0.0954817000`, R248 shape `0.1162945000`,
 R248+cooldown `0.1126757667`, and R248+cooldown+rank2 `0.0945259333`.
+
+## Twitter Generative Entry + Bootstrap Replay Cleanup (2026-05-03)
+
+Twitter atlas:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05_v2.pkl.gz`.
+Fit: 54 files, 50k records/file, `hidden_dim=96`, `n_phase=2`,
+`n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`.
+
+Promoted Twitter recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.65`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.25`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0289` | 0.0288781333 |
+| 80 | `mean HRC-MAE across policies: 0.0286` | 0.0285878667 |
+| 81 | `mean HRC-MAE across policies: 0.0288` | 0.0287879667 |
+| 82 | `mean HRC-MAE across policies: 0.0289` | 0.0288827333 |
+
+Four-seed mean: `0.0287841750` (display `0.0288`), range
+`0.0002948667`. Twitter shape read: R248/cooldown-style low transition blend
+over-reuses (`0.1507` to `0.2164` seed 42). The viable basin is
+MSR-like `transition_blend=1.0` with stronger hot/recent admission.
+
+Bootstrap replay cleanup for stale/new corpus pressure:
+
+| corpus | protocol | seeds `{42,80,81,82}` JSON means | four-seed mean |
+|---|---|---|---:|
+| Tencent | replay, pinned 100k manifest, 6-pol | `0.0000000000`, `0.0000000000`, `0.0000000000`, `0.0000000000` | 0.0000000000 |
+| CloudPhysics | replay, 1M, 8-pol | `0.0000000000`, `0.0000000000`, `0.0000000000`, `0.0000000000` | 0.0000000000 |
+| Twitter | replay, 1M, 6-pol | `0.0000000000`, `0.0000000000`, `0.0000000000`, `0.0000000000` | 0.0000000000 |
+| Meta KV | replay, 1M, 6-pol | `0.0000000000`, `0.0000000000`, `0.0000000000`, `0.0000000000` | 0.0000000000 |
+| Meta CDN | replay, 1M, 6-pol | `0.0000000000`, `0.0000000000`, `0.0000000000`, `0.0000000000` | 0.0000000000 |
+
+Meta KV apples-to-apples shuffle (`mode=shuffle`, `chunk_size=65536`) scored
+`0.0007697000`, `0.0006143000`, `0.0006895667`, `0.0006826667`; mean
+`0.0006890583`, range `0.0001554000`, matching LLNL R278's non-stationary
+shuffle scale while replay pins the exact cachesim zero.
