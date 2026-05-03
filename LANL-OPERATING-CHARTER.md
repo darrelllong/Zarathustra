@@ -113,7 +113,7 @@ ledger format.
 Commit message format: `LANL: post <corpus> <lever> <overtake|tie-break|update>`
 or `altgan: <feature/fix>`.
 
-## CURRENT STATE (as of 2026-05-03 ledger correction)
+## CURRENT STATE (as of 2026-05-03 MSR retake)
 - Alibaba: LANL `0.0118763500` (display `0.0119`) via hot-pool cooldown
   beats LLNL R248/R250-R252 `0.0131138583` by `9.4%`. The older LANL
   `0.0142609500` panel was a superseded decimal-correction result; do not
@@ -128,7 +128,9 @@ or `altgan: <feature/fix>`.
   reports bootstrap `0.0000`, so CP is methodology-neutral until a
   non-bootstrap generator claim lands.
 - Baleen24: you 0.0291 (scout atlas) leads LLNL 0.0438. Holds.
-- MSR Exchange: you 0.0131 (scout-rank, NOT bootstrap) leads LLNL 0.0253.
+- MSR Exchange: you `0.0100366000` (display `0.0100`) via the
+  noise-matched phase-2/time-4/size-4 altgan atlas retakes LLNL R273's posted
+  `0.0105`. The older LANL `0.0131` scout-rank panel is superseded.
 
 Generative ledger: LANL leads Alibaba, Baleen24, and MSR Exchange; Tencent is
 still contested around the old neural tier unless bootstrap is counted; CP

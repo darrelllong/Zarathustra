@@ -2066,12 +2066,14 @@ non-bootstrap CP single-seed row:
 | `cloudphysics_lanl_freqpool_p003_k4096_wp05_age16_seed42` | `prob=0.03`, `k=4096`, `weight_power=0.5`, `min_age=16` | 0.0396531500 | `mean HRC-MAE across policies: 0.0409` | 0.0408657083 | 0.1130800000 | 0.0718263333 |
 | `cloudphysics_lanl_freqpool_p008_k2048_wp05_age16_seed42` | `prob=0.08`, `k=2048`, `weight_power=0.5`, `min_age=16` | 0.0317419000 | `mean HRC-MAE across policies: 0.0442` | 0.0441683542 | 0.1141291667 | 0.0766388333 |
 | `cloudphysics_lanl_freqpool_p005_k8192_wp025_age64_seed42` | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64` | 0.0358485000 | `mean HRC-MAE across policies: 0.0420` | 0.0419542500 | 0.1119820000 | 0.0742111667 |
+| `cloudphysics_lanl_freqband_p005_k8192_wp025_age64_r8192_32768_seed42` | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64`, `min_rank=8192`, `max_rank=32768` | n/a | `mean HRC-MAE across policies: 0.0421` | 0.0421487917 | 0.1118605000 | 0.0746280000 |
+| `cloudphysics_lanl_freqband_p008_k8192_wp025_age64_r16384_65536_seed42` | `prob=0.08`, `k=8192`, `weight_power=0.25`, `min_age=64`, `min_rank=16384`, `max_rank=65536` | n/a | `mean HRC-MAE across policies: 0.0441` | 0.0440802500 | 0.1106048333 | 0.0782850000 |
 
 The closest row was still worse than the incumbent (`0.0408657083` vs
-`0.0406011250`). The architecture moved evaluator/shape diagnostics and a
-little LFU mass, but LIRS worsened enough that cachesim rejected the branch.
-Close this path for CP unless paired with a separate LIRS-preserving residency
-mechanism.
+`0.0406011250`), and rank-banding did not rescue the family. The architecture
+moved evaluator/shape diagnostics and a little LFU mass, but LIRS worsened
+enough that cachesim rejected the branch. Close this path for CP unless paired
+with a separate LIRS-preserving residency mechanism.
 
 ## TraceBootstrap Missing-Corpus Completion (2026-05-03)
 
@@ -2099,3 +2101,33 @@ Four-seed means: Alibaba `0.0000164250`, Baleen24 `0.0000000250`, MSR
 Exchange `0.0000000000`; all display as `0.0000`. Bootstrap methodology is now
 published by LANL on all five corpora, so LLNL's R259g "LANL not published"
 bootstrap-only advantage is closed.
+
+## MSR Exchange Noise-Matched Time-Size Retake (2026-05-03)
+
+LANL added train-time conditioning noise to `altgan.neural_atlas` in commit
+`68f389b`, fit
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`,
+and ran the official six-policy `llgan.cachesim_eval` surface against
+`/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`.
+
+Recipe: phase-2/time-4/size-4 atlas, `hidden_dim=96`,
+`records_per_file=50000`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`; generation with forced phase,
+`condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.45`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.15`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0104` | 0.0103523333 |
+| 80 | `mean HRC-MAE across policies: 0.0097` | 0.0096974333 |
+| 81 | `mean HRC-MAE across policies: 0.0100` | 0.0099689667 |
+| 82 | `mean HRC-MAE across policies: 0.0101` | 0.0101276667 |
+
+Four-seed mean: `0.0100366000` (display `0.0100`), range `0.0006549000`.
+This retakes the MSR Exchange non-bootstrap generative ledger from LLNL R273's
+posted `0.0105` multi-seed claim under the matched official cachesim protocol.

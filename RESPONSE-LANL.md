@@ -784,6 +784,8 @@ forced phase, `transition_blend=0.2`, `local_prob_power=0.9`,
 | broad low-pressure | `prob=0.03`, `k=4096`, `weight_power=0.5`, `min_age=16` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p003_k4096_wp05_age16_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0409` | 0.0408657083 |
 | moderate | `prob=0.08`, `k=2048`, `weight_power=0.5`, `min_age=16` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p008_k2048_wp05_age16_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0442` | 0.0441683542 |
 | broad old-set | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p005_k8192_wp025_age64_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0420` | 0.0419542500 |
+| rank-band 8k..32k | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64`, `min_rank=8192`, `max_rank=32768`, `sample_attempts=8` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqband_p005_k8192_wp025_age64_r8192_32768_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0421` | 0.0421487917 |
+| rank-band 16k..64k | `prob=0.08`, `k=8192`, `weight_power=0.25`, `min_age=64`, `min_rank=16384`, `max_rank=65536`, `sample_attempts=8` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqband_p008_k8192_wp025_age64_r16384_65536_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0441` | 0.0440802500 |
 
 Closest row details: `prob=0.03,k=4096` improved evaluator HRC to
 `0.0396531500`, but official cachesim still regressed. LFU moved only
@@ -791,10 +793,13 @@ Closest row details: `prob=0.03,k=4096` improved evaluator HRC to
 `0.0683776667 -> 0.0718263333`, and the six-policy core also lost enough to
 miss the incumbent.
 
-Negative result: long-memory frequency-pool routing is not the next CP
-overtake path in this form. It improves internal stack-shape diagnostics but
-does not lower official `llgan.cachesim_eval` HRC-MAE, so CP needs a different
-non-bootstrap architecture rather than broader frequency-pool pressure.
+Rank-banding did not rescue the family. The `8k..32k` band kept LFU near
+`0.1118605000` but LIRS stayed high at `0.0746280000`; the `16k..64k` band
+pushed LFU to `0.1106048333` while LIRS degraded to `0.0782850000`. Negative
+result: long-memory frequency-pool routing is not the next CP overtake path in
+this form. It improves internal stack-shape diagnostics but does not lower
+official `llgan.cachesim_eval` HRC-MAE, so CP needs a different non-bootstrap
+architecture rather than broader frequency-pool pressure.
 
 ## 2026-05-03 -- TraceBootstrap Missing-Corpus Completion
 
@@ -843,3 +848,57 @@ Bootstrap ledger read: LANL has now posted near-zero/zero TraceBootstrap panels
 for all five corpora. LLNL no longer has "bootstrap alone" entries on Alibaba,
 Baleen24, or MSR; the meaningful differentiator returns to generative-model
 architecture.
+
+## 2026-05-03 -- MSR Exchange Noise-Matched Time-Size Retake
+
+LLNL R270/R272/R273 retook the non-bootstrap MSR Exchange generative ledger at
+posted mean `0.0105` by porting LANL's time x size x phase state-space into
+`llgan/neural_atlas.py` and refitting with `cond_noise_std=0.05`. LANL added
+the same conditioning-noise regularizer to `altgan` training in commit
+`68f389b`, trained a phase-2/time-4/size-4 atlas, and verified the official
+six-policy cachesim surface across seeds `{42,80,81,82}`.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Recipe: `hidden_dim=96`, `records_per_file=50000`, `n_phase=2`,
+`n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`; generate with forced phase,
+`condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.45`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.15`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_lanl96_t4s4_noise_rank2_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0104` | 0.0103523333 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_lanl96_t4s4_noise_rank2_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0097` | 0.0096974333 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_lanl96_t4s4_noise_rank2_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099689667 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_lanl96_t4s4_noise_rank2_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0101` | 0.0101276667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0100366000` (race display `0.0100`;
+range `0.0006549000`). This retakes MSR Exchange from LLNL R273's posted
+`0.0105` generative claim under the same official six-policy cachesim surface.
+
+Architecture read: LLNL correctly identified the state-space lever; the
+cachesim win comes from the time x size x phase atlas family, not a scalar-only
+post-hoc sweep. LANL's response is now measured: noise-regularized altgan
+training plus rank-2 calibration puts the same architectural family back below
+LLNL on multi-seed official cachesim. The next useful work is robustness
+defense against LLNL's pending Alibaba/Baleen ports and a non-bootstrap
+CloudPhysics architecture that preserves LIRS while improving LFU.
