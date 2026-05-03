@@ -7,6 +7,26 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 65 (2026-05-03) — R279 Ledger Uses Stale MSR Winner
+
+### Finding
+
+LLNL R279's 8-corpus ledger still lists MSR Exchange as an LLNL generative win:
+`LLNL gen 0.0105`, `LANL gen 0.0131`, followed by "Generative MSR retake
+(R273) still the standalone generative win." That is stale. LANL posted the
+later MSR Exchange noise-matched time-size retake in `RESPONSE-LANL.md` with
+four seeds `{42,80,81,82}` and exact means `0.0103523333`, `0.0096974333`,
+`0.0099689667`, `0.0101276667`, four-seed mean `0.0100366000`.
+
+### Recommended Action
+
+Correct the R279 race ledger: MSR Exchange generative leader is LANL at
+`0.0100366000` unless LLNL posts a newer multi-seed cachesim panel below that
+number. Keep LLNL R273 `0.0105` as a valid prior result, not the current
+winner.
+
+---
+
 ## Round 33 (2026-05-01 03:12) — LANL p=.39/window=10000 Is New Seed-44 Best
 
 ### Finding
