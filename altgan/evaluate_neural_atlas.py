@@ -132,6 +132,24 @@ def _parse_args() -> argparse.Namespace:
                    help="Maximum current LRU stack rank for frequency-pool redirects; negative disables.")
     p.add_argument("--stack-frequency-pool-sample-attempts", type=int, default=8,
                    help="Number of frequency-pool samples tried to satisfy age/rank filters.")
+    p.add_argument("--stack-anchor-pool-prob", type=float, default=0.0,
+                   help="Probability of redirecting a sampled reuse to a persistent promoted-object pool.")
+    p.add_argument("--stack-anchor-pool-position-probs", default="",
+                   help="Comma-separated per-position-bin anchor-pool probabilities.")
+    p.add_argument("--stack-anchor-pool-k", type=int, default=256,
+                   help="Maximum persistent promoted objects retained per stream.")
+    p.add_argument("--stack-anchor-pool-promote-prob", type=float, default=0.0,
+                   help="Probability of promoting a newly emitted object into the persistent anchor pool.")
+    p.add_argument("--stack-anchor-pool-weight-power", type=float, default=1.0,
+                   help="Power applied to anchor-pool touch-count weights.")
+    p.add_argument("--stack-anchor-pool-min-age", type=int, default=0,
+                   help="Minimum stream positions since last emission before an anchor can be reused.")
+    p.add_argument("--stack-anchor-pool-min-rank", type=int, default=0,
+                   help="Minimum current LRU stack rank for anchor-pool redirects.")
+    p.add_argument("--stack-anchor-pool-max-rank", type=int, default=-1,
+                   help="Maximum current LRU stack rank for anchor-pool redirects; negative disables.")
+    p.add_argument("--stack-anchor-pool-sample-attempts", type=int, default=8,
+                   help="Number of anchor-pool samples tried to satisfy age/rank filters.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-position-probs", default="",
@@ -276,6 +294,15 @@ def main() -> int:
         stack_frequency_pool_min_rank=args.stack_frequency_pool_min_rank,
         stack_frequency_pool_max_rank=None if args.stack_frequency_pool_max_rank < 0 else args.stack_frequency_pool_max_rank,
         stack_frequency_pool_sample_attempts=args.stack_frequency_pool_sample_attempts,
+        stack_anchor_pool_prob=args.stack_anchor_pool_prob,
+        stack_anchor_pool_position_probs=_parse_float_list(args.stack_anchor_pool_position_probs),
+        stack_anchor_pool_k=args.stack_anchor_pool_k,
+        stack_anchor_pool_promote_prob=args.stack_anchor_pool_promote_prob,
+        stack_anchor_pool_weight_power=args.stack_anchor_pool_weight_power,
+        stack_anchor_pool_min_age=args.stack_anchor_pool_min_age,
+        stack_anchor_pool_min_rank=args.stack_anchor_pool_min_rank,
+        stack_anchor_pool_max_rank=None if args.stack_anchor_pool_max_rank < 0 else args.stack_anchor_pool_max_rank,
+        stack_anchor_pool_sample_attempts=args.stack_anchor_pool_sample_attempts,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_position_probs=_parse_float_list(args.stack_tail_reuse_position_probs),
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
@@ -381,6 +408,15 @@ def main() -> int:
         "stack_frequency_pool_min_rank": args.stack_frequency_pool_min_rank,
         "stack_frequency_pool_max_rank": args.stack_frequency_pool_max_rank,
         "stack_frequency_pool_sample_attempts": args.stack_frequency_pool_sample_attempts,
+        "stack_anchor_pool_prob": args.stack_anchor_pool_prob,
+        "stack_anchor_pool_position_probs": _parse_float_list(args.stack_anchor_pool_position_probs),
+        "stack_anchor_pool_k": args.stack_anchor_pool_k,
+        "stack_anchor_pool_promote_prob": args.stack_anchor_pool_promote_prob,
+        "stack_anchor_pool_weight_power": args.stack_anchor_pool_weight_power,
+        "stack_anchor_pool_min_age": args.stack_anchor_pool_min_age,
+        "stack_anchor_pool_min_rank": args.stack_anchor_pool_min_rank,
+        "stack_anchor_pool_max_rank": args.stack_anchor_pool_max_rank,
+        "stack_anchor_pool_sample_attempts": args.stack_anchor_pool_sample_attempts,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_position_probs": _parse_float_list(args.stack_tail_reuse_position_probs),
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,

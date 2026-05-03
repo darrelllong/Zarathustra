@@ -60,6 +60,15 @@ class Spec:
     frequency_pool_min_rank: int = 0
     frequency_pool_max_rank: int = -1
     frequency_pool_sample_attempts: int = 8
+    anchor_pool_prob: float = 0.0
+    anchor_pool_position_probs: str = ""
+    anchor_pool_k: int = 256
+    anchor_pool_promote_prob: float = 0.0
+    anchor_pool_weight_power: float = 1.0
+    anchor_pool_min_age: int = 0
+    anchor_pool_min_rank: int = 0
+    anchor_pool_max_rank: int = -1
+    anchor_pool_sample_attempts: int = 8
     recent_pool_prob: float = 0.15
     recent_pool_position_probs: str = ""
     recent_pool_window: int = 16
@@ -170,6 +179,24 @@ def _parse_spec(text: str) -> Spec:
         "fpmaxrank": "frequency_pool_max_rank",
         "fp_attempts": "frequency_pool_sample_attempts",
         "fpattempts": "frequency_pool_sample_attempts",
+        "ap": "anchor_pool_prob",
+        "anchor": "anchor_pool_prob",
+        "ap_pos": "anchor_pool_position_probs",
+        "appos": "anchor_pool_position_probs",
+        "apk": "anchor_pool_k",
+        "ap_k": "anchor_pool_k",
+        "appromote": "anchor_pool_promote_prob",
+        "ap_promote": "anchor_pool_promote_prob",
+        "apwp": "anchor_pool_weight_power",
+        "ap_weight": "anchor_pool_weight_power",
+        "apage": "anchor_pool_min_age",
+        "ap_min_age": "anchor_pool_min_age",
+        "ap_min_rank": "anchor_pool_min_rank",
+        "apminrank": "anchor_pool_min_rank",
+        "ap_max_rank": "anchor_pool_max_rank",
+        "apmaxrank": "anchor_pool_max_rank",
+        "ap_attempts": "anchor_pool_sample_attempts",
+        "apattempts": "anchor_pool_sample_attempts",
         "rp": "recent_pool_prob",
         "rp_pos": "recent_pool_position_probs",
         "rppos": "recent_pool_position_probs",
@@ -224,6 +251,8 @@ def _auto_name(spec: Spec) -> str:
         f"_minage{spec.hot_pool_min_age}_fp{_tag(spec.frequency_pool_prob)}"
         f"k{spec.frequency_pool_k}cr{spec.frequency_pool_min_count_rank}"
         f"-{spec.frequency_pool_max_count_rank}"
+        f"_ap{_tag(spec.anchor_pool_prob)}k{spec.anchor_pool_k}"
+        f"prom{_tag(spec.anchor_pool_promote_prob)}"
         f"_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
@@ -375,6 +404,24 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.frequency_pool_max_rank),
         "--stack-frequency-pool-sample-attempts",
         str(spec.frequency_pool_sample_attempts),
+        "--stack-anchor-pool-prob",
+        str(spec.anchor_pool_prob),
+        "--stack-anchor-pool-position-probs",
+        spec.anchor_pool_position_probs,
+        "--stack-anchor-pool-k",
+        str(spec.anchor_pool_k),
+        "--stack-anchor-pool-promote-prob",
+        str(spec.anchor_pool_promote_prob),
+        "--stack-anchor-pool-weight-power",
+        str(spec.anchor_pool_weight_power),
+        "--stack-anchor-pool-min-age",
+        str(spec.anchor_pool_min_age),
+        "--stack-anchor-pool-min-rank",
+        str(spec.anchor_pool_min_rank),
+        "--stack-anchor-pool-max-rank",
+        str(spec.anchor_pool_max_rank),
+        "--stack-anchor-pool-sample-attempts",
+        str(spec.anchor_pool_sample_attempts),
         "--stack-recent-pool-prob",
         str(spec.recent_pool_prob),
         "--stack-recent-pool-position-probs",

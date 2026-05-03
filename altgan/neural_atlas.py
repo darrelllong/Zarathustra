@@ -135,6 +135,15 @@ class NeuralAtlasModel:
         stack_frequency_pool_min_rank: int = 0,
         stack_frequency_pool_max_rank: int | None = None,
         stack_frequency_pool_sample_attempts: int = 8,
+        stack_anchor_pool_prob: float = 0.0,
+        stack_anchor_pool_position_probs: Sequence[float] | None = None,
+        stack_anchor_pool_k: int = 256,
+        stack_anchor_pool_promote_prob: float = 0.0,
+        stack_anchor_pool_weight_power: float = 1.0,
+        stack_anchor_pool_min_age: int = 0,
+        stack_anchor_pool_min_rank: int = 0,
+        stack_anchor_pool_max_rank: int | None = None,
+        stack_anchor_pool_sample_attempts: int = 8,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_position_probs: Sequence[float] | None = None,
         stack_tail_reuse_min_frac: float = 0.5,
@@ -328,6 +337,8 @@ class NeuralAtlasModel:
             freq_counts: Counter[int] = Counter()
             freq_last_pos: dict[int, int] = {}
             freq_pool: list[tuple[int, int]] = []
+            anchor_counts: Counter[int] = Counter()
+            anchor_last_pos: dict[int, int] = {}
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
 
             for pos in range(per_stream):
@@ -385,6 +396,12 @@ class NeuralAtlasModel:
                     per_stream,
                     stack_rank_band_reuse_prob,
                 )
+                anchor_pool_prob = _position_value(
+                    stack_anchor_pool_position_probs,
+                    pos,
+                    per_stream,
+                    stack_anchor_pool_prob,
+                )
                 reuse_drop_prob = _position_value(
                     stack_reuse_drop_position_probs,
                     pos,
@@ -426,6 +443,40 @@ class NeuralAtlasModel:
                             rank_power=stack_rank_band_reuse_power,
                             rng=rng,
                         )
+                    elif (
+                        not boosted_reuse
+                        and anchor_pool_prob > 0.0
+                        and anchor_counts
+                        and rng.random() < anchor_pool_prob
+                    ):
+                        rank_from_pool = _rank_from_object_pool(
+                            stack,
+                            list(anchor_counts.items()),
+                            last_pos=anchor_last_pos,
+                            current_pos=pos,
+                            min_age=stack_anchor_pool_min_age,
+                            min_rank=stack_anchor_pool_min_rank,
+                            max_rank=stack_anchor_pool_max_rank,
+                            weight_power=stack_anchor_pool_weight_power,
+                            max_search=0,
+                            sample_attempts=stack_anchor_pool_sample_attempts,
+                            rng=rng,
+                        )
+                        if rank_from_pool is not None:
+                            rank = rank_from_pool
+                        else:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
                     elif adj_dup_prob > 0.0 and rng.random() < adj_dup_prob:
                         use_band = (
                             stack_adj_dup_max_rank > 0
@@ -719,6 +770,18 @@ class NeuralAtlasModel:
                             min_count_rank=stack_frequency_pool_min_count_rank,
                             max_count_rank=stack_frequency_pool_max_count_rank,
                         )
+                if stack_anchor_pool_prob > 0.0 or stack_anchor_pool_position_probs:
+                    anchor_obj = int(obj_id)
+                    if anchor_obj in anchor_counts:
+                        anchor_counts[anchor_obj] += 1
+                        anchor_last_pos[anchor_obj] = pos
+                    elif (
+                        len(anchor_counts) < max(int(stack_anchor_pool_k), 1)
+                        and stack_anchor_pool_promote_prob > 0.0
+                        and rng.random() < stack_anchor_pool_promote_prob
+                    ):
+                        anchor_counts[anchor_obj] = 1
+                        anchor_last_pos[anchor_obj] = pos
                 if stack_recent_pool_prob > 0.0 or stack_recent_pool_position_probs:
                     recent_window.append(int(obj_id))
                 if progress_interval > 0 and (pos + 1) % progress_interval == 0:
