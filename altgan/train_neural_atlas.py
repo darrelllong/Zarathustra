@@ -51,6 +51,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--n-size-bins", type=int, default=4)
     p.add_argument("--n-phase-bins", type=int, default=1,
                    help="Within-file position bins added to atlas state for nonstationary traces.")
+    p.add_argument("--rank-state-edges", default="",
+                   help="Comma-separated stack-distance edges for optional distance-state bins.")
     p.add_argument("--max-samples-per-state", type=int, default=1024)
     return p.parse_args()
 
@@ -109,6 +111,7 @@ def main() -> int:
         lr=args.lr,
         cond_noise_std=args.cond_noise_std,
         max_samples_per_state=args.max_samples_per_state,
+        rank_state_edges=_parse_int_list(args.rank_state_edges),
         seed=args.seed,
     )
     model.metadata.update({
@@ -117,6 +120,7 @@ def main() -> int:
         "paths": [str(p) for p in paths],
         "records_per_file": args.records_per_file,
         "cond_noise_std": args.cond_noise_std,
+        "rank_state_edges": _parse_int_list(args.rank_state_edges),
     })
     model.save(args.output)
     print(f"[altgan.train_neural_atlas] wrote {args.output}")
@@ -178,6 +182,10 @@ def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
             for key in _char_row_keys(rel, path):
                 lookup[key] = vec
     return lookup
+
+
+def _parse_int_list(text: str) -> list[int]:
+    return [int(x) for x in text.split(",") if x.strip()]
 
 
 def _char_row_keys(rel_path: str, abs_path: str) -> list[str]:

@@ -27,7 +27,6 @@ from .model import (
     _interarrival,
     _quantile_edges,
     _reservoir_add,
-    _state_id,
     stack_distances,
 )
 
@@ -67,6 +66,8 @@ class NeuralAtlasModel:
     global_samples_by_state: Dict[int, List[EventSample]]
     global_samples: List[EventSample]
     max_obj_id: int
+    rank_state_edges: np.ndarray | None = None
+    n_dist_states: int = StackAtlasModel.N_ACTIONS
     mark_model: object | None = None
     metadata: dict = field(default_factory=dict)
 
@@ -243,7 +244,11 @@ class NeuralAtlasModel:
 
         per_stream = int(np.ceil(n_records / n_streams))
         rows = []
-        base_span = self.n_time_bins * self.n_size_bins * StackAtlasModel.N_ACTIONS
+        rank_state_edges = getattr(self, "rank_state_edges", None)
+        n_dist_states = int(getattr(self, "n_dist_states", StackAtlasModel.N_ACTIONS))
+        if rank_state_edges is None:
+            n_dist_states = StackAtlasModel.N_ACTIONS
+        base_span = self.n_time_bins * self.n_size_bins * n_dist_states
         for stream_id in range(n_streams):
             reservoir = self._nearest_reservoir(conds[stream_id])
             init_p = self._blend_initial(
@@ -513,7 +518,15 @@ class NeuralAtlasModel:
                     )
                     stack.insert_front(obj_id)
                     in_stack.add(obj_id)
-                mark_state = _state_with_action(state, effective_action_class)
+                mark_dist_state = _dist_state_from_stack_distance(
+                    effective_stack_distance,
+                    rank_state_edges,
+                )
+                mark_state = _state_with_dist_state(
+                    state,
+                    mark_dist_state,
+                    n_dist_states,
+                )
 
                 mark = ev
                 if mark_runtime is not None:
@@ -744,6 +757,7 @@ def fit_neural_atlas(
     lr: float = 2e-3,
     cond_noise_std: float = 0.0,
     max_samples_per_state: int = 1024,
+    rank_state_edges: Sequence[int] | None = None,
     seed: int = 7,
 ) -> NeuralAtlasModel:
     import torch
@@ -771,7 +785,9 @@ def fit_neural_atlas(
     time_edges = _quantile_edges(np.log1p(all_dt), n_time_bins)
     size_edges = _quantile_edges(np.log(all_size), n_size_bins)
     n_phase_bins = max(int(n_phase_bins), 1)
-    n_states = n_phase_bins * n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS
+    rank_state_edges_arr = _rank_state_edges_array(rank_state_edges)
+    n_dist_states = _n_dist_states(rank_state_edges_arr)
+    n_states = n_phase_bins * n_time_bins * n_size_bins * n_dist_states
 
     reservoirs: List[AtlasReservoir] = []
     file_conds = []
@@ -800,6 +816,8 @@ def fit_neural_atlas(
             n_size_bins=n_size_bins,
             n_phase_bins=n_phase_bins,
             n_states=n_states,
+            rank_state_edges=rank_state_edges_arr,
+            n_dist_states=n_dist_states,
             max_samples_per_state=max_samples_per_state,
             rng=rng,
         )
@@ -897,6 +915,10 @@ def fit_neural_atlas(
         "model": "NeuralAtlasModel",
         "n_transition_rows": int(len(trans_states)),
         "n_phase_bins": n_phase_bins,
+        "rank_state_edges": (
+            None if rank_state_edges_arr is None else rank_state_edges_arr.tolist()
+        ),
+        "n_dist_states": int(n_dist_states),
     }
     return NeuralAtlasModel(
         version=1,
@@ -918,6 +940,8 @@ def fit_neural_atlas(
         global_samples_by_state=global_samples_by_state,
         global_samples=global_samples,
         max_obj_id=max_obj_id,
+        rank_state_edges=rank_state_edges_arr,
+        n_dist_states=n_dist_states,
         metadata=metadata,
     )
 
@@ -925,6 +949,7 @@ def fit_neural_atlas(
 def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
                     size_edges: np.ndarray, n_time_bins: int, n_size_bins: int,
                     n_phase_bins: int, n_states: int,
+                    rank_state_edges: np.ndarray | None, n_dist_states: int,
                     max_samples_per_state: int, rng: np.random.Generator):
     ts = df["ts"].to_numpy(dtype=np.float64)
     obj_ids = _object_ids_for_stack(df["obj_id"])
@@ -936,7 +961,17 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
     size_bins = np.searchsorted(size_edges, np.log(sizes), side="right")
     phase_bins = _phase_bins(len(df), n_phase_bins)
     actions = np.array([_action_class(int(x)) for x in stack_d], dtype=np.int64)
-    base_states = _state_id(time_bins, size_bins, actions, n_size_bins)
+    dist_states = np.array([
+        _dist_state_from_stack_distance(int(x), rank_state_edges)
+        for x in stack_d
+    ], dtype=np.int64)
+    base_states = _state_id_with_dist(
+        time_bins,
+        size_bins,
+        dist_states,
+        n_size_bins,
+        n_dist_states,
+    )
     states = (phase_bins * (n_time_bins * n_size_bins * StackAtlasModel.N_ACTIONS)
               + base_states).astype(np.int64)
     opcodes = df["opcode"].to_numpy(dtype=object)
@@ -1010,6 +1045,49 @@ def _state_with_phase(state: int, phase: int, base_span: int) -> int:
 def _state_with_action(state: int, action_class: int) -> int:
     action = min(max(int(action_class), 0), StackAtlasModel.N_ACTIONS - 1)
     return int(state) - (int(state) % StackAtlasModel.N_ACTIONS) + action
+
+
+def _state_id_with_dist(time_bins: np.ndarray, size_bins: np.ndarray,
+                        dist_states: np.ndarray, n_size_bins: int,
+                        n_dist_states: int) -> np.ndarray:
+    return ((time_bins * n_size_bins + size_bins) * int(n_dist_states)
+            + dist_states).astype(np.int64)
+
+
+def _state_with_dist_state(state: int, dist_state: int, n_dist_states: int) -> int:
+    n = max(int(n_dist_states), 1)
+    dist = min(max(int(dist_state), 0), n - 1)
+    return int(state) - (int(state) % n) + dist
+
+
+def _rank_state_edges_array(values: Sequence[int] | None) -> np.ndarray | None:
+    if not values:
+        return None
+    arr = np.unique(np.asarray([int(v) for v in values], dtype=np.int64))
+    arr = arr[arr >= 0]
+    if len(arr) < 2:
+        raise ValueError("rank_state_edges must contain at least two non-negative edges")
+    if int(arr[0]) != 0:
+        arr = np.concatenate([np.array([0], dtype=np.int64), arr])
+    return arr.astype(np.int64)
+
+
+def _n_dist_states(rank_state_edges: np.ndarray | None) -> int:
+    if rank_state_edges is None:
+        return StackAtlasModel.N_ACTIONS
+    return int(len(rank_state_edges))
+
+
+def _dist_state_from_stack_distance(
+    stack_distance: int,
+    rank_state_edges: np.ndarray | None,
+) -> int:
+    if rank_state_edges is None:
+        return _action_class(int(stack_distance))
+    if int(stack_distance) < 0:
+        return 0
+    bucket = int(np.searchsorted(rank_state_edges[1:], int(stack_distance), side="right"))
+    return 1 + min(bucket, len(rank_state_edges) - 2)
 
 
 def _calibrated_stack_rank(
