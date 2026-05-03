@@ -403,7 +403,12 @@ def _stack_distance(obj_ids: np.ndarray) -> np.ndarray:
 
 
 def _read_oracle_general_obj_ids(path: str, max_records: int) -> np.ndarray:
-    """Read obj_ids from oracleGeneral .zst (skip sentinels)."""
+    """Read obj_ids from oracleGeneral .zst (skip sentinels).
+
+    R277: use uint64 to accommodate Twitter cluster traces, whose obj_ids
+    can exceed int64 range (max 18.4e18). All downstream code coerces to
+    Python int via int(...) at use sites, so the dtype only matters for
+    the np.array construction itself."""
     sys.path.insert(0, "/home/darrell/Zarathustra")
     from llgan.phase_pmf_atlas import _read_trace
     out = []
@@ -411,7 +416,7 @@ def _read_oracle_general_obj_ids(path: str, max_records: int) -> np.ndarray:
         out.append(ev[1])
         if len(out) >= max_records:
             break
-    return np.array(out, dtype=np.int64)
+    return np.array(out, dtype=np.uint64)
 
 
 def _read_oracle_general_full(path: str, max_records: int):
@@ -426,7 +431,7 @@ def _read_oracle_general_full(path: str, max_records: int):
         if len(oid_l) >= max_records:
             break
     return (np.asarray(ts_l, dtype=np.float64),
-            np.asarray(oid_l, dtype=np.int64),
+            np.asarray(oid_l, dtype=np.uint64),
             np.asarray(sz_l, dtype=np.int64))
 
 
