@@ -161,7 +161,8 @@ def cond_from_trace(path: str, max_records: int = 25_000) -> np.ndarray:
     if len(ts_arr) < 2:
         return np.zeros(COND_DIM, dtype=np.float32)
     ts = np.asarray(ts_arr, dtype=np.float64)
-    oid = np.asarray(oid_arr, dtype=np.int64)
+    # R277: uint64 to handle Twitter cluster traces (oid > int64 max).
+    oid = np.asarray(oid_arr, dtype=np.uint64)
     sz = np.asarray(sz_arr, dtype=np.float64)
     op = np.asarray(op_arr, dtype=np.int64)
 
