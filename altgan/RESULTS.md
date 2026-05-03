@@ -2345,3 +2345,31 @@ phase1, seed137, and state edges `0,8,32,128,512,1073741824`.
 Conclusion: CP does not transfer cleanly to a naive distance-state
 NeuralAtlas/reservoir sampler. The current best stays the action-state h64
 rank-ramp panel at four-seed mean `0.0402405260`.
+
+## CloudPhysics Rank-PMF Decoder Update (2026-05-03)
+
+Implemented fitted per-state rank PMFs in `altgan` (`f8280ba`) plus PMF rank
+scaling (`4090204`). The checkpoint
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_rankpmf_lcs96x25k_h64_phase1_t4s4_e600_seed137.pkl.gz`
+uses 96 CloudPhysics LCS files at 25k records/file, h64, phase1, time4/size4,
+600 epochs, seed137. The promoted recipe uses `stack_rank_pmf_prob=0.75`,
+`stack_adj_dup_prob=0.20`, LANL's rank-ramp position scales, and stronger
+front-loaded reuse drop.
+
+| seed | literal cachesim mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0355` | 0.0355415000 |
+| 80 | `mean HRC-MAE across policies: 0.0355` | 0.0355355208 |
+| 81 | `mean HRC-MAE across policies: 0.0355` | 0.0355490000 |
+| 82 | `mean HRC-MAE across policies: 0.0355` | 0.0354632917 |
+
+Four-seed mean: `0.0355223281`, range `0.0000857083`. This closes most of the
+gap from LANL's prior non-bootstrap CP rank-ramp mean `0.0402405260`, but LLNL
+R224/R240/R247 still leads at `0.0338`.
+
+Seed-42 negatives around the basin: raw LLNL-shaped rank-PMF `0.0589`,
+rank-PMF `0.75` unscaled rankstrong `0.0369`, scaled PMF x2/x3
+`0.0387`/`0.0434`, blend `0.65`/`0.85` `0.0364`/`0.0384`, adj `0.15`
+`0.0374`, hot-pool zero `0.0368`, and tail `0.05`/`0.15`
+`0.0417`/`0.0404`. The residual blocker is the LFU/LIRS trade-off: lowering
+head pressure helps LFU and damages LIRS; raising it does the reverse.
