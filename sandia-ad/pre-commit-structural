@@ -1,0 +1,113 @@
+#!/bin/bash
+# Sandia structural pre-commit hook — NO LLM, just bash + jq + grep.
+# Catches the fabrication failure mode (row in RESPONSE-Sandia.md without
+# real artifacts on disk) at git-commit time. Replaces the LLM-based
+# SANDIA-AD that was disabled because llama3.3:70b OOM'd this Mac.
+#
+# Behavior:
+#   - If the commit touches RESPONSE-Sandia.md (new measurement row)
+#     it MUST come with a .sandia-claim.json and:
+#       * fake_csv path exists, size > 0
+#       * cachesim_log path exists and contains the literal mean
+#     If any check fails, reject the commit with a printable diagnosis.
+#   - If RESPONSE-Sandia.md is not touched, allow (infra commits).
+#
+# Install with:
+#   ln -sf ~/Sandia/Zarathustra/sandia-ad/pre-commit-structural \
+#          ~/Sandia/Zarathustra/.git/hooks/pre-commit
+
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+CLAIM="$ROOT/.sandia-claim.json"
+
+# What's staged?
+TOUCHED_RESPONSE=0
+if git diff --cached --name-only | grep -qx 'RESPONSE-Sandia.md'; then
+  TOUCHED_RESPONSE=1
+fi
+
+# Did the staged diff actually ADD a measurement row (lines starting with `| 20`)?
+ADDED_ROW=$(git diff --cached -- RESPONSE-Sandia.md \
+              | grep -E '^\+\| 20[0-9]{2}-' || true)
+
+if [ $TOUCHED_RESPONSE -eq 0 ] || [ -z "$ADDED_ROW" ]; then
+  # Infra commit; no claim required.
+  exit 0
+fi
+
+if [ ! -f "$CLAIM" ]; then
+  echo "pre-commit: REJECTED" >&2
+  echo "  RESPONSE-Sandia.md added a measurement row but no .sandia-claim.json exists." >&2
+  echo "  Drop a claim file at the repo root with corpus, recipe, claimed_mean," >&2
+  echo "  fake_csv, real_csv, cachesim_log fields. See SANDIA-OPERATING-CHARTER.md." >&2
+  echo "  Suspect fabrication. If you cannot point at a real CSV+log on disk," >&2
+  echo "  do NOT commit a row." >&2
+  exit 1
+fi
+
+# jq required from here on (claim manifest reader).
+if ! command -v jq >/dev/null 2>&1; then
+  echo "pre-commit: jq not found; install jq or run via python fallback." >&2
+  exit 1
+fi
+
+CORPUS=$(jq -r '.corpus // empty' "$CLAIM")
+RECIPE=$(jq -r '.recipe // empty' "$CLAIM")
+MEAN=$(jq -r '.claimed_mean // empty' "$CLAIM")
+FAKE=$(jq -r '.fake_csv // empty' "$CLAIM")
+REAL=$(jq -r '.real_csv // empty' "$CLAIM")
+LOG=$(jq -r '.cachesim_log // empty' "$CLAIM")
+
+for v in CORPUS:"$CORPUS" RECIPE:"$RECIPE" MEAN:"$MEAN" FAKE:"$FAKE" REAL:"$REAL" LOG:"$LOG"; do
+  k=${v%%:*}; val=${v#*:}
+  if [ -z "$val" ]; then
+    echo "pre-commit: REJECTED — .sandia-claim.json missing field $k" >&2
+    exit 1
+  fi
+done
+
+# 1. fake_csv must exist (possibly on /tiamat/, possibly via ssh).
+if [[ "$FAKE" == /tiamat/* ]]; then
+  # /tiamat is NFS-shared but not mounted on the Mac. Probe the remote.
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=5 baase.local "[ -s '$FAKE' ]" 2>/dev/null; then
+    echo "pre-commit: REJECTED — fake_csv path on baase.local is missing or empty: $FAKE" >&2
+    echo "  ssh baase.local 'ls -la $FAKE' to investigate." >&2
+    exit 1
+  fi
+elif [ ! -s "$FAKE" ]; then
+  echo "pre-commit: REJECTED — fake_csv path missing or empty: $FAKE" >&2
+  exit 1
+fi
+
+# 2. cachesim_log must exist and contain the literal claimed mean.
+LOG_TEXT=""
+if [[ "$LOG" == /tiamat/* ]]; then
+  LOG_TEXT=$(ssh -o BatchMode=yes -o ConnectTimeout=5 baase.local "cat '$LOG' 2>/dev/null" 2>/dev/null || true)
+elif [ -r "$LOG" ]; then
+  LOG_TEXT=$(cat "$LOG" 2>/dev/null || true)
+fi
+
+if [ -z "$LOG_TEXT" ]; then
+  echo "pre-commit: REJECTED — cachesim_log unreadable: $LOG" >&2
+  exit 1
+fi
+
+if ! echo "$LOG_TEXT" | grep -q "mean HRC-MAE"; then
+  echo "pre-commit: REJECTED — cachesim_log does not contain 'mean HRC-MAE': $LOG" >&2
+  exit 1
+fi
+
+if ! echo "$LOG_TEXT" | grep -F -q "$MEAN"; then
+  echo "pre-commit: REJECTED — claimed_mean '$MEAN' does not appear literally in cachesim_log $LOG" >&2
+  exit 1
+fi
+
+# 3. The added row in RESPONSE-Sandia.md must reference the same mean.
+if ! echo "$ADDED_ROW" | grep -F -q "$MEAN"; then
+  echo "pre-commit: REJECTED — added RESPONSE-Sandia.md row does not contain claimed_mean '$MEAN'" >&2
+  echo "  added row: $ADDED_ROW" >&2
+  exit 1
+fi
+
+echo "pre-commit: structural check passed (corpus=$CORPUS mean=$MEAN)." >&2
+exit 0
