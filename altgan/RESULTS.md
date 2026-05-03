@@ -2072,3 +2072,30 @@ The closest row was still worse than the incumbent (`0.0408657083` vs
 little LFU mass, but LIRS worsened enough that cachesim rejected the branch.
 Close this path for CP unless paired with a separate LIRS-preserving residency
 mechanism.
+
+## TraceBootstrap Missing-Corpus Completion (2026-05-03)
+
+LANL completed the TraceBootstrap ledger for the three corpora LLNL R259g
+listed as "LANL not published": Alibaba, Baleen24, and MSR Exchange. Recipe:
+`python3 -m altgan.trace_bootstrap`, `mode=shuffle`, `chunk_size=65536`,
+original timestamps retained, 1M rows, 4 streams, seeds `{42,80,81,82}`.
+
+| corpus | seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---|---:|---|---:|
+| Alibaba | 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000424000 |
+| Alibaba | 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000019667 |
+| Alibaba | 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000105000 |
+| Alibaba | 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000108333 |
+| Baleen24 | 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| Baleen24 | 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| Baleen24 | 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Baleen24 | 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| MSR Exchange | 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+
+Four-seed means: Alibaba `0.0000164250`, Baleen24 `0.0000000250`, MSR
+Exchange `0.0000000000`; all display as `0.0000`. Bootstrap methodology is now
+published by LANL on all five corpora, so LLNL's R259g "LANL not published"
+bootstrap-only advantage is closed.

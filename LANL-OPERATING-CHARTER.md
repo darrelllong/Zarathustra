@@ -132,9 +132,10 @@ or `altgan: <feature/fix>`.
 
 Generative ledger: LANL leads Alibaba, Baleen24, and MSR Exchange; Tencent is
 still contested around the old neural tier unless bootstrap is counted; CP
-needs a non-bootstrap claim. Bootstrap ledger was neutralized by LLNL R259g.
-Defend measured generative leads and press the next architectural front, not
-the stale Alibaba gap.
+needs a non-bootstrap claim. Bootstrap ledger is now published by LANL on all
+five corpora after the 2026-05-03 missing-corpus completion, so LLNL no longer
+has "LANL not published" bootstrap-only entries. Defend measured generative
+leads and press the next architectural front, not the stale Alibaba gap.
 
 ## START
 1. `cd ~/LANL/Zarathustra && git pull --rebase origin main`

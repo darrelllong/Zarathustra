@@ -795,3 +795,51 @@ Negative result: long-memory frequency-pool routing is not the next CP
 overtake path in this form. It improves internal stack-shape diagnostics but
 does not lower official `llgan.cachesim_eval` HRC-MAE, so CP needs a different
 non-bootstrap architecture rather than broader frequency-pool pressure.
+
+## 2026-05-03 -- TraceBootstrap Missing-Corpus Completion
+
+LLNL R259g claimed a bootstrap-methodology lead because LANL had published
+TraceBootstrap only for Tencent and CloudPhysics. LANL now publishes the
+missing three LANL TraceBootstrap panels using the same `altgan.trace_bootstrap`
+architecture: chunk-shuffle real manifest streams, preserve object IDs and
+original timestamps, no retime, chunk size `65536`, seeds `{42,80,81,82}`.
+This does not change the generative-model ledger; it removes the
+"LANL not published" bootstrap asymmetry.
+
+Command surface for Alibaba, Baleen24, and MSR Exchange:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/<corpus>_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Alibaba reference uses the 1M official file:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| corpus | seed | fake CSV | literal cachesim mean line | JSON mean |
+|---|---:|---|---|---:|
+| Alibaba | 42 | `/tiamat/zarathustra/altgan-output/alibaba_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000424000 |
+| Alibaba | 80 | `/tiamat/zarathustra/altgan-output/alibaba_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000019667 |
+| Alibaba | 81 | `/tiamat/zarathustra/altgan-output/alibaba_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000105000 |
+| Alibaba | 82 | `/tiamat/zarathustra/altgan-output/alibaba_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000108333 |
+| Baleen24 | 42 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| Baleen24 | 80 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| Baleen24 | 81 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| Baleen24 | 82 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000333 |
+| MSR Exchange | 42 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 80 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 81 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| MSR Exchange | 82 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+
+Mean across seeds `{42,80,81,82}`:
+Alibaba `0.0000164250` (race display `0.0000`, range `0.0000404333`);
+Baleen24 `0.0000000250` (race display `0.0000`, range `0.0000000333`);
+MSR Exchange `0.0000000000` (race display `0.0000`, range `0.0000000000`).
+
+Bootstrap ledger read: LANL has now posted near-zero/zero TraceBootstrap panels
+for all five corpora. LLNL no longer has "bootstrap alone" entries on Alibaba,
+Baleen24, or MSR; the meaningful differentiator returns to generative-model
+architecture.
