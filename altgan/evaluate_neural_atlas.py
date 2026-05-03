@@ -104,6 +104,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Number of long-memory frequent objects eligible for frequency-pool reuse.")
     p.add_argument("--stack-frequency-pool-max-candidates", type=int, default=1000,
                    help="Maximum approximate frequency candidates retained before pruning to top-k.")
+    p.add_argument("--stack-frequency-pool-refresh-interval", type=int, default=512,
+                   help="Records between long-memory frequency-pool refreshes.")
     p.add_argument("--stack-frequency-pool-min-count-rank", type=int, default=0,
                    help="Zero-based frequency rank to start frequency-pool candidates; skips hotter objects.")
     p.add_argument("--stack-frequency-pool-max-count-rank", type=int, default=-1,
@@ -240,6 +242,7 @@ def main() -> int:
         stack_frequency_pool_prob=args.stack_frequency_pool_prob,
         stack_frequency_pool_k=args.stack_frequency_pool_k,
         stack_frequency_pool_max_candidates=args.stack_frequency_pool_max_candidates,
+        stack_frequency_pool_refresh_interval=args.stack_frequency_pool_refresh_interval,
         stack_frequency_pool_min_count_rank=args.stack_frequency_pool_min_count_rank,
         stack_frequency_pool_max_count_rank=(
             None
@@ -342,6 +345,7 @@ def main() -> int:
         "stack_frequency_pool_prob": args.stack_frequency_pool_prob,
         "stack_frequency_pool_k": args.stack_frequency_pool_k,
         "stack_frequency_pool_max_candidates": args.stack_frequency_pool_max_candidates,
+        "stack_frequency_pool_refresh_interval": args.stack_frequency_pool_refresh_interval,
         "stack_frequency_pool_min_count_rank": args.stack_frequency_pool_min_count_rank,
         "stack_frequency_pool_max_count_rank": args.stack_frequency_pool_max_count_rank,
         "stack_frequency_pool_weight_power": args.stack_frequency_pool_weight_power,

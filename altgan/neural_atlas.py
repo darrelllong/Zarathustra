@@ -112,6 +112,7 @@ class NeuralAtlasModel:
         stack_frequency_pool_prob: float = 0.0,
         stack_frequency_pool_k: int = 100,
         stack_frequency_pool_max_candidates: int = 1000,
+        stack_frequency_pool_refresh_interval: int = 512,
         stack_frequency_pool_min_count_rank: int = 0,
         stack_frequency_pool_max_count_rank: int | None = None,
         stack_frequency_pool_weight_power: float = 1.0,
@@ -188,6 +189,10 @@ class NeuralAtlasModel:
         stack_frequency_pool_max_candidates = max(
             int(stack_frequency_pool_max_candidates),
             stack_frequency_pool_k,
+        )
+        stack_frequency_pool_refresh_interval = max(
+            int(stack_frequency_pool_refresh_interval),
+            1,
         )
         stack_frequency_pool_min_count_rank = max(
             int(stack_frequency_pool_min_count_rank),
@@ -303,7 +308,11 @@ class NeuralAtlasModel:
             for pos in range(per_stream):
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
                     hot_pool = hot_counts.most_common(stack_hot_pool_k)
-                if stack_frequency_pool_prob > 0.0 and pos % 512 == 0 and freq_counts:
+                if (
+                    stack_frequency_pool_prob > 0.0
+                    and pos % stack_frequency_pool_refresh_interval == 0
+                    and freq_counts
+                ):
                     freq_pool = _frequency_rank_pool(
                         freq_counts,
                         pool_size=stack_frequency_pool_k,

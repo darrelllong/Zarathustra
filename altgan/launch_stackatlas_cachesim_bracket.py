@@ -46,6 +46,7 @@ class Spec:
     frequency_pool_prob: float = 0.0
     frequency_pool_k: int = 100
     frequency_pool_max_candidates: int = 1000
+    frequency_pool_refresh_interval: int = 512
     frequency_pool_min_count_rank: int = 0
     frequency_pool_max_count_rank: int = -1
     frequency_pool_weight_power: float = 1.0
@@ -134,6 +135,8 @@ def _parse_spec(text: str) -> Spec:
         "fp_k": "frequency_pool_k",
         "fpmaxcand": "frequency_pool_max_candidates",
         "fp_max_candidates": "frequency_pool_max_candidates",
+        "fprefresh": "frequency_pool_refresh_interval",
+        "fp_refresh": "frequency_pool_refresh_interval",
         "fp_count_min": "frequency_pool_min_count_rank",
         "fpmincount": "frequency_pool_min_count_rank",
         "fpr_min": "frequency_pool_min_count_rank",
@@ -323,6 +326,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.frequency_pool_k),
         "--stack-frequency-pool-max-candidates",
         str(spec.frequency_pool_max_candidates),
+        "--stack-frequency-pool-refresh-interval",
+        str(spec.frequency_pool_refresh_interval),
         "--stack-frequency-pool-min-count-rank",
         str(spec.frequency_pool_min_count_rank),
         "--stack-frequency-pool-max-count-rank",
