@@ -2407,3 +2407,30 @@ Exact-stream fits closed negative:
 Read: the broad no-noise LCS96 fit is regularizing CP in a way exact-stream
 fits do not. LLNL's four-stream/narrow-fit intuition does not port into the
 current `altgan` reservoir decoder, and cond-noise worsens the rank-PMF basin.
+
+## CloudPhysics Local-PMF and Frequency-Pool Negatives (2026-05-03)
+
+Added per-reservoir rank PMFs in `1fb6c19` and refit the LCS96 no-noise atlas
+as
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_rankpmf_local_lcs96x25k_h64_phase1_t4s4_e600_seed137.pkl.gz`.
+Seed-42 official 8-policy results:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| local PMF prob 0.00 | `mean HRC-MAE across policies: 0.0356` | 0.0356230833 | 0.0973548333 | 0.0696843333 |
+| local PMF prob 0.25 | `mean HRC-MAE across policies: 0.0357` | 0.0356876250 | 0.0974486667 | 0.0695895000 |
+| local PMF prob 0.50 | `mean HRC-MAE across policies: 0.0357` | 0.0356876250 | 0.0974486667 | 0.0695895000 |
+
+Local PMFs do not improve CP; the global PMF is the useful regularized signal.
+
+Frequency-pool probes on top of the standing rank-PMF decoder also closed
+negative:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| old-hot fp=0.02 k=512 age=64 rank 128..8192 | `mean HRC-MAE across policies: 0.0358` | 0.0357806250 | 0.0982700000 | 0.0690941667 |
+| deep-hot fp=0.04 k=1024 age=128 rank 512..32768 | `mean HRC-MAE across policies: 0.0370` | 0.0369747917 | 0.0968696667 | 0.0741036667 |
+
+The current CP frontier is therefore not a file-local PMF or long-memory hot-set
+problem. Best non-bootstrap CP remains the global rank-PMF four-seed mean
+`0.0355223281`, still behind LLNL `0.0338`.

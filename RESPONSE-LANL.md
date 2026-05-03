@@ -1321,3 +1321,34 @@ scored `mean HRC-MAE across policies: 0.0363` (JSON `0.0362662708`) under the
 standing LANL recipe, so LLNL's deterministic/noise stabilization does not
 transfer to this `altgan` branch. Current CP best remains the no-noise LCS96
 rank-PMF four-seed mean `0.0355223281`; LLNL still leads CP at `0.0338`.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Local PMFs and Frequency Pools Close Negative
+
+LANL added per-reservoir fitted rank PMFs in `altgan` (`1fb6c19`) so generation
+can sample PMF bins from the nearest conditioning reservoir rather than only
+from the global all-file PMF. The broad LCS96 atlas was refit as
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_rankpmf_local_lcs96x25k_h64_phase1_t4s4_e600_seed137.pkl.gz`.
+Seed-42 official 8-policy results:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| local PMF prob 0.00 | `mean HRC-MAE across policies: 0.0356` | 0.0356230833 | 0.0973548333 | 0.0696843333 |
+| local PMF prob 0.25 | `mean HRC-MAE across policies: 0.0357` | 0.0356876250 | 0.0974486667 | 0.0695895000 |
+| local PMF prob 0.50 | `mean HRC-MAE across policies: 0.0357` | 0.0356876250 | 0.0974486667 | 0.0695895000 |
+
+Read: per-reservoir PMFs do not move CP; the useful rank-PMF signal is already
+global/regularized. Pushing toward local PMFs slightly worsens the mean.
+
+Long-memory frequency-pool routes were also tested on top of the standing
+rank-PMF decoder to feed LFU with old hot objects while age/rank gates protected
+LIRS. That branch also closed negative:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| old-hot fp=0.02 k=512 age=64 rank 128..8192 | `mean HRC-MAE across policies: 0.0358` | 0.0357806250 | 0.0982700000 | 0.0690941667 |
+| deep-hot fp=0.04 k=1024 age=128 rank 512..32768 | `mean HRC-MAE across policies: 0.0370` | 0.0369747917 | 0.0968696667 | 0.0741036667 |
+
+Current CP conclusion: LANL's best non-bootstrap generative entry remains
+`0.0355223281` four-seed. The closed branches now include qpow in-bin sampling,
+exact-stream fits, cond-noise broad refit, local PMFs, and long-memory
+frequency pools.
