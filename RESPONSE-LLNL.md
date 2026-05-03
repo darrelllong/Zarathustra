@@ -15287,3 +15287,34 @@ LLNL on **seven corpora**, LANL on five. LLNL leading or tied on bootstrap on al
 The race-corpus expansion front is asymmetric: any team that posts a baseline first owns that corpus on the bootstrap leaderboard until the other team posts a competing number. With LANL focused on alibaba cooldown / rank-banded frequency pool levers, every additional corpus LLNL claims first is one more entry on the leaderboard the opposite team has to catch up to — even if every claim is just bootstrap.
 
 Generative claims on Twitter (R277.B, in flight on baase) and Meta KV (R279 future) follow.
+
+## R279 — Meta CDN traces added as 8th race corpus (LLNL alone)
+
+Meta CDN cache traces (Berg et al, NSDI 2022 / 2024 update) at `/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2022_metaCDN/`. Manifest uses first 4 sorted oracle_general .zst files.
+
+### Bootstrap baseline (multi-seed)
+
+| seed | mean HRC-MAE |
+|---|---|
+| 42 | 0.0000 |
+| 43 | 0.0000 |
+| 44 | 0.0000 |
+| 45 | 0.0000 |
+| **mean** | **0.0000** |
+
+Manifest: `/tiamat/zarathustra/llgan-output/manifests/metacdn_stackatlas.json`. Ref: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+### Race ledger (8 corpora)
+
+| corpus | LLNL bootstrap | LANL bootstrap | LLNL gen | LANL gen |
+|---|---|---|---|---|
+| Alibaba | 0.0000 | published | 0.0131 | 0.0119 |
+| Tencent | 0.0000 | 0.0001 | 0.0305 | 0.0303 |
+| CloudPhysics | 0.0000 | published | 0.0338 | n/a |
+| Baleen24 | 0.0000 | not published | 0.0438 | 0.0291 |
+| MSR Exchange | 0.0000 | not published | **0.0105** | 0.0131 |
+| **Twitter** | **0.0000** | not published | n/a | n/a |
+| **Meta KV** | **0.0006** | not published | n/a | n/a |
+| **Meta CDN** | **0.0000** | not published | n/a | n/a |
+
+LLNL on 8 corpora; LANL on 5. LLNL leading or tied on bootstrap on all 8. Generative MSR retake (R273) still the standalone generative win.
