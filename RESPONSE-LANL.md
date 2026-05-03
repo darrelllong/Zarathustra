@@ -747,3 +747,51 @@ Architecture read: the live Alibaba front is not "close the old `0.0143`
 gap"; that gap is already closed. The next useful work is defending the
 cooldown/admission architecture under peer attack or porting the cache-native
 architectural idea to another non-bootstrap corpus.
+
+## 2026-05-03 -- CloudPhysics Frequency-Pool Scout Closes Negative
+
+LANL added a long-memory frequency-pool reuse route in `altgan` commit
+`d62d950` to attack CloudPhysics without trace-bootstrap replay. The hypothesis
+was cache-native: CP's official eight-policy surface is dominated by LFU/LIRS,
+so a persistent object-popularity memory might improve LFU at large capacities
+without copying real chunks. The test started from LANL's best non-bootstrap CP
+single-seed row, `cloudphysics_lanl_phase1_rank3_adj25_hp05_drop005`, whose
+official eight-policy JSON mean is `0.0406011250`.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+Recipe base: `cloudphysics_phaseatlas_scout96x25k_h64_phase1_e600_seed137`,
+forced phase, `transition_blend=0.2`, `local_prob_power=0.9`,
+`stack_rank_scale=3.0`, `stack_adj_dup_prob=0.25`,
+`stack_hot_pool_prob=0.05`, `stack_hot_pool_k=50`,
+`stack_hot_pool_window=10000`, `stack_reuse_drop_prob=0.05`,
+`stack_tail_reuse_prob=0.10`, `stack_recent_pool_prob=0.10`,
+`stack_recent_pool_window=2`, plus the frequency-pool settings below.
+
+| scout | frequency-pool settings | fake CSV | literal cachesim mean line | JSON mean |
+|---|---|---|---|---:|
+| broad low-pressure | `prob=0.03`, `k=4096`, `weight_power=0.5`, `min_age=16` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p003_k4096_wp05_age16_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0409` | 0.0408657083 |
+| moderate | `prob=0.08`, `k=2048`, `weight_power=0.5`, `min_age=16` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p008_k2048_wp05_age16_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0442` | 0.0441683542 |
+| broad old-set | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64` | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_freqpool_p005_k8192_wp025_age64_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0420` | 0.0419542500 |
+
+Closest row details: `prob=0.03,k=4096` improved evaluator HRC to
+`0.0396531500`, but official cachesim still regressed. LFU moved only
+`0.1136410000 -> 0.1130800000` while LIRS worsened
+`0.0683776667 -> 0.0718263333`, and the six-policy core also lost enough to
+miss the incumbent.
+
+Negative result: long-memory frequency-pool routing is not the next CP
+overtake path in this form. It improves internal stack-shape diagnostics but
+does not lower official `llgan.cachesim_eval` HRC-MAE, so CP needs a different
+non-bootstrap architecture rather than broader frequency-pool pressure.

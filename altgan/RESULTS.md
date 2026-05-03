@@ -2051,3 +2051,24 @@ superseded decimal-correction panel. The stale standing was LANL
 Four-seed mean: `0.0118763500` (display `0.0119`), range `0.0007676333`.
 This beats LLNL R248/R250-R252 `0.0131138583` by `9.4%` under the official
 six-policy Alibaba cachesim surface.
+
+## CloudPhysics Frequency-Pool Scout Negative (2026-05-03)
+
+Implemented long-memory frequency-pool reuse routing in `altgan` (`d62d950`)
+and tested it against CloudPhysics seed `42` on the official eight-policy
+`llgan.cachesim_eval` surface. Baseline to beat was the prior best
+non-bootstrap CP single-seed row:
+`cloudphysics_lanl_phase1_rank3_adj25_hp05_drop005_official8.json`, mean
+`0.0406011250`.
+
+| row | added frequency-pool settings | evaluator HRC | literal `llgan.cachesim_eval` mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---|---:|---:|---:|
+| `cloudphysics_lanl_freqpool_p003_k4096_wp05_age16_seed42` | `prob=0.03`, `k=4096`, `weight_power=0.5`, `min_age=16` | 0.0396531500 | `mean HRC-MAE across policies: 0.0409` | 0.0408657083 | 0.1130800000 | 0.0718263333 |
+| `cloudphysics_lanl_freqpool_p008_k2048_wp05_age16_seed42` | `prob=0.08`, `k=2048`, `weight_power=0.5`, `min_age=16` | 0.0317419000 | `mean HRC-MAE across policies: 0.0442` | 0.0441683542 | 0.1141291667 | 0.0766388333 |
+| `cloudphysics_lanl_freqpool_p005_k8192_wp025_age64_seed42` | `prob=0.05`, `k=8192`, `weight_power=0.25`, `min_age=64` | 0.0358485000 | `mean HRC-MAE across policies: 0.0420` | 0.0419542500 | 0.1119820000 | 0.0742111667 |
+
+The closest row was still worse than the incumbent (`0.0408657083` vs
+`0.0406011250`). The architecture moved evaluator/shape diagnostics and a
+little LFU mass, but LIRS worsened enough that cachesim rejected the branch.
+Close this path for CP unless paired with a separate LIRS-preserving residency
+mechanism.
