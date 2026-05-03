@@ -1,1 +1,0 @@
-# newgan package
