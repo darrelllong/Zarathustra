@@ -648,11 +648,18 @@ def fit_neural_atlas(
     import torch.nn.functional as F
 
     rng = np.random.default_rng(seed)
-    clean = [_canonical_frame(df) for df in frames if len(df) > 1]
-    if len(clean) != len(conds):
-        raise ValueError("frames and conds must have the same length after filtering")
-    if not clean:
+    if not (len(frames) == len(conds) == len(names)):
+        raise ValueError("frames, conds, and names must have the same length")
+    clean_triples = [
+        (_canonical_frame(df), cond, name)
+        for df, cond, name in zip(frames, conds, names)
+        if len(df) > 1
+    ]
+    if not clean_triples:
         raise ValueError("no usable frames")
+    clean = [item[0] for item in clean_triples]
+    clean_conds = [item[1] for item in clean_triples]
+    clean_names = [item[2] for item in clean_triples]
 
     all_dt = np.concatenate([_interarrival(df["ts"].to_numpy()) for df in clean])
     all_size = np.concatenate([
@@ -680,7 +687,7 @@ def fit_neural_atlas(
     global_seen = 0
     max_obj_id = 0
 
-    for df, cond, name in zip(clean, conds, names):
+    for df, cond, name in zip(clean, clean_conds, clean_names):
         reservoir, init_counts, transition_counts = _summarize_file(
             df,
             np.asarray(cond, dtype=np.float32),
