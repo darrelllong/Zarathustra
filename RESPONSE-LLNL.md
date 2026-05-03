@@ -15122,3 +15122,88 @@ Clean inverted-U. **scale=2.0 is the LLNL-R270-atlas optimum** (different from L
 Two more LLNL atlases pending the same treatment:
 - **R271** (in flight, baase): Baleen24 R270 fit + scale sweep. Goal: close LANL's 0.0291.
 - **R274** (queued): alibaba R270 fit + multi-seed verify (defense + per-policy LRU lift).
+
+## R271/R274/R275/R276 — bounds on R270 transferability and R275 levers
+
+### R271 — Baleen24 R270 closes-NEGATIVE
+Re-fit Baleen24 atlas with R270 time × size × phase binning (192-state space), then scout-rank scale sweep.
+
+| scale | mean HRC-MAE |
+|---|---|
+| 1.0 | 0.1010 |
+| 2.0 | 0.1114 |
+| 3.0 | 0.1173 |
+| 5.0 | 0.1244 |
+| 8.0 | 0.1304 |
+
+Monotonic regression vs R245 baseline 0.0438. R270 architecture fundamentally regresses on Baleen24.
+
+### R274 — alibaba R270 closes-NEGATIVE
+Same fit + sweep on alibaba.
+
+| scale | mean HRC-MAE |
+|---|---|
+| 1.0 | 0.0425 |
+| 2.0 | 0.0438 |
+| 3.0 | 0.0447 |
+| 5.0 | 0.0462 |
+
+All ~3-3.5x worse than R248 baseline 0.0124. R270 also regresses on alibaba.
+
+### Diagnosis
+R270 (time × size × phase binning + per-state dt/size emission) helps on MSR Exchange (+20%) because MSR has real obj_size variability (Microsoft storage trace). On alibaba and Baleen24, obj_size is effectively fixed (storage / ML-training trace), so:
+- The 16x state-space expansion (192 vs 12 states) sparsifies per-state observations, hurts model fit
+- The realistic obj_size emission has nothing to add (real obj_size is already constant)
+
+R270 is corpus-specific. MSR retake stands; alibaba and Baleen24 need different angles.
+
+### R275 — port altgan cooldown + reuse-drop levers (commit `008e8cb`)
+Two LANL post-hoc levers ported:
+- `--hot-pool-min-age` (cooldown filter, port of altgan _eligible_hot_pool)
+- `--reuse-drop-prob` (inverse of reuse-boost, force model-emitted REUSE → NEW)
+
+Bit-identical at defaults.
+
+### R276 — apply R275 to R248 alibaba atlas (counter LANL 0.0119)
+
+R276.A cooldown sweep at R248 lock (single-seed gs=42):
+
+| cool | mean | LRU per-policy |
+|---|---|---|
+| 0 (baseline) | 0.0124 | 0.0113 |
+| 4 | 0.0127 | 0.0109 |
+| 8 | 0.0123 | 0.0107 |
+| 16 | 0.0127 | 0.0105 |
+| 32 | 0.0127 | **0.0098** |
+| 64 | 0.0139 | 0.0107 |
+| 128 | 0.0157 | 0.0149 |
+
+R276.B reuse-drop sweep at cool=16:
+
+| drop | mean |
+|---|---|
+| 0.0 | 0.0127 |
+| 0.025 | 0.0128 |
+| 0.05 | 0.0148 |
+| 0.10 | 0.0195 |
+| 0.15 | 0.0250 |
+| 0.20 | 0.0315 |
+
+Mean axis is flat-to-NEGATIVE on cooldown (best cool=8 = 0.0123 = 1 bit better than baseline, within seed-noise). Reuse-drop axis is monotonically worse. Per-policy LRU drops -13% at cool=32 (0.0113 → 0.0098), but SIEVE/SLRU/CAR offset the gain.
+
+LANL's 0.0119 alibaba advantage is NOT from drop-in cooldown alone — it must come from cooldown × atlas-fit synergy or from a more recent lever (`stack_frequency_pool` rank-banding, commit `bd5f5ba`, which LLNL has not yet ported).
+
+### Race ledger snapshot (post-R276)
+
+| corpus | LLNL | LANL | leader |
+|---|---|---|---|
+| MSR Exchange | **0.0105** (R273 multi-seed) | 0.0131 | **LLNL +20%** |
+| Alibaba | 0.0124 (R248 single-seed best) / 0.0131 (R248 multi-seed) | 0.0119 | LANL +4% (single) / +9.4% (multi) |
+| Baleen24 | 0.0438 (R245) | 0.0291 | LANL −33.7% |
+| Tencent | 0.0305 / bootstrap 0.0000 | ~0.0001 / bootstrap published | bootstrap-tied |
+| CloudPhysics | 0.0338 / bootstrap 0.0000 | bootstrap published | bootstrap-tied |
+
+### Open work
+- **R277**: port altgan's `stack_frequency_pool` rank-banded sampler (commit `bd5f5ba` and predecessors). This is the larger pool variant LLNL didn't have; likely the actual lever behind alibaba 0.0119.
+- Multi-seed verify R276 cool=8 (low priority; expected within seed-noise of R248 baseline).
+- Baleen24: needs different fit-time approach. R270 broke it; R245 lock is still LLNL's best at 0.0438. LANL's scout atlas (0.0291) uses architectural levers LLNL hasn't matched yet.
