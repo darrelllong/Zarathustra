@@ -97,6 +97,9 @@ class NeuralAtlasModel:
         stack_rank_position_scales: Sequence[float] | None = None,
         stack_rank_pmf_prob: float = 0.0,
         stack_rank_pmf_scale: float = 1.0,
+        stack_rank_pmf_bin_power: float = 1.0,
+        stack_rank_pmf_tail_bin_power: float | None = None,
+        stack_rank_pmf_tail_power_pivot: int | None = None,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -169,6 +172,11 @@ class NeuralAtlasModel:
         stack_rank_position_scales = _nonnegative_float_list(stack_rank_position_scales)
         stack_rank_pmf_prob = float(np.clip(stack_rank_pmf_prob, 0.0, 1.0))
         stack_rank_pmf_scale = max(float(stack_rank_pmf_scale), 0.0)
+        stack_rank_pmf_bin_power = max(float(stack_rank_pmf_bin_power), 1e-6)
+        if stack_rank_pmf_tail_bin_power is not None:
+            stack_rank_pmf_tail_bin_power = max(float(stack_rank_pmf_tail_bin_power), 1e-6)
+        if stack_rank_pmf_tail_power_pivot is not None and stack_rank_pmf_tail_power_pivot < 0:
+            stack_rank_pmf_tail_power_pivot = None
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -551,6 +559,9 @@ class NeuralAtlasModel:
                                 rank_pmf_edges,
                                 rank_pmf_by_state.get(int(state)),
                                 stack_len=len(stack),
+                                bin_power=stack_rank_pmf_bin_power,
+                                tail_bin_power=stack_rank_pmf_tail_bin_power,
+                                tail_power_pivot=stack_rank_pmf_tail_power_pivot,
                                 rng=rng,
                             )
                             if rank is not None:
@@ -1226,6 +1237,9 @@ def _sample_rank_pmf(
     pmf: np.ndarray | None,
     *,
     stack_len: int,
+    bin_power: float,
+    tail_bin_power: float | None,
+    tail_power_pivot: int | None,
     rng: np.random.Generator,
 ) -> int | None:
     if edges is None or pmf is None or stack_len <= 0:
@@ -1246,7 +1260,16 @@ def _sample_rank_pmf(
     hi = min(max(hi, lo), int(stack_len) - 1)
     if hi <= lo:
         return max(lo, 0)
-    return int(rng.integers(max(lo, 0), hi + 1))
+    power = max(float(bin_power), 1e-6)
+    if (
+        tail_bin_power is not None
+        and tail_power_pivot is not None
+        and hi >= int(tail_power_pivot)
+    ):
+        power = max(float(tail_bin_power), 1e-6)
+    span = hi - max(lo, 0) + 1
+    offset = int(np.floor((float(rng.random()) ** (1.0 / power)) * span))
+    return min(max(lo, 0) + offset, hi)
 
 
 def _boosted_reuse_rank(
