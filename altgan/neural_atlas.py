@@ -96,6 +96,11 @@ class NeuralAtlasModel:
         stack_adj_dup_min_rank: int = 0,
         stack_adj_dup_max_rank: int = 0,
         stack_adj_dup_band_prob: float = 1.0,
+        stack_rank_band_reuse_prob: float = 0.0,
+        stack_rank_band_reuse_position_probs: Sequence[float] | None = None,
+        stack_rank_band_reuse_min_rank: int = 0,
+        stack_rank_band_reuse_max_rank: int | None = None,
+        stack_rank_band_reuse_power: float = 1.0,
         stack_hot_pool_prob: float = 0.0,
         stack_hot_pool_position_probs: Sequence[float] | None = None,
         stack_hot_pool_k: int = 100,
@@ -160,6 +165,14 @@ class NeuralAtlasModel:
         stack_adj_dup_min_rank = max(int(stack_adj_dup_min_rank), 0)
         stack_adj_dup_max_rank = max(int(stack_adj_dup_max_rank), stack_adj_dup_min_rank)
         stack_adj_dup_band_prob = float(np.clip(stack_adj_dup_band_prob, 0.0, 1.0))
+        stack_rank_band_reuse_prob = float(np.clip(stack_rank_band_reuse_prob, 0.0, 1.0))
+        stack_rank_band_reuse_position_probs = _clip_prob_list(
+            stack_rank_band_reuse_position_probs
+        )
+        stack_rank_band_reuse_min_rank = max(int(stack_rank_band_reuse_min_rank), 0)
+        if stack_rank_band_reuse_max_rank is not None and stack_rank_band_reuse_max_rank < 0:
+            stack_rank_band_reuse_max_rank = None
+        stack_rank_band_reuse_power = max(float(stack_rank_band_reuse_power), 1e-6)
         stack_hot_pool_prob = float(np.clip(stack_hot_pool_prob, 0.0, 1.0))
         stack_hot_pool_position_probs = _clip_prob_list(stack_hot_pool_position_probs)
         stack_hot_pool_k = max(int(stack_hot_pool_k), 1)
@@ -297,6 +310,12 @@ class NeuralAtlasModel:
                     per_stream,
                     stack_tail_reuse_prob,
                 )
+                rank_band_reuse_prob = _position_value(
+                    stack_rank_band_reuse_position_probs,
+                    pos,
+                    per_stream,
+                    stack_rank_band_reuse_prob,
+                )
                 reuse_drop_prob = _position_value(
                     stack_reuse_drop_position_probs,
                     pos,
@@ -330,6 +349,14 @@ class NeuralAtlasModel:
                             biased = u ** stack_tail_reuse_rank_power
                             rank = int(lo + (len(stack) - 1 - lo) * biased)
                             rank = max(lo, min(rank, len(stack) - 1))
+                    elif rank_band_reuse_prob > 0.0 and rng.random() < rank_band_reuse_prob:
+                        rank = _sample_rank_band(
+                            stack_len=len(stack),
+                            min_rank=stack_rank_band_reuse_min_rank,
+                            max_rank=stack_rank_band_reuse_max_rank,
+                            rank_power=stack_rank_band_reuse_power,
+                            rng=rng,
+                        )
                     elif adj_dup_prob > 0.0 and rng.random() < adj_dup_prob:
                         use_band = (
                             stack_adj_dup_max_rank > 0
@@ -1019,6 +1046,29 @@ def _boosted_reuse_rank(
     u = float(rng.random())
     offset = int(np.floor((u ** (1.0 / max(float(rank_power), 1e-6))) * span))
     return min(lo + offset, int(stack_len) - 1)
+
+
+def _sample_rank_band(
+    *,
+    stack_len: int,
+    min_rank: int,
+    max_rank: int | None,
+    rank_power: float,
+    rng: np.random.Generator,
+) -> int:
+    if stack_len <= 1:
+        return 0
+    lo = min(max(int(min_rank), 0), int(stack_len) - 1)
+    if max_rank is None:
+        hi = int(stack_len) - 1
+    else:
+        hi = min(max(int(max_rank), lo), int(stack_len) - 1)
+    span = hi - lo + 1
+    if span <= 1:
+        return lo
+    u = float(rng.random())
+    offset = int(np.floor((u ** (1.0 / max(float(rank_power), 1e-6))) * span))
+    return min(lo + offset, hi)
 
 
 def _sample_hot_pool_obj(

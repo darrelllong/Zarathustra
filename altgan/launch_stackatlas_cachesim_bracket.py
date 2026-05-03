@@ -32,6 +32,11 @@ class Spec:
     adj_dup_min_rank: int = 0
     adj_dup_max_rank: int = 0
     adj_dup_band_prob: float = 1.0
+    rank_band_reuse_prob: float = 0.0
+    rank_band_reuse_position_probs: str = ""
+    rank_band_reuse_min_rank: int = 0
+    rank_band_reuse_max_rank: int = -1
+    rank_band_reuse_power: float = 1.0
     hot_pool_prob: float = 0.45
     hot_pool_position_probs: str = ""
     hot_pool_k: int = 75
@@ -87,6 +92,25 @@ def _parse_spec(text: str) -> Spec:
         "adjmax": "adj_dup_max_rank",
         "adj_band": "adj_dup_band_prob",
         "adjband": "adj_dup_band_prob",
+        "rank_band": "rank_band_reuse_prob",
+        "rankband": "rank_band_reuse_prob",
+        "rb": "rank_band_reuse_prob",
+        "rank_band_pos": "rank_band_reuse_position_probs",
+        "rankband_pos": "rank_band_reuse_position_probs",
+        "rb_pos": "rank_band_reuse_position_probs",
+        "rbpos": "rank_band_reuse_position_probs",
+        "rank_band_min": "rank_band_reuse_min_rank",
+        "rankband_min": "rank_band_reuse_min_rank",
+        "rb_min": "rank_band_reuse_min_rank",
+        "rbmin": "rank_band_reuse_min_rank",
+        "rank_band_max": "rank_band_reuse_max_rank",
+        "rankband_max": "rank_band_reuse_max_rank",
+        "rb_max": "rank_band_reuse_max_rank",
+        "rbmax": "rank_band_reuse_max_rank",
+        "rank_band_power": "rank_band_reuse_power",
+        "rankband_power": "rank_band_reuse_power",
+        "rb_power": "rank_band_reuse_power",
+        "rbpow": "rank_band_reuse_power",
         "hp": "hot_pool_prob",
         "hp_pos": "hot_pool_position_probs",
         "hppos": "hot_pool_position_probs",
@@ -138,6 +162,7 @@ def _auto_name(spec: Spec) -> str:
         f"_lp{_tag(spec.local_prob_power)}_rank{_tag(spec.rank_scale)}"
         f"max{spec.rank_max}_tailp{spec.rank_tail_pivot}"
         f"s{_tag(spec.rank_tail_scale)}_adj{_tag(spec.adj_dup_prob)}"
+        f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
         f"w{spec.hot_pool_window}wp{_tag(spec.hot_pool_weight_power)}"
         f"_minage{spec.hot_pool_min_age}_rp{_tag(spec.recent_pool_prob)}"
@@ -227,6 +252,16 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.adj_dup_max_rank),
         "--stack-adj-dup-band-prob",
         str(spec.adj_dup_band_prob),
+        "--stack-rank-band-reuse-prob",
+        str(spec.rank_band_reuse_prob),
+        "--stack-rank-band-reuse-position-probs",
+        spec.rank_band_reuse_position_probs,
+        "--stack-rank-band-reuse-min-rank",
+        str(spec.rank_band_reuse_min_rank),
+        "--stack-rank-band-reuse-max-rank",
+        str(spec.rank_band_reuse_max_rank),
+        "--stack-rank-band-reuse-power",
+        str(spec.rank_band_reuse_power),
         "--stack-reuse-boost-prob",
         str(spec.reuse_boost_prob),
         "--stack-reuse-boost-min-rank",

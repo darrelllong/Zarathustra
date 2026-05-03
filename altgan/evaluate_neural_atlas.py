@@ -74,6 +74,16 @@ def _parse_args() -> argparse.Namespace:
                    help="Maximum rank used by adjacent-duplicate redirects.")
     p.add_argument("--stack-adj-dup-band-prob", type=float, default=1.0,
                    help="Probability of using the adjacent duplicate rank band when max-rank is positive.")
+    p.add_argument("--stack-rank-band-reuse-prob", type=float, default=0.0,
+                   help="Probability of redirecting a sampled reuse to a configurable LRU rank band.")
+    p.add_argument("--stack-rank-band-reuse-position-probs", default="",
+                   help="Comma-separated per-position-bin rank-band reuse probabilities.")
+    p.add_argument("--stack-rank-band-reuse-min-rank", type=int, default=0,
+                   help="Minimum LRU rank for rank-band reuse redirects.")
+    p.add_argument("--stack-rank-band-reuse-max-rank", type=int, default=-1,
+                   help="Maximum LRU rank for rank-band reuse redirects; negative uses stack tail.")
+    p.add_argument("--stack-rank-band-reuse-power", type=float, default=1.0,
+                   help="Power shaping for rank-band redirects; values >1 favor deeper ranks.")
     p.add_argument("--stack-hot-pool-prob", type=float, default=0.0,
                    help="Probability of redirecting an ordinary sampled reuse to the recent hot pool.")
     p.add_argument("--stack-hot-pool-position-probs", default="",
@@ -211,6 +221,11 @@ def main() -> int:
         stack_adj_dup_min_rank=args.stack_adj_dup_min_rank,
         stack_adj_dup_max_rank=args.stack_adj_dup_max_rank,
         stack_adj_dup_band_prob=args.stack_adj_dup_band_prob,
+        stack_rank_band_reuse_prob=args.stack_rank_band_reuse_prob,
+        stack_rank_band_reuse_position_probs=_parse_float_list(args.stack_rank_band_reuse_position_probs),
+        stack_rank_band_reuse_min_rank=args.stack_rank_band_reuse_min_rank,
+        stack_rank_band_reuse_max_rank=None if args.stack_rank_band_reuse_max_rank < 0 else args.stack_rank_band_reuse_max_rank,
+        stack_rank_band_reuse_power=args.stack_rank_band_reuse_power,
         stack_hot_pool_prob=args.stack_hot_pool_prob,
         stack_hot_pool_position_probs=_parse_float_list(args.stack_hot_pool_position_probs),
         stack_hot_pool_k=args.stack_hot_pool_k,
@@ -302,6 +317,11 @@ def main() -> int:
         "stack_adj_dup_min_rank": args.stack_adj_dup_min_rank,
         "stack_adj_dup_max_rank": args.stack_adj_dup_max_rank,
         "stack_adj_dup_band_prob": args.stack_adj_dup_band_prob,
+        "stack_rank_band_reuse_prob": args.stack_rank_band_reuse_prob,
+        "stack_rank_band_reuse_position_probs": _parse_float_list(args.stack_rank_band_reuse_position_probs),
+        "stack_rank_band_reuse_min_rank": args.stack_rank_band_reuse_min_rank,
+        "stack_rank_band_reuse_max_rank": args.stack_rank_band_reuse_max_rank,
+        "stack_rank_band_reuse_power": args.stack_rank_band_reuse_power,
         "stack_hot_pool_prob": args.stack_hot_pool_prob,
         "stack_hot_pool_position_probs": _parse_float_list(args.stack_hot_pool_position_probs),
         "stack_hot_pool_k": args.stack_hot_pool_k,
