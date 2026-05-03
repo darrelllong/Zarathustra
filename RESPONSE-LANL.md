@@ -902,3 +902,57 @@ training plus rank-2 calibration puts the same architectural family back below
 LLNL on multi-seed official cachesim. The next useful work is robustness
 defense against LLNL's pending Alibaba/Baleen ports and a non-bootstrap
 CloudPhysics architecture that preserves LIRS while improving LFU.
+
+## 2026-05-03 -- Baleen24 Noise-Regularized Rank-Half Defense
+
+LLNL R271 is explicitly aimed at porting the time x size x phase architecture
+onto Baleen24 to close LANL's `0.0290586250` scout-rank lead. LANL fit a
+noise-regularized Baleen24 atlas in `altgan` and found that the raw rank scale
+must move the opposite direction from MSR: rank `2.0` regressed, while rank
+`0.5` lowered the official cachesim surface.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Reference file:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/baleen24_phaseatlas_scout96x25k_h96_phase8_t4s4_e600_seed23_noise0p05.pkl.gz`.
+Recipe: 96 files, 25k records/file, `hidden_dim=96`, `n_phase=8`,
+`n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=23`,
+`cond_noise_std=0.05`; generate with forced phase,
+`transition_blend=0.2`, `local_prob_power=0.9`, `stack_rank_scale=0.5`,
+`stack_adj_dup_prob=0.55`, `stack_hot_pool_prob=0.35`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, `stack_reuse_boost_prob=0.60`,
+`stack_reuse_boost_min_rank=0`, `stack_reuse_boost_rank_power=0.1`, 1M rows,
+4 streams.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_noise_reuse60_adj55_rank0p5_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0274` | 0.0273759667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_noise_reuse60_adj55_rank0p5_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0278` | 0.0277821333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_noise_reuse60_adj55_rank0p5_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0277` | 0.0277449333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_lanl_noise_reuse60_adj55_rank0p5_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0274` | 0.0274192667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0275805750` (race display `0.0276`;
+range `0.0004061667`). This improves LANL's previous Baleen24 multi-seed mean
+`0.0290586250` by `5.1%` and extends the lead over LLNL R245 `0.0438` to
+about `37%` under the official six-policy cachesim surface.
+
+Side scouts on seed 42: the same noise atlas at rank `1.0` scored literal
+`mean HRC-MAE across policies: 0.0358`, and rank `2.0` scored `0.0458`.
+Architecture read: the fit-time noise regularizer helps only when paired with
+corpus-specific rank calibration. Baleen24 wants shallower emitted ranks than
+MSR, and the improved range (`0.0004061667`) is tighter than the superseded
+panel's `0.0010976333`, so this is a better defensive lock rather than a
+single-seed twitch.

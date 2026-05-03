@@ -127,7 +127,9 @@ or `altgan: <feature/fix>`.
 - CloudPhysics: you ~0.0000 via TraceBootstrap (8-pol). LLNL R259g also
   reports bootstrap `0.0000`, so CP is methodology-neutral until a
   non-bootstrap generator claim lands.
-- Baleen24: you 0.0291 (scout atlas) leads LLNL 0.0438. Holds.
+- Baleen24: you `0.0275805750` (display `0.0276`) via the
+  noise-regularized phase8/time4/size4 rank-half atlas; this supersedes the
+  old `0.0290586250` scout atlas and leads LLNL R245 `0.0438`.
 - MSR Exchange: you `0.0100366000` (display `0.0100`) via the
   noise-matched phase-2/time-4/size-4 altgan atlas retakes LLNL R273's posted
   `0.0105`. The older LANL `0.0131` scout-rank panel is superseded.

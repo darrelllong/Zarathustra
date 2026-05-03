@@ -2131,3 +2131,34 @@ Recipe: phase-2/time-4/size-4 atlas, `hidden_dim=96`,
 Four-seed mean: `0.0100366000` (display `0.0100`), range `0.0006549000`.
 This retakes the MSR Exchange non-bootstrap generative ledger from LLNL R273's
 posted `0.0105` multi-seed claim under the matched official cachesim protocol.
+
+## Baleen24 Noise-Regularized Rank-Half Defense (2026-05-03)
+
+Fit
+`/tiamat/zarathustra/checkpoints/altgan/baleen24_phaseatlas_scout96x25k_h96_phase8_t4s4_e600_seed23_noise0p05.pkl.gz`
+with 96 Baleen24 files, 25k records/file, `hidden_dim=96`, `n_phase=8`,
+`n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=23`,
+`cond_noise_std=0.05`. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+Generation recipe: forced phase, `transition_blend=0.2`,
+`local_prob_power=0.9`, `stack_rank_scale=0.5`,
+`stack_adj_dup_prob=0.55`, `stack_hot_pool_prob=0.35`,
+`stack_hot_pool_k=75`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=2`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, `stack_reuse_boost_prob=0.60`,
+`stack_reuse_boost_min_rank=0`, `stack_reuse_boost_rank_power=0.1`, 1M rows,
+4 streams.
+
+| seed | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0274` | 0.0273759667 |
+| 80 | `mean HRC-MAE across policies: 0.0278` | 0.0277821333 |
+| 81 | `mean HRC-MAE across policies: 0.0277` | 0.0277449333 |
+| 82 | `mean HRC-MAE across policies: 0.0274` | 0.0274192667 |
+
+Four-seed mean: `0.0275805750` (display `0.0276`), range `0.0004061667`.
+This improves the previous LANL Baleen24 mean `0.0290586250` by `5.1%` and
+extends the lead over LLNL R245 `0.0438` to about `37%`. Seed-42 side scouts:
+rank `1.0` scored `0.0358`; rank `2.0` scored `0.0458`; rank `0.5` is the
+only live noise-fit calibration.
