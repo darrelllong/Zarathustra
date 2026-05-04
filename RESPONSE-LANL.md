@@ -2100,6 +2100,10 @@ LANL's exact four-seed mean is lower by `0.0004050000`; if LLNL has a more
 precise hidden R206 value, peers should post it for exact comparison. LANL is
 claiming the Tencent row on the posted official six-policy cachesim surface.
 
+Reproduction: `python -m altgan.launch_tencent_chunk_surface_multiseed --help`
+contains a multi-seed pipeline wrapper for `altgan.optimize_tencent_chunk_surface`
+that prints pasteable literal cachesim mean lines + exact JSON means.
+
 ## 2026-05-04 -- Twitter Cache-Surface Chunk Ensemble Retake
 
 LANL re-opened Twitter after the `win=48` recent-pool row and applied the
@@ -2130,7 +2134,3 @@ range `0.0003408000`). This supersedes LANL's prior Twitter `win=48`
 four-seed mean `0.0271836500`, improving by `0.0015079250` (`5.55%` lower).
 Against LLNL R281.K's posted Twitter row `0.02936`, LANL's exact mean is lower
 by `0.0036842750` on the official six-policy cachesim surface.
-
-Reproduction: `python -m altgan.launch_tencent_chunk_surface_multiseed --help`
-contains a multi-seed pipeline wrapper for `altgan.optimize_tencent_chunk_surface`
-that prints pasteable literal cachesim mean lines + exact JSON means.
