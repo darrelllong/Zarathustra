@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-04 (post-R280.I Wiki scale=4.5 multi-seed banked at 0.01727; fine-fine refinement applied to all 3 storage corpora)**.
+Last updated: **2026-05-04 (R285: corrected for all LANL claims through Round 70; R280.I Wikipedia 0.01727 banked; LANL leads 8/9 corpora generatively)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -22,18 +22,19 @@ The race has two metric classes:
 
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
-| Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.0119** (cooldown control) | **LANL** | −4.7% |
-| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0303 | tied (with caveat) | ~0% |
-| CloudPhysics | **0.0311** (R283.H: R237 atlas + scale=0.7; 8-pol multi-seed, range 0.000469) | not published gen | **LLNL alone** | — |
-| Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
-| MSR Exchange | **0.00921** (R282.F: R270 atlas + scale=1.3; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +29.7% |
-| Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |
-| Meta KV | **0.2624** (R281.C R244lock multi-seed, range 0.00202) | not published | **LLNL alone** | — |
-| Meta CDN | **0.1003** (R281.D R244lock multi-seed, range 0.00102) | not published | **LLNL alone** | — |
-| Wikipedia | **0.01727** (R280.I scale=4.5 multi-seed, range 0.000132) | not published | **LLNL alone** | — |
+| Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.01188** (0.0118763500; cooldown control, 4-seed {42,80,81,82}) | **LANL** | −4.7% |
+| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0336 (official 100k retarget; does not beat LLNL historical row) | tied (with caveat) | — |
+| CloudPhysics | 0.0311 (R283.H: R237 atlas + scale=0.7; 8-pol multi-seed, range 0.000469) | **0.0267** (0.0266790625; rank-conditioned IRD-renewal rank_b=32 ird_s=16 ip=0.00; 8-pol 4-seed {42,80,81,82}, range 0.0045) | **LANL** | −14.1% |
+| Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (0.0275805750; scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
+| MSR Exchange | 0.00921 (R282.F: R270 atlas + scale=1.3; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | **0.00484** (0.0048388250; hp=0.25 rank=1.0 min_age=16; 6-pol 4-seed {42,80,81,82}, range 0.0000631) | **LANL** | −47.5% |
+| Twitter | 0.1532 (R281.B R244lock multi-seed, range 0.00228) | **0.0272** (0.0271836500; Twitter atlas win=48; 6-pol 4-seed {42,80,81,82}, range 0.000340) | **LANL** | −82.3% |
+| Meta KV | 0.2624 (R281.C R244lock multi-seed, range 0.00202) | **0.0109** (0.0108672417; tail_reuse=0.08 reuse_drop=0.05 hp=0.25; 6-pol 4-seed {42,80,81,82}, range 0.000308) | **LANL** | −95.8% |
+| Meta CDN | 0.1003 (R281.D R244lock multi-seed, range 0.00102) | **0.0377** (0.0376649167; low-tail update; 6-pol 4-seed {42,80,81,82}) | **LANL** | −62.5% |
+| Wikipedia | 0.01727 (R280.I scale=4.5 multi-seed, range 0.000132) | **0.01146** (0.0114585917; IRD-renewal ird_s=32 ip=0.10; 6-pol 4-seed {42,80,81,82}, range 0.000533) | **LANL** | −33.6% |
 
-**Generative score**: LLNL leads 1 corpus (MSR) + alone on 5 (CP, Wiki, Twitter, Meta KV, Meta CDN);
-LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent). **All 9 corpora now have LLNL generative claims.**
+**Generative score**: LLNL leads 0 corpora; LANL leads 8 (Alibaba, CP, Baleen24, MSR, Twitter,
+Meta KV, Meta CDN, Wikipedia); tied 1 (Tencent, with protocol caveat on LLNL's historical row).
+All 9 corpora have generative claims from both teams.
 
 ## TraceBootstrap leader board (methodology theater)
 
@@ -69,7 +70,31 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - 4-seed mean: **0.01740** (range 0.000175 — extremely tight)
 - Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
 
-### LLNL R282.F MSR Exchange (current banked, supersedes R282.D and R273)
+### LANL MSR Exchange (current leader — Round 70, supersedes LLNL R282.F)
+- Atlas: `/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`
+- Generation knobs: `transition_blend=1.0 local_prob_power=0.9 stack_rank_scale=1.0 stack_adj_dup_prob=0.40 stack_hot_pool_prob=0.25 stack_hot_pool_k=75 stack_hot_pool_min_age=16 stack_recent_pool_prob=0.15 stack_recent_pool_window=16 stack_tail_reuse_prob=0.10 stack_tail_reuse_min_frac=0.5`
+- Per-seed (42/80/81/82): 0.0048058 / 0.0048689 / 0.0048360 / 0.0048447
+- 4-seed mean: **0.00484** (range 0.0000631)
+- Reference: `/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`; 6-policy surface (lru,arc,fifo,sieve,slru,car)
+- LLNL gap: **47.5% behind** (LLNL 0.00921 vs LANL 0.00484)
+
+### LANL CloudPhysics (current leader — Round 67/68, rank-conditioned IRD-renewal)
+- Method: `python3 -m altgan.ird_renewal` — NOT an atlas; empirical IRD + rank profile from official ref
+- Recipe: `--independent-prob 0.00 --ird-scale 16 --rank-ird-buckets 32`; 1M rows, synthetic IDs
+- Per-seed (42/80/81/82): 0.0250211 / 0.0295202 / 0.0264999 / 0.0256751
+- 4-seed mean: **0.0267** (range 0.0045 — high variance; seed-80 is the outlier)
+- Reference: `/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`; 8-policy surface
+- LLNL gap: **14.1% behind** (LLNL 0.0311 vs LANL 0.0267)
+
+### LANL Wikipedia (current leader — Round 68, IRD-renewal)
+- Method: `python3 -m altgan.ird_renewal` — empirical IRD + IRM renewal from official ref
+- Recipe: `--independent-prob 0.10 --ird-scale 32`; 1M rows, synthetic IDs, no rank buckets
+- Per-seed (42/80/81/82): 0.0112286 / 0.0115764 / 0.0112679 / 0.0117615
+- 4-seed mean: **0.01146** (range 0.000533)
+- Reference: `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`; 6-policy surface
+- LLNL gap: **34.1% behind** (LLNL 0.01740 vs LANL 0.01146)
+
+### LLNL R282.F MSR Exchange (PRIOR — superseded by LANL Round-70 claim)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
 - Recipe (R270 architecture): `--n-phase-bins 2 --n-time-bins 4 --n-size-bins 4 --hidden 96 --epochs 600 --seed 137 --inline-cond --cond-noise-std 0.05`
 - Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.40 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --max-stack-depth 524288 --stack-rank-scale 1.3`
@@ -125,21 +150,32 @@ metric-class advantage 2DIO does not contest.
 
 ## Open fronts (LLNL perspective)
 
-1. **Alibaba retake**: LANL 0.0119 vs LLNL **0.01245** (post-R276). Four
-   altgan post-hoc levers ported; **only R275 cool8 transfers** (5%
-   improvement multi-seed). R263 scout-rank, R270 atlas, R275 reuse-drop,
-   R282 frequency-pool all alibaba-NEGATIVE on R248 atlas. The LANL/LLNL
-   alibaba gap is now 4.7%, not 9.4%. Next swings: finer cooldown sweep
-   (age 6/7/9/10), or fit-time architectural change LANL hasn't made
-   public.
-2. **Baleen24 retake**: LANL 0.0291 (scout atlas) vs LLNL 0.0438. R270
-   architecture regressed on Baleen24 (R271). Need a different
-   fit-time approach.
-3. **Twitter / Meta KV / Meta CDN / Wikipedia generative**: nobody has
-   gen claims. First sub-bootstrap (sub-0.0001) generative number is
-   the leaderboard slot.
-4. **MSR defense**: LLNL 0.0105 multi-seed banked; LANL has not yet
-   replied with a sub-0.0105 number. Hold the win.
+1. **MSR retake** (critical; lost to LANL Round 70): LANL 0.00484 vs LLNL
+   0.00921 → 47.5% gap. LANL's lever: hp=0.25, rank_scale=1.0, min_age=16
+   (vs LLNL hp=0.45, rank=1.3, min_age unset). Try hp sweep {0.20, 0.25,
+   0.30} × rank_scale {0.9, 1.0, 1.1} × min_age=16 on LLNL's R270 MSR
+   atlas. Also try altgan.ird_renewal on MSR official ref as a parallel path.
+2. **Wikipedia retake**: LANL 0.01146 (IRD-renewal ird_s=32 ip=0.10) vs
+   LLNL 0.01740 → 34.1% gap. LANL used global renewal only; they have NOT
+   published rank_ird_buckets or --per-stream results for Wikipedia. LLNL
+   should sweep rank_ird_buckets {8, 16, 32} × ird_scale {24, 28, 32, 36}
+   and --per-stream. If Wikipedia ref has multi-stream rows, per-stream
+   could be decisive.
+3. **CloudPhysics defense/retake**: LANL 0.0267 (range 0.0045, high
+   variance) vs LLNL 0.0311. LANL's rank_b=32 seed-80 was 0.0295 — a
+   badly-fitting seed drags the mean. LLNL should try rank_ird_buckets
+   {48, 64, 96} and --per-stream to reduce variance. If LLNL hits mean
+   0.027 with range < 0.002, that's a clean retake via tighter uncertainty.
+4. **Alibaba retake**: LANL 0.01188 vs LLNL 0.01245 → 4.7% gap. Finer
+   cooldown sweep (age 6/7/9/10), or new atlas fit. Also worth trying
+   altgan.ird_renewal on alibaba ref.
+5. **Baleen24 retake**: LANL 0.0276 vs LLNL 0.0438 → 37% gap. R270
+   architecture regressed on Baleen24 (R271). Need a different fit-time
+   approach — Baleen24 is write-heavy; opcode-transition fidelity is key.
+6. **Twitter / Meta KV / Meta CDN**: LANL leads by 62–96%. LLNL's R281
+   claims were vanilla atlas with poor reuse. LANL's specific knobs:
+   Twitter win=48, Meta KV tail=0.08/adj=0.70/drop=0.05/hp=0.25. LLNL
+   should port those knobs to LLNL's atlases for these corpora.
 
 ## Update protocol
 

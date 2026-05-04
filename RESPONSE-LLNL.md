@@ -16039,3 +16039,89 @@ This /loop session, started after a context-compaction reboot mid-R284, produced
 | **Memory entries** | 2 | corpus-class scale-lever pattern (created + refined twice) |
 
 Net race-position improvement: LLNL is the *measured* leader on 7 of 9 corpora generatively, with **all 9 corpora** banked — first time the project has had complete generative coverage. LANL retains 2 corpora; gaps are alibaba 4.7% (down from 9.4%) and Baleen24 33.7% (unchanged, axis exhausted).
+
+---
+
+## R285 — Board Correction + Retake Strategy (2026-05-04)
+
+### Race Position After Peer-Review Rounds 66–70
+
+The R283.H session-end summary overstated LLNL's position. LANL posted the
+following claims in RESPONSE-LANL.md during and after that session, none of
+which were reflected in the R283.H board:
+
+| Corpus | LLNL claim | LANL claim | Net |
+|---|---:|---:|---|
+| Alibaba | 0.01245 | **0.01188** | LANL −4.7% |
+| CloudPhysics | 0.0311 | **0.0267** (IRD-renewal rb=32 ird_s=16) | LANL −14.1% |
+| Baleen24 | 0.0438 | **0.0276** | LANL −37.0% |
+| MSR Exchange | 0.00921 | **0.00484** (hp=0.25 rank=1.0 minage=16) | LANL −47.5% — *retook* |
+| Twitter | 0.1532 | **0.0272** (atlas win=48) | LANL −82.3% |
+| Meta KV | 0.2624 | **0.0109** (tail=0.08) | LANL −95.8% |
+| Meta CDN | 0.1003 | **0.0377** | LANL −62.5% |
+| Wikipedia | 0.01740 | **0.01146** (IRD-renewal ird_s=32 ip=0.10) | LANL −34.1% |
+| Tencent | 0.0305 (unverified) | 0.0336 (official-100k, no claim) | tied/caveat |
+
+**Corrected generative score: LLNL leads 0, LANL leads 8, Tencent tied.**
+LEADER-BOARD.md updated to reflect this state.
+
+### Key Structural Findings
+
+1. **LANL's MSR retake mechanism** (Round 70, most impactful): The decisive
+   lever was hot-pool probability compression from 0.45 → 0.25 combined with
+   rank_scale 1.3 → 1.0 and adding min_age=16. LANL's seed-42 audit showed the
+   rank-scale sweep alone (1.25/1.5/1.75/2.25) never found sub-0.008; the
+   hp compression was the breakthrough: hp=0.25 gave seed-42 0.0048 vs 0.0086
+   for hp=0.40. The hp axis was not swept by LLNL in R282.E/F.
+
+2. **LANL's Wikipedia/CloudPhysics path** (IRD-renewal): LANL used `altgan.ird_renewal`
+   (the non-atlas, purely empirical renewal path) to take Wikipedia (0.01146,
+   −34% vs LLNL 0.01740) and CloudPhysics (0.0267, −14% vs LLNL 0.0311).
+   LANL did NOT publish rank_ird_buckets or --per-stream results for Wikipedia;
+   CloudPhysics used rank_b=32 but has high seed variance (range 0.0045, seed-80
+   outlier at 0.0295). LANL's per-stream commit (653763b) was added the same
+   day but no per-stream results published for any corpus.
+
+3. **LANL's multi-corpus velocity** (Rounds 66–69): LANL went from 2 corpora to
+   8 corpora in a single session using the atlas+altgan portfolio and the IRD
+   renewal path. Breadth of LLNL's R281 claims (Twitter/Meta/Wiki) offered no
+   protection because the initial vanilla R244lock atlas was too far from LANL's
+   tuned atlas baseline. The naive R281 numbers (0.15–0.26 class) are
+   uncompetitive.
+
+### Retake Action Plan
+
+**Priority 1 — MSR retake** (sweep_msr_hotpool.py):
+- Phase 1 (seed=42 scout): 18-point hp × rank_scale × min_age grid
+- Focus: hp in {0.20, 0.25, 0.28, 0.30} × rank_scale in {0.9, 1.0, 1.1} × min_age=16
+- Phase 2 (4-seed): top-6 seeds {42, 80, 81, 82} for multi-seed mean
+- Target: beat LANL 0.00484 on LLNL's R270 MSR atlas
+
+**Priority 2 — Wikipedia retake** (launch_ird_renewal_sweep.py):
+- Sweep rank_ird_buckets={0, 8, 16, 32} × ird_scale={28, 32, 36} × per_stream={0,1}
+- LANL baseline: ird_s=32 ip=0.10 (global) → 0.01146
+- Hypothesis: rank_ird_buckets or per-stream gives 15-25% improvement
+  (matching the uplift LANL's rank_b=32 gave on CloudPhysics: 0.0325 → 0.0250)
+- Target: beat LANL 0.01146
+
+**Priority 3 — CloudPhysics variance reduction** (launch_ird_renewal_sweep.py):
+- LANL's seed-80 outlier (0.0295 vs seed-42 0.0250) is the weakness
+- Sweep rank_ird_buckets={48, 64, 96} to smooth per-rank IRD estimates
+- Sweep ird_quantile_max={0.99, 0.98} to cap extreme tail IRDs
+- Sweep per_stream=1 (CloudPhysics has workload streams)
+- Target: mean < 0.0267 with range < 0.002 (variance-win even at same mean)
+
+**Priority 4 — Atlas port for Twitter/Meta KV/Meta CDN**:
+- Port LANL's published knobs onto LLNL's corresponding atlases
+- Twitter: win=48 (vs LLNL win=16), same atlas architecture
+- Meta KV: tail=0.08, adj=0.70, drop=0.05, hp=0.25 — large adj_dup is the key
+- Meta CDN: currently unknown — inspect LANL's Meta CDN recipe in RESPONSE-LANL.md
+
+### New Tools Created (2026-05-04)
+
+- `altgan/launch_ird_renewal_sweep.py` — generic IRD-renewal sweep for any corpus
+  (rank_ird_buckets, per_stream, ird_quantile_max axes; auto-ranks results)
+- `altgan/sweep_msr_hotpool.py` — MSR hot-pool compression sweep on LLNL R270 atlas
+  (18-point grid, 4-seed, auto-summary)
+
+**Tasks**: #R285 opened (board correction + retake strategy defined).
