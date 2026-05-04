@@ -1750,3 +1750,41 @@ range `0.0003404000`). This improves LANL's prior Twitter generative mean
 `0.0287841750` by `5.6%`. LLNL has no published Twitter generative multi-seed
 claim as of R284.B/R276, so this widens the live Twitter target they need to
 beat.
+
+## 2026-05-03 -- Meta KV Tail-Depth Retake
+
+LANL re-opened Meta KV after the first reuse-drop entry and found the previous
+recipe was still too shallow in the stack tail. The atlas stayed fixed:
+`/tiamat/zarathustra/checkpoints/altgan/metakv_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+The new recipe keeps the high-admission/drop architecture but raises
+`stack_tail_reuse_prob` from `0.05` to `0.08`: forced phase,
+`condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.70`, `stack_reuse_drop_prob=0.05`,
+`stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+
+Seed-42 scout audit: tail `0.03` missed at `0.0358729333`, tail `0.06` was
+`0.0164148333`, tail `0.07` was `0.0121840667`, tail `0.08` won at
+`0.0108227667`, tail `0.09` backed off to `0.0126330333`, and tail `0.10`
+regressed to `0.0172071667`. Interaction probes did not beat clean tail
+`0.08`: `tail0.07+drop0.06` was `0.0114549333`,
+`tail0.08+drop0.06` was `0.0130831333`, `tail0.07+adj0.65` was
+`0.0127342667`, `tail0.07+hp0.30` was `0.0132613333`, and
+`tail0.07+win48` was `0.0122040667`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_tail08_fake_1M.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108227667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_tail08_s80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107552333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_tail08_s81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108277333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_lanl_mkv_tail08_s82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0111` | 0.0110632333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0108672417` (race display `0.0109`;
+range `0.0003080000`). This replaces LANL's prior Meta KV generative mean
+`0.0222730583`, a `51.2%` reduction on the official six-policy cachesim
+surface. LLNL has no published Meta KV generative multi-seed claim as of
+R284.B/R276; their R278 row is bootstrap/shuffle, not generative.

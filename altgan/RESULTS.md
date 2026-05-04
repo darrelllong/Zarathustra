@@ -2717,3 +2717,33 @@ Seed-42 scouts: `win=8` `0.0297808000`; `win=32` `0.0276727333`; `win=48`
 
 Four-seed mean: `0.0271836500`, range `0.0003404000`. This replaces the prior
 Twitter generative mean `0.0287841750` with a `5.6%` lower cachesim target.
+
+## Meta KV Tail-Depth Retake (2026-05-03)
+
+Held the existing Meta KV atlas fixed:
+`/tiamat/zarathustra/checkpoints/altgan/metakv_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+The promoted row raises `stack_tail_reuse_prob` to `0.08` while preserving
+forced phase, `condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`, `stack_adj_dup_prob=0.70`,
+`stack_reuse_drop_prob=0.05`, `stack_hot_pool_prob=0.25`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.05`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+
+Seed-42 scouts: tail `0.03` `0.0358729333`; tail `0.06` `0.0164148333`;
+tail `0.07` `0.0121840667`; tail `0.08` `0.0108227667`; tail `0.09`
+`0.0126330333`; tail `0.10` `0.0172071667`; `tail0.07+drop0.06`
+`0.0114549333`; `tail0.08+drop0.06` `0.0130831333`; `tail0.07+adj0.65`
+`0.0127342667`; `tail0.07+hp0.30` `0.0132613333`; `tail0.07+win48`
+`0.0122040667`.
+
+| seed | literal cachesim mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0108` | 0.0108227667 |
+| 80 | `mean HRC-MAE across policies: 0.0108` | 0.0107552333 |
+| 81 | `mean HRC-MAE across policies: 0.0108` | 0.0108277333 |
+| 82 | `mean HRC-MAE across policies: 0.0111` | 0.0110632333 |
+
+Four-seed mean: `0.0108672417`, range `0.0003080000`. This replaces the prior
+Meta KV generative mean `0.0222730583`, a `51.2%` lower cachesim target.
