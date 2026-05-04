@@ -1064,10 +1064,10 @@ zero baseline; shuffle matches LLNL's reported non-stationary perturbation
 scale.
 
 Reproduce / publish the shuffle TraceBootstrap ledger panels (including the
-missing Twitter / Meta CDN shuffle rows) with:
+missing Twitter / Meta KV / Meta CDN / Wikipedia shuffle rows) with:
 
 ```bash
-python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter,metacdn --markdown
+python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter,metakv,metacdn,wiki --markdown
 ```
 
 ## 2026-05-03 -- Meta KV Generative Reuse-Drop Entry
