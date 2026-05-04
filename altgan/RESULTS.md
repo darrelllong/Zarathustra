@@ -2259,7 +2259,7 @@ Seed-42 scouts: MSR base `0.0350`, Twitter shape `0.0439`, R248 shape
 The winning row pairs high adjacent admission with reuse drop; matching total
 reuse alone did not win the cachesim curve.
 
-## Meta CDN Generative Low-Drop Entry (2026-05-03)
+## Meta CDN Generative Low-Tail Update (2026-05-03)
 
 Atlas:
 `/tiamat/zarathustra/checkpoints/altgan/metacdn_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
@@ -2272,22 +2272,25 @@ Recipe: forced phase, `condition_from_real_manifest`,
 `stack_adj_dup_prob=0.70`, `stack_reuse_drop_prob=0.03`,
 `stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
 `stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
-`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.03`,
 `stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official ref:
 `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
 
 | seed | literal `llgan.cachesim_eval` mean line | JSON mean |
 |---:|---|---:|
-| 42 | `mean HRC-MAE across policies: 0.0417` | 0.0417317333 |
-| 80 | `mean HRC-MAE across policies: 0.0410` | 0.0409825333 |
-| 81 | `mean HRC-MAE across policies: 0.0419` | 0.0418999000 |
-| 82 | `mean HRC-MAE across policies: 0.0414` | 0.0414264667 |
+| 42 | `mean HRC-MAE across policies: 0.0376` | 0.0376173333 |
+| 80 | `mean HRC-MAE across policies: 0.0375` | 0.0375326333 |
+| 81 | `mean HRC-MAE across policies: 0.0380` | 0.0380410333 |
+| 82 | `mean HRC-MAE across policies: 0.0375` | 0.0374686667 |
 
-Four-seed mean: `0.0415101583` (display `0.0415`), range `0.0009173667`.
-Seed-42 scouts: Meta KV transfer/drop `0.05` scored `0.0473`, drop `0.07`
-scored `0.0530`, hotter admission/tail variants scored `0.0627` to `0.0739`,
-and MSR/Twitter shapes scored `0.0788`/`0.0761`. The current CDN basin keeps
-the high-admission/drop architecture from Meta KV, but needs lighter drop.
+Four-seed mean: `0.0376649167` (display `0.0377`), range `0.0005723667`.
+This replaces the first Meta CDN generative row `0.0415101583`, a `9.3%`
+lower cachesim target. Seed-42 scouts: `tail=0.03` `0.0376173333`,
+`tail=0.07` `0.0472252333`, `tail=0.08` `0.0502006000`, `tail=0.09`
+`0.0531047333`, `tail=0.10` `0.0558878333`, `drop=0.02` `0.0396857667`,
+`drop=0.04` `0.0445329333`, `tail0.08+drop0.02` `0.0475122000`,
+`tail0.08+drop0.04` `0.0529505000`, `tail0.08+adj0.65` `0.0556624667`,
+`tail0.08+hp0.30` `0.0514508667`.
 
 ## CloudPhysics Rank-Ramp Non-Bootstrap Update (2026-05-03)
 
