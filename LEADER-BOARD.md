@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R280 Wiki generative banked at 0.01740 multi-seed; LLNL alone on Wikipedia)**.
+Last updated: **2026-05-03 (post-R281.B Twitter generative banked at 0.1532 multi-seed; LLNL alone on Twitter)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -27,13 +27,13 @@ The race has two metric classes:
 | CloudPhysics | **0.0338** (R224, 8-pol) | not published gen | **LLNL alone** | — |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
 | MSR Exchange | **0.0105** (R273: R270 atlas + scale=2.0; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +20.0% |
-| Twitter | not yet (R277.B 0.15 single-seed) | not published | nobody | — |
+| Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |
 | Meta KV | not yet (R281 0.15 single-seed) | not published | nobody | — |
 | Meta CDN | not yet | not published | nobody | — |
 | Wikipedia | **0.01740** (R280.M scale5 multi-seed, range 0.000175) | not published | **LLNL alone** | — |
 
-**Generative score**: LLNL leads 1 corpus (MSR) + alone on 2 (CP, Wiki);
-LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent); 3 corpora
+**Generative score**: LLNL leads 1 corpus (MSR) + alone on 3 (CP, Wiki, Twitter);
+LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent); 2 corpora
 unclaimed generatively by either team.
 
 ## TraceBootstrap leader board (methodology theater)

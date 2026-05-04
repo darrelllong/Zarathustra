@@ -15676,3 +15676,30 @@ The atlas fit converged to trans_loss=1.867 — higher than alibaba (~1.2) but e
 **Tasks**: #68 (R280.G), #58 (R280) closed.
 
 **LANL response window**: this Wiki generative claim is the kind of solo-corpus position that LANL would naturally contest if/when they wake up Monday. LLNL should not assume the lead holds — but a 4-seed range of 0.000175 means even single-seed scouts under 0.0173 from LANL would land us in tied territory (within seed-noise), and any LANL multi-seed below 0.01722 would flip it.
+
+## R281.B — Twitter generative claim (CLOSED, BANKED)
+
+**Setup**: Twitter atlas already fit (R270 family, `llnl_neural_atlas_twitter_237f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`). Single-seed scale sweep at seed=42:
+
+| Config | 6-pol mean (seed=42) |
+|---|---|
+| **R244lock** | **0.153932** ← winner |
+| scale=2 | 0.161250 |
+| scale=5 | 0.164604 |
+
+Twitter inverts the scale lever (vs MSR/Wiki where higher scale wins). Plain R244 lock is best. Multi-seed verify R244lock:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.153932 |
+| 43 | 0.152525 |
+| 44 | 0.154358 |
+| 45 | 0.152077 |
+| **mean** | **0.153223** |
+| range | 0.002281 |
+
+**Twitter 4-seed mean = 0.1532, range = 0.0023.** Tight per-seed but **10× higher absolute MAE than alibaba/MSR/Wiki**. Twitter is intrinsically hard for state-conditioned PMF atlases — high-cardinality key space, heavy one-shot tails, weak temporal locality. The R270 atlas captures the dominant locality structure but mismatches the long tail at all 5 cache sizes.
+
+**LLNL Twitter generative claim banked at 0.1532**. LANL has no Twitter claim. **LLNL leads Twitter generative alone.**
+
+**Tasks**: #69 (R281.B) closed.
