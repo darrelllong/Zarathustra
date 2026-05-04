@@ -15473,3 +15473,40 @@ The LANL competition is in the same metric class as LLNL (corpus-trained atlases
 **R284.X/Y closure**: both retired. The capacity-vs-data hypothesis is **falsified for the per-trace regime**. The next-architecture todo is a **fit-time IRD-shape loss on the atlas itself** (explicit MAE-on-HRC objective during atlas training, similar to 2DIO's analytical fit but learned) — that is the only path that has a chance of crossing into the 0.02–0.05 bracket. Filed as IDEAS-LLNL #26 (instantiates the broader #24 "Cache-Aware Training Loss" against the atlas-fit objective rather than the GAN-training objective).
 
 **Tasks**: #63 (R284.X) and #64 (R284.Y) closed.
+
+## R284.B — CloudPhysics 4-trace head-to-head vs 2DIO (CP atlas, 2DIO cache-size protocol)
+
+**Setup**: Apply the existing R224 CloudPhysics atlas (`cloudphysics_b2_inline_extbins.pkl.gz`) to each of 2DIO's four CP traces (w11, w24, w44, w82). Generate 1M records per trace via the canonical R244 lock; evaluate LRU HRC-MAE at six normalized cache sizes per 2DIO Fig. 8: 5%, 10%, 25%, 50%, 75%, 100% of M.
+
+**Results**:
+
+| Trace | M (footprint) | Cache sizes | LLNL R224 atlas, R244 lock | 2DIO bar |
+|---|---|---|---|---|
+| w11 | 2,992,519 | 150k–3M | **0.314** | 0.02–0.05 |
+| w24 | 16,487,648 | 824k–16M | **0.386** | 0.02–0.05 |
+| w44 | 3,679,382 | 184k–3.7M | **0.537** | 0.02–0.05 |
+| w82 | 189,785 | 9k–190k | **0.141** | 0.02–0.05 |
+
+**Mean across 4**: 0.345 vs 2DIO ~0.04 = **8–9× the 2DIO bar.**
+
+**Interpretation**:
+
+1. **w11/w24/w44 are extrapolation failures.** Their M values are 3M / 16M / 3.7M, so 100%-of-M cache sizes range up to 16M items. The LLNL CP atlas was trained on a normalized cache-size sweep that *capped at a few hundred thousand* — orders of magnitude smaller. The 0.31 / 0.39 / 0.54 numbers are not "the atlas can't model CP" — they are "the atlas was never asked to model cache scales 100× past its training distribution." The R224 atlas remains correct at the cache scales it was *trained to fit* (the LLNL race's cache-size sweep), where R224 multi-seed mean is 0.0338.
+
+2. **w82 is the fair comparison and it is still 3–7× worse than 2DIO.** w82's M=190k brings the cache-size sweep down to 9k–190k, which sits squarely inside the LLNL atlas's training cache scale. At this fair-scale comparison the LLNL atlas hits **0.141** — better than the extrapolation cases by 2–4× but still 3–7× above 2DIO's 0.02–0.05 bar.
+
+3. **Combined with R284.X/Y on alibabaBlock_521 (per-trace floor 0.10 regardless of capacity), the picture is consistent**: the LLNL atlas's per-trace HRC-MAE floor is structurally above 2DIO's per-trace bar by 2–7×, regardless of corpus, capacity, or extrapolation regime. This is not a tuning problem; it is an architecture-fit problem (cf. R284.X/Y closure and IDEAS-LLNL #26).
+
+**LLNL race-position is unchanged**:
+
+- The LLNL/LANL race is "corpus-trained atlas applied to held-out cache sizes / policies / volumes" — same metric class. R224 wins (or ties) that race on CP at LLNL's standard cache sweep. R273 wins MSR. The 2DIO numbers do not contest this.
+- LLNL's *corpus generalization* on alibabaBlock_521 (R248: 0.079 with one model fitting 237 traces) remains banked. 2DIO publishes no corpus-generalization claim.
+- The 2DIO 0.02–0.05 bar applies to *per-trace* memoization, where LLNL's atlas is structurally above. We do not claim the per-trace metric class.
+
+**Open R284 items**:
+
+- **R284.C** — build the 2DIO trace-gen CLI on baase from `Effygal/trace-gen` (zenodo:17202588), reproduce their 0.02–0.05 numbers ourselves so the comparison is end-to-end measured, not paper-quoted.
+- **R284.D** — final 6-trace writeup (v521, v827, w11, w24, w44, w82) once R284.C measurements are in hand.
+- **R284.E** (deferred) — implement IDEAS-LLNL #26 atlas-fit IRD-shape loss and re-measure on the same 6 traces. Only path to closing the per-trace gap.
+
+**Tasks**: #65 (R284.B closure) opened and closed.
