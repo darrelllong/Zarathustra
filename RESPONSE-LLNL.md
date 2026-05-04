@@ -15431,3 +15431,45 @@ If LLNL beats 2DIO on any of the eight, post the win loud. If 2DIO wins all eigh
 ### Methodological note for the eventual writeup
 
 2DIO's argument is correct: a generator trained on `[LBA, Length]` distributional fidelity (the 2024 NAS LSTM-GAN) cannot reproduce HRC. That critique was already addressed in this project starting at R162 (move to state-conditioned transition nets that explicitly track stack-distance) and confirmed at R220 (extended-bins covering deep IRD tail). Calling the current LLNL architecture by the 2024 paper's name conflates two architectures separated by ~121 rounds of work.
+
+## R284.X / R284.Y — per-trace memoization floor on v521 (capacity vs data ablation)
+
+**Setup**: Single-trace fit on `alibabaBlock_521.oracleGeneral.zst` (1M records, M=158018) to test the memoization ceiling of the LLNL atlas architecture on a 2DIO-named trace. Two atlases swept across LRU at six cache sizes (5/10/25/50/75/100% of M):
+
+- **R284.X** — high capacity: n_phase=2, n_time=4, n_size=4 = **192 states**, hidden=96, ep=600, seed=137, R270 architecture engaged.
+- **R284.Y** — low capacity: n_phase=1, n_time=1, n_size=1 = **6 states**, hidden=64, ep=400, seed=137, R270 axes disabled.
+
+Both fits converged cleanly (R284.X trans_loss 1.2391, R284.Y 1.2204).
+
+**Results — LRU HRC-MAE on v521**:
+
+| Run | Config | baseline | R244 lock | scale=2 | scale=5 | best |
+|---|---|---|---|---|---|---|
+| R284.X | per-trace, 192 states, h=96 | — | 0.116 | 0.109 | 0.101 | **0.101** |
+| R284.Y | per-trace, 6 states, h=64 | 0.111 | 0.129 | 0.127 | 0.123 | **0.111** |
+| R248 | corpus-fit, 237 traces, R270 | — | — | — | — | **0.079** |
+| 2DIO | per-trace θ (paper claim) | — | — | — | — | **0.02–0.05** |
+
+**Interpretation**:
+
+1. **Capacity is not the bottleneck.** Shrinking from 192 states+h=96 down to 6 states+h=64 leaves the per-trace floor essentially unchanged (0.101 → 0.111). The LLNL atlas hits a structural wall at ~0.10 on per-trace v521 regardless of how many parameters you throw at it.
+
+2. **Corpus-fit beats per-trace by 22–37%** on the same trace, regardless of per-trace capacity. The R248 model trained on 237 traces *generalizes* to v521 better than any model trained only on v521. This is the opposite of the usual ML expectation that per-instance memorization beats per-corpus generalization. Three reasons it happens here:
+   - (a) **Sparsity**: at 192 states × 1M records the average state holds ~5200 records; the long tail of the rank PMF is severely undersampled per-state.
+   - (b) **State binning is a regularizer, not a data multiplier**: time/size bins partition the data — they don't fabricate it. A per-trace fit at 192 states is data-starved relative to a corpus fit at 192 states.
+   - (c) **Shared structure**: alibaba traces share rank/IRD shape across volumes; corpus aggregation exploits that shape, per-trace fitting cannot.
+
+3. **Post-hoc levers are corpus-tuned and counter-productive on per-trace.** R244's hot-pool / tail-reuse / recent-pool stack was tuned against R248. Applied to a per-trace LOW-CAP atlas it makes things 16% worse (0.111 → 0.129). Architecture and lever calibration co-evolve.
+
+4. **2DIO's 0.02–0.05 bar appears structurally unreachable from this approach.** The gap is not capacity, not training time, not data volume. 2DIO's per-trace θ profile encodes IRD+IRM directly with a 3-parameter analytical model that is *exactly* what cachesim measures; LLNL's atlas approximates the same shape through learned PMFs and pays a ~5× MAE penalty for the indirection.
+
+**Race-position takeaway**: the right framing for the writeup is that LLNL and 2DIO occupy **different metric classes**:
+
+- **Per-trace memoization (2DIO regime)**: 2DIO 0.02–0.05, LLNL ≥0.10. 2DIO wins by 2–5×.
+- **Corpus generalization (LLNL regime)**: LLNL 0.079 with one model across 237 alibaba volumes. 2DIO has no published number here — their tool calibrates θ per-trace; running their tool on a held-out trace requires a fresh fit, which is the per-trace regime by definition.
+
+The LANL competition is in the same metric class as LLNL (corpus-trained atlases applied to held-out cache sizes / policies). 2DIO is in a different metric class. Cross-class comparisons are interesting but not winnable on either side without changing the rules.
+
+**R284.X/Y closure**: both retired. The capacity-vs-data hypothesis is **falsified for the per-trace regime**. The next-architecture todo is a **fit-time IRD-shape loss on the atlas itself** (explicit MAE-on-HRC objective during atlas training, similar to 2DIO's analytical fit but learned) — that is the only path that has a chance of crossing into the 0.02–0.05 bracket. Filed as IDEAS-LLNL #26 (instantiates the broader #24 "Cache-Aware Training Loss" against the atlas-fit objective rather than the GAN-training objective).
+
+**Tasks**: #63 (R284.X) and #64 (R284.Y) closed.

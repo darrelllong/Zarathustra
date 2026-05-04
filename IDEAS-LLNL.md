@@ -51,3 +51,19 @@
 
 ---
 
+### 26. Atlas-Fit IRD-Shape Loss (R284 followup)
+
+**Why this is the breakthrough candidate:** R284.X (R270 capacity, 192 states) and R284.Y (low capacity, 6 states) both showed the LLNL atlas hits a per-trace floor of ~0.10 LRU HRC-MAE on alibabaBlock_521 — *capacity is not the bottleneck.* 2DIO achieves 0.02–0.05 by directly parameterizing the IRD distribution with a 3-param analytical model. The LLNL atlas approximates that shape indirectly via state-conditioned rank PMFs and pays a 2–5× MAE penalty for the indirection. The fix is to add a direct objective on the IRD shape during atlas fit.
+
+**Implementation sketch:**
+1. During `neural_atlas fit`, after each epoch, generate a small batch (e.g. 100k records) from the current atlas using the manifest's actual eval cache sizes.
+2. Compute LRU stack-distance histogram on both real and generated batches; sum-MAE over the 43 fine bins (or directly over the cumulative HRC at the eval sizes).
+3. Add this MAE as an auxiliary loss term, weighted ~0.1× the trans_loss, with a slow ramp-up after epoch 100 (so the rank PMF is roughly fit before the IRD-shape gradient kicks in).
+4. *Alternative (cheaper):* Maintain a running bootstrap estimate of the real IRD shape and project the generator's predicted PMF onto that target via KL/EMD instead of running cachesim per epoch.
+
+**Expected impact:** • Closes some-or-all of the 2DIO per-trace gap without abandoning the corpus-fit strength. • Gives an architectural path to *learn* what 2DIO hand-designs — atlases that are simultaneously corpus-general and IRD-faithful. • Worst case: confirms the gap is fundamental (which is itself a paper).
+
+**Risk:** generating per-epoch eval batches is expensive; mitigations are to keep the inner batch small (100k), eval only every K epochs, and gate behind a `--atlas-fit-hrc-loss` flag so existing recipes stay unchanged.
+
+---
+

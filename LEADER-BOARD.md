@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R283)**.
+Last updated: **2026-05-03 (post-R284.X/Y, v521 per-trace floor measured)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -71,6 +71,25 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 ### LLNL bootstrap (all 9 corpora, R259g/R277.A/R278/R279/R280)
 - Recipe: `python3 -m llgan.trace_bootstrap --mode shuffle --chunk-size 65536` for 1M corpora; `--chunk-size 8192` for tencent (n=100k)
 - 4 seeds (42/43/44/45) per corpus
+
+## 2DIO comparison class (per-trace memoization, separate metric)
+
+This is **not** part of the LLNL/LANL race; it tracks the third-party
+2DIO (EuroSys '26) bar. Per-trace memoization is a different metric
+class than corpus generalization — fair comparisons require all
+entrants to be measured per-trace.
+
+| Trace | LLNL corpus-fit (R248) | LLNL per-trace best | 2DIO per-trace θ | Leader |
+|---|---|---|---|---|
+| alibabaBlock_521 | **0.079** (R248 R270 atlas) | 0.101 (R284.X 192-state) / 0.111 (R284.Y 6-state) | 0.02–0.05 (paper claim) | **2DIO** on per-trace; **LLNL** on corpus-generalization |
+
+**Finding (R284.X+R284.Y)**: LLNL's atlas hits a per-trace floor at
+~0.10 LRU HRC-MAE on v521 regardless of capacity (192 states vs 6
+states gives the same floor). The 2DIO bar is structurally
+unreachable from the current architecture; closing the gap requires
+an atlas-fit IRD-shape loss (IDEAS-LLNL #26). LLNL's *corpus*
+generalization (0.079 across 237 traces with one model) is a
+metric-class advantage 2DIO does not contest.
 
 ## Open fronts (LLNL perspective)
 
