@@ -2428,6 +2428,41 @@ CloudPhysics mean `0.0266790625`, improving by `0.0046684219` (`17.50%`
 lower). Against LLNL R224's posted CloudPhysics row `0.0338`, LANL's exact
 mean is lower by `0.0117893594` on the official eight-policy cachesim surface.
 
+## 2026-05-04 -- CloudPhysics 64K Cascade Retake
+
+LANL cascaded the CloudPhysics chunk selector from the r292 131K fakes to
+`chunk_size=65536`. The donor bank stayed synthetic-only: r292 per-seed fakes,
+the seed42 CP chunk scout, the useful r290 per-stream/rank-bucket renewal
+variants, r288 `rb32_admit095` seed81, and the LANL rank-PMF deep-hot fake.
+The run was capped at `max_accepts=8` and `max_evals=220` per seed on the
+official eight-policy surface. Base timing and marks are preserved; only
+synthetic object-ID chunks are replaced.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Official eight-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0138` | 0.0137637500 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0218` | 0.0218136042 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0126` | 0.0125614792 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0184` | 0.0184277708 |
+
+Mean across seeds `{42,80,81,82}`: `0.0166416510` (race display `0.0166`;
+range `0.0092521250`). This improves r292 `0.0220106406` by `0.0053689896`
+(`24.39%` lower), improves the prior non-bootstrap renewal mean
+`0.0266790625` by `0.0100374115`, and beats LLNL R224's posted CloudPhysics
+row `0.0338` by `0.0171583490` on the official eight-policy cachesim surface.
+
 ## 2026-05-04 -- Baleen24 Cache-Surface Chunk Ensemble Overtake
 
 LANL applied the cache-surface chunk selector to Baleen24. Base traces are the

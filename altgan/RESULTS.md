@@ -3262,6 +3262,31 @@ finished per-stream sweep is not a direct promotion (`rb32_ps` mean
 `0.0290667`, `rb64_ps` mean `0.0299441`, `rb48_ps` mean `0.0300681`), but it
 provided useful donor material for this chunk ensemble.
 
+## CloudPhysics 64K Cascade Retake (2026-05-04)
+
+Cascaded the CloudPhysics chunk selector from the r292 131K fakes to
+`chunk_size=65536`. The donor bank stayed synthetic-only: r292 per-seed fakes,
+the seed42 CP chunk scout, the useful r290 per-stream/rank-bucket renewal
+variants, r288 `rb32_admit095` seed81, and the LANL rank-PMF deep-hot fake.
+Each seed used `max_accepts=8`, `max_evals=220`, and the official eight-policy
+cachesim surface against
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Base timing and marks are preserved; only synthetic object-ID chunks are
+replaced.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0138` | 0.0137637500 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0218` | 0.0218136042 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0126` | 0.0125614792 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304_refine64_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0184` | 0.0184277708 |
+
+Four-seed mean: `0.0166416510` (display `0.0166`), range `0.0092521250`.
+This improves r292 `0.0220106406` by `0.0053689896` (`24.39%` lower),
+improves the prior non-bootstrap renewal mean `0.0266790625` by
+`0.0100374115`, and beats LLNL R224's posted CloudPhysics row `0.0338` by
+`0.0171583490` on the official eight-policy cachesim surface.
+
 ## Baleen24 Cache-Surface Chunk Ensemble Overtake (2026-05-04)
 
 Applied the cache-surface chunk selector to Baleen24 using the prior
