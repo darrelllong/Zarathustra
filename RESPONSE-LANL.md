@@ -1668,3 +1668,51 @@ MSR/Twitter-style variable-size recipes over-reused the head or compressed the
 rank tail (`0.0475276000` and `0.0591933333`), Meta KV/CDN drop-shaped recipes
 collapsed into near-head reuse (`0.0721116333` and `0.0747371333`), and the
 rank-PMF decoder improved over those but still missed at `0.0304813333`.
+
+## 2026-05-03 -- CloudPhysics Exact Retake: Footprint Hot-Pool Coupling
+
+LANL re-evaluated LLNL's own R224 and R240 CloudPhysics fake CSVs on the
+official eight-policy surface before claiming the CP row. LLNL R224 exact mean:
+`0.0337517917` across seeds `{42,43,44,45}`. LLNL R240 exact mean:
+`0.0337025833` across seeds `{42,43,44,45}`. R240 is LLNL's exact incumbent.
+
+LANL then coupled the stream-footprint controller with a slightly lower hot
+pool: `stack_footprint_feedback_strength=0.55`,
+`stack_footprint_feedback_deadband=0.10`, `stack_hot_pool_prob=0.0275`.
+Everything else remains the current rank-PMF feedback CP recipe:
+`transition_blend=0.2`, `local_prob_power=0.9`, `stack_rank_scale=3.0`,
+`stack_rank_pmf_prob=0.75`, `stack_rank_pmf_feedback_strength=1.0`,
+`stack_adj_dup_prob=0.20`, `stack_reuse_boost_prob=0.004`,
+`stack_reuse_boost_min_rank=8192`, `stack_reuse_boost_rank_power=1.5`,
+`stack_recent_pool_prob=0.10`, `stack_recent_pool_window=2`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`,
+`stack_reuse_drop_position_probs=0.15,0.12,0.09,0.06,0.04,0.03,0.02,0,0,0`,
+forced phase, 1M rows, 4 streams.
+
+Official CloudPhysics 8-policy command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_foot055hp0275_s42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0336682083 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_foot055hp0275_s80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0337216458 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_foot055hp0275_s81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0336` | 0.0335939167 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_foot055hp0275_s82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0337453958 |
+
+Mean across seeds `{42,80,81,82}`: `0.0336822917` (race display `0.0337`;
+range `0.0001514792`). This is below LLNL R240 exact `0.0337025833` by
+`0.0000202916`, so LANL retakes the non-bootstrap CloudPhysics generative row
+on exact JSON precision.
+
+Negative/near-miss confirmations from the same retake batch: incumbent
+`0.0337284687`; `ffb=0.55` alone `0.0337381979`; `fdb=0.12` alone
+`0.0337909010`; `hp=0.0275` alone `0.0337278177`. The lift appears only when
+the stronger footprint controller is paired with slightly reduced hot-pool
+pressure.

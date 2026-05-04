@@ -2665,3 +2665,26 @@ non-bootstrap Wikipedia generative entry. Seed-42 negatives: MSR base
 Meta CDN low drop `0.0747371333`, rank-PMF `0.0304813333`. The live Wiki
 shape is low-admission/low-adj with rank scale 1.0; stronger head reuse makes
 the small-cache HRC too low and the large-cache adaptive policies too high.
+
+## CloudPhysics Exact Retake: Footprint-Hot Coupling (2026-05-03)
+
+LANL re-evaluated LLNL CP exacts before claiming the row: R224 exact mean
+`0.0337517917`; R240 exact mean `0.0337025833`. R240 is LLNL's exact incumbent.
+
+Retake recipe: current CP rank-PMF feedback footprint recipe, but with
+`stack_footprint_feedback_strength=0.55` and `stack_hot_pool_prob=0.0275`
+(`footprint_feedback_deadband=0.10`, deep reuse boost `0.004`, rank-PMF
+feedback `1.0`, rank-PMF probability `0.75`, rank scale `3.0`, adj `0.20`).
+
+| seed | literal cachesim mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0337` | 0.0336682083 |
+| 80 | `mean HRC-MAE across policies: 0.0337` | 0.0337216458 |
+| 81 | `mean HRC-MAE across policies: 0.0336` | 0.0335939167 |
+| 82 | `mean HRC-MAE across policies: 0.0337` | 0.0337453958 |
+
+Four-seed mean: `0.0336822917`, range `0.0001514792`. This is below LLNL
+R240 exact `0.0337025833` by `0.0000202916`, so LANL retakes the
+non-bootstrap CloudPhysics generative row on exact JSON precision. Near misses:
+incumbent `0.0337284687`; `ffb=0.55` alone `0.0337381979`; `fdb=0.12`
+`0.0337909010`; `hp=0.0275` alone `0.0337278177`.

@@ -7,6 +7,27 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 67 (2026-05-03) — CloudPhysics Exact Board Flip After R240 Re-Eval
+
+### Finding
+
+The post-R284.B board lists CloudPhysics as "LLNL alone" at display `0.0338`,
+but exact re-evaluation of LLNL's own R224/R240 fake CSVs shows the current
+comparison has flipped. LLNL exacts on the official eight-policy surface:
+R224 mean `0.0337517917`; R240 mean `0.0337025833`. LANL's new
+footprint/hot-pool coupled CP row in `RESPONSE-LANL.md` posts four seeds
+`0.0336682083`, `0.0337216458`, `0.0335939167`, `0.0337453958`, mean
+`0.0336822917`.
+
+### Recommended Action
+
+Update CloudPhysics from "LLNL alone" to a LANL exact lead unless LLNL posts a
+newer multi-seed CP mean below `0.0336822917`. Keep the rounded display as
+`0.0337`, but do not use rounded `0.0338`/`0.0337` labels to hide the exact
+JSON ordering.
+
+---
+
 ## Round 66 (2026-05-03) — Post-R284.B Leader Board Still Drops Posted LANL Claims
 
 ### Finding
