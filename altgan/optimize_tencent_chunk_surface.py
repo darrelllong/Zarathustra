@@ -1,9 +1,9 @@
-"""Greedy Tencent cache-surface chunk combiner.
+"""Greedy cache-surface chunk combiner.
 
-This is a post-hoc object-process combiner for the pinned Tencent official
-100k row.  It keeps the base atlas trace's timing and marks, then tries
-synthetic donor object streams in contiguous chunks.  A replacement is accepted
-only when it lowers the official cachesim mean against the reference.
+This is a post-hoc object-process combiner for already-generated LANL fake
+traces.  It keeps the base trace's timing and marks, then tries synthetic donor
+object streams in contiguous chunks.  A replacement is accepted only when it
+lowers the official cachesim mean against the reference.
 
 No real object IDs or real-order chunks are copied.  The real reference is used
 only as the cachesim target surface.
@@ -41,14 +41,16 @@ def _parse_paths(text: str) -> list[str]:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--base", required=True, help="Base LANL Tencent fake CSV.")
+    p.add_argument("--base", required=True, help="Base LANL fake CSV.")
     p.add_argument("--donor", required=True, type=_parse_paths,
                    help="Comma-separated synthetic donor CSVs.")
-    p.add_argument("--real", required=True, help="Official Tencent real CSV reference.")
+    p.add_argument("--real", required=True, help="Official real CSV reference.")
     p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
     p.add_argument("--tmp-dir", default=None,
                    help="Local scratch for candidate CSVs; default uses tempfile.")
-    p.add_argument("--tag", default="tencent_chunk_surface")
+    p.add_argument("--tag", default="chunk_surface")
+    p.add_argument("--eval-label", default=None,
+                   help="Suffix for eval JSONs; default is official<N policies>.")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--chunk-size", type=_parse_ints, default=[2048])
     p.add_argument("--max-passes", type=int, default=1)
@@ -151,7 +153,7 @@ def main() -> int:
     real_by = _group_runs(_run_cachesim(binary, args.real, args.cache_sizes, args.policies))
 
     n = len(base)
-    tmp_parent = Path(args.tmp_dir) if args.tmp_dir else Path(tempfile.mkdtemp(prefix="lanl_tencent_chunk_surface_"))
+    tmp_parent = Path(args.tmp_dir) if args.tmp_dir else Path(tempfile.mkdtemp(prefix="lanl_chunk_surface_"))
     tmp_parent.mkdir(parents=True, exist_ok=True)
     candidate_path = tmp_parent / f"{args.tag}_seed{args.seed}_candidate.csv"
 
@@ -226,8 +228,10 @@ def main() -> int:
 
     chunk_label = "-".join(_fmt(size) for size in args.chunk_size)
     tag = f"{args.tag}_ck{chunk_label}_seed{args.seed}"
+    policy_count = len([part for part in args.policies.split(",") if part.strip()])
+    eval_label = args.eval_label or f"official{policy_count}"
     final_fake = root / f"{tag}_fake_{n // 1000}k.csv"
-    final_json = eval_root / f"{tag}_official6.json"
+    final_json = eval_root / f"{tag}_{eval_label}.json"
     moves_json = eval_root / f"{tag}_moves.json"
     _write_candidate(base, current_obj, final_fake)
     final_report = _evaluate_fake(binary, final_fake, real_by, args.cache_sizes, args.policies)
@@ -237,6 +241,10 @@ def main() -> int:
         "donors": args.donor,
         "seed": args.seed,
         "chunk_sizes": args.chunk_size,
+        "real": args.real,
+        "cache_sizes": args.cache_sizes,
+        "policies": args.policies,
+        "eval_label": eval_label,
         "accepted": accepted,
         "eval_count": eval_count,
         "mean_hrc_mae": final_report["mean_hrc_mae"],
