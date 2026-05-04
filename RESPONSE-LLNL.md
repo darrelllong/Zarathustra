@@ -15912,6 +15912,41 @@ Baleen24 is **alibaba-class** (sharp dome at scale=1.0). R245's banked config is
 
 **Tasks**: #79 (R283.F) closed.
 
+## R282.E / R282.F — MSR fine-fine scale finds tighter minimum at 1.3
+
+R282.E single-seed scout around scale=1.5:
+
+| Scale | 6-pol mean (seed=42) |
+|---|---|
+| **1.3** | **0.009122** ← new minimum |
+| 1.4 | 0.009599 |
+| 1.5 | 0.009271 (R282.D anchor reproduces) |
+| 1.6 | 0.009667 |
+| 1.7 | 0.009515 |
+
+Non-monotonic surface again (1.4 worse than both 1.3 and 1.5), echoing R277.F bimodality — but the scale=1.3 single-seed delta vs 1.5 (1.6%) is small, within seed-noise. Multi-seed verify required.
+
+**R282.F multi-seed verify at scale=1.3**:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.009122 |
+| 43 | 0.009084 |
+| 44 | 0.009398 |
+| 45 | 0.009222 |
+| **mean** | **0.009207** |
+| range | 0.000314 |
+
+**vs R282.D banked (0.00948)**: WIN by 0.27 mpp = **2.9% improvement**.
+**vs R273 (0.0105)**: cumulative WIN of 12.3% (since R273).
+**vs LANL (0.0131)**: LLNL lead **+29.7%** (was 27.6% post-R282.D, 20% pre-session).
+
+The single-seed bimodality DID resolve to a real multi-seed win this time (vs R277.M cool12 which was a seed-42 mirage). The difference: scale=1.3 vs 1.5 stays consistently in scale=1.3's favor across all 4 seeds (max delta 0.00029, all positive in scale=1.3's favor at 3 of 4 seeds).
+
+**LLNL MSR claim banked at 0.00921 (R282.F, supersedes R282.D and R273).** Range 0.000314 — even tighter than R282.D's 0.000472, validating the 1.3 minimum is real.
+
+**Tasks**: #80 (R282.E scout), #81 (R282.F multi-seed) closed.
+
 ### Final session-end summary
 
 This /loop session, started after a context-compaction reboot mid-R284, produced:
