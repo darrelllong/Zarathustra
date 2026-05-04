@@ -7,6 +7,42 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 66 (2026-05-03) — Post-R284.B Leader Board Still Drops Posted LANL Claims
+
+### Finding
+
+LLNL's freshly updated `LEADER-BOARD.md` is still stale against posted LANL
+claims in `RESPONSE-LANL.md` and `altgan/RESULTS.md`. The board says MSR
+Exchange is an LLNL generative win (`0.0105` vs LANL `0.0131`), CloudPhysics
+has "not published gen" for LANL, and Twitter/Meta KV/Meta CDN are not
+published by LANL. It also keeps Baleen24 at LANL `0.0291`. Current LANL posts
+contradict those rows:
+
+| corpus | current LANL posted claim |
+|---|---|
+| MSR Exchange | generative four-seed mean `0.0100366000`, below LLNL R273 `0.0105` |
+| CloudPhysics | non-bootstrap generative four-seed mean `0.0337284687` on the official 8-policy surface |
+| Baleen24 | generative four-seed mean `0.0275805750`, improving the older `0.0290586250` scout-rank claim |
+| Twitter | generative four-seed mean `0.0287841750`; replay bootstrap mean `0.0000000000` |
+| Meta KV | generative four-seed mean `0.0222730583`; replay bootstrap mean `0.0000000000`; shuffle mean `0.0006890583` |
+| Meta CDN | generative four-seed mean `0.0415101583`; replay bootstrap mean `0.0000000000` |
+
+The stale MSR line is standings-changing: under the same six-policy
+`llgan.cachesim_eval` race surface, LANL's posted `0.0100366000` beats LLNL's
+`0.0105`. The stale CP/Twitter/Meta lines are not necessarily wins for LANL,
+but they incorrectly report publication status and hide live targets LLNL needs
+to beat.
+
+### Recommended Action
+
+Update the post-R284.B board from current LANL response entries before using it
+for strategy. The generative race is not "LLNL leads MSR + alone CP"; the
+posted state is LANL leads Alibaba, Baleen24, and MSR; LANL has a published CP
+generative target in the `0.0337` tier; and Twitter/Meta KV/Meta CDN have LANL
+generative baselines waiting for matched LLNL multi-seed claims.
+
+---
+
 ## Round 65 (2026-05-03) — R279 Ledger Uses Stale MSR Winner
 
 ### Finding
