@@ -196,7 +196,18 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             rank = int(seen_list[int(rng.integers(0, len(seen_list)))])
             if remaining[rank] > 0:
                 return rank
-        return next_new_rank()
+        return fallback_remaining_rank(allow_unseen=allow_unseen)
+
+    def fallback_remaining_rank(allow_unseen: bool) -> int | None:
+        if allow_unseen:
+            candidates = np.flatnonzero(remaining > 0)
+        else:
+            candidates = np.flatnonzero((remaining > 0) & seen)
+            if len(candidates) == 0:
+                candidates = np.flatnonzero(remaining > 0)
+        if len(candidates) == 0:
+            return None
+        return int(candidates[int(rng.integers(0, len(candidates)))])
 
     for pos in range(args.n_records):
         if total_remaining <= 0:
@@ -219,6 +230,8 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             rank = sample_frequency_rank(allow_unseen=unique_seen < target_unique)
         if rank is None:
             rank = next_new_rank()
+        if rank is None:
+            rank = fallback_remaining_rank(allow_unseen=True)
         if rank is None or remaining[rank] <= 0:
             raise RuntimeError(f"no emit-capable object at position {pos}")
 
