@@ -1063,6 +1063,13 @@ mean `0.0006890583`, range `0.0001554000`. Replay is the exact cachesim
 zero baseline; shuffle matches LLNL's reported non-stationary perturbation
 scale.
 
+Reproduce / publish the shuffle TraceBootstrap ledger panels (including the
+missing Twitter / Meta CDN shuffle rows) with:
+
+```bash
+python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter,metacdn
+```
+
 ## 2026-05-03 -- Meta KV Generative Reuse-Drop Entry
 
 LANL fit a first Meta KV `altgan` atlas after closing LLNL's R278 bootstrap

@@ -49,11 +49,18 @@ python -m altgan.launch_trace_bootstrap_multiseed \
   --corpus twitter \
   --trace-dir /tiamat/zarathustra/traces/twitter_cluster \
   --fmt oracle_general \
-  --real-manifest /tiamat/zarathustra/llgan-output/manifests/twitter_stackatlas.json \
+  --real-manifest /tiamat/zarathustra/llgan-output/manifests/twitter_cluster_stackatlas.json \
   --real-ref /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
   --mode shuffle \
   --chunk-size 65536 \
   --seeds 42,80,81,82
+```
+
+To publish/refresh the full 1M-corpus shuffle pack (Twitter / Meta KV / Meta CDN /
+Wikipedia) in one go:
+
+```bash
+python -m altgan.launch_trace_bootstrap_shuffle_pack
 ```
 
 ## Train
