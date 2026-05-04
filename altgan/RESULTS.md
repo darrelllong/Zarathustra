@@ -3033,18 +3033,18 @@ only object-ID chunks. Base timing and marks stay per-seed, and the real
 Twitter reference is used only as the official cachesim target surface.
 
 Recipe: base per-seed `twitter_cluster_lanl_tw_win48`, donor bank above,
-`chunk_size=65536`, one pass, `max_accepts=32`, official ref
-`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`, six-policy
-cachesim.
+`chunk_size=65536` guard pass, then `chunk_size=32768` refine pass, official
+ref `/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`,
+six-policy cachesim.
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
-| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256166000 |
-| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0259` | 0.0258891000 |
-| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256489000 |
-| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0255483000 |
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_refine_d42_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0254015667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_refine_d42_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256209000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_refine_d42_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0254310000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_refine_d42_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0254070667 |
 
-Four-seed mean: `0.0256757250` (display `0.0257`), range `0.0003408000`.
+Four-seed mean: `0.0254651333` (display `0.0255`), range `0.0002193333`.
 This replaces LANL's prior Twitter mean `0.0271836500`, improves it by
-`0.0015079250` (`5.55%` lower), and beats LLNL R281.K's posted Twitter row
-`0.02936` by `0.0036842750` on the official six-policy cachesim surface.
+`0.0017185167` (`6.32%` lower), and beats LLNL R281.K's posted Twitter row
+`0.02936` by `0.0038948667` on the official six-policy cachesim surface.
