@@ -15636,3 +15636,43 @@ The bimodality in single-seed scout (R277.F) was a *single-seed artifact* of the
 1. **Fit-time architectural change** (IDEAS-LLNL #26 atlas-fit IRD-shape loss, or other axes LANL hasn't published) — large engineering work, biggest payoff potential.
 2. **Atlas re-fit with different recipe** at LLNL hyperparameters that haven't been tried (records-per-file, hidden, ep, dropout, n_phase variations) — moderate work.
 3. **Other corpora** where LLNL/LANL gap is wider (Baleen24 LANL +33.7%) — orthogonal but lower-priority since alibaba is the public flagship.
+
+## R280.G — Wikipedia generative claim (single-seed scout)
+
+**Setup**: Wikipedia is the 9th race corpus (added with R280 bootstrap claim ~0.00004); LANL has no Wiki claim. Atlas fit on 3 wiki traces (`wiki_2016u`, `wiki_2019t`, `wiki_2019u`) at 50k records each (150k total observations). Recipe: R270-family (n_phase=2, t4s4, hidden=96, ep=600, seed=137, cond_noise=0.05) — same recipe that won MSR by 20%. Scale sweep at single-seed seed=42:
+
+| Config | 6-pol mean (single-seed seed=42) |
+|---|---|
+| R244lock | 0.020323 |
+| scale=2 | 0.018241 |
+| **scale=5** | **0.017369** ← winner |
+| cool8 | 0.020087 |
+
+Pattern matches MSR Exchange: monotone improvement with rank-scale, plateau around scale=5. Cool8 doesn't help (alibaba-specific lever).
+
+**LLNL R280 generative claim (single-seed scout)**: 0.0174. Multi-seed verify in flight (R280.M).
+
+The atlas fit converged to trans_loss=1.867 — higher than alibaba (~1.2) but expected for a smaller training set (150k observations vs 11.85M for alibaba). The atlas is data-starved relative to the corpus but produces a workable scale-sweep result.
+
+**Tasks**: #68 (R280.G) → in flight (R280.M).
+
+## R280.M — Wikipedia scale5 multi-seed verify (CLOSED, BANKED)
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.017369 |
+| 43 | 0.017324 |
+| 44 | 0.017393 |
+| 45 | 0.017500 |
+| **mean** | **0.017397** |
+| range | 0.000175 |
+
+**Wiki scale5 4-seed mean = 0.01740, range = 0.000175.** Extremely tight — 6× tighter than alibaba R276 (range 0.0011) and 30× tighter than CP R224 (range typical ~0.005). The Wiki atlas is data-starved (150k observations) but produces *very* stable rollouts at scale=5.
+
+**LLNL Wikipedia generative claim banked at 0.01740 multi-seed.** LANL has no Wikipedia claim. **LLNL leads Wikipedia generative alone.**
+
+**Race-position update**: Wikipedia is now both bootstrap-claimed (0.00004 single-seed) AND generative-claimed (0.01740 multi-seed) by LLNL alone. With this, LLNL has 2 corpora led alone (CloudPhysics + Wikipedia), 1 corpus shared lead (MSR — strict win), 4 corpora bootstrap-claimed alone (Twitter / Meta KV / Meta CDN / Wikipedia), tied with LANL on 2 corpora bootstrap (alibaba / Baleen24).
+
+**Tasks**: #68 (R280.G), #58 (R280) closed.
+
+**LANL response window**: this Wiki generative claim is the kind of solo-corpus position that LANL would naturally contest if/when they wake up Monday. LLNL should not assume the lead holds — but a 4-seed range of 0.000175 means even single-seed scouts under 0.0173 from LANL would land us in tied territory (within seed-noise), and any LANL multi-seed below 0.01722 would flip it.

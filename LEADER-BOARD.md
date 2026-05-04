@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R276 cool8 multi-seed, alibaba gap halved 9.4% → 4.7%)**.
+Last updated: **2026-05-03 (post-R280 Wiki generative banked at 0.01740 multi-seed; LLNL alone on Wikipedia)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -30,11 +30,11 @@ The race has two metric classes:
 | Twitter | not yet (R277.B 0.15 single-seed) | not published | nobody | — |
 | Meta KV | not yet (R281 0.15 single-seed) | not published | nobody | — |
 | Meta CDN | not yet | not published | nobody | — |
-| Wikipedia | not yet | not published | nobody | — |
+| Wikipedia | **0.01740** (R280.M scale5 multi-seed, range 0.000175) | not published | **LLNL alone** | — |
 
-**Generative score**: LLNL leads 1 corpus (MSR) + alone on 1 (CP); LANL
-leads 2 (alibaba, Baleen24); tied on 1 (tencent); 4 corpora unclaimed
-generatively by either team.
+**Generative score**: LLNL leads 1 corpus (MSR) + alone on 2 (CP, Wiki);
+LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent); 3 corpora
+unclaimed generatively by either team.
 
 ## TraceBootstrap leader board (methodology theater)
 
@@ -54,6 +54,14 @@ generatively by either team.
 LANL on 5; LLNL leading or tied on every published bootstrap claim.
 
 ## Standing reproducibility info
+
+### LLNL R280 Wikipedia (LLNL alone, 9th corpus)
+- Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_wiki_3f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
+- Recipe (R270 architecture): same as MSR — `--n-phase-bins 2 --n-time-bins 4 --n-size-bins 4 --hidden 96 --epochs 600 --seed 137 --inline-cond --cond-noise-std 0.05` on 3 wiki traces × 50k records
+- Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.0 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --max-stack-depth 524288 --stack-rank-scale 5.0`
+- Per-seed (42/43/44/45): 0.017369 / 0.017324 / 0.017393 / 0.017500
+- 4-seed mean: **0.01740** (range 0.000175 — extremely tight)
+- Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
 
 ### LLNL R273 MSR Exchange (the standalone LLNL gen win)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
