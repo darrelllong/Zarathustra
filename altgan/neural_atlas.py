@@ -146,6 +146,16 @@ class NeuralAtlasModel:
         stack_anchor_pool_min_rank: int = 0,
         stack_anchor_pool_max_rank: int | None = None,
         stack_anchor_pool_sample_attempts: int = 8,
+        stack_delayed_reuse_prob: float = 0.0,
+        stack_delayed_reuse_position_probs: Sequence[float] | None = None,
+        stack_delayed_reuse_schedule_prob: float = 0.0,
+        stack_delayed_reuse_schedule_reuses: bool = False,
+        stack_delayed_reuse_min_delay: int = 8192,
+        stack_delayed_reuse_max_delay: int = 65536,
+        stack_delayed_reuse_min_rank: int = 0,
+        stack_delayed_reuse_max_rank: int | None = None,
+        stack_delayed_reuse_max_pending: int = 4096,
+        stack_delayed_reuse_sample_attempts: int = 8,
         stack_tail_reuse_prob: float = 0.0,
         stack_tail_reuse_position_probs: Sequence[float] | None = None,
         stack_tail_reuse_min_frac: float = 0.5,
@@ -342,9 +352,15 @@ class NeuralAtlasModel:
             anchor_counts: Counter[int] = Counter()
             anchor_last_pos: dict[int, int] = {}
             rank_pmf_feedback_counts: Dict[int, np.ndarray] = {}
+            delayed_due: dict[int, deque[int]] = {}
+            delayed_ready: deque[int] = deque()
+            delayed_pending = 0
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
 
             for pos in range(per_stream):
+                due_now = delayed_due.pop(pos, None)
+                if due_now:
+                    delayed_ready.extend(due_now)
                 if stack_hot_pool_prob > 0.0 and pos % 512 == 0 and hot_counts:
                     hot_pool = hot_counts.most_common(stack_hot_pool_k)
                 if (
@@ -405,6 +421,12 @@ class NeuralAtlasModel:
                     per_stream,
                     stack_anchor_pool_prob,
                 )
+                delayed_reuse_prob = _position_value(
+                    stack_delayed_reuse_position_probs,
+                    pos,
+                    per_stream,
+                    stack_delayed_reuse_prob,
+                )
                 reuse_drop_prob = _position_value(
                     stack_reuse_drop_position_probs,
                     pos,
@@ -446,6 +468,35 @@ class NeuralAtlasModel:
                             rank_power=stack_rank_band_reuse_power,
                             rng=rng,
                         )
+                    elif (
+                        not boosted_reuse
+                        and delayed_reuse_prob > 0.0
+                        and delayed_ready
+                        and rng.random() < delayed_reuse_prob
+                    ):
+                        rank_from_delayed, delayed_popped = _rank_from_delayed_pool(
+                            stack,
+                            delayed_ready,
+                            min_rank=stack_delayed_reuse_min_rank,
+                            max_rank=stack_delayed_reuse_max_rank,
+                            sample_attempts=stack_delayed_reuse_sample_attempts,
+                        )
+                        delayed_pending = max(delayed_pending - delayed_popped, 0)
+                        if rank_from_delayed is not None:
+                            rank = rank_from_delayed
+                        else:
+                            phase_rank_scale = _phase_value(stack_rank_phase_scales, phase, position_rank_scale)
+                            phase_rank_max = _phase_value(stack_rank_phase_maxes, phase, stack_rank_max)
+                            if phase_rank_max is not None and phase_rank_max < 0:
+                                phase_rank_max = None
+                            rank = _calibrated_stack_rank(
+                                ev.stack_distance,
+                                stack_rank_scale=phase_rank_scale,
+                                stack_rank_max=phase_rank_max,
+                                stack_rank_tail_pivot=stack_rank_tail_pivot,
+                                stack_rank_tail_scale=stack_rank_tail_scale,
+                                stack_len=len(stack),
+                            )
                     elif (
                         not boosted_reuse
                         and anchor_pool_prob > 0.0
@@ -651,6 +702,7 @@ class NeuralAtlasModel:
                     effective_stack_distance = int(rank)
                     effective_action_class = _action_class(effective_stack_distance)
                     obj_id = stack.move_to_front(rank)
+                    emitted_new = False
                     if (
                         stack_rank_pmf_feedback_strength > 0.0
                         and rank_pmf_edges is not None
@@ -671,6 +723,7 @@ class NeuralAtlasModel:
                     )
                     stack.insert_front(obj_id)
                     in_stack.add(obj_id)
+                    emitted_new = True
                 mark_dist_state = _dist_state_from_stack_distance(
                     effective_stack_distance,
                     rank_state_edges,
@@ -753,6 +806,18 @@ class NeuralAtlasModel:
                     "stack_distance": effective_stack_distance,
                     "action_class": effective_action_class,
                 })
+                if (
+                    stack_delayed_reuse_schedule_prob > 0.0
+                    and delayed_pending < max(int(stack_delayed_reuse_max_pending), 1)
+                    and (emitted_new or stack_delayed_reuse_schedule_reuses)
+                    and rng.random() < stack_delayed_reuse_schedule_prob
+                ):
+                    lo_delay = max(int(stack_delayed_reuse_min_delay), 1)
+                    hi_delay = max(int(stack_delayed_reuse_max_delay), lo_delay)
+                    due_pos = pos + int(rng.integers(lo_delay, hi_delay + 1))
+                    if due_pos < per_stream:
+                        delayed_due.setdefault(due_pos, deque()).append(int(obj_id))
+                        delayed_pending += 1
                 if stack_hot_pool_prob > 0.0 or stack_hot_pool_position_probs:
                     if len(hot_window) >= stack_hot_pool_window:
                         old_obj = hot_window.popleft()
@@ -1566,6 +1631,34 @@ def _rank_from_object_pool(
             continue
         return rank
     return None
+
+
+def _rank_from_delayed_pool(
+    stack,
+    ready: deque[int],
+    *,
+    min_rank: int,
+    max_rank: int | None,
+    sample_attempts: int,
+) -> tuple[int | None, int]:
+    if not ready:
+        return None, 0
+    lo = max(int(min_rank), 0)
+    hi = None if max_rank is None else max(int(max_rank), lo)
+    popped = 0
+    for _ in range(min(max(int(sample_attempts), 1), len(ready))):
+        obj_id = int(ready.popleft())
+        popped += 1
+        try:
+            rank = int(stack.index(obj_id))
+        except ValueError:
+            continue
+        if rank < lo:
+            continue
+        if hi is not None and rank > hi:
+            continue
+        return rank, popped
+    return None, popped
 
 
 class _RankedLRUNode:

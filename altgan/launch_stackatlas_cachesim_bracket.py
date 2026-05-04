@@ -73,6 +73,16 @@ class Spec:
     anchor_pool_min_rank: int = 0
     anchor_pool_max_rank: int = -1
     anchor_pool_sample_attempts: int = 8
+    delayed_reuse_prob: float = 0.0
+    delayed_reuse_position_probs: str = ""
+    delayed_reuse_schedule_prob: float = 0.0
+    delayed_reuse_schedule_reuses: int = 0
+    delayed_reuse_min_delay: int = 8192
+    delayed_reuse_max_delay: int = 65536
+    delayed_reuse_min_rank: int = 0
+    delayed_reuse_max_rank: int = -1
+    delayed_reuse_max_pending: int = 4096
+    delayed_reuse_sample_attempts: int = 8
     recent_pool_prob: float = 0.15
     recent_pool_position_probs: str = ""
     recent_pool_window: int = 16
@@ -209,6 +219,26 @@ def _parse_spec(text: str) -> Spec:
         "apmaxrank": "anchor_pool_max_rank",
         "ap_attempts": "anchor_pool_sample_attempts",
         "apattempts": "anchor_pool_sample_attempts",
+        "dr": "delayed_reuse_prob",
+        "delay": "delayed_reuse_prob",
+        "dr_pos": "delayed_reuse_position_probs",
+        "drpos": "delayed_reuse_position_probs",
+        "drsched": "delayed_reuse_schedule_prob",
+        "dr_schedule": "delayed_reuse_schedule_prob",
+        "dr_reuses": "delayed_reuse_schedule_reuses",
+        "drreuses": "delayed_reuse_schedule_reuses",
+        "dr_min_delay": "delayed_reuse_min_delay",
+        "drmindelay": "delayed_reuse_min_delay",
+        "dr_max_delay": "delayed_reuse_max_delay",
+        "drmaxdelay": "delayed_reuse_max_delay",
+        "dr_min_rank": "delayed_reuse_min_rank",
+        "drminrank": "delayed_reuse_min_rank",
+        "dr_max_rank": "delayed_reuse_max_rank",
+        "drmaxrank": "delayed_reuse_max_rank",
+        "dr_max_pending": "delayed_reuse_max_pending",
+        "drmaxpending": "delayed_reuse_max_pending",
+        "dr_attempts": "delayed_reuse_sample_attempts",
+        "drattempts": "delayed_reuse_sample_attempts",
         "rp": "recent_pool_prob",
         "rp_pos": "recent_pool_position_probs",
         "rppos": "recent_pool_position_probs",
@@ -267,6 +297,7 @@ def _auto_name(spec: Spec) -> str:
         f"-{spec.frequency_pool_max_count_rank}"
         f"_ap{_tag(spec.anchor_pool_prob)}k{spec.anchor_pool_k}"
         f"prom{_tag(spec.anchor_pool_promote_prob)}"
+        f"_dr{_tag(spec.delayed_reuse_prob)}s{_tag(spec.delayed_reuse_schedule_prob)}"
         f"_rp{_tag(spec.recent_pool_prob)}"
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
@@ -442,6 +473,24 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.anchor_pool_max_rank),
         "--stack-anchor-pool-sample-attempts",
         str(spec.anchor_pool_sample_attempts),
+        "--stack-delayed-reuse-prob",
+        str(spec.delayed_reuse_prob),
+        "--stack-delayed-reuse-position-probs",
+        spec.delayed_reuse_position_probs,
+        "--stack-delayed-reuse-schedule-prob",
+        str(spec.delayed_reuse_schedule_prob),
+        "--stack-delayed-reuse-min-delay",
+        str(spec.delayed_reuse_min_delay),
+        "--stack-delayed-reuse-max-delay",
+        str(spec.delayed_reuse_max_delay),
+        "--stack-delayed-reuse-min-rank",
+        str(spec.delayed_reuse_min_rank),
+        "--stack-delayed-reuse-max-rank",
+        str(spec.delayed_reuse_max_rank),
+        "--stack-delayed-reuse-max-pending",
+        str(spec.delayed_reuse_max_pending),
+        "--stack-delayed-reuse-sample-attempts",
+        str(spec.delayed_reuse_sample_attempts),
         "--stack-recent-pool-prob",
         str(spec.recent_pool_prob),
         "--stack-recent-pool-position-probs",
@@ -476,6 +525,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         ])
     if spec.rank_pmf_target_real > 0:
         cmd.append("--stack-rank-pmf-target-real")
+    if spec.delayed_reuse_schedule_reuses > 0:
+        cmd.append("--stack-delayed-reuse-schedule-reuses")
     if args.force_phase:
         cmd.insert(cmd.index("--stack-adj-dup-prob"), "--force-phase-schedule")
     return cmd

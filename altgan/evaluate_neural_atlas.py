@@ -167,6 +167,26 @@ def _parse_args() -> argparse.Namespace:
                    help="Maximum current LRU stack rank for anchor-pool redirects; negative disables.")
     p.add_argument("--stack-anchor-pool-sample-attempts", type=int, default=8,
                    help="Number of anchor-pool samples tried to satisfy age/rank filters.")
+    p.add_argument("--stack-delayed-reuse-prob", type=float, default=0.0,
+                   help="Probability of redirecting a sampled reuse to a due delayed object echo.")
+    p.add_argument("--stack-delayed-reuse-position-probs", default="",
+                   help="Comma-separated per-position-bin delayed-reuse probabilities.")
+    p.add_argument("--stack-delayed-reuse-schedule-prob", type=float, default=0.0,
+                   help="Probability of scheduling an emitted object for a future delayed reuse.")
+    p.add_argument("--stack-delayed-reuse-schedule-reuses", action="store_true",
+                   help="Allow reused objects, not only new objects, to schedule delayed echoes.")
+    p.add_argument("--stack-delayed-reuse-min-delay", type=int, default=8192,
+                   help="Minimum stream-position delay for scheduled object echoes.")
+    p.add_argument("--stack-delayed-reuse-max-delay", type=int, default=65536,
+                   help="Maximum stream-position delay for scheduled object echoes.")
+    p.add_argument("--stack-delayed-reuse-min-rank", type=int, default=0,
+                   help="Minimum current LRU rank for delayed-reuse redirects.")
+    p.add_argument("--stack-delayed-reuse-max-rank", type=int, default=-1,
+                   help="Maximum current LRU rank for delayed-reuse redirects; negative disables.")
+    p.add_argument("--stack-delayed-reuse-max-pending", type=int, default=4096,
+                   help="Maximum scheduled delayed objects per generated stream.")
+    p.add_argument("--stack-delayed-reuse-sample-attempts", type=int, default=8,
+                   help="Number of due delayed objects tried to satisfy rank gates.")
     p.add_argument("--stack-tail-reuse-prob", type=float, default=0.0,
                    help="Probability of redirecting a sampled reuse to a deep stack-tail object.")
     p.add_argument("--stack-tail-reuse-position-probs", default="",
@@ -330,6 +350,16 @@ def main() -> int:
         stack_anchor_pool_min_rank=args.stack_anchor_pool_min_rank,
         stack_anchor_pool_max_rank=None if args.stack_anchor_pool_max_rank < 0 else args.stack_anchor_pool_max_rank,
         stack_anchor_pool_sample_attempts=args.stack_anchor_pool_sample_attempts,
+        stack_delayed_reuse_prob=args.stack_delayed_reuse_prob,
+        stack_delayed_reuse_position_probs=_parse_float_list(args.stack_delayed_reuse_position_probs),
+        stack_delayed_reuse_schedule_prob=args.stack_delayed_reuse_schedule_prob,
+        stack_delayed_reuse_schedule_reuses=args.stack_delayed_reuse_schedule_reuses,
+        stack_delayed_reuse_min_delay=args.stack_delayed_reuse_min_delay,
+        stack_delayed_reuse_max_delay=args.stack_delayed_reuse_max_delay,
+        stack_delayed_reuse_min_rank=args.stack_delayed_reuse_min_rank,
+        stack_delayed_reuse_max_rank=None if args.stack_delayed_reuse_max_rank < 0 else args.stack_delayed_reuse_max_rank,
+        stack_delayed_reuse_max_pending=args.stack_delayed_reuse_max_pending,
+        stack_delayed_reuse_sample_attempts=args.stack_delayed_reuse_sample_attempts,
         stack_tail_reuse_prob=args.stack_tail_reuse_prob,
         stack_tail_reuse_position_probs=_parse_float_list(args.stack_tail_reuse_position_probs),
         stack_tail_reuse_min_frac=args.stack_tail_reuse_min_frac,
@@ -450,6 +480,16 @@ def main() -> int:
         "stack_anchor_pool_min_rank": args.stack_anchor_pool_min_rank,
         "stack_anchor_pool_max_rank": args.stack_anchor_pool_max_rank,
         "stack_anchor_pool_sample_attempts": args.stack_anchor_pool_sample_attempts,
+        "stack_delayed_reuse_prob": args.stack_delayed_reuse_prob,
+        "stack_delayed_reuse_position_probs": _parse_float_list(args.stack_delayed_reuse_position_probs),
+        "stack_delayed_reuse_schedule_prob": args.stack_delayed_reuse_schedule_prob,
+        "stack_delayed_reuse_schedule_reuses": args.stack_delayed_reuse_schedule_reuses,
+        "stack_delayed_reuse_min_delay": args.stack_delayed_reuse_min_delay,
+        "stack_delayed_reuse_max_delay": args.stack_delayed_reuse_max_delay,
+        "stack_delayed_reuse_min_rank": args.stack_delayed_reuse_min_rank,
+        "stack_delayed_reuse_max_rank": args.stack_delayed_reuse_max_rank,
+        "stack_delayed_reuse_max_pending": args.stack_delayed_reuse_max_pending,
+        "stack_delayed_reuse_sample_attempts": args.stack_delayed_reuse_sample_attempts,
         "stack_tail_reuse_prob": args.stack_tail_reuse_prob,
         "stack_tail_reuse_position_probs": _parse_float_list(args.stack_tail_reuse_position_probs),
         "stack_tail_reuse_min_frac": args.stack_tail_reuse_min_frac,
