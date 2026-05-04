@@ -141,6 +141,7 @@ class NeuralAtlasModel:
         stack_frequency_pool_min_age: int = 0,
         stack_frequency_pool_min_rank: int = 0,
         stack_frequency_pool_max_rank: int | None = None,
+        stack_frequency_pool_max_search: int = 0,
         stack_frequency_pool_sample_attempts: int = 8,
         stack_anchor_pool_prob: float = 0.0,
         stack_anchor_pool_position_probs: Sequence[float] | None = None,
@@ -281,6 +282,7 @@ class NeuralAtlasModel:
         stack_frequency_pool_min_rank = max(int(stack_frequency_pool_min_rank), 0)
         if stack_frequency_pool_max_rank is not None and stack_frequency_pool_max_rank < 0:
             stack_frequency_pool_max_rank = None
+        stack_frequency_pool_max_search = max(int(stack_frequency_pool_max_search), 0)
         stack_frequency_pool_sample_attempts = max(int(stack_frequency_pool_sample_attempts), 1)
         stack_tail_reuse_prob = float(np.clip(stack_tail_reuse_prob, 0.0, 1.0))
         stack_tail_reuse_position_probs = _clip_prob_list(stack_tail_reuse_position_probs)
@@ -624,7 +626,7 @@ class NeuralAtlasModel:
                             min_rank=stack_frequency_pool_min_rank,
                             max_rank=stack_frequency_pool_max_rank,
                             weight_power=stack_frequency_pool_weight_power,
-                            max_search=0,
+                            max_search=stack_frequency_pool_max_search,
                             sample_attempts=stack_frequency_pool_sample_attempts,
                             rng=rng,
                         )

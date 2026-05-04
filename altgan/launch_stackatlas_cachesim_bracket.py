@@ -68,6 +68,7 @@ class Spec:
     frequency_pool_min_age: int = 0
     frequency_pool_min_rank: int = 0
     frequency_pool_max_rank: int = -1
+    frequency_pool_max_search: int = 0
     frequency_pool_sample_attempts: int = 8
     anchor_pool_prob: float = 0.0
     anchor_pool_position_probs: str = ""
@@ -214,6 +215,10 @@ def _parse_spec(text: str) -> Spec:
         "fpminrank": "frequency_pool_min_rank",
         "fp_max_rank": "frequency_pool_max_rank",
         "fpmaxrank": "frequency_pool_max_rank",
+        "fp_max_search": "frequency_pool_max_search",
+        "fpmaxsearch": "frequency_pool_max_search",
+        "fp_search": "frequency_pool_max_search",
+        "fpsearch": "frequency_pool_max_search",
         "fp_attempts": "frequency_pool_sample_attempts",
         "fpattempts": "frequency_pool_sample_attempts",
         "ap": "anchor_pool_prob",
@@ -478,6 +483,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.frequency_pool_min_rank),
         "--stack-frequency-pool-max-rank",
         str(spec.frequency_pool_max_rank),
+        "--stack-frequency-pool-max-search",
+        str(spec.frequency_pool_max_search),
         "--stack-frequency-pool-sample-attempts",
         str(spec.frequency_pool_sample_attempts),
         "--stack-anchor-pool-prob",

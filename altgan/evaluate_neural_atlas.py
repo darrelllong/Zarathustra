@@ -157,6 +157,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Minimum current LRU stack rank for frequency-pool redirects.")
     p.add_argument("--stack-frequency-pool-max-rank", type=int, default=-1,
                    help="Maximum current LRU stack rank for frequency-pool redirects; negative disables.")
+    p.add_argument("--stack-frequency-pool-max-search", type=int, default=0,
+                   help="Optional maximum stack prefix searched for frequency-pool objects; 0 searches full stack.")
     p.add_argument("--stack-frequency-pool-sample-attempts", type=int, default=8,
                    help="Number of frequency-pool samples tried to satisfy age/rank filters.")
     p.add_argument("--stack-anchor-pool-prob", type=float, default=0.0,
@@ -360,6 +362,7 @@ def main() -> int:
         stack_frequency_pool_min_age=args.stack_frequency_pool_min_age,
         stack_frequency_pool_min_rank=args.stack_frequency_pool_min_rank,
         stack_frequency_pool_max_rank=None if args.stack_frequency_pool_max_rank < 0 else args.stack_frequency_pool_max_rank,
+        stack_frequency_pool_max_search=args.stack_frequency_pool_max_search,
         stack_frequency_pool_sample_attempts=args.stack_frequency_pool_sample_attempts,
         stack_anchor_pool_prob=args.stack_anchor_pool_prob,
         stack_anchor_pool_position_probs=_parse_float_list(args.stack_anchor_pool_position_probs),
@@ -496,6 +499,7 @@ def main() -> int:
         "stack_frequency_pool_min_age": args.stack_frequency_pool_min_age,
         "stack_frequency_pool_min_rank": args.stack_frequency_pool_min_rank,
         "stack_frequency_pool_max_rank": args.stack_frequency_pool_max_rank,
+        "stack_frequency_pool_max_search": args.stack_frequency_pool_max_search,
         "stack_frequency_pool_sample_attempts": args.stack_frequency_pool_sample_attempts,
         "stack_anchor_pool_prob": args.stack_anchor_pool_prob,
         "stack_anchor_pool_position_probs": _parse_float_list(args.stack_anchor_pool_position_probs),
