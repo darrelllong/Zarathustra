@@ -15377,3 +15377,57 @@ The remaining LANL advantage on alibaba is the atlas itself — the way LANL's t
 | CloudPhysics | 0.0338 (R224) | n/a | LLNL alone |
 
 Generative score: LLNL leads MSR + alone CP; LANL leads alibaba + Baleen24; tencent tied. **One TRUE win on each side, plus LLNL's CP.**
+
+## R284 — 2DIO (EuroSys 2026) head-to-head plan
+
+Wang, Khor, and Desnoyers (EuroSys '26, doi:10.1145/3767295.3769391; PDF at `pubs/2DIO_CacheAccurate_2026.pdf`) propose 2DIO, a synthetic-trace generator that explicitly shapes the inter-reference distance (IRD) distribution to reproduce non-concave LRU HRCs (cliffs and plateaus) that frequency-only generators (fio, IOMeter, Bonnie++) miss. Their evaluation reports LRU HRC-MAE in the range 0.02-0.05 across **eight specific traces**:
+
+- AliCloud: `v521`, `v538`, `v766`, `v827` (lengths 3M-1.2B; footprints 124k-33M)
+- CloudPhysics: `w11`, `w24`, `w44`, `w82` (lengths 14M-297M; footprints 190k-16M)
+
+### What 2DIO actually compares against
+
+Reference [43] in their bibliography is the **2024 NAS paper by Zhang, Yang, Xie, Wu, Li, Feng, Wildani, and Long** — "Accurate Generation of I/O Workloads Using Generative Adversarial Networks." That is the project's own pre-neural-atlas LSTM-GAN. 2DIO reproduces it from the open-sourced `Effygal/gan-io` repo at M=100, N=10k, 30 epochs, hidden=100-126, latent=10-16, batch=64-128, optimized via 50-trial Optuna search against MMD² and G-loss. Resulting MMD² range 0.005-0.118 across the eight traces; HRCs visibly mismatched in their Fig. 8.
+
+That LSTM-GAN is **not the current LLGAN architecture.** Roughly 121 rounds have run since the NAS paper:
+
+- R162-R178 cond-conditioned transition net (replaces LSTM-GAN entirely)
+- R180-R220 fine-bin rank PMF expanded to 43 bins covering 250k-deep IRD tail
+- R237 seed=137 + cond_noise=0.05 (deterministic R221-tier basin)
+- R244 cascading-lock knob audit (5-axis post-hoc rank shaping)
+- **R270 time × size × phase state binning** — ports altgan's architectural moat; 192-state space vs 12 in pre-R270
+- R263 scout-rank scale, R275 hot-pool cooldown + reuse-drop, R282 frequency-pool with rank-banding (full LANL post-hoc lever set)
+
+The current architecture optimizes IRD-shape directly via state-conditioned PMFs over 43-bin rank histograms — it is exactly the IRD-shape modeling 2DIO calls out as missing from MMD²-trained GANs. The 2DIO critique applies to the 2024 NAS LSTM-GAN; it does not apply to the post-R162 neural-atlas line.
+
+### Race position framing
+
+2DIO's MAE bar (LRU HRC, single-policy):
+- Median across 8 traces ≈ 0.03-0.04
+- Range 0.02-0.05
+
+LLNL R248 alibaba (multi-seed, 6-policy mean): **0.0131**. That's already in their MAE range on a strictly harder metric (mean over six policies, not just LRU). The numbers aren't directly comparable until run head-to-head on the same eight traces.
+
+### R284 execution plan
+
+**R284.A (setup)**: Locate the eight specific trace files on /tiamat. AliCloud at `/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/` (look for `v521.oracleGeneral.zst` etc.). CloudPhysics at `/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/` (look for `w11.oracleGeneral.zst` etc.). Build per-trace manifests + reference CSVs at the trace's natural footprint M (Table 1 lists M values 124k to 33M — manageable; cap N at the lesser of native length or 1M for pipeline speed).
+
+**R284.B (LLNL atlas + lever sweep per trace)**: For each of the 8 traces, run the current architecture's best configurations:
+- v-prefix (alibaba): R248 atlas + R244 lock; R270 atlas + R272 lock; R248 atlas + R275 cooldown=8 lock
+- w-prefix (CP): R224 atlas + R224 lock; R270-style CP atlas (need fresh fit) + scout-rank scale sweep
+Compute LRU HRC-MAE at normalized cache sizes (5%, 10%, 25%, 50%, 75%, 100% of M) per their Fig. 8 protocol. Single-seed; multi-seed any winner.
+
+**R284.C (2DIO own tool baseline)**: Pull `Effygal/trace-gen` (zenodo:17202588), build on baase via cargo/cmake, run their per-trace `θ` profiles per their Table 3:
+```
+trace-gen -m <M> -n 1000000 -p_irm <PIRM> -g zipf:<alpha> -fgen <fgen-spec>
+```
+Compute LRU HRC-MAE at the same normalized cache sizes. This is the 0.02-0.05 number to compare against.
+
+**R284.D (head-to-head writeup)**: Three-column table per trace:
+| trace | LLNL R248/R270 best | 2DIO own tool | original 2024 NAS LLGAN (reproduced) |
+
+If LLNL beats 2DIO on any of the eight, post the win loud. If 2DIO wins all eight, the gap is real and we owe a fit-time IRD-shape loss term in the next-architecture work (R285+).
+
+### Methodological note for the eventual writeup
+
+2DIO's argument is correct: a generator trained on `[LBA, Length]` distributional fidelity (the 2024 NAS LSTM-GAN) cannot reproduce HRC. That critique was already addressed in this project starting at R162 (move to state-conditioned transition nets that explicitly track stack-distance) and confirmed at R220 (extended-bins covering deep IRD tail). Calling the current LLNL architecture by the 2024 paper's name conflates two architectures separated by ~121 rounds of work.
