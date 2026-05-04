@@ -102,6 +102,8 @@ class NeuralAtlasModel:
         stack_rank_pmf_tail_bin_power: float | None = None,
         stack_rank_pmf_tail_power_pivot: int | None = None,
         stack_rank_pmf_local_prob: float = 0.0,
+        stack_rank_pmf_feedback_strength: float = 0.0,
+        stack_rank_pmf_feedback_alpha: float = 32.0,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -339,6 +341,7 @@ class NeuralAtlasModel:
             freq_pool: list[tuple[int, int]] = []
             anchor_counts: Counter[int] = Counter()
             anchor_last_pos: dict[int, int] = {}
+            rank_pmf_feedback_counts: Dict[int, np.ndarray] = {}
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
 
             for pos in range(per_stream):
@@ -622,6 +625,9 @@ class NeuralAtlasModel:
                                 bin_power=stack_rank_pmf_bin_power,
                                 tail_bin_power=stack_rank_pmf_tail_bin_power,
                                 tail_power_pivot=stack_rank_pmf_tail_power_pivot,
+                                feedback_counts=rank_pmf_feedback_counts.get(int(state)),
+                                feedback_strength=stack_rank_pmf_feedback_strength,
+                                feedback_alpha=stack_rank_pmf_feedback_alpha,
                                 rng=rng,
                             )
                             if rank is not None:
@@ -645,6 +651,15 @@ class NeuralAtlasModel:
                     effective_stack_distance = int(rank)
                     effective_action_class = _action_class(effective_stack_distance)
                     obj_id = stack.move_to_front(rank)
+                    if (
+                        stack_rank_pmf_feedback_strength > 0.0
+                        and rank_pmf_edges is not None
+                    ):
+                        counts = rank_pmf_feedback_counts.setdefault(
+                            int(state),
+                            np.zeros(len(rank_pmf_edges) - 1, dtype=np.float64),
+                        )
+                        counts[_rank_bin_index(effective_stack_distance, rank_pmf_edges)] += 1.0
                 else:
                     effective_stack_distance = int(ev.stack_distance)
                     effective_action_class = int(ev.action_class)
@@ -1314,6 +1329,9 @@ def _sample_rank_pmf(
     tail_bin_power: float | None,
     tail_power_pivot: int | None,
     rng: np.random.Generator,
+    feedback_counts: np.ndarray | None = None,
+    feedback_strength: float = 0.0,
+    feedback_alpha: float = 32.0,
 ) -> int | None:
     if edges is None or pmf is None or stack_len <= 0:
         return None
@@ -1325,6 +1343,25 @@ def _sample_rank_pmf(
         return None
     if abs(total - 1.0) > 1e-6:
         probs = probs / total
+    if (
+        feedback_counts is not None
+        and feedback_strength > 0.0
+        and len(feedback_counts) == len(probs)
+    ):
+        counts = np.asarray(feedback_counts, dtype=np.float64)
+        smooth = max(float(feedback_alpha), 0.0)
+        observed = counts + smooth * probs
+        observed_total = float(observed.sum())
+        if np.isfinite(observed_total) and observed_total > 0.0:
+            observed = observed / observed_total
+            correction = np.power(
+                probs / np.maximum(observed, 1e-12),
+                max(float(feedback_strength), 0.0),
+            )
+            shaped = probs * correction
+            shaped_total = float(shaped.sum())
+            if np.isfinite(shaped_total) and shaped_total > 0.0:
+                probs = shaped / shaped_total
     idx = int(rng.choice(len(probs), p=probs))
     lo = int(edges[idx])
     hi = int(edges[idx + 1]) - 1
