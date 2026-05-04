@@ -82,6 +82,9 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--rank-ird-smooth", action="store_true",
                    help="Blend sparse rank-buckets with neighbors instead of falling back to global. "
                         "Reduces cross-seed variance when tail buckets are under-sampled.")
+    p.add_argument("--heap-mode", choices=("due", "priority"), default="due",
+                   help="due preserves LANL's paced renewal heap; priority pops the smallest "
+                        "scheduled sleep key on each dependent arrival, matching 2DIO Gen-from-IRD.")
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
@@ -165,6 +168,7 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     obj_out = np.empty(args.n_records, dtype=np.uint64)
     total_remaining = int(remaining.sum())
     unique_seen = 0
+    heap_mode = getattr(args, "heap_mode", "due")
 
     def sample_ird(rank: int) -> int:
         source = profile.irds
@@ -193,6 +197,13 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
         versions[rank] += 1
         heapq.heappush(due_heap, (pos + sample_ird(rank), int(versions[rank]), rank))
 
+    def schedule_after(rank: int, due_key: int) -> None:
+        if remaining[rank] <= 0:
+            versions[rank] += 1
+            return
+        versions[rank] += 1
+        heapq.heappush(due_heap, (due_key + sample_ird(rank), int(versions[rank]), rank))
+
     def peek_due(pos: int) -> int | None:
         while due_heap:
             due, version, rank = due_heap[0]
@@ -210,6 +221,14 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             return None
         heapq.heappop(due_heap)
         return rank
+
+    def pop_priority() -> tuple[int, int] | None:
+        while due_heap:
+            due, version, rank = heapq.heappop(due_heap)
+            if remaining[rank] <= 0 or int(versions[rank]) != version:
+                continue
+            return int(rank), int(due)
+        return None
 
     def next_new_rank() -> int | None:
         nonlocal new_cursor
@@ -246,9 +265,50 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             return None
         return int(candidates[int(rng.integers(0, len(candidates)))])
 
+    if heap_mode == "priority":
+        for rank in range(footprint):
+            if remaining[rank] > 0:
+                versions[rank] += 1
+                heapq.heappush(due_heap, (sample_ird(rank), int(versions[rank]), int(rank)))
+
     for pos in range(args.n_records):
         if total_remaining <= 0:
             raise RuntimeError("frequency budget exhausted before n_records")
+        if heap_mode == "priority":
+            rank = None
+            due_key = pos
+            from_dependent = False
+            if rng.random() < args.independent_prob:
+                rank = sample_frequency_rank(allow_unseen=True)
+            if rank is None:
+                popped = pop_priority()
+                if popped is not None:
+                    rank, due_key = popped
+                    from_dependent = True
+            if rank is None:
+                rank = fallback_remaining_rank(allow_unseen=True)
+            if rank is None or remaining[rank] <= 0:
+                raise RuntimeError(f"no emit-capable object at position {pos}")
+
+            if not seen[rank]:
+                seen[rank] = True
+                seen_list.append(rank)
+                unique_seen += 1
+            remaining[rank] -= 1
+            total_remaining -= 1
+            obj_out[pos] = np.uint64(args.synthetic_base_id + rank)
+            if from_dependent:
+                schedule_after(rank, due_key)
+
+            if args.progress_interval > 0 and (pos + 1) % args.progress_interval == 0:
+                print(
+                    "[altgan.ird_renewal] "
+                    f"pos={pos + 1}/{args.n_records} unique={unique_seen}/{footprint} "
+                    f"pending={len(due_heap)} remaining={total_remaining}",
+                    flush=True,
+                )
+            continue
+
         target_unique = min(footprint, int(round((pos + 1) * footprint / args.n_records)))
         rank: int | None = None
         due_rank = peek_due(pos)
