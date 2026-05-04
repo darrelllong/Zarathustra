@@ -15947,6 +15947,43 @@ The single-seed bimodality DID resolve to a real multi-seed win this time (vs R2
 
 **Tasks**: #80 (R282.E scout), #81 (R282.F multi-seed) closed.
 
+## R283.G / R283.H — CP fine-fine scale finds tighter minimum at 0.7
+
+R283.G single-seed scout around scale=1.0:
+
+| Scale | 8-pol mean (seed=42) |
+|---|---|
+| 0.5 | 0.034361 |
+| **0.7** | **0.031391** ← new minimum |
+| 0.85 | 0.031718 |
+| 1.0 | 0.032701 (R283.E anchor reproduces) |
+| 1.15 | 0.033941 |
+| 1.3 | 0.034757 |
+
+Like MSR, CP's coarse-grid "scale=1.0 winner" was an artifact. Fine-fine at scale=0.7 beats by 4%.
+
+**R283.H multi-seed verify at scale=0.7**:
+
+| seed | 8-pol mean |
+|---|---|
+| 42 | 0.031391 |
+| 43 | 0.031072 |
+| 44 | 0.030922 |
+| 45 | 0.031045 |
+| **mean** | **0.031108** |
+| range | 0.000469 |
+
+**vs R283.E banked (0.0326)**: WIN by 1.52 mpp = **4.6% improvement**.
+**vs R224 baseline (0.0338)**: cumulative **8.0% improvement** since session start.
+
+**LLNL CP claim banked at 0.0311 (R283.H, supersedes R283.E and R224).** LLNL still alone on CP.
+
+### Pattern across MSR/CP fine-fine sweeps
+
+Both MSR (R282.E/F: scale 1.3 over 1.5) and CP (R283.G/H: scale 0.7 over 1.0) showed the same pattern: the *coarse-grid winner* was not the true minimum. Fine-fine sweeps at +/- 1 step around the coarse winner found a real, multi-seed-confirmed improvement of 3-5%. **General rule**: for every storage corpus with banked claim from a coarse scale-grid sweep, do one fine-fine pass before declaring the claim final. Memory entry should note this; next time a corpus is added, plan for two-stage scale tuning (coarse → fine-fine).
+
+**Tasks**: #82 (R283.G), #83 (R283.H) closed.
+
 ### Final session-end summary
 
 This /loop session, started after a context-compaction reboot mid-R284, produced:
