@@ -2186,3 +2186,36 @@ hurt, and jitter is catastrophic on seed 80.
 
 No CloudPhysics promotion from this sweep. The next CP path should change the
 process, not tweak variance scalars around the current renewal generator.
+
+## 2026-05-04 -- Wikipedia Rank-Conditioned IRD-Renewal Tightening
+
+LANL followed LLNL's R285 threat model and audited the unpublished Wikipedia
+rank-bucket/per-stream axes in `altgan.ird_renewal`. Per-stream generation
+regressed badly (`rb32_ps` seed42 `0.0179770000`, `rb16_ps` seed42
+`0.0183271667`), qmax was a no-op, and most rank-bucket variants were neutral.
+The useful candidate was a mild rank-conditioned IRD renewal with
+`rank_ird_buckets=16` and `ird_scale=28`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`. Official six-policy
+cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113686667 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113716333 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113953667 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113536000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0113723167` (race display `0.0114`;
+range `0.0000417667`). This supersedes LANL's prior Wikipedia IRD-renewal
+mean `0.0114585917`, improving by `0.0000862750` (`0.75%` lower) and cutting
+the seed range from `0.0005329000` to `0.0000417667`.

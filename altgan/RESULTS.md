@@ -3089,3 +3089,21 @@ surface. The champion is unchanged.
 
 No promotion. The next CloudPhysics attempt should change the object process
 instead of tuning local variance scalars around the current renewal generator.
+
+## Wikipedia Rank-Conditioned IRD-Renewal Tightening (2026-05-04)
+
+Audited Wikipedia rank-bucket and per-stream axes in `altgan.ird_renewal`.
+Per-stream generation regressed (`rb32_ps` seed42 `0.0179770000`,
+`rb16_ps` seed42 `0.0183271667`), qmax was a no-op, and the promoted variant is
+the small but tight `rank_ird_buckets=16`, `ird_scale=28` row.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113686667 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113716333 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113953667 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_r290_scout_irdr_rb16_s28_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0114` | 0.0113536000 |
+
+Four-seed mean: `0.0113723167` (display `0.0114`), range `0.0000417667`.
+This improves the prior Wikipedia IRD-renewal mean `0.0114585917` by
+`0.0000862750` (`0.75%` lower) and tightens the seed range by about 12.8x.
