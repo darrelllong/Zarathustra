@@ -4,6 +4,7 @@ Sweeps the axes LANL has NOT published results for:
   - rank_ird_buckets > 0 (finer per-rank IRD conditioning)
   - --per-stream (fit one renewal profile per stream)
   - ird_quantile_max < 1.0 (cap extreme tail IRDs to reduce seed variance)
+  - heap=priority (2DIO-style priority-sleep dependent arrivals)
 
 Compared to LANL's published baselines:
   Wikipedia: ird_s=32 ip=0.10 global → mean 0.01146 range 0.000533
@@ -28,7 +29,8 @@ Usage examples (run from repo root):
       --spec "rb32_s28:ird_s=28,ip=0.10,rb=32" \\
       --spec "rb16_ps:ird_s=32,ip=0.10,rb=16,per_stream=1" \\
       --spec "rb32_ps:ird_s=32,ip=0.10,rb=32,per_stream=1" \\
-      --spec "qmax99:ird_s=32,ip=0.10,qmax=0.99"
+      --spec "qmax99:ird_s=32,ip=0.10,qmax=0.99" \\
+      --spec "prio:ird_s=32,ip=0.10,heap=priority"
 
   # CloudPhysics sweep — finer rank_ird_buckets + per-stream + smoothing + quantile cap
   # LANL's rank_b=32 had range=0.0045 (seed-80 outlier at 0.0295 vs seed-42 0.0250).
@@ -78,6 +80,7 @@ class Spec:
     frequency_alpha: float = 1.0
     new_debt_priority: float = 0.85
     dependent_admit_prob: float = 1.0
+    heap_mode: str = "due"
 
 
 def _parse_spec(text: str) -> Spec:
@@ -98,6 +101,7 @@ def _parse_spec(text: str) -> Spec:
         "alpha": "frequency_alpha",
         "debt": "new_debt_priority",
         "admit": "dependent_admit_prob",
+        "heap": "heap_mode",
     }
     fields = {f.name: f for f in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs: dict[str, object] = {"name": name}
@@ -114,6 +118,8 @@ def _parse_spec(text: str) -> Spec:
         current_type = type(getattr(Spec(name="_"), fname))
         if current_type is bool:
             kwargs[fname] = value.strip() not in ("0", "false", "False", "no")
+        elif current_type is str:
+            kwargs[fname] = value.strip()
         else:
             kwargs[fname] = current_type(value.strip())
     if not kwargs.get("name"):
@@ -135,6 +141,8 @@ def _auto_name(spec: Spec) -> str:
         parts.append(f"jit{spec.ird_jitter:g}")
     if spec.frequency_alpha != 1.0:
         parts.append(f"fa{spec.frequency_alpha:g}")
+    if spec.heap_mode != "due":
+        parts.append(spec.heap_mode)
     return "_".join(parts)
 
 
@@ -173,6 +181,7 @@ def _renewal_cmd(
         "--frequency-alpha", str(spec.frequency_alpha),
         "--new-debt-priority", str(spec.new_debt_priority),
         "--dependent-admit-prob", str(spec.dependent_admit_prob),
+        "--heap-mode", spec.heap_mode,
         "--progress-interval", str(args.progress_interval),
     ]
     if spec.rank_ird_buckets > 0:
