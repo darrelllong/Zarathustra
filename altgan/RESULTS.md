@@ -2545,3 +2545,38 @@ The best follow-up is a rare deep-rank reuse boost on top of feedback-1.0:
 Four-seed mean: `0.0353353802`, range `0.0002590208`. This replaces the
 feedback-1.0 multi-seed mean `0.0353795990` as LANL's current best
 non-bootstrap CloudPhysics entry, but remains behind LLNL `0.0338`.
+
+## CloudPhysics Footprint-Controller Multi-Seed Lift (2026-05-03)
+
+Implemented route-level rank-PMF guards in `9ddb551` and stream footprint
+control in `cb0dcbc`. Route guards closed negative; stream footprint control is
+the lift. It uses real-manifest cumulative per-stream footprint curves so CP
+generation stops flattening very different real streams into four same-sized
+synthetic streams.
+
+Seed-42 scout summary:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| rank-PMF guard `g=0.10` | `mean HRC-MAE across policies: 0.0360` | 0.0360481875 | 0.0889545000 | 0.0700411667 |
+| footprint `ffb=0.50`, deadband `0.10` | `mean HRC-MAE across policies: 0.0339` | 0.0338825417 | 0.0985961667 | 0.0608405000 |
+| footprint + `reuse=0.004` | `mean HRC-MAE across policies: 0.0338` | 0.0337967500 | 0.0985816667 | 0.0607050000 |
+| footprint + `reuse=0.004`, `hp=0.03` | `mean HRC-MAE across policies: 0.0337` | 0.0336850208 | 0.0984810000 | 0.0607841667 |
+| footprint + `adj=0.15` | `mean HRC-MAE across policies: 0.0358` | 0.0357577917 | 0.0834795000 | 0.0731778333 |
+| footprint + `adj=0.25` | `mean HRC-MAE across policies: 0.0364` | 0.0363846042 | 0.1132591667 | 0.0477646667 |
+
+Promoted recipe: feedback-1.0 CP recipe plus
+`stack_footprint_target_real`, `stack_footprint_feedback_strength=0.50`,
+`stack_footprint_feedback_deadband=0.10`, `stack_reuse_boost_prob=0.004`,
+`stack_reuse_boost_min_rank=8192`, and `stack_hot_pool_prob=0.03`.
+
+| seed | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---:|---|---:|---:|---:|
+| 42 | `mean HRC-MAE across policies: 0.0337` | 0.0336850208 | 0.0984810000 | 0.0607841667 |
+| 80 | `mean HRC-MAE across policies: 0.0338` | 0.0338214792 | 0.0988440000 | 0.0591466667 |
+| 81 | `mean HRC-MAE across policies: 0.0336` | 0.0336096667 | 0.0985358333 | 0.0600906667 |
+| 82 | `mean HRC-MAE across policies: 0.0338` | 0.0337977083 | 0.0982730000 | 0.0616163333 |
+
+Four-seed mean: `0.0337284687`, range `0.0002118125`. Current LANL
+non-bootstrap CP best is now in the `0.0337` tier; the remaining visible tax is
+LFU.

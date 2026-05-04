@@ -1497,3 +1497,58 @@ Mean across seeds `{42,80,81,82}`: `0.0353353802` (race display `0.0353`;
 range `0.0002590208`). This improves LANL's feedback-1.0 CP mean
 `0.0353795990` by `0.0000442188` and replaces LANL's prior non-bootstrap CP
 best, but LLNL still leads CP at `0.0338`.
+
+## 2026-05-03 -- CloudPhysics: Route Guard Negative, Footprint Controller Multi-Seed Lift
+
+LANL added a route-level rank-PMF guard in `altgan` (`9ddb551`) and a
+stream-footprint controller in `altgan` (`cb0dcbc`). The guard tests whether
+all reuse routes should be corrected back toward fitted rank PMFs; it closes
+negative. The footprint controller is the useful architecture: it reads the
+real-manifest per-stream cumulative footprint curves and applies light
+new-vs-reuse pressure so CP's generated streams stop being four near-identical
+`~117k`-footprint streams. This targets the real CP heterogeneity directly.
+
+Seed-42 official 8-policy scouts:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| rank-PMF route guard `g=0.10` | `mean HRC-MAE across policies: 0.0360` | 0.0360481875 | 0.0889545000 | 0.0700411667 |
+| rank-PMF route guard `g=0.25` | `mean HRC-MAE across policies: 0.0371` | 0.0371336042 | 0.0788165000 | 0.0740413333 |
+| rank-PMF route guard `g=0.50` | `mean HRC-MAE across policies: 0.0399` | 0.0398634167 | 0.0618553333 | 0.0817495000 |
+| footprint `ffb=0.50`, deadband `0.05` | `mean HRC-MAE across policies: 0.0344` | 0.0344264167 | 0.0980495000 | 0.0635861667 |
+| footprint `ffb=0.25`, deadband `0.05` | `mean HRC-MAE across policies: 0.0342` | 0.0342397917 | 0.0981825000 | 0.0612868333 |
+| footprint `ffb=0.40`, deadband `0.05` | `mean HRC-MAE across policies: 0.0341` | 0.0341121042 | 0.0982243333 | 0.0621663333 |
+| footprint `ffb=0.50`, deadband `0.10` | `mean HRC-MAE across policies: 0.0339` | 0.0338825417 | 0.0985961667 | 0.0608405000 |
+| footprint + lower deep reuse `reuse=0.004` | `mean HRC-MAE across policies: 0.0338` | 0.0337967500 | 0.0985816667 | 0.0607050000 |
+| footprint + lower deep reuse + `hp=0.03` | `mean HRC-MAE across policies: 0.0337` | 0.0336850208 | 0.0984810000 | 0.0607841667 |
+| footprint + `hp=0.00` | `mean HRC-MAE across policies: 0.0343` | 0.0343450833 | 0.0988071667 | 0.0599728333 |
+| footprint + `adj=0.15` | `mean HRC-MAE across policies: 0.0358` | 0.0357577917 | 0.0834795000 | 0.0731778333 |
+| footprint + `adj=0.25` | `mean HRC-MAE across policies: 0.0364` | 0.0363846042 | 0.1132591667 | 0.0477646667 |
+
+Promoted CP recipe: standing rank-PMF feedback recipe plus
+`stack_footprint_target_real`, `stack_footprint_feedback_strength=0.50`,
+`stack_footprint_feedback_deadband=0.10`, `stack_reuse_boost_prob=0.004`,
+`stack_reuse_boost_min_rank=8192`, and `stack_hot_pool_prob=0.03`.
+
+Official CloudPhysics 8-policy command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---:|---|---|---:|---:|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_foot_hp003_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0336850208 | 0.0984810000 | 0.0607841667 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_foot_hp003_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0338` | 0.0338214792 | 0.0988440000 | 0.0591466667 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_foot_hp003_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0336` | 0.0336096667 | 0.0985358333 | 0.0600906667 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_foot_hp003_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0338` | 0.0337977083 | 0.0982730000 | 0.0616163333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0337284687` (race display `0.0337`;
+range `0.0002118125`). This replaces LANL's non-bootstrap CP best
+`0.0338323750` and moves LANL from behind LLNL's published `0.0338` CP display
+to the `0.0337` tier. Remaining tax is LFU; ordinary policies and LIRS improved
+from the stream-footprint architecture.
