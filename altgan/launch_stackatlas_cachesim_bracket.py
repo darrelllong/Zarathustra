@@ -33,6 +33,8 @@ class Spec:
     rank_pmf_tail_bin_power: float = -1.0
     rank_pmf_tail_power_pivot: int = -1
     rank_pmf_local_prob: float = 0.0
+    rank_pmf_target_real: int = 0
+    rank_pmf_target_blend: float = 1.0
     rank_pmf_feedback_strength: float = 0.0
     rank_pmf_feedback_alpha: float = 32.0
     adj_dup_prob: float = 0.0
@@ -122,6 +124,10 @@ def _parse_spec(text: str) -> Spec:
         "rpmf_pivot": "rank_pmf_tail_power_pivot",
         "rpmflocal": "rank_pmf_local_prob",
         "rpmf_local": "rank_pmf_local_prob",
+        "rpmftarget": "rank_pmf_target_real",
+        "rpmf_target": "rank_pmf_target_real",
+        "rpmftargetblend": "rank_pmf_target_blend",
+        "rpmf_target_blend": "rank_pmf_target_blend",
         "rpmffb": "rank_pmf_feedback_strength",
         "rpmf_fb": "rank_pmf_feedback_strength",
         "rpmffba": "rank_pmf_feedback_alpha",
@@ -250,6 +256,7 @@ def _auto_name(spec: Spec) -> str:
         f"x{_tag(spec.rank_pmf_scale)}pow{_tag(spec.rank_pmf_bin_power)}"
         f"tp{_tag(spec.rank_pmf_tail_bin_power)}piv{spec.rank_pmf_tail_power_pivot}"
         f"loc{_tag(spec.rank_pmf_local_prob)}"
+        f"tgt{spec.rank_pmf_target_real}b{_tag(spec.rank_pmf_target_blend)}"
         f"fb{_tag(spec.rank_pmf_feedback_strength)}"
         f"_adj{_tag(spec.adj_dup_prob)}"
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
@@ -349,6 +356,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_pmf_tail_power_pivot),
         "--stack-rank-pmf-local-prob",
         str(spec.rank_pmf_local_prob),
+        "--stack-rank-pmf-target-blend",
+        str(spec.rank_pmf_target_blend),
         "--stack-rank-pmf-feedback-strength",
         str(spec.rank_pmf_feedback_strength),
         "--stack-rank-pmf-feedback-alpha",
@@ -465,6 +474,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
             "--stack-reuse-drop-position-probs",
             spec.reuse_drop_position_probs,
         ])
+    if spec.rank_pmf_target_real > 0:
+        cmd.append("--stack-rank-pmf-target-real")
     if args.force_phase:
         cmd.insert(cmd.index("--stack-adj-dup-prob"), "--force-phase-schedule")
     return cmd

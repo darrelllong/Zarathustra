@@ -19,7 +19,16 @@ sys.path.insert(0, str(_LLGAN))
 from llgan.long_rollout_eval import _gap, _metrics_for_stream, _per_stream_obj_ids, _sample_real_stream  # noqa: E402
 
 from .mark_quality import mark_quality  # noqa: E402
-from .neural_atlas import NeuralAtlasModel  # noqa: E402
+from .model import _interarrival, stack_distances  # noqa: E402
+from .neural_atlas import (  # noqa: E402
+    NeuralAtlasModel,
+    RANK_PMF_EDGES,
+    _dist_state_from_stack_distance,
+    _phase_bins,
+    _rank_bin_index,
+    _rank_pmfs,
+    _state_id_with_dist,
+)
 from .train_neural_atlas import _cond_lookup_keys, _load_file_characterizations  # noqa: E402
 
 
@@ -66,6 +75,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Rank pivot for tail-specific fitted rank-PMF in-bin power; negative disables.")
     p.add_argument("--stack-rank-pmf-local-prob", type=float, default=0.0,
                    help="Probability of using the nearest reservoir's fitted rank-PMF instead of the global PMF.")
+    p.add_argument("--stack-rank-pmf-target-real", action="store_true",
+                   help="Use the sampled real manifest to build a target rank PMF for generation.")
+    p.add_argument("--stack-rank-pmf-target-blend", type=float, default=1.0,
+                   help="Blend real-manifest target PMFs with fitted model PMFs when --stack-rank-pmf-target-real is set.")
     p.add_argument("--stack-rank-pmf-feedback-strength", type=float, default=0.0,
                    help="Online PMF-bin correction strength based on ranks already emitted in each state.")
     p.add_argument("--stack-rank-pmf-feedback-alpha", type=float, default=32.0,
@@ -234,6 +247,14 @@ def main() -> int:
     if source_names:
         conds = np.vstack([_lookup_cond(cond_lookup, name, args.cond_dim) for name in source_names])
 
+    saved_rank_pmfs = getattr(model, "rank_pmf_by_state", None)
+    if args.stack_rank_pmf_target_real:
+        model.rank_pmf_by_state = _real_rank_pmfs(
+            real_df,
+            model,
+            blend=args.stack_rank_pmf_target_blend,
+        )
+
     saved_mark_model = getattr(model, "mark_model", None)
     if args.disable_neural_marks:
         model.mark_model = None
@@ -331,6 +352,8 @@ def main() -> int:
     )
     if args.disable_neural_marks:
         model.mark_model = saved_mark_model
+    if args.stack_rank_pmf_target_real:
+        model.rank_pmf_by_state = saved_rank_pmfs or {}
     if args.fake_output:
         fake_out = Path(args.fake_output)
         fake_out.parent.mkdir(parents=True, exist_ok=True)
@@ -381,6 +404,8 @@ def main() -> int:
         "stack_rank_pmf_tail_bin_power": args.stack_rank_pmf_tail_bin_power,
         "stack_rank_pmf_tail_power_pivot": args.stack_rank_pmf_tail_power_pivot,
         "stack_rank_pmf_local_prob": args.stack_rank_pmf_local_prob,
+        "stack_rank_pmf_target_real": args.stack_rank_pmf_target_real,
+        "stack_rank_pmf_target_blend": args.stack_rank_pmf_target_blend,
         "stack_rank_pmf_feedback_strength": args.stack_rank_pmf_feedback_strength,
         "stack_rank_pmf_feedback_alpha": args.stack_rank_pmf_feedback_alpha,
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
@@ -558,6 +583,66 @@ def _run_cachesim_comparison(
     output.write_text(json.dumps(report, indent=2))
     print(f"[altgan.evaluate_neural_atlas] wrote cachesim report {output}")
     return report
+
+
+def _real_rank_pmfs(real_df, model: NeuralAtlasModel, *, blend: float) -> dict[int, np.ndarray]:
+    rank_state_edges = getattr(model, "rank_state_edges", None)
+    n_dist_states = int(getattr(model, "n_dist_states", 0) or NeuralAtlasModel.n_dist_states)
+    if rank_state_edges is None:
+        n_dist_states = 3
+    base_span = int(model.n_time_bins) * int(model.n_size_bins) * int(n_dist_states)
+    counts_by_state: dict[int, np.ndarray] = {}
+
+    if "stream_id" in real_df.columns:
+        groups = real_df.groupby("stream_id", sort=False)
+    else:
+        groups = [(0, real_df)]
+    for _, stream_df in groups:
+        ts = stream_df["ts"].to_numpy(dtype=np.float64)
+        obj_ids = stream_df["obj_id"].to_numpy()
+        sizes = np.maximum(stream_df["obj_size"].to_numpy(dtype=np.float64), 1.0)
+        dt = _interarrival(ts)
+        stack_d = stack_distances(obj_ids)
+        time_bins = np.searchsorted(model.time_edges, np.log1p(dt), side="right")
+        size_bins = np.searchsorted(model.size_edges, np.log(sizes), side="right")
+        dist_states = np.array([
+            _dist_state_from_stack_distance(int(x), rank_state_edges)
+            for x in stack_d
+        ], dtype=np.int64)
+        base_states = _state_id_with_dist(
+            time_bins,
+            size_bins,
+            dist_states,
+            int(model.n_size_bins),
+            n_dist_states,
+        )
+        phase_bins = _phase_bins(len(stream_df), int(model.n_phase_bins))
+        states = (phase_bins * base_span + base_states).astype(np.int64)
+        for state, rank in zip(states, stack_d):
+            if int(rank) < 0:
+                continue
+            bucket = counts_by_state.setdefault(
+                int(state),
+                np.zeros(len(RANK_PMF_EDGES) - 1, dtype=np.float64),
+            )
+            bucket[_rank_bin_index(int(rank), RANK_PMF_EDGES)] += 1.0
+
+    target = _rank_pmfs(counts_by_state)
+    blend_clamped = min(max(float(blend), 0.0), 1.0)
+    if blend_clamped >= 1.0:
+        return target
+    fitted = getattr(model, "rank_pmf_by_state", {}) or {}
+    out = dict(fitted)
+    for state, target_pmf in target.items():
+        fitted_pmf = fitted.get(int(state))
+        if fitted_pmf is None or len(fitted_pmf) != len(target_pmf):
+            out[int(state)] = target_pmf
+            continue
+        mixed = blend_clamped * target_pmf + (1.0 - blend_clamped) * np.asarray(fitted_pmf)
+        total = float(mixed.sum())
+        if np.isfinite(total) and total > 0.0:
+            out[int(state)] = mixed / total
+    return out
 
 
 def _write_namespaced_csv(df, path: Path) -> None:
