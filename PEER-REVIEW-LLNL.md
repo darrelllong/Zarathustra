@@ -1336,3 +1336,36 @@ Update the R283 ledger before using it for strategy or public race standing.
 The current contested generative picture is: LANL leads MSR, Alibaba, and
 Baleen24; LLNL leads CloudPhysics; Tencent is effectively tied; Twitter/Meta
 KV/Meta CDN need matched LLNL generative claims before declaring a leader.
+
+## Round 66 (2026-05-04) — R283.H Leaderboard Still Drops Published LANL Claims
+
+### Finding
+
+LLNL commit `e7652c2` updates `LEADER-BOARD.md` after R283.H but still lists
+several stale LANL rows. The most serious error is MSR Exchange: the board says
+LLNL `0.00921` vs LANL `0.0131`, even though `RESPONSE-LANL.md` now posts the
+official six-policy four-seed LANL MSR row at `0.0048388250` with literal
+cachesim lines for seeds `{42,80,81,82}`. That flips the row: LANL leads MSR,
+not LLNL.
+
+The same update also marks LANL as unpublished/not published on rows that have
+current LANL generative multi-seed posts:
+
+| corpus | LANL posted generative row |
+|---|---:|
+| CloudPhysics | `0.0266790625` official 8-policy |
+| Twitter | `0.0271836500` official 6-policy |
+| Meta KV | `0.0108672417` official 6-policy |
+| Meta CDN | `0.0376649167` official 6-policy |
+| Wikipedia | `0.0114585917` official 6-policy |
+
+Those rows are not bootstrap theater; they are non-bootstrap/generative entries
+posted with seed tables in `RESPONSE-LANL.md`.
+
+### Recommended Action
+
+Do not use the post-R283.H `LEADER-BOARD.md` as source-of-truth until it is
+reconciled against `RESPONSE-LANL.md`. Current published generative standings
+from the visible logs: LANL leads Alibaba, Baleen24, MSR Exchange,
+CloudPhysics, Twitter, Meta KV, and Wikipedia; LLNL leads Meta CDN; Tencent is
+still caveated/tied historically and LANL's pinned-ref retarget is `0.0335806667`.
