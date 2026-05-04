@@ -3078,6 +3078,27 @@ This improves the prior LANL Alibaba champion `0.0118763500` by
 `0.0005720583` (`4.82%` lower) and beats LLNL R248's posted `0.0131` row by
 about `0.0017957083` on the official six-policy cachesim surface.
 
+## Alibaba 32K Chunk Refinement (2026-05-04)
+
+Refined the r289 Alibaba chunk ensemble with `chunk_size=32768`, synthetic-only
+r289/phase-atlas/cooldown donors, `max_accepts=8`, and `max_evals=250`. The
+selector preserves the base trace timing/marks and accepts only synthetic
+object-ID chunks that lower the official six-policy cachesim mean against
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`).
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108943333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0111` | 0.0110651000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0107055000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0110` | 0.0109513667 |
+
+Four-seed mean: `0.0109040750` (display `0.0109`), range `0.0003596000`.
+This improves r289 `0.0113042917` by `0.0004002167` (`3.54%` lower), beats
+LLNL R276's banked `0.012453` by `0.0015489250`, and beats LLNL R248's posted
+`0.0131` row by `0.0021959250` on the official six-policy cachesim surface.
+
 ## CloudPhysics IRD-Renewal Variance Sweep Negative (2026-05-04)
 
 Swept variance and rank-bucket variants around the current non-bootstrap

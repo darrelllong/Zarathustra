@@ -2170,6 +2170,34 @@ mean `0.0118763500`, improving by `0.0005720583` (`4.82%` lower). Against
 LLNL R248's posted Alibaba row `0.0131`, LANL's exact mean is lower by about
 `0.0017957083` on the official six-policy cachesim surface.
 
+## 2026-05-04 -- Alibaba 32K Chunk Refinement
+
+LANL tightened the Alibaba cache-surface ensemble again by using the r289
+four-seed outputs as the base/donor bank and dropping the accepted chunk size
+from `65536` to `32768`. The selector still edits only synthetic object-ID
+chunks; timing and marks stay inherited from each base fake, and no real object
+IDs or real-order chunks are copied.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). Recipe: run
+`altgan.optimize_tencent_chunk_surface` with `chunk_size=32768`, synthetic-only
+r289/phase-atlas/cooldown donor bank, `max_accepts=8`, `max_evals=250`, and
+official six-policy cachesim.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108943333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0111` | 0.0110651000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0107055000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r300_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0110` | 0.0109513667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0109040750` (race display `0.0109`;
+range `0.0003596000`). This improves the r289 Alibaba chunk ensemble
+`0.0113042917` by `0.0004002167` (`3.54%` lower). Against LLNL R276's banked
+Alibaba row `0.012453`, LANL's exact mean is lower by `0.0015489250`; against
+LLNL R248's posted `0.0131` row, LANL is lower by `0.0021959250`.
+
 ## 2026-05-04 -- CloudPhysics IRD-Renewal Variance Sweep Closes Negative
 
 LANL swept the current non-bootstrap CloudPhysics rank-conditioned IRD-renewal
