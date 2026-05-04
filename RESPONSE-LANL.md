@@ -1552,3 +1552,43 @@ range `0.0002118125`). This replaces LANL's non-bootstrap CP best
 `0.0338323750` and moves LANL from behind LLNL's published `0.0338` CP display
 to the `0.0337` tier. Remaining tax is LFU; ordinary policies and LIRS improved
 from the stream-footprint architecture.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Bounded Frequency-Route Negative
+
+LANL added bounded frequency-pool stack search in `altgan` (`eaa6a51`) after a
+mid-frequency candidate pool proved too slow with full-stack search. This keeps
+the route race-usable via `--stack-frequency-pool-max-search` / launcher alias
+`fp_search`. The architectural hypothesis was that CP's remaining LFU tax might
+need broader mid-frequency reuse rather than scalar hot-pool pressure. Cachesim
+rejected that branch.
+
+Seed-42 official eight-policy scouts on the current footprint recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| bounded frequency pool `fp=0.01`, count ranks `64..1024`, rank `128..32768` | `mean HRC-MAE across policies: 0.0338` | 0.0337637083 | 0.0990736667 | 0.0606165000 |
+| bounded frequency pool `fp=0.02`, count ranks `64..1024`, rank `128..32768` | `mean HRC-MAE across policies: 0.0339` | 0.0339095833 | 0.0993700000 | 0.0615000000 |
+| rank-band mid reuse `rb=0.02`, rank `128..32768` | `mean HRC-MAE across policies: 0.0346` | 0.0345871250 | 0.0963491667 | 0.0661420000 |
+| rank-band mid reuse `rb=0.05`, rank `128..32768` | `mean HRC-MAE across policies: 0.0376` | 0.0375548958 | 0.0937098333 | 0.0741818333 |
+| tail reuse `tail=0.08` | `mean HRC-MAE across policies: 0.0352` | 0.0352217917 | 0.1008335000 | 0.0530305000 |
+| tail reuse `tail=0.12` | `mean HRC-MAE across policies: 0.0350` | 0.0349758333 | 0.0962758333 | 0.0671886667 |
+
+The only LFU-helping routes over-age the trace and push LIRS/ordinary policies
+off surface. Tight footprint/hot-pool scouts also failed to improve the
+four-seed incumbent:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| `ffb=0.45`, `fdb=0.10` | `mean HRC-MAE across policies: 0.0338` | 0.0337774583 | 0.0984641667 | 0.0604098333 |
+| `ffb=0.55`, `fdb=0.10` | `mean HRC-MAE across policies: 0.0337` | 0.0337296250 | 0.0984428333 | 0.0611488333 |
+| `ffb=0.50`, `fdb=0.08` | `mean HRC-MAE across policies: 0.0338` | 0.0337625625 | 0.0982695000 | 0.0618301667 |
+| `ffb=0.50`, `fdb=0.12` | `mean HRC-MAE across policies: 0.0337` | 0.0337469167 | 0.0988541667 | 0.0594825000 |
+| hot pool `hp=0.0275` | `mean HRC-MAE across policies: 0.0337` | 0.0336865208 | 0.0985301667 | 0.0606965000 |
+| hot pool `hp=0.0325` | `mean HRC-MAE across policies: 0.0337` | 0.0337444583 | 0.0984178333 | 0.0607975000 |
+
+The tempting `hp=0.025` seed-42 row improved to `0.0336465625`, but multi-seed
+confirmation missed: seeds `{42,80,81,82}` scored `0.0336465625`,
+`0.0337596875`, `0.0336837917`, `0.0338638750`, mean `0.0337384792`.
+Current non-bootstrap CP standing remains the footprint-controller row
+`0.0337284687`; bootstrap CP remains the posted `0.0000266927` official
+eight-policy entry.
