@@ -15586,3 +15586,29 @@ The gap to LANL is **halved**. LLNL's banked alibaba claim improves from 0.0131 
 - More aggressive cooldown sweep around age=8 (try age=6, 7, 9, 10 — finer resolution)
 - LANL's published cooldown claim is 0.0119 single-seed (per RESPONSE-LANL); their multi-seed mean might also be ~0.0125, in which case the LLNL/LANL gap could already be a tie within seed-noise. Action item: query LANL for cooldown multi-seed.
 - Alibaba retake will likely require a fit-time architectural change LANL hasn't published, since post-hoc levers have all been ported and only the cool8 axis transferred.
+
+## R277.F — fine cooldown sweep around age=8 minimum (single-seed scout)
+
+**Setup**: After R276 found cool8=0.012306 single-seed @ seed=42, swept the cooldown axis at finer resolution to check if a smaller minimum exists nearby. Same atlas, same R244 lock, same protocol.
+
+| age | 6-pol mean (seed=42) |
+|---|---|
+| 0 | 0.012426 (R244 baseline, prior) |
+| 4 | 0.012748 (prior) |
+| 5 | 0.012596 |
+| 6 | 0.012877 |
+| 7 | 0.012851 |
+| **8** | **0.012306** (anchor reproduce: 0.012306 ✓) |
+| 9 | 0.012707 |
+| 10 | 0.012717 |
+| **12** | **0.012307** ← second tied minimum |
+| 16 | 0.012695 (prior) |
+| 32 | 0.012740 (prior) |
+
+**Surprising finding**: the cooldown landscape has **two well-separated minima** at age=8 and age=12 (0.01231 each), separated by a 0.0127 ridge at age=9–11. Not a smooth bowl. This is reproducible at single-seed (cool8 anchor reproduces 0.012306 to 6 decimal places).
+
+**Hypothesis on the bimodality**: the cooldown threshold interacts with the typical inter-access gap distribution. Age=8 might align with the modal short-range reuse gap; age=12 might align with a secondary reuse mode (e.g., page-cycle period in the alibaba traces). At age=9–11 the cooldown lands between modes and *blocks* legitimate reuses without the compensating gain.
+
+**Single-seed cool12 = cool8 within noise floor.** Multi-seed (R277.M, in flight) will tell us whether cool12's multi-seed mean is below cool8's 0.01245.
+
+**Tasks**: #66 (R277.F) closed; #67 (R277.M cool12 multi-seed) opened.
