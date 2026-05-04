@@ -1443,3 +1443,57 @@ the feedback-1.0 recipe:
 Read: the band redirects make LFU look dramatically better and destroy
 adaptive/LIRS behavior. This confirms the CP frontier is not a simple rank-0
 excess patch.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Scheduled Delayed Reuse Closes Negative
+
+LANL added a scheduled delayed-reuse decoder in `altgan` (`9a95740`) to test
+whether CP needs explicit old-object echoes rather than immediate adjacent or
+recent-window reuse. The mechanism schedules emitted objects for future reuse
+after a sampled delay, with rank gates so the echo only fires once the object is
+far enough down the stack.
+
+Seed-42 official 8-policy scouts on the feedback-1.0 CP recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| sparse delayed echo: `dr=0.04`, `sched=0.08`, delay `8192..65536`, rank `8192..131072` | `mean HRC-MAE across policies: 0.0382` | 0.0382346875 | 0.0921473333 | 0.0793248333 |
+| mid delayed echo: `dr=0.08`, `sched=0.10`, delay `4096..65536`, rank `4096..131072` | `mean HRC-MAE across policies: 0.0460` | 0.0460476042 | 0.0890638333 | 0.0910135000 |
+| deep delayed echo: `dr=0.12`, `sched=0.10`, delay `16384..131072`, rank `8192..196608` | `mean HRC-MAE across policies: 0.0455` | 0.0455386042 | 0.0891483333 | 0.0905656667 |
+| recurrent delayed echo: `dr=0.06`, `sched=0.04`, one reschedule | `mean HRC-MAE across policies: 0.0422` | 0.0422261875 | 0.0897923333 | 0.0860290000 |
+| tiny delayed echo: `dr=0.01`, `sched=0.03`, delay `4096..32768` | `mean HRC-MAE across policies: 0.0355` | 0.0355013542 | 0.0944428333 | 0.0707080000 |
+| tiny deep echo: `dr=0.01`, `sched=0.05`, delay `8192..65536`, rank `16384..131072` | `mean HRC-MAE across policies: 0.0354` | 0.0353543125 | 0.0951568333 | 0.0692285000 |
+| tiny recurrent echo: `dr=0.02`, `sched=0.01`, one reschedule | `mean HRC-MAE across policies: 0.0361` | 0.0361447500 | 0.0936455000 | 0.0730815000 |
+
+Read: delayed echoes can buy LFU, but they over-age the trace and tax
+LIRS/adaptive policies. The only near-tie (`tiny deep`) is a seed-42 scout, not
+a multi-seed improvement over the feedback-1.0 CP entry.
+
+## 2026-05-03 -- CloudPhysics Multi-Seed Update: Deep Reuse Boost Improves LANL CP
+
+LANL then tested a lighter architectural nudge already present in the decoder:
+rare deep-rank reuse boosts on top of the feedback-1.0 recipe. The best scout
+was `stack_reuse_boost_prob=0.008`,
+`stack_reuse_boost_min_rank=8192`,
+`stack_reuse_boost_rank_power=1.5`.
+
+Official CloudPhysics 8-policy command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---:|---|---|---:|---:|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_fb10_reuse008_8192_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0353` | 0.0352885208 | 0.0954403333 | 0.0683585000 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_fb10_reuse008_8192_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0353` | 0.0353286042 | 0.0959356667 | 0.0664928333 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_fb10_reuse008_8192_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0355` | 0.0354917083 | 0.0951196667 | 0.0693333333 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_fb10_reuse008_8192_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0352` | 0.0352326875 | 0.0959676667 | 0.0665425000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0353353802` (race display `0.0353`;
+range `0.0002590208`). This improves LANL's feedback-1.0 CP mean
+`0.0353795990` by `0.0000442188` and replaces LANL's prior non-bootstrap CP
+best, but LLNL still leads CP at `0.0338`.

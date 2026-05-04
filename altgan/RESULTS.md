@@ -2509,3 +2509,39 @@ rank 0.
 
 The result is policy-overfit: LFU improves sharply while LIRS/adaptive policies
 break. Current CP best remains the feedback-1.0 multi-seed mean `0.0353795990`.
+
+## CloudPhysics Scheduled Delayed-Reuse Negative (2026-05-03)
+
+Implemented scheduled delayed reuse in `9a95740`: emitted objects can be queued
+for future reuse after a sampled delay and only released when age/rank gates are
+satisfied. Seed-42 official 8-policy scouts on the feedback-1.0 recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| sparse delayed echo | `mean HRC-MAE across policies: 0.0382` | 0.0382346875 | 0.0921473333 | 0.0793248333 |
+| mid delayed echo | `mean HRC-MAE across policies: 0.0460` | 0.0460476042 | 0.0890638333 | 0.0910135000 |
+| deep delayed echo | `mean HRC-MAE across policies: 0.0455` | 0.0455386042 | 0.0891483333 | 0.0905656667 |
+| recurrent delayed echo | `mean HRC-MAE across policies: 0.0422` | 0.0422261875 | 0.0897923333 | 0.0860290000 |
+| tiny delayed echo | `mean HRC-MAE across policies: 0.0355` | 0.0355013542 | 0.0944428333 | 0.0707080000 |
+| tiny deep echo | `mean HRC-MAE across policies: 0.0354` | 0.0353543125 | 0.0951568333 | 0.0692285000 |
+| tiny recurrent echo | `mean HRC-MAE across policies: 0.0361` | 0.0361447500 | 0.0936455000 | 0.0730815000 |
+
+Delayed reuse is not the CP fix. It can relieve LFU, but the full 8-policy
+cachesim surface moves away except for a seed-42 near-tie.
+
+## CloudPhysics Deep Reuse-Boost Multi-Seed Update (2026-05-03)
+
+The best follow-up is a rare deep-rank reuse boost on top of feedback-1.0:
+`stack_reuse_boost_prob=0.008`, `stack_reuse_boost_min_rank=8192`,
+`stack_reuse_boost_rank_power=1.5`.
+
+| seed | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---:|---|---:|---:|---:|
+| 42 | `mean HRC-MAE across policies: 0.0353` | 0.0352885208 | 0.0954403333 | 0.0683585000 |
+| 80 | `mean HRC-MAE across policies: 0.0353` | 0.0353286042 | 0.0959356667 | 0.0664928333 |
+| 81 | `mean HRC-MAE across policies: 0.0355` | 0.0354917083 | 0.0951196667 | 0.0693333333 |
+| 82 | `mean HRC-MAE across policies: 0.0352` | 0.0352326875 | 0.0959676667 | 0.0665425000 |
+
+Four-seed mean: `0.0353353802`, range `0.0002590208`. This replaces the
+feedback-1.0 multi-seed mean `0.0353795990` as LANL's current best
+non-bootstrap CloudPhysics entry, but remains behind LLNL `0.0338`.
