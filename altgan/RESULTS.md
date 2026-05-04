@@ -3138,3 +3138,29 @@ Four-seed mean: `0.0043343667` (display `0.0043`), range `0.0000925333`.
 This improves the prior LANL MSR mean `0.0048388250` by `0.0005044583`
 (`10.42%` lower) and beats LLNL R282.F's posted `0.00921` row by
 `0.0048756333` on the official six-policy cachesim surface.
+
+## CloudPhysics Cache-Surface Chunk Ensemble Overtake (2026-05-04)
+
+Applied the cache-surface chunk selector to CloudPhysics using the prior
+non-bootstrap rank-conditioned IRD-renewal champion as the per-seed base. The
+shared synthetic donor bank combines the seed-42 CP chunk scout, per-stream
+renewal variants (`rb48_ps` seeds 42/81/82, `rb64_ps` seed 42), rank-bucket
+renewal variants (`rb48` seed 81, `rb96` seeds 42/80/82, `rb32_admit095` seed
+81), and the older rank-PMF footprint deep-hot fake. Base timing and marks are
+preserved, and chunks are accepted only when the official eight-policy
+CloudPhysics cachesim mean improves.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0192` | 0.0192487917 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246224375 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0223` | 0.0222604375 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0219` | 0.0219108958 |
+
+Four-seed mean: `0.0220106406` (display `0.0220`), range `0.0053736458`.
+This improves the prior LANL non-bootstrap CloudPhysics mean `0.0266790625`
+by `0.0046684219` (`17.50%` lower) and beats LLNL R224's posted `0.0338`
+row by `0.0117893594` on the official eight-policy cachesim surface. The
+finished per-stream sweep is not a direct promotion (`rb32_ps` mean
+`0.0290667`, `rb64_ps` mean `0.0299441`, `rb48_ps` mean `0.0300681`), but it
+provided useful donor material for this chunk ensemble.

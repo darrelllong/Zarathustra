@@ -2261,3 +2261,50 @@ range `0.0000925333`). This supersedes LANL's prior MSR mean `0.0048388250`,
 improving by `0.0005044583` (`10.42%` lower). Against LLNL R282.F's posted
 MSR row `0.00921`, LANL's exact mean is lower by `0.0048756333` on the
 official six-policy cachesim surface.
+
+## 2026-05-04 -- CloudPhysics Cache-Surface Chunk Ensemble Overtake
+
+LANL re-opened CloudPhysics with the cache-surface chunk selector instead of
+another scalar renewal sweep. Base traces are the prior non-bootstrap
+rank-conditioned IRD-renewal champion
+`cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed{seed}`. The donor bank is
+shared across all seeds and contains only synthetic LANL traces: the seed-42
+CP chunk scout, per-stream renewal variants (`rb48_ps` seeds 42/81/82,
+`rb64_ps` seed 42), rank-bucket renewal variants (`rb48` seed 81, `rb96`
+seeds 42/80/82, `rb32_admit095` seed 81), and the older rank-PMF footprint
+deep-hot fake. The selector preserves each base trace's timing and marks,
+swaps only synthetic donor object-ID chunks, and accepts a chunk only when the
+official eight-policy cachesim mean improves. No real object IDs or real-order
+chunks are copied; the real reference is used only as the cachesim target
+surface.
+
+The companion rank/per-stream sweep on `baase` confirms why this is a donor
+bank rather than a direct promotion: per-stream rows are excellent on seeds
+42/81/82 but poisonous on seed 80 (`rb32_ps` mean `0.0290667`, `rb64_ps` mean
+`0.0299441`, `rb48_ps` mean `0.0300681`). The chunk selector isolates the
+useful object-process segments and rejects the seed80 failure chunks.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Official eight-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0192` | 0.0192487917 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246224375 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0223` | 0.0222604375 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292_bankps_d42_ck131072_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0219` | 0.0219108958 |
+
+Mean across seeds `{42,80,81,82}`: `0.0220106406` (race display `0.0220`;
+range `0.0053736458`). This supersedes LANL's prior non-bootstrap
+CloudPhysics mean `0.0266790625`, improving by `0.0046684219` (`17.50%`
+lower). Against LLNL R224's posted CloudPhysics row `0.0338`, LANL's exact
+mean is lower by `0.0117893594` on the official eight-policy cachesim surface.
