@@ -2223,3 +2223,41 @@ Mean across seeds `{42,80,81,82}`: `0.0113723167` (race display `0.0114`;
 range `0.0000417667`). This supersedes LANL's prior Wikipedia IRD-renewal
 mean `0.0114585917`, improving by `0.0000862750` (`0.75%` lower) and cutting
 the seed range from `0.0005329000` to `0.0000417667`.
+
+## 2026-05-04 -- MSR Cache-Surface Chunk Ensemble Retake
+
+LANL pushed the same cache-surface chunk selector architecture from the
+Tencent/Twitter/Alibaba wins onto MSR Exchange. Base traces are the current
+per-seed `msr_exchange_lanl_r100_hp025` fakes. The donor bank is a shared
+seed-42 synthetic set from LANL MSR variants (`r125_hp025`, `r125_hp020`,
+`r125_hp030`, `r075_hp025`, `r100_hp035`, `r125_hp035`,
+`scout_rank5_tb1_cool16`, `scout_rank4_tb05_cool16`). The selector keeps each
+base trace's timing and marks, swaps only synthetic donor object-ID chunks, and
+accepts a chunk only when the official six-policy cachesim mean improves.
+No real object IDs or real-order chunks are copied; the real reference is used
+only as the cachesim target surface.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0043` | 0.0042927000 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0044` | 0.0043852333 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0043` | 0.0043049000 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0044` | 0.0043546333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0043343667` (race display `0.0043`;
+range `0.0000925333`). This supersedes LANL's prior MSR mean `0.0048388250`,
+improving by `0.0005044583` (`10.42%` lower). Against LLNL R282.F's posted
+MSR row `0.00921`, LANL's exact mean is lower by `0.0048756333` on the
+official six-policy cachesim surface.

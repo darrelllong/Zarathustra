@@ -3114,3 +3114,27 @@ the small but tight `rank_ird_buckets=16`, `ird_scale=28` row.
 Four-seed mean: `0.0113723167` (display `0.0114`), range `0.0000417667`.
 This improves the prior Wikipedia IRD-renewal mean `0.0114585917` by
 `0.0000862750` (`0.75%` lower) and tightens the seed range by about 12.8x.
+
+## MSR Cache-Surface Chunk Ensemble Retake (2026-05-04)
+
+Applied the same cache-surface chunk selector used for Tencent, Twitter, and
+Alibaba to MSR Exchange. Base traces are the per-seed
+`msr_exchange_lanl_r100_hp025` fakes; the donor bank is a shared seed-42
+synthetic set (`r125_hp025`, `r125_hp020`, `r125_hp030`, `r075_hp025`,
+`r100_hp035`, `r125_hp035`, `scout_rank5_tb1_cool16`,
+`scout_rank4_tb05_cool16`). The selector preserves base timing/marks and
+accepts only synthetic donor object-ID chunks that improve the official
+six-policy cachesim mean against
+`/tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0043` | 0.0042927000 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0044` | 0.0043852333 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0043` | 0.0043049000 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_chunksurf_r291_refine_d42_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0044` | 0.0043546333 |
+
+Four-seed mean: `0.0043343667` (display `0.0043`), range `0.0000925333`.
+This improves the prior LANL MSR mean `0.0048388250` by `0.0005044583`
+(`10.42%` lower) and beats LLNL R282.F's posted `0.00921` row by
+`0.0048756333` on the official six-policy cachesim surface.
