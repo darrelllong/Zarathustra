@@ -2688,3 +2688,32 @@ R240 exact `0.0337025833` by `0.0000202916`, so LANL retakes the
 non-bootstrap CloudPhysics generative row on exact JSON precision. Near misses:
 incumbent `0.0337284687`; `ffb=0.55` alone `0.0337381979`; `fdb=0.12`
 `0.0337909010`; `hp=0.0275` alone `0.0337278177`.
+
+## Twitter Recent-Pool Window Retake (2026-05-03)
+
+Held the existing Twitter atlas fixed:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05_v2.pkl.gz`.
+The promoted row widens the recent emitted-object pool to
+`stack_recent_pool_window=48` while preserving the prior MSR-like basin:
+forced phase, `condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`, `stack_adj_dup_prob=0.40`,
+`stack_hot_pool_prob=0.65`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.25`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+Seed-42 scouts: `win=8` `0.0297808000`; `win=32` `0.0276727333`; `win=48`
+`0.0271723667`; `win=64` `0.0278539000`; `win32+tail0.08` `0.0271796333`;
+`win32+hp0.70` `0.0277293667`; `win32+adj0.35` `0.0278383333`;
+`win32+rp0.20` `0.0278997000`.
+
+| seed | literal cachesim mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0272` | 0.0271723667 |
+| 80 | `mean HRC-MAE across policies: 0.0271` | 0.0271073000 |
+| 81 | `mean HRC-MAE across policies: 0.0271` | 0.0270572667 |
+| 82 | `mean HRC-MAE across policies: 0.0274` | 0.0273976667 |
+
+Four-seed mean: `0.0271836500`, range `0.0003404000`. This replaces the prior
+Twitter generative mean `0.0287841750` with a `5.6%` lower cachesim target.

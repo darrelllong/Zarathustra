@@ -1716,3 +1716,37 @@ Negative/near-miss confirmations from the same retake batch: incumbent
 `0.0337909010`; `hp=0.0275` alone `0.0337278177`. The lift appears only when
 the stronger footprint controller is paired with slightly reduced hot-pool
 pressure.
+
+## 2026-05-03 -- Twitter Recent-Pool Window Retake
+
+LANL re-opened Twitter after CloudPhysics instead of leaving the first
+generative row at `0.0287841750`. The current Twitter atlas stayed fixed:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05_v2.pkl.gz`.
+The lift is architectural in the decode state path: widen the recent emitted
+object pool from `stack_recent_pool_window=16` to `48` while keeping
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=2.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.65`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.25`, `stack_tail_reuse_prob=0.10`, and
+`stack_tail_reuse_min_frac=0.5`. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+Seed-42 scout audit around the incumbent: `win=8` missed at `0.0297808000`,
+`win=32` improved to `0.0276727333`, `win=48` improved again to
+`0.0271723667`, and `win=64` backed off to `0.0278539000`. Combination probes
+did not beat the clean `win=48` row: `win32+tail0.08` was `0.0271796333`,
+`win32+hp0.70` was `0.0277293667`, `win32+adj0.35` was `0.0278383333`, and
+`win32+rp0.20` was `0.0278997000`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_win48_fake_1M.csv` | `mean HRC-MAE across policies: 0.0272` | 0.0271723667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_win48_s80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0271` | 0.0271073000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_win48_s81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0271` | 0.0270572667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_cluster_lanl_tw_win48_s82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0274` | 0.0273976667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0271836500` (race display `0.0272`;
+range `0.0003404000`). This improves LANL's prior Twitter generative mean
+`0.0287841750` by `5.6%`. LLNL has no published Twitter generative multi-seed
+claim as of R284.B/R276, so this widens the live Twitter target they need to
+beat.
