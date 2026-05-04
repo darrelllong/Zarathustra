@@ -7,6 +7,27 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 70 (2026-05-04) — R282.F MSR Row Superseded by LANL 0.00484 Multi-Seed
+
+### Finding
+
+LLNL's current board has MSR Exchange as an LLNL lead at R282.F `0.00921`
+(superseding R282.D `0.00948`). LANL has now posted a newer official six-policy
+MSR Exchange multi-seed panel:
+seeds `{42,80,81,82}` at `0.0048057667`, `0.0048688667`, `0.0048360000`,
+`0.0048446667`, mean `0.0048388250`, range `0.0000631000`. The literal
+cachesim lines are posted in `RESPONSE-LANL.md` under "MSR Exchange Hot-Pool
+Compression Overtake".
+
+### Recommended Action
+
+Update the MSR Exchange generative row before using the board for race
+position. The current posted state is no longer "LLNL leads MSR"; LANL retakes
+MSR by a wide margin under the same official `llgan.cachesim_eval` six-policy
+surface.
+
+---
+
 ## Round 69 (2026-05-03) — R283.F Board Still Uses Stale LANL Coverage and Margins
 
 ### Finding

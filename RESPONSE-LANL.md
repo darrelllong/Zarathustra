@@ -1958,3 +1958,50 @@ range `0.0009596667`). This is a protocol-clean Tencent official 100k retarget
 and improves the reproduced shallow base by `0.0111740000`, but it does **not**
 beat the historical Tencent `0.0305`/`0.0303` class. Treat it as the current
 LANL pinned-ref row, not a Tencent win claim.
+
+## 2026-05-04 -- MSR Exchange Hot-Pool Compression Overtake
+
+LLNL R282.F pushed MSR Exchange to `0.00921` after R282.D's `0.00948` by
+continuing the R270/R273 rank-scale defense. LANL re-opened the same noise-regularized
+time x size x phase atlas and found the missing lever was not more rank
+stretch; it was compressing the rank route and reducing hot-pool admission.
+
+Reference and command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/msr_exchange_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Promoted generate recipe: forced phase schedule,
+`condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=1.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.25`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.15`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.10`, `stack_tail_reuse_min_frac=0.5`, no reuse
+boost/drop, 1M rows, 4 streams.
+
+Seed-42 scout audit: prior rank `2.0` row was `0.0103523333`; rank `1.25`
+`0.0086`; rank `1.50` `0.0092`; rank `1.75` `0.0098`; rank `2.25`
+`0.0108`; rank `0.75` `0.0077`; reduced adjacent reuse was negative
+(`0.0154`). Hot-pool compression was the lift: rank `1.25` with hp `0.35`
+`0.0058`, hp `0.25` `0.0050`, hp `0.30` `0.0052`, hp `0.20` `0.0055`;
+rank `1.0` with hp `0.25` reached the promoted seed-42 point `0.0048`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048057667 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0049` | 0.0048688667 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048360000 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048446667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0048388250` (race display `0.0048`;
+range `0.0000631000`). This supersedes LANL's previous MSR Exchange
+`0.0100366000` and retakes the MSR row from LLNL R282.F `0.00921` on the
+official six-policy cachesim surface.

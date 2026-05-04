@@ -2885,3 +2885,32 @@ reuse-drop negative `0.0452770000`.
 Four-seed mean: `0.0335806667`, range `0.0009596667`. This improves the
 reproduced pinned-ref shallow base by `0.0111740000`, but remains behind the
 historical Tencent `0.0305`/`0.0303` class.
+
+## MSR Exchange Hot-Pool Compression Overtake (2026-05-04)
+
+Re-opened MSR after LLNL R282.F posted `0.00921`. The winning path stays on the
+noise-regularized time x size x phase atlas
+`/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`,
+but changes generation to rank compression plus lower hot-pool admission:
+`transition_blend=1.0`, `local_prob_power=0.9`, forced phase,
+`condition_from_real_manifest`, `stack_rank_scale=1.0`,
+`stack_adj_dup_prob=0.40`, `stack_hot_pool_prob=0.25`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.15`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`, no reuse boost/drop.
+
+Seed-42 scouts: rank `1.25` `0.0086`; rank `1.50` `0.0092`; rank `1.75`
+`0.0098`; rank `2.25` `0.0108`; rank `0.75` `0.0077`; adjacent `0.30`
+negative `0.0154`; rank `1.25` hp `0.35` `0.0058`; rank `1.25` hp `0.25`
+`0.0050`; rank `1.0` hp `0.25` promoted at `0.0048`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048057667 |
+| 80 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0049` | 0.0048688667 |
+| 81 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048360000 |
+| 82 | `/tiamat/zarathustra/altgan-output/msr_exchange_lanl_r100_hp025_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0048` | 0.0048446667 |
+
+Four-seed mean: `0.0048388250` (display `0.0048`), range `0.0000631000`.
+This retakes MSR Exchange from LLNL R282.F `0.00921` and supersedes LANL's
+previous `0.0100366000` row on the official six-policy cachesim surface.
