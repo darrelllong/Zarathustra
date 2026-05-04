@@ -98,10 +98,12 @@ class Spec:
     tail_reuse_min_frac: float = 0.5
     tail_reuse_rank_power: float = 1.0
     reuse_boost_prob: float = 0.0
+    reuse_boost_stream_probs: str = ""
     reuse_boost_min_rank: int = 32768
     reuse_boost_rank_power: float = 2.0
     reuse_drop_prob: float = 0.0
     reuse_drop_position_probs: str = ""
+    reuse_drop_stream_probs: str = ""
     disable_neural_marks: int = 0
     mark_temperature: float = -1.0
     mark_numeric_noise: float = 0.05
@@ -285,12 +287,16 @@ def _parse_spec(text: str) -> Spec:
         "tail_power": "tail_reuse_rank_power",
         "tpow": "tail_reuse_rank_power",
         "reuse": "reuse_boost_prob",
+        "reuse_stream": "reuse_boost_stream_probs",
+        "boost_stream": "reuse_boost_stream_probs",
         "reuse_min": "reuse_boost_min_rank",
         "reuse_power": "reuse_boost_rank_power",
         "drop": "reuse_drop_prob",
         "reuse_drop": "reuse_drop_prob",
         "drop_pos": "reuse_drop_position_probs",
         "reuse_drop_pos": "reuse_drop_position_probs",
+        "drop_stream": "reuse_drop_stream_probs",
+        "reuse_drop_stream": "reuse_drop_stream_probs",
         "marks_off": "disable_neural_marks",
         "disable_marks": "disable_neural_marks",
         "mtemp": "mark_temperature",
@@ -360,6 +366,7 @@ def _auto_name(spec: Spec) -> str:
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
         f"_drop{_tag(spec.reuse_drop_prob)}"
+        f"ds{spec.reuse_drop_stream_probs.replace(',', '-')}"
         f"_mb{_tag(spec.mark_numeric_blend)}"
         f"mfb{_tag(spec.mark_feedback_numeric_blend)}"
     )
@@ -485,12 +492,16 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_band_reuse_power),
         "--stack-reuse-boost-prob",
         str(spec.reuse_boost_prob),
+        "--stack-reuse-boost-stream-probs",
+        spec.reuse_boost_stream_probs,
         "--stack-reuse-boost-min-rank",
         str(spec.reuse_boost_min_rank),
         "--stack-reuse-boost-rank-power",
         str(spec.reuse_boost_rank_power),
         "--stack-reuse-drop-prob",
         str(spec.reuse_drop_prob),
+        "--stack-reuse-drop-stream-probs",
+        spec.reuse_drop_stream_probs,
         "--stack-hot-pool-prob",
         str(spec.hot_pool_prob),
         "--stack-hot-pool-position-probs",

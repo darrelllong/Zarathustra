@@ -97,6 +97,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Relative footprint error ignored by the footprint controller.")
     p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
                    help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
+    p.add_argument("--stack-reuse-boost-stream-probs", default="",
+                   help="Comma-separated per-stream NEW-to-reuse boost probabilities; extra streams reuse the last value.")
     p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
                    help="Minimum LRU rank for injected new-to-reuse events.")
     p.add_argument("--stack-reuse-boost-rank-power", type=float, default=1.0,
@@ -105,6 +107,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Probability of converting a sampled reuse into a new object.")
     p.add_argument("--stack-reuse-drop-position-probs", default="",
                    help="Comma-separated per-position-bin reuse-drop probabilities.")
+    p.add_argument("--stack-reuse-drop-stream-probs", default="",
+                   help="Comma-separated per-stream reuse-to-NEW drop probabilities; extra streams reuse the last value.")
     p.add_argument("--stack-adj-dup-prob", type=float, default=0.0,
                    help="Probability that a sampled reuse emits the current MRU object.")
     p.add_argument("--stack-adj-dup-position-probs", default="",
@@ -330,10 +334,12 @@ def main() -> int:
         stack_footprint_feedback_strength=args.stack_footprint_feedback_strength,
         stack_footprint_feedback_deadband=args.stack_footprint_feedback_deadband,
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
+        stack_reuse_boost_stream_probs=_parse_float_list(args.stack_reuse_boost_stream_probs),
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
         stack_reuse_drop_prob=args.stack_reuse_drop_prob,
         stack_reuse_drop_position_probs=_parse_float_list(args.stack_reuse_drop_position_probs),
+        stack_reuse_drop_stream_probs=_parse_float_list(args.stack_reuse_drop_stream_probs),
         stack_adj_dup_prob=args.stack_adj_dup_prob,
         stack_adj_dup_position_probs=_parse_float_list(args.stack_adj_dup_position_probs),
         stack_adj_dup_min_rank=args.stack_adj_dup_min_rank,
@@ -472,10 +478,12 @@ def main() -> int:
         "stack_footprint_feedback_deadband": args.stack_footprint_feedback_deadband,
         "stack_footprint_target_curves": footprint_target_curves,
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
+        "stack_reuse_boost_stream_probs": _parse_float_list(args.stack_reuse_boost_stream_probs),
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
         "stack_reuse_drop_prob": args.stack_reuse_drop_prob,
         "stack_reuse_drop_position_probs": _parse_float_list(args.stack_reuse_drop_position_probs),
+        "stack_reuse_drop_stream_probs": _parse_float_list(args.stack_reuse_drop_stream_probs),
         "stack_adj_dup_prob": args.stack_adj_dup_prob,
         "stack_adj_dup_position_probs": _parse_float_list(args.stack_adj_dup_position_probs),
         "stack_adj_dup_min_rank": args.stack_adj_dup_min_rank,

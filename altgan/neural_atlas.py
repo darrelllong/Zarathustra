@@ -112,10 +112,12 @@ class NeuralAtlasModel:
         stack_footprint_feedback_strength: float = 0.0,
         stack_footprint_feedback_deadband: float = 0.02,
         stack_reuse_boost_prob: float = 0.0,
+        stack_reuse_boost_stream_probs: Sequence[float] | None = None,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
         stack_reuse_drop_prob: float = 0.0,
         stack_reuse_drop_position_probs: Sequence[float] | None = None,
+        stack_reuse_drop_stream_probs: Sequence[float] | None = None,
         stack_adj_dup_prob: float = 0.0,
         stack_adj_dup_position_probs: Sequence[float] | None = None,
         stack_adj_dup_min_rank: int = 0,
@@ -223,10 +225,12 @@ class NeuralAtlasModel:
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
+        stack_reuse_boost_stream_probs = _clip_prob_list(stack_reuse_boost_stream_probs)
         stack_reuse_boost_min_rank = max(int(stack_reuse_boost_min_rank), 0)
         stack_reuse_boost_rank_power = max(float(stack_reuse_boost_rank_power), 1e-6)
         stack_reuse_drop_prob = float(np.clip(stack_reuse_drop_prob, 0.0, 1.0))
         stack_reuse_drop_position_probs = _clip_prob_list(stack_reuse_drop_position_probs)
+        stack_reuse_drop_stream_probs = _clip_prob_list(stack_reuse_drop_stream_probs)
         stack_adj_dup_prob = float(np.clip(stack_adj_dup_prob, 0.0, 1.0))
         stack_adj_dup_position_probs = _clip_prob_list(stack_adj_dup_position_probs)
         stack_adj_dup_min_rank = max(int(stack_adj_dup_min_rank), 0)
@@ -457,6 +461,13 @@ class NeuralAtlasModel:
                     per_stream,
                     stack_reuse_drop_prob,
                 )
+                if stack_reuse_drop_stream_probs:
+                    stream_idx = min(stream_id, len(stack_reuse_drop_stream_probs) - 1)
+                    reuse_drop_prob = float(stack_reuse_drop_stream_probs[stream_idx])
+                reuse_boost_prob = stack_reuse_boost_prob
+                if stack_reuse_boost_stream_probs:
+                    stream_idx = min(stream_id, len(stack_reuse_boost_stream_probs) - 1)
+                    reuse_boost_prob = float(stack_reuse_boost_stream_probs[stream_idx])
                 dropped_reuse = (
                     wants_reuse
                     and reuse_drop_prob > 0.0
@@ -468,8 +479,8 @@ class NeuralAtlasModel:
                     not wants_reuse
                     and not dropped_reuse
                     and bool(stack)
-                    and stack_reuse_boost_prob > 0.0
-                    and rng.random() < stack_reuse_boost_prob
+                    and reuse_boost_prob > 0.0
+                    and rng.random() < reuse_boost_prob
                 )
                 if boosted_reuse:
                     wants_reuse = True
