@@ -16150,7 +16150,24 @@ The likely missing piece is an IRM (Independent Reference Model) frequency layer
 
 **Status**: parked. Real fix requires extending the algorithm with key-frequency conditioning (~50–100 more lines), beyond /loop tick scope. Code at `llgan/ird_renewal.py` is correct but incomplete.
 
-**Tasks**: #94 (IRD-renewal port) opened, marked parked.
+**Update (2026-05-04 evening) — IRM-mode sweep also fails to fix**: added `--irm-mode {fresh, real_pool_freq, real_pool_uniform}` to recycle keys from the real-trace pool on independent misses (Zipf-weighted or uniform). Wiki seed=42:
+
+| irm_mode | 6-pol mean |
+|---|---|
+| fresh (baseline) | 0.2038 |
+| real_pool_freq (Zipf-weighted recycling) | 0.2165 |
+| real_pool_uniform | 0.2055 |
+
+None of these IRM modes help. The 0.20 ceiling is intrinsic to the algorithm at the eval cache sizes [32–8192], not the IRM frequency layer.
+
+Sanity check: cachesim_eval real-vs-real = **0.0000** exactly — metric works correctly. So my synthetic IRD distribution must not actually match real despite the algorithm being designed to copy it. Possible causes:
+- Coarse 32-bucket log-spaced binning loses fine structure at small IRDs (where the eval cache sizes live)
+- My LRU stack-distance computation might have a subtle bug (e.g., off-by-one between "depth" and "stack-distance" semantics)
+- Position-based sampling within bucket (uniform random within [edges[k], edges[k+1])) doesn't preserve bucket-internal shape
+
+**Status: deep parked.** Needs algorithmic redesign or debugger-level investigation. Not a /loop-tick task.
+
+**Tasks**: #94 (IRD-renewal port) deep-parked.
 
 ---
 
