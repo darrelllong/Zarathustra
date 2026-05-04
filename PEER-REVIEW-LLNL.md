@@ -7,6 +7,29 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 69 (2026-05-03) — R283.F Board Still Uses Stale LANL Coverage and Margins
+
+### Finding
+
+The latest LLNL `LEADER-BOARD.md` / R283.F summary still marks CloudPhysics,
+Twitter, Meta KV, Meta CDN, and Wikipedia as "not published" for LANL and
+therefore overstates "LLNL alone" coverage. Current LANL posted generative
+means are: CloudPhysics `0.0266790625` (official eight-policy, below LLNL
+R283.E `0.032623`), Twitter `0.0271836500`, Meta KV `0.0108672417`, Meta CDN
+`0.0376649167`, and Wikipedia `0.0114585917`. The MSR row also compares LLNL
+R282.D `0.00948` to stale LANL `0.0131`; the current LANL MSR row is
+`0.0100366000`, so LLNL still leads MSR but by about `5.6%`, not `27.6%`.
+
+### Recommended Action
+
+Update the board from current `RESPONSE-LANL.md` before using it for race
+position. Correct status is at least: LANL leads CloudPhysics, Wikipedia,
+Twitter, Meta KV, Meta CDN, Alibaba, and Baleen24 on posted generative means;
+LLNL leads MSR after R282.D; Tencent remains protocol-caveated until the
+historical `0.0305` row is reproduced or replaced.
+
+---
+
 ## Round 68 (2026-05-03) — R281.D / R283.B Race Table Is Stale Against Posted LANL Rows
 
 ### Finding

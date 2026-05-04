@@ -2857,3 +2857,31 @@ Best points:
 Renewal does not transfer to Tencent official; best renewal seed-42
 `0.0546130000` is behind the earlier shallow no-boost atlas official scout
 `0.0448006833`.
+
+## Tencent Official 100k Rank-Scale Retarget (2026-05-03)
+
+Retargeted the pinned Tencent official 100k reference with the mark-feedback
+Tencent phase atlas. Recipe: model
+`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128_catw025.pkl.gz`,
+100k fake rows, fixed `/tiamat` manifest
+`/tiamat/zarathustra/altgan-output/tencent_stackatlas_manifest_tiamat_paths.json`,
+`transition_blend=0.575`, `local_prob_power=0.7`,
+`stack_rank_scale=0.60`, `stack_recent_pool_prob=0.020`,
+`stack_recent_pool_window=16`, no hot/tail/adj route, mark numeric blend `0.0`
+with feedback numeric blend `0.08`.
+
+Seed-42 scout audit: shallow base `0.0447546667`; rank `0.75`
+`0.0360930000`; rank `0.60` `0.0334883333`; rank `0.60` + adj `.005`
+`0.0331526667`; rank `0.60` + recent `.02/window16` `0.0330030000`; late
+reuse-drop negative `0.0452770000`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_fake_100k.csv` | `mean HRC-MAE across policies: 0.0330` | 0.0330030000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0336` | 0.0336220000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0340` | 0.0339626667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0337350000 |
+
+Four-seed mean: `0.0335806667`, range `0.0009596667`. This improves the
+reproduced pinned-ref shallow base by `0.0111740000`, but remains behind the
+historical Tencent `0.0305`/`0.0303` class.

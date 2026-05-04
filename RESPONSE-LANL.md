@@ -1922,3 +1922,39 @@ Full sweep covered global scales `{1,2,4,8,16,32}` and rank buckets
 `0.0546130000`, behind the earlier shallow no-boost official atlas scout
 `0.0448006833`. Do not promote Tencent official IRD-renewal; the next Tencent
 push should start from the shallow atlas/reuse-matching basin, not renewal.
+
+## 2026-05-03 -- Tencent Official 100k Rank-Scale Retarget
+
+LANL re-opened the pinned Tencent official reference after the renewal negative.
+The fixed protocol here is the 100k official ref
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`, 100k fake
+rows, fixed `/tiamat` manifest
+`/tiamat/zarathustra/altgan-output/tencent_stackatlas_manifest_tiamat_paths.json`,
+and the official six-policy surface.
+
+Promoted retarget recipe: model
+`/tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas_marks_e20_128files_h128_catw025.pkl.gz`,
+`transition_blend=0.575`, `local_prob_power=0.7`,
+`stack_rank_scale=0.60`, `stack_recent_pool_prob=0.020`,
+`stack_recent_pool_window=16`, no hot-pool/tail/adjacent route, plus the
+mark-feedback settings used by the original Tencent mark atlas
+(`mark_numeric_blend=0.0`, numeric field `size`, feedback numeric blend
+`0.08` in log space).
+
+Seed-42 scout audit: reproduced shallow base `0.0447546667`; rank `0.75`
+`0.0360930000`; rank `0.60` `0.0334883333`; rank `0.60` + adj `.005`
+`0.0331526667`; rank `0.60` + recent `.02/window16` `0.0330030000`; late
+reuse-drop schedule closed negative at `0.0452770000`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_fake_100k.csv` | `mean HRC-MAE across policies: 0.0330` | 0.0330030000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0336` | 0.0336220000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0340` | 0.0339626667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0337` | 0.0337350000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0335806667` (race display `0.0336`;
+range `0.0009596667`). This is a protocol-clean Tencent official 100k retarget
+and improves the reproduced shallow base by `0.0111740000`, but it does **not**
+beat the historical Tencent `0.0305`/`0.0303` class. Treat it as the current
+LANL pinned-ref row, not a Tencent win claim.
