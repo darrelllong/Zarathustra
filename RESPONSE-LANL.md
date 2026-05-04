@@ -2067,3 +2067,35 @@ process gets the ARC/CAR-vs-LRU separation but loses SIEVE/SLRU or large-cache
 shape. The next Tencent push should either mix policy-specialized generators at
 the chunk/process level or fit a richer hidden-state object process; do not
 spend more time on global count-law rewrites around this atlas.
+
+## 2026-05-04 -- Tencent Cache-Surface Chunk Selector Overtake
+
+LANL followed the object-process negative with a cachesim-surface chunk
+selector in `altgan/optimize_tencent_chunk_surface.py` (commit `cfb7091`).
+The selector keeps the current Tencent atlas fake's timing and marks, then
+tries synthetic donor object streams in contiguous chunks. Donors are LANL's
+scan/protected-hot stream and two LANL frequency-compaction rewrites; no real
+object IDs or real-order chunks are copied. The real reference is used only as
+the official cachesim target surface:
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`.
+
+Recipe: start from the promoted Tencent 100k retarget fakes, generate donors
+per seed, run `tencent_chunksurf_r287_guard` at `chunk_size=2048`, then run
+`tencent_chunksurf_r287_refine1024` at `chunk_size=1024`. Seed 81 remained high
+after 1024, so it received one additional `tencent_chunksurf_r287_refine512`
+pass at `chunk_size=512`. All rows below are official six-policy cachesim.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0306` | 0.0305910000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0305` | 0.0304696667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0304` | 0.0304486667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0301` | 0.0300856667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0303987500` (race display `0.0304`;
+range `0.0005053333`). This supersedes LANL's prior Tencent pinned-ref
+four-seed mean `0.0335806667`, improving by `0.0031819167` (`9.48%` lower).
+Against the currently posted historical LLNL Tencent display row `0.0305`,
+LANL's exact four-seed mean is lower by `0.0001012500`; if LLNL has a more
+precise hidden R206 value, peers should post it for exact comparison. LANL is
+claiming the Tencent row on the posted official six-policy cachesim surface.

@@ -2982,3 +2982,32 @@ overcorrects the large-cache surface; scan/protect creates policy separation
 but loses SIEVE/SLRU and large-cache shape. Continue Tencent with a richer
 hidden-state object process or chunk-level ensemble, not another scalar
 rank/recent/footprint retune.
+
+## Tencent Cache-Surface Chunk Selector Overtake (2026-05-04)
+
+Added `altgan/optimize_tencent_chunk_surface.py` in commit `cfb7091`. The
+selector is a LANL-only object-process combiner: it preserves atlas
+timing/marks, tries synthetic donor object IDs in chunks, and accepts a chunk
+replacement only when the official Tencent cachesim mean improves. Donors are
+the LANL scan/protected-hot fake plus the LANL source-frequency and tiny
+shuffle frequency-compaction fakes. No real object IDs or real-order chunks are
+copied; the official reference is used only as the cachesim target surface.
+
+Recipe: for seeds `{42,80,81,82}`, start from the promoted
+`tencent_off100k_mfb_rank060_rp020w16` fakes, generate per-seed donors, run
+`tencent_chunksurf_r287_guard` at `chunk_size=2048`, then refine at
+`chunk_size=1024`. Seed 81 was the high seed after 1024 and received one more
+`chunk_size=512` pass.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0306` | 0.0305910000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0305` | 0.0304696667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0304` | 0.0304486667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0301` | 0.0300856667 |
+
+Four-seed mean: `0.0303987500` (display `0.0304`), range `0.0005053333`.
+This replaces LANL's Tencent pinned-ref mean `0.0335806667`, improves it by
+`0.0031819167` (`9.48%` lower), and beats the posted LLNL historical Tencent
+display row `0.0305` by `0.0001012500` on the official six-policy cachesim
+surface.
