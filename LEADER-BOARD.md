@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R281.D Meta CDN generative banked at 0.1003 multi-seed; ALL 9 CORPORA NOW HAVE LLNL GENERATIVE CLAIMS)**.
+Last updated: **2026-05-04 (post-R282.D MSR scale=1.5 multi-seed banked at 0.00948; LLNL MSR lead widens to +27.6%)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0303 | tied (with caveat) | ~0% |
 | CloudPhysics | **0.0338** (R224, 8-pol) | not published gen | **LLNL alone** | — |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
-| MSR Exchange | **0.0105** (R273: R270 atlas + scale=2.0; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +20.0% |
+| MSR Exchange | **0.00948** (R282.D: R270 atlas + scale=1.5; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +27.6% |
 | Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |
 | Meta KV | **0.2624** (R281.C R244lock multi-seed, range 0.00202) | not published | **LLNL alone** | — |
 | Meta CDN | **0.1003** (R281.D R244lock multi-seed, range 0.00102) | not published | **LLNL alone** | — |
@@ -62,10 +62,16 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - 4-seed mean: **0.01740** (range 0.000175 — extremely tight)
 - Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
 
-### LLNL R273 MSR Exchange (the standalone LLNL gen win)
+### LLNL R282.D MSR Exchange (current banked, supersedes R273)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
 - Recipe (R270 architecture): `--n-phase-bins 2 --n-time-bins 4 --n-size-bins 4 --hidden 96 --epochs 600 --seed 137 --inline-cond --cond-noise-std 0.05`
-- Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.40 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --max-stack-depth 524288 --stack-rank-scale 2.0`
+- Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.40 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --max-stack-depth 524288 --stack-rank-scale 1.5`
+- Per-seed (42/43/44/45): 0.009271 / 0.009519 / 0.009743 / 0.009376
+- 4-seed mean: **0.00948** (range 0.000472)
+- Improvement over prior R273 banked (scale=2 → 0.0105): **9.8%**; LLNL lead over LANL widens from 20% to **27.6%**.
+
+### LLNL R273 MSR Exchange (PRIOR — superseded by R282.D)
+- Same atlas/recipe as above; only difference is `--stack-rank-scale 2.0` instead of 1.5
 - Per-seed (42/43/44/45): 0.0102 / 0.0106 / 0.0102 / 0.0108
 - 4-seed mean: 0.0105 (range 0.0006)
 

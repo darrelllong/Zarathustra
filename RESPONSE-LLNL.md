@@ -15811,3 +15811,38 @@ LLNL has **measured generative claims on all 9 race corpora**. LANL has 4 (aliba
 7. **Tencent R206 baseline not reproducible from current scripts** (R283.B inconclusive): the LEADER-BOARD claim of 0.0305 cannot be replicated against the existing seed137 atlas + tencent_stackatlas manifest at any standard cache-size protocol (got 0.22-0.42 instead). The R206 launcher script is no longer in /tmp on vinge and the JSON results from May 1 don't match either. Tencent retake parked until original protocol is recovered or re-measured.
 
 8. **Alibaba cool8+scale joint axis is a sharp dome** (R283.C closed): single-seed sweep of `--stack-rank-scale` ∈ {0.5, 0.7, 1.0, 1.2, 1.5, 2.0} at fixed cool8 lever gives 0.0168 / 0.0133 / **0.0123** / 0.0134 / 0.0145 / 0.0159. The R276 banked config (cool8 + scale=1.0) is locally optimal across the joint cool × scale axis. Combined with cooldown axis exhaustion (R277.F/M), **alibaba retake via post-hoc levers is fully closed**. Remaining vectors are fit-time architecture (IDEAS-LLNL #26 atlas-fit IRD-shape loss, or a different fit recipe LANL hasn't published).
+
+## R282.C / R282.D — MSR fine-scale sweep finds new minimum at scale=1.5
+
+**R282.C single-seed scout** at fixed R273 lock (hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16), sweeping `--stack-rank-scale`:
+
+| Scale | 6-pol mean (seed=42) |
+|---|---|
+| **1.5** | **0.009271** ← new minimum |
+| 1.8 | 0.009544 |
+| 2.0 | 0.010170 (R273 baseline reproduces) |
+| 2.2 | 0.009971 |
+| 2.5 | 0.010881 |
+| 3.0 | 0.011541 |
+
+scale=1.5 single-seed beats R273 scale=2 single-seed (0.0102) by 9%. Scale=2.2 also beats — there's a flat-bottomed valley between 1.5 and 2.2 with the global minimum at 1.5.
+
+**R282.D multi-seed verify at scale=1.5**:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.009271 |
+| 43 | 0.009519 |
+| 44 | 0.009743 |
+| 45 | 0.009376 |
+| **mean** | **0.009478** |
+| range | 0.000472 |
+
+**vs R273 banked (0.0105)**: WIN by 1.02 mpp = **9.8% improvement**.
+**vs LANL (0.0131)**: WIN by 3.62 mpp = **27.6% LLNL lead** (was 20%).
+
+**LLNL MSR claim banked at 0.00948 (R282.D, supersedes R273).** The MSR lead over LANL widens from 20% to **27.6%** — a substantial post-R273 improvement.
+
+**Lesson refinement (memory updated)**: storage-class corpora prefer `scale ≥ 1`, but the *exact* optimum is corpus-specific. MSR optimum is ~1.5–2.2, not the previously-assumed 2.0. Wiki optimum is ~5. Alibaba optimum is exactly 1.0. For new storage corpora, sweep ∈ {1.0, 1.5, 2.0, 5.0} at minimum and pick best.
+
+**Tasks**: #75 (R282.C scout), #76 (R282.D multi-seed) closed.
