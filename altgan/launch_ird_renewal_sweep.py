@@ -21,14 +21,18 @@ Usage examples (run from repo root):
       --seeds 42,80,81,82 \\
       --spec "base:ird_s=32,ip=0.10" \\
       --spec "rb16:ird_s=32,ip=0.10,rb=16" \\
+      --spec "rb16_sm:ird_s=32,ip=0.10,rb=16,smooth=1" \\
       --spec "rb32:ird_s=32,ip=0.10,rb=32" \\
+      --spec "rb32_sm:ird_s=32,ip=0.10,rb=32,smooth=1" \\
       --spec "rb16_s28:ird_s=28,ip=0.10,rb=16" \\
       --spec "rb32_s28:ird_s=28,ip=0.10,rb=32" \\
       --spec "rb16_ps:ird_s=32,ip=0.10,rb=16,per_stream=1" \\
       --spec "rb32_ps:ird_s=32,ip=0.10,rb=32,per_stream=1" \\
       --spec "qmax99:ird_s=32,ip=0.10,qmax=0.99"
 
-  # CloudPhysics sweep — finer rank_ird_buckets + per-stream + quantile cap
+  # CloudPhysics sweep — finer rank_ird_buckets + per-stream + smoothing + quantile cap
+  # LANL's rank_b=32 had range=0.0045 (seed-80 outlier at 0.0295 vs seed-42 0.0250).
+  # --rank-ird-smooth blends sparse tail buckets with neighbors to reduce this variance.
   python3 -m altgan.launch_ird_renewal_sweep \\
       --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \\
       --output-root /tiamat/zarathustra/altgan-output \\
@@ -37,8 +41,11 @@ Usage examples (run from repo root):
       --policies lru,arc,fifo,sieve,slru,car,lfu,lirs \\
       --seeds 42,80,81,82 \\
       --spec "lanl_ref:ird_s=16,ip=0.00,rb=32" \\
+      --spec "rb32_sm:ird_s=16,ip=0.00,rb=32,smooth=1" \\
       --spec "rb48:ird_s=16,ip=0.00,rb=48" \\
+      --spec "rb48_sm:ird_s=16,ip=0.00,rb=48,smooth=1" \\
       --spec "rb64:ird_s=16,ip=0.00,rb=64" \\
+      --spec "rb64_sm:ird_s=16,ip=0.00,rb=64,smooth=1" \\
       --spec "rb96:ird_s=16,ip=0.00,rb=96" \\
       --spec "rb64_q99:ird_s=16,ip=0.00,rb=64,qmax=0.99" \\
       --spec "rb64_ps:ird_s=16,ip=0.00,rb=64,per_stream=1" \\
@@ -65,6 +72,7 @@ class Spec:
     rank_ird_buckets: int = 0
     rank_ird_min_samples: int = 256
     per_stream: bool = False
+    rank_ird_smooth: bool = False
     ird_quantile_max: float = 1.0
     ird_jitter: float = 0.0
     frequency_alpha: float = 1.0
@@ -84,6 +92,7 @@ def _parse_spec(text: str) -> Spec:
         "rb": "rank_ird_buckets",
         "min_s": "rank_ird_min_samples",
         "per_stream": "per_stream",
+        "smooth": "rank_ird_smooth",
         "qmax": "ird_quantile_max",
         "jitter": "ird_jitter",
         "alpha": "frequency_alpha",
@@ -118,6 +127,8 @@ def _auto_name(spec: Spec) -> str:
         parts.append(f"rb{spec.rank_ird_buckets}")
     if spec.per_stream:
         parts.append("ps")
+    if spec.rank_ird_smooth:
+        parts.append("sm")
     if spec.ird_quantile_max < 1.0:
         parts.append(f"qmax{spec.ird_quantile_max:g}")
     if spec.ird_jitter > 0:
@@ -168,6 +179,8 @@ def _renewal_cmd(
         cmd += ["--rank-ird-buckets", str(spec.rank_ird_buckets)]
     if spec.per_stream:
         cmd.append("--per-stream")
+    if spec.rank_ird_smooth:
+        cmd.append("--rank-ird-smooth")
     if 0.0 < spec.ird_quantile_max < 1.0:
         cmd += ["--ird-quantile-max", str(spec.ird_quantile_max)]
     if spec.ird_jitter > 0:

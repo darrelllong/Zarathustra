@@ -79,6 +79,9 @@ def _parse_args() -> argparse.Namespace:
                    help="If >0, sample IRDs from logarithmic object-rank buckets.")
     p.add_argument("--rank-ird-min-samples", type=int, default=256,
                    help="Minimum fitted IRDs required for a rank bucket before global fallback.")
+    p.add_argument("--rank-ird-smooth", action="store_true",
+                   help="Blend sparse rank-buckets with neighbors instead of falling back to global. "
+                        "Reduces cross-seed variance when tail buckets are under-sampled.")
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
@@ -440,10 +443,38 @@ def _make_rank_ird_buckets(profile: RenewalProfile, args: argparse.Namespace) ->
     footprint = max(1, profile.footprint)
     for delay, rank in zip(profile.irds, profile.ird_ranks, strict=False):
         buckets[_rank_bucket(int(rank), footprint, bucket_count)].append(int(delay))
+
+    min_samples = int(args.rank_ird_min_samples)
+    smooth = getattr(args, "rank_ird_smooth", False)
+
+    if smooth:
+        return _smooth_rank_buckets(buckets, profile.irds, min_samples)
     return [
-        np.asarray(bucket, dtype=np.int64) if bucket else profile.irds
+        np.asarray(bucket, dtype=np.int64) if len(bucket) >= min_samples else profile.irds
         for bucket in buckets
     ]
+
+
+def _smooth_rank_buckets(
+    raw: list[list[int]], global_irds: np.ndarray, min_samples: int
+) -> list[np.ndarray]:
+    """Blend sparse buckets with neighbors; fall back to global only when no neighbor has data."""
+    n = len(raw)
+    out: list[np.ndarray] = []
+    for i, bucket in enumerate(raw):
+        if len(bucket) >= min_samples:
+            out.append(np.asarray(bucket, dtype=np.int64))
+            continue
+        # Collect neighbor samples in expanding radius until we meet min_samples
+        combined: list[int] = list(bucket)
+        for radius in range(1, n):
+            for j in (i - radius, i + radius):
+                if 0 <= j < n:
+                    combined.extend(raw[j])
+            if len(combined) >= min_samples:
+                break
+        out.append(np.asarray(combined, dtype=np.int64) if combined else global_irds)
+    return out
 
 
 def _make_marks(profile: RenewalProfile, args: argparse.Namespace, rng: np.random.Generator) -> dict[str, np.ndarray]:
