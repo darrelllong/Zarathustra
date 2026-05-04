@@ -7,12 +7,20 @@
 % Storage trace synthesis lineage
 % -------------------------------------------------------------------------
 
-@article{wang2026_2dio,
-  title     = {2DIO: Configurable and Cache-Accurate Trace Generation for Storage Benchmarking},
-  author    = {Yirong Wang and Isaac Khor and Peter Desnoyers},
-  journal   = {Proceedings of the 21st European Conference on Computer Systems (EuroSys '26)},
+@inproceedings{wang2026twodio,
+  author    = {Wang, Yirong and Khor, Isaac and Desnoyers, Peter},
+  title     = {{2DIO}: Configurable and Cache-Accurate Trace Generation for Storage Benchmarking},
+  booktitle = {Proceedings of the 21st European Conference on Computer Systems},
+  series    = {EuroSys '26},
   year      = {2026},
-  note      = {VERIFIED: pubs/2DIO_CacheAccurate_2026.pdf}
+  pages     = {108--123},
+  publisher = {ACM},
+  doi       = {10.1145/3767295.3769391},
+  note      = {VERIFIED: pubs/2DIO_CacheAccurate_2026.pdf. Names LLGAN as
+               a baseline that matches LBA/length distributions but fails
+               cache-fidelity (HRC-MAE) on CloudPhysics and AliCloud
+               evaluation. Two-axis IRD (recency) plus IRM (frequency)
+               model; trace-gen C++ CLI plus Python analysis library.}
 }
 
 @inproceedings{sabnis2021_tragen,
