@@ -37,6 +37,8 @@ class Spec:
     rank_pmf_target_blend: float = 1.0
     rank_pmf_feedback_strength: float = 0.0
     rank_pmf_feedback_alpha: float = 32.0
+    rank_pmf_guard_prob: float = 0.0
+    rank_pmf_guard_strength: float = 1.0
     adj_dup_prob: float = 0.0
     adj_dup_position_probs: str = ""
     adj_dup_min_rank: int = 0
@@ -142,6 +144,10 @@ def _parse_spec(text: str) -> Spec:
         "rpmf_fb": "rank_pmf_feedback_strength",
         "rpmffba": "rank_pmf_feedback_alpha",
         "rpmf_fb_alpha": "rank_pmf_feedback_alpha",
+        "rpmfguard": "rank_pmf_guard_prob",
+        "rpmfg": "rank_pmf_guard_prob",
+        "rpmfguardstrength": "rank_pmf_guard_strength",
+        "rpmfgs": "rank_pmf_guard_strength",
         "adj": "adj_dup_prob",
         "adj_pos": "adj_dup_position_probs",
         "adjpos": "adj_dup_position_probs",
@@ -288,6 +294,7 @@ def _auto_name(spec: Spec) -> str:
         f"loc{_tag(spec.rank_pmf_local_prob)}"
         f"tgt{spec.rank_pmf_target_real}b{_tag(spec.rank_pmf_target_blend)}"
         f"fb{_tag(spec.rank_pmf_feedback_strength)}"
+        f"g{_tag(spec.rank_pmf_guard_prob)}gs{_tag(spec.rank_pmf_guard_strength)}"
         f"_adj{_tag(spec.adj_dup_prob)}"
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
@@ -393,6 +400,10 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_pmf_feedback_strength),
         "--stack-rank-pmf-feedback-alpha",
         str(spec.rank_pmf_feedback_alpha),
+        "--stack-rank-pmf-guard-prob",
+        str(spec.rank_pmf_guard_prob),
+        "--stack-rank-pmf-guard-strength",
+        str(spec.rank_pmf_guard_strength),
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
         "--stack-adj-dup-position-probs",

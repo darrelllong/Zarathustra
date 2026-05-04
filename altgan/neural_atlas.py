@@ -104,6 +104,8 @@ class NeuralAtlasModel:
         stack_rank_pmf_local_prob: float = 0.0,
         stack_rank_pmf_feedback_strength: float = 0.0,
         stack_rank_pmf_feedback_alpha: float = 32.0,
+        stack_rank_pmf_guard_prob: float = 0.0,
+        stack_rank_pmf_guard_strength: float = 1.0,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -201,6 +203,10 @@ class NeuralAtlasModel:
         if stack_rank_pmf_tail_power_pivot is not None and stack_rank_pmf_tail_power_pivot < 0:
             stack_rank_pmf_tail_power_pivot = None
         stack_rank_pmf_local_prob = float(np.clip(stack_rank_pmf_local_prob, 0.0, 1.0))
+        stack_rank_pmf_feedback_strength = max(float(stack_rank_pmf_feedback_strength), 0.0)
+        stack_rank_pmf_feedback_alpha = max(float(stack_rank_pmf_feedback_alpha), 0.0)
+        stack_rank_pmf_guard_prob = float(np.clip(stack_rank_pmf_guard_prob, 0.0, 1.0))
+        stack_rank_pmf_guard_strength = max(float(stack_rank_pmf_guard_strength), 0.0)
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -699,6 +705,42 @@ class NeuralAtlasModel:
                                 stack_rank_tail_scale=stack_rank_tail_scale,
                                 stack_len=len(stack),
                             )
+                    if (
+                        stack_rank_pmf_guard_prob > 0.0
+                        and rank_pmf_edges is not None
+                        and rng.random() < stack_rank_pmf_guard_prob
+                    ):
+                        guard_pmf = rank_pmf_by_state.get(int(state))
+                        if stack_rank_pmf_local_prob > 0.0 and rng.random() < stack_rank_pmf_local_prob:
+                            local_pmfs = getattr(reservoir, "rank_pmf_by_state", {}) or {}
+                            local_pmf = local_pmfs.get(int(state))
+                            if local_pmf is not None:
+                                guard_pmf = local_pmf
+                        feedback_counts = rank_pmf_feedback_counts.get(int(state))
+                        if _rank_pmf_bin_over_target(
+                            int(rank),
+                            rank_pmf_edges,
+                            guard_pmf,
+                            feedback_counts,
+                            feedback_alpha=stack_rank_pmf_feedback_alpha,
+                        ):
+                            guarded_rank = _sample_rank_pmf(
+                                rank_pmf_edges,
+                                guard_pmf,
+                                stack_len=len(stack),
+                                bin_power=stack_rank_pmf_bin_power,
+                                tail_bin_power=stack_rank_pmf_tail_bin_power,
+                                tail_power_pivot=stack_rank_pmf_tail_power_pivot,
+                                feedback_counts=feedback_counts,
+                                feedback_strength=stack_rank_pmf_guard_strength,
+                                feedback_alpha=stack_rank_pmf_feedback_alpha,
+                                rng=rng,
+                            )
+                            if guarded_rank is not None:
+                                rank = min(
+                                    int(round(int(guarded_rank) * stack_rank_pmf_scale)),
+                                    len(stack) - 1,
+                                )
                     effective_stack_distance = int(rank)
                     effective_action_class = _action_class(effective_stack_distance)
                     obj_id = stack.move_to_front(rank)
@@ -1370,6 +1412,39 @@ def _calibrated_stack_rank(
 def _rank_bin_index(rank: int, edges: np.ndarray) -> int:
     idx = int(np.searchsorted(edges[1:], max(int(rank), 0), side="right"))
     return min(max(idx, 0), len(edges) - 2)
+
+
+def _rank_pmf_bin_over_target(
+    rank: int,
+    edges: np.ndarray | None,
+    pmf: np.ndarray | None,
+    feedback_counts: np.ndarray | None,
+    *,
+    feedback_alpha: float,
+) -> bool:
+    if edges is None or pmf is None or feedback_counts is None:
+        return False
+    probs = np.asarray(pmf, dtype=np.float64)
+    counts = np.asarray(feedback_counts, dtype=np.float64)
+    if len(edges) != len(probs) + 1 or len(counts) != len(probs):
+        return False
+    total = float(probs.sum())
+    if not np.isfinite(total) or total <= 0.0:
+        return False
+    if abs(total - 1.0) > 1e-6:
+        probs = probs / total
+    raw_total = float(counts.sum())
+    if not np.isfinite(raw_total) or raw_total <= 0.0:
+        return False
+    smooth = max(float(feedback_alpha), 0.0)
+    observed = counts + smooth * probs
+    observed_total = float(observed.sum())
+    if not np.isfinite(observed_total) or observed_total <= 0.0:
+        return False
+    idx = _rank_bin_index(int(rank), edges)
+    target = max(float(probs[idx]), 1e-12)
+    observed_share = float(observed[idx]) / observed_total
+    return observed_share > target
 
 
 def _rank_pmfs(

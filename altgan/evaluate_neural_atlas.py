@@ -83,6 +83,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Online PMF-bin correction strength based on ranks already emitted in each state.")
     p.add_argument("--stack-rank-pmf-feedback-alpha", type=float, default=32.0,
                    help="Smoothing mass for online PMF-bin feedback.")
+    p.add_argument("--stack-rank-pmf-guard-prob", type=float, default=0.0,
+                   help="Probability of redirecting overproduced reuse-rank bins through online PMF feedback.")
+    p.add_argument("--stack-rank-pmf-guard-strength", type=float, default=1.0,
+                   help="Correction strength used when the route-level rank-PMF guard redirects a reuse.")
     p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
                    help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
     p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
@@ -304,6 +308,8 @@ def main() -> int:
         stack_rank_pmf_local_prob=args.stack_rank_pmf_local_prob,
         stack_rank_pmf_feedback_strength=args.stack_rank_pmf_feedback_strength,
         stack_rank_pmf_feedback_alpha=args.stack_rank_pmf_feedback_alpha,
+        stack_rank_pmf_guard_prob=args.stack_rank_pmf_guard_prob,
+        stack_rank_pmf_guard_strength=args.stack_rank_pmf_guard_strength,
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
@@ -438,6 +444,8 @@ def main() -> int:
         "stack_rank_pmf_target_blend": args.stack_rank_pmf_target_blend,
         "stack_rank_pmf_feedback_strength": args.stack_rank_pmf_feedback_strength,
         "stack_rank_pmf_feedback_alpha": args.stack_rank_pmf_feedback_alpha,
+        "stack_rank_pmf_guard_prob": args.stack_rank_pmf_guard_prob,
+        "stack_rank_pmf_guard_strength": args.stack_rank_pmf_guard_strength,
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
