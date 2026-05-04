@@ -16105,6 +16105,23 @@ This /loop session, started after a context-compaction reboot mid-R284, produced
 
 Net race-position improvement: LLNL is the *measured* leader on 7 of 9 corpora generatively, with **all 9 corpora** banked — first time the project has had complete generative coverage. LANL retains 2 corpora; gaps are alibaba 4.7% (down from 9.4%) and Baleen24 33.7% (unchanged, axis exhausted).
 
+**Note (2026-05-04 evening)**: LANL's R285 counter-attack landed during this session, claiming all 9 corpora and inverting the leaderboard — see R285 section below for the corrected board. LLNL's session-end position is no longer the "leads 7 of 9" stated above; LANL now leads 8 of 9. The R281.K KV-class improvements still stand (e.g., closing Twitter from 82% behind to 7%) but were measured before LANL's claims arrived.
+
+## R282.G — Test if LANL's MSR recipe transfers to LLNL atlas (CLOSED NEGATIVE)
+
+**Hypothesis**: LANL banked MSR at 0.00484 with hp=0.25 cool=16 scale=1.0 — a recipe LLNL never tried. If LANL's lever values transfer to LLNL's MSR atlas, the gap closes by ~47%.
+
+**Result**: LANL recipe on LLNL atlas = **0.0335** single-seed = **3.6× WORSE than LLNL's existing R282.F (0.00921)** and 6.9× worse than LANL's banked 0.00484.
+
+**Reason**: LANL's atlas filename is `msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz` — `phaseatlas`, not `neural_atlas`. They have a **materially different atlas implementation**. Their lever recipe is tuned to phaseatlas internals; values do not transfer.
+
+**Conclusion**: closing the MSR gap requires architecture work, not lever tuning. Three vectors:
+1. Reverse-engineer or port LANL's `phaseatlas` (peer-dir read, no edit)
+2. Implement IRD-renewal method (LANL's CP/Wiki tool — empirical IRD + IRM renewal, no atlas)
+3. Re-fit MSR with phaseatlas-style architecture in LLNL
+
+**Tasks**: #93 (R282.G) closed NEGATIVE.
+
 ---
 
 ## R285 — Board Correction + Retake Strategy (2026-05-04)
