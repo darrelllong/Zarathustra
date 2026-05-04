@@ -2031,10 +2031,13 @@ Seed-42 official six-policy negative scouts:
 | footprint controller | `footprint target, ffb=.05` | `mean HRC-MAE across policies: 0.0333` | 0.0333300000 |
 | transition/local fine sweep | `tb=.575, lp=.80` | `mean HRC-MAE across policies: 0.0334` | 0.0333656667 |
 | recent-pool micro-sweep | `rp=.015, win=16` | `mean HRC-MAE across policies: 0.0333` | 0.0332506667 |
+| rank-band policy split | `rb=.020, ranks 128..512` | `mean HRC-MAE across policies: 0.0335` | 0.0335460000 |
 
 None beats the promoted seed-42 row `0.0330030000`, so there is no Tencent
 promotion and no multi-seed claim. The useful conclusion is architectural:
 Tencent's remaining gap is not fixed by stream-level scalar correction,
 per-stream renewal, deeper-per-file phase fitting, footprint feedback, or
-micro-tuning the recent-pool probability. Keep the current pinned-ref LANL row
-at `0.0335806667` four-seed mean until a new object-process architecture lands.
+micro-tuning the recent-pool probability. A targeted rank-band route can widen
+the rank tail but still loses the policy mean. Keep the current pinned-ref LANL
+row at `0.0335806667` four-seed mean until a new object-process architecture
+lands.

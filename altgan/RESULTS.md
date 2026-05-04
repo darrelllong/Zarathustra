@@ -2937,8 +2937,10 @@ Seed-42 official six-policy summary:
 | footprint controller | `footprint target, ffb=.05` | 0.0333300000 |
 | transition/local fine sweep | `tb=.575, lp=.80` | 0.0333656667 |
 | recent-pool micro-sweep | `rp=.015, win=16` | 0.0332506667 |
+| rank-band policy split | `rb=.020, ranks 128..512` | 0.0335460000 |
 
 All branches are negative versus the promoted seed-42 `0.0330030000`; no
 multi-seed Tencent promotion. The next Tencent attempt should not spend more
-time on scalar recent/footprint/rank controls around this atlas. The remaining
-gap needs a different object-process model, not a local retune.
+time on scalar recent/footprint/rank controls around this atlas. The targeted
+rank-band branch widened the tail, but the policy mean still regressed. The
+remaining gap needs a different object-process model, not a local retune.
