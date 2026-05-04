@@ -2750,3 +2750,36 @@ tail `0.07` `0.0121840667`; tail `0.08` `0.0108227667`; tail `0.09`
 
 Four-seed mean: `0.0108672417`, range `0.0003080000`. This replaces the prior
 Meta KV generative mean `0.0222730583`, a `51.2%` lower cachesim target.
+
+## Wikipedia IRD-Renewal Generative Retake (2026-05-03)
+
+Added `altgan.ird_renewal` as a 2DIO-inspired IRD+IRM generator. The generator
+fits `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv` into empirical
+inter-reference distances and object-count ranks, emits synthetic object IDs
+from a heap-scheduled renewal process, and mixes in an independent frequency
+surface. This is not TraceBootstrap: no real object labels or chunks are
+replayed.
+
+Recipe: 1M rows, seed `{42,80,81,82}`, `independent_prob=0.10`,
+`ird_scale=32.00`, default exact-count synthetic rank footprint, monotone
+synthetic timestamps. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`.
+
+Seed-42 scouts: old neural-atlas row `0.0231457667`; unique-rate atlas scout
+`0.0219476667`; renewal scale `5` `0.0172005667`, scale `9`
+`0.0144125000`, scale `12` `0.0130832667`, scale `16` `0.0123852667`,
+scale `24` `0.0115046000`, scale `32` `0.0112286000`, scale `48`
+`0.0116648000`, scale `64` `0.0115176667`; tail-only pivot 128/scale 9
+missed at `0.0228915667`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0112` | 0.0112286000 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0116` | 0.0115763667 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112679000 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0118` | 0.0117615000 |
+
+Four-seed mean: `0.0114585917`, range `0.0005329000`. This replaces LANL's
+neural-atlas Wikipedia generative mean `0.0232978750` and beats LLNL R280's
+published Wikipedia generative mean `0.017397` on the official six-policy
+cachesim surface.

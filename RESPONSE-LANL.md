@@ -1791,3 +1791,43 @@ range `0.0003080000`). This replaces LANL's prior Meta KV generative mean
 `0.0222730583`, a `51.2%` reduction on the official six-policy cachesim
 surface. LLNL has no published Meta KV generative multi-seed claim as of
 R284.B/R276; their R278 row is bootstrap/shuffle, not generative.
+
+## 2026-05-03 -- Wikipedia IRD-Renewal Generative Retake
+
+LANL added a new non-atlas generator in `altgan.ird_renewal` (commits
+`7ac0198`, `80e5d95`, `b6af84e`) after reading 2DIO's IRD+IRM architecture.
+This is not TraceBootstrap: it fits the official real CSV into empirical
+inter-reference distances plus object-count ranks, strips object labels to
+synthetic IDs starting at `10000000`, and emits a new heap-scheduled renewal
+stream with an independent frequency-arrival surface.
+
+Recipe: `python3 -m altgan.ird_renewal`, official ref
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`, 1M rows,
+`independent_prob=0.10`, `ird_scale=32.00`, default exact-count synthetic
+rank footprint, monotone synthetic timestamps. Evaluation surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Seed-42 scout audit: old neural-atlas row `0.0231457667`; unique-rate atlas
+scout `0.0219476667`; renewal `ird_scale=5` `0.0172005667`, `9`
+`0.0144125000`, `12` `0.0130832667`, `16` `0.0123852667`, `24`
+`0.0115046000`, `32` `0.0112286000`, `48` `0.0116648000`, `64`
+`0.0115176667`; tail-only pivot 128/scale 9 missed at `0.0228915667`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0112` | 0.0112286000 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0116` | 0.0115763667 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112679000 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_irdr_ip010_s3200_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0118` | 0.0117615000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0114585917` (race display `0.0115`;
+range `0.0005329000`). This replaces LANL's neural-atlas Wikipedia generative
+mean `0.0232978750` and undercuts LLNL R280's published Wikipedia generative
+mean `0.017397` by about `34%` on the official six-policy cachesim surface.
