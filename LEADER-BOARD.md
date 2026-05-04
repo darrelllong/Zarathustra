@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-04 (post-R282.D MSR scale=1.5 multi-seed banked at 0.00948; LLNL MSR lead widens to +27.6%)**.
+Last updated: **2026-05-04 (post-R283.E CP scale=1.0 multi-seed banked at 0.0326; +3.5% over R224)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -24,7 +24,7 @@ The race has two metric classes:
 |---|---|---|---|---|
 | Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.0119** (cooldown control) | **LANL** | −4.7% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0303 | tied (with caveat) | ~0% |
-| CloudPhysics | **0.0338** (R224, 8-pol) | not published gen | **LLNL alone** | — |
+| CloudPhysics | **0.0326** (R283.E: R237 atlas + scale=1.0; 8-pol multi-seed, range 0.000538) | not published gen | **LLNL alone** | — |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
 | MSR Exchange | **0.00948** (R282.D: R270 atlas + scale=1.5; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +27.6% |
 | Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |

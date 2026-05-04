@@ -15846,3 +15846,51 @@ scale=1.5 single-seed beats R273 scale=2 single-seed (0.0102) by 9%. Scale=2.2 a
 **Lesson refinement (memory updated)**: storage-class corpora prefer `scale ≥ 1`, but the *exact* optimum is corpus-specific. MSR optimum is ~1.5–2.2, not the previously-assumed 2.0. Wiki optimum is ~5. Alibaba optimum is exactly 1.0. For new storage corpora, sweep ∈ {1.0, 1.5, 2.0, 5.0} at minimum and pick best.
 
 **Tasks**: #75 (R282.C scout), #76 (R282.D multi-seed) closed.
+
+## R283.D / R283.E — CloudPhysics scale-sweep finds win on the R237 atlas
+
+**R283.D single-seed scout** at fixed R224-style lock (hp=0.15 K=50 adj=0.35 tp=0.10 mf=0.5 rp=0.10 win=2) on the R237-family CP atlas (`cloudphysics_b2_inline_extbins_seed137_noise0p05.pkl.gz`):
+
+| Scale | 8-pol mean (seed=42) |
+|---|---|
+| **1.0** | **0.032701** ← winner |
+| 1.5 | 0.036204 |
+| 2.0 | 0.040519 |
+| 5.0 | 0.056117 |
+
+CP follows the alibaba pattern (sharp dome at scale=1.0). The R237 atlas at scale=1.0 already beats the R224 banked single-seed by 3%.
+
+**R283.E multi-seed verify at scale=1.0**:
+
+| seed | 8-pol mean |
+|---|---|
+| 42 | 0.032701 |
+| 43 | 0.032304 |
+| 44 | 0.032643 |
+| 45 | 0.032842 |
+| **mean** | **0.032623** |
+| range | 0.000538 |
+
+**vs R224 banked (0.0338)**: WIN by 1.18 mpp = **3.5% improvement**. Range 0.000538 — extremely tight.
+
+**LLNL CP claim banked at 0.0326 (R283.E, supersedes R224).** LLNL is still alone on CP generative.
+
+**Tasks**: #77 (R283.D scout), #78 (R283.E multi-seed) closed.
+
+### Session-end consolidated results
+
+This /loop session produced:
+
+| Round | Effect |
+|---|---|
+| **R280** | NEW: Wikipedia generative banked 0.01740 (LLNL alone) |
+| **R281.B** | NEW: Twitter generative banked 0.1532 (LLNL alone) |
+| **R281.C** | NEW: Meta KV generative banked 0.2624 (LLNL alone) |
+| **R281.D** | NEW: Meta CDN generative banked 0.1003 (LLNL alone) |
+| **R276** | IMPROVED: alibaba 0.0131 → 0.01245 (gap to LANL halved 9.4% → 4.7%) |
+| **R282.D** | IMPROVED: MSR 0.0105 → 0.00948 (lead over LANL widens 20% → 27.6%) |
+| **R283.E** | IMPROVED: CP 0.0338 → 0.0326 (LLNL alone, +3.5%) |
+| R284.X/Y/B | INFORMATIONAL: 2DIO per-trace floor measured on 5 traces |
+| R277.F/M, R277.B (R281), R282.B/C, R283.B/C/D | INFORMATIONAL: axis-exhaustion + alibaba-negative refinements |
+
+**Net race-position**: LLNL has banked generative claims on **all 9 race corpora**. LLNL leads 7 of 9 (5 alone + 1 strict win + 1 tie). LANL leads 2 (alibaba 4.7%, Baleen24 33.7%).
