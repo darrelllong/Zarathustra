@@ -82,11 +82,14 @@ def sample_ird(rng: np.random.Generator, edges: np.ndarray, probs: np.ndarray) -
 
 def generate_ird_renewal(real_obj_ids, real_sizes, n_records: int, seed: int = 42,
                          ird_buckets: int = 32, independent_prob: float = 0.10,
-                         rank_ird_buckets: int = 0):
+                         rank_ird_buckets: int = 0, stack_cap: int = 0):
     """Generate synthetic trace using empirical IRD + IRM renewal.
 
-    Implementation maintains a virtual LRU stack as SortedList of (timestamp, key).
+    Implementation maintains a virtual LRU stack as SortedList of timestamps.
     'Top' = largest timestamp. To pick at depth k: SortedList[len-1-k] (O(log n)).
+
+    stack_cap: if > 0, evict LRU (oldest timestamp) when stack exceeds cap.
+    Use the real trace's working-set size for cap on bounded-WS workloads.
     """
     rng = np.random.default_rng(seed)
 
@@ -150,6 +153,15 @@ def generate_ird_renewal(real_obj_ids, real_sizes, n_records: int, seed: int = 4
         obj_at_ts[ts] = obj
         ts_of_obj[obj] = ts
 
+        # Evict LRU if over cap.
+        if stack_cap > 0 and len(timestamps) > stack_cap:
+            old_ts = timestamps[0]
+            old_obj = obj_at_ts[old_ts]
+            timestamps.remove(old_ts)
+            del obj_at_ts[old_ts]
+            if ts_of_obj.get(old_obj) == old_ts:
+                del ts_of_obj[old_obj]
+
         out_ids[i] = obj
         out_sizes[i] = sizes_real[rng.integers(0, len(sizes_real))]
 
@@ -166,6 +178,9 @@ def main():
     ap.add_argument("--independent-prob", type=float, default=0.10)
     ap.add_argument("--rank-ird-buckets", type=int, default=0)
     ap.add_argument("--max-real-rows", type=int, default=200_000)
+    ap.add_argument("--stack-cap", type=int, default=0,
+                    help="cap virtual LRU stack size (0 = unbounded). "
+                         "Use real working-set size for bounded-WS workloads.")
     args = ap.parse_args()
 
     print(f"Loading real trace from {args.real} (max_rows={args.max_real_rows})", flush=True)
@@ -178,7 +193,7 @@ def main():
     out_ids, out_sizes = generate_ird_renewal(
         obj_ids, obj_sizes, n_records=args.n, seed=args.seed,
         ird_buckets=args.ird_scale, independent_prob=args.independent_prob,
-        rank_ird_buckets=args.rank_ird_buckets,
+        rank_ird_buckets=args.rank_ird_buckets, stack_cap=args.stack_cap,
     )
 
     print(f"Writing {len(out_ids):,} records → {args.output}", flush=True)
