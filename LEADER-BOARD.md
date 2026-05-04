@@ -23,7 +23,7 @@ The race has two metric classes:
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
 | Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.0119** (cooldown control) | **LANL** | −4.7% |
-| Tencent | 0.0305 (R206) | 0.0303 | tied | ~0% |
+| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0303 | tied (with caveat) | ~0% |
 | CloudPhysics | **0.0338** (R224, 8-pol) | not published gen | **LLNL alone** | — |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
 | MSR Exchange | **0.0105** (R273: R270 atlas + scale=2.0; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +20.0% |

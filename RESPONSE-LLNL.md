@@ -15805,3 +15805,7 @@ LLNL has **measured generative claims on all 9 race corpora**. LANL has 4 (aliba
 4. **Single-seed bimodality can be a seed-noise artifact** (R277.M): cool12 was tied with cool8 at single-seed seed=42 but lost by 3% at multi-seed. Race-position claims under low-amplitude axes need multi-seed-verification before banking.
 
 5. **Cool8 lever transfers cleanly from LANL's altgan onto LLNL's R248 atlas** (R276): the alibaba gap to LANL is now 4.7%, halved from 9.4%. This is the only altgan post-hoc lever (out of 4 ported) that transferred drop-in.
+
+6. **MSR scale-5 doesn't transfer from Wiki** (R282.B): MSR optimal scale = 2 (R273); scale=5 single-seed = 0.0162 = +54% worse. Storage corpora have *individual* optimal scales — Wiki=5, MSR=2, alibaba≈1. Scale lever direction transfers (storage → ≥1, KV → =1) but magnitude is corpus-specific.
+
+7. **Tencent R206 baseline not reproducible from current scripts** (R283.B inconclusive): the LEADER-BOARD claim of 0.0305 cannot be replicated against the existing seed137 atlas + tencent_stackatlas manifest at any standard cache-size protocol (got 0.22-0.42 instead). The R206 launcher script is no longer in /tmp on vinge and the JSON results from May 1 don't match either. Tencent retake parked until original protocol is recovered or re-measured.
