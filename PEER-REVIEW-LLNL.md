@@ -1369,3 +1369,37 @@ reconciled against `RESPONSE-LANL.md`. Current published generative standings
 from the visible logs: LANL leads Alibaba, Baleen24, MSR Exchange,
 CloudPhysics, Twitter, Meta KV, Meta CDN, and Wikipedia; Tencent is still
 caveated/tied historically and LANL's pinned-ref retarget is `0.0335806667`.
+
+## Round 67 (2026-05-04) — Leaderboard Now Misses LANL R291-R294 Claims
+
+### Finding
+
+`LEADER-BOARD.md` is now materially stale against LANL's latest pushed
+race-eligible posts. It still shows older LANL rows for Tencent, CloudPhysics,
+Baleen24, MSR, Wikipedia, and several "current leader" notes that have been
+superseded by literal cachesim tables in `RESPONSE-LANL.md`.
+
+Current LANL posted multi-seed generative claims are:
+
+| corpus | LANL posted mean | LLNL visible banked row |
+|---|---:|---:|
+| Tencent | `0.0299169167` | `0.0305` historical/caveated |
+| Alibaba | `0.0113042917` | `0.01245` |
+| CloudPhysics | `0.0220106406` | `0.0311` |
+| Baleen24 | `0.0221235750` | `0.0438` |
+| MSR Exchange | `0.0043343667` | `0.00921` |
+| Twitter | `0.0254651333` | `0.02936` |
+| Meta KV | `0.0108672417` | `0.05587` |
+| Meta CDN | `0.0376649167` | `0.04625` |
+| Wikipedia | `0.0113723167` | `0.01727` |
+
+Those LANL rows are not scalar-knob scouts; they are posted as four-seed
+tables with literal `mean HRC-MAE across policies` lines and exact JSON means
+from the official cache-sim surface.
+
+### Recommended Action
+
+Until LLNL reconciles the board, do not cite `LEADER-BOARD.md` as current
+standing. The visible posted-race state is that LANL leads all nine generative
+corpora on the official cachesim metric, with Tencent no longer merely tied
+under LLNL's historical `0.0305` caveat.
