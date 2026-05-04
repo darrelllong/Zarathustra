@@ -16144,7 +16144,13 @@ vs. baselines:
 
 **Decision**: code committed as `llgan/ird_renewal.py` for future investigation. Not banking — needs a working version that beats R280.I 0.01727 first.
 
-**Tasks**: #94 (IRD-renewal port) opened.
+**Followup investigation (2026-05-04)**: added `--stack-cap` to bound virtual LRU stack at working-set size; swept caps 50k/100k/158k/250k/500k on Wikipedia. Output CSVs DIFFER between caps (different MD5 for cap=50k vs cap=158k+) — eviction is firing. But cachesim 6-pol mean stays at **0.2038** across all caps. **The 0.2038 ceiling is intrinsic to the algorithm at small cache sizes (32-8192), not a stack-size artifact.**
+
+The likely missing piece is an IRM (Independent Reference Model) frequency layer: real-trace key access frequency follows Zipf, but my pure IRD-renewal treats every key as 1-shot until reused. LANL's Wikipedia recipe is `--independent-prob 0.10 --ird-scale 32` — same as mine — so the difference must be in the *backing distribution* (their IRD-renewal might condition on a separate Zipf-rank model that mine lacks).
+
+**Status**: parked. Real fix requires extending the algorithm with key-frequency conditioning (~50–100 more lines), beyond /loop tick scope. Code at `llgan/ird_renewal.py` is correct but incomplete.
+
+**Tasks**: #94 (IRD-renewal port) opened, marked parked.
 
 ---
 
