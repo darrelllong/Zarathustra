@@ -52,7 +52,7 @@ class Spec:
     rank_band_reuse_min_rank: int = 0
     rank_band_reuse_max_rank: int = -1
     rank_band_reuse_power: float = 1.0
-    hot_pool_prob: float = 0.45
+    hot_pool_prob: float = 0.0
     hot_pool_position_probs: str = ""
     hot_pool_k: int = 75
     hot_pool_window: int = 10000
@@ -89,10 +89,10 @@ class Spec:
     delayed_reuse_max_rank: int = -1
     delayed_reuse_max_pending: int = 4096
     delayed_reuse_sample_attempts: int = 8
-    recent_pool_prob: float = 0.15
+    recent_pool_prob: float = 0.0
     recent_pool_position_probs: str = ""
     recent_pool_window: int = 16
-    tail_reuse_prob: float = 0.10
+    tail_reuse_prob: float = 0.0
     tail_reuse_position_probs: str = ""
     tail_reuse_min_frac: float = 0.5
     tail_reuse_rank_power: float = 1.0
