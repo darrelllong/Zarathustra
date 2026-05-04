@@ -16122,6 +16122,30 @@ Net race-position improvement: LLNL is the *measured* leader on 7 of 9 corpora g
 
 **Tasks**: #93 (R282.G) closed NEGATIVE.
 
+## R286 — LLNL IRD-renewal port (WIP, first attempt UNDERPERFORMS)
+
+**Setup**: Wrote `llgan/ird_renewal.py` from scratch based on the public R285 description (algorithm only, no peer-source read). Uses `sortedcontainers.SortedList` for O(n log n) LRU stack maintenance. ~150 lines.
+
+**First test (Wikipedia, ip=0.10, ird_s=32, max_real_rows=200000)**:
+- Generation: 9.3s for 1M records — fast.
+- LRU HRC-MAE 6-pol mean: **0.2038**
+
+vs. baselines:
+- LLNL R280.I (atlas + scale=4.5): 0.01727
+- LANL Wiki (their IRD-renewal): 0.01146
+
+**The first-attempt LLNL implementation underperforms by ~12× vs LLNL atlas approach** and ~18× vs LANL's IRD-renewal. Algorithm is correct (LRU stack-distance via SortedList; samples IRD from empirical bucketed distribution), but missing some piece LANL has.
+
+**Hypotheses**:
+1. **Stack unbounded**: my impl lets the virtual stack grow without limit; LANL likely bounds it (LRU eviction past M unique keys, where M = real-trace working-set size).
+2. **Size distribution**: my impl samples sizes uniformly from `real_sizes`, ignoring the size-rank correlation that may matter for cachesim.
+3. **Initial transient**: my impl seeds with all-fresh new IDs; LANL may pre-load the stack with real keys to skip cold-start.
+4. **Rank conditioning untested**: I implemented `--rank-ird-buckets` but tested with 0; may matter a lot.
+
+**Decision**: code committed as `llgan/ird_renewal.py` for future investigation. Not banking — needs a working version that beats R280.I 0.01727 first.
+
+**Tasks**: #94 (IRD-renewal port) opened.
+
 ---
 
 ## R285 — Board Correction + Retake Strategy (2026-05-04)
