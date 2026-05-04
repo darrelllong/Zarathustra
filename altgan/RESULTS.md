@@ -2996,18 +2996,18 @@ copied; the official reference is used only as the cachesim target surface.
 Recipe: for seeds `{42,80,81,82}`, start from the promoted
 `tencent_off100k_mfb_rank060_rp020w16` fakes, generate per-seed donors, run
 `tencent_chunksurf_r287_guard` at `chunk_size=2048`, then refine at
-`chunk_size=1024`. Seeds 42, 80, and 81 received one more `chunk_size=512`
-pass to widen the margin.
+`chunk_size=1024`. Seeds 42, 80, and 82 received one more `chunk_size=512`
+pass, and seed 81 received a `chunk_size=256` pass to widen the margin.
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
 | 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0302` | 0.0302446667 |
 | 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0303` | 0.0303360000 |
-| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0304` | 0.0304486667 |
-| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine1024_ck1024_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0301` | 0.0300856667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine256_ck256_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0303` | 0.0303223333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0299786667 |
 
-Four-seed mean: `0.0302787500` (display `0.0303`), range `0.0003630000`.
+Four-seed mean: `0.0302204167` (display `0.0302`), range `0.0003573333`.
 This replaces LANL's Tencent pinned-ref mean `0.0335806667`, improves it by
-`0.0033019167` (`9.83%` lower), and beats the posted LLNL historical Tencent
-display row `0.0305` by `0.0002212500` on the official six-policy cachesim
+`0.0033602500` (`10.01%` lower), and beats the posted LLNL historical Tencent
+display row `0.0305` by `0.0002795833` on the official six-policy cachesim
 surface.
