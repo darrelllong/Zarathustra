@@ -15744,3 +15744,64 @@ Multi-seed verify R244lock:
 The scale lever is **corpus-class-dependent**: storage workloads (alibaba/Wiki/MSR/CP) want scale ≥ 1.0; KV-style workloads (Twitter/Meta KV) want scale = 1.0. This is a stable empirical pattern across 5 corpora.
 
 **Tasks**: #70 (R281.C) closed; #71 (R281.D Meta CDN) in flight.
+
+## R281.D — Meta CDN generative claim (CLOSED, BANKED — final unclaimed corpus closed)
+
+**Setup**: Meta CDN atlas needed to be fit (4 traces from `2022_metaCDN/`: meta_reag, meta_rnha, plus 2 others). R270 family recipe (n_phase=2 t4s4 hidden=96 ep=600 seed=137 noise=0.05). Atlas converged to trans_loss=2.20 (similar to Wiki's 1.87 — moderate-data regime).
+
+**Single-seed scale sweep at seed=42**:
+
+| Config | 6-pol mean (seed=42) |
+|---|---|
+| **R244lock** | **0.100071** ← winner |
+| scale=2 | 0.112697 |
+| scale=5 | 0.128016 |
+
+Same scale-inversion pattern as Twitter and Meta KV. **All three Meta-domain workloads (Meta KV, Meta CDN) and Twitter — collectively the "non-storage" corpus class — disprefer the rank-scale lever.**
+
+**Multi-seed verify R244lock**:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.100071 |
+| 43 | 0.100925 |
+| 44 | 0.100274 |
+| 45 | 0.099901 |
+| **mean** | **0.100293** |
+| range | 0.001024 |
+
+**Meta CDN 4-seed mean = 0.1003, range = 0.00102.**
+
+**LLNL Meta CDN generative claim banked at 0.1003.** LANL has no Meta CDN claim. **LLNL leads Meta CDN generative alone.**
+
+### MILESTONE: All 9 corpora now have LLNL generative claims
+
+After R281.D, the LLNL/LANL race-position is:
+
+| Corpus | LLNL gen (multi-seed) | LANL gen | Status |
+|---|---|---|---|
+| **alibaba** | 0.01245 (R276) | 0.0119 | LANL +4.7% (down from +9.4%) |
+| **tencent** | 0.0305 (R206) | 0.0303 | TIED |
+| **CloudPhysics** | 0.0338 (R224) | — | LLNL alone |
+| **Baleen24** | 0.0438 (R245) | 0.0291 | LANL +33.7% |
+| **MSR** | 0.0105 (R273) | 0.0131 | LLNL strict win +20% |
+| **Twitter** | 0.1532 (R281.B) | — | LLNL alone |
+| **Meta KV** | 0.2624 (R281.C) | — | LLNL alone |
+| **Meta CDN** | 0.1003 (R281.D) | — | LLNL alone |
+| **Wikipedia** | 0.01740 (R280) | — | LLNL alone |
+
+LLNL has **measured generative claims on all 9 race corpora**. LANL has 4 (alibaba, tencent, CP, Baleen24, MSR — though their CP claim is just 0.0000 bootstrap, not a true generative claim). LLNL has banked generative numbers on **5 corpora LANL has not contested** plus a strict win on MSR plus a tie on tencent. **LLNL leads 7 of 9 corpora generatively (5 alone + 1 win + 1 tie). LANL leads 2 (alibaba +4.7%, Baleen24 +33.7%).**
+
+**Tasks**: #71 (R281.D) closed.
+
+### Empirical patterns surfaced this session
+
+1. **Per-corpus architecture confirmed across 3 axes** (R274 closure): multi-scale critic, PCF loss, R270 atlas binning all alibaba-NEGATIVE despite winning on other corpora.
+
+2. **Scale lever is corpus-class-dependent** (R280/R281.B/R281.C/R281.D): storage workloads (alibaba/Wiki/MSR/CP) prefer scale ≥ 1.0; KV/CDN-like workloads (Twitter/Meta KV/Meta CDN) prefer scale = 1.0 and degrade monotonically with higher scale.
+
+3. **Per-trace memoization is structurally above the 2DIO bar** by 2-7× (R284.X/Y/B): LLNL's atlas hits a per-trace floor at ~0.10 LRU HRC-MAE on alibabaBlock_521 regardless of capacity (192 states vs 6 states) and ~0.14 on CP w82 at training scale. The path to closing the gap is IDEAS-LLNL #26 (atlas-fit IRD-shape loss).
+
+4. **Single-seed bimodality can be a seed-noise artifact** (R277.M): cool12 was tied with cool8 at single-seed seed=42 but lost by 3% at multi-seed. Race-position claims under low-amplitude axes need multi-seed-verification before banking.
+
+5. **Cool8 lever transfers cleanly from LANL's altgan onto LLNL's R248 atlas** (R276): the alibaba gap to LANL is now 4.7%, halved from 9.4%. This is the only altgan post-hoc lever (out of 4 ported) that transferred drop-in.

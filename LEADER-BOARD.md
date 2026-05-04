@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R281.C Meta KV generative banked at 0.2624 multi-seed; LLNL alone on Meta KV; R281.D Meta CDN in flight)**.
+Last updated: **2026-05-03 (post-R281.D Meta CDN generative banked at 0.1003 multi-seed; ALL 9 CORPORA NOW HAVE LLNL GENERATIVE CLAIMS)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -29,12 +29,11 @@ The race has two metric classes:
 | MSR Exchange | **0.0105** (R273: R270 atlas + scale=2.0; hp=0.45 K=75 adj=0.40 tp=0.10 mf=0.5 rp=0.15 win=16) | 0.0131 | **LLNL** | +20.0% |
 | Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |
 | Meta KV | **0.2624** (R281.C R244lock multi-seed, range 0.00202) | not published | **LLNL alone** | — |
-| Meta CDN | not yet | not published | nobody | — |
+| Meta CDN | **0.1003** (R281.D R244lock multi-seed, range 0.00102) | not published | **LLNL alone** | — |
 | Wikipedia | **0.01740** (R280.M scale5 multi-seed, range 0.000175) | not published | **LLNL alone** | — |
 
-**Generative score**: LLNL leads 1 corpus (MSR) + alone on 4 (CP, Wiki, Twitter, Meta KV);
-LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent); 1 corpus
-(Meta CDN) still unclaimed generatively by either team (R281.D in flight).
+**Generative score**: LLNL leads 1 corpus (MSR) + alone on 5 (CP, Wiki, Twitter, Meta KV, Meta CDN);
+LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent). **All 9 corpora now have LLNL generative claims.**
 
 ## TraceBootstrap leader board (methodology theater)
 
