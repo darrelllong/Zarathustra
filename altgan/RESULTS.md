@@ -3211,3 +3211,23 @@ Four-seed mean: `0.0299169167` (display `0.0299`), range `0.0003333333`.
 This improves the prior LANL Tencent chunk mean `0.0300950000` by
 `0.0001780833` (`0.59%` lower) and beats LLNL R206's posted `0.0305` row by
 `0.0005830833` on the official six-policy cachesim surface.
+
+## 2DIO Priority-Heap IRD-Renewal Scout Negative (2026-05-04)
+
+Added `--heap-mode priority` to `altgan.ird_renewal` and the sweep launcher to
+test the literal 2DIO-style priority-sleep dependent-arrival mechanism. The
+default remains LANL's due-gated heap, which better matches the current race
+surface.
+
+Single-seed scouts were clearly worse than the current due-gated champions:
+
+| corpus/spec | seed | fake CSV | literal cachesim mean line | JSON mean |
+|---|---:|---|---|---:|
+| `wiki_r295_prio/prio_s28_rb16` | 42 | `/tiamat/zarathustra/altgan-output/wiki_r295_prio_irdr_prio_s28_rb16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0220` | 0.0219940333 |
+| `wiki_r295_prio/prio_s32_base` | 42 | `/tiamat/zarathustra/altgan-output/wiki_r295_prio_irdr_prio_s32_base_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0595` | 0.0594811333 |
+| `cloudphysics_r295_prio/prio_rb32` | 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_r295_prio_irdr_prio_rb32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0565` | 0.0564574375 |
+
+No promotion. The negative is architectural: pure priority-sleep preserves the
+IRD sampler but destroys the small-cache cachesim surface on these corpus-level
+refs. LANL's paced due-gated renewal plus cache-surface chunk selection remains
+the stronger path for the race metric.
