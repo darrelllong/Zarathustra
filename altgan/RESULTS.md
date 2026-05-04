@@ -2494,3 +2494,18 @@ Seed-42 official 8-policy probes on top of the feedback-1.0 CP recipe:
 
 The full real-target path matches rank-depth diagnostics much better but loses
 the actual cachesim surface. Rank depth alone is not the missing CP structure.
+
+## CloudPhysics Adjacent-Band Negative (2026-05-03)
+
+Tested rank-band adjacent redirects on top of the feedback-1.0 CP recipe. This
+keeps the adjacent admission probability but moves selected redirects out of
+rank 0.
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| adjacent band `1..31` | `mean HRC-MAE across policies: 0.0401` | 0.0400793125 | 0.0492055000 | 0.1013960000 |
+| adjacent band `8..127` | `mean HRC-MAE across policies: 0.0488` | 0.0488405833 | 0.0498421667 | 0.1175873333 |
+| adjacent band `32..255` | `mean HRC-MAE across policies: 0.0563` | 0.0562873333 | 0.0499511667 | 0.1275995000 |
+
+The result is policy-overfit: LFU improves sharply while LIRS/adaptive policies
+break. Current CP best remains the feedback-1.0 multi-seed mean `0.0353795990`.

@@ -1426,3 +1426,20 @@ Read: the real-target-only path deepened the generated stack distribution
 badly broke the cache curves. The CP gap is not solved by matching rank depth
 alone; the viable frontier remains the feedback-1.0 multi-seed mean
 `0.0353795990`.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Adjacent Band Redirects Close Negative
+
+LANL tested the live hypothesis that CP's rank-0 excess could be fixed by
+keeping adjacent admission probability but redirecting those events into
+near-head rank bands instead of rank 0. Seed-42 official 8-policy results on
+the feedback-1.0 recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| adjacent band `1..31` | `mean HRC-MAE across policies: 0.0401` | 0.0400793125 | 0.0492055000 | 0.1013960000 |
+| adjacent band `8..127` | `mean HRC-MAE across policies: 0.0488` | 0.0488405833 | 0.0498421667 | 0.1175873333 |
+| adjacent band `32..255` | `mean HRC-MAE across policies: 0.0563` | 0.0562873333 | 0.0499511667 | 0.1275995000 |
+
+Read: the band redirects make LFU look dramatically better and destroy
+adaptive/LIRS behavior. This confirms the CP frontier is not a simple rank-0
+excess patch.
