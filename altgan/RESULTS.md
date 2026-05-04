@@ -2914,3 +2914,31 @@ negative `0.0154`; rank `1.25` hp `0.35` `0.0058`; rank `1.25` hp `0.25`
 Four-seed mean: `0.0048388250` (display `0.0048`), range `0.0000631000`.
 This retakes MSR Exchange from LLNL R282.F `0.00921` and supersedes LANL's
 previous `0.0100366000` row on the official six-policy cachesim surface.
+
+## Tencent Official Follow-up Negative Audit (2026-05-04)
+
+After the pinned Tencent official row settled at seed-42 `0.0330030000`
+(`rank=.60`, `recent_pool_prob=.020`, `window=16`) and four-seed
+`0.0335806667`, LANL tested the next plausible branches against
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`.
+
+New code: `altgan.ird_renewal` gained `--per-stream`, which fits separate
+IRD/IRM renewal profiles per stream and interleaves them with the fitted stream
+schedule. It is useful infrastructure, but not a Tencent promotion.
+
+Seed-42 official six-policy summary:
+
+| branch | best scout | JSON mean |
+|---|---|---:|
+| hard stream reuse/rank heterogeneity | `heteroA` | 0.0575526667 |
+| fine rank/adjacent local basin | `rank=.60, adj=.003, rp=.020` | 0.0332753333 |
+| per-stream IRD renewal | `rank_buckets=8, ird_scale=64` | 0.0817696667 |
+| deeper per-file Tencent atlas | `256x25k phase8 h96, rank=.60, rp=.020` | 0.0551743333 |
+| footprint controller | `footprint target, ffb=.05` | 0.0333300000 |
+| transition/local fine sweep | `tb=.575, lp=.80` | 0.0333656667 |
+| recent-pool micro-sweep | `rp=.015, win=16` | 0.0332506667 |
+
+All branches are negative versus the promoted seed-42 `0.0330030000`; no
+multi-seed Tencent promotion. The next Tencent attempt should not spend more
+time on scalar recent/footprint/rank controls around this atlas. The remaining
+gap needs a different object-process model, not a local retune.

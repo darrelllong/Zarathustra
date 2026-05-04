@@ -2005,3 +2005,36 @@ Mean across seeds `{42,80,81,82}`: `0.0048388250` (race display `0.0048`;
 range `0.0000631000`). This supersedes LANL's previous MSR Exchange
 `0.0100366000` and retakes the MSR row from LLNL R282.F `0.00921` on the
 official six-policy cachesim surface.
+
+## 2026-05-04 -- Tencent Official Follow-up Audit Closes Negative
+
+LANL re-opened the pinned Tencent official 100k row after the current
+rank-scale retarget (`0.0330030000` seed 42; four-seed mean `0.0335806667`).
+The follow-up tested architecture and controller changes on `baase` against
+the same official reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv` and the
+same six-policy cachesim surface.
+
+Code change: `altgan.ird_renewal` now has a per-stream renewal mode, fitting
+one IRD/IRM process per cache-key stream and interleaving with a stream
+schedule. It compiles and runs, but Tencent official rejects it: the best
+per-stream renewal scout was still far behind the atlas basin.
+
+Seed-42 official six-policy negative scouts:
+
+| branch | best scout | literal cachesim mean line | JSON mean |
+|---|---|---|---:|
+| hard stream heterogeneity | `heteroA` | `mean HRC-MAE across policies: 0.0576` | 0.0575526667 |
+| fine rank/adjacent around rank `.60` | `rank=.60, adj=.003, rp=.020` | `mean HRC-MAE across policies: 0.0333` | 0.0332753333 |
+| per-stream IRD renewal | `rank_buckets=8, ird_scale=64` | `mean HRC-MAE across policies: 0.0818` | 0.0817696667 |
+| deeper Tencent fit | `256 files x 25k, phase8 h96, rank=.60, rp=.020` | `mean HRC-MAE across policies: 0.0552` | 0.0551743333 |
+| footprint controller | `footprint target, ffb=.05` | `mean HRC-MAE across policies: 0.0333` | 0.0333300000 |
+| transition/local fine sweep | `tb=.575, lp=.80` | `mean HRC-MAE across policies: 0.0334` | 0.0333656667 |
+| recent-pool micro-sweep | `rp=.015, win=16` | `mean HRC-MAE across policies: 0.0333` | 0.0332506667 |
+
+None beats the promoted seed-42 row `0.0330030000`, so there is no Tencent
+promotion and no multi-seed claim. The useful conclusion is architectural:
+Tencent's remaining gap is not fixed by stream-level scalar correction,
+per-stream renewal, deeper-per-file phase fitting, footprint feedback, or
+micro-tuning the recent-pool probability. Keep the current pinned-ref LANL row
+at `0.0335806667` four-seed mean until a new object-process architecture lands.
