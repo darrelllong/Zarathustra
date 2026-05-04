@@ -43,6 +43,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Comma-separated exponents for the target count law.")
     p.add_argument("--footprint-scale", type=_parse_csv_floats, default=[1.0],
                    help="Comma-separated multipliers for the real unique count.")
+    p.add_argument("--mix", type=_parse_csv_floats, default=[1.0],
+                   help="Comma-separated fractions of base positions to rewrite.")
     p.add_argument("--mode", type=_parse_csv_strings,
                    default=["source_freq", "source_roundrobin", "shuffle"],
                    help="Comma-separated position assignment modes.")
@@ -139,23 +141,31 @@ def _rewrite(
     seed: int,
     alpha: float,
     footprint_scale: float,
+    mix: float,
     mode: str,
     synthetic_base_id: int,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
-    counts = _target_counts(real_counts, len(base), footprint_scale, alpha)
     positions = _source_positions(base["obj_id"], mode, rng)
     if len(positions) != len(base):
         raise RuntimeError(f"assignment produced {len(positions)} positions, expected {len(base)}")
+    rewrite_n = max(0, min(len(base), int(round(len(base) * mix))))
+    if rewrite_n == 0:
+        return base.copy()
 
-    obj_out = np.empty(len(base), dtype=np.uint64)
+    # When only part of the trace is rewritten, scale the target footprint down
+    # with the rewritten mass.  Otherwise small mixes degenerate into all-cold
+    # one-hit scans and lose the frequency head we are trying to inject.
+    counts = _target_counts(real_counts, rewrite_n, footprint_scale * max(mix, 1.0 / len(base)), alpha)
+    selected = positions[:rewrite_n]
+    obj_out = base["obj_id"].to_numpy(copy=True)
     cursor = 0
     for rank, count in enumerate(counts):
         next_cursor = cursor + int(count)
-        obj_out[positions[cursor:next_cursor]] = np.uint64(synthetic_base_id + rank)
+        obj_out[selected[cursor:next_cursor]] = np.uint64(synthetic_base_id + rank)
         cursor = next_cursor
-    if cursor != len(base):
-        raise RuntimeError(f"assigned {cursor} records, expected {len(base)}")
+    if cursor != rewrite_n:
+        raise RuntimeError(f"assigned {cursor} rewritten records, expected {rewrite_n}")
 
     out = base.copy()
     out["obj_id"] = obj_out
@@ -212,38 +222,40 @@ def main() -> int:
     summary: list[tuple[str, float | None]] = []
     for mode in args.mode:
         for fp_scale in args.footprint_scale:
-            for alpha in args.count_alpha:
-                tag = (
-                    f"{args.tag}_{mode}_a{_fmt_float(alpha)}_fp{_fmt_float(fp_scale)}"
-                    f"_seed{args.seed}"
-                )
-                fake = root / f"{tag}_fake_{len(base) // 1000}k.csv"
-                out_json = eval_root / f"{tag}_official6.json"
-                if args.skip_existing and out_json.exists():
-                    print(f"[tencent_fc] skip existing {out_json}", flush=True)
-                else:
-                    print(
-                        f"[tencent_fc] generating mode={mode} alpha={alpha:g} "
-                        f"footprint_scale={fp_scale:g}",
-                        flush=True,
+            for mix in args.mix:
+                for alpha in args.count_alpha:
+                    tag = (
+                        f"{args.tag}_{mode}_a{_fmt_float(alpha)}_fp{_fmt_float(fp_scale)}"
+                        f"_m{_fmt_float(mix)}_seed{args.seed}"
                     )
-                    if not args.dry_run:
-                        out = _rewrite(
-                            base,
-                            real_counts,
-                            seed=args.seed,
-                            alpha=alpha,
-                            footprint_scale=fp_scale,
-                            mode=mode,
-                            synthetic_base_id=args.synthetic_base_id,
+                    fake = root / f"{tag}_fake_{len(base) // 1000}k.csv"
+                    out_json = eval_root / f"{tag}_official6.json"
+                    if args.skip_existing and out_json.exists():
+                        print(f"[tencent_fc] skip existing {out_json}", flush=True)
+                    else:
+                        print(
+                            f"[tencent_fc] generating mode={mode} alpha={alpha:g} "
+                            f"footprint_scale={fp_scale:g} mix={mix:g}",
+                            flush=True,
                         )
-                        out.to_csv(fake, index=False)
-                        print(f"[tencent_fc] wrote {fake}", flush=True)
-                    _run(_eval_cmd(args, fake, out_json), args.dry_run, env)
-                mean = _mean(out_json)
-                summary.append((tag, mean))
-                if mean is not None:
-                    print(f"[tencent_fc] {tag}: {mean:.10f}", flush=True)
+                        if not args.dry_run:
+                            out = _rewrite(
+                                base,
+                                real_counts,
+                                seed=args.seed,
+                                alpha=alpha,
+                                footprint_scale=fp_scale,
+                                mix=mix,
+                                mode=mode,
+                                synthetic_base_id=args.synthetic_base_id,
+                            )
+                            out.to_csv(fake, index=False)
+                            print(f"[tencent_fc] wrote {fake}", flush=True)
+                        _run(_eval_cmd(args, fake, out_json), args.dry_run, env)
+                    mean = _mean(out_json)
+                    summary.append((tag, mean))
+                    if mean is not None:
+                        print(f"[tencent_fc] {tag}: {mean:.10f}", flush=True)
 
     print("\n=== TENCENT FREQUENCY-COMPACTION RESULTS ===", flush=True)
     for tag, mean in sorted(summary, key=lambda item: float("inf") if item[1] is None else item[1]):
