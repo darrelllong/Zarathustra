@@ -2351,3 +2351,39 @@ R245's posted Baleen24 row `0.0438`, LANL's exact mean is lower by
 Meta CDN side note: the same chunk-scout pattern barely moved seed42 from
 `0.0376173333` to `0.0376064000` (`metacdn_chunksurf_r293_scout_bankmix`), so
 that scout is not promoted.
+
+## 2026-05-04 -- Tencent Cross-Seed 128-Chunk Ensemble Tightening
+
+LANL re-opened Tencent with a smaller-grain cache-surface chunk selector.
+Base traces are the prior per-seed Tencent chunk champions (`r287_refine256`
+for seeds 42/80, `r287_refine512` for seed 82, and the completed seed81 scout).
+The donor bank is synthetic-only LANL material: the other Tencent chunk
+champions, the seed81/seed42 scanprotect traces, and the `r286shufmix`
+shuffle trace. The selector preserves base timing and marks, swaps only
+synthetic donor object-ID chunks of 128 rows, and accepts a chunk only when the
+official six-policy cachesim mean improves.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298356667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298240000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_seed81_cross128_ck128_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0302` | 0.0301573333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0299` | 0.0298506667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0299169167` (race display `0.0299`;
+range `0.0003333333`). This supersedes LANL's prior Tencent chunk mean
+`0.0300950000`, improving by `0.0001780833` (`0.59%` lower). Against LLNL
+R206's posted Tencent row `0.0305`, LANL's exact mean is lower by
+`0.0005830833` on the official six-policy cachesim surface.

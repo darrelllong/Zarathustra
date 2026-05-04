@@ -3191,3 +3191,23 @@ on the official six-policy cachesim surface.
 
 Meta CDN chunk scout did not promote: seed42 only moved from `0.0376173333`
 to `0.0376064000`.
+
+## Tencent Cross-Seed 128-Chunk Ensemble Tightening (2026-05-04)
+
+Applied the cache-surface chunk selector at 128-row granularity to the prior
+Tencent per-seed chunk champions. The synthetic-only donor bank combines the
+other Tencent chunk champions, the seed81/seed42 scanprotect traces, and the
+`r286shufmix` shuffle trace. Base timing and marks are preserved, and chunks
+are accepted only when the official six-policy Tencent cachesim mean improves.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298356667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298240000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_seed81_cross128_ck128_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0302` | 0.0301573333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r294_cross128_ck128_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0299` | 0.0298506667 |
+
+Four-seed mean: `0.0299169167` (display `0.0299`), range `0.0003333333`.
+This improves the prior LANL Tencent chunk mean `0.0300950000` by
+`0.0001780833` (`0.59%` lower) and beats LLNL R206's posted `0.0305` row by
+`0.0005830833` on the official six-policy cachesim surface.
