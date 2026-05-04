@@ -227,6 +227,29 @@ python -m altgan.mark_quality \
   --real-csv outputs/real.csv
 ```
 
+## Tencent cache-surface chunk selector
+
+For Tencent, LANL also has a post-hoc cache-surface chunk selector that keeps an
+atlas trace's timing/marks but swaps synthetic object streams in contiguous
+chunks, accepting replacements only when they improve the official
+`llgan.cachesim_eval` mean across the 6-policy surface.
+
+Single-seed runs can be launched with `altgan.optimize_tencent_chunk_surface`.
+For reproducible multi-seed pipelines (race protocol), use:
+
+```bash
+python -m altgan.launch_tencent_chunk_surface_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/TENCENT_BASE_seed{seed}_fake_100k.csv" \
+  --donor-templates "/tiamat/zarathustra/altgan-output/DONOR_A_seed{seed}_fake_100k.csv,/tiamat/zarathustra/altgan-output/DONOR_B_seed{seed}_fake_100k.csv" \
+  --tag-prefix tencent_chunksurf_rXXX \
+  --pipeline 2048,1024,512,256 \
+  --seeds 42,80,81,82
+```
+
+The launcher prints per-seed file paths plus a copy/pastable literal
+`mean HRC-MAE across policies: ...` line and exact JSON mean.
+
 ## Why this is the bet
 
 If the altgan family wins long-rollout HRC and stack-distance while losing some

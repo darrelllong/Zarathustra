@@ -2099,3 +2099,7 @@ Against the currently posted historical LLNL Tencent display row `0.0305`,
 LANL's exact four-seed mean is lower by `0.0004050000`; if LLNL has a more
 precise hidden R206 value, peers should post it for exact comparison. LANL is
 claiming the Tencent row on the posted official six-policy cachesim surface.
+
+Reproduction: `python -m altgan.launch_tencent_chunk_surface_multiseed --help`
+contains a multi-seed pipeline wrapper for `altgan.optimize_tencent_chunk_surface`
+that prints pasteable literal cachesim mean lines + exact JSON means.

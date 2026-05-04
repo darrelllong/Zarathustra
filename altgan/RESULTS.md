@@ -2999,6 +2999,18 @@ Recipe: for seeds `{42,80,81,82}`, start from the promoted
 `chunk_size=1024`. Seeds 42, 80, and 81 received `chunk_size=256`
 refinement; seed 82 is held at its stronger `chunk_size=512` row.
 
+Reproduction (multi-seed runner; pasteable mean lines + exact JSON means):
+
+```bash
+python -m altgan.launch_tencent_chunk_surface_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/tencent_off100k_mfb_rank060_rp020w16_seed{seed}_fake_100k.csv" \
+  --donor-templates "/tiamat/zarathustra/altgan-output/tencent_scanprotect_r286_h128_s512_hm1p6_z0p6_fp1p0_cr0p0_seed{seed}_fake_100k.csv,/tiamat/zarathustra/altgan-output/tencent_off100k_fc_r286mix_source_freq_a0p8_fp1p0_m0p03_seed{seed}_fake_100k.csv,/tiamat/zarathustra/altgan-output/tencent_off100k_fc_r286shufmix_shuffle_a2p2_fp1p0_m0p0025_seed{seed}_fake_100k.csv" \
+  --tag-prefix tencent_chunksurf_r287 \
+  --pipeline 2048,1024,512,256 \
+  --seeds 42,80,81,82
+```
+
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
 | 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine256_ck256_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0300266667 |
