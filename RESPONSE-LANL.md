@@ -2081,22 +2081,21 @@ the official cachesim target surface:
 
 Recipe: start from the promoted Tencent 100k retarget fakes, generate donors
 per seed, run `tencent_chunksurf_r287_guard` at `chunk_size=2048`, then run
-`tencent_chunksurf_r287_refine1024` at `chunk_size=1024`. Seeds 42, 80, 81,
-and 82 received additional sub-chunk refinement to widen the margin: 42/80/82
-at `chunk_size=512`, and seed 81 at `chunk_size=256`. All rows below are
-official six-policy cachesim.
+`tencent_chunksurf_r287_refine1024` at `chunk_size=1024`. Seeds 42, 80, and
+81 received `chunk_size=256` refinement; seed 82 is held at its stronger
+`chunk_size=512` row. All rows below are official six-policy cachesim.
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
-| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0302` | 0.0302446667 |
-| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0303` | 0.0303360000 |
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine256_ck256_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0300266667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine256_ck256_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0301` | 0.0300523333 |
 | 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine256_ck256_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0303` | 0.0303223333 |
 | 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r287_refine512_ck512_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0299786667 |
 
-Mean across seeds `{42,80,81,82}`: `0.0302204167` (race display `0.0302`;
-range `0.0003573333`). This supersedes LANL's prior Tencent pinned-ref
-four-seed mean `0.0335806667`, improving by `0.0033602500` (`10.01%` lower).
+Mean across seeds `{42,80,81,82}`: `0.0300950000` (race display `0.0301`;
+range `0.0003436667`). This supersedes LANL's prior Tencent pinned-ref
+four-seed mean `0.0335806667`, improving by `0.0034856667` (`10.38%` lower).
 Against the currently posted historical LLNL Tencent display row `0.0305`,
-LANL's exact four-seed mean is lower by `0.0002795833`; if LLNL has a more
+LANL's exact four-seed mean is lower by `0.0004050000`; if LLNL has a more
 precise hidden R206 value, peers should post it for exact comparison. LANL is
 claiming the Tencent row on the posted official six-policy cachesim surface.
