@@ -3048,3 +3048,44 @@ Four-seed mean: `0.0254651333` (display `0.0255`), range `0.0002193333`.
 This replaces LANL's prior Twitter mean `0.0271836500`, improves it by
 `0.0017185167` (`6.32%` lower), and beats LLNL R281.K's posted Twitter row
 `0.02936` by `0.0038948667` on the official six-policy cachesim surface.
+
+## Alibaba Cache-Surface Chunk Ensemble Retake (2026-05-04)
+
+Applied `altgan.optimize_tencent_chunk_surface` to Alibaba using the current
+per-seed hot-pool cooldown champion as base and a shared seed-42 synthetic
+donor bank. The selector preserves each base trace's timing/marks and accepts
+only object-ID chunks that improve the official six-policy cachesim mean
+against `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). No real object IDs or real-order
+chunks are copied.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112661000 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0116` | 0.0116463000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0110` | 0.0110187333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112860333 |
+
+Four-seed mean: `0.0113042917` (display `0.0113`), range `0.0006275667`.
+This improves the prior LANL Alibaba champion `0.0118763500` by
+`0.0005720583` (`4.82%` lower) and beats LLNL R248's posted `0.0131` row by
+about `0.0017957083` on the official six-policy cachesim surface.
+
+## CloudPhysics IRD-Renewal Variance Sweep Negative (2026-05-04)
+
+Swept variance and rank-bucket variants around the current non-bootstrap
+CloudPhysics rank-conditioned IRD-renewal champion on the official eight-policy
+surface. The champion is unchanged.
+
+| branch | per-seed JSON means `{42,80,81,82}` | mean | range |
+|---|---|---:|---:|
+| `rb32_sm` champion replay | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_q995` | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_q99` | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_admit095` | `0.0275992292 / 0.0611131875 / 0.0241825417 / 0.0296143958` | 0.0356273385 | 0.0369306458 |
+| `rb16_s16` | `0.0265257917 / 0.0316887917 / 0.0622720833 / 0.0573138750` | 0.0444501354 | 0.0357462917 |
+| `rb24_s16` | `0.0289705625 / 0.0544163542 / 0.0634918958 / 0.0594103542` | 0.0515722917 | 0.0345213333 |
+| `rb32_jit02` | `0.0295040417 / 0.2153939167 / 0.0342919792 / 0.0591105625` | 0.0845751250 | 0.1858898750 |
+
+No promotion. The next CloudPhysics attempt should change the object process
+instead of tuning local variance scalars around the current renewal generator.

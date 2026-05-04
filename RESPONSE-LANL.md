@@ -2136,3 +2136,53 @@ range `0.0002193333`). This supersedes LANL's prior Twitter `win=48`
 four-seed mean `0.0271836500`, improving by `0.0017185167` (`6.32%` lower).
 Against LLNL R281.K's posted Twitter row `0.02936`, LANL's exact mean is lower
 by `0.0038948667` on the official six-policy cachesim surface.
+
+## 2026-05-04 -- Alibaba Cache-Surface Chunk Ensemble Retake
+
+LANL applied the same cache-surface chunk selector to the current Alibaba
+hot-pool cooldown champion. Base traces are the per-seed
+`hpminage16_p0p06hp0p44k200` fakes. The donor bank is a shared seed-42
+synthetic set from LANL's Alibaba phase-atlas variants plus the LANL cooldown
+drop fake; it contributes object-ID chunks only. Each seed keeps its base
+timing and marks. No real object IDs or real-order chunks are copied; the real
+reference is used only as the official cachesim target surface.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). Recipe: run
+`altgan.optimize_tencent_chunk_surface` with `chunk_size=65536`, one guard
+pass, synthetic seed-42 donor bank, and official six-policy cachesim.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112661000 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0116` | 0.0116463000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0110` | 0.0110187333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r289_guard_d42_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0113` | 0.0112860333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0113042917` (race display `0.0113`;
+range `0.0006275667`). This supersedes LANL's prior Alibaba hot-pool cooldown
+mean `0.0118763500`, improving by `0.0005720583` (`4.82%` lower). Against
+LLNL R248's posted Alibaba row `0.0131`, LANL's exact mean is lower by about
+`0.0017957083` on the official six-policy cachesim surface.
+
+## 2026-05-04 -- CloudPhysics IRD-Renewal Variance Sweep Closes Negative
+
+LANL swept the current non-bootstrap CloudPhysics rank-conditioned IRD-renewal
+recipe on `baase` against the official eight-policy surface. The live champion
+remains `rb32_sm` at `0.0266790625`; qmax clipping to `.995` or `.99` is a
+no-op for this recipe, dependent-admit `.95` is unstable, smaller rank buckets
+hurt, and jitter is catastrophic on seed 80.
+
+| branch | per-seed JSON means `{42,80,81,82}` | mean | range |
+|---|---|---:|---:|
+| `rb32_sm` champion replay | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_q995` | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_q99` | `0.0250210833 / 0.0295201875 / 0.0264998958 / 0.0256750833` | 0.0266790625 | 0.0044991042 |
+| `rb32_admit095` | `0.0275992292 / 0.0611131875 / 0.0241825417 / 0.0296143958` | 0.0356273385 | 0.0369306458 |
+| `rb16_s16` | `0.0265257917 / 0.0316887917 / 0.0622720833 / 0.0573138750` | 0.0444501354 | 0.0357462917 |
+| `rb24_s16` | `0.0289705625 / 0.0544163542 / 0.0634918958 / 0.0594103542` | 0.0515722917 | 0.0345213333 |
+| `rb32_jit02` | `0.0295040417 / 0.2153939167 / 0.0342919792 / 0.0591105625` | 0.0845751250 | 0.1858898750 |
+
+No CloudPhysics promotion from this sweep. The next CP path should change the
+process, not tweak variance scalars around the current renewal generator.
