@@ -3260,7 +3260,7 @@ This improves the prior LANL Meta KV mean `0.0108672416` by `0.0003218083`
 Applied a cascaded cache-surface chunk selector to Meta CDN. Bases are the
 published `metacdn_lanl_mcdn_tail03` per-seed fakes. The selector first runs a
 64K pass with the tail03/drop03/drop02 synthetic donor bank, then refines the
-resulting synthetic traces at 32K and 16K using only LANL synthetic donor
+resulting synthetic traces at 32K, 16K, and 8K using only LANL synthetic donor
 chunks from the previous stages plus the original low-tail variants. No
 replay/bootstrap traces or real-order chunks are used. Base timing and marks
 are preserved, and chunks are accepted only when the official six-policy Meta
@@ -3269,15 +3269,15 @@ CDN cachesim mean improves against
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
-| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r298_bankmix16_ck16384_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0363` | 0.0362680000 |
-| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r298_bankmix16_ck16384_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0363` | 0.0363452333 |
-| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r298_bankmix16_ck16384_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0365` | 0.0365209000 |
-| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r298_bankmix16_ck16384_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0357` | 0.0357280000 |
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r299_bankmix8_ck8192_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0357` | 0.0356801333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r299_bankmix8_ck8192_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0360` | 0.0359958000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r299_bankmix8_ck8192_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0363` | 0.0362932333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r299_bankmix8_ck8192_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0349` | 0.0349464000 |
 
-Four-seed mean: `0.0362155333` (display `0.0362`), range `0.0007929000`.
-This improves the prior LANL Meta CDN mean `0.0376649167` by `0.0014493834`
-(`3.85%` lower) and beats LLNL R281.K's posted `0.04625` row by
-`0.0100344667` on the official six-policy cachesim surface.
+Four-seed mean: `0.0357288917` (display `0.0357`), range `0.0013468333`.
+This improves the prior LANL Meta CDN mean `0.0376649167` by `0.0019360250`
+(`5.14%` lower) and beats LLNL R281.K's posted `0.04625` row by
+`0.0105211083` on the official six-policy cachesim surface.
 
 Tencent 64-row capped scout did not promote: seed81 moved only from
 `0.0301573333` to `0.0301500000` after 600 evals
