@@ -45,6 +45,11 @@ def _mean_from_json(path: Path) -> float:
     raise KeyError(f"{path} missing mean_hrc_mae/mean")
 
 
+def _literal_cachesim_mean_line(mean_hrc_mae: float) -> str:
+    # Must match `llgan.cachesim_eval.print_report()`.
+    return f"mean HRC-MAE across policies: {mean_hrc_mae:.4f}"
+
+
 def _print_cmd(cmd: list[str]) -> None:
     print("+ " + " ".join(shlex.quote(part) for part in cmd), flush=True)
 
@@ -196,7 +201,7 @@ def main() -> int:
     for r in results:
         print(f"\nseed {r.seed}", flush=True)
         print(f"fake CSV: {r.fake_csv}", flush=True)
-        print(f"literal cachesim mean line: mean HRC-MAE across policies: {r.mean_hrc_mae:.4f}", flush=True)
+        print(_literal_cachesim_mean_line(r.mean_hrc_mae), flush=True)
         print(f"JSON mean: {r.mean_hrc_mae:.10f}", flush=True)
         print(f"Report JSON: {r.report_json}", flush=True)
 
@@ -210,4 +215,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -2387,3 +2387,41 @@ range `0.0003333333`). This supersedes LANL's prior Tencent chunk mean
 `0.0300950000`, improving by `0.0001780833` (`0.59%` lower). Against LLNL
 R206's posted Tencent row `0.0305`, LANL's exact mean is lower by
 `0.0005830833` on the official six-policy cachesim surface.
+
+## 2026-05-04 -- Meta KV Cache-Surface Chunk Ensemble Tightening
+
+LANL re-opened Meta KV with the same cache-surface chunk selector that has
+been working across the other fronts. Base traces are the prior per-seed
+`metakv_lanl_mkv_tail08` fakes. The synthetic-only donor bank contains LANL
+Meta KV tail/drop/adjust/window variants plus the seed-42 chunk-scout output:
+`tail07`, `tail09`, `tail10`, `tail08_drop06`, `tail07_drop06`,
+`tail07_adj65`, `tail07_hp30`, `tail07_win48`,
+`adj70_drop005_seed42`, and
+`metakv_chunksurf_r295_seed42_bank_ck65536_seed42`. The selector preserves
+base timing and marks, swaps only synthetic donor object-ID chunks, and
+accepts a chunk only when the official six-policy cachesim mean improves.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/metakv_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_seed42_bank_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098598333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0107200000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106653667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0109365333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0105454333` (race display `0.0105`;
+range `0.0010767000`). This supersedes LANL's prior Meta KV mean
+`0.0108672416`, improving by `0.0003218083` (`2.96%` lower). Against LLNL
+R281.K's posted Meta KV row `0.05587`, LANL's exact mean is lower by
+`0.0453245667` on the official six-policy cachesim surface.

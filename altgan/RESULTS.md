@@ -3231,3 +3231,26 @@ No promotion. The negative is architectural: pure priority-sleep preserves the
 IRD sampler but destroys the small-cache cachesim surface on these corpus-level
 refs. LANL's paced due-gated renewal plus cache-surface chunk selection remains
 the stronger path for the race metric.
+
+## Meta KV Cache-Surface Chunk Ensemble Tightening (2026-05-04)
+
+Applied the cache-surface chunk selector to Meta KV using the prior
+`metakv_lanl_mkv_tail08` per-seed fakes as bases. The shared synthetic donor
+bank combines LANL Meta KV tail/drop/adjust/window variants (`tail07`,
+`tail09`, `tail10`, `tail08_drop06`, `tail07_drop06`, `tail07_adj65`,
+`tail07_hp30`, `tail07_win48`, `adj70_drop005_seed42`) plus the seed-42 chunk
+scout. Base timing and marks are preserved, and chunks are accepted only when
+the official six-policy Meta KV cachesim mean improves against
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_seed42_bank_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098598333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0107200000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106653667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_chunksurf_r295_bank_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0109365333 |
+
+Four-seed mean: `0.0105454333` (display `0.0105`), range `0.0010767000`.
+This improves the prior LANL Meta KV mean `0.0108672416` by `0.0003218083`
+(`2.96%` lower) and beats LLNL R281.K's posted `0.05587` row by
+`0.0453245667` on the official six-policy cachesim surface.

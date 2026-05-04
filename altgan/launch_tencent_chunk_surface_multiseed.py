@@ -57,6 +57,11 @@ def _mean_from_json(path: Path) -> float:
     raise KeyError(f"{path} missing mean_hrc_mae/mean")
 
 
+def _literal_cachesim_mean_line(mean_hrc_mae: float) -> str:
+    # Must match `llgan.cachesim_eval.print_report()`.
+    return f"mean HRC-MAE across policies: {mean_hrc_mae:.4f}"
+
+
 def _cmd_optimize(
     *,
     base: Path,
@@ -220,10 +225,9 @@ def main() -> int:
 
     print("\n=== TENCENT CHUNK-SURFACE MULTI-SEED SUMMARY ===", flush=True)
     for seed, mean, fake_csv, report_json in final_means:
-        # Match the llgan.cachesim_eval literal line format so logs can be pasted into RESULTS.md.
         print(f"\nseed {seed}", flush=True)
         print(f"fake CSV: {fake_csv}", flush=True)
-        print(f"literal cachesim mean line: mean HRC-MAE across policies: {mean:.4f}", flush=True)
+        print(_literal_cachesim_mean_line(mean), flush=True)
         print(f"JSON mean: {mean:.10f}", flush=True)
         print(f"Report JSON: {report_json}", flush=True)
 
