@@ -32,6 +32,7 @@ from .model import (
 
 _INT64_MAX = np.iinfo(np.int64).max
 _MAX_GENERATED_ID_BASE = 1_000_000_000_000_000
+_PHASE_WINDOW = 200
 RANK_PMF_EDGES = np.array([
     0, 1, 2, 3, 4, 6, 8, 11, 14, 18, 24, 32, 42, 56, 74, 97, 127, 167,
     219, 288, 377, 495, 649, 851, 1116, 1463, 1919, 2516, 3299, 4323,
@@ -1073,6 +1074,7 @@ def fit_neural_atlas(
     n_time_bins: int = 4,
     n_size_bins: int = 4,
     n_phase_bins: int = 1,
+    phase_mode: str = "position",
     hidden_dim: int = 96,
     epochs: int = 800,
     lr: float = 2e-3,
@@ -1107,6 +1109,14 @@ def fit_neural_atlas(
     time_edges = _quantile_edges(np.log1p(all_dt), n_time_bins)
     size_edges = _quantile_edges(np.log(all_size), n_size_bins)
     n_phase_bins = max(int(n_phase_bins), 1)
+    phase_mode = str(phase_mode or "position").strip().lower()
+    if phase_mode not in {"position", "unique_rate"}:
+        raise ValueError("phase_mode must be one of: position, unique_rate")
+    phase_edges = (
+        _unique_rate_phase_edges(clean, n_phase_bins)
+        if phase_mode == "unique_rate"
+        else np.array([], dtype=np.float64)
+    )
     rank_state_edges_arr = _rank_state_edges_array(rank_state_edges)
     n_dist_states = _n_dist_states(rank_state_edges_arr)
     n_states = n_phase_bins * n_time_bins * n_size_bins * n_dist_states
@@ -1138,6 +1148,8 @@ def fit_neural_atlas(
             n_time_bins=n_time_bins,
             n_size_bins=n_size_bins,
             n_phase_bins=n_phase_bins,
+            phase_mode=phase_mode,
+            phase_edges=phase_edges,
             n_states=n_states,
             rank_state_edges=rank_state_edges_arr,
             n_dist_states=n_dist_states,
@@ -1245,6 +1257,8 @@ def fit_neural_atlas(
         "model": "NeuralAtlasModel",
         "n_transition_rows": int(len(trans_states)),
         "n_phase_bins": n_phase_bins,
+        "phase_mode": phase_mode,
+        "phase_edges": phase_edges.tolist(),
         "rank_state_edges": (
             None if rank_state_edges_arr is None else rank_state_edges_arr.tolist()
         ),
@@ -1282,7 +1296,8 @@ def fit_neural_atlas(
 
 def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
                     size_edges: np.ndarray, n_time_bins: int, n_size_bins: int,
-                    n_phase_bins: int, n_states: int,
+                    n_phase_bins: int, phase_mode: str, phase_edges: np.ndarray,
+                    n_states: int,
                     rank_state_edges: np.ndarray | None, n_dist_states: int,
                     max_samples_per_state: int, rng: np.random.Generator):
     ts = df["ts"].to_numpy(dtype=np.float64)
@@ -1293,7 +1308,10 @@ def _summarize_file(df, cond: np.ndarray, name: str, *, time_edges: np.ndarray,
     strides = np.diff(obj_ids, prepend=obj_ids[0]).astype(np.int64)
     time_bins = np.searchsorted(time_edges, np.log1p(dt), side="right")
     size_bins = np.searchsorted(size_edges, np.log(sizes), side="right")
-    phase_bins = _phase_bins(len(df), n_phase_bins)
+    if phase_mode == "unique_rate":
+        phase_bins = _unique_rate_phase_bins(obj_ids, n_phase_bins, phase_edges)
+    else:
+        phase_bins = _phase_bins(len(df), n_phase_bins)
     actions = np.array([_action_class(int(x)) for x in stack_d], dtype=np.int64)
     dist_states = np.array([
         _dist_state_from_stack_distance(int(x), rank_state_edges)
@@ -1378,6 +1396,46 @@ def _phase_bins(n_rows: int, n_phase_bins: int) -> np.ndarray:
         return np.zeros(max(n_rows, 0), dtype=np.int64)
     raw = np.floor(np.arange(n_rows, dtype=np.float64) * n_phase_bins / n_rows).astype(np.int64)
     return np.clip(raw, 0, n_phase_bins - 1)
+
+
+def _unique_rate_phase_edges(frames: Sequence, n_phase_bins: int) -> np.ndarray:
+    if n_phase_bins <= 1:
+        return np.array([], dtype=np.float64)
+    samples: list[float] = []
+    for df in frames:
+        obj_ids = _object_ids_for_stack(df["obj_id"])
+        if len(obj_ids) < _PHASE_WINDOW * 2:
+            continue
+        seen: set[int] = set()
+        for idx, obj_id in enumerate(obj_ids, start=1):
+            seen.add(int(obj_id))
+            if idx % _PHASE_WINDOW == 0:
+                samples.append(len(seen) / float(_PHASE_WINDOW))
+                seen = set()
+    if not samples:
+        return np.array([], dtype=np.float64)
+    quantiles = np.linspace(0.0, 1.0, n_phase_bins + 1)[1:-1]
+    return np.unique(np.quantile(np.asarray(samples, dtype=np.float64), quantiles))
+
+
+def _unique_rate_phase_bins(
+    obj_ids: np.ndarray,
+    n_phase_bins: int,
+    phase_edges: np.ndarray,
+) -> np.ndarray:
+    if n_phase_bins <= 1 or len(obj_ids) == 0:
+        return np.zeros(len(obj_ids), dtype=np.int64)
+    out = np.zeros(len(obj_ids), dtype=np.int64)
+    seen: set[int] = set()
+    current_rate = 0.0
+    for idx, obj_id in enumerate(obj_ids):
+        phase = int(np.searchsorted(phase_edges, current_rate, side="right"))
+        out[idx] = min(max(phase, 0), n_phase_bins - 1)
+        seen.add(int(obj_id))
+        if (idx + 1) % _PHASE_WINDOW == 0:
+            current_rate = len(seen) / float(_PHASE_WINDOW)
+            seen = set()
+    return out
 
 
 def _state_with_phase(state: int, phase: int, base_span: int) -> int:

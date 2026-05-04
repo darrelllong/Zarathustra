@@ -51,6 +51,9 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--n-size-bins", type=int, default=4)
     p.add_argument("--n-phase-bins", type=int, default=1,
                    help="Within-file position bins added to atlas state for nonstationary traces.")
+    p.add_argument("--phase-mode", default="position",
+                   choices=("position", "unique_rate"),
+                   help="Phase encoding: fixed position bins or running unique-rate bins.")
     p.add_argument("--rank-state-edges", default="",
                    help="Comma-separated stack-distance edges for optional distance-state bins.")
     p.add_argument("--transition-weight-mode", default="log",
@@ -109,6 +112,7 @@ def main() -> int:
         n_time_bins=args.n_time_bins,
         n_size_bins=args.n_size_bins,
         n_phase_bins=args.n_phase_bins,
+        phase_mode=args.phase_mode,
         hidden_dim=args.hidden_dim,
         epochs=args.epochs,
         lr=args.lr,
