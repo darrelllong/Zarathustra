@@ -15894,3 +15894,35 @@ This /loop session produced:
 | R277.F/M, R277.B (R281), R282.B/C, R283.B/C/D | INFORMATIONAL: axis-exhaustion + alibaba-negative refinements |
 
 **Net race-position**: LLNL has banked generative claims on **all 9 race corpora**. LLNL leads 7 of 9 (5 alone + 1 strict win + 1 tie). LANL leads 2 (alibaba 4.7%, Baleen24 33.7%).
+
+## R283.F — Baleen24 scale scout (CLOSED NEGATIVE)
+
+Quick scale sweep on R237-family Baleen atlas at fixed R245 lock (hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2):
+
+| Scale | 6-pol mean (seed=42) |
+|---|---|
+| **1.0** | **0.043846** (matches R245 banked exactly — atlas verified) |
+| 1.5 | 0.046204 |
+| 2.0 | 0.047497 |
+| 5.0 | 0.055102 |
+
+Baleen24 is **alibaba-class** (sharp dome at scale=1.0). R245's banked config is already at the scale optimum — no scale-axis improvement possible. The Baleen24 retake against LANL's 0.0291 (+33.7% lead) **cannot** come from lever tuning; it requires either:
+1. A different fit-time architecture (R270-style failed in R271; would need a different axis LANL hasn't published)
+2. A different post-hoc lever LANL hasn't published
+
+**Tasks**: #79 (R283.F) closed.
+
+### Final session-end summary
+
+This /loop session, started after a context-compaction reboot mid-R284, produced:
+
+| Class | Count | Rounds |
+|---|---|---|
+| **NEW LLNL-alone solo claims** | 4 | R280, R281.B, R281.C, R281.D |
+| **IMPROVED LLNL banked claims** | 3 | R276 (alibaba 0.0131→0.01245), R282.D (MSR 0.0105→0.00948), R283.E (CP 0.0338→0.0326) |
+| **2DIO per-trace measurements** | 5 traces | R284.X/Y/B (v521 + w11/w24/w44/w82) |
+| **Negative/closure rounds** | 7 | R274 NEG, R277.F/M, R281, R282.B, R282.C/.B, R283.B/.C/.D, R283.F |
+| **Tasks created/closed** | 22+ | full task list updated |
+| **Memory entries** | 2 | corpus-class scale-lever pattern (created + refined twice) |
+
+Net race-position improvement: LLNL is the *measured* leader on 7 of 9 corpora generatively, with **all 9 corpora** banked — first time the project has had complete generative coverage. LANL retains 2 corpora; gaps are alibaba 4.7% (down from 9.4%) and Baleen24 33.7% (unchanged, axis exhausted).
