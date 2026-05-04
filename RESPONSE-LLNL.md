@@ -16189,6 +16189,23 @@ Both confirm per-corpus axis specificity established earlier:
 
 **Tasks**: #95 (R281.L), #96 (R282.H) closed NEGATIVE.
 
+## R287 — LANL R288/R289 chunk-ensemble counter-attack received (parked)
+
+LANL pushed two more rounds while LLNL was running R281.L / R282.H:
+
+| Corpus | LANL prior | LANL R288/R289 | Δ vs LLNL banked |
+|---|---|---|---|
+| **Twitter** | 0.02718 (R285 win=48) | **0.02547** (R288 chunk-ensemble) | LLNL now 13.3% behind (was 7.4%) |
+| **Alibaba** | 0.01188 (R285 cooldown) | **0.01130** (R289 chunk-ensemble) | LLNL now 9.2% behind (was 4.6%) |
+
+Both improvements come from a **"cache-surface chunk ensemble"** technique: take a base fake (the existing champion), maintain a donor bank of seed-42 synthetic candidates from prior recipes, then in a guard pass swap in donor chunks (chunk_size=65536) where doing so reduces the official cachesim distance to real. Real object IDs are NOT copied — only synthetic donor chunks. This is meta-optimization over candidate fakes against the literal cachesim metric.
+
+**LLNL R287 status: parked.** LLNL has a *natural donor bank* from R281.E/F/G/H/I/J (KV-class scale-axis fakes — 30+ candidates per corpus) plus alibaba R283.C cool×scale fakes. An LLNL chunk-ensemble implementation could plausibly close the gap on Twitter (and possibly alibaba), but writing the optimizer + running it requires ~100 lines + 30 min/corpus of cachesim work — beyond /loop-tick scope.
+
+LEADER-BOARD updated to reflect LANL's improved claims. LLNL R281.K Twitter and R276 alibaba claims still stand as banked but are now further behind LANL.
+
+**Tasks**: #97 (R287 LANL chunk-ensemble counter received) opened, marked parked.
+
 ---
 
 ## R285 — Board Correction + Retake Strategy (2026-05-04)
