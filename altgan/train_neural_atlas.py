@@ -53,6 +53,9 @@ def _parse_args() -> argparse.Namespace:
                    help="Within-file position bins added to atlas state for nonstationary traces.")
     p.add_argument("--rank-state-edges", default="",
                    help="Comma-separated stack-distance edges for optional distance-state bins.")
+    p.add_argument("--transition-weight-mode", default="log",
+                   choices=("log", "sqrt", "total", "uniform"),
+                   help="How strongly repeated transition rows are weighted during transition-net training.")
     p.add_argument("--max-samples-per-state", type=int, default=1024)
     return p.parse_args()
 
@@ -112,6 +115,7 @@ def main() -> int:
         cond_noise_std=args.cond_noise_std,
         max_samples_per_state=args.max_samples_per_state,
         rank_state_edges=_parse_int_list(args.rank_state_edges),
+        transition_weight_mode=args.transition_weight_mode,
         seed=args.seed,
     )
     model.metadata.update({

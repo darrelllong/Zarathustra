@@ -1079,6 +1079,7 @@ def fit_neural_atlas(
     cond_noise_std: float = 0.0,
     max_samples_per_state: int = 1024,
     rank_state_edges: Sequence[int] | None = None,
+    transition_weight_mode: str = "log",
     seed: int = 7,
 ) -> NeuralAtlasModel:
     import torch
@@ -1156,7 +1157,7 @@ def fit_neural_atlas(
             trans_conds.append(reservoir.cond)
             trans_states.append(int(state))
             trans_targets.append(_dense_counts(counts, n_states))
-            trans_weights.append(np.log1p(float(total)))
+            trans_weights.append(_transition_weight(total, transition_weight_mode))
             g = global_transition_counts.setdefault(int(state), {})
             for nxt, count in counts.items():
                 g[int(nxt)] = g.get(int(nxt), 0) + int(count)
@@ -1249,6 +1250,7 @@ def fit_neural_atlas(
         ),
         "rank_pmf_edges": RANK_PMF_EDGES.tolist(),
         "n_dist_states": int(n_dist_states),
+        "transition_weight_mode": transition_weight_mode,
     }
     return NeuralAtlasModel(
         version=1,
@@ -1416,6 +1418,22 @@ def _n_dist_states(rank_state_edges: np.ndarray | None) -> int:
     if rank_state_edges is None:
         return StackAtlasModel.N_ACTIONS
     return int(len(rank_state_edges))
+
+
+def _transition_weight(total: int, mode: str) -> float:
+    total_f = max(float(total), 1.0)
+    norm_mode = str(mode or "log").strip().lower()
+    if norm_mode == "log":
+        return float(np.log1p(total_f))
+    if norm_mode == "sqrt":
+        return float(np.sqrt(total_f))
+    if norm_mode == "total":
+        return total_f
+    if norm_mode == "uniform":
+        return 1.0
+    raise ValueError(
+        "transition_weight_mode must be one of: log, sqrt, total, uniform"
+    )
 
 
 def _dist_state_from_stack_distance(
