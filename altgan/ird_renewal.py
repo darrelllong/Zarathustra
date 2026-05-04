@@ -24,6 +24,7 @@ class RenewalProfile:
     counts_by_rank: np.ndarray
     new_order: np.ndarray
     irds: np.ndarray
+    ird_ranks: np.ndarray
     sizes: np.ndarray
     opcodes: np.ndarray
     tenants: np.ndarray
@@ -73,6 +74,10 @@ def _parse_args() -> argparse.Namespace:
                    help="Hard cap for sampled IRDs; 0 disables the cap.")
     p.add_argument("--ird-quantile-max", type=float, default=1.0,
                    help="Quantile cap for fitted IRDs before generation.")
+    p.add_argument("--rank-ird-buckets", type=int, default=0,
+                   help="If >0, sample IRDs from logarithmic object-rank buckets.")
+    p.add_argument("--rank-ird-min-samples", type=int, default=256,
+                   help="Minimum fitted IRDs required for a rank bucket before global fallback.")
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
@@ -98,14 +103,18 @@ def fit_profile(path: Path, fit_rows: int = 0, ird_quantile_max: float = 1.0) ->
 
     last = np.full(len(counts_by_code), -1, dtype=np.int64)
     gaps: list[int] = []
+    gap_ranks: list[int] = []
     for pos, code in enumerate(codes):
         prev = int(last[code])
         if prev >= 0:
             gaps.append(pos - prev)
+            gap_ranks.append(int(code_to_rank[code]))
         last[code] = pos
     if not gaps:
         gaps = [max(1, len(codes))]
+        gap_ranks = [0]
     irds = np.asarray(gaps, dtype=np.int64)
+    ird_ranks = np.asarray(gap_ranks, dtype=np.int64)
     if 0.0 < ird_quantile_max < 1.0 and len(irds) > 1:
         cap = max(1, int(np.quantile(irds, ird_quantile_max)))
         irds = np.minimum(irds, cap)
@@ -115,6 +124,7 @@ def fit_profile(path: Path, fit_rows: int = 0, ird_quantile_max: float = 1.0) ->
         counts_by_rank=counts_by_rank,
         new_order=new_order.astype(np.int64, copy=False),
         irds=np.maximum(irds, 1),
+        ird_ranks=ird_ranks,
         sizes=_column_or_default(df, "obj_size", 1).astype(np.int64, copy=False),
         opcodes=_column_or_default(df, "opcode", 0).astype(np.int64, copy=False),
         tenants=_column_or_default(df, "tenant", 0).astype(np.int64, copy=False),
@@ -138,13 +148,19 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     weight_cdf = np.cumsum(weights)
     if not np.isfinite(weight_cdf[-1]) or weight_cdf[-1] <= 0:
         weight_cdf = np.arange(1, footprint + 1, dtype=np.float64)
+    rank_ird_buckets = _make_rank_ird_buckets(profile, args)
 
     obj_out = np.empty(args.n_records, dtype=np.uint64)
     total_remaining = int(remaining.sum())
     unique_seen = 0
 
-    def sample_ird() -> int:
-        delay = int(profile.irds[int(rng.integers(0, len(profile.irds)))])
+    def sample_ird(rank: int) -> int:
+        source = profile.irds
+        if rank_ird_buckets:
+            bucket = _rank_bucket(rank, footprint, len(rank_ird_buckets))
+            if len(rank_ird_buckets[bucket]) >= int(args.rank_ird_min_samples):
+                source = rank_ird_buckets[bucket]
+        delay = int(source[int(rng.integers(0, len(source)))])
         if args.ird_tail_pivot > 0 and delay > args.ird_tail_pivot:
             pivot = int(args.ird_tail_pivot)
             delay = pivot + int(round((delay - pivot) * args.ird_tail_scale))
@@ -163,7 +179,7 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             versions[rank] += 1
             return
         versions[rank] += 1
-        heapq.heappush(due_heap, (pos + sample_ird(), int(versions[rank]), rank))
+        heapq.heappush(due_heap, (pos + sample_ird(rank), int(versions[rank]), rank))
 
     def peek_due(pos: int) -> int | None:
         while due_heap:
@@ -319,6 +335,27 @@ def _scaled_new_order(source_order: np.ndarray, footprint: int, rng: np.random.G
     order = np.arange(footprint, dtype=np.int64)
     rng.shuffle(order)
     return order
+
+
+def _rank_bucket(rank: int, footprint: int, bucket_count: int) -> int:
+    if bucket_count <= 1 or footprint <= 1:
+        return 0
+    scaled = np.log1p(max(0, rank)) / np.log1p(max(1, footprint - 1))
+    return max(0, min(bucket_count - 1, int(scaled * bucket_count)))
+
+
+def _make_rank_ird_buckets(profile: RenewalProfile, args: argparse.Namespace) -> list[np.ndarray]:
+    bucket_count = int(args.rank_ird_buckets)
+    if bucket_count <= 0:
+        return []
+    buckets: list[list[int]] = [[] for _ in range(bucket_count)]
+    footprint = max(1, profile.footprint)
+    for delay, rank in zip(profile.irds, profile.ird_ranks, strict=False):
+        buckets[_rank_bucket(int(rank), footprint, bucket_count)].append(int(delay))
+    return [
+        np.asarray(bucket, dtype=np.int64) if bucket else profile.irds
+        for bucket in buckets
+    ]
 
 
 def _make_marks(profile: RenewalProfile, args: argparse.Namespace, rng: np.random.Generator) -> dict[str, np.ndarray]:
