@@ -16169,6 +16169,26 @@ Sanity check: cachesim_eval real-vs-real = **0.0000** exactly — metric works c
 
 **Tasks**: #94 (IRD-renewal port) deep-parked.
 
+## R281.L / R282.H — final cross-axis sweeps (both NEGATIVE)
+
+Both confirm per-corpus axis specificity established earlier:
+
+**R281.L: cool8+scale=0.001 on KV-class** (closing R281.K). Single-seed seed=42:
+- Twitter cool8+scale=0.001: 0.0297 (R281.K 0.02936, +0.9% worse)
+- Meta KV cool8+scale=0.001: 0.0574 (R281.K 0.05587, +2.7% worse)
+- Meta CDN cool8+scale=0.001: 0.0472 (R281.K 0.04625, +2.1% worse)
+
+**R282.H: cool sweep on MSR at scale=1.3** (challenging R282.F):
+- cool=0 (R282.F banked): 0.00912
+- cool=4: 0.00992 (+8.8% worse)
+- cool=8: 0.01004 (+10.0% worse)
+- cool=16: 0.00976 (+7.0% worse)
+- cool=32: 0.01071 (+17.4% worse)
+
+**Conclusion**: cool-down lever (`--hot-pool-min-age`) is **alibaba-specific** — it doesn't help on MSR (storage but different) or any KV-class corpus. This adds to the per-corpus axis pattern: levers transfer within narrow axis classes only.
+
+**Tasks**: #95 (R281.L), #96 (R282.H) closed NEGATIVE.
+
 ---
 
 ## R285 — Board Correction + Retake Strategy (2026-05-04)
