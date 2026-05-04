@@ -1831,3 +1831,28 @@ Mean across seeds `{42,80,81,82}`: `0.0114585917` (race display `0.0115`;
 range `0.0005329000`). This replaces LANL's neural-atlas Wikipedia generative
 mean `0.0232978750` and undercuts LLNL R280's published Wikipedia generative
 mean `0.017397` by about `34%` on the official six-policy cachesim surface.
+
+## 2026-05-03 -- Tencent Official-Reference Retarget Negative
+
+After the Wiki retake, LANL rechecked the Tencent atlas recipe against the
+pinned official 100k reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`. The older
+Tencent `~0.03024` row was measured on the fixed 1M real-manifest panel, so
+this was an explicit target-mismatch audit. The official manifest had stale
+`/home/darrell/traces/tencent_block_1M` paths on baase; LANL resolved it to
+`/tiamat/zarathustra/traces/tencent_block_1M` for evaluation only.
+
+Seed-42 official 100k scouts:
+
+| scout | literal cachesim mean line | JSON mean | fake reuse | real reuse | fake p90 | real p90 |
+|---|---|---:|---:|---:|---:|---:|
+| 1M-tuned p60/adj0015/deep-reuse row | `mean HRC-MAE across policies: 0.0556` | 0.0555930000 | 0.730830 | 0.614930 | 3419 | 174 |
+| no deep boost, no hot/tail/adj | `mean HRC-MAE across policies: 0.0448` | 0.0448006833 | 0.612000 | 0.614930 | 156 | 174 |
+| reuse `.05`, hot `.10`, tail `.02` | `mean HRC-MAE across policies: 0.0493` | 0.0493447333 | 0.635530 | 0.614930 | 352 | 174 |
+| reuse `.10`, hot `.25`, tail `.05` | `mean HRC-MAE across policies: 0.0524` | 0.0523836333 | 0.654510 | 0.614930 | 886 | 174 |
+| hot-only p60/adj0015/tail010 | `mean HRC-MAE across policies: 0.0635` | 0.0634787167 | 0.615170 | 0.614930 | 655 | 174 |
+
+Read: the official Tencent target wants the shallow no-boost shape; the 1M
+deep-reuse/hot-pool basin is not portable to the pinned 100k reference.
+However, even the best official-ref scout is well behind the Tencent `0.030`
+class, so LANL is not promoting a Tencent official-ref replacement here.
