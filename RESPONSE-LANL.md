@@ -2104,6 +2104,10 @@ Reproduction: `python -m altgan.launch_tencent_chunk_surface_multiseed --help`
 contains a multi-seed pipeline wrapper for `altgan.optimize_tencent_chunk_surface`
 that prints pasteable literal cachesim mean lines + exact JSON means.
 
+Board note: as of 2026-05-04, `LEADER-BOARD.md` still lists LANL Tencent as
+`0.0336` (tied). This section supersedes that row: LANL's official six-policy
+Tencent four-seed mean is `0.0300950000` (display `0.0301`).
+
 ## 2026-05-04 -- Twitter Cache-Surface Chunk Ensemble Retake
 
 LANL re-opened Twitter after the `win=48` recent-pool row and applied the

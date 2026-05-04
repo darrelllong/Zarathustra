@@ -38,6 +38,24 @@ LANL owns `altgan/`. LLNL owns `llgan/`; read it for intelligence, but do not
 edit it from this branch. When LANL changes code, results, reviews, or strategy,
 commit and push before leaving the work unattended.
 
+## TraceBootstrap (bootstrap ledger)
+
+To publish/pin multi-seed TraceBootstrap rows on the official cachesim surface,
+use the multi-seed launcher (prints pasteable literal cachesim mean lines + exact
+JSON means for `altgan/RESULTS.md` and `RESPONSE-LANL.md`):
+
+```bash
+python -m altgan.launch_trace_bootstrap_multiseed \
+  --corpus twitter \
+  --trace-dir /tiamat/zarathustra/traces/twitter_cluster \
+  --fmt oracle_general \
+  --real-manifest /tiamat/zarathustra/llgan-output/manifests/twitter_stackatlas.json \
+  --real-ref /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --mode shuffle \
+  --chunk-size 65536 \
+  --seeds 42,80,81,82
+```
+
 ## Train
 
 ```bash

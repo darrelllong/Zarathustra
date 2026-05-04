@@ -2229,6 +2229,13 @@ Meta KV apples-to-apples shuffle (`mode=shuffle`, `chunk_size=65536`) scored
 `0.0006890583`, range `0.0001554000`, matching LLNL R278's non-stationary
 shuffle scale while replay pins the exact cachesim zero.
 
+Reproduction / extension (full per-seed fake paths + literal cachesim mean lines
++ exact JSON means; use this to close Twitter + Meta CDN shuffle rows too):
+
+```bash
+python -m altgan.launch_trace_bootstrap_multiseed --help
+```
+
 ## Meta KV Generative Reuse-Drop Entry (2026-05-03)
 
 Atlas:
