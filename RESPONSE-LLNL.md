@@ -15510,3 +15510,30 @@ The LANL competition is in the same metric class as LLNL (corpus-trained atlases
 - **R284.E** (deferred) — implement IDEAS-LLNL #26 atlas-fit IRD-shape loss and re-measure on the same 6 traces. Only path to closing the per-trace gap.
 
 **Tasks**: #65 (R284.B closure) opened and closed.
+
+## R274 — alibaba R270 atlas evaluation (CLOSED NEGATIVE)
+
+**Setup**: The R270 architecture (n_phase=2 × n_time=4 × n_size=4 = 192-state binning) lifted MSR Exchange by 20% (R273: 0.0105 vs LANL 0.0131). The natural follow-on was to apply R270 to alibaba and try to retake the 0.0119 LANL claim. Atlas was fit on 237 alibaba traces (50k records each, hidden=96, ep=600, seed=137, cond_noise=0.05) — same recipe that won MSR. Scale sweep 0.5/1.0/2.0/5.0 against the standard alibaba 6-policy / 4-cache-size race protocol.
+
+**Results — 6-pol mean HRC-MAE on the alibaba race protocol**:
+
+| Scale | 6-pol mean | By-policy (LRU/ARC/FIFO/SIEVE/SLRU/CAR) |
+|---|---|---|
+| 0.5 | **0.0519** | 0.055 / 0.059 / 0.046 / 0.044 / 0.047 / 0.060 |
+| 1.0 | 0.0584 | 0.061 / 0.066 / 0.052 / 0.050 / 0.054 / 0.067 |
+| 2.0 | 0.0640 | 0.066 / 0.072 / 0.058 / 0.056 / 0.060 / 0.073 |
+| 5.0 | 0.0713 | 0.074 / 0.079 / 0.065 / 0.063 / 0.067 / 0.080 |
+
+**Compared to**: R248 (pre-R270 alibaba atlas) **0.0131** multi-seed mean, LANL cooldown **0.0119**. R270 best-scale (0.5) is **4× worse than R248** and 4.4× worse than LANL.
+
+**Verdict**: **R270 architecture inverts on alibaba.** It joins the alibaba-negative list:
+
+- Multi-scale critic: +0.050 on alibaba (per memory)
+- PCF loss: +0.009 on alibaba (per memory)
+- **R270 (192-state binning): +0.039 on alibaba** (this round)
+
+The same architectural axis that won MSR by 20% loses on alibaba by 300%. Per-corpus architecture is now confirmed across **three** axes (critic, loss, atlas binning). The alibaba retake against LANL's 0.0119 cooldown will not come from architectural ports — it has to come from a lever or fit-time change that LANL hasn't published.
+
+**Open path forward**: R276 — apply R275's cooldown + reuse-drop levers to the *existing* R248 atlas (LANL's mechanism on LLNL's atlas). This is the next swing.
+
+**Tasks**: #52 (R274) closed NEGATIVE.
