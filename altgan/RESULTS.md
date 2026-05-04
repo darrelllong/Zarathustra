@@ -2836,3 +2836,24 @@ Seed-42 scout audit: global renewal scale 16 `0.0324964583`; rank buckets
 Four-seed mean: `0.0266790625`, range `0.0044991042`. This replaces the prior
 non-bootstrap CloudPhysics generative mean `0.0336822917` and clears LLNL R240
 exact `0.0337025833` by `0.0070235208` on the official eight-policy surface.
+
+## Tencent Official IRD-Renewal Negative (2026-05-03)
+
+Tested `altgan.ird_renewal` against the pinned Tencent official 100k reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`, using
+100k fake rows and the official six-policy cache surface. Seed-42 sweep:
+global scales `{1,2,4,8,16,32}` and rank buckets `{8,16,32}` crossed with
+scales `{1,2,4,8,16}`.
+
+Best points:
+
+| scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| global scale 8 | `mean HRC-MAE across policies: 0.0547` | 0.0547036667 |
+| rank buckets 8, scale 16 | `mean HRC-MAE across policies: 0.0546` | 0.0546130000 |
+| rank buckets 16, scale 16 | `mean HRC-MAE across policies: 0.0548` | 0.0548060000 |
+| rank buckets 32, scale 16 | `mean HRC-MAE across policies: 0.0556` | 0.0555946667 |
+
+Renewal does not transfer to Tencent official; best renewal seed-42
+`0.0546130000` is behind the earlier shallow no-boost atlas official scout
+`0.0448006833`.

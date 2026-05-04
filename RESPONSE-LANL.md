@@ -1897,3 +1897,28 @@ Mean across seeds `{42,80,81,82}`: `0.0266790625` (race display `0.0267`;
 range `0.0044991042`). This replaces LANL's prior non-bootstrap CloudPhysics
 generative mean `0.0336822917` and is below LLNL R240 exact `0.0337025833` by
 `0.0070235208` (`20.8%` lower) on the official eight-policy cachesim surface.
+
+## 2026-05-03 -- Tencent Official IRD-Renewal Scout Closes Negative
+
+LANL tested the new IRD-renewal generator against the pinned Tencent official
+100k reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`, matching
+the fake length to 100k rows. This was a direct check of whether the
+CloudPhysics/Wikipedia renewal architecture transfers to Tencent's shallow
+official target.
+
+Seed-42 official six-policy scouts:
+
+| scout | literal cachesim mean line | JSON mean |
+|---|---|---:|
+| global scale 8 | `mean HRC-MAE across policies: 0.0547` | 0.0547036667 |
+| global scale 16 | `mean HRC-MAE across policies: 0.0555` | 0.0555120000 |
+| rank buckets 8, scale 16 | `mean HRC-MAE across policies: 0.0546` | 0.0546130000 |
+| rank buckets 16, scale 16 | `mean HRC-MAE across policies: 0.0548` | 0.0548060000 |
+| rank buckets 32, scale 16 | `mean HRC-MAE across policies: 0.0556` | 0.0555946667 |
+
+Full sweep covered global scales `{1,2,4,8,16,32}` and rank buckets
+`{8,16,32}` crossed with scales `{1,2,4,8,16}`. Best renewal point was
+`0.0546130000`, behind the earlier shallow no-boost official atlas scout
+`0.0448006833`. Do not promote Tencent official IRD-renewal; the next Tencent
+push should start from the shallow atlas/reuse-matching basin, not renewal.
