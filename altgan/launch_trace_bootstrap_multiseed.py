@@ -97,6 +97,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
     p.add_argument("--cache-sizes", default="32,128,512,2048,8192")
     p.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car")
+    p.add_argument(
+        "--emit-markdown",
+        action="store_true",
+        help="Print a paste-ready Markdown results table after running.",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -210,6 +215,26 @@ def main() -> int:
     overall_range = max(means) - min(means) if means else 0.0
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
     print(f"Range: {overall_range:.10f}", flush=True)
+
+    if args.emit_markdown:
+        seeds_fmt = ",".join(str(s) for s in args.seeds)
+        print("\n---", flush=True)
+        print("\nPaste-ready Markdown:", flush=True)
+        print("", flush=True)
+        print("| seed | fake CSV | literal cachesim mean line | JSON mean |", flush=True)
+        print("|---:|---|---|---:|", flush=True)
+        for r in results:
+            mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
+            print(
+                f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae:.10f} |",
+                flush=True,
+            )
+        print("", flush=True)
+        print(
+            f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`",
+            flush=True,
+        )
+        print(f"Range: `{overall_range:.10f}`", flush=True)
     return 0
 
 

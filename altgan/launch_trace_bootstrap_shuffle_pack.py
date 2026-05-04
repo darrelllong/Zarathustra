@@ -75,6 +75,11 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--seeds", default="42,80,81,82")
     p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
+    p.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Forward `--emit-markdown` to the underlying multi-seed runner.",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -120,6 +125,8 @@ def main() -> int:
             "--output-root",
             args.output_root,
         ]
+        if args.markdown:
+            cmd.append("--emit-markdown")
         if args.dry_run:
             cmd.append("--dry-run")
 
