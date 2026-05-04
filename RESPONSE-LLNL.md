@@ -15537,3 +15537,52 @@ The same architectural axis that won MSR by 20% loses on alibaba by 300%. Per-co
 **Open path forward**: R276 — apply R275's cooldown + reuse-drop levers to the *existing* R248 atlas (LANL's mechanism on LLNL's atlas). This is the next swing.
 
 **Tasks**: #52 (R274) closed NEGATIVE.
+
+## R276 — R275 cooldown lever on R248 alibaba atlas (CLOSED, GAP HALVED)
+
+**Setup**: Apply the R275-ported `--hot-pool-min-age` cooldown lever (LANL's mechanism) to the existing R248 alibaba atlas (`llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600_extbins_seed137_noise0p05.pkl.gz`). LANL's published alibaba claim is 0.0119 (cooldown). Standard alibaba race protocol: 6 policies (lru/arc/fifo/sieve/slru/car) × 5 cache sizes [32, 128, 512, 2048, 8192]. R244 lock kept fixed; only `--hot-pool-min-age` swept.
+
+**Phase A (single-seed cooldown sweep, 2026-05-03 morning)**: ages 0/4/8/16/32/64/128:
+
+| age | 6-pol mean (seed=42) |
+|---|---|
+| 0 (R244 baseline) | 0.012426 |
+| 4 | 0.012748 |
+| **8** | **0.012306** ← winner |
+| 16 | 0.012695 |
+| 32 | 0.012740 |
+| 64 | 0.013923 |
+| 128 | 0.015682 |
+
+Cooldown lever has a clear minimum at age=8 (~1% improvement over R244 baseline). Older cooldowns degrade (atoms can't re-enter hot pool fast enough → spurious miss).
+
+**Phase B (multi-seed verify of cool8)**:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.012306 (reproduced morning result exactly) |
+| 43 | 0.013106 |
+| 44 | 0.012055 |
+| 45 | 0.012345 |
+
+**4-seed mean = 0.012453, range = 0.001052.**
+
+**Reuse-drop sweep (Phase C, single-seed, cool=16 base)**: drops 0/0.025/0.05/0.10/0.15/0.20 → 0.0127 / 0.0128 / 0.0148 / 0.0195 / 0.0250 / 0.0315. **Reuse-drop is alibaba-NEGATIVE** at all probes — adds to the alibaba-negative list (joining multi-scale critic, PCF, R270).
+
+### Race-position update
+
+| | LLNL (banked) | LANL (banked) | Gap |
+|---|---|---|---|
+| Pre-R276 | R248: 0.0131 (4-seed) | 0.0119 (cooldown) | LANL +9.4% ahead |
+| **Post-R276** | **R276 cool8: 0.01245 (4-seed, range 0.0011)** | 0.0119 (cooldown) | **LANL +4.7% ahead** |
+
+The gap to LANL is **halved**. LLNL's banked alibaba claim improves from 0.0131 → **0.01245**. LANL still leads alibaba but by half the margin.
+
+**Verdict**: R275-ported cooldown is a **partial-credit alibaba lever**. The cool8 setting transfers cleanly from LANL's mechanism (hot-pool-min-age) onto LLNL's R248 atlas and produces a measurable improvement. Reuse-drop does not transfer — LANL's reuse-drop benefit must depend on architectural properties of altgan that R248 doesn't have.
+
+**Tasks**: #54 (R276) closed.
+
+**Open frontiers for further alibaba retake**:
+- More aggressive cooldown sweep around age=8 (try age=6, 7, 9, 10 — finer resolution)
+- LANL's published cooldown claim is 0.0119 single-seed (per RESPONSE-LANL); their multi-seed mean might also be ~0.0125, in which case the LLNL/LANL gap could already be a tie within seed-noise. Action item: query LANL for cooldown multi-seed.
+- Alibaba retake will likely require a fit-time architectural change LANL hasn't published, since post-hoc levers have all been ported and only the cool8 axis transferred.

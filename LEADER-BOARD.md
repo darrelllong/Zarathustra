@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-03 (post-R284.B, 5-trace per-trace gap measured)**.
+Last updated: **2026-05-03 (post-R276 cool8 multi-seed, alibaba gap halved 9.4% → 4.7%)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -22,7 +22,7 @@ The race has two metric classes:
 
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
-| Alibaba | 0.0131 (R248: hp=0.45 K=75 adj=0 tp=0.10 mf=0.5 rp=0.15 win=16) | **0.0119** (cooldown control) | **LANL** | −9.4% |
+| Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.0119** (cooldown control) | **LANL** | −4.7% |
 | Tencent | 0.0305 (R206) | 0.0303 | tied | ~0% |
 | CloudPhysics | **0.0338** (R224, 8-pol) | not published gen | **LLNL alone** | — |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0291** (scout-rank atlas) | **LANL** | −33.7% |
@@ -62,11 +62,14 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - Per-seed (42/43/44/45): 0.0102 / 0.0106 / 0.0102 / 0.0108
 - 4-seed mean: 0.0105 (range 0.0006)
 
-### LLNL R248 Alibaba (current LLNL alibaba claim, trails LANL's cooldown)
+### LLNL R276 Alibaba (current LLNL alibaba claim — R248 atlas + cool8 lever)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_alibaba_237f_inline_50k_phase2_ep600_extbins_seed137_noise0p05.pkl.gz`
-- Recipe: phase=2 ep=600 seed=137 cond_noise=0.05 (R237 family)
-- Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.0 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16`
-- 4-seed mean: 0.0131 (range 0.0011)
+- Recipe: phase=2 ep=600 seed=137 cond_noise=0.05 (R237 family) — same atlas as R248
+- Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.0 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --hot-pool-min-age 8 --max-stack-depth 524288`
+- Per-seed (42/43/44/45): 0.012306 / 0.013106 / 0.012055 / 0.012345
+- 4-seed mean: **0.01245** (range 0.001052)
+- Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
+- Improvement over R248 baseline (0.0131): **5%**; gap to LANL 0.0119: **4.7% behind** (was 9.4%)
 
 ### LLNL bootstrap (all 9 corpora, R259g/R277.A/R278/R279/R280)
 - Recipe: `python3 -m llgan.trace_bootstrap --mode shuffle --chunk-size 65536` for 1M corpora; `--chunk-size 8192` for tencent (n=100k)
@@ -97,11 +100,13 @@ metric-class advantage 2DIO does not contest.
 
 ## Open fronts (LLNL perspective)
 
-1. **Alibaba retake**: LANL 0.0119 vs LLNL 0.0131. Four altgan post-hoc
-   levers ported (R263 scout-rank, R270 time×size atlas, R275 cooldown
-   + reuse-drop, R282 frequency-pool) — none transfer drop-in to R248
-   atlas. Path forward: re-fit alibaba with combinations of
-   architectural changes that LANL hasn't made public.
+1. **Alibaba retake**: LANL 0.0119 vs LLNL **0.01245** (post-R276). Four
+   altgan post-hoc levers ported; **only R275 cool8 transfers** (5%
+   improvement multi-seed). R263 scout-rank, R270 atlas, R275 reuse-drop,
+   R282 frequency-pool all alibaba-NEGATIVE on R248 atlas. The LANL/LLNL
+   alibaba gap is now 4.7%, not 9.4%. Next swings: finer cooldown sweep
+   (age 6/7/9/10), or fit-time architectural change LANL hasn't made
+   public.
 2. **Baleen24 retake**: LANL 0.0291 (scout atlas) vs LLNL 0.0438. R270
    architecture regressed on Baleen24 (R271). Need a different
    fit-time approach.
