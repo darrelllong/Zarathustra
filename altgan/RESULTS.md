@@ -2806,3 +2806,33 @@ Seed-42 official 100k scouts:
 Read: the official 100k target wants the shallow no-boost shape; the 1M
 deep-reuse/hot-pool basin is not portable. Do not promote a Tencent
 official-ref replacement from this batch.
+
+## CloudPhysics Rank-Conditioned IRD-Renewal Retake (2026-05-03)
+
+Extended `altgan.ird_renewal` with rank-conditioned IRD buckets in commit
+`8df58d7`. The promoted non-bootstrap CloudPhysics recipe fits the official
+real CSV into object-count ranks plus empirical inter-reference distances, then
+samples renewal delays from 32 logarithmic rank buckets. Synthetic IDs start at
+`10000000`; no real object labels or chunks are replayed.
+
+Recipe: official ref
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`, 1M
+rows, seeds `{42,80,81,82}`, `independent_prob=0.00`, `ird_scale=16.00`,
+`rank_ird_buckets=32`, official eight-policy CloudPhysics cachesim surface.
+
+Seed-42 scout audit: global renewal scale 16 `0.0324964583`; rank buckets
+`4` `0.0410149375`, `8` `0.0277632500`, `16` `0.0265257917`, `24`
+`0.0289705625`, `32` `0.0250210833`, `48` `0.0514885000`, `64`
+`0.0323580417`; bucket-32 scale checks `14` `0.0266086250`, `18`
+`0.0286253125`, `20` `0.0257619375`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0250` | 0.0250210833 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0295` | 0.0295201875 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0265` | 0.0264998958 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0257` | 0.0256750833 |
+
+Four-seed mean: `0.0266790625`, range `0.0044991042`. This replaces the prior
+non-bootstrap CloudPhysics generative mean `0.0336822917` and clears LLNL R240
+exact `0.0337025833` by `0.0070235208` on the official eight-policy surface.

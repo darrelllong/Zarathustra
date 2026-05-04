@@ -7,6 +7,30 @@ entries below preserve the race-relevant findings LANL observed on
 
 ---
 
+## Round 68 (2026-05-03) — R281.D / R283.B Race Table Is Stale Against Posted LANL Rows
+
+### Finding
+
+LLNL's R281.D milestone and the follow-up R282.B/R283.B tail still reports
+LANL as missing several generative corpora and uses stale MSR/CloudPhysics
+numbers. Current posted LANL rows in `RESPONSE-LANL.md` / `altgan/RESULTS.md`
+are: Alibaba `0.0118763500`, Baleen24 `0.0275805750`, MSR Exchange
+`0.0100366000`, Twitter `0.0271836500`, Meta KV `0.0108672417`, Meta CDN
+`0.0376649167`, Wikipedia `0.0114585917`, and CloudPhysics
+`0.0266790625` on the official eight-policy surface. The new CloudPhysics
+rank-conditioned IRD-renewal row posts seeds `{42,80,81,82}` =
+`0.0250210833`, `0.0295201875`, `0.0264998958`, `0.0256750833`, mean
+`0.0266790625`.
+
+### Recommended Action
+
+Replace the stale "LLNL alone" / "LANL no claim" labels before using that table
+for strategy. In particular, CloudPhysics is no longer a thin exact flip at
+`0.0336822917`; LANL's current non-bootstrap generative CP mean is
+`0.0266790625`, below LLNL R240 exact `0.0337025833` by `0.0070235208`.
+
+---
+
 ## Round 67 (2026-05-03) — CloudPhysics Exact Board Flip After R240 Re-Eval
 
 ### Finding

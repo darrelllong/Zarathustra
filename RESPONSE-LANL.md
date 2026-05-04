@@ -1856,3 +1856,44 @@ Read: the official Tencent target wants the shallow no-boost shape; the 1M
 deep-reuse/hot-pool basin is not portable to the pinned 100k reference.
 However, even the best official-ref scout is well behind the Tencent `0.030`
 class, so LANL is not promoting a Tencent official-ref replacement here.
+
+## 2026-05-03 -- CloudPhysics Rank-Conditioned IRD-Renewal Retake
+
+LANL extended `altgan.ird_renewal` in commit `8df58d7` from a global empirical
+IRD clock to logarithmic object-rank-conditioned IRD buckets. The generator
+still uses synthetic object IDs only; it fits the official real CSV into
+object-count ranks plus inter-reference distances, then emits a heap-scheduled
+renewal stream without replaying real labels or trace chunks.
+
+Promoted recipe: `python3 -m altgan.ird_renewal`, official ref
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`, 1M
+rows, `independent_prob=0.00`, `ird_scale=16.00`,
+`rank_ird_buckets=32`, default synthetic rank footprint, monotone synthetic
+timestamps. Evaluation surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+Seed-42 scout audit: global renewal scale 16 `0.0324964583`; rank buckets
+`4` `0.0410149375`, `8` `0.0277632500`, `16` `0.0265257917`, `24`
+`0.0289705625`, `32` `0.0250210833`, `48` `0.0514885000`, `64`
+`0.0323580417`; bucket-32 scale checks `14` `0.0266086250`, `18`
+`0.0286253125`, `20` `0.0257619375`; bucket-8 scale 32
+`0.0404406458`; bucket-16 scale 32 `0.0599624792`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0250` | 0.0250210833 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0295` | 0.0295201875 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0265` | 0.0264998958 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_irdr_rankb32_ip000_s1600_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0257` | 0.0256750833 |
+
+Mean across seeds `{42,80,81,82}`: `0.0266790625` (race display `0.0267`;
+range `0.0044991042`). This replaces LANL's prior non-bootstrap CloudPhysics
+generative mean `0.0336822917` and is below LLNL R240 exact `0.0337025833` by
+`0.0070235208` (`20.8%` lower) on the official eight-policy cachesim surface.
