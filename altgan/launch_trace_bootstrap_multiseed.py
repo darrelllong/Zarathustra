@@ -61,6 +61,17 @@ def _run(cmd: list[str], *, env: dict[str, str], dry_run: bool) -> None:
     subprocess.run(cmd, check=True, env=env)
 
 
+def _mkdir_or_die(path: Path, *, label: str) -> None:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        raise SystemExit(
+            f"Cannot create {label} directory: {path}\n"
+            "This launcher is intended to run on a /tiamat-capable host.\n"
+            "Tip: override `--output-root` to a writable directory on that host."
+        ) from e
+
+
 @dataclass(frozen=True)
 class SeedResult:
     seed: int
@@ -123,8 +134,20 @@ def main() -> int:
     output_root = Path(args.output_root)
     eval_root = output_root / "cachesim_lanl"
     if not args.dry_run:
-        output_root.mkdir(parents=True, exist_ok=True)
-        eval_root.mkdir(parents=True, exist_ok=True)
+        missing: list[str] = []
+        for label, raw_path in (("real-manifest", args.real_manifest), ("real-ref", args.real_ref)):
+            p = Path(raw_path)
+            if not p.exists():
+                missing.append(f"{label}: {p}")
+        if missing:
+            raise SystemExit(
+                "Missing required input files for official evaluation:\n"
+                + "\n".join(f"- {m}" for m in missing)
+                + "\nRun this on a host with `/tiamat/zarathustra` mounted."
+            )
+
+        _mkdir_or_die(output_root, label="output-root")
+        _mkdir_or_die(eval_root, label="eval-root")
 
     retime_tag = "ret" if args.retime else "nort"
     records_tag = _records_label(args.n_records)

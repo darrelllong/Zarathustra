@@ -131,7 +131,16 @@ def main() -> int:
             cmd.append("--dry-run")
 
         print(f"\n=== TRACEBOOTSTRAP SHUFFLE PACK: {corpus} ===", flush=True)
-        subprocess.run(cmd, check=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(
+                f"\n[error] TraceBootstrap shuffle pack failed for corpus '{corpus}' "
+                f"(exit {e.returncode}).",
+                file=sys.stderr,
+                flush=True,
+            )
+            return int(e.returncode)
 
     return 0
 
