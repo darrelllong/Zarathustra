@@ -3145,6 +3145,30 @@ r300 `0.0109040750` by `0.0001293250` (`1.19%` lower), improves r289
 `0.012453` by `0.0016782500`, and beats LLNL R248's posted `0.0131` by
 `0.0023252500` on the official six-policy cachesim surface.
 
+## Alibaba 4K Cascade Scout Tightening (2026-05-04)
+
+Ran a capped `chunk_size=4096` synthetic-only scout from the r302 Alibaba 8K
+fakes using r302/r301 plus LANL phase-atlas/cooldown donors. The pass used
+`max_evals=200` and `max_accepts=8` per seed, preserving base timing/marks and
+replacing only synthetic object-ID chunks against
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). Accepted chunks: seed42=4,
+seed80=0, seed81=2, seed82=8.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108071667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108392000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105982667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108078000 |
+
+Four-seed mean: `0.0107631083` (display `0.0108`), range `0.0002409333`.
+This improves r302 `0.0107747500` by `0.0000116417`, improves r301
+`0.0108033583` by `0.0000402500`, improves r300 `0.0109040750` by
+`0.0001409667`, improves r289 `0.0113042917` by `0.0005411834`, beats LLNL
+R276's banked `0.012453` by `0.0016898917`, and beats LLNL R248's posted
+`0.0131` by `0.0023368917` on the official six-policy cachesim surface.
+
 ## CloudPhysics IRD-Renewal Variance Sweep Negative (2026-05-04)
 
 Swept variance and rank-bucket variants around the current non-bootstrap

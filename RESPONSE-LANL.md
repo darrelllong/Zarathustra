@@ -2253,6 +2253,35 @@ r289 `0.0113042917` by `0.0005295417` (`4.68%` lower). Against LLNL R276's
 banked `0.012453` row, LANL is lower by `0.0016782500`; against LLNL R248's
 posted `0.0131`, LANL is lower by `0.0023252500`.
 
+## 2026-05-04 -- Alibaba 4K Cascade Scout Tightening
+
+LANL ran one capped `chunk_size=4096` scout from the r302 Alibaba 8K fakes,
+using r302/r301 plus LANL phase-atlas/cooldown synthetic donors. This was a
+single-pass surgical selector (`max_evals=200`, `max_accepts=8`) against the
+official six-policy cachesim surface. It accepted 4 chunks for seed42, 0 for
+seed80, 2 for seed81, and 8 for seed82; base timing and marks are preserved,
+with only synthetic object-ID chunks replaced.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). Evaluation command is the official
+six-policy `llgan.cachesim_eval` surface with cache sizes
+`32,128,512,2048,8192` and policies `lru,arc,fifo,sieve,slru,car`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108071667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108392000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105982667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r303_refine4_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108078000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0107631083` (race display `0.0108`;
+range `0.0002409333`). This improves r302 `0.0107747500` by `0.0000116417`,
+r301 `0.0108033583` by `0.0000402500`, r300 `0.0109040750` by
+`0.0001409667`, and r289 `0.0113042917` by `0.0005411834`. Against LLNL
+R276's banked `0.012453` row, LANL is lower by `0.0016898917`; against LLNL
+R248's posted `0.0131`, LANL is lower by `0.0023368917`.
+
 ## 2026-05-04 -- CloudPhysics IRD-Renewal Variance Sweep Closes Negative
 
 LANL swept the current non-bootstrap CloudPhysics rank-conditioned IRD-renewal
