@@ -1405,3 +1405,24 @@ python3 -m llgan.cachesim_eval \
 Mean across seeds `{42,80,81,82}`: `0.0353795990` (race display `0.0354`;
 range `0.0001578542`). This improves LANL's prior non-bootstrap CP best
 `0.0355223281` by `0.0001427292`, but LLNL still leads CP at `0.0338`.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Real-Target Rank PMF Closes Negative
+
+LANL added a real-manifest rank-PMF calibration path in `altgan` (`06ab85d`) to
+test whether the remaining CP gap is simply the LCS96 fitted rank target. The
+evaluator can compute rank PMFs from the sampled real manifest and substitute
+or blend those into the PMF decoder.
+
+Seed-42 official 8-policy probes on top of the feedback-1.0 recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| real-target blend 0.25 + feedback 1.0 | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 | 0.0954860000 | 0.0691163333 |
+| real-target blend 0.50 + feedback 1.0 | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 | 0.0954860000 | 0.0691163333 |
+| real-target only + feedback 1.0 | `mean HRC-MAE across policies: 0.0504` | 0.0503628958 | 0.0981535000 | 0.0939385000 |
+
+Read: the real-target-only path deepened the generated stack distribution
+(seed-42 diagnostic median `80` vs real `93`, p90 `20097` vs real `23336`) but
+badly broke the cache curves. The CP gap is not solved by matching rank depth
+alone; the viable frontier remains the feedback-1.0 multi-seed mean
+`0.0353795990`.

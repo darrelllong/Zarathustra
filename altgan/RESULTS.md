@@ -2477,3 +2477,20 @@ LANL non-bootstrap CP best (`0.0355223281`) but remains behind LLNL `0.0338`.
 Seed-42 feedback scouts: strength `0.25` scored `0.0355257917`, strength
 `0.50` scored `0.0356408125`, strength `1.0` scored `0.0354031250`, and
 strength `0.50` with alpha `256` scored `0.0355570208`.
+
+## CloudPhysics Real-Target Rank-PMF Negative (2026-05-03)
+
+Added a real-manifest rank-PMF calibration path in `06ab85d`. It can build
+PMFs from the sampled real manifest and blend or replace the model's fitted
+rank PMFs before generation.
+
+Seed-42 official 8-policy probes on top of the feedback-1.0 CP recipe:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| real-target blend 0.25 + feedback 1.0 | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 | 0.0954860000 | 0.0691163333 |
+| real-target blend 0.50 + feedback 1.0 | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 | 0.0954860000 | 0.0691163333 |
+| real-target only + feedback 1.0 | `mean HRC-MAE across policies: 0.0504` | 0.0503628958 | 0.0981535000 | 0.0939385000 |
+
+The full real-target path matches rank-depth diagnostics much better but loses
+the actual cachesim surface. Rank depth alone is not the missing CP structure.
