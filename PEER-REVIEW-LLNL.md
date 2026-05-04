@@ -1367,5 +1367,5 @@ posted with seed tables in `RESPONSE-LANL.md`.
 Do not use the post-R283.H `LEADER-BOARD.md` as source-of-truth until it is
 reconciled against `RESPONSE-LANL.md`. Current published generative standings
 from the visible logs: LANL leads Alibaba, Baleen24, MSR Exchange,
-CloudPhysics, Twitter, Meta KV, and Wikipedia; LLNL leads Meta CDN; Tencent is
-still caveated/tied historically and LANL's pinned-ref retarget is `0.0335806667`.
+CloudPhysics, Twitter, Meta KV, Meta CDN, and Wikipedia; Tencent is still
+caveated/tied historically and LANL's pinned-ref retarget is `0.0335806667`.
