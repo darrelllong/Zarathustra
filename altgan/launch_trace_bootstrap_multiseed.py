@@ -109,6 +109,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--cache-sizes", default="32,128,512,2048,8192")
     p.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car")
     p.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip seeds whose fake CSV + official report JSON already exist.",
+    )
+    p.add_argument(
         "--emit-markdown",
         action="store_true",
         help="Print a paste-ready Markdown results table after running.",
@@ -164,6 +169,24 @@ def main() -> int:
             f"_seed{seed}_official{policy_count}.json"
         )
 
+        if args.skip_existing and not args.dry_run:
+            if fake_csv.exists() and report_json.exists():
+                mean = _mean_from_json(report_json)
+                results.append(
+                    SeedResult(
+                        seed=seed,
+                        fake_csv=fake_csv,
+                        report_json=report_json,
+                        mean_hrc_mae=mean,
+                    )
+                )
+                print(
+                    f"[skip-existing] seed={seed} already has fake+report; "
+                    f"mean={mean:.10f}",
+                    flush=True,
+                )
+                continue
+
         cmd_boot = [
             sys.executable,
             "-u",
@@ -190,7 +213,10 @@ def main() -> int:
         ]
         if args.retime:
             cmd_boot.append("--retime")
-        _run(cmd_boot, env=env, dry_run=args.dry_run)
+        if not (args.skip_existing and not args.dry_run and fake_csv.exists()):
+            _run(cmd_boot, env=env, dry_run=args.dry_run)
+        else:
+            print(f"[skip-existing] seed={seed} fake CSV exists: {fake_csv}", flush=True)
 
         cmd_eval = [
             sys.executable,
@@ -208,7 +234,10 @@ def main() -> int:
             "--out",
             str(report_json),
         ]
-        _run(cmd_eval, env=env, dry_run=args.dry_run)
+        if not (args.skip_existing and not args.dry_run and report_json.exists()):
+            _run(cmd_eval, env=env, dry_run=args.dry_run)
+        else:
+            print(f"[skip-existing] seed={seed} report JSON exists: {report_json}", flush=True)
 
         if not args.dry_run:
             mean = _mean_from_json(report_json)

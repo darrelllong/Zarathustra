@@ -85,6 +85,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Continue other corpora if one fails; report failures at the end.",
     )
+    p.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Forward `--skip-existing` to the underlying multi-seed runner.",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -133,6 +138,8 @@ def main() -> int:
         ]
         if args.markdown:
             cmd.append("--emit-markdown")
+        if args.skip_existing:
+            cmd.append("--skip-existing")
         if args.dry_run:
             cmd.append("--dry-run")
 

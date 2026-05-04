@@ -53,14 +53,18 @@ python -m altgan.launch_trace_bootstrap_multiseed \
   --real-ref /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
   --mode shuffle \
   --chunk-size 65536 \
-  --seeds 42,80,81,82
+  --seeds 42,80,81,82 \
+  --emit-markdown
 ```
+
+If the run is interrupted, re-run with `--skip-existing` to resume without
+recomputing completed seeds.
 
 To publish/refresh the full 1M-corpus shuffle pack (Twitter / Meta KV / Meta CDN /
 Wikipedia) in one go:
 
 ```bash
-python -m altgan.launch_trace_bootstrap_shuffle_pack
+python -m altgan.launch_trace_bootstrap_shuffle_pack --markdown --skip-existing --keep-going
 ```
 
 ## Train
