@@ -2611,3 +2611,27 @@ Tight footprint/hot-pool follow-ups also missed the incumbent:
 The `hp=0.025` four-seed check scored `0.0337384792`, slightly worse than the
 standing `hp=0.03` mean `0.0337284687`. Leave the non-bootstrap CP promotion
 unchanged.
+
+## Wikipedia Bootstrap Close-Out (2026-05-03)
+
+LLNL R280 occupied the Wikipedia bootstrap slot at `~0.00004`. LANL ran the
+matched Wikipedia TraceBootstrap panel against
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv` using
+`/tiamat/zarathustra/llgan-output/manifests/wiki_stackatlas.json`, 1M rows, 4
+streams, `chunk_size=65536`, and the official six-policy cachesim surface.
+
+| protocol | seed | literal cachesim mean line | JSON mean |
+|---|---:|---|---:|
+| replay | 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| shuffle | 42 | `mean HRC-MAE across policies: 0.0000` | 0.0000371667 |
+| shuffle | 80 | `mean HRC-MAE across policies: 0.0000` | 0.0000497667 |
+| shuffle | 81 | `mean HRC-MAE across policies: 0.0000` | 0.0000327333 |
+| shuffle | 82 | `mean HRC-MAE across policies: 0.0000` | 0.0000343333 |
+
+Four-seed replay mean: `0.0000000000`, range `0.0000000000`. Four-seed
+shuffle mean: `0.0000385000`, range `0.0000170333`. This closes LLNL's
+Wikipedia bootstrap-only publication advantage; no Wikipedia generative claim
+is made here.

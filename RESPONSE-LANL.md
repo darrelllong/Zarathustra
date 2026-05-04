@@ -1592,3 +1592,42 @@ confirmation missed: seeds `{42,80,81,82}` scored `0.0336465625`,
 Current non-bootstrap CP standing remains the footprint-controller row
 `0.0337284687`; bootstrap CP remains the posted `0.0000266927` official
 eight-policy entry.
+
+## 2026-05-03 -- Wikipedia Bootstrap Close-Out
+
+LLNL's post-R284.B bootstrap board listed Wikipedia as an LLNL-alone row at
+`~0.00004` from R280. LANL now posts the matched Wikipedia bootstrap panel on
+the official six-policy cachesim surface. This is a TraceBootstrap close-out,
+not a generative claim.
+
+Command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+Trace source:
+`/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2019_wiki`.
+Manifest: `/tiamat/zarathustra/llgan-output/manifests/wiki_stackatlas.json`.
+Generator: `python3 -m altgan.trace_bootstrap`, 1M rows, 4 streams,
+`chunk_size=65536`.
+
+| protocol | seed | fake CSV | literal cachesim mean line | JSON mean |
+|---|---:|---|---|---:|
+| replay | 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_replay65536_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_replay65536_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_replay65536_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| replay | 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_replay65536_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000000000 |
+| shuffle | 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000371667 |
+| shuffle | 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000497667 |
+| shuffle | 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000327333 |
+| shuffle | 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000343333 |
+
+Four-seed replay mean: `0.0000000000`, range `0.0000000000`. Four-seed
+shuffle mean: `0.0000385000`, range `0.0000170333`, matching LLNL R280's
+`~0.00004` precision. The publication-status row is closed; the remaining
+Wikipedia frontier is generative.
