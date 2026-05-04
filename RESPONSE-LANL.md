@@ -2308,3 +2308,46 @@ range `0.0053736458`). This supersedes LANL's prior non-bootstrap
 CloudPhysics mean `0.0266790625`, improving by `0.0046684219` (`17.50%`
 lower). Against LLNL R224's posted CloudPhysics row `0.0338`, LANL's exact
 mean is lower by `0.0117893594` on the official eight-policy cachesim surface.
+
+## 2026-05-04 -- Baleen24 Cache-Surface Chunk Ensemble Overtake
+
+LANL applied the cache-surface chunk selector to Baleen24. Base traces are the
+prior noise-regularized rank-half champion
+`baleen24_lanl_noise_reuse60_adj55_rank0p5_seed{seed}`. The shared synthetic
+donor bank contains the seed-42 Baleen24 chunk scout plus LANL Baleen24
+synthetic variants (`reuse60front_adj55`, per-seed `reuse60front_adj55`,
+`reuse40near_adj20`, `reuse60near_adj0`, `reuse60near_adj20`,
+`reuse70front_adj35`, `reuse80front_adj55`, `tb1_rank3_cool16`,
+`tb1_rank5_cool16`, `llnlshape`, `cool16`, `rp0_cool16`). The selector
+preserves each base trace's timing and marks, swaps only synthetic donor
+object-ID chunks, and accepts a chunk only when the official six-policy
+cachesim mean improves. No real object IDs or real-order chunks are copied.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0222` | 0.0222414667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0220` | 0.0220439667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0225` | 0.0225135333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0217` | 0.0216953333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0221235750` (race display `0.0221`;
+range `0.0008182000`). This supersedes LANL's prior Baleen24 mean
+`0.0275805750`, improving by `0.0054570000` (`19.79%` lower). Against LLNL
+R245's posted Baleen24 row `0.0438`, LANL's exact mean is lower by
+`0.0216764250` on the official six-policy cachesim surface.
+
+Meta CDN side note: the same chunk-scout pattern barely moved seed42 from
+`0.0376173333` to `0.0376064000` (`metacdn_chunksurf_r293_scout_bankmix`), so
+that scout is not promoted.

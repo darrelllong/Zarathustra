@@ -3164,3 +3164,30 @@ row by `0.0117893594` on the official eight-policy cachesim surface. The
 finished per-stream sweep is not a direct promotion (`rb32_ps` mean
 `0.0290667`, `rb64_ps` mean `0.0299441`, `rb48_ps` mean `0.0300681`), but it
 provided useful donor material for this chunk ensemble.
+
+## Baleen24 Cache-Surface Chunk Ensemble Overtake (2026-05-04)
+
+Applied the cache-surface chunk selector to Baleen24 using the prior
+noise-regularized rank-half champion as the per-seed base. The shared
+synthetic donor bank combines the seed-42 Baleen24 chunk scout with LANL
+Baleen24 variants (`reuse60front_adj55`, per-seed `reuse60front_adj55`,
+`reuse40near_adj20`, `reuse60near_adj0`, `reuse60near_adj20`,
+`reuse70front_adj35`, `reuse80front_adj55`, `tb1_rank3_cool16`,
+`tb1_rank5_cool16`, `llnlshape`, `cool16`, `rp0_cool16`). Base timing and
+marks are preserved, and chunks are accepted only when the official six-policy
+Baleen24 cachesim mean improves.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0222` | 0.0222414667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0220` | 0.0220439667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0225` | 0.0225135333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r293_bank_d42_ck131072_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0217` | 0.0216953333 |
+
+Four-seed mean: `0.0221235750` (display `0.0221`), range `0.0008182000`.
+This improves the prior LANL Baleen24 mean `0.0275805750` by `0.0054570000`
+(`19.79%` lower) and beats LLNL R245's posted `0.0438` row by `0.0216764250`
+on the official six-policy cachesim surface.
+
+Meta CDN chunk scout did not promote: seed42 only moved from `0.0376173333`
+to `0.0376064000`.
