@@ -39,7 +39,7 @@ def read_real_csv(path: str, max_rows: int | None = None) -> list[tuple]:
     return rows
 
 
-def stack_distance_per_record(obj_ids: np.ndarray) -> np.ndarray:
+def stack_distance_per_record(obj_ids) -> np.ndarray:
     """Compute LRU stack-distance for each record. -1 = first access (cold)."""
     n = len(obj_ids)
     sd = np.empty(n, dtype=np.int64)
@@ -137,11 +137,11 @@ def generate_ird_renewal(
                 rank_dists.append(build_ird_distribution(sub, ird_buckets))
 
     # Generation: maintain virtual LRU stack.
-    out_ids = np.empty(n_records, dtype=np.int64)
+    out_ids = np.empty(n_records, dtype=np.uint64)
     out_sizes = np.empty(n_records, dtype=np.int64)
     stack: list[int] = []
     pos_of: dict[int, int] = {}
-    next_new_id = 10_000_000  # synthetic IDs
+    next_new_id = np.uint64(10_000_000)  # synthetic IDs
 
     for i in range(n_records):
         # Decide between independent (new) miss or IRD-driven reuse.
@@ -194,7 +194,7 @@ def main():
 
     print(f"Loading real trace from {args.real} (max_rows={args.max_real_rows})")
     rows = read_real_csv(args.real, max_rows=args.max_real_rows)
-    obj_ids = np.array([int(r[2]) for r in rows], dtype=np.int64)
+    obj_ids = np.array([int(r[2]) for r in rows], dtype=np.uint64)
     obj_sizes = np.array([int(r[3]) for r in rows], dtype=np.int64)
     print(f"Read {len(obj_ids):,} real records; building IRD distribution "
           f"(buckets={args.ird_scale}, rank_buckets={args.rank_ird_buckets})")
