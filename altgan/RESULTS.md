@@ -3099,6 +3099,29 @@ This improves r289 `0.0113042917` by `0.0004002167` (`3.54%` lower), beats
 LLNL R276's banked `0.012453` by `0.0015489250`, and beats LLNL R248's posted
 `0.0131` row by `0.0021959250` on the official six-policy cachesim surface.
 
+## Alibaba 16K Cascade Tightening (2026-05-04)
+
+Cascaded the r300 Alibaba 32K fakes through a narrower `chunk_size=16384`
+synthetic-only selector. Donors were the r300 outputs, r289 outputs, and the
+existing LANL phase-atlas/cooldown synthetic variants. Each seed used
+`max_accepts=8`, `max_evals=250`, and the official six-policy cachesim surface
+against `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`). Timing/marks are inherited from the
+base fakes; only synthetic object-ID chunks are replaced.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r301_refine16_ck16384_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108481667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r301_refine16_ck16384_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108704667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r301_refine16_ck16384_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106126000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r301_refine16_ck16384_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108822000 |
+
+Four-seed mean: `0.0108033583` (display `0.0108`), range `0.0002696000`.
+This improves r300 `0.0109040750` by `0.0001007167` (`0.92%` lower), improves
+r289 `0.0113042917` by `0.0005009333` (`4.43%` lower), beats LLNL R276's
+banked `0.012453` by `0.0016496417`, and beats LLNL R248's posted `0.0131` by
+`0.0022966417` on the official six-policy cachesim surface.
+
 ## CloudPhysics IRD-Renewal Variance Sweep Negative (2026-05-04)
 
 Swept variance and rank-bucket variants around the current non-bootstrap
