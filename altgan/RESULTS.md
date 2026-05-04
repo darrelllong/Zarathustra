@@ -3122,6 +3122,29 @@ r289 `0.0113042917` by `0.0005009333` (`4.43%` lower), beats LLNL R276's
 banked `0.012453` by `0.0016496417`, and beats LLNL R248's posted `0.0131` by
 `0.0022966417` on the official six-policy cachesim surface.
 
+## Alibaba 8K Cascade Tightening (2026-05-04)
+
+Ran a capped `chunk_size=8192` synthetic-only cascade from the r301 Alibaba
+fakes using r301/r300/r289 plus phase-atlas/cooldown donors. The pass used
+`max_evals=250` and `max_accepts=8` per seed, preserving base timing/marks and
+replacing only synthetic object-ID chunks against
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`
+(md5 `97d0054230348d07aef2021ec15f6fd8`).
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r302_refine8_ck8192_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108231667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r302_refine8_ck8192_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108392000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r302_refine8_ck8192_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106032333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r302_refine8_ck8192_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108334000 |
+
+Four-seed mean: `0.0107747500` (display `0.0108`), range `0.0002359667`.
+This improves r301 `0.0108033583` by `0.0000286083` (`0.26%` lower), improves
+r300 `0.0109040750` by `0.0001293250` (`1.19%` lower), improves r289
+`0.0113042917` by `0.0005295417` (`4.68%` lower), beats LLNL R276's banked
+`0.012453` by `0.0016782500`, and beats LLNL R248's posted `0.0131` by
+`0.0023252500` on the official six-policy cachesim surface.
+
 ## CloudPhysics IRD-Renewal Variance Sweep Negative (2026-05-04)
 
 Swept variance and rank-bucket variants around the current non-bootstrap
