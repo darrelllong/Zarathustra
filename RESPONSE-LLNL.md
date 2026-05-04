@@ -15703,3 +15703,44 @@ Twitter inverts the scale lever (vs MSR/Wiki where higher scale wins). Plain R24
 **LLNL Twitter generative claim banked at 0.1532**. LANL has no Twitter claim. **LLNL leads Twitter generative alone.**
 
 **Tasks**: #69 (R281.B) closed.
+
+## R281.C — Meta KV generative claim (CLOSED, BANKED)
+
+**Setup**: Meta KV atlas already fit (R270 family). Same template as R281.B Twitter. Single-seed scale sweep at seed=42:
+
+| Config | 6-pol mean (seed=42) |
+|---|---|
+| **R244lock** | **0.263308** ← winner |
+| scale=2 | 0.284030 |
+| scale=5 | 0.309864 |
+
+Same scale-inversion pattern as Twitter (R244lock wins, scale lever HURTS at higher values). KV workloads consistently disprefer the rank-scale lever.
+
+Multi-seed verify R244lock:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.263308 |
+| 43 | 0.261285 |
+| 44 | 0.262703 |
+| 45 | 0.262150 |
+| **mean** | **0.262362** |
+| range | 0.002024 |
+
+**Meta KV 4-seed mean = 0.2624, range = 0.0020.** Tight per-seed but **17× higher absolute MAE than alibaba/MSR/Wiki**. Meta KV is the hardest measured corpus; the R270 atlas captures bulk locality but mismatches the heavy-tail one-shot key access pattern characteristic of KV workloads.
+
+**LLNL Meta KV generative claim banked at 0.2624.** LANL has no Meta KV claim. **LLNL leads Meta KV generative alone.**
+
+**Pattern across the four solo-claim corpora**:
+
+| Corpus | LLNL multi-seed mean | range | Scale-lever direction |
+|---|---|---|---|
+| Wiki | 0.0174 | 0.000175 | scale=5 wins (+15% over R244lock) |
+| MSR | 0.0105 | 0.0006 | scale=2 wins |
+| CP | 0.0338 | typical 0.005 | n/a (R224 era) |
+| Twitter | 0.1532 | 0.00228 | R244lock wins, scale ↑ HURTS |
+| Meta KV | 0.2624 | 0.00202 | R244lock wins, scale ↑ HURTS |
+
+The scale lever is **corpus-class-dependent**: storage workloads (alibaba/Wiki/MSR/CP) want scale ≥ 1.0; KV-style workloads (Twitter/Meta KV) want scale = 1.0. This is a stable empirical pattern across 5 corpora.
+
+**Tasks**: #70 (R281.C) closed; #71 (R281.D Meta CDN) in flight.
