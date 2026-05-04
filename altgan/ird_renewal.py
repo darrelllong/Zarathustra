@@ -57,6 +57,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Probability of honoring an overdue renewal event.")
     p.add_argument("--new-debt-priority", type=float, default=0.85,
                    help="Probability of emitting a new object when below target footprint pace.")
+    p.add_argument("--new-when-no-due-prob", type=float, default=0.0,
+                   help="Emit an unseen object when no renewal is due, even if footprint is ahead.")
     p.add_argument("--frequency-alpha", type=float, default=1.0,
                    help="Exponent applied to empirical object-count weights for IRM sampling.")
     p.add_argument("--ird-scale", type=float, default=1.0)
@@ -228,6 +230,8 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
         if rank is None and due_rank is not None and rng.random() < args.dependent_admit_prob:
             rank = pop_due(pos)
         if rank is None and unique_seen < target_unique:
+            rank = next_new_rank()
+        if rank is None and due_rank is None and rng.random() < args.new_when_no_due_prob:
             rank = next_new_rank()
         if rank is None and rng.random() < args.independent_prob:
             rank = sample_frequency_rank(allow_unseen=unique_seen < target_unique)
