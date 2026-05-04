@@ -101,6 +101,16 @@ class Spec:
     reuse_boost_rank_power: float = 2.0
     reuse_drop_prob: float = 0.0
     reuse_drop_position_probs: str = ""
+    disable_neural_marks: int = 0
+    mark_temperature: float = -1.0
+    mark_numeric_noise: float = 0.05
+    mark_numeric_blend: float = 1.0
+    mark_numeric_blend_space: str = "raw"
+    mark_numeric_fields: str = "both"
+    mark_categorical_source: str = "neural"
+    mark_feedback_numeric_blend: float = -1.0
+    mark_feedback_numeric_blend_space: str = "log"
+    mark_feedback_numeric_fields: str = "both"
 
 
 def _parse_spec(text: str) -> Spec:
@@ -276,6 +286,26 @@ def _parse_spec(text: str) -> Spec:
         "reuse_drop": "reuse_drop_prob",
         "drop_pos": "reuse_drop_position_probs",
         "reuse_drop_pos": "reuse_drop_position_probs",
+        "marks_off": "disable_neural_marks",
+        "disable_marks": "disable_neural_marks",
+        "mtemp": "mark_temperature",
+        "mark_temp": "mark_temperature",
+        "mnoise": "mark_numeric_noise",
+        "mark_noise": "mark_numeric_noise",
+        "mblend": "mark_numeric_blend",
+        "mark_blend": "mark_numeric_blend",
+        "mspace": "mark_numeric_blend_space",
+        "mark_space": "mark_numeric_blend_space",
+        "mfields": "mark_numeric_fields",
+        "mark_fields": "mark_numeric_fields",
+        "mcatsrc": "mark_categorical_source",
+        "mark_cat": "mark_categorical_source",
+        "mfb": "mark_feedback_numeric_blend",
+        "mark_fb": "mark_feedback_numeric_blend",
+        "mfb_space": "mark_feedback_numeric_blend_space",
+        "mark_fb_space": "mark_feedback_numeric_blend_space",
+        "mfb_fields": "mark_feedback_numeric_fields",
+        "mark_fb_fields": "mark_feedback_numeric_fields",
     }
     fields = {field.name: field.type for field in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs = {"name": defaults.name}
@@ -324,6 +354,8 @@ def _auto_name(spec: Spec) -> str:
         f"w{spec.recent_pool_window}_tail{_tag(spec.tail_reuse_prob)}"
         f"mf{_tag(spec.tail_reuse_min_frac)}pow{_tag(spec.tail_reuse_rank_power)}"
         f"_drop{_tag(spec.reuse_drop_prob)}"
+        f"_mb{_tag(spec.mark_numeric_blend)}"
+        f"mfb{_tag(spec.mark_feedback_numeric_blend)}"
     )
 
 
@@ -537,6 +569,20 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.tail_reuse_min_frac),
         "--stack-tail-reuse-rank-power",
         str(spec.tail_reuse_rank_power),
+        "--mark-numeric-noise",
+        str(spec.mark_numeric_noise),
+        "--mark-numeric-blend",
+        str(spec.mark_numeric_blend),
+        "--mark-numeric-blend-space",
+        spec.mark_numeric_blend_space,
+        "--mark-numeric-fields",
+        spec.mark_numeric_fields,
+        "--mark-categorical-source",
+        spec.mark_categorical_source,
+        "--mark-feedback-numeric-blend-space",
+        spec.mark_feedback_numeric_blend_space,
+        "--mark-feedback-numeric-fields",
+        spec.mark_feedback_numeric_fields,
         "--n-records",
         str(args.n_records),
         "--n-streams",
@@ -554,6 +600,15 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         cmd.extend([
             "--stack-reuse-drop-position-probs",
             spec.reuse_drop_position_probs,
+        ])
+    if spec.disable_neural_marks > 0:
+        cmd.append("--disable-neural-marks")
+    if spec.mark_temperature >= 0.0:
+        cmd.extend(["--mark-temperature", str(spec.mark_temperature)])
+    if spec.mark_feedback_numeric_blend >= 0.0:
+        cmd.extend([
+            "--mark-feedback-numeric-blend",
+            str(spec.mark_feedback_numeric_blend),
         ])
     if spec.rank_pmf_target_real > 0:
         cmd.append("--stack-rank-pmf-target-real")
