@@ -2944,3 +2944,41 @@ multi-seed Tencent promotion. The next Tencent attempt should not spend more
 time on scalar recent/footprint/rank controls around this atlas. The targeted
 rank-band branch widened the tail, but the policy mean still regressed. The
 remaining gap needs a different object-process model, not a local retune.
+
+## Tencent Object-Process Architecture Audit (2026-05-04)
+
+Added two LANL-only Tencent architecture scouts:
+
+- `altgan/sweep_tencent_frequency_compact.py`: rewrites synthetic object IDs to
+  test count-law compaction toward the official real sorted frequency
+  histogram, without copying real IDs or order.
+- `altgan/sweep_tencent_scan_protect.py`: generates a two-state scan plus
+  protected-hot object process, using the current Tencent fake only for marks
+  and timestamps.
+
+All evals used the official Tencent reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv` and the
+official six-policy surface.
+
+Seed-42 official scouts:
+
+| branch | best scout | literal cachesim mean line | JSON mean |
+|---|---|---|---:|
+| full frequency compaction | `source_freq alpha=.8 fp=1.0` | `mean HRC-MAE across policies: 0.0490` | 0.0489500000 |
+| partial frequency compaction | `source_freq alpha=.8 mix=.03 fp=1.0` | `mean HRC-MAE across policies: 0.0354` | 0.0353996667 |
+| tiny random frequency injection | `shuffle alpha=2.2 mix=.0025 fp=1.0` | `mean HRC-MAE across policies: 0.0334` | 0.0334433333 |
+| scan/protected-hot generator | `hot=128 scan=512 hot_mult=1.6 zipf=.6` | `mean HRC-MAE across policies: 0.0407` | 0.0406503333 |
+
+Artifact examples:
+
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_off100k_fc_r286_source_freq_a0p8_fp1p0_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_off100k_fc_r286mix_source_freq_a0p8_fp1p0_m0p03_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_off100k_fc_r286shufmix_shuffle_a2p2_fp1p0_m0p0025_seed42_official6.json`
+- `/tiamat/zarathustra/altgan-output/cachesim_lanl/tencent_scanprotect_r286_h128_s512_hm1p6_z0p6_fp1p0_cr0p0_seed42_official6.json`
+
+Conclusion: all object-process scouts are negative versus the promoted Tencent
+seed-42 `0.0330030000` and four-seed `0.0335806667`. Count-law compaction alone
+overcorrects the large-cache surface; scan/protect creates policy separation
+but loses SIEVE/SLRU and large-cache shape. Continue Tencent with a richer
+hidden-state object process or chunk-level ensemble, not another scalar
+rank/recent/footprint retune.

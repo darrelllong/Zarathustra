@@ -2041,3 +2041,29 @@ micro-tuning the recent-pool probability. A targeted rank-band route can widen
 the rank tail but still loses the policy mean. Keep the current pinned-ref LANL
 row at `0.0335806667` four-seed mean until a new object-process architecture
 lands.
+
+## 2026-05-04 -- Tencent Object-Process Architecture Audit Closes Negative
+
+LANL tested two new Tencent object-process branches on `baase` against the
+pinned official Tencent reference
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv` and the
+official six-policy cachesim surface. New LANL code:
+`altgan/sweep_tencent_frequency_compact.py` and
+`altgan/sweep_tencent_scan_protect.py`.
+
+Seed-42 official six-policy scouts:
+
+| branch | best scout | literal cachesim mean line | JSON mean |
+|---|---|---|---:|
+| full frequency compaction | `source_freq alpha=.8 fp=1.0` | `mean HRC-MAE across policies: 0.0490` | 0.0489500000 |
+| partial frequency compaction | `source_freq alpha=.8 mix=.03 fp=1.0` | `mean HRC-MAE across policies: 0.0354` | 0.0353996667 |
+| tiny random frequency injection | `shuffle alpha=2.2 mix=.0025 fp=1.0` | `mean HRC-MAE across policies: 0.0334` | 0.0334433333 |
+| scan/protected-hot generator | `hot=128 scan=512 hot_mult=1.6 zipf=.6` | `mean HRC-MAE across policies: 0.0407` | 0.0406503333 |
+
+None beats the promoted Tencent seed-42 row `0.0330030000`; no multi-seed
+promotion. The negative is useful: matching Tencent's heavy frequency head
+alone damages the large-cache surface, and a naive scan/protected-hot two-state
+process gets the ARC/CAR-vs-LRU separation but loses SIEVE/SLRU or large-cache
+shape. The next Tencent push should either mix policy-specialized generators at
+the chunk/process level or fit a richer hidden-state object process; do not
+spend more time on global count-law rewrites around this atlas.
