@@ -2635,3 +2635,33 @@ Four-seed replay mean: `0.0000000000`, range `0.0000000000`. Four-seed
 shuffle mean: `0.0000385000`, range `0.0000170333`. This closes LLNL's
 Wikipedia bootstrap-only publication advantage; no Wikipedia generative claim
 is made here.
+
+## Wikipedia Generative Entry (2026-05-03)
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/wiki_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 3 Wikipedia oracleGeneral files, 74,722 records total, h96, phase2,
+time4/size4, 600 epochs, seed137, `cond_noise_std=0.05`.
+
+Promoted recipe: forced phase, `condition_from_real_manifest`,
+`transition_blend=1.0`, `local_prob_power=0.9`, `stack_rank_scale=1.0`,
+`stack_adj_dup_prob=0.10`, `stack_hot_pool_prob=0.10`,
+`stack_hot_pool_k=50`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.05`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.05`, `stack_tail_reuse_min_frac=0.5`, 1M rows,
+4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`.
+
+| seed | literal cachesim mean line | JSON mean |
+|---:|---|---:|
+| 42 | `mean HRC-MAE across policies: 0.0231` | 0.0231457667 |
+| 80 | `mean HRC-MAE across policies: 0.0234` | 0.0234062667 |
+| 81 | `mean HRC-MAE across policies: 0.0233` | 0.0232733000 |
+| 82 | `mean HRC-MAE across policies: 0.0234` | 0.0233661667 |
+
+Four-seed mean: `0.0232978750`, range `0.0002605000`. This is LANL's first
+non-bootstrap Wikipedia generative entry. Seed-42 negatives: MSR base
+`0.0475276000`, Twitter-hot `0.0591933333`, Meta KV drop `0.0721116333`,
+Meta CDN low drop `0.0747371333`, rank-PMF `0.0304813333`. The live Wiki
+shape is low-admission/low-adj with rank scale 1.0; stronger head reuse makes
+the small-cache HRC too low and the large-cache adaptive policies too high.

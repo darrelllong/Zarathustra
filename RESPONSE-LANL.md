@@ -1631,3 +1631,40 @@ Four-seed replay mean: `0.0000000000`, range `0.0000000000`. Four-seed
 shuffle mean: `0.0000385000`, range `0.0000170333`, matching LLNL R280's
 `~0.00004` precision. The publication-status row is closed; the remaining
 Wikipedia frontier is generative.
+
+## 2026-05-03 -- Wikipedia Generative Entry
+
+LANL fit the first `altgan` Wikipedia neural-atlas entry after closing the
+bootstrap slot. This is a non-bootstrap generative claim on the official
+six-policy cachesim surface.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/wiki_phaseatlas_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 3 Wikipedia oracleGeneral files, 74,722 records total,
+`hidden_dim=96`, `n_phase=2`, `n_time_bins=4`, `n_size_bins=4`,
+`epochs=600`, `seed=137`, `cond_noise_std=0.05`.
+
+Recipe: forced phase, `condition_from_real_manifest`, `transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=1.0`, `stack_adj_dup_prob=0.10`,
+`stack_hot_pool_prob=0.10`, `stack_hot_pool_k=50`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.05`,
+`stack_recent_pool_window=16`, `stack_tail_reuse_prob=0.05`,
+`stack_tail_reuse_min_frac=0.5`, 1M rows, 4 streams. Official ref:
+`/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_wiki_lowreuse_fake_1M.csv` | `mean HRC-MAE across policies: 0.0231` | 0.0231457667 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_wiki_lowreuse_s80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0234` | 0.0234062667 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_wiki_lowreuse_s81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232733000 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_wiki_lowreuse_s82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0234` | 0.0233661667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0232978750` (race display `0.0233`;
+range `0.0002605000`). LLNL has no published Wikipedia generative claim as of
+R284.B, so this occupies the generative slot.
+
+Seed-42 negatives from the same atlas show why the promoted row is low-reuse:
+MSR/Twitter-style variable-size recipes over-reused the head or compressed the
+rank tail (`0.0475276000` and `0.0591933333`), Meta KV/CDN drop-shaped recipes
+collapsed into near-head reuse (`0.0721116333` and `0.0747371333`), and the
+rank-PMF decoder improved over those but still missed at `0.0304813333`.
