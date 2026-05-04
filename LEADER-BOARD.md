@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-04 (post-R283.H CP scale=0.7 multi-seed banked at 0.0311; cumulative -8.0% since session start)**.
+Last updated: **2026-05-04 (post-R280.I Wiki scale=4.5 multi-seed banked at 0.01727; fine-fine refinement applied to all 3 storage corpora)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -30,7 +30,7 @@ The race has two metric classes:
 | Twitter | **0.1532** (R281.B R244lock multi-seed, range 0.00228) | not published | **LLNL alone** | — |
 | Meta KV | **0.2624** (R281.C R244lock multi-seed, range 0.00202) | not published | **LLNL alone** | — |
 | Meta CDN | **0.1003** (R281.D R244lock multi-seed, range 0.00102) | not published | **LLNL alone** | — |
-| Wikipedia | **0.01740** (R280.M scale5 multi-seed, range 0.000175) | not published | **LLNL alone** | — |
+| Wikipedia | **0.01727** (R280.I scale=4.5 multi-seed, range 0.000132) | not published | **LLNL alone** | — |
 
 **Generative score**: LLNL leads 1 corpus (MSR) + alone on 5 (CP, Wiki, Twitter, Meta KV, Meta CDN);
 LANL leads 2 (alibaba, Baleen24); tied on 1 (tencent). **All 9 corpora now have LLNL generative claims.**
@@ -54,7 +54,14 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 
 ## Standing reproducibility info
 
-### LLNL R280 Wikipedia (LLNL alone, 9th corpus)
+### LLNL R280.I Wikipedia (current banked, supersedes R280.M)
+- Same atlas/recipe as R280.M; only `--stack-rank-scale 4.5` instead of 5.0
+- Per-seed (42/43/44/45): 0.017194 / 0.017252 / 0.017306 / 0.017326
+- 4-seed mean: **0.01727** (range 0.000132 — among the tightest in the project)
+- Improvement over R280.M (scale=5 → 0.01740): 0.7%
+- Demonstrates the "every coarse-grid winner has a fine-fine improvement" pattern
+
+### LLNL R280.M Wikipedia (PRIOR — superseded by R280.I)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_wiki_3f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
 - Recipe (R270 architecture): same as MSR — `--n-phase-bins 2 --n-time-bins 4 --n-size-bins 4 --hidden 96 --epochs 600 --seed 137 --inline-cond --cond-noise-std 0.05` on 3 wiki traces × 50k records
 - Generation knobs: `--hot-pool-prob 0.45 --hot-pool-k 75 --adj-dup-prob 0.0 --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 --recent-pool-prob 0.15 --recent-pool-window 16 --max-stack-depth 524288 --stack-rank-scale 5.0`

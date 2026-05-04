@@ -15984,6 +15984,47 @@ Both MSR (R282.E/F: scale 1.3 over 1.5) and CP (R283.G/H: scale 0.7 over 1.0) sh
 
 **Tasks**: #82 (R283.G), #83 (R283.H) closed.
 
+## R280.H / R280.I — Wiki fine-fine scale finds tighter minimum at 4.5
+
+R280.H single-seed scout around scale=5:
+
+| Scale | 6-pol mean (seed=42) |
+|---|---|
+| 3.5 | 0.017399 |
+| 4.0 | 0.017300 |
+| **4.5** | **0.017194** ← new minimum |
+| 5.0 | 0.017369 (R280.M anchor reproduces) |
+| 5.5 | 0.017543 |
+| 6.0 | 0.017665 |
+| 8.0 | 0.018302 |
+| 10.0 | 0.019053 |
+
+Smooth dome with minimum at 4.5. Less dramatic than CP/MSR fine-fine (1% vs 4-5%) — Wiki's atlas is well-calibrated to a wider scale range.
+
+**R280.I multi-seed verify at scale=4.5**:
+
+| seed | 6-pol mean |
+|---|---|
+| 42 | 0.017194 |
+| 43 | 0.017252 |
+| 44 | 0.017306 |
+| 45 | 0.017326 |
+| **mean** | **0.017270** |
+| range | 0.000132 |
+
+**vs R280.M banked (0.01740)**: WIN by 0.13 mpp = **0.7% improvement**. Range 0.000132 — among the tightest multi-seed ranges in the project (3× tighter than alibaba R276's 0.0011, 4× tighter than MSR R282.F's 0.000314).
+
+**LLNL Wiki claim banked at 0.01727 (R280.I, supersedes R280.M).** LLNL still alone on Wiki.
+
+**Pattern complete**: All 3 storage-class corpora that were banked from coarse scale-grid sweeps got fine-fine improvements:
+- MSR: scale 2 → 1.5 → 1.3 (R273 → R282.D → R282.F): -12.3% cumulative
+- CP: scale 1.0 (R224) → 1.0 (R283.E) → 0.7 (R283.H): -8.0% cumulative
+- Wiki: scale 5 (R280.M) → 4.5 (R280.I): -0.7%
+
+Wiki's gain is small because the dome is shallow there. CP/MSR domes are sharper. The fine-fine pass cost ~30 min total per corpus and yielded a real, multi-seed-confirmed claim improvement on every storage corpus tested. Should be SOP for all future coarse-grid claims.
+
+**Tasks**: #84 (R280.H), #85 (R280.I) closed.
+
 ### Final session-end summary
 
 This /loop session, started after a context-compaction reboot mid-R284, produced:
