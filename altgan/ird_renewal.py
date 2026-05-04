@@ -10,6 +10,7 @@ not copied real IDs.
 from __future__ import annotations
 
 import argparse
+import copy
 import heapq
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +82,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
+    p.add_argument("--per-stream", action="store_true",
+                   help="Fit one renewal profile per stream and interleave using a stream schedule.")
+    p.add_argument("--stream-sequence-mode", choices=("sequence", "sample"), default="sequence",
+                   help="Per-stream mode: repeat the fitted stream order or sample stream IDs by frequency.")
     p.add_argument("--zero-ts", action="store_true",
                    help="Write ts=0 for every row instead of monotone synthetic ticks.")
     p.add_argument("--progress-interval", type=int, default=200_000)
@@ -90,8 +95,12 @@ def _parse_args() -> argparse.Namespace:
 def fit_profile(path: Path, fit_rows: int = 0, ird_quantile_max: float = 1.0) -> RenewalProfile:
     nrows = fit_rows if fit_rows and fit_rows > 0 else None
     df = pd.read_csv(path, nrows=nrows)
+    return fit_profile_from_df(df, ird_quantile_max)
+
+
+def fit_profile_from_df(df: pd.DataFrame, ird_quantile_max: float = 1.0) -> RenewalProfile:
     if "obj_id" not in df.columns:
-        raise ValueError(f"{path} is missing obj_id")
+        raise ValueError("input frame is missing obj_id")
     codes, _ = pd.factorize(df["obj_id"], sort=False)
     codes = codes.astype(np.int64, copy=False)
     counts_by_code = np.bincount(codes)
@@ -128,7 +137,7 @@ def fit_profile(path: Path, fit_rows: int = 0, ird_quantile_max: float = 1.0) ->
         sizes=_column_or_default(df, "obj_size", 1).astype(np.int64, copy=False),
         opcodes=_column_or_default(df, "opcode", 0).astype(np.int64, copy=False),
         tenants=_column_or_default(df, "tenant", 0).astype(np.int64, copy=False),
-        streams=_column_or_default(df, "stream_id", 0).astype(np.int64, copy=False),
+        streams=_stream_values(df).astype(np.int64, copy=False),
     )
 
 
@@ -295,10 +304,89 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     return df
 
 
+def generate_per_stream(path: Path, args: argparse.Namespace) -> pd.DataFrame:
+    nrows = args.fit_rows if args.fit_rows and args.fit_rows > 0 else None
+    df = pd.read_csv(path, nrows=nrows)
+    streams = _stream_values(df).astype(np.int64, copy=False)
+    stream_schedule = _stream_schedule(streams, int(args.n_records), args.stream_sequence_mode, args.seed)
+    stream_ids, stream_counts = np.unique(stream_schedule, return_counts=True)
+    frames: dict[int, pd.DataFrame] = {}
+    cursors: dict[int, int] = {}
+    for stream_id, count in zip(stream_ids, stream_counts, strict=False):
+        sdf = df[streams == int(stream_id)].copy()
+        if sdf.empty:
+            continue
+        sargs = copy.copy(args)
+        sargs.n_records = int(count)
+        sargs.preserve_streams = True
+        profile = fit_profile_from_df(sdf, args.ird_quantile_max)
+        frames[int(stream_id)] = generate(profile, sargs)
+        cursors[int(stream_id)] = 0
+
+    first = next(iter(frames.values()), None)
+    if first is None:
+        raise RuntimeError("per-stream renewal had no fitted stream profiles")
+    columns = list(first.columns)
+    frame_arrays = {
+        sid: {col: frame[col].to_numpy(copy=False) for col in columns}
+        for sid, frame in frames.items()
+    }
+    out_arrays = {
+        col: np.empty(int(args.n_records), dtype=first[col].to_numpy(copy=False).dtype)
+        for col in columns
+    }
+    out_pos = 0
+    for stream_id in stream_schedule:
+        sid = int(stream_id)
+        arrays = frame_arrays.get(sid)
+        if arrays is None:
+            continue
+        cursor = cursors[sid]
+        if cursor >= len(arrays[columns[0]]):
+            continue
+        for col in columns:
+            out_arrays[col][out_pos] = arrays[col][cursor]
+        cursors[sid] = cursor + 1
+        out_pos += 1
+    if out_pos != int(args.n_records):
+        raise RuntimeError(f"per-stream renewal produced {out_pos} rows, expected {args.n_records}")
+    out = pd.DataFrame(out_arrays)
+    out["ts"] = (
+        np.zeros(len(out), dtype=np.int64)
+        if args.zero_ts
+        else np.arange(len(out), dtype=np.int64)
+    )
+    return out
+
+
 def _column_or_default(df: pd.DataFrame, name: str, default: int) -> np.ndarray:
     if name in df.columns:
         return df[name].fillna(default).to_numpy()
     return np.full(len(df), default)
+
+
+def _stream_values(df: pd.DataFrame) -> np.ndarray:
+    for name in ("stream_id", "stream", "tenant"):
+        if name in df.columns:
+            return df[name].fillna(0).to_numpy()
+    return np.zeros(len(df), dtype=np.int64)
+
+
+def _stream_schedule(
+    streams: np.ndarray,
+    n_records: int,
+    mode: str,
+    seed: int,
+) -> np.ndarray:
+    if len(streams) == 0:
+        return np.zeros(n_records, dtype=np.int64)
+    if mode == "sample":
+        rng = np.random.default_rng(seed + 1_000_003)
+        stream_ids, counts = np.unique(streams, return_counts=True)
+        probs = counts.astype(np.float64) / max(float(counts.sum()), 1.0)
+        return rng.choice(stream_ids, size=n_records, replace=True, p=probs).astype(np.int64, copy=False)
+    reps = int(np.ceil(n_records / max(len(streams), 1)))
+    return np.tile(streams.astype(np.int64, copy=False), reps)[:n_records]
 
 
 def _scaled_counts(source_counts: np.ndarray, n_records: int, rng: np.random.Generator) -> np.ndarray:
@@ -375,14 +463,18 @@ def _make_marks(profile: RenewalProfile, args: argparse.Namespace, rng: np.rando
 
 def main() -> int:
     args = _parse_args()
-    profile = fit_profile(Path(args.real), args.fit_rows, args.ird_quantile_max)
-    print(
-        "[altgan.ird_renewal] fitted "
-        f"rows={profile.source_rows} footprint={profile.footprint} "
-        f"reuse_fraction={profile.reuse_fraction:.6f} irds={len(profile.irds)}",
-        flush=True,
-    )
-    fake = generate(profile, args)
+    if args.per_stream:
+        print("[altgan.ird_renewal] fitting per-stream renewal profiles", flush=True)
+        fake = generate_per_stream(Path(args.real), args)
+    else:
+        profile = fit_profile(Path(args.real), args.fit_rows, args.ird_quantile_max)
+        print(
+            "[altgan.ird_renewal] fitted "
+            f"rows={profile.source_rows} footprint={profile.footprint} "
+            f"reuse_fraction={profile.reuse_fraction:.6f} irds={len(profile.irds)}",
+            flush=True,
+        )
+        fake = generate(profile, args)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     fake.to_csv(out, index=False)
