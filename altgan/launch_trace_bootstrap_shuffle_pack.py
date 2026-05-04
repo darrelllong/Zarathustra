@@ -80,6 +80,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Forward `--emit-markdown` to the underlying multi-seed runner.",
     )
+    p.add_argument(
+        "--keep-going",
+        action="store_true",
+        help="Continue other corpora if one fails; report failures at the end.",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -91,6 +96,7 @@ def main() -> int:
     if unknown:
         raise SystemExit(f"Unknown corpora: {unknown}. Choices: {sorted(_PRESETS)}")
 
+    failures: list[tuple[str, int]] = []
     for corpus in corpora:
         preset = _PRESETS[corpus]
         cmd = [
@@ -140,7 +146,15 @@ def main() -> int:
                 file=sys.stderr,
                 flush=True,
             )
-            return int(e.returncode)
+            if not args.keep_going:
+                return int(e.returncode)
+            failures.append((corpus, int(e.returncode)))
+
+    if failures:
+        print("\n[error] TraceBootstrap shuffle pack failures:", file=sys.stderr, flush=True)
+        for corpus, code in failures:
+            print(f"- {corpus}: exit {code}", file=sys.stderr, flush=True)
+        return failures[0][1] if failures[0][1] != 0 else 1
 
     return 0
 
