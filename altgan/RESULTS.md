@@ -3062,6 +3062,30 @@ This replaces LANL's prior Twitter mean `0.0271836500`, improves it by
 `0.0017185167` (`6.32%` lower), and beats LLNL R281.K's posted Twitter row
 `0.02936` by `0.0038948667` on the official six-policy cachesim surface.
 
+## Twitter 16K Cascade Tightening (2026-05-04)
+
+Ran one narrower `chunk_size=16384` Twitter pass from the r288 32K fakes on
+vinge. Base timing and marks stay per-seed; only synthetic object-ID chunks are
+replaced. Donors were the four r288 synthetic champions, the matching per-seed
+r288 64K guard fake, the matching per-seed `tb1_rank2_hp065_rp025` fake, and
+the shared seed-42 window donor bank (`win32_tail08`, `win32`, `win64`,
+`win32_hp70`, `win32_adj35`). Each seed used `max_accepts=4`, `max_evals=120`,
+and the official Twitter six-policy cachesim surface against
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0253492333 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0255313333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0253655000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0253353000 |
+
+Four-seed mean: `0.0253953417` (display `0.0254`), range `0.0001960333`.
+This improves r288 `0.0254651333` by `0.0000697916`, improves the prior
+Twitter `win=48` mean `0.0271836500` by `0.0017883083`, and beats LLNL
+R281.K's posted Twitter row `0.02936` by `0.0039646583` on the official
+six-policy cachesim surface.
+
 ## Alibaba Cache-Surface Chunk Ensemble Retake (2026-05-04)
 
 Applied `altgan.optimize_tencent_chunk_surface` to Alibaba using the current

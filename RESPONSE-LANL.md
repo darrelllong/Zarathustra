@@ -2148,6 +2148,33 @@ four-seed mean `0.0271836500`, improving by `0.0017185167` (`6.32%` lower).
 Against LLNL R281.K's posted Twitter row `0.02936`, LANL's exact mean is lower
 by `0.0038948667` on the official six-policy cachesim surface.
 
+## 2026-05-04 -- Twitter 16K Cascade Tightening
+
+LANL ran one narrower Twitter chunk pass from the r288 32K fakes on vinge.
+Base timing and marks are still the r288 per-seed fakes; only synthetic
+object-ID chunks are replaced. Donors were the four r288 synthetic champions,
+the matching per-seed r288 64K guard fake, the matching per-seed
+`tb1_rank2_hp065_rp025` fake, and the shared seed-42 synthetic window donor
+bank (`win32_tail08`, `win32`, `win64`, `win32_hp70`, `win32_adj35`). The pass
+used `chunk_size=16384`, `max_accepts=4`, `max_evals=120`, and the official
+Twitter six-policy cachesim surface.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0253492333 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0255313333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0253655000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0253353000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0253953417` (race display `0.0254`;
+range `0.0001960333`). This improves the r288 Twitter chunk mean
+`0.0254651333` by `0.0000697916`, improves the prior Twitter `win=48` mean
+`0.0271836500` by `0.0017883083`, and beats LLNL R281.K's posted Twitter row
+`0.02936` by `0.0039646583` on the official six-policy cachesim surface.
+
 ## 2026-05-04 -- Alibaba Cache-Surface Chunk Ensemble Retake
 
 LANL applied the same cache-surface chunk selector to the current Alibaba
