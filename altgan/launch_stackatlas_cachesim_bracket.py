@@ -39,6 +39,9 @@ class Spec:
     rank_pmf_feedback_alpha: float = 32.0
     rank_pmf_guard_prob: float = 0.0
     rank_pmf_guard_strength: float = 1.0
+    footprint_target_real: int = 0
+    footprint_feedback_strength: float = 0.0
+    footprint_feedback_deadband: float = 0.02
     adj_dup_prob: float = 0.0
     adj_dup_position_probs: str = ""
     adj_dup_min_rank: int = 0
@@ -148,6 +151,12 @@ def _parse_spec(text: str) -> Spec:
         "rpmfg": "rank_pmf_guard_prob",
         "rpmfguardstrength": "rank_pmf_guard_strength",
         "rpmfgs": "rank_pmf_guard_strength",
+        "footprint": "footprint_target_real",
+        "ftarget": "footprint_target_real",
+        "ffb": "footprint_feedback_strength",
+        "footfb": "footprint_feedback_strength",
+        "fdb": "footprint_feedback_deadband",
+        "footdead": "footprint_feedback_deadband",
         "adj": "adj_dup_prob",
         "adj_pos": "adj_dup_position_probs",
         "adjpos": "adj_dup_position_probs",
@@ -295,6 +304,7 @@ def _auto_name(spec: Spec) -> str:
         f"tgt{spec.rank_pmf_target_real}b{_tag(spec.rank_pmf_target_blend)}"
         f"fb{_tag(spec.rank_pmf_feedback_strength)}"
         f"g{_tag(spec.rank_pmf_guard_prob)}gs{_tag(spec.rank_pmf_guard_strength)}"
+        f"ft{spec.footprint_target_real}f{_tag(spec.footprint_feedback_strength)}"
         f"_adj{_tag(spec.adj_dup_prob)}"
         f"_rb{_tag(spec.rank_band_reuse_prob)}"
         f"_hp{_tag(spec.hot_pool_prob)}k{spec.hot_pool_k}"
@@ -404,6 +414,10 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_pmf_guard_prob),
         "--stack-rank-pmf-guard-strength",
         str(spec.rank_pmf_guard_strength),
+        "--stack-footprint-feedback-strength",
+        str(spec.footprint_feedback_strength),
+        "--stack-footprint-feedback-deadband",
+        str(spec.footprint_feedback_deadband),
         "--stack-adj-dup-prob",
         str(spec.adj_dup_prob),
         "--stack-adj-dup-position-probs",
@@ -536,6 +550,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         ])
     if spec.rank_pmf_target_real > 0:
         cmd.append("--stack-rank-pmf-target-real")
+    if spec.footprint_target_real > 0:
+        cmd.append("--stack-footprint-target-real")
     if spec.delayed_reuse_schedule_reuses > 0:
         cmd.append("--stack-delayed-reuse-schedule-reuses")
     if args.force_phase:

@@ -87,6 +87,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Probability of redirecting overproduced reuse-rank bins through online PMF feedback.")
     p.add_argument("--stack-rank-pmf-guard-strength", type=float, default=1.0,
                    help="Correction strength used when the route-level rank-PMF guard redirects a reuse.")
+    p.add_argument("--stack-footprint-target-real", action="store_true",
+                   help="Use real-manifest per-stream cumulative footprints as generation targets.")
+    p.add_argument("--stack-footprint-feedback-strength", type=float, default=0.0,
+                   help="Controller strength for matching per-stream footprint growth.")
+    p.add_argument("--stack-footprint-feedback-deadband", type=float, default=0.02,
+                   help="Relative footprint error ignored by the footprint controller.")
     p.add_argument("--stack-reuse-boost-prob", type=float, default=0.0,
                    help="Probability of converting a sampled NEW event into a reuse when the stack is nonempty.")
     p.add_argument("--stack-reuse-boost-min-rank", type=int, default=0,
@@ -278,6 +284,11 @@ def main() -> int:
             model,
             blend=args.stack_rank_pmf_target_blend,
         )
+    footprint_target_curves = (
+        _footprint_target_curves(real_df, args.n_streams)
+        if args.stack_footprint_target_real
+        else None
+    )
 
     saved_mark_model = getattr(model, "mark_model", None)
     if args.disable_neural_marks:
@@ -310,6 +321,9 @@ def main() -> int:
         stack_rank_pmf_feedback_alpha=args.stack_rank_pmf_feedback_alpha,
         stack_rank_pmf_guard_prob=args.stack_rank_pmf_guard_prob,
         stack_rank_pmf_guard_strength=args.stack_rank_pmf_guard_strength,
+        stack_footprint_target_curves=footprint_target_curves,
+        stack_footprint_feedback_strength=args.stack_footprint_feedback_strength,
+        stack_footprint_feedback_deadband=args.stack_footprint_feedback_deadband,
         stack_reuse_boost_prob=args.stack_reuse_boost_prob,
         stack_reuse_boost_min_rank=args.stack_reuse_boost_min_rank,
         stack_reuse_boost_rank_power=args.stack_reuse_boost_rank_power,
@@ -446,6 +460,10 @@ def main() -> int:
         "stack_rank_pmf_feedback_alpha": args.stack_rank_pmf_feedback_alpha,
         "stack_rank_pmf_guard_prob": args.stack_rank_pmf_guard_prob,
         "stack_rank_pmf_guard_strength": args.stack_rank_pmf_guard_strength,
+        "stack_footprint_target_real": args.stack_footprint_target_real,
+        "stack_footprint_feedback_strength": args.stack_footprint_feedback_strength,
+        "stack_footprint_feedback_deadband": args.stack_footprint_feedback_deadband,
+        "stack_footprint_target_curves": footprint_target_curves,
         "stack_reuse_boost_prob": args.stack_reuse_boost_prob,
         "stack_reuse_boost_min_rank": args.stack_reuse_boost_min_rank,
         "stack_reuse_boost_rank_power": args.stack_reuse_boost_rank_power,
@@ -565,6 +583,31 @@ def _source_names_from_manifest(manifest: dict) -> list[str]:
             continue
         names.append(Path(entries[0]["path"]).name)
     return names
+
+
+def _footprint_target_curves(real_df, n_streams: int, n_bins: int = 10) -> list[list[int]]:
+    curves: list[list[int]] = []
+    if "stream_id" in real_df.columns:
+        grouped = {int(k): g for k, g in real_df.groupby("stream_id", sort=False)}
+    else:
+        grouped = {0: real_df}
+    for stream_id in range(max(int(n_streams), 0)):
+        stream_df = grouped.get(stream_id)
+        if stream_df is None or len(stream_df) == 0:
+            curves.append([])
+            continue
+        obj_ids = stream_df["obj_id"].to_numpy()
+        seen = set()
+        curve = [0]
+        start = 0
+        for bin_idx in range(1, max(int(n_bins), 1) + 1):
+            end = int(round(len(obj_ids) * bin_idx / max(int(n_bins), 1)))
+            for obj_id in obj_ids[start:end]:
+                seen.add(obj_id)
+            curve.append(len(seen))
+            start = end
+        curves.append(curve)
+    return curves
 
 
 def _lookup_cond(cond_lookup: dict, name_or_path: str, cond_dim: int) -> np.ndarray:

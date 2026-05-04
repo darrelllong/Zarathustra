@@ -106,6 +106,9 @@ class NeuralAtlasModel:
         stack_rank_pmf_feedback_alpha: float = 32.0,
         stack_rank_pmf_guard_prob: float = 0.0,
         stack_rank_pmf_guard_strength: float = 1.0,
+        stack_footprint_target_curves: Sequence[Sequence[int]] | None = None,
+        stack_footprint_feedback_strength: float = 0.0,
+        stack_footprint_feedback_deadband: float = 0.02,
         stack_reuse_boost_prob: float = 0.0,
         stack_reuse_boost_min_rank: int = 0,
         stack_reuse_boost_rank_power: float = 1.0,
@@ -207,6 +210,12 @@ class NeuralAtlasModel:
         stack_rank_pmf_feedback_alpha = max(float(stack_rank_pmf_feedback_alpha), 0.0)
         stack_rank_pmf_guard_prob = float(np.clip(stack_rank_pmf_guard_prob, 0.0, 1.0))
         stack_rank_pmf_guard_strength = max(float(stack_rank_pmf_guard_strength), 0.0)
+        footprint_target_curves = _normalize_footprint_curves(
+            stack_footprint_target_curves,
+            n_streams,
+        )
+        stack_footprint_feedback_strength = max(float(stack_footprint_feedback_strength), 0.0)
+        stack_footprint_feedback_deadband = max(float(stack_footprint_feedback_deadband), 0.0)
         if stack_rank_tail_pivot is not None and stack_rank_tail_pivot < 0:
             stack_rank_tail_pivot = None
         stack_reuse_boost_prob = float(np.clip(stack_reuse_boost_prob, 0.0, 1.0))
@@ -362,6 +371,7 @@ class NeuralAtlasModel:
             delayed_ready: deque[int] = deque()
             delayed_pending = 0
             recent_window: deque[int] = deque(maxlen=stack_recent_pool_window)
+            footprint_curve = footprint_target_curves[stream_id]
 
             for pos in range(per_stream):
                 due_now = delayed_due.pop(pos, None)
@@ -455,6 +465,33 @@ class NeuralAtlasModel:
                 )
                 if boosted_reuse:
                     wants_reuse = True
+                if stack_footprint_feedback_strength > 0.0 and footprint_curve:
+                    target_footprint = _position_curve_value(footprint_curve, pos, per_stream)
+                    if target_footprint is not None and target_footprint > 0:
+                        pressure = (len(stack) - target_footprint) / max(target_footprint, 1)
+                        deadband = stack_footprint_feedback_deadband
+                        if wants_reuse and pressure < -deadband:
+                            prob = min(
+                                stack_footprint_feedback_strength * (-pressure - deadband),
+                                1.0,
+                            )
+                            if rng.random() < prob:
+                                wants_reuse = False
+                                boosted_reuse = False
+                                dropped_reuse = True
+                        elif (
+                            not wants_reuse
+                            and not dropped_reuse
+                            and bool(stack)
+                            and pressure > deadband
+                        ):
+                            prob = min(
+                                stack_footprint_feedback_strength * (pressure - deadband),
+                                1.0,
+                            )
+                            if rng.random() < prob:
+                                wants_reuse = True
+                                boosted_reuse = True
                 if wants_reuse and stack:
                     if tail_reuse_prob > 0.0 and rng.random() < tail_reuse_prob:
                         lo = max(int(len(stack) * stack_tail_reuse_min_frac), len(stack) // 2)
@@ -1923,6 +1960,34 @@ def _position_value(values: Sequence[float] | None, pos: int, per_stream: int, d
     idx = int(int(pos) * len(values) / max(int(per_stream), 1))
     idx = min(max(idx, 0), len(values) - 1)
     return float(values[idx])
+
+
+def _position_curve_value(values: Sequence[int], pos: int, per_stream: int) -> int | None:
+    if not values:
+        return None
+    if len(values) == 1:
+        return max(int(values[0]), 0)
+    progress = min(max((int(pos) + 1) / max(int(per_stream), 1), 0.0), 1.0)
+    scaled = progress * (len(values) - 1)
+    lo = int(np.floor(scaled))
+    hi = min(lo + 1, len(values) - 1)
+    frac = float(scaled - lo)
+    target = (1.0 - frac) * float(values[lo]) + frac * float(values[hi])
+    return max(int(round(target)), 0)
+
+
+def _normalize_footprint_curves(
+    curves: Sequence[Sequence[int]] | None,
+    n_streams: int,
+) -> list[list[int]]:
+    out: list[list[int]] = []
+    for idx in range(max(int(n_streams), 0)):
+        if curves is None or idx >= len(curves):
+            out.append([])
+            continue
+        curve = [max(int(x), 0) for x in curves[idx]]
+        out.append(curve)
+    return out
 
 
 def _clip_prob_list(values: Sequence[float] | None) -> list[float]:
