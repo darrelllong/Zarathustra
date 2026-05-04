@@ -2434,3 +2434,24 @@ negative:
 The current CP frontier is therefore not a file-local PMF or long-memory hot-set
 problem. Best non-bootstrap CP remains the global rank-PMF four-seed mean
 `0.0355223281`, still behind LLNL `0.0338`.
+
+## CloudPhysics Persistent Anchor-Pool Negative (2026-05-03)
+
+Implemented persistent promoted-object anchors in `b184a1a`. Unlike the sliding
+hot pool and generated-count frequency pool, anchors are an explicit durable
+identity set with age/rank gates. The goal was to match CP's real heavy-hitter
+identity persistence without changing the trained atlas.
+
+Seed-42 official 8-policy results on
+`/tiamat/zarathustra/checkpoints/altgan/cloudphysics_rankpmf_lcs96x25k_h64_phase1_t4s4_e600_seed137.pkl.gz`:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| anchor light: `ap=0.02`, `k=512`, age/rank `32..32768` | `mean HRC-MAE across policies: 0.0367` | 0.0366531667 | 0.1047451667 | 0.0673445000 |
+| anchor mid: `ap=0.05`, `k=512`, age/rank `64..65536` | `mean HRC-MAE across policies: 0.0380` | 0.0379836458 | 0.1115808333 | 0.0655595000 |
+| anchor deep: `ap=0.08`, `k=1024`, age/rank `128`, `512..131072` | `mean HRC-MAE across policies: 0.0410` | 0.0409794375 | 0.1068363333 | 0.0708028333 |
+| anchor plus lower adjacent pressure: `adj=0.10`, `ap=0.06` | `mean HRC-MAE across policies: 0.0403` | 0.0402951042 | 0.0883876667 | 0.0826723333 |
+
+Anchor persistence is not the missing CP architecture in this decoder. It can
+push LFU or LIRS independently, but the joint 8-policy mean moves away from the
+standing global rank-PMF result.

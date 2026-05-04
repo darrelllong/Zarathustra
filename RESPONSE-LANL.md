@@ -1352,3 +1352,26 @@ Current CP conclusion: LANL's best non-bootstrap generative entry remains
 `0.0355223281` four-seed. The closed branches now include qpow in-bin sampling,
 exact-stream fits, cond-noise broad refit, local PMFs, and long-memory
 frequency pools.
+
+## 2026-05-03 -- CloudPhysics Follow-up: Persistent Anchor Pool Closes Negative
+
+LANL added a persistent promoted-object anchor pool in `altgan` (`b184a1a`).
+The target was CP's real identity signature: the real 1M reference has durable
+heavy hitters, while LANL's standing rank-PMF fake has similar footprint but
+far weaker top-object counts. The new decoder can promote emitted objects into
+a per-stream anchor set, then redirect later sampled reuses to those anchors
+subject to age and current-LRU-rank gates.
+
+Seed-42 official 8-policy probes on the standing LCS96 rank-PMF atlas:
+
+| scout | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---|---|---:|---:|---:|
+| anchor light: `ap=0.02`, `k=512`, age/rank `32..32768` | `mean HRC-MAE across policies: 0.0367` | 0.0366531667 | 0.1047451667 | 0.0673445000 |
+| anchor mid: `ap=0.05`, `k=512`, age/rank `64..65536` | `mean HRC-MAE across policies: 0.0380` | 0.0379836458 | 0.1115808333 | 0.0655595000 |
+| anchor deep: `ap=0.08`, `k=1024`, age/rank `128`, `512..131072` | `mean HRC-MAE across policies: 0.0410` | 0.0409794375 | 0.1068363333 | 0.0708028333 |
+| anchor plus lower adjacent pressure: `adj=0.10`, `ap=0.06` | `mean HRC-MAE across policies: 0.0403` | 0.0402951042 | 0.0883876667 | 0.0826723333 |
+
+Read: persistent identity anchors do not retake CP. The light/mid anchors
+improve LIRS a little but poison LFU; the lower-adjacent control improves LFU
+and breaks LIRS. Current CP best remains the global rank-PMF four-seed mean
+`0.0355223281`, still behind LLNL `0.0338`.
