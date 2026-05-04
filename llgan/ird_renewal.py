@@ -82,14 +82,19 @@ def sample_ird(rng: np.random.Generator, edges: np.ndarray, probs: np.ndarray) -
 
 def generate_ird_renewal(real_obj_ids, real_sizes, n_records: int, seed: int = 42,
                          ird_buckets: int = 32, independent_prob: float = 0.10,
-                         rank_ird_buckets: int = 0, stack_cap: int = 0):
+                         rank_ird_buckets: int = 0, stack_cap: int = 0,
+                         irm_mode: str = "fresh"):
     """Generate synthetic trace using empirical IRD + IRM renewal.
 
     Implementation maintains a virtual LRU stack as SortedList of timestamps.
     'Top' = largest timestamp. To pick at depth k: SortedList[len-1-k] (O(log n)).
 
     stack_cap: if > 0, evict LRU (oldest timestamp) when stack exceeds cap.
-    Use the real trace's working-set size for cap on bounded-WS workloads.
+    irm_mode: how to choose object on an "independent miss":
+        - "fresh": emit a brand-new synthetic ID (default; old behavior)
+        - "real_pool_freq": pick key from real trace, weighted by access frequency
+          (Zipf-like; matches real-trace IRM)
+        - "real_pool_uniform": pick key uniformly from real-trace key pool
     """
     rng = np.random.default_rng(seed)
 
@@ -99,6 +104,17 @@ def generate_ird_renewal(real_obj_ids, real_sizes, n_records: int, seed: int = 4
     sizes_real = real_sizes[real_sizes > 0]
     if len(sizes_real) == 0:
         sizes_real = np.array([4096])
+
+    # Build IRM pool from real trace.
+    real_pool: np.ndarray | None = None
+    real_pool_probs: np.ndarray | None = None
+    if irm_mode in ("real_pool_freq", "real_pool_uniform"):
+        unique_keys, counts = np.unique(real_obj_ids, return_counts=True)
+        real_pool = unique_keys
+        if irm_mode == "real_pool_freq":
+            real_pool_probs = counts.astype(np.float64) / counts.sum()
+        else:
+            real_pool_probs = np.full(len(unique_keys), 1.0 / len(unique_keys))
 
     rank_dists = None
     if rank_ird_buckets > 0:
@@ -130,8 +146,21 @@ def generate_ird_renewal(real_obj_ids, real_sizes, n_records: int, seed: int = 4
     for i in range(n_records):
         is_new = (len(timestamps) == 0) or (rng.random() < independent_prob)
         if is_new:
-            obj = next_new_id
-            next_new_id += np.uint64(1)
+            if real_pool is not None and real_pool_probs is not None:
+                # Sample from IRM pool. If sampled key is already in stack,
+                # treat as "warm hit" via stack lookup; otherwise inject fresh.
+                idx = rng.choice(len(real_pool), p=real_pool_probs)
+                obj = np.uint64(real_pool[idx])
+                # If obj is already on the stack, remove old timestamp first
+                # (this becomes a reuse, not a true insert).
+                if obj in ts_of_obj:
+                    old_ts = ts_of_obj[obj]
+                    if old_ts in obj_at_ts:
+                        timestamps.remove(old_ts)
+                        del obj_at_ts[old_ts]
+            else:
+                obj = next_new_id
+                next_new_id += np.uint64(1)
         else:
             if rank_dists is not None:
                 rank_idx = rng.integers(0, len(rank_dists))
@@ -181,6 +210,9 @@ def main():
     ap.add_argument("--stack-cap", type=int, default=0,
                     help="cap virtual LRU stack size (0 = unbounded). "
                          "Use real working-set size for bounded-WS workloads.")
+    ap.add_argument("--irm-mode", default="fresh",
+                    choices=["fresh", "real_pool_freq", "real_pool_uniform"],
+                    help="how to pick obj on independent miss")
     args = ap.parse_args()
 
     print(f"Loading real trace from {args.real} (max_rows={args.max_real_rows})", flush=True)
@@ -194,6 +226,7 @@ def main():
         obj_ids, obj_sizes, n_records=args.n, seed=args.seed,
         ird_buckets=args.ird_scale, independent_prob=args.independent_prob,
         rank_ird_buckets=args.rank_ird_buckets, stack_cap=args.stack_cap,
+        irm_mode=args.irm_mode,
     )
 
     print(f"Writing {len(out_ids):,} records → {args.output}", flush=True)
