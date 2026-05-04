@@ -1375,3 +1375,33 @@ Read: persistent identity anchors do not retake CP. The light/mid anchors
 improve LIRS a little but poison LFU; the lower-adjacent control improves LFU
 and breaks LIRS. Current CP best remains the global rank-PMF four-seed mean
 `0.0355223281`, still behind LLNL `0.0338`.
+
+## 2026-05-03 -- CloudPhysics Multi-Seed Update: Rank-PMF Feedback Improves LANL CP
+
+LANL added online rank-PMF feedback shaping in `altgan` (`2685867`). During
+generation, the decoder tracks emitted rank-PMF bins per state and reshapes the
+PMF branch away from bins already overproduced by adjacent/recent/tail routes.
+This is a small architecture lift, not a refit: same LCS96 rank-PMF atlas,
+same standing CP recipe, plus `stack_rank_pmf_feedback_strength=1.0` and
+`stack_rank_pmf_feedback_alpha=32`.
+
+Official CloudPhysics 8-policy command surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rpmffb10_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rpmffb10_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0354` | 0.0353670833 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rpmffb10_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0355` | 0.0354530208 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_lanl_cp_rpmffb10_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0353` | 0.0352951667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0353795990` (race display `0.0354`;
+range `0.0001578542`). This improves LANL's prior non-bootstrap CP best
+`0.0355223281` by `0.0001427292`, but LLNL still leads CP at `0.0338`.

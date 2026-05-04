@@ -2455,3 +2455,25 @@ Seed-42 official 8-policy results on
 Anchor persistence is not the missing CP architecture in this decoder. It can
 push LFU or LIRS independently, but the joint 8-policy mean moves away from the
 standing global rank-PMF result.
+
+## CloudPhysics Rank-PMF Feedback Multi-Seed Update (2026-05-03)
+
+Implemented online rank-PMF feedback shaping in `2685867`. The decoder tracks
+emitted rank bins per state and multiplicatively corrects the PMF branch toward
+the fitted per-state PMF when other reuse routes overproduce a bin. The winning
+CP setting is `stack_rank_pmf_feedback_strength=1.0`,
+`stack_rank_pmf_feedback_alpha=32` on the standing LCS96 rank-PMF atlas.
+
+| seed | literal cachesim mean line | JSON mean | LFU | LIRS |
+|---:|---|---:|---:|---:|
+| 42 | `mean HRC-MAE across policies: 0.0354` | 0.0354031250 | 0.0954860000 | 0.0691163333 |
+| 80 | `mean HRC-MAE across policies: 0.0354` | 0.0353670833 | 0.0952138333 | 0.0666363333 |
+| 81 | `mean HRC-MAE across policies: 0.0355` | 0.0354530208 | 0.0952008333 | 0.0694540000 |
+| 82 | `mean HRC-MAE across policies: 0.0353` | 0.0352951667 | 0.0950235000 | 0.0692613333 |
+
+Four-seed mean: `0.0353795990`, range `0.0001578542`. This replaces the prior
+LANL non-bootstrap CP best (`0.0355223281`) but remains behind LLNL `0.0338`.
+
+Seed-42 feedback scouts: strength `0.25` scored `0.0355257917`, strength
+`0.50` scored `0.0356408125`, strength `1.0` scored `0.0354031250`, and
+strength `0.50` with alpha `256` scored `0.0355570208`.
