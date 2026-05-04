@@ -60,6 +60,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--frequency-alpha", type=float, default=1.0,
                    help="Exponent applied to empirical object-count weights for IRM sampling.")
     p.add_argument("--ird-scale", type=float, default=1.0)
+    p.add_argument("--ird-tail-pivot", type=int, default=0,
+                   help="If >0, only IRDs above this raw distance get tail scaling.")
+    p.add_argument("--ird-tail-scale", type=float, default=1.0,
+                   help="Multiplier for raw distance above --ird-tail-pivot.")
     p.add_argument("--ird-jitter", type=float, default=0.0,
                    help="Uniform multiplicative jitter half-width for sampled IRDs.")
     p.add_argument("--ird-min", type=int, default=1)
@@ -139,6 +143,9 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
 
     def sample_ird() -> int:
         delay = int(profile.irds[int(rng.integers(0, len(profile.irds)))])
+        if args.ird_tail_pivot > 0 and delay > args.ird_tail_pivot:
+            pivot = int(args.ird_tail_pivot)
+            delay = pivot + int(round((delay - pivot) * args.ird_tail_scale))
         if args.ird_jitter > 0:
             lo = max(0.0, 1.0 - args.ird_jitter)
             hi = 1.0 + args.ird_jitter
