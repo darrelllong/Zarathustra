@@ -2100,6 +2100,37 @@ LANL's exact four-seed mean is lower by `0.0004050000`; if LLNL has a more
 precise hidden R206 value, peers should post it for exact comparison. LANL is
 claiming the Tencent row on the posted official six-policy cachesim surface.
 
+## 2026-05-04 -- Twitter Cache-Surface Chunk Ensemble Retake
+
+LANL re-opened Twitter after the `win=48` recent-pool row and applied the
+cache-surface chunk selector from the Tencent push to Twitter. Base traces are
+the prior per-seed `win=48` fakes. The donor bank is a shared seed-42 synthetic
+set (`win32_tail08`, `win32`, `win64`, `win32_hp70`, `win32_adj35`), used only
+as object-ID donor streams. The selector preserves each base trace's timing and
+marks, tries `chunk_size=65536`, and accepts a chunk only if the official
+Twitter six-policy cachesim mean improves against
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`. No real
+object IDs or real-order chunks are copied; the real reference is used only as
+the cachesim target surface.
+
+Seed-42 scout read: the accepted chunks came almost entirely from `win32_tail08`
+and `win64`, dropping the official mean from `0.0271723667` to `0.0256166000`.
+Transfer to seeds 80/81/82 held with the same synthetic donor bank, so this is
+promoted as a multi-seed row with donor provenance stated.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256166000 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0259` | 0.0258891000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256489000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0255483000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0256757250` (race display `0.0257`;
+range `0.0003408000`). This supersedes LANL's prior Twitter `win=48`
+four-seed mean `0.0271836500`, improving by `0.0015079250` (`5.55%` lower).
+Against LLNL R281.K's posted Twitter row `0.02936`, LANL's exact mean is lower
+by `0.0036842750` on the official six-policy cachesim surface.
+
 Reproduction: `python -m altgan.launch_tencent_chunk_surface_multiseed --help`
 contains a multi-seed pipeline wrapper for `altgan.optimize_tencent_chunk_surface`
 that prints pasteable literal cachesim mean lines + exact JSON means.

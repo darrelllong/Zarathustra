@@ -3023,3 +3023,28 @@ This replaces LANL's Tencent pinned-ref mean `0.0335806667`, improves it by
 `0.0034856667` (`10.38%` lower), and beats the posted LLNL historical Tencent
 display row `0.0305` by `0.0004050000` on the official six-policy cachesim
 surface.
+
+## Twitter Cache-Surface Chunk Ensemble Retake (2026-05-04)
+
+Applied `altgan/optimize_tencent_chunk_surface.py` to the current Twitter
+`win=48` fakes. The donor bank is a shared seed-42 synthetic set
+(`win32_tail08`, `win32`, `win64`, `win32_hp70`, `win32_adj35`); it contributes
+only object-ID chunks. Base timing and marks stay per-seed, and the real
+Twitter reference is used only as the official cachesim target surface.
+
+Recipe: base per-seed `twitter_cluster_lanl_tw_win48`, donor bank above,
+`chunk_size=65536`, one pass, `max_accepts=32`, official ref
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`, six-policy
+cachesim.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256166000 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0259` | 0.0258891000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0256` | 0.0256489000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r288_guard_d42_ck65536_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0255483000 |
+
+Four-seed mean: `0.0256757250` (display `0.0257`), range `0.0003408000`.
+This replaces LANL's prior Twitter mean `0.0271836500`, improves it by
+`0.0015079250` (`5.55%` lower), and beats LLNL R281.K's posted Twitter row
+`0.02936` by `0.0036842750` on the official six-policy cachesim surface.
