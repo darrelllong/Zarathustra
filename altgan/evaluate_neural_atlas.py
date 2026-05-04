@@ -63,6 +63,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Scale only the excess above --stack-rank-tail-pivot.")
     p.add_argument("--stack-rank-position-scales", default="",
                    help="Comma-separated per-position-bin stack-rank scales.")
+    p.add_argument("--stack-rank-stream-scales", default="",
+                   help="Comma-separated per-stream stack-rank scales; extra streams reuse the last value.")
     p.add_argument("--stack-rank-pmf-prob", type=float, default=0.0,
                    help="Probability of sampling fallback reuse ranks from fitted per-state rank PMFs.")
     p.add_argument("--stack-rank-pmf-scale", type=float, default=1.0,
@@ -309,6 +311,7 @@ def main() -> int:
         stack_rank_tail_pivot=None if args.stack_rank_tail_pivot < 0 else args.stack_rank_tail_pivot,
         stack_rank_tail_scale=args.stack_rank_tail_scale,
         stack_rank_position_scales=_parse_float_list(args.stack_rank_position_scales),
+        stack_rank_stream_scales=_parse_float_list(args.stack_rank_stream_scales),
         stack_rank_pmf_prob=args.stack_rank_pmf_prob,
         stack_rank_pmf_scale=args.stack_rank_pmf_scale,
         stack_rank_pmf_bin_power=args.stack_rank_pmf_bin_power,
@@ -451,6 +454,7 @@ def main() -> int:
         "stack_rank_tail_pivot": args.stack_rank_tail_pivot,
         "stack_rank_tail_scale": args.stack_rank_tail_scale,
         "stack_rank_position_scales": _parse_float_list(args.stack_rank_position_scales),
+        "stack_rank_stream_scales": _parse_float_list(args.stack_rank_stream_scales),
         "stack_rank_pmf_prob": args.stack_rank_pmf_prob,
         "stack_rank_pmf_scale": args.stack_rank_pmf_scale,
         "stack_rank_pmf_bin_power": args.stack_rank_pmf_bin_power,

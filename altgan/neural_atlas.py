@@ -97,6 +97,7 @@ class NeuralAtlasModel:
         stack_rank_tail_pivot: int | None = None,
         stack_rank_tail_scale: float = 1.0,
         stack_rank_position_scales: Sequence[float] | None = None,
+        stack_rank_stream_scales: Sequence[float] | None = None,
         stack_rank_pmf_prob: float = 0.0,
         stack_rank_pmf_scale: float = 1.0,
         stack_rank_pmf_bin_power: float = 1.0,
@@ -200,6 +201,7 @@ class NeuralAtlasModel:
         stack_rank_scale = max(float(stack_rank_scale), 0.0)
         stack_rank_tail_scale = max(float(stack_rank_tail_scale), 0.0)
         stack_rank_position_scales = _nonnegative_float_list(stack_rank_position_scales)
+        stack_rank_stream_scales = _nonnegative_float_list(stack_rank_stream_scales)
         stack_rank_pmf_prob = float(np.clip(stack_rank_pmf_prob, 0.0, 1.0))
         stack_rank_pmf_scale = max(float(stack_rank_pmf_scale), 0.0)
         stack_rank_pmf_bin_power = max(float(stack_rank_pmf_bin_power), 1e-6)
@@ -404,6 +406,9 @@ class NeuralAtlasModel:
                     per_stream,
                     stack_rank_scale,
                 )
+                if stack_rank_stream_scales:
+                    stream_idx = min(stream_id, len(stack_rank_stream_scales) - 1)
+                    position_rank_scale = float(stack_rank_stream_scales[stream_idx])
                 adj_dup_prob = _position_value(
                     stack_adj_dup_position_probs,
                     pos,

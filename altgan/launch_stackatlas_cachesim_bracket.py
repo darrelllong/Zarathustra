@@ -27,6 +27,7 @@ class Spec:
     rank_tail_pivot: int = -1
     rank_tail_scale: float = 1.0
     rank_position_scales: str = ""
+    rank_stream_scales: str = ""
     rank_pmf_prob: float = 0.0
     rank_pmf_scale: float = 1.0
     rank_pmf_bin_power: float = 1.0
@@ -139,6 +140,10 @@ def _parse_spec(text: str) -> Spec:
         "tailscale": "rank_tail_scale",
         "rank_pos": "rank_position_scales",
         "rankpos": "rank_position_scales",
+        "rank_stream": "rank_stream_scales",
+        "rankstreams": "rank_stream_scales",
+        "stream_rank": "rank_stream_scales",
+        "srank": "rank_stream_scales",
         "rpmf": "rank_pmf_prob",
         "rank_pmf": "rank_pmf_prob",
         "rpmfs": "rank_pmf_scale",
@@ -332,6 +337,7 @@ def _auto_name(spec: Spec) -> str:
         f"seed{spec.seed}_tb{_tag(spec.transition_blend)}"
         f"_lp{_tag(spec.local_prob_power)}_rank{_tag(spec.rank_scale)}"
         f"max{spec.rank_max}_tailp{spec.rank_tail_pivot}"
+        f"_rs{spec.rank_stream_scales.replace(',', '-')}"
         f"s{_tag(spec.rank_tail_scale)}_rpmf{_tag(spec.rank_pmf_prob)}"
         f"x{_tag(spec.rank_pmf_scale)}pow{_tag(spec.rank_pmf_bin_power)}"
         f"tp{_tag(spec.rank_pmf_tail_bin_power)}piv{spec.rank_pmf_tail_power_pivot}"
@@ -429,6 +435,8 @@ def _eval_cmd(args: argparse.Namespace, spec: Spec, fake: Path, eval_json: Path)
         str(spec.rank_tail_scale),
         "--stack-rank-position-scales",
         spec.rank_position_scales,
+        "--stack-rank-stream-scales",
+        spec.rank_stream_scales,
         "--stack-rank-pmf-prob",
         str(spec.rank_pmf_prob),
         "--stack-rank-pmf-scale",
