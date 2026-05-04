@@ -55,6 +55,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--chunk-size", type=_parse_ints, default=[2048])
     p.add_argument("--max-passes", type=int, default=1)
     p.add_argument("--max-accepts", type=int, default=128)
+    p.add_argument("--max-evals", type=int, default=0,
+                   help="Stop after this many candidate/base evaluations; 0 means no cap.")
     p.add_argument("--min-improvement", type=float, default=1e-6)
     p.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     p.add_argument("--policies", default=DEFAULT_POLICIES)
@@ -169,6 +171,7 @@ def main() -> int:
 
     accepted: list[dict] = []
     eval_count = 1
+    stop_search = False
     for chunk_size in args.chunk_size:
         chunks = list(range(0, n, chunk_size))
         rng = np.random.default_rng(args.seed + chunk_size)
@@ -177,11 +180,14 @@ def main() -> int:
         for pass_ix in range(args.max_passes):
             pass_accepts = 0
             for chunk_ix in chunk_order:
-                if len(accepted) >= args.max_accepts:
+                if len(accepted) >= args.max_accepts or stop_search:
                     break
                 start = chunks[chunk_ix]
                 end = min(n, start + chunk_size)
                 for donor_name, donor_obj in donor_frames:
+                    if args.max_evals and eval_count >= args.max_evals:
+                        stop_search = True
+                        break
                     if np.array_equal(current_obj[start:end], donor_obj[start:end]):
                         continue
                     trial_obj = current_obj.copy()
@@ -216,14 +222,21 @@ def main() -> int:
                             flush=True,
                         )
                         break
+                if stop_search:
+                    print(
+                        f"[chunk_surface] max evals reached eval_count={eval_count} "
+                        f"limit={args.max_evals}",
+                        flush=True,
+                    )
+                    break
             print(
                 f"[chunk_surface] pass done chunk={chunk_size} pass={pass_ix + 1} "
                 f"accepts={pass_accepts} best={best_mean:.10f}",
                 flush=True,
             )
-            if pass_accepts == 0:
+            if pass_accepts == 0 or stop_search:
                 break
-        if len(accepted) >= args.max_accepts:
+        if len(accepted) >= args.max_accepts or stop_search:
             break
 
     chunk_label = "-".join(_fmt(size) for size in args.chunk_size)
@@ -245,6 +258,7 @@ def main() -> int:
         "cache_sizes": args.cache_sizes,
         "policies": args.policies,
         "eval_label": eval_label,
+        "max_evals": args.max_evals,
         "accepted": accepted,
         "eval_count": eval_count,
         "mean_hrc_mae": final_report["mean_hrc_mae"],
