@@ -15612,3 +15612,27 @@ The gap to LANL is **halved**. LLNL's banked alibaba claim improves from 0.0131 
 **Single-seed cool12 = cool8 within noise floor.** Multi-seed (R277.M, in flight) will tell us whether cool12's multi-seed mean is below cool8's 0.01245.
 
 **Tasks**: #66 (R277.F) closed; #67 (R277.M cool12 multi-seed) opened.
+
+## R277.M — cool12 multi-seed verification (CLOSED, cool8 stays banked)
+
+cool12 was tied with cool8 at single-seed seed=42 (both 0.01231). Multi-seed verify diverges:
+
+| seed | cool12 | cool8 (R276) |
+|---|---|---|
+| 42 | 0.012307 | 0.012306 |
+| 43 | 0.012667 | 0.013106 |
+| 44 | 0.013006 | 0.012055 |
+| 45 | 0.013410 | 0.012345 |
+| **mean** | **0.012848** | **0.012453** |
+| range | 0.001103 | 0.001052 |
+
+**cool12 LOSES to cool8 by 3.2%** in multi-seed mean. The seed=42 coincidence was not a stable second minimum — at seeds 43/44/45 cool12 trends worse, and the multi-seed gap is larger than seed-noise. **cool8 remains the banked alibaba claim at 0.012453.**
+
+The bimodality in single-seed scout (R277.F) was a *single-seed artifact* of the cooldown × specific-trace-realization interaction at seed=42. The multi-seed protocol washes it out. **Lesson**: single-seed sweeps over a low-amplitude axis can produce reproducible-looking minima that vanish under multi-seed aggregation. For race-position claims, single-seed minima below ~5% over baseline must be multi-seed-verified before banking.
+
+**Tasks**: #67 (R277.M) closed.
+
+**Cooldown axis is now fully exhausted** for the alibaba retake. The remaining attack vectors are:
+1. **Fit-time architectural change** (IDEAS-LLNL #26 atlas-fit IRD-shape loss, or other axes LANL hasn't published) — large engineering work, biggest payoff potential.
+2. **Atlas re-fit with different recipe** at LLNL hyperparameters that haven't been tried (records-per-file, hidden, ep, dropout, n_phase variations) — moderate work.
+3. **Other corpora** where LLNL/LANL gap is wider (Baleen24 LANL +33.7%) — orthogonal but lower-priority since alibaba is the public flagship.
