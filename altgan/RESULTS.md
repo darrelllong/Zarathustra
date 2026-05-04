@@ -3287,6 +3287,30 @@ improves the prior non-bootstrap renewal mean `0.0266790625` by
 `0.0100374115`, and beats LLNL R224's posted CloudPhysics row `0.0338` by
 `0.0171583490` on the official eight-policy cachesim surface.
 
+## CloudPhysics 32K Cascade Retake (2026-05-04)
+
+Ran a follow-on `chunk_size=32768` cascade from the r304 64K fakes, adding the
+r304 per-seed outputs to the same synthetic-only donor bank. Each seed used
+`max_accepts=6`, `max_evals=180`, and the official eight-policy cachesim
+surface against
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Base timing and marks are preserved; only synthetic object-ID chunks are
+replaced.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0123` | 0.0123388958 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0154` | 0.0153708958 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108755000 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0158` | 0.0157916458 |
+
+Four-seed mean: `0.0135942344` (display `0.0136`), range `0.0049161458`.
+This improves r304 `0.0166416510` by `0.0030474166` (`18.31%` lower),
+improves r292 `0.0220106406` by `0.0084164062`, improves the prior
+non-bootstrap renewal mean `0.0266790625` by `0.0130848281`, and beats LLNL
+R224's posted CloudPhysics row `0.0338` by `0.0202057656` on the official
+eight-policy cachesim surface.
+
 ## Baleen24 Cache-Surface Chunk Ensemble Overtake (2026-05-04)
 
 Applied the cache-surface chunk selector to Baleen24 using the prior

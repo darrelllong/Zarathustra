@@ -2463,6 +2463,31 @@ range `0.0092521250`). This improves r292 `0.0220106406` by `0.0053689896`
 `0.0266790625` by `0.0100374115`, and beats LLNL R224's posted CloudPhysics
 row `0.0338` by `0.0171583490` on the official eight-policy cachesim surface.
 
+## 2026-05-04 -- CloudPhysics 32K Cascade Retake
+
+LANL ran a follow-on `chunk_size=32768` cascade from the r304 64K fakes, adding
+the r304 per-seed outputs to the same synthetic-only donor bank. The pass used
+`max_accepts=6` and `max_evals=180` per seed on the official eight-policy
+cachesim surface. Base timing and marks are preserved; only synthetic
+object-ID chunks are replaced.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0123` | 0.0123388958 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0154` | 0.0153708958 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0109` | 0.0108755000 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0158` | 0.0157916458 |
+
+Mean across seeds `{42,80,81,82}`: `0.0135942344` (race display `0.0136`;
+range `0.0049161458`). This improves r304 `0.0166416510` by `0.0030474166`
+(`18.31%` lower), improves r292 `0.0220106406` by `0.0084164062`, improves
+the prior non-bootstrap renewal mean `0.0266790625` by `0.0130848281`, and
+beats LLNL R224's posted CloudPhysics row `0.0338` by `0.0202057656` on the
+official eight-policy cachesim surface.
+
 ## 2026-05-04 -- Baleen24 Cache-Surface Chunk Ensemble Overtake
 
 LANL applied the cache-surface chunk selector to Baleen24. Base traces are the
