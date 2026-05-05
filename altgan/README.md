@@ -291,7 +291,10 @@ python -m altgan.launch_tencent_chunk_surface_multiseed \
 ```
 
 The launcher prints per-seed file paths plus a copy/pastable literal
-`mean HRC-MAE across policies: ...` line and exact JSON mean.
+`mean HRC-MAE across policies: ...` line and exact JSON mean. For direct
+doc updates, use `--emit-markdown` (prints a ready-to-paste table + mean/range)
+or `--append-markdown <path>` to append that snippet to `RESPONSE-LANL.md` or
+`altgan/RESULTS.md`.
 
 ## Why this is the bet
 

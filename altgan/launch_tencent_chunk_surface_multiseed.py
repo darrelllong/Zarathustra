@@ -17,6 +17,7 @@ import os
 import shlex
 import subprocess
 import sys
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,6 +61,38 @@ def _mean_from_json(path: Path) -> float:
 def _literal_cachesim_mean_line(mean_hrc_mae: float) -> str:
     # Must match `llgan.cachesim_eval.print_report()`.
     return f"mean HRC-MAE across policies: {mean_hrc_mae:.4f}"
+
+
+def _race_display(value: float) -> str:
+    # Race display convention in RESPONSE-* and LEADER-BOARD is 4 decimals.
+    return f"{value:.4f}"
+
+
+def _markdown_snippet(
+    *,
+    title: str,
+    seeds: list[int],
+    final_means: list[tuple[int, float, Path, Path]],
+    overall_mean: float,
+    overall_range: float,
+) -> str:
+    seeds_text = "{" + ",".join(str(seed) for seed in seeds) + "}"
+    lines: list[str] = [
+        title,
+        "",
+        "| seed | fake CSV | literal cachesim mean line | JSON mean |",
+        "|---:|---|---|---:|",
+    ]
+    for seed, mean, fake_csv, _report_json in final_means:
+        lines.append(
+            f"| {seed} | `{fake_csv}` | `{_literal_cachesim_mean_line(mean)}` | {mean:.10f} |"
+        )
+    lines += [
+        "",
+        f"Mean across seeds `{seeds_text}`: `{overall_mean:.10f}` (race display `{_race_display(overall_mean)}`; range `{overall_range:.10f}`).",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def _cmd_optimize(
@@ -149,6 +182,21 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--max-passes", type=int, default=1)
     p.add_argument("--max-accepts", type=int, default=128)
     p.add_argument("--min-improvement", type=float, default=1e-6)
+    p.add_argument(
+        "--emit-markdown",
+        action="store_true",
+        help="Print a ready-to-paste markdown snippet (table + mean/range).",
+    )
+    p.add_argument(
+        "--append-markdown",
+        default=None,
+        help="Append the markdown snippet to this file (e.g. RESPONSE-LANL.md or altgan/RESULTS.md).",
+    )
+    p.add_argument(
+        "--markdown-title",
+        default=None,
+        help="Optional markdown title line (defaults to an auto header with UTC timestamp + tag-prefix).",
+    )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -236,6 +284,27 @@ def main() -> int:
     overall_range = max(means) - min(means) if means else 0.0
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
     print(f"Range: {overall_range:.10f}", flush=True)
+
+    if args.emit_markdown or args.append_markdown:
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%MZ")
+        title = args.markdown_title or f"## {timestamp} -- {args.tag_prefix} multi-seed summary"
+        snippet = _markdown_snippet(
+            title=title,
+            seeds=list(args.seeds),
+            final_means=final_means,
+            overall_mean=overall_mean,
+            overall_range=overall_range,
+        )
+        if args.emit_markdown:
+            print("\n=== MARKDOWN SNIPPET (paste into RESPONSE-LANL.md / altgan/RESULTS.md) ===", flush=True)
+            print(snippet, flush=True)
+        if args.append_markdown:
+            dest = Path(args.append_markdown)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with dest.open("a", encoding="utf-8") as f:
+                f.write("\n")
+                f.write(snippet)
+            print(f"[markdown] appended snippet to {dest}", flush=True)
     return 0
 
 
