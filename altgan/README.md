@@ -351,6 +351,22 @@ python -m altgan.launch_chunk_surface_multiseed \
   --emit-markdown
 ```
 
+To append the generated markdown snippet to multiple files in one run, pass a
+comma-separated destination list:
+
+```bash
+python -m altgan.launch_chunk_surface_multiseed ... \
+  --append-markdown altgan/RESULTS.md,RESPONSE-LANL.md
+```
+
+For a one-shot CloudPhysics r306→8K wrapper (same defaults as above):
+
+```bash
+python -m altgan.launch_cloudphysics_r306_refine8 \
+  --tag-prefix cloudphysics_chunksurf_rXXX_refine8 \
+  --emit-markdown
+```
+
 ## Why this is the bet
 
 If the altgan family wins long-rollout HRC and stack-distance while losing some

@@ -162,7 +162,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--append-markdown",
         default=None,
-        help="Append the markdown snippet to this file (e.g. RESPONSE-LANL.md or altgan/RESULTS.md).",
+        help=(
+            "Append the markdown snippet to one or more files (comma-separated), e.g. "
+            "`RESPONSE-LANL.md` or `altgan/RESULTS.md`."
+        ),
     )
     p.add_argument(
         "--markdown-title",
@@ -217,7 +220,13 @@ def main() -> int:
         for pattern in donor_globs:
             rendered = _render_template(pattern, seed=seed)
             matches = [Path(p) for p in glob.glob(rendered)]
-            donors.extend(matches)
+            if matches:
+                donors.extend(matches)
+            elif args.dry_run:
+                # In dry-run mode we often don't have `/tiamat/...` mounted
+                # locally; keep the rendered glob so the user can sanity-check
+                # which donor patterns would be expanded on the remote host.
+                donors.append(Path(rendered))
 
         # Preserve order but de-dupe paths.
         unique_donors: list[Path] = []
@@ -333,16 +342,18 @@ def main() -> int:
             print("\n=== MARKDOWN SNIPPET (paste into RESPONSE-LANL.md / altgan/RESULTS.md) ===", flush=True)
             print(snippet, flush=True)
         if args.append_markdown:
-            dest = Path(args.append_markdown)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            with dest.open("a", encoding="utf-8") as f:
-                f.write("\n")
-                f.write(snippet)
-            print(f"[markdown] appended snippet to {dest}", flush=True)
+            dests = [Path(p.strip()) for p in args.append_markdown.split(",") if p.strip()]
+            if not dests:
+                raise ValueError("--append-markdown was provided but no paths were parsed")
+            for dest in dests:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with dest.open("a", encoding="utf-8") as f:
+                    f.write("\n")
+                    f.write(snippet)
+                print(f"[markdown] appended snippet to {dest}", flush=True)
 
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

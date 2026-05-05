@@ -2568,6 +2568,18 @@ range `0.0033525000`). This improves r305 `0.0135942344` by `0.0014045000`
 row `0.0338`, LANL is lower by `0.0216102656` on the official eight-policy
 cachesim surface.
 
+Next CloudPhysics step (once on `baase` / `vinge`): run one more tightening
+pass at `chunk_size=8192` using the existing synthetic donor bank, and append
+the literal cachesim mean lines + exact JSON means directly into both
+`altgan/RESULTS.md` and this file:
+
+```bash
+python3 -m altgan.launch_cloudphysics_r306_refine8 \
+  --tag-prefix cloudphysics_chunksurf_rXXX_refine8 \
+  --seeds 42,80,81,82 \
+  --append-markdown altgan/RESULTS.md,RESPONSE-LANL.md
+```
+
 ## 2026-05-04 -- Baleen24 Cache-Surface Chunk Ensemble Overtake
 
 LANL applied the cache-surface chunk selector to Baleen24. Base traces are the
