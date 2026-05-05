@@ -67,6 +67,36 @@ _PRESETS: dict[str, CorpusPreset] = {
 }
 
 
+def _replace_between_markers(*, text: str, begin: str, end: str, replacement: str) -> str:
+    """Replace the content between two unique marker lines (inclusive markers remain)."""
+    begin_idx = text.find(begin)
+    end_idx = text.find(end)
+    if begin_idx == -1 or end_idx == -1:
+        missing = []
+        if begin_idx == -1:
+            missing.append("begin")
+        if end_idx == -1:
+            missing.append("end")
+        raise ValueError(f"Missing {', '.join(missing)} marker(s): {begin!r} / {end!r}")
+    if end_idx < begin_idx:
+        raise ValueError(f"End marker appears before begin marker: {begin!r} / {end!r}")
+
+    after_begin = begin_idx + len(begin)
+    new_text = (
+        text[:after_begin]
+        + "\n"
+        + replacement.rstrip()
+        + "\n"
+        + text[end_idx:]
+    )
+    return new_text
+
+
+def _default_repo_root() -> Path:
+    # altgan/<this_file>.py -> repo root = parent of altgan/
+    return Path(__file__).resolve().parents[1]
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
@@ -85,6 +115,25 @@ def _parse_args() -> argparse.Namespace:
         "--emit-summary-json-dir",
         default=None,
         help="If set, write one machine-readable JSON summary per corpus into this directory.",
+    )
+    p.add_argument(
+        "--update-lanl-docs",
+        action="store_true",
+        help=(
+            "After each corpus completes, update RESPONSE-LANL.md and altgan/RESULTS.md "
+            "by replacing the corresponding TRACEBOOTSTRAP_SHUFFLE_* marker blocks "
+            "with the emitted per-corpus Markdown snippet."
+        ),
+    )
+    p.add_argument(
+        "--response-lanl-md",
+        default=None,
+        help="Path to RESPONSE-LANL.md (default: auto-detect from repo root).",
+    )
+    p.add_argument(
+        "--altgan-results-md",
+        default=None,
+        help="Path to altgan/RESULTS.md (default: auto-detect from repo root).",
     )
     p.add_argument(
         "--markdown",
@@ -112,16 +161,38 @@ def main() -> int:
     if unknown:
         raise SystemExit(f"Unknown corpora: {unknown}. Choices: {sorted(_PRESETS)}")
 
+    output_root = Path(args.output_root)
     md_dir = Path(args.emit_markdown_dir) if args.emit_markdown_dir else None
-    if md_dir:
-        md_dir.mkdir(parents=True, exist_ok=True)
     json_dir = Path(args.emit_summary_json_dir) if args.emit_summary_json_dir else None
-    if json_dir:
-        json_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.update_lanl_docs:
+        # Ensure we always emit paste-ready snippets where the doc updater can find them.
+        if md_dir is None:
+            md_dir = output_root / "paste_ready"
+        if json_dir is None:
+            json_dir = output_root / "paste_ready"
+        args.markdown = True
+
+    if not args.dry_run:
+        if md_dir:
+            md_dir.mkdir(parents=True, exist_ok=True)
+        if json_dir:
+            json_dir.mkdir(parents=True, exist_ok=True)
+
+    response_path = None
+    results_path = None
+    if args.update_lanl_docs:
+        repo_root = _default_repo_root()
+        response_path = Path(args.response_lanl_md) if args.response_lanl_md else (repo_root / "RESPONSE-LANL.md")
+        results_path = (
+            Path(args.altgan_results_md) if args.altgan_results_md else (repo_root / "altgan" / "RESULTS.md")
+        )
 
     failures: list[tuple[str, int]] = []
     for corpus in corpora:
         preset = _PRESETS[corpus]
+        md_path = md_dir / f"tracebootstrap_shuffle_{preset.corpus}.md" if md_dir else None
+        summary_path = json_dir / f"tracebootstrap_shuffle_{preset.corpus}.json" if json_dir else None
         cmd = [
             sys.executable,
             "-u",
@@ -156,20 +227,10 @@ def main() -> int:
         ]
         if args.markdown:
             cmd.append("--emit-markdown")
-        if md_dir:
-            cmd.extend(
-                [
-                    "--emit-markdown-to",
-                    str(md_dir / f"tracebootstrap_shuffle_{preset.corpus}.md"),
-                ]
-            )
-        if json_dir:
-            cmd.extend(
-                [
-                    "--emit-summary-json-to",
-                    str(json_dir / f"tracebootstrap_shuffle_{preset.corpus}.json"),
-                ]
-            )
+        if md_path:
+            cmd.extend(["--emit-markdown-to", str(md_path)])
+        if summary_path:
+            cmd.extend(["--emit-summary-json-to", str(summary_path)])
         if args.skip_existing:
             cmd.append("--skip-existing")
         if args.dry_run:
@@ -178,6 +239,29 @@ def main() -> int:
         print(f"\n=== TRACEBOOTSTRAP SHUFFLE PACK: {corpus} ===", flush=True)
         try:
             subprocess.run(cmd, check=True)
+            if args.update_lanl_docs and not args.dry_run:
+                if md_path is None:
+                    raise SystemExit("--update-lanl-docs requires an emit-markdown destination.")
+                if not md_path.exists():
+                    raise SystemExit(f"Expected Markdown snippet not found: {md_path}")
+                snippet = md_path.read_text()
+                marker = preset.corpus.upper()
+                begin = f"<!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_{marker} -->"
+                end = f"<!-- END TRACEBOOTSTRAP_SHUFFLE_{marker} -->"
+
+                for doc_path in (response_path, results_path):
+                    if doc_path is None:
+                        continue
+                    doc_text = doc_path.read_text()
+                    new_text = _replace_between_markers(
+                        text=doc_text,
+                        begin=begin,
+                        end=end,
+                        replacement=snippet,
+                    )
+                    if new_text != doc_text:
+                        doc_path.write_text(new_text)
+                        print(f"[docs] Updated: {doc_path}", flush=True)
         except subprocess.CalledProcessError as e:
             print(
                 f"\n[error] TraceBootstrap shuffle pack failed for corpus '{corpus}' "

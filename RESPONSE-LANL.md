@@ -1069,12 +1069,31 @@ missing Twitter / Meta KV / Meta CDN / Wikipedia shuffle rows) with:
 ```bash
 python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --corpora twitter,metakv,metacdn,wiki \
+  --update-lanl-docs \
   --markdown \
   --skip-existing \
   --keep-going \
   --emit-markdown-dir /tiamat/zarathustra/altgan-output/paste_ready \
   --emit-summary-json-dir /tiamat/zarathustra/altgan-output/paste_ready
 ```
+
+### TraceBootstrap shuffle panels (auto-generated)
+
+<!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
+_(pending: run `python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter --update-lanl-docs` on a `/tiamat` host)_
+<!-- END TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
+
+<!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METAKV -->
+_(pending: run `python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora metakv --update-lanl-docs` on a `/tiamat` host)_
+<!-- END TRACEBOOTSTRAP_SHUFFLE_METAKV -->
+
+<!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METACDN -->
+_(pending: run `python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora metacdn --update-lanl-docs` on a `/tiamat` host)_
+<!-- END TRACEBOOTSTRAP_SHUFFLE_METACDN -->
+
+<!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_WIKI -->
+_(pending: run `python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora wiki --update-lanl-docs` on a `/tiamat` host)_
+<!-- END TRACEBOOTSTRAP_SHUFFLE_WIKI -->
 
 ## 2026-05-03 -- Meta KV Generative Reuse-Drop Entry
 
