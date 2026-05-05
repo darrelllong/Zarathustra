@@ -313,6 +313,44 @@ doc updates, use `--emit-markdown` (prints a ready-to-paste table + mean/range)
 or `--append-markdown <path>` to append that snippet to `RESPONSE-LANL.md` or
 `altgan/RESULTS.md`.
 
+## Generic cache-surface chunk selector (any corpus)
+
+Despite the module name, `altgan.optimize_tencent_chunk_surface` is corpus-agnostic
+and is used across other corpora (Alibaba/MSR/Twitter/CloudPhysics/etc). For a
+generic multi-seed runner (supports arbitrary policies/sizes and donor globs),
+use:
+
+```bash
+python -m altgan.launch_chunk_surface_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/<CORPUS>_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/<BASE>_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/<DONOR_PREFIX>*_seed{seed}_fake_1000k.csv" \
+  --tag-prefix <TAG> \
+  --pipeline 65536 \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car \
+  --seeds 42,80,81,82 \
+  --emit-markdown
+```
+
+CloudPhysics uses an 8-policy official surface (note the extra cache size and
+policies). Example (8K tightening from the current r306 16K fakes):
+
+```bash
+python -m altgan.launch_chunk_surface_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r306_refine16_ck16384_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r306*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292*_seed{seed}_fake_1000k.csv" \
+  --tag-prefix cloudphysics_chunksurf_rXXX_refine8 \
+  --pipeline 8192 \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs \
+  --max-accepts 4 \
+  --max-evals 120 \
+  --seeds 42,80,81,82 \
+  --emit-markdown
+```
+
 ## Why this is the bet
 
 If the altgan family wins long-rollout HRC and stack-distance while losing some
