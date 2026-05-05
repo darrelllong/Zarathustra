@@ -19,6 +19,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -78,7 +79,7 @@ def _markdown_snippet(
     *,
     title: str,
     seeds: list[int],
-    final_means: list[tuple[int, float, Path, Path]],
+    final_means: list[tuple[int, float, Path, Path, str]],
     overall_mean: float,
     overall_range: float,
 ) -> str:
@@ -89,9 +90,9 @@ def _markdown_snippet(
         "| seed | fake CSV | literal cachesim mean line | JSON mean |",
         "|---:|---|---|---:|",
     ]
-    for seed, mean, fake_csv, _report_json in final_means:
+    for seed, mean, fake_csv, _report_json, literal_mean_line in final_means:
         lines.append(
-            f"| {seed} | `{fake_csv}` | `{_literal_cachesim_mean_line(mean)}` | {mean:.10f} |"
+            f"| {seed} | `{fake_csv}` | `{literal_mean_line}` | {mean:.10f} |"
         )
     lines += [
         "",
@@ -105,11 +106,30 @@ def _print_cmd(cmd: list[str]) -> None:
     print("+ " + " ".join(shlex.quote(part) for part in cmd), flush=True)
 
 
-def _run(cmd: list[str], *, env: dict[str, str], dry_run: bool) -> None:
+def _run(cmd: list[str], *, env: dict[str, str], dry_run: bool) -> str | None:
     _print_cmd(cmd)
     if dry_run:
-        return
-    subprocess.run(cmd, check=True, env=env)
+        return None
+    mean_line: str | None = None
+    mean_re = re.compile(r"^mean HRC-MAE across policies:\s*[0-9.]+\s*$")
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip("\n")
+        print(line, flush=True)
+        if mean_re.match(line.strip()):
+            mean_line = line.strip()
+    rc = proc.wait()
+    if rc != 0:
+        raise subprocess.CalledProcessError(rc, cmd)
+    return mean_line
 
 
 @dataclass(frozen=True)
@@ -119,6 +139,7 @@ class StageOutput:
     fake_csv: Path
     report_json: Path
     mean_hrc_mae: float
+    literal_mean_line: str
 
 
 def _parse_args() -> argparse.Namespace:
@@ -202,7 +223,7 @@ def main() -> int:
     policy_count = _policy_count(args.policies)
     eval_label = f"official{policy_count}"
 
-    final_means: list[tuple[int, float, Path, Path]] = []
+    final_means: list[tuple[int, float, Path, Path, str]] = []
 
     for seed in args.seeds:
         base = Path(_render_template(args.base_template, seed=seed))
@@ -285,7 +306,7 @@ def main() -> int:
                 "--policies",
                 args.policies,
             ]
-            _run(cmd, env=env, dry_run=args.dry_run)
+            stage_literal_line = _run(cmd, env=env, dry_run=args.dry_run)
 
             # `optimize_tencent_chunk_surface` builds:
             #   tag = f"{args.tag}_ck{chunk_label}_seed{seed}"
@@ -304,6 +325,7 @@ def main() -> int:
                 fake_csv=out_fake,
                 report_json=out_json,
                 mean_hrc_mae=mean,
+                literal_mean_line=stage_literal_line or _literal_cachesim_mean_line(mean),
             )
             current_base = out_fake
 
@@ -311,21 +333,23 @@ def main() -> int:
             continue
         if last_out is None:
             raise RuntimeError("pipeline produced no stages")
-        final_means.append((seed, last_out.mean_hrc_mae, last_out.fake_csv, last_out.report_json))
+        final_means.append(
+            (seed, last_out.mean_hrc_mae, last_out.fake_csv, last_out.report_json, last_out.literal_mean_line)
+        )
 
     if args.dry_run:
         print("\n[dry-run] No stages executed; exiting.", flush=True)
         return 0
 
     print("\n=== CHUNK-SURFACE MULTI-SEED SUMMARY ===", flush=True)
-    for seed, mean, fake_csv, report_json in final_means:
+    for seed, mean, fake_csv, report_json, literal_mean_line in final_means:
         print(f"\nseed {seed}", flush=True)
         print(f"fake CSV: {fake_csv}", flush=True)
-        print(_literal_cachesim_mean_line(mean), flush=True)
+        print(literal_mean_line, flush=True)
         print(f"JSON mean: {mean:.10f}", flush=True)
         print(f"Report JSON: {report_json}", flush=True)
 
-    means = [m for _, m, _, _ in final_means]
+    means = [mean for _, mean, _, _, _ in final_means]
     overall_mean = sum(means) / len(means)
     overall_range = max(means) - min(means) if means else 0.0
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
