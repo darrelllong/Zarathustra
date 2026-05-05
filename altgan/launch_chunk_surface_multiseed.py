@@ -249,7 +249,10 @@ def main() -> int:
         current_base = base
         last_out: StageOutput | None = None
         for chunk_size in args.pipeline:
-            stage_tag = f"{args.tag_prefix}_ck{chunk_size}"
+            # `altgan.optimize_tencent_chunk_surface` appends its own `_ck<chunk>` suffix,
+            # so `--tag` should be a stable prefix (no `_ck...` here) to avoid
+            # `..._ck8192_ck8192_seed42` style duplication.
+            stage_tag = args.tag_prefix
             cmd = [
                 sys.executable,
                 "-u",
