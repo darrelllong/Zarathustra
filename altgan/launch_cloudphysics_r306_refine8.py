@@ -40,6 +40,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    output_root = args.output_root.rstrip("/")
 
     cmd = [
         sys.executable,
@@ -48,15 +49,17 @@ def main() -> int:
         "altgan.launch_chunk_surface_multiseed",
         "--real",
         "/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv",
+        "--output-root",
+        output_root,
         "--base-template",
-        "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r306_refine16_ck16384_seed{seed}_fake_1000k.csv",
+        f"{output_root}/cloudphysics_chunksurf_r306_refine16_ck16384_seed{{seed}}_fake_1000k.csv",
         "--donor-globs",
         ",".join(
             [
-                "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r306*_seed{seed}_fake_1000k.csv",
-                "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r305*_seed{seed}_fake_1000k.csv",
-                "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r304*_seed{seed}_fake_1000k.csv",
-                "/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r292*_seed{seed}_fake_1000k.csv",
+                f"{output_root}/cloudphysics_chunksurf_r306*_seed{{seed}}_fake_1000k.csv",
+                f"{output_root}/cloudphysics_chunksurf_r305*_seed{{seed}}_fake_1000k.csv",
+                f"{output_root}/cloudphysics_chunksurf_r304*_seed{{seed}}_fake_1000k.csv",
+                f"{output_root}/cloudphysics_chunksurf_r292*_seed{{seed}}_fake_1000k.csv",
             ]
         ),
         "--tag-prefix",
@@ -93,4 +96,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
