@@ -81,6 +81,23 @@ python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --emit-summary-json-dir /tmp/tracebootstrap_shuffle_snips
 ```
 
+## IRD-renewal (Wikipedia / CloudPhysics)
+
+The IRD-renewal sweep launcher can also emit/append paste-ready Markdown tables
+with the per-seed literal cachesim mean line + exact JSON mean:
+
+```bash
+python3 -m altgan.launch_ird_renewal_sweep \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --output-root /tiamat/zarathustra/altgan-output \
+  --corpus wiki \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car \
+  --seeds 42,80,81,82 \
+  --spec "rb16_s28:ird_s=28,ip=0.10,rb=16" \
+  --emit-markdown
+```
+
 ## Train
 
 ```bash

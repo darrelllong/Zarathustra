@@ -67,6 +67,16 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
+class SeedResult:
+    spec: str
+    seed: int
+    fake: Path
+    cachesim_json: Path
+    cachesim_line: str | None
+    mean: float | None
+
+
+@dataclass(frozen=True)
 class Spec:
     name: str
     ird_scale: float = 32.0
@@ -160,6 +170,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--skip-existing", action="store_true")
     p.add_argument("--dry-run", action="store_true", help="Print commands only, do not run.")
     p.add_argument("--progress-interval", type=int, default=200_000)
+    p.add_argument("--emit-markdown", action="store_true", help="Print a markdown summary table to stdout.")
+    p.add_argument("--append-markdown", help="Append the markdown summary table to a file path.")
     return p.parse_args()
 
 
@@ -214,6 +226,31 @@ def _run(cmd: list[str], env: dict[str, str], dry_run: bool) -> None:
         subprocess.run(cmd, check=True, env=env)
 
 
+def _run_capture(cmd: list[str], env: dict[str, str], dry_run: bool) -> str:
+    print("+ " + " ".join(shlex.quote(p) for p in cmd), flush=True)
+    if dry_run:
+        return ""
+    completed = subprocess.run(
+        cmd,
+        check=True,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    if completed.stdout:
+        sys.stdout.write(completed.stdout)
+        sys.stdout.flush()
+    return completed.stdout or ""
+
+
+def _extract_cachesim_mean_line(output: str) -> str | None:
+    for line in output.splitlines():
+        if "mean HRC-MAE across policies:" in line:
+            return line.strip()
+    return None
+
+
 def _read_mean(json_path: Path) -> float | None:
     if not json_path.exists():
         return None
@@ -222,6 +259,55 @@ def _read_mean(json_path: Path) -> float | None:
         return float(data.get("mean_hrc_mae", data.get("mean", float("nan"))))
     except Exception:
         return None
+
+
+def _format_markdown(
+    *,
+    corpus: str,
+    real: str,
+    cache_sizes: str,
+    policies: str,
+    results: list[SeedResult],
+) -> str:
+    lines: list[str] = []
+    lines.append(f"## {corpus} IRD-renewal sweep (official cachesim surface)")
+    lines.append("")
+    lines.append(f"Official reference: `{real}`.")
+    lines.append("")
+    lines.append("Official `llgan.cachesim_eval` surface:")
+    lines.append("")
+    lines.append("```bash")
+    lines.append(
+        "python3 -m llgan.cachesim_eval "
+        f"--fake <fake.csv> --real {shlex.quote(real)} "
+        f"--cache-sizes {shlex.quote(cache_sizes)} --policies {shlex.quote(policies)}"
+    )
+    lines.append("```")
+    lines.append("")
+    lines.append("| spec | seed | fake CSV | literal cachesim mean line | JSON mean |")
+    lines.append("|---|---:|---|---|---:|")
+    for r in results:
+        mean_cell = f"{r.mean:.10f}" if r.mean is not None else ""
+        cachesim_cell = f"`{r.cachesim_line}`" if r.cachesim_line else ""
+        lines.append(f"| `{r.spec}` | {r.seed} | `{r.fake}` | {cachesim_cell} | {mean_cell} |")
+
+    by_spec: dict[str, list[float]] = {}
+    for r in results:
+        if r.mean is None:
+            continue
+        by_spec.setdefault(r.spec, []).append(r.mean)
+
+    if by_spec:
+        lines.append("")
+        lines.append("| spec | mean across seeds | range |")
+        lines.append("|---|---:|---:|")
+        for spec, means in sorted(by_spec.items(), key=lambda kv: sum(kv[1]) / len(kv[1])):
+            m = sum(means) / len(means)
+            rng = max(means) - min(means)
+            lines.append(f"| `{spec}` | `{m:.10f}` | `{rng:.10f}` |")
+
+    lines.append("")
+    return "\n".join(lines)
 
 
 def main() -> int:
@@ -235,6 +321,7 @@ def main() -> int:
         env[key] = "1"
 
     summary: list[dict] = []
+    all_seed_results: list[SeedResult] = []
 
     for spec in args.spec:
         seed_means: list[float] = []
@@ -243,6 +330,7 @@ def main() -> int:
             fake = root / f"{tag}_fake_{args.n_records // 1_000}k.csv"
             cs_json = root / "cachesim_lanl" / f"{tag}_official.json"
             cs_json.parent.mkdir(parents=True, exist_ok=True)
+            cachesim_line: str | None = None
 
             if args.skip_existing and cs_json.exists():
                 print(f"[irdr_sweep] skip existing {cs_json.name}", flush=True)
@@ -250,12 +338,23 @@ def main() -> int:
                 print(f"[irdr_sweep] generating {fake.name}", flush=True)
                 _run(_renewal_cmd(spec, args, seed, fake), env, args.dry_run)
                 print(f"[irdr_sweep] eval {cs_json.name}", flush=True)
-                _run(_cachesim_cmd(args, fake, cs_json), env, args.dry_run)
+                output = _run_capture(_cachesim_cmd(args, fake, cs_json), env, args.dry_run)
+                cachesim_line = _extract_cachesim_mean_line(output)
 
             mean = _read_mean(cs_json)
             if mean is not None:
                 seed_means.append(mean)
             print(f"[irdr_sweep] {tag}: {mean:.7f}" if mean is not None else f"[irdr_sweep] {tag}: pending", flush=True)
+            all_seed_results.append(
+                SeedResult(
+                    spec=spec.name,
+                    seed=seed,
+                    fake=fake,
+                    cachesim_json=cs_json,
+                    cachesim_line=cachesim_line,
+                    mean=mean,
+                )
+            )
 
         if seed_means:
             overall_mean = sum(seed_means) / len(seed_means)
@@ -273,6 +372,25 @@ def main() -> int:
         print(f"{'spec':<30} {'mean':>10} {'range':>10}", flush=True)
         for row in sorted(summary, key=lambda r: r["mean"]):
             print(f"{row['spec']:<30} {row['mean']:>10.7f} {row['range']:>10.7f}", flush=True)
+
+    if args.emit_markdown or args.append_markdown:
+        md = _format_markdown(
+            corpus=args.corpus,
+            real=args.real,
+            cache_sizes=args.cache_sizes,
+            policies=args.policies,
+            results=all_seed_results,
+        )
+        if args.emit_markdown:
+            print("\n" + md, flush=True)
+        if args.append_markdown:
+            path = Path(args.append_markdown)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                path.write_text(path.read_text() + "\n\n" + md)
+            else:
+                path.write_text(md)
+            print(f"[irdr_sweep] appended markdown -> {path}", flush=True)
 
     return 0
 
