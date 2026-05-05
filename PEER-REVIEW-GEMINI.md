@@ -71,3 +71,16 @@ After reviewing the newest inference features and core metrics, here is the next
 6. `[P2]` **Boundary Critic (`D_bc`) Deployment**: The boundary critic is correctly instantiated, optimized, and serialized inside `train.py`. However, its adversarial loss contribution `loss_bc = -D_bc(_bc_tail_g, _bc_head_g).mean()` relies purely on the standard WGAN-SN loss shape without gradient clipping natively on the generator-side of the boundary loss. While stable today, long-horizon WGAN training can occasionally destabilize if `D_bc` becomes an overpowered discriminator relative to the single-window `C` and `C_feat` critics. Monitor the relative loss values; you may need to reduce `_bc_w` over time.
 
 The project has commendably cleared its most significant codebase and mathematical "debt," fully resolving the CFG leakage, evaluation metrics hardcoding, and mathematical instability in the MMD estimators. With these foundational fixes in place and the successful deployment of the `LRUStackDecoder` and `BoundaryCritic`, the codebase is robust enough to fully shift focus from scalar tuning to architectural/structural innovations.
+
+## Round 5
+
+### Code-Level Findings: Vanishing Gradients in Chained Training
+
+After reviewing the newest structural ideas added since Round 4 (specifically IDEAS #116 and #79), I found a critical PyTorch autograd bug in the backward pass of the new sequence-level losses.
+
+1. `[P1]` **Mathematical Bug: Vanishing Gradient in Hybrid Surrogate Loss**
+**Location:** `llgan/train.py` (Lines ~1908 and ~2012)
+**Issue:** The hybrid surrogate loss (used by both `chain_reuse_weight` and `long_chain_weight`) is designed to provide a constant non-saturating gradient when the reuse logit is positive (`val >= 0`). This is to prevent the generator from collapsing into a super-threshold state where the reuse rate becomes permanently stuck at 1.0. The comment explicitly states the intent: `"piecewise-linear val/T for val≥0 — constant gradient 1/T, no saturation"`. However, the implementation computes this via:
+   `_pos_surr = torch.clamp(val / T, 0.0, 1.0)`
+- **Effect:** In PyTorch, `torch.clamp(x, min, max)` produces a gradient of *exactly zero* when `x` is outside the `[min, max]` bounds. If the generator produces a large positive reuse logit (e.g., `val >= 10.0`), `_pos_surr` saturates to 1.0, and its gradient becomes exactly zero. The generator receives absolutely zero penalty signal to push the value back down, making the super-threshold collapse irreversible once it occurs.
+- **Fix:** Remove `torch.clamp` from the positive surrogate computation. The straight-through estimator equation (`_rate = surr + (hard - surr).detach()`) already naturally forces the forward pass to evaluate to exactly `1.0`. By using `_pos_surr = val / T` directly, the backward pass will continuously transmit the intended `1/T` gradient back to the generator for all `val > 0`, correctly pushing the values back toward the target threshold.
