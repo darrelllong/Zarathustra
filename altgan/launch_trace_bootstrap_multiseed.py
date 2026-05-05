@@ -80,19 +80,46 @@ class SeedResult:
     mean_hrc_mae: float
 
 
-def _markdown_snippet(*, results: list[SeedResult], seeds: list[int]) -> str:
+def _markdown_snippet(
+    *,
+    corpus: str,
+    mode: str,
+    chunk_size: int,
+    retime: bool,
+    n_records: int,
+    n_streams: int,
+    cache_sizes: str,
+    policies: str,
+    real_manifest: str,
+    real_ref: str,
+    results: list[SeedResult],
+    seeds: list[int],
+) -> str:
     means = [r.mean_hrc_mae for r in results]
     overall_mean = sum(means) / len(means) if means else 0.0
     overall_range = max(means) - min(means) if means else 0.0
     seeds_fmt = ",".join(str(s) for s in seeds)
 
     lines: list[str] = []
+    lines.append(f"**Corpus:** `{corpus}`")
+    lines.append(
+        "**Protocol:** "
+        + f"`mode={mode}` "
+        + f"`chunk_size={chunk_size}` "
+        + f"`n_records={_records_label(n_records)}` "
+        + f"`n_streams={n_streams}` "
+        + f"`retime={'on' if retime else 'off'}`"
+    )
+    lines.append(f"**Eval surface:** `cache_sizes={cache_sizes}` `policies={policies}`")
+    lines.append(f"**Refs:** `real_manifest={real_manifest}` `real_ref={real_ref}`")
+    lines.append("")
     lines.append("| seed | fake CSV | literal cachesim mean line | JSON mean |")
     lines.append("|---:|---|---|---:|")
     for r in results:
         mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
         lines.append(f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae:.10f} |")
     lines.append("")
+    lines.append(f"Literal cachesim mean line (mean across seeds): `{_literal_cachesim_mean_line(overall_mean)}`")
     lines.append(f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`")
     lines.append(f"Range: `{overall_range:.10f}`")
     return "\n".join(lines) + "\n"
@@ -301,6 +328,15 @@ def main() -> int:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         summary = {
             "corpus": args.corpus,
+            "mode": args.mode,
+            "chunk_size": int(args.chunk_size),
+            "retime": bool(args.retime),
+            "n_records": int(args.n_records),
+            "n_streams": int(args.n_streams),
+            "cache_sizes": args.cache_sizes,
+            "policies": args.policies,
+            "real_manifest": args.real_manifest,
+            "real_ref": args.real_ref,
             "seeds": list(args.seeds),
             "results": [
                 {
@@ -319,7 +355,20 @@ def main() -> int:
 
     markdown_text = None
     if args.emit_markdown_to:
-        markdown_text = _markdown_snippet(results=results, seeds=list(args.seeds))
+        markdown_text = _markdown_snippet(
+            corpus=args.corpus,
+            mode=args.mode,
+            chunk_size=int(args.chunk_size),
+            retime=bool(args.retime),
+            n_records=int(args.n_records),
+            n_streams=int(args.n_streams),
+            cache_sizes=args.cache_sizes,
+            policies=args.policies,
+            real_manifest=args.real_manifest,
+            real_ref=args.real_ref,
+            results=results,
+            seeds=list(args.seeds),
+        )
         out_path = Path(args.emit_markdown_to)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(markdown_text)
@@ -327,7 +376,20 @@ def main() -> int:
 
     if args.emit_markdown or args.emit_markdown_to:
         if markdown_text is None:
-            markdown_text = _markdown_snippet(results=results, seeds=list(args.seeds))
+            markdown_text = _markdown_snippet(
+                corpus=args.corpus,
+                mode=args.mode,
+                chunk_size=int(args.chunk_size),
+                retime=bool(args.retime),
+                n_records=int(args.n_records),
+                n_streams=int(args.n_streams),
+                cache_sizes=args.cache_sizes,
+                policies=args.policies,
+                real_manifest=args.real_manifest,
+                real_ref=args.real_ref,
+                results=results,
+                seeds=list(args.seeds),
+            )
         print("\n---", flush=True)
         print("\nPaste-ready Markdown:", flush=True)
         print("", flush=True)
