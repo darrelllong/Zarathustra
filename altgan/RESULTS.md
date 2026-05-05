@@ -2244,7 +2244,7 @@ If launching from a machine without `/tiamat`, use the SSH dispatcher to run on
 `vinge`/`baase` and commit+push doc updates via git (no scp):
 
 ```bash
-python -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack
+python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack
 ```
 
 ```bash

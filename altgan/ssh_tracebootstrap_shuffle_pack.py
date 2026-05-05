@@ -8,7 +8,7 @@ LANL docs through git (no scp).
 
 Typical use (from any machine with SSH access):
 
-  python -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local
+  python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local
 
 If `/tiamat` is mounted elsewhere on the remote host, pass `--zarathustra-root`.
 Use `--tmux-session` for long runs so the job is explicitly managed.
@@ -77,7 +77,22 @@ def _q(value: str) -> str:
 def _remote_shell(*, args: argparse.Namespace) -> str:
     host = args.host if args.user is None else f"{args.user}@{args.host}"
     key = str(Path(args.ssh_key).expanduser())
-    return " ".join(["ssh", "-i", _q(key), "-A", _q(host), "--"])
+    return " ".join(
+        [
+            "ssh",
+            "-i",
+            _q(key),
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "ConnectionAttempts=1",
+            "-A",
+            _q(host),
+            "--",
+        ]
+    )
 
 
 def _build_remote_script(*, args: argparse.Namespace) -> str:
@@ -85,7 +100,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     output_root = args.output_root or f"{zar_root}/altgan-output"
     emit_dir = args.emit_dir or f"{output_root}/paste_ready"
     cmd = [
-        "python",
+        "python3",
         "-m",
         "altgan.launch_trace_bootstrap_shuffle_pack",
         "--corpora",
@@ -132,7 +147,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
         "set -euo pipefail",
         f"cd {_q(args.repo_dir)}",
         "git pull --rebase origin main",
-        "python -V",
+        "python3 -V",
         "echo '[ssh_tracebootstrap] Running TraceBootstrap shuffle pack...'",
         " ".join(_q(part) for part in cmd),
     ]
@@ -174,4 +189,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
