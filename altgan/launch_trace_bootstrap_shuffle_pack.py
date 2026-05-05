@@ -14,6 +14,7 @@ import argparse
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,16 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--seeds", default="42,80,81,82")
     p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
     p.add_argument(
+        "--emit-markdown-dir",
+        default=None,
+        help="If set, write one paste-ready Markdown snippet per corpus into this directory.",
+    )
+    p.add_argument(
+        "--emit-summary-json-dir",
+        default=None,
+        help="If set, write one machine-readable JSON summary per corpus into this directory.",
+    )
+    p.add_argument(
         "--markdown",
         action="store_true",
         help="Forward `--emit-markdown` to the underlying multi-seed runner.",
@@ -100,6 +111,13 @@ def main() -> int:
     unknown = [c for c in corpora if c not in _PRESETS]
     if unknown:
         raise SystemExit(f"Unknown corpora: {unknown}. Choices: {sorted(_PRESETS)}")
+
+    md_dir = Path(args.emit_markdown_dir) if args.emit_markdown_dir else None
+    if md_dir:
+        md_dir.mkdir(parents=True, exist_ok=True)
+    json_dir = Path(args.emit_summary_json_dir) if args.emit_summary_json_dir else None
+    if json_dir:
+        json_dir.mkdir(parents=True, exist_ok=True)
 
     failures: list[tuple[str, int]] = []
     for corpus in corpora:
@@ -138,6 +156,20 @@ def main() -> int:
         ]
         if args.markdown:
             cmd.append("--emit-markdown")
+        if md_dir:
+            cmd.extend(
+                [
+                    "--emit-markdown-to",
+                    str(md_dir / f"tracebootstrap_shuffle_{preset.corpus}.md"),
+                ]
+            )
+        if json_dir:
+            cmd.extend(
+                [
+                    "--emit-summary-json-to",
+                    str(json_dir / f"tracebootstrap_shuffle_{preset.corpus}.json"),
+                ]
+            )
         if args.skip_existing:
             cmd.append("--skip-existing")
         if args.dry_run:

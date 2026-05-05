@@ -60,11 +60,25 @@ python -m altgan.launch_trace_bootstrap_multiseed \
 If the run is interrupted, re-run with `--skip-existing` to resume without
 recomputing completed seeds.
 
+To save the paste-ready Markdown (and a machine-readable JSON summary) to files:
+
+```bash
+python -m altgan.launch_trace_bootstrap_multiseed \
+  ... \
+  --emit-markdown-to /tmp/tracebootstrap_twitter_shuffle.md \
+  --emit-summary-json-to /tmp/tracebootstrap_twitter_shuffle.json
+```
+
 To publish/refresh the full 1M-corpus shuffle pack (Twitter / Meta KV / Meta CDN /
 Wikipedia) in one go:
 
 ```bash
-python -m altgan.launch_trace_bootstrap_shuffle_pack --markdown --skip-existing --keep-going
+python -m altgan.launch_trace_bootstrap_shuffle_pack \
+  --markdown \
+  --skip-existing \
+  --keep-going \
+  --emit-markdown-dir /tmp/tracebootstrap_shuffle_snips \
+  --emit-summary-json-dir /tmp/tracebootstrap_shuffle_snips
 ```
 
 ## Train

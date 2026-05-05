@@ -1067,7 +1067,13 @@ Reproduce / publish the shuffle TraceBootstrap ledger panels (including the
 missing Twitter / Meta KV / Meta CDN / Wikipedia shuffle rows) with:
 
 ```bash
-python -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter,metakv,metacdn,wiki --markdown
+python -m altgan.launch_trace_bootstrap_shuffle_pack \
+  --corpora twitter,metakv,metacdn,wiki \
+  --markdown \
+  --skip-existing \
+  --keep-going \
+  --emit-markdown-dir /tiamat/zarathustra/altgan-output/paste_ready \
+  --emit-summary-json-dir /tiamat/zarathustra/altgan-output/paste_ready
 ```
 
 ## 2026-05-03 -- Meta KV Generative Reuse-Drop Entry

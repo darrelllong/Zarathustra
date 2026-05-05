@@ -80,6 +80,24 @@ class SeedResult:
     mean_hrc_mae: float
 
 
+def _markdown_snippet(*, results: list[SeedResult], seeds: list[int]) -> str:
+    means = [r.mean_hrc_mae for r in results]
+    overall_mean = sum(means) / len(means) if means else 0.0
+    overall_range = max(means) - min(means) if means else 0.0
+    seeds_fmt = ",".join(str(s) for s in seeds)
+
+    lines: list[str] = []
+    lines.append("| seed | fake CSV | literal cachesim mean line | JSON mean |")
+    lines.append("|---:|---|---|---:|")
+    for r in results:
+        mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
+        lines.append(f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae:.10f} |")
+    lines.append("")
+    lines.append(f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`")
+    lines.append(f"Range: `{overall_range:.10f}`")
+    return "\n".join(lines) + "\n"
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--corpus", required=True, help="Corpus label used for output naming.")
@@ -117,6 +135,16 @@ def _parse_args() -> argparse.Namespace:
         "--emit-markdown",
         action="store_true",
         help="Print a paste-ready Markdown results table after running.",
+    )
+    p.add_argument(
+        "--emit-markdown-to",
+        default=None,
+        help="Write the paste-ready Markdown snippet to this file path (also implies --emit-markdown).",
+    )
+    p.add_argument(
+        "--emit-summary-json-to",
+        default=None,
+        help="Write a machine-readable JSON summary (per-seed means + overall mean/range) to this file path.",
     )
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
@@ -268,25 +296,42 @@ def main() -> int:
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
     print(f"Range: {overall_range:.10f}", flush=True)
 
-    if args.emit_markdown:
-        seeds_fmt = ",".join(str(s) for s in args.seeds)
+    if args.emit_summary_json_to:
+        out_path = Path(args.emit_summary_json_to)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "corpus": args.corpus,
+            "seeds": list(args.seeds),
+            "results": [
+                {
+                    "seed": r.seed,
+                    "fake_csv": str(r.fake_csv),
+                    "report_json": str(r.report_json),
+                    "mean_hrc_mae": float(r.mean_hrc_mae),
+                }
+                for r in results
+            ],
+            "overall_mean": float(overall_mean),
+            "overall_range": float(overall_range),
+        }
+        out_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+        print(f"\nWrote summary JSON: {out_path}", flush=True)
+
+    markdown_text = None
+    if args.emit_markdown_to:
+        markdown_text = _markdown_snippet(results=results, seeds=list(args.seeds))
+        out_path = Path(args.emit_markdown_to)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(markdown_text)
+        print(f"\nWrote Markdown snippet: {out_path}", flush=True)
+
+    if args.emit_markdown or args.emit_markdown_to:
+        if markdown_text is None:
+            markdown_text = _markdown_snippet(results=results, seeds=list(args.seeds))
         print("\n---", flush=True)
         print("\nPaste-ready Markdown:", flush=True)
         print("", flush=True)
-        print("| seed | fake CSV | literal cachesim mean line | JSON mean |", flush=True)
-        print("|---:|---|---|---:|", flush=True)
-        for r in results:
-            mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
-            print(
-                f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae:.10f} |",
-                flush=True,
-            )
-        print("", flush=True)
-        print(
-            f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`",
-            flush=True,
-        )
-        print(f"Range: `{overall_range:.10f}`", flush=True)
+        print(markdown_text, end="", flush=True)
     return 0
 
 

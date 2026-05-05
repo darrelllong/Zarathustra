@@ -2239,7 +2239,12 @@ python -m altgan.launch_trace_bootstrap_multiseed --help
 Shortcut (standard 1M shuffle protocol for Twitter / Meta KV / Meta CDN / Wiki):
 
 ```bash
-python -m altgan.launch_trace_bootstrap_shuffle_pack --markdown
+python -m altgan.launch_trace_bootstrap_shuffle_pack \
+  --markdown \
+  --skip-existing \
+  --keep-going \
+  --emit-markdown-dir /tiamat/zarathustra/altgan-output/paste_ready \
+  --emit-summary-json-dir /tiamat/zarathustra/altgan-output/paste_ready
 ```
 
 ## Meta KV Generative Reuse-Drop Entry (2026-05-03)
