@@ -23,7 +23,7 @@ The race has two metric classes:
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
 | Alibaba | 0.01245 (R276 cool8: R244 lock + --hot-pool-min-age 8) | **0.01130** (R289 chunk-ensemble guard pass on hot-pool-cooldown base, 4-seed {42,80,81,82}) | **LANL** | −9.2% |
-| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | 0.0336 (100k retarget) | tied (with caveat) | — |
+| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.0311 (R283.H: R237 atlas + scale=0.7; 8-pol multi-seed, range 0.000469) | **0.0267** (rank-conditioned IRD-renewal, 8-pol 4-seed {42,80,81,82}) | **LANL** | −14.1% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
 | MSR Exchange | 0.00921 (R282.F: R270 atlas + scale=1.3) | **0.00484** (hp=0.25 rank=1.0 min_age=16; 6-pol 4-seed {42,80,81,82}, range 0.0000631) | **LANL** | −47.5% |
@@ -32,8 +32,8 @@ The race has two metric classes:
 | Meta CDN | **0.04625** (R281.K scale=0.001 multi-seed, range 0.000378) | **0.0377** (low-tail update; 4-seed {42,80,81,82}) | **LANL** | −18.5% |
 | Wikipedia | 0.01727 (R280.I scale=4.5 multi-seed, range 0.000132) | **0.01146** (IRD-renewal ird_s=32 ip=0.10; 4-seed {42,80,81,82}, range 0.000533) | **LANL** | −33.6% |
 
-**Generative score**: LLNL leads 0 corpora; LANL leads 8 (Alibaba, CP, Baleen24, MSR, Twitter,
-Meta KV, Meta CDN, Wikipedia); tied 1 (Tencent, with protocol caveat on LLNL's historical row).
+**Generative score**: LLNL leads 0 corpora; LANL leads 9 (Alibaba, Tencent, CP, Baleen24, MSR, Twitter,
+Meta KV, Meta CDN, Wikipedia); tied 0.
 All 9 corpora have generative claims from both teams.
 
 ## TraceBootstrap leader board (methodology theater)
@@ -69,6 +69,13 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - Per-seed (42/43/44/45): 0.017369 / 0.017324 / 0.017393 / 0.017500
 - 4-seed mean: **0.01740** (range 0.000175 — extremely tight)
 - Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
+
+### LANL Tencent (current leader — Round 71, cache-surface chunk selector)
+- Method: `python -m altgan.launch_tencent_chunk_surface_multiseed` — chunk-level object-ID donor selector optimized only against `llgan.cachesim_eval` mean
+- Reference: `/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`; official 6-policy surface (lru,arc,fifo,sieve,slru,car)
+- Per-seed (42/80/81/82): 0.0300267 / 0.0300523 / 0.0303223 / 0.0299787
+- 4-seed mean: **0.03010** (range 0.000344)
+- Notes: beats LLNL's historical Tencent row (0.0305) which is unverified / protocol-lost
 
 ### LANL MSR Exchange (current leader — Round 70, supersedes LLNL R282.F)
 - Atlas: `/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`
