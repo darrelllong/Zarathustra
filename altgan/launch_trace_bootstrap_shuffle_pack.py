@@ -20,10 +20,10 @@ from pathlib import Path
 @dataclass(frozen=True)
 class CorpusPreset:
     corpus: str
-    trace_dir: str
+    trace_dir_rel: str
     fmt: str
-    real_manifest: str
-    real_ref: str
+    real_manifest_rel: str
+    real_ref_rel: str
     n_records: int = 1_000_000
     n_streams: int = 4
     mode: str = "shuffle"
@@ -38,31 +38,31 @@ _PRESETS: dict[str, CorpusPreset] = {
     # file paths, so these are safe defaults.
     "twitter": CorpusPreset(
         corpus="twitter",
-        trace_dir="/tiamat/zarathustra/traces/twitter_cluster",
+        trace_dir_rel="traces/twitter_cluster",
         fmt="oracle_general",
-        real_manifest="/tiamat/zarathustra/llgan-output/manifests/twitter_cluster_stackatlas.json",
-        real_ref="/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv",
+        real_manifest_rel="llgan-output/manifests/twitter_cluster_stackatlas.json",
+        real_ref_rel="llgan-output/refs/twitter_cluster_real.csv",
     ),
     "metakv": CorpusPreset(
         corpus="metakv",
-        trace_dir="/tiamat/zarathustra/traces",
+        trace_dir_rel="traces",
         fmt="oracle_general",
-        real_manifest="/tiamat/zarathustra/llgan-output/manifests/metakv_stackatlas.json",
-        real_ref="/tiamat/zarathustra/llgan-output/refs/metakv_real.csv",
+        real_manifest_rel="llgan-output/manifests/metakv_stackatlas.json",
+        real_ref_rel="llgan-output/refs/metakv_real.csv",
     ),
     "metacdn": CorpusPreset(
         corpus="metacdn",
-        trace_dir="/tiamat/zarathustra/traces",
+        trace_dir_rel="traces",
         fmt="oracle_general",
-        real_manifest="/tiamat/zarathustra/llgan-output/manifests/metacdn_stackatlas.json",
-        real_ref="/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv",
+        real_manifest_rel="llgan-output/manifests/metacdn_stackatlas.json",
+        real_ref_rel="llgan-output/refs/metacdn_real.csv",
     ),
     "wiki": CorpusPreset(
         corpus="wiki",
-        trace_dir="/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2019_wiki",
+        trace_dir_rel="traces/s3-cache-datasets/cache_dataset_oracleGeneral/2019_wiki",
         fmt="oracle_general",
-        real_manifest="/tiamat/zarathustra/llgan-output/manifests/wiki_stackatlas.json",
-        real_ref="/tiamat/zarathustra/llgan-output/refs/wiki_real.csv",
+        real_manifest_rel="llgan-output/manifests/wiki_stackatlas.json",
+        real_ref_rel="llgan-output/refs/wiki_real.csv",
     ),
 }
 
@@ -105,7 +105,19 @@ def _parse_args() -> argparse.Namespace:
         help=f"Comma-separated subset of: {','.join(sorted(_PRESETS))}",
     )
     p.add_argument("--seeds", default="42,80,81,82")
-    p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
+    p.add_argument(
+        "--zarathustra-root",
+        default="/tiamat/zarathustra",
+        help=(
+            "Root directory containing `traces/` and `llgan-output/` (default: /tiamat/zarathustra). "
+            "Use this if `/tiamat` is mounted elsewhere on your host."
+        ),
+    )
+    p.add_argument(
+        "--output-root",
+        default=None,
+        help="Where to write fake CSVs + cachesim JSON reports (default: <zarathustra-root>/altgan-output).",
+    )
     p.add_argument(
         "--emit-markdown-dir",
         default=None,
@@ -161,7 +173,8 @@ def main() -> int:
     if unknown:
         raise SystemExit(f"Unknown corpora: {unknown}. Choices: {sorted(_PRESETS)}")
 
-    output_root = Path(args.output_root)
+    zar_root = Path(args.zarathustra_root)
+    output_root = Path(args.output_root) if args.output_root else (zar_root / "altgan-output")
     md_dir = Path(args.emit_markdown_dir) if args.emit_markdown_dir else None
     json_dir = Path(args.emit_summary_json_dir) if args.emit_summary_json_dir else None
 
@@ -191,6 +204,9 @@ def main() -> int:
     failures: list[tuple[str, int]] = []
     for corpus in corpora:
         preset = _PRESETS[corpus]
+        trace_dir = str(zar_root / preset.trace_dir_rel)
+        real_manifest = str(zar_root / preset.real_manifest_rel)
+        real_ref = str(zar_root / preset.real_ref_rel)
         md_path = md_dir / f"tracebootstrap_shuffle_{preset.corpus}.md" if md_dir else None
         summary_path = json_dir / f"tracebootstrap_shuffle_{preset.corpus}.json" if json_dir else None
         cmd = [
@@ -201,13 +217,13 @@ def main() -> int:
             "--corpus",
             preset.corpus,
             "--trace-dir",
-            preset.trace_dir,
+            trace_dir,
             "--fmt",
             preset.fmt,
             "--real-manifest",
-            preset.real_manifest,
+            real_manifest,
             "--real-ref",
-            preset.real_ref,
+            real_ref,
             "--seeds",
             args.seeds,
             "--n-records",
@@ -223,7 +239,7 @@ def main() -> int:
             "--policies",
             preset.policies,
             "--output-root",
-            args.output_root,
+            str(output_root),
         ]
         if args.markdown:
             cmd.append("--emit-markdown")

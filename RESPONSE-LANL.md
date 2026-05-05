@@ -1066,6 +1066,8 @@ scale.
 Reproduce / publish the shuffle TraceBootstrap ledger panels (including the
 missing Twitter / Meta KV / Meta CDN / Wikipedia shuffle rows) with:
 
+If your `/tiamat` mount point differs, pass `--zarathustra-root /path/to/zarathustra`.
+
 ```bash
 python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --corpora twitter,metakv,metacdn,wiki \

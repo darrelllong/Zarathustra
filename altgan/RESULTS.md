@@ -2238,6 +2238,8 @@ python -m altgan.launch_trace_bootstrap_multiseed --help
 
 Shortcut (standard 1M shuffle protocol for Twitter / Meta KV / Meta CDN / Wiki):
 
+If your `/tiamat` mount point differs, pass `--zarathustra-root /path/to/zarathustra`.
+
 ```bash
 python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --update-lanl-docs \
