@@ -2240,6 +2240,13 @@ Shortcut (standard 1M shuffle protocol for Twitter / Meta KV / Meta CDN / Wiki):
 
 If your `/tiamat` mount point differs, pass `--zarathustra-root /path/to/zarathustra`.
 
+If launching from a machine without `/tiamat`, use the SSH dispatcher to run on
+`vinge`/`baase` and commit+push doc updates via git (no scp):
+
+```bash
+python -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack
+```
+
 ```bash
 python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --update-lanl-docs \

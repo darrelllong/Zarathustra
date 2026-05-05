@@ -1068,6 +1068,13 @@ missing Twitter / Meta KV / Meta CDN / Wikipedia shuffle rows) with:
 
 If your `/tiamat` mount point differs, pass `--zarathustra-root /path/to/zarathustra`.
 
+If you're launching from a machine without `/tiamat` but with SSH access to a
+`/tiamat` host, use the git-only dispatcher (no scp):
+
+```bash
+python -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack
+```
+
 ```bash
 python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --corpora twitter,metakv,metacdn,wiki \
