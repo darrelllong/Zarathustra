@@ -14,10 +14,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -43,6 +45,34 @@ def _mean_from_json(path: Path) -> float:
     if "mean" in data:
         return float(data["mean"])
     raise KeyError(f"{path} missing mean_hrc_mae/mean")
+
+
+_NUMBER_RE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+
+def _mean_token_from_json_text(path: Path) -> tuple[str, float]:
+    """Return the *literal* numeric token used for the mean field in a JSON report.
+
+    `llgan.cachesim_eval` writes JSON via Python's `json.dumps()` which may choose
+    either fixed-point or scientific notation; LANL docs want the exact token
+    string so it can be pasted verbatim.
+    """
+
+    text = path.read_text()
+    for field in ("mean_hrc_mae", "mean"):
+        m = re.search(rf"\"{re.escape(field)}\"\s*:\s*({_NUMBER_RE})", text)
+        if m:
+            token = m.group(1)
+            d = Decimal(token)
+            # Preserve the exact JSON numeric value but render without scientific notation
+            # so the docs stay readable.
+            as_fixed = format(d, "f")
+            if "." in as_fixed:
+                as_fixed = as_fixed.rstrip("0").rstrip(".") or "0"
+            return as_fixed, float(d)
+
+    # Fallback: parse as JSON (loses formatting), but still returns a value.
+    return f"{_mean_from_json(path):.10f}", _mean_from_json(path)
 
 
 def _literal_cachesim_mean_line(mean_hrc_mae: float) -> str:
@@ -78,6 +108,7 @@ class SeedResult:
     fake_csv: Path
     report_json: Path
     mean_hrc_mae: float
+    mean_hrc_mae_token: str
 
 
 def _markdown_snippet(
@@ -117,7 +148,7 @@ def _markdown_snippet(
     lines.append("|---:|---|---|---:|")
     for r in results:
         mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
-        lines.append(f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae:.10f} |")
+        lines.append(f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae_token} |")
     lines.append("")
     lines.append(f"Literal cachesim mean line (mean across seeds): `{_literal_cachesim_mean_line(overall_mean)}`")
     lines.append(f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`")
@@ -226,18 +257,19 @@ def main() -> int:
 
         if args.skip_existing and not args.dry_run:
             if fake_csv.exists() and report_json.exists():
-                mean = _mean_from_json(report_json)
+                mean_token, mean = _mean_token_from_json_text(report_json)
                 results.append(
                     SeedResult(
                         seed=seed,
                         fake_csv=fake_csv,
                         report_json=report_json,
                         mean_hrc_mae=mean,
+                        mean_hrc_mae_token=mean_token,
                     )
                 )
                 print(
                     f"[skip-existing] seed={seed} already has fake+report; "
-                    f"mean={mean:.10f}",
+                    f"mean={mean_token}",
                     flush=True,
                 )
                 continue
@@ -295,13 +327,14 @@ def main() -> int:
             print(f"[skip-existing] seed={seed} report JSON exists: {report_json}", flush=True)
 
         if not args.dry_run:
-            mean = _mean_from_json(report_json)
+            mean_token, mean = _mean_token_from_json_text(report_json)
             results.append(
                 SeedResult(
                     seed=seed,
                     fake_csv=fake_csv,
                     report_json=report_json,
                     mean_hrc_mae=mean,
+                    mean_hrc_mae_token=mean_token,
                 )
             )
 
@@ -314,7 +347,7 @@ def main() -> int:
         print(f"\nseed {r.seed}", flush=True)
         print(f"fake CSV: {r.fake_csv}", flush=True)
         print(_literal_cachesim_mean_line(r.mean_hrc_mae), flush=True)
-        print(f"JSON mean: {r.mean_hrc_mae:.10f}", flush=True)
+        print(f"JSON mean: {r.mean_hrc_mae_token}", flush=True)
         print(f"Report JSON: {r.report_json}", flush=True)
 
     means = [r.mean_hrc_mae for r in results]
@@ -344,6 +377,7 @@ def main() -> int:
                     "fake_csv": str(r.fake_csv),
                     "report_json": str(r.report_json),
                     "mean_hrc_mae": float(r.mean_hrc_mae),
+                    "mean_hrc_mae_token": r.mean_hrc_mae_token,
                 }
                 for r in results
             ],
