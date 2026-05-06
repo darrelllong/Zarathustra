@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,9 @@ def _parse_ints(text: str) -> list[int]:
 
 
 def _parse_templates(text: str) -> list[str]:
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+def _parse_paths(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
@@ -46,6 +50,7 @@ class StageResult:
     fake_csv: Path
     report_json: Path
     mean_hrc_mae: float
+    literal_mean_line: str
 
 
 def _mean_from_json(path: Path) -> float:
@@ -72,7 +77,7 @@ def _markdown_snippet(
     *,
     title: str,
     seeds: list[int],
-    final_means: list[tuple[int, float, Path, Path]],
+    final_means: list[tuple[int, float, Path, Path, str]],
     overall_mean: float,
     overall_range: float,
 ) -> str:
@@ -83,9 +88,9 @@ def _markdown_snippet(
         "| seed | fake CSV | literal cachesim mean line | JSON mean |",
         "|---:|---|---|---:|",
     ]
-    for seed, mean, fake_csv, _report_json in final_means:
+    for seed, mean, fake_csv, _report_json, literal_mean_line in final_means:
         lines.append(
-            f"| {seed} | `{fake_csv}` | `{_literal_cachesim_mean_line(mean)}` | {mean:.10f} |"
+            f"| {seed} | `{fake_csv}` | `{literal_mean_line}` | {mean:.10f} |"
         )
     lines += [
         "",
@@ -147,11 +152,30 @@ def _print_cmd(cmd: list[str]) -> None:
     print("+ " + " ".join(shlex.quote(part) for part in cmd), flush=True)
 
 
-def _run(cmd: list[str], *, env: dict[str, str], dry_run: bool) -> None:
+def _run(cmd: list[str], *, env: dict[str, str], dry_run: bool) -> str | None:
     _print_cmd(cmd)
     if dry_run:
-        return
-    subprocess.run(cmd, check=True, env=env)
+        return None
+    mean_line: str | None = None
+    mean_re = re.compile(r"^mean HRC-MAE across policies:\s*[0-9.]+\s*$")
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip("\n")
+        print(line, flush=True)
+        if mean_re.match(line.strip()):
+            mean_line = line.strip()
+    rc = proc.wait()
+    if rc != 0:
+        raise subprocess.CalledProcessError(rc, cmd)
+    return mean_line
 
 
 def _parse_args() -> argparse.Namespace:
@@ -190,7 +214,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--append-markdown",
         default=None,
-        help="Append the markdown snippet to this file (e.g. RESPONSE-LANL.md or altgan/RESULTS.md).",
+        help=(
+            "Append the markdown snippet to one or more files (comma-separated), e.g. "
+            "`RESPONSE-LANL.md,altgan/RESULTS.md`."
+        ),
     )
     p.add_argument(
         "--markdown-title",
@@ -222,7 +249,7 @@ def main() -> int:
         eval_root.mkdir(parents=True, exist_ok=True)
 
     results: list[StageResult] = []
-    final_means: list[tuple[int, float, Path, Path]] = []
+    final_means: list[tuple[int, float, Path, Path, str]] = []
 
     for seed in args.seeds:
         base = Path(_render_template(args.base_template, seed=seed))
@@ -246,13 +273,14 @@ def main() -> int:
                 max_accepts=args.max_accepts,
                 min_improvement=args.min_improvement,
             )
-            _run(cmd, env=env, dry_run=args.dry_run)
+            literal_mean_line = _run(cmd, env=env, dry_run=args.dry_run)
 
             out_fake = output_root / f"{tag}_ck{chunk_size}_seed{seed}_fake_100k.csv"
             out_json = eval_root / f"{tag}_ck{chunk_size}_seed{seed}_official6.json"
             if args.dry_run:
                 continue
             mean = _mean_from_json(out_json)
+            literal = literal_mean_line or _literal_cachesim_mean_line(mean)
             results.append(
                 StageResult(
                     seed=seed,
@@ -260,26 +288,35 @@ def main() -> int:
                     fake_csv=out_fake,
                     report_json=out_json,
                     mean_hrc_mae=mean,
+                    literal_mean_line=literal,
                 )
             )
             current_base = out_fake
 
         if not args.dry_run:
-            final_means.append((seed, results[-1].mean_hrc_mae, results[-1].fake_csv, results[-1].report_json))
+            final_means.append(
+                (
+                    seed,
+                    results[-1].mean_hrc_mae,
+                    results[-1].fake_csv,
+                    results[-1].report_json,
+                    results[-1].literal_mean_line,
+                )
+            )
 
     if args.dry_run:
         print("\n[dry-run] No stages executed; exiting.", flush=True)
         return 0
 
     print("\n=== TENCENT CHUNK-SURFACE MULTI-SEED SUMMARY ===", flush=True)
-    for seed, mean, fake_csv, report_json in final_means:
+    for seed, mean, fake_csv, report_json, literal_mean_line in final_means:
         print(f"\nseed {seed}", flush=True)
         print(f"fake CSV: {fake_csv}", flush=True)
-        print(_literal_cachesim_mean_line(mean), flush=True)
+        print(literal_mean_line, flush=True)
         print(f"JSON mean: {mean:.10f}", flush=True)
         print(f"Report JSON: {report_json}", flush=True)
 
-    means = [m for _, m, _, _ in final_means]
+    means = [m for _, m, _, _, _ in final_means]
     overall_mean = sum(means) / len(means)
     overall_range = max(means) - min(means) if means else 0.0
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
@@ -299,12 +336,15 @@ def main() -> int:
             print("\n=== MARKDOWN SNIPPET (paste into RESPONSE-LANL.md / altgan/RESULTS.md) ===", flush=True)
             print(snippet, flush=True)
         if args.append_markdown:
-            dest = Path(args.append_markdown)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            with dest.open("a", encoding="utf-8") as f:
-                f.write("\n")
-                f.write(snippet)
-            print(f"[markdown] appended snippet to {dest}", flush=True)
+            dests = [Path(p) for p in _parse_paths(args.append_markdown)]
+            if not dests:
+                raise ValueError("--append-markdown was provided but no paths were parsed")
+            for dest in dests:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with dest.open("a", encoding="utf-8") as f:
+                    f.write("\n")
+                    f.write(snippet)
+                print(f"[markdown] appended snippet to {dest}", flush=True)
     return 0
 
 
