@@ -2247,7 +2247,7 @@ If launching from a machine without `/tiamat`, use the SSH dispatcher to run on
 python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack
 ```
 
-If your ssh config routes through a jump host (ProxyJump) and that host doesn't resolve, add `--no-proxyjump` (or `--ssh-option ProxyJump=`).
+If your ssh config routes through a jump host (ProxyJump) and that host doesn't resolve, add `--no-proxyjump` (or `--ssh-option ProxyJump=none`).
 
 ```bash
 python3 -m altgan.launch_trace_bootstrap_shuffle_pack \

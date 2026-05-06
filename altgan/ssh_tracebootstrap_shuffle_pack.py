@@ -44,7 +44,7 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Disable ssh ProxyJump (overrides any ssh config) by passing "
-            "`-o ProxyJump=`. Useful when your ssh config routes `baase` via "
+            "`-o ProxyJump=none`. Useful when your ssh config routes `baase` via "
             "`vinge` and DNS for the jump host is unavailable."
         ),
     )
@@ -135,7 +135,7 @@ def _remote_shell(*, args: argparse.Namespace) -> str:
         "ConnectionAttempts=1",
     ]
     if args.no_proxyjump:
-        ssh_parts.extend(["-o", "ProxyJump="])
+        ssh_parts.extend(["-o", "ProxyJump=none"])
     for opt in args.ssh_option:
         ssh_parts.extend(["-o", _q(opt)])
     if not args.no_agent_forwarding:
@@ -161,7 +161,7 @@ def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
         "ConnectionAttempts=1",
     ]
     if args.no_proxyjump:
-        ssh_argv.extend(["-o", "ProxyJump="])
+        ssh_argv.extend(["-o", "ProxyJump=none"])
     for opt in args.ssh_option:
         ssh_argv.extend(["-o", opt])
     if not args.no_agent_forwarding:
