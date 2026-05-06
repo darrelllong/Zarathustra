@@ -2260,19 +2260,19 @@ python3 -m altgan.launch_trace_bootstrap_shuffle_pack \
 ### TraceBootstrap shuffle panels (auto-generated)
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
-_(pending: run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --corpora twitter --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METAKV -->
-_(pending: run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --corpora metakv --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METAKV -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METACDN -->
-_(pending: run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --corpora metacdn --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METACDN -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_WIKI -->
-_(pending: run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --corpora wiki --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_WIKI -->
 
 ## Meta KV Generative Reuse-Drop Entry (2026-05-03)
