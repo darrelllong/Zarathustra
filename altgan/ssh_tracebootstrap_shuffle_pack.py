@@ -45,6 +45,17 @@ def _parse_args() -> argparse.Namespace:
         default="/tiamat/zarathustra",
         help="Remote root containing traces/ and llgan-output/ (default: /tiamat/zarathustra).",
     )
+    p.add_argument(
+        "--sync",
+        choices=["pull", "bundle", "none"],
+        default="pull",
+        help=(
+            "How to sync the remote repo before running: "
+            "`pull` runs `git pull --rebase origin main` on the remote; "
+            "`bundle` streams the *local* `main` branch as a git bundle over SSH and hard-resets the remote; "
+            "`none` skips syncing."
+        ),
+    )
     p.add_argument("--corpora", default="twitter,metakv,metacdn,wiki")
     p.add_argument("--seeds", default="42,80,81,82")
     p.add_argument(
@@ -124,6 +135,61 @@ def _remote_shell(*, args: argparse.Namespace) -> str:
     )
 
 
+def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
+    host = args.host if args.user is None else f"{args.user}@{args.host}"
+    key = str(Path(args.ssh_key).expanduser())
+    ssh_argv = [
+        "ssh",
+        "-i",
+        key,
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "ConnectionAttempts=1",
+    ]
+    for opt in args.ssh_option:
+        ssh_argv.extend(["-o", opt])
+    if not args.no_agent_forwarding:
+        ssh_argv.append("-A")
+    ssh_argv.extend([host, "--"])
+    return ssh_argv
+
+
+def _create_local_bundle_bytes(*, ref: str) -> bytes:
+    repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    # `git bundle create - <ref>` writes the bundle to stdout.
+    proc = subprocess.run(
+        ["git", "bundle", "create", "-q", "-", ref],
+        cwd=repo_root,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr.decode("utf-8", errors="replace"))
+        raise SystemExit(f"git bundle create failed with code {proc.returncode}")
+    return proc.stdout
+
+
+def _build_remote_sync_script(*, args: argparse.Namespace, ref: str) -> str:
+    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    remote_ref = f"refs/remotes/codex_sync/{ref}"
+    script_lines = [
+        "set -euo pipefail",
+        f"cd {repo_dir_expr}",
+        "bundle_path=$(mktemp)",
+        "cat > \"$bundle_path\"",
+        f"git fetch \"$bundle_path\" {shlex.quote(ref)}:{shlex.quote(remote_ref)}",
+        "rm -f \"$bundle_path\"",
+        f"git checkout -B {shlex.quote(ref)} {shlex.quote(remote_ref)}",
+        "git clean -fdx",
+        "echo '[ssh_tracebootstrap] Remote repo synced via git bundle.'",
+    ]
+    return "\n".join(script_lines)
+
+
 def _build_remote_script(*, args: argparse.Namespace) -> str:
     zar_root = args.zarathustra_root
     output_root = args.output_root or f"{zar_root}/altgan-output"
@@ -176,7 +242,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     script_lines = [
         "set -euo pipefail",
         f"cd {repo_dir_expr}",
-        "git pull --rebase origin main",
+        *(["git pull --rebase origin main"] if args.sync == "pull" else []),
         "python3 -V",
         "echo '[ssh_tracebootstrap] Running TraceBootstrap shuffle pack...'",
         " ".join(_q(part) for part in cmd),
@@ -222,6 +288,21 @@ def main() -> int:
         return 0
 
     print(f"[ssh_tracebootstrap] dispatch -> {args.host}", flush=True)
+    if args.sync == "bundle":
+        bundle_bytes = _create_local_bundle_bytes(ref="main")
+        sync_script = _build_remote_sync_script(args=args, ref="main")
+        ssh_argv = _ssh_argv(args=args)
+        # 1) Sync the remote repo to the local `main` tip via bundle streamed over SSH.
+        sync_res = subprocess.run(
+            [*ssh_argv, "bash", "-lc", sync_script],
+            input=bundle_bytes,
+        )
+        if sync_res.returncode != 0:
+            return sync_res.returncode
+        # 2) Run the actual pack command on the now-synced remote repo (tmux or direct).
+        run_res = subprocess.run(remote_cmd, shell=True)
+        return run_res.returncode
+
     return subprocess.run(remote_cmd, shell=True).returncode
 
 
