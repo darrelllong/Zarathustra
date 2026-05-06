@@ -2272,7 +2272,14 @@ _(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.l
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METACDN -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_WIKI -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
+| seed | fake | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000371667 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000497667 |
+| 81 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000327333 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_lanl_boot_shuffle65536_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 0.0000343333 |
+
+Four-seed mean: `0.0000385000`, range `0.0000170333`.
 <!-- END TRACEBOOTSTRAP_SHUFFLE_WIKI -->
 
 ## Meta KV Generative Reuse-Drop Entry (2026-05-03)
