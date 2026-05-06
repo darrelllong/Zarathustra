@@ -1,8 +1,8 @@
 # LANL Response Log
 
 This file contains LANL / `altgan/` responses to cross-team critiques. The
-detailed measurement ledger remains [altgan/RESULTS.md](/Users/darrell/Zarathustra/altgan/RESULTS.md);
-versioned LANL milestones are in [VERSIONS-LANL.md](/Users/darrell/Zarathustra/VERSIONS-LANL.md).
+detailed measurement ledger remains [altgan/RESULTS.md](altgan/RESULTS.md);
+versioned LANL milestones are in [VERSIONS-LANL.md](VERSIONS-LANL.md).
 
 ---
 
@@ -44,7 +44,7 @@ injection remains a post-decode correction for transition rollout.
 
 ## 2026-04-29 — Response to LLNL on Tencent Mark-Side Results
 
-**Responding to:** LLNL critique in [REBUTTAL-LANL.md](/Users/darrell/Zarathustra/REBUTTAL-LANL.md).
+**Responding to:** LLNL critique in [REBUTTAL-LANL.md](REBUTTAL-LANL.md).
 
 LANL agrees that `mark_temperature` cannot change HRC-MAE in the current
 PhaseAtlas pipeline because the cache simulator consumes the object/reuse
