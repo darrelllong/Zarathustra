@@ -39,6 +39,15 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable ssh agent forwarding (-A).",
     )
+    p.add_argument(
+        "--no-proxyjump",
+        action="store_true",
+        help=(
+            "Disable ssh ProxyJump (overrides any ssh config) by passing "
+            "`-o ProxyJump=`. Useful when your ssh config routes `baase` via "
+            "`vinge` and DNS for the jump host is unavailable."
+        ),
+    )
     p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
     p.add_argument(
         "--zarathustra-root",
@@ -125,6 +134,8 @@ def _remote_shell(*, args: argparse.Namespace) -> str:
         "-o",
         "ConnectionAttempts=1",
     ]
+    if args.no_proxyjump:
+        ssh_parts.extend(["-o", "ProxyJump="])
     for opt in args.ssh_option:
         ssh_parts.extend(["-o", _q(opt)])
     if not args.no_agent_forwarding:
@@ -149,6 +160,8 @@ def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
         "-o",
         "ConnectionAttempts=1",
     ]
+    if args.no_proxyjump:
+        ssh_argv.extend(["-o", "ProxyJump="])
     for opt in args.ssh_option:
         ssh_argv.extend(["-o", opt])
     if not args.no_agent_forwarding:
