@@ -28,6 +28,17 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--host", default="vinge.local", help="SSH target (e.g. vinge.local or baase.local).")
     p.add_argument("--user", default=None, help="Optional SSH user (default: ssh config).")
     p.add_argument("--ssh-key", default="~/.ssh/id_rsa", help="Path to RSA key (default: ~/.ssh/id_rsa).")
+    p.add_argument(
+        "--ssh-option",
+        action="append",
+        default=[],
+        help="Extra ssh -o option (repeatable), e.g. --ssh-option StrictHostKeyChecking=accept-new",
+    )
+    p.add_argument(
+        "--no-agent-forwarding",
+        action="store_true",
+        help="Disable ssh agent forwarding (-A).",
+    )
     p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
     p.add_argument(
         "--zarathustra-root",
@@ -92,21 +103,24 @@ def _remote_repo_dir_expr(repo_dir: str) -> str:
 def _remote_shell(*, args: argparse.Namespace) -> str:
     host = args.host if args.user is None else f"{args.user}@{args.host}"
     key = str(Path(args.ssh_key).expanduser())
+    ssh_parts = [
+        "ssh",
+        "-i",
+        _q(key),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "ConnectionAttempts=1",
+    ]
+    for opt in args.ssh_option:
+        ssh_parts.extend(["-o", _q(opt)])
+    if not args.no_agent_forwarding:
+        ssh_parts.append("-A")
+    ssh_parts.extend([_q(host), "--"])
     return " ".join(
-        [
-            "ssh",
-            "-i",
-            _q(key),
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=10",
-            "-o",
-            "ConnectionAttempts=1",
-            "-A",
-            _q(host),
-            "--",
-        ]
+        ssh_parts
     )
 
 
@@ -196,7 +210,15 @@ def main() -> int:
     if args.dry_run:
         print(remote_cmd)
         if args.tmux_session:
-            print(f"# attach: ssh {args.host} tmux attach -t {args.tmux_session}")
+            key = str(Path(args.ssh_key).expanduser())
+            host = args.host if args.user is None else f"{args.user}@{args.host}"
+            attach_parts: list[str] = ["ssh", "-i", key]
+            for opt in args.ssh_option:
+                attach_parts.extend(["-o", opt])
+            if not args.no_agent_forwarding:
+                attach_parts.append("-A")
+            attach_parts.extend([host, "tmux", "attach", "-t", args.tmux_session])
+            print("# attach: " + " ".join(shlex.quote(part) for part in attach_parts))
         return 0
 
     print(f"[ssh_tracebootstrap] dispatch -> {args.host}", flush=True)
