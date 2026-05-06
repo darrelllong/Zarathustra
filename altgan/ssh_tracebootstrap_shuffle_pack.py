@@ -74,6 +74,21 @@ def _q(value: str) -> str:
     return shlex.quote(value)
 
 
+def _remote_repo_dir_expr(repo_dir: str) -> str:
+    """Return a shell-safe `cd ...` expression for a remote repo dir.
+
+    We intentionally avoid single-quoting a leading `~` because that prevents
+    tilde expansion on the remote shell.
+    """
+    repo_dir = repo_dir.strip()
+    if repo_dir == "~":
+        return '"$HOME"'
+    if repo_dir.startswith("~/"):
+        # Use $HOME so it expands on the remote host even when quoted.
+        return f"\"$HOME/{repo_dir[2:]}\""
+    return _q(repo_dir)
+
+
 def _remote_shell(*, args: argparse.Namespace) -> str:
     host = args.host if args.user is None else f"{args.user}@{args.host}"
     key = str(Path(args.ssh_key).expanduser())
@@ -99,6 +114,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     zar_root = args.zarathustra_root
     output_root = args.output_root or f"{zar_root}/altgan-output"
     emit_dir = args.emit_dir or f"{output_root}/paste_ready"
+    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     cmd = [
         "python3",
         "-m",
@@ -145,7 +161,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
 
     script_lines = [
         "set -euo pipefail",
-        f"cd {_q(args.repo_dir)}",
+        f"cd {repo_dir_expr}",
         "git pull --rebase origin main",
         "python3 -V",
         "echo '[ssh_tracebootstrap] Running TraceBootstrap shuffle pack...'",
