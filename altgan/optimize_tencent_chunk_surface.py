@@ -206,8 +206,18 @@ def main() -> int:
                     trial_obj = current_obj.copy()
                     trial_obj[start:end] = donor_obj[start:end]
                     _write_candidate(base, trial_obj, candidate_path)
-                    report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
                     eval_count += 1
+                    try:
+                        report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
+                    except RuntimeError as exc:
+                        first_line = str(exc).splitlines()[0] if str(exc) else "unknown error"
+                        print(
+                            f"[chunk_surface] SKIP invalid candidate eval={eval_count} "
+                            f"chunk={chunk_size} start={start} donor={donor_name} "
+                            f"reason={first_line}",
+                            flush=True,
+                        )
+                        continue
                     mean = float(report["mean_hrc_mae"])
                     delta = best_mean - mean
                     print(
