@@ -129,30 +129,17 @@ def _markdown_snippet(
     means = [r.mean_hrc_mae for r in results]
     overall_mean = sum(means) / len(means) if means else 0.0
     overall_range = max(means) - min(means) if means else 0.0
-    seeds_fmt = ",".join(str(s) for s in seeds)
 
     lines: list[str] = []
-    lines.append(f"**Corpus:** `{corpus}`")
-    lines.append(
-        "**Protocol:** "
-        + f"`mode={mode}` "
-        + f"`chunk_size={chunk_size}` "
-        + f"`n_records={_records_label(n_records)}` "
-        + f"`n_streams={n_streams}` "
-        + f"`retime={'on' if retime else 'off'}`"
-    )
-    lines.append(f"**Eval surface:** `cache_sizes={cache_sizes}` `policies={policies}`")
-    lines.append(f"**Refs:** `real_manifest={real_manifest}` `real_ref={real_ref}`")
-    lines.append("")
-    lines.append("| seed | fake CSV | literal cachesim mean line | JSON mean |")
+    # Keep the snippet minimal so it can be pasted into ledger-style blocks.
+    lines.append("| seed | fake | literal `llgan.cachesim_eval` mean line | JSON mean |")
     lines.append("|---:|---|---|---:|")
     for r in results:
         mean_line = _literal_cachesim_mean_line(r.mean_hrc_mae)
         lines.append(f"| {r.seed} | `{r.fake_csv}` | `{mean_line}` | {r.mean_hrc_mae_token} |")
     lines.append("")
-    lines.append(f"Literal cachesim mean line (mean across seeds): `{_literal_cachesim_mean_line(overall_mean)}`")
-    lines.append(f"Mean across seeds `{{{seeds_fmt}}}`: `{overall_mean:.10f}`")
-    lines.append(f"Range: `{overall_range:.10f}`")
+    seed_label = "Four-seed" if len(seeds) == 4 else f"{len(seeds)}-seed"
+    lines.append(f"{seed_label} mean: `{overall_mean:.10f}`, range `{overall_range:.10f}`.")
     return "\n".join(lines) + "\n"
 
 
