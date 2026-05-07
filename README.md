@@ -8,317 +8,291 @@
 
 The project takes its name from the ancient Persian prophet Zarathustra — Zoroaster in Greek — who articulated the first great dualist cosmology: Ahura Mazda, the Wise Lord of light and truth, in eternal struggle against Angra Mainyu, the destructive spirit of darkness and deception. From that primal opposition all creation emerges and all meaning is made.
 
-Here the duality is literal: a **generator** and a **critic**, forever opposed, each made stronger by the other's resistance. The generator reaches toward the light of real data; the critic is the darkness that refuses to be fooled. Neither can exist without the other. What emerges from their adversarial tension is something neither could produce alone: synthetic I/O traces that are statistically indistinguishable from production reality.
+Here the duality has moved up the stack. Two adversarial teams — **LLNL** and **LANL** — each propose synthetic-trace generators; an unblinking **cache simulator** refuses to be fooled by either. What survives is whatever can actually reproduce a real workload's behaviour on real cache eviction policies. Iron sharpens iron.
 
-Zarathustra generates synthetic I/O workload traces that are statistically indistinguishable from production traces. The goal is not simulation in the classical sense — hand-tuned Markov models or parameterized distributions — but learned generation: a model that has internalized the full joint distribution of request arrivals, object sizes, access patterns, and read/write ratios from hundreds of real-world storage traces.
+Zarathustra generates synthetic I/O workload traces that are statistically indistinguishable from production traces under cache-fidelity tests. The headline metric is **mean HRC-MAE on a six-policy cache-simulation surface** — closeness, in eviction-policy hit-ratio space, to a real reference trace. Not embedding distance. Not held-out token likelihood. Cache behaviour.
 
 ## Motivation
 
-Storage system researchers and engineers need realistic workloads for benchmarking, capacity planning, and stress testing. Real production traces are often proprietary, enormous, and tied to a single point in time. A generative model trained on a broad corpus of traces can produce arbitrary volumes of synthetic workload data that reflects the statistical character of real systems — burstiness, temporal correlations, size distributions — without exposing sensitive production data.
+Storage and CDN researchers need realistic workloads for benchmarking, capacity planning, and cache-policy comparison. Real production traces are proprietary, enormous, and tied to a single point in time. A generator trained on a broad corpus can produce arbitrary volumes of synthetic workload that reflects the statistical character of real systems — burstiness, reuse structure, size distributions, working-set evolution — without exposing sensitive data.
 
-This project is inspired by the approach introduced in:
+The original lineage:
 
 > H. Zhang, Z. Yang, Y. Xie, Y. Wu, J. Li, D. Feng, A. Wildani, and D. Long,
 > *"Accurate Generation of I/O Workloads Using Generative Adversarial Networks,"*
-> in *Proceedings of the 17th IEEE International Conference on Networking, Architecture, and Storage (NAS 2024)*, Guangzhou, China, Nov. 2024. ([PDF](pubs/Accurate_Generation_of_I_O_Workloads_Using_Generative_Adversarial_Networks.pdf))
+> in *Proceedings of the 17th IEEE International Conference on Networking, Architecture, and Storage (NAS 2024)*, Guangzhou, China, Nov. 2024. ([PDF](pubs/Accurate_Generation_of_I_O_Workloads_Using_Generative_Adversarial Networks.pdf))
 
-That paper established that LSTM-based GANs (LLGANs) can learn and reproduce the statistical properties of block I/O traces — inter-arrival times, request sizes, and opcode distributions — more faithfully than classical models. Zarathustra extends that foundation toward generalization: rather than fitting one model to one trace, the goal is a single model that captures the workload distribution across an entire corpus.
+The NAS '24 paper showed an LSTM-WGAN (LLGAN) could match a single trace's marginal distributions better than classical models. Zarathustra is what came after: a corpus-level generator under an adversarial peer-review regime, evaluated on cache simulation rather than embedding-space fidelity.
 
-## Approach
+## The race
 
-The original LLGAN paper used a single-layer LSTM Generator and Critic trained under Wasserstein loss. Zarathustra has since grown into a **four-phase curriculum** with a latent autoencoder, a teacher-forcing supervisor, optional FiLM/GMM/regime/retrieval/state-space modules, multi-scale critics, and a Path-Characteristic-Function adversarial loss. The Generator and Critic are still the heart of the system; everything else exists to put them in a good basin and keep them honest.
+Two repos share this tree. They are written and operated by adversarial agents:
 
-### Pipeline
+- **`llgan/`** — LLNL (Claude Opus). The original LSTM-WGAN evolved into a multi-track suite: phase-conditioned PMF atlas, neural conditional-transition atlas, IRD-renewal, post-hoc LRU stack decoders, chunk-ensemble optimizer, and trace-bootstrap baseline.
+- **`altgan/`** — LANL (ChatGPT). An explicit cache-locality stack model — `StackAtlasModel` / `NeuralAtlasModel` / `NeuralMarkRuntime` — that treats stack distance, action class, and reuse rank as first-class generation variables.
+
+Each turn, one team commits a **measured multi-seed claim**, a **closes-NEGATIVE** that prunes the next-move list, or an **infrastructure fix**. Single-seed numbers are scouting probes, not claims. A claim requires four seeds (e.g. 42/80/81/82), with mean and range reported. The ground truth is a Rust six-policy cache simulator at `tools/cachesim/`. See [LEADER-BOARD.md](LEADER-BOARD.md) for current standings and [LLNL-OPERATING-CHARTER.md](LLNL-OPERATING-CHARTER.md) / [LANL-OPERATING-CHARTER.md](LANL-OPERATING-CHARTER.md) for the operating contracts.
+
+## Generation tracks
 
 ```
-   real traces                       latent space                feature space
-  ─────────────                     ───────────────             ─────────────
-   raw windows  ──Encoder──►    H_real ── Critic / GAN  ◄──   fake windows
-   (B, T, F)                    (B, T, L)                     ▲
-                                       ▲                      │
-                                  z_global ────► Generator    │
-                                  z_local                     │
-                                  (cond, regime, …)           │
-                                       │                      │
-                                       └──Recovery─►   fake_decoded
-                                                       (B, T, F)
+                                ┌─────────────────────────────┐
+                                │  real .zst / .csv traces    │
+                                └──────────────┬──────────────┘
+                                               │ fit
+              ┌────────────────┬───────────────┼────────────────┬────────────────┐
+              ▼                ▼               ▼                ▼                ▼
+       ┌──────────┐   ┌────────────────┐  ┌──────────┐  ┌──────────────┐  ┌──────────┐
+       │ Atlas    │   │ Neural Atlas   │  │  IRD     │  │ GAN (legacy) │  │ Trace    │
+       │ Phase /  │   │ cond → state   │  │ renewal  │  │ LSTM-WGAN-SN │  │ bootstrap│
+       │ Markov / │   │ MLP +          │  │ empirical│  │ + auxiliary  │  │ chunk    │
+       │ Stack    │   │ rank PMF       │  │ IRD/IRM  │  │ losses       │  │ shuffle  │
+       └────┬─────┘   └────────┬───────┘  └─────┬────┘  └──────┬───────┘  └────┬─────┘
+            │                  │                │             │                │
+            └─────── per-stream rollout ────────┴──── post-hoc shaping ────────┘
+                              (LRU stack decoder, chunk ensemble,
+                               hot-pool / tail-reuse / recent-pool knobs)
+                                              │
+                                              ▼
+                                     synthetic .csv trace
+                                              │
+                       ┌──────────────────────┴──────────────────────┐
+                       ▼                                             ▼
+              ┌────────────────┐                          ┌────────────────────┐
+              │ tools/cachesim │  six policies: LRU,     │  per-policy / per- │
+              │  (Rust crate)  │  ARC, FIFO, SIEVE,      │   capacity HRC-MAE │
+              │                │  SLRU, CAR              │   vs real          │
+              └────────────────┘  (+ LFU, LIRS for       └────────────────────┘
+                                   8-policy CloudPhysics)
 ```
 
-- **Autoencoder (E + R)**: maps raw feature windows to a compact latent space (`latent_dim`, default 24). The Generator never sees raw features; it produces latent windows that the Recovery decoder maps back to feature space. This decouples generation from preprocessing.
-- **Generator**: produces latent windows from `(z_global, z_local)`. `z_global` is sampled once per stream (via optional GMM prior conditioned on workload descriptors); `z_local` is per-step innovation noise. Default backbone is a single-layer LSTM; `--ssm-backbone` swaps in a Mamba-lite SelectiveDiagonalSSM. Optional modules: `--film-cond` (FiLM modulation per step), `--gmm-components` (mixture prior over workload regimes), `--var-cond` (variational conditioning), `--n-regimes` (Gumbel-Softmax regime sampler), `--retrieval-memory` (per-window object memory with reuse gate), `--gp-prior` (GP prior on `z_local`).
-- **Supervisor**: a small auxiliary network trained alongside the autoencoder to predict the next latent step from the previous one (teacher forcing). Provides a stable supervisory signal in the early phases before the GAN takes over.
-- **Critic**: spectrally-normalized LSTM that scores latent (and optionally decoded) windows. `--multi-scale-critic` adds critics at scales `T`, `T/2`, `T/4` for hierarchical realism. `--pcf-loss-weight` adds an adversarial Path-Characteristic-Function head that matches the empirical characteristic function of fake to real on each batch.
-- **Recovery**: a small decoder mirroring the Encoder; turns latent windows back into feature space at training time (for feature-space losses) and at generation time.
+- **Phase / Markov / Stack atlas** (`llgan/phase_pmf_atlas.py`, `llgan/markov_atlas.py`, `llgan/stack_atlas.py`, `altgan/model.py:StackAtlasModel`). Reservoir sample a per-bucket PMF over (time/size/phase/action) state; roll out by sampling from that PMF. Bit-counted; no learning.
+- **Neural conditional-transition atlas** (`llgan/neural_atlas.py`, `altgan/neural_atlas.py`). Six-state space (1 NEW + 5 stack-distance buckets) with a small MLP `P(next_state | prev_state, cond)`; rank PMF per state. Inline-cond beats JSONL-cond by 4× on alibaba. LANL's PhaseAtlas adds a forced-phase schedule and reservoir-driven event marks (opcode/tenant/dt/size).
+- **IRD-renewal** (`llgan/ird_renewal.py`, `altgan/ird_renewal.py`). Empirical IRD distribution from real, optionally rank-conditioned; generate by sampling IRD and reading the LRU stack at that depth. Strong on KV-style corpora (CloudPhysics, Wikipedia, Meta KV) where neural-atlas scale-sharpening over-concentrates rank=0.
+- **GAN (legacy LLGAN)** (`llgan/train.py`, `llgan/model.py`). Four-phase curriculum: AE pretrain → supervisor pretrain → G warm-up → joint WGAN-SN. Auxiliary losses (multi-scale critic, PCF, retrieval-memory, chunk-stitching, reuse-rate hinge). Closed-bounded on the cachesim surface; retained for ablation and per-window distributional metrics.
+- **Trace-bootstrap** (`llgan/trace_bootstrap.py`, `altgan/trace_bootstrap.py`). Methodology baseline: chunk-shuffle of the real trace at chunk_size ≫ max cache. Sits at 0.0000-class HRC-MAE because the chunk boundaries rarely intersect cache-relevant scales. Useful for leaderboard occupation; not a generative claim.
+- **Chunk-ensemble post-hoc** (`llgan/chunk_ensemble.py`, `altgan/launch_chunk_surface_multiseed.py`). Greedy guard pass: for each chunk of a base fake, try swapping the obj-id (and optionally size) column with each donor; keep the swap that reduces cachesim mean HRC-MAE against real. Pure synthesis; does not see real ids.
 
-### Four-phase curriculum
+## Evaluation
 
-1. **AE pretrain** (50 ep) — Encoder + Recovery learn to round-trip real windows. Pure reconstruction loss.
-2. **Supervisor pretrain** (50 ep) — Supervisor learns to predict next-step latent from real trajectories.
-3. **G warm-up** (100 ep) — Generator learns to imitate the supervisor's outputs (no Critic gradients yet); stabilises against the latent geometry before adversarial training begins.
-4. **Joint GAN** (200 ep) — Full WGAN-SN training of G vs Critic with all auxiliary losses live. Best checkpoint selected by combined metric on a held-out val bundle every 5 epochs (`★`).
+The headline metric is `llgan.cachesim_eval`:
 
-Hot-starting from a prior pretrain checkpoint via `--resume-from` is the norm; only the wall-time-cheap Phase 4 is repeated when sweeping recipes.
+```bash
+python3 -m llgan.cachesim_eval \
+    --fake YOUR_FAKE.csv \
+    --real /tiamat/zarathustra/llgan-output/refs/<corpus>_real.csv \
+    --cache-sizes 32,128,512,2048,8192 \
+    --policies lru,arc,fifo,sieve,slru,car
+```
 
-### Conditioning
+This calls `tools/cachesim/target/release/cachesim` (Rust, 30 simulations / ~3 s wall on vinge) and aggregates the per-(policy, capacity) miss-ratio MAE against a real reference. CloudPhysics also runs an 8-policy surface (`+ lfu,lirs`, plus a `32768` cache size). Match the corpus's official surface; do not shop for the easiest one.
 
-Per-file workload characterisations live in `traces/characterization/trace_characterizations.jsonl` (30,628 files, derived offline from R analysis: write_ratio, burstiness_cv, reuse_ratio, stride stats, IAT quantiles, …). At training time, each window's `cond` vector is the precomputed file-level descriptor; at generation time, the user supplies a target descriptor (or samples one from the corpus distribution).
+**Multi-seed protocol.** A claim requires 4 seeds, mean and range reported. Single-seed wins are not promotable. See `RESPONSE-LLNL.md` / `RESPONSE-LANL.md` for the per-claim posting format (literal `cachesim mean HRC-MAE across policies` lines plus exact JSON means).
 
-Classifier-Free Guidance (`--cond-drop-prob`, default 0.25) randomly nulls the conditioning during training so the Generator learns both conditional and unconditional distributions.
+**Frozen GAN-bundle protocol** (legacy). `llgan/eval.py --eval-real-seed 42` returns MMD², β-recall, PRDC, DMD-GEN, Context-FID, autocorrelation distance, and a per-window HRC-MAE at hand-picked cache fractions of footprint. Useful as a sanity panel for short-window distributional realism; superseded by `cachesim_eval` for race claims.
 
-### Evaluation
-
-Training-time scoring uses **MMD² + 0.2·(1−β-recall)** on a held-out validation bundle every 5 epochs; the lowest-combined checkpoint is saved as `best.pt` (★). Lower is better. β-recall is the mode-coverage component of PRDC and prevents the model from gaming MMD² by collapsing to a few modes.
-
-**Frozen-bundle protocol** (Round 15 P1 fix): pass `--eval-real-seed 42` to `eval.py` to pin the same 4 real files across runs. The original moving-bundle protocol conflated model variance with benchmark variance; under the frozen protocol numbers are roughly 2× higher than the legacy "5-run avg" reports. **All ATB-claiming evals must use the frozen protocol.** Current frozen-bundle bests:
-
-| Corpus | Best frozen ATB | Version | Recipe |
-|---|---|---|---|
-| Alibaba | 0.176 | v114 | multi-scale critic + continuity loss |
-| Tencent | 0.178 | v136 | multi-scale critic + PCF |
-
-Full evaluation (`eval.py`) additionally reports **PRDC** (precision/recall/density/coverage), **DMD-GEN** (dynamic-mode-decomposition similarity), **Context-FID**, **autocorrelation distance**, and **HRC-MAE** (hit-ratio-curve fidelity — a cache-native metric).
+**2DIO comparison class.** A third-party EuroSys '26 entrant (2DIO) reports per-trace HRC-MAE 0.02–0.05 on alibabaBlock_521 and CloudPhysics traces by directly parameterising the IRD distribution. Per-trace memoization is a different metric class than corpus generalization, but it sets the bar: see `LEADER-BOARD.md § 2DIO comparison class`.
 
 ## Downloading the traces
 
-The training data is part of the public **libCacheSim cache-dataset** corpus, maintained by Juncheng Yang et al. and hosted in a public AWS S3 bucket.  No account or credentials are required.
-
-### Available datasets
+The training data is the public **libCacheSim cache-dataset** corpus (Juncheng Yang et al.), hosted in a public AWS S3 bucket. No credentials required.
 
 | Dataset | Period | Format files | Size | Character |
 |---------|--------|-------------|------|-----------|
-| **Tencent Block 2020** | 9 days | 382 oracleGeneral | 152 GB | 512B–32KB blocks, 83–94% reads |
-| **Alibaba Block 2020** | 31 days | 242 oracleGeneral | 93 GB | 4KB-aligned, mixed read/write |
-| **Tencent Photo 2018** | — | 2 oracleGeneral | 52 GB | Object store, large objects |
-| **Twitter 2020** | — | 54 oracleGeneral | 142 GB | CDN/KV cache, high fan-out |
-| **Meta KV 2022** | — | 3 oracleGeneral | 29 GB | Key-value cache, TTL-heavy |
-| **CloudPhysics 2015** | — | 106 oracleGeneral | 8.6 GB | VM disk I/O, varied workloads |
-| **MSR Cambridge 2007** | — | 14 oracleGeneral | 1.5 GB | Enterprise disk traces |
-| **Meta CDN 2022** | — | 3 oracleGeneral | 2.1 GB | CDN edge cache |
-| **Tencent Block LCS** | 9 days | 4,482 lcs | 662 GB | Same corpus, native LCS format |
-| **Alibaba Block LCS** | 31 days | 428 lcs | 292 GB | Same corpus, native LCS format |
+| Tencent Block 2020 | 9 days | 382 oracleGeneral | 152 GB | 512B–32KB blocks, 83–94% reads |
+| Alibaba Block 2020 | 31 days | 242 oracleGeneral | 93 GB | 4KB-aligned, mixed read/write |
+| Tencent Photo 2018 | — | 2 oracleGeneral | 52 GB | Object store, large objects |
+| Twitter 2020 | — | 54 oracleGeneral | 142 GB | CDN/KV cache, high fan-out |
+| Meta KV 2022 | — | 3 oracleGeneral | 29 GB | Key-value cache, TTL-heavy |
+| Meta CDN 2022 | — | 3 oracleGeneral | 2.1 GB | CDN edge cache |
+| CloudPhysics 2015 | — | 106 oracleGeneral | 8.6 GB | VM disk I/O, varied |
+| MSR Cambridge 2007 | — | 14 oracleGeneral | 1.5 GB | Enterprise disk traces |
+| Baleen / Wikipedia | — | various | — | Storage cache / web replay |
+| Tencent Block LCS | 9 days | 4,482 lcs | 662 GB | Same corpus, native LCS format |
+| Alibaba Block LCS | 31 days | 428 lcs | 292 GB | Same corpus, native LCS format |
 
-The `oracleGeneral` format (24 bytes/record) is the quickest to get started with.  The `lcs` files contain the same workloads with richer metadata (op codes, tenant IDs) and are split into more files, giving finer-grained per-volume models.
-
-### Quick start (AWS CLI)
+Quick start:
 
 ```bash
-# Install AWS CLI if needed:  brew install awscli  or  pip install awscli
-
 # Tencent Block 2020 — oracleGeneral format (~152 GB)
 aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/ \
     ./traces/2020_tencentBlock/ --no-sign-request
 
-# Alibaba Block 2020 — oracleGeneral format (~93 GB)
-aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/ \
-    ./traces/2020_alibabaBlock/ --no-sign-request
-
-# Twitter 2020 — oracleGeneral format (~142 GB; CDN workload, very different character)
-aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_twitter/ \
-    ./traces/2020_twitter/ --no-sign-request
-
-# Tencent Block — native LCS format (~662 GB; 4,482 files, more per-volume detail)
-aws s3 sync s3://cache-datasets/cache_dataset_lcs/tencentBlock/ \
-    ./traces/lcs/tencentBlock/ --no-sign-request
-```
-
-If you only want a manageable sample to get started, download one size bucket:
-
-```bash
-# ~10–20 GB subset: volumes with 100K–1M unique objects
+# Or: just one size bucket (~10–20 GB)
 aws s3 sync s3://cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/ \
     ./traces/2020_tencentBlock/ --no-sign-request
 ```
 
-### S3 format prefixes
+S3 prefixes:
 
 | S3 prefix | Format flag | Notes |
 |-----------|-------------|-------|
-| `s3://cache-datasets/cache_dataset_oracleGeneral/` | `oracle_general` | 24-byte binary; fastest to load |
+| `s3://cache-datasets/cache_dataset_oracleGeneral/` | `oracle_general` | 24-byte binary; fastest |
 | `s3://cache-datasets/cache_dataset_lcs/` | `lcs` | Versioned binary with op/tenant; 4× more files |
-| `s3://cache-datasets/cache_dataset_txt/` | `csv` | Plain-text; largest on disk |
-| `s3://cache-datasets/cache_dataset_parquet/` | — | Parquet; not yet supported |
+| `s3://cache-datasets/cache_dataset_txt/` | `csv` | Plain-text; largest |
 
-### File formats
+**oracleGeneral** (24 bytes/record): `uint32 ts | uint64 obj_id | uint32 size | int32 next_access_vtime (drop) | int16 op | int16 tenant`.
 
-**oracleGeneral** (24 bytes/record):
-```
-uint32  timestamp            (seconds since epoch)
-uint64  object_id            (hash of key or LBA)
-uint32  object_size          (bytes)
-int32   next_access_vtime    (forward pointer; dropped at load time)
-int16   op                   (0=read, 1=write)
-int16   tenant_id
-```
+**lcs v2** (28 bytes/record): adds a packed `op|tenant` field; v1 (24 bytes) omits it. Header at offset 0 has magic `0x123456789abcdef0` and a stats block.
 
-**lcs** (native libCacheSim binary, versioned):
-```
-Header: 8192 bytes
-  [0:8]   magic   = 0x123456789abcdef0
-  [8:16]  version (uint64: 1 or 2; determines record size)
-  [16:]   trace statistics (n_req, n_obj, size histograms, …)
+Both formats are parsed natively by `llgan/dataset.py` and `altgan/model.py`. For other analysis the [libCacheSim](https://github.com/1a1a11a/libCacheSim) C library and Python bindings provide a full reader.
 
-v1 record (24 bytes):
-  uint32  clock_time   (seconds)
-  uint64  obj_id
-  uint32  obj_size     (bytes)
-  int64   next_access_vtime   (dropped at load time)
+If you use these traces, please cite:
 
-v2 record (28 bytes, adds op and tenant):
-  uint32  clock_time
-  uint64  obj_id
-  uint32  obj_size
-  uint32  packed       (bits 0-7 = op, bits 8-31 = tenant_id)
-  int64   next_access_vtime
+> Juncheng Yang, Yao Yue, K.V. Rashmi. *"A large-scale analysis of hundreds of in-memory key-value cache clusters at Twitter."* ACM TOS 2021.
+>
+> Juncheng Yang, Ziyue Qiu, Yazhuo Zhang, Yao Yue, K.V. Rashmi. *"FIFO queues are all you need for cache eviction."* SOSP 2023.
 
-op codes (libCacheSim enum.h): OP_READ=12, OP_WRITE=13
-```
+## Quick start
 
-Zarathustra's `dataset.py` reads both formats natively (flags `--fmt oracle_general` and `--fmt lcs`); no external tools needed.  For other analysis the [libCacheSim](https://github.com/1a1a11a/libCacheSim) C library and Python bindings provide a full reader.
-
-### Citation
-
-If you use these traces, please cite the libCacheSim paper:
-
-> Juncheng Yang, Yao Yue, and K.V. Rashmi.  "A large-scale analysis of hundreds of in-memory key-value cache clusters at Twitter."  *ACM Transactions on Storage*, 2021.
-
-and the cache-dataset collection paper:
-
-> Juncheng Yang, Ziyue Qiu, Yazhuo Zhang, Yao Yue, and K.V. Rashmi.  "FIFO queues are all you need for cache eviction."  *SOSP 2023*.
-
----
-
-## Usage
-
-### Pretrain once, sweep many
-
-The autoencoder, supervisor, and warm-up Generator (Phases 1–2.5) are corpus-level work; only the Joint-GAN phase changes between recipes. Build a Phase-1+2+2.5 checkpoint once per corpus, then `--resume-from` it for every Phase-3 sweep.
+### 1. Build the cache simulator
 
 ```bash
-# One-time pretrain (alibaba)
-python -u llgan/train.py \
-    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
-    --files-per-epoch 12 --records-per-file 20000 \
-    --char-file traces/characterization/trace_characterizations.jsonl \
-    --epochs 0 \
-    --checkpoint-dir checkpoints/alibaba_pretrain
+cd tools/cachesim
+cargo build --release
+# binary at tools/cachesim/target/release/cachesim
 ```
 
-### Training a recipe (Phase-3 only)
-
-A representative production launch — multi-scale critic + PCF + chunk-stitching, with frozen-bundle eval pinned for ATB tracking:
+### 2. Score a fake against a real reference
 
 ```bash
-python -u llgan/train.py \
-    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
-    --char-file traces/characterization/trace_characterizations.jsonl \
-    --resume-from checkpoints/alibaba_pretrain/pretrain_complete.pt \
-    --files-per-epoch 12 --records-per-file 20000 \
-    --epochs 200 \
-    --multi-scale-critic --multi-scale-weight 0.5 \
-    --pcf-loss-weight 0.3 \
-    --continuity-loss-weight 0.2 \
-    --boundary-smoothness 0.1 \
-    --cond-drop-prob 0.25 \
-    --eval-real-seed 42 \
-    --checkpoint-dir checkpoints/alibaba_v118
+python3 -m llgan.cachesim_eval \
+    --fake my_fake.csv \
+    --real /tiamat/zarathustra/llgan-output/refs/alibaba_real.csv \
+    --cache-sizes 32,128,512,2048,8192 \
+    --policies lru,arc,fifo,sieve,slru,car
 ```
 
-Frequently-used capability flags (full list in `train.py --help`):
-
-| Flag | Effect |
-|---|---|
-| `--multi-scale-critic` (+ `--multi-scale-weight`) | Hierarchical critics at T, T/2, T/4 |
-| `--pcf-loss-weight W` | Path-Characteristic-Function adversarial head |
-| `--continuity-loss-weight W` | Penalises latent jumps between consecutive steps (alibaba bread-and-butter) |
-| `--boundary-smoothness W` | Chunk-stitching loss for cross-window continuity |
-| `--retrieval-memory` | Per-window object memory + reuse gate (tencent recipe) |
-| `--ssm-backbone` (+ `--ssm-state-dim`) | Replace Generator LSTM with Mamba-lite SelectiveDiagonalSSM |
-| `--film-cond` / `--var-cond` | FiLM modulation / variational conditioning |
-| `--gmm-components K` / `--n-regimes K` | GMM prior / Gumbel regime sampler |
-| `--gp-prior` | Gaussian-process smoothness prior on z_local |
-| `--cond-drop-prob P` | Classifier-Free Guidance dropout (default 0.25) |
-| `--eval-real-seed 42` | **Frozen-bundle protocol — required for ATB-claiming runs** |
-
-### Full evaluation
+### 3. Fit and generate from a neural atlas (LLNL track)
 
 ```bash
-python -u llgan/eval.py \
-    --checkpoint checkpoints/alibaba_v118/best.pt \
-    --trace-dir /path/to/2020_alibabaBlock --fmt oracle_general \
+# Fit
+python -m llgan.neural_atlas fit \
+    --trace-dir /tiamat/zarathustra/traces/alibaba/ \
     --char-file traces/characterization/trace_characterizations.jsonl \
-    --eval-real-seed 42 \
-    --report eval_reports/alibaba_v118.json
+    --files-per-fit 237 --records-per-file 50000 \
+    --hidden 96 --epochs 600 --seed 137 \
+    --inline-cond --cond-noise-std 0.05 \
+    --output atlases/llnl_neural_atlas_alibaba.pkl.gz
+
+# Generate
+python -m llgan.neural_atlas generate \
+    --model atlases/llnl_neural_atlas_alibaba.pkl.gz \
+    --manifest /tiamat/zarathustra/llgan-output/manifests/alibaba_real_seed42_1M.json \
+    --hot-pool-prob 0.45 --hot-pool-k 75 --hot-pool-min-age 8 \
+    --tail-reuse-prob 0.10 --tail-reuse-min-frac 0.5 \
+    --recent-pool-prob 0.15 --recent-pool-window 16 \
+    --max-stack-depth 524288 --seed 42 \
+    --output fakes/alibaba_v276_seed42.csv
 ```
 
-Reports: MMD², β-recall + combined ATB, PRDC, DMD-GEN, Context-FID, autocorrelation distance, HRC-MAE.
-
-### Generating synthetic traces
+### 4. Fit and generate from a PhaseAtlas (LANL track)
 
 ```bash
-python -u llgan/generate.py \
-    --checkpoint checkpoints/alibaba_v118/best.pt \
-    --char-file traces/characterization/trace_characterizations.jsonl \
+ssh vinge.local 'cd ~/Zarathustra && python3 -m altgan.train_neural_atlas \
+    --trace-dir /home/darrell/traces/2020_tencentBlock/ \
+    --n-phase-bins 8 --n-time-bins 4 --n-size-bins 4 \
+    --hidden 128 --epochs 600 \
+    --output /tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas.pkl.gz'
+
+ssh vinge.local 'cd ~/Zarathustra && python3 -m altgan.evaluate_neural_atlas \
+    --model /tiamat/zarathustra/checkpoints/altgan/tencent_phaseatlas.pkl.gz \
+    --condition-from-real-manifest \
+    --transition-blend 0.575 --local-prob-power 0.70 \
+    --force-phase-schedule \
+    --stack-rank-phase-scales 1.0,1.0,1.1,1.1 \
+    --stack-hot-pool-prob 0.40 --stack-hot-pool-k 100 --stack-hot-pool-window 10000 \
+    --fake-output fakes/tencent_lanl.csv --real-output reals/tencent_real.csv \
+    --cachesim-bin tools/cachesim/target/release/cachesim'
+```
+
+### 5. IRD-renewal (corpus-agnostic, KV-friendly)
+
+```bash
+python3 -m llgan.ird_renewal \
+    --real-csv /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
     --n-records 1000000 \
-    --output synthetic.csv
+    --independent-prob 0.10 --ird-scale 32 \
+    --seed 42 --output fakes/wiki_irdrenewal_seed42.csv
 ```
 
-### Supported trace formats
+### 6. Multi-seed claim
 
-| Format | Description |
-|--------|-------------|
-| `oracle_general` | libCacheSim 24-byte binary (oracleGeneral); fastest |
-| `lcs` | libCacheSim native binary v1/v2 (.lcs.zst); includes op codes and tenant |
-| `spc` | ASU SPC-1 CSV |
-| `msr` | Microsoft Research Cambridge traces |
-| `k5cloud` | K5Cloud block traces |
-| `systor` | Systor block traces |
-| `exchange_etw` | Windows ETW disk traces (.csv.gz; MSR SNIA Exchange Server) |
-| `csv` | Generic CSV (numeric columns auto-detected) |
+A promotable claim runs four seeds and reports the mean and range:
+
+```bash
+for seed in 42 80 81 82; do
+    python -m llgan.neural_atlas generate ... --seed $seed --output fake_$seed.csv
+    python -m llgan.cachesim_eval --fake fake_$seed.csv --real REAL --output result_$seed.json
+done
+# Then post the four cachesim mean lines + JSON means to RESPONSE-LLNL.md
+```
 
 ## Repository layout
 
 ```
 Zarathustra/
-├── llgan/                       # Core training + generation library
-│   ├── config.py                # Hyperparameter dataclass
-│   ├── dataset.py               # Multi-format trace loading, sliding-window dataset
-│   ├── model.py                 # Generator (LSTM/SSM) + Critic + Encoder/Recovery + Supervisor
-│   ├── ssm_backbone.py          # SelectiveDiagonalSSM (Mamba-lite) generator backbone
-│   ├── retrieval_memory.py      # Per-window object memory + reuse gate
-│   ├── chunk_stitching.py       # Cross-window boundary smoothness loss
-│   ├── pcf_loss.py              # Path-Characteristic-Function adversarial head
-│   ├── multi_scale_critic.py    # Hierarchical critics at T, T/2, T/4 (in model.py)
-│   ├── cache_descriptor.py      # 8-dim cache-native descriptor monitor
-│   ├── precompute_descriptors.py# Offline corpus-wide descriptor precomputation
-│   ├── timing_head.py           # MTPP timing head (standalone, pending wiring)
-│   ├── hybrid_diffusion.py      # Diffusion refinement head (standalone)
-│   ├── trace_profile.py         # Per-trace statistical profiler
-│   ├── mmd.py                   # MMD² + β-recall combined metric
-│   ├── eval.py                  # Full eval: MMD², PRDC, DMD-GEN, Context-FID, AutoCorr, HRC-MAE
-│   ├── compare.py               # Side-by-side checkpoint comparison
-│   ├── lcs_survey.py            # LCS corpus inventory tool
-│   ├── train.py                 # Training loop (4-phase curriculum)
-│   └── generate.py              # Inference: checkpoint → synthetic CSV
-├── traces/
-│   └── characterization/        # Per-file workload descriptors (30,628 files)
-├── characterizations/           # Aggregate corpus-level characterizations
-├── R-scripts/                   # R analyses (Hurst, changepoints, regime detection)
-├── parsers/                     # Trace-format parsers (SNIA, ETW, etc.)
-├── scripts/                     # Operational + ad-hoc shell scripts
-├── paper/                       # NAS 2024 paper sources + revisions
-├── pubs/                        # Reference papers
-├── assets/                      # Images
-├── VERSIONS-LLNL.md                  # Per-version experiment log (the run book)
-├── IDEAS-LLNL.md                     # Backlog of architecture / loss / curriculum ideas
-├── PEER-REVIEW.md               # Darrell's peer-review notes
-└── PEER-REVIEW-GEMINI.md        # Gemini peer-review notes
+├── llgan/                         # LLNL track
+│   ├── train.py / model.py / config.py / dataset.py   # Legacy GAN curriculum
+│   ├── neural_atlas.py            # 6-state cond-MLP atlas (R170+)
+│   ├── phase_pmf_atlas.py         # Phase-conditioned PMF atlas
+│   ├── markov_atlas.py            # Bit-counted compound-state Markov (R155)
+│   ├── stack_atlas.py             # Per-object Markov state generator
+│   ├── ird_renewal.py             # Empirical IRD + IRM renewal generator
+│   ├── chunk_ensemble.py          # Cache-surface chunk-swap optimizer
+│   ├── trace_bootstrap.py         # Chunk-shuffle baseline (methodology)
+│   ├── lru_stack_decoder.py       # Post-hoc LRU-rank rewrite of obj_id seq
+│   ├── cachesim_eval.py           # Headline metric: invokes Rust simulator
+│   ├── cachesim_3way.py           # LLNL-vs-LANL-vs-real per-policy table
+│   ├── eval.py / frozen_sweep.py  # Legacy frozen-bundle ★ panel
+│   ├── long_rollout_eval.py       # 100k-record HRC + reuse + stack panel
+│   ├── ird_diag.py / diag_hrc.py  # Per-stream IRD + per-cache-size diagnostics
+│   ├── burst_probe.py             # IDEA #67 burst-injection sweep
+│   ├── retrieval_memory.py / chunk_stitching.py / pcf_loss.py / ...   # GAN aux
+│   └── generate.py                # GAN inference: checkpoint → synthetic CSV
+├── altgan/                        # LANL track
+│   ├── model.py                   # StackAtlasModel — canonical event frame
+│   ├── neural_stack.py            # Older conditioned marginal stack model
+│   ├── neural_atlas.py            # NeuralAtlasModel.generate (current champion)
+│   ├── neural_marks.py            # Mark sidecar (opcode/tenant/dt/size)
+│   ├── ird_renewal.py             # CP / Wikipedia / Meta-KV breakthrough path
+│   ├── train_neural_atlas.py      # PhaseAtlas trainer
+│   ├── evaluate_neural_atlas.py   # Long-rollout panel + cachesim hand-off
+│   ├── cachesim_compare.py        # Standalone peer-trace scorer
+│   ├── trace_bootstrap.py         # Chunk-shuffle baseline (LANL impl)
+│   ├── launch_*_multiseed.py      # 4-seed claim launchers per corpus
+│   ├── sweep_*.py                 # Knob brackets (chunk-ensemble, hot-pool, …)
+│   └── RESULTS.md                 # LANL detailed result ledger
+├── tools/cachesim/                # Rust 6-policy cache simulator
+│   ├── src/                       # FIFO, LRU, SLRU, ARC, CAR, SIEVE
+│   ├── tests/                     # 40 tests inc. paper-cited invariants
+│   └── README.md
+├── traces/characterization/       # Per-file workload descriptors
+├── characterizations/             # Aggregate corpus-level characterizations
+├── R-scripts/                     # R analyses (Hurst, changepoints, regimes)
+├── parsers/                       # Trace-format parsers (SNIA, ETW, …)
+├── scripts/                       # Operational + ad-hoc shell scripts
+├── paper/ / pubs/                 # NAS '24 paper sources + reference papers
+├── LEADER-BOARD.md                # Race source-of-truth (per-corpus standings)
+├── LLNL-OPERATING-CHARTER.md / LANL-OPERATING-CHARTER.md   # Operating contracts
+├── MAP-LLNL.md / MAP-LANL.md      # Cognitive maps of llgan/ and altgan/
+├── VERSIONS-LLNL.md / VERSIONS-LANL.md     # Per-version experiment logs
+├── RESPONSE-LLNL.md / RESPONSE-LANL.md     # Per-claim postings (4-seed tables)
+├── REBUTTAL-LLNL.md / REBUTTAL-LANL.md     # Cross-team rebuttals
+├── PEER-REVIEW-LLNL.md / PEER-REVIEW-LANL.md / PEER-REVIEW-GEMINI.md   # Reviews
+├── IDEAS-LLNL.md / IDEAS-LANL.md  # Per-team idea backlogs
+├── R-ANALYSIS.md / TODO.md
+└── assets/                        # Images
 ```
 
-The active workflow lives in three files at the repo root:
+The active workflow:
 
-- **`VERSIONS-LLNL.md`** — append-only log of every Phase-3 launch: recipe, hyperparameters, motivation, training-★ trajectory, frozen-bundle ATB on completion, post-mortem.
-- **`IDEAS-LLNL.md`** — numbered backlog of pending architecture / loss / curriculum bets, with status (queued / wired / running / closed).
-- **`PEER-REVIEW.md`** + **`PEER-REVIEW-GEMINI.md`** — the two outside reviewers' running feedback. Read both at the start of each session.
+- **`LEADER-BOARD.md`** — per-corpus generative + bootstrap leaderboard, multi-seed banked rows, open fronts.
+- **`VERSIONS-LLNL.md` / `VERSIONS-LANL.md`** — append-only round logs; recipe, knobs, motivation, multi-seed result, post-mortem.
+- **`RESPONSE-LLNL.md` / `RESPONSE-LANL.md`** — per-claim official postings (literal `cachesim mean HRC-MAE` lines + JSON means + 4-seed tables).
+- **`PEER-REVIEW-*`** — running adversarial peer reviews; read both at the start of each session.
+- **`IDEAS-LLNL.md` / `IDEAS-LANL.md`** — per-team backlogs of architecture / loss / curriculum bets.
+- **`MAP-LLNL.md` / `MAP-LANL.md`** — cognitive maps; refresh when load-bearing code shape changes.
 
 ---
 

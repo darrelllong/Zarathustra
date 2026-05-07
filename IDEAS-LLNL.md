@@ -1,69 +1,318 @@
-### 22. Hierarchical Trace Generation
+# IDEAS-LLNL.md
 
-**Why this is the breakthrough candidate:** The current generator only plans a 12‑step window at a time, treating each window independently apart from hidden‑state carry. By introducing a coarse global plan that specifies high‑level workload characteristics (e.g., overall burstiness, average stride, total size budget) and letting a fine‑grained generator produce each window conditioned on that plan, we explicitly separate *what* the trace should look like from *when* events occur.
+LLNL backlog of architecture, loss, and post-hoc bets for the cachesim
+HRC-MAE race. Status as of **2026-05-06**: LANL leads all 9 corpora
+(see `LEADER-BOARD.md`). Every idea here is judged by *expected
+multi-seed mean cachesim HRC-MAE delta vs the standing LANL claim*,
+not by training-time diagnostics.
 
-**Implementation sketch:**
-1. Add a lightweight global planner module (e.g., a small MLP that predicts a sequence of latent global vectors, one per window).  
-2. Train the planner jointly with the generator using a multi‑head loss: the generator learns to match per‑window real data while the planner learns to produce a sequence that reconstructs the full trace using a *trace‑reconstruction* loss (e.g., MAE on aggregated statistics). 
-3. During inference, sample a planner sequence from the prior and feed each latent into the window generator.
+Numbering continues from the closed-failed GAN-era backlog (#22–#25
+addressed by current implementation, #26 still open). New ideas start
+at **#27**.
 
-**Expected impact:**  • Improves global coherence and reduces drift across window boundaries.  • Lowers reliance on hidden‑state carry, allowing the generator to be resetted each window.  • Makes training more stable and gives a clear signal that “global structure” matters.
-
----
-
-### 23. Explicit Long‑Term Object Memory
-
-**Why this is the breakthrough candidate:** Reuse decisions are currently learned implicitly by the discriminator in the generator, which struggles to preserve long‑range object identity across hundreds of events. An explicit, trainable memory of recently accessed objects can give the generator a concrete way to decide *which* object to reuse.
-
-**Implementation sketch:**
-1. Maintain a fixed‑size hash‐based memory table that stores a small embedding of each object seen in the last N events (e.g., N=256).  
-2. The generator outputs a *reuse gate* probability and, if reusing, a query vector.  
-3. During training, use a differentiable attention mechanism (softmax over memory similarity) to select an object.  
-4. Add a reconstruction loss that encourages the selected object's features (size, opcode) to match the generated values.
-
-**Expected impact:**  • Significantly raises reuse rate and fidelity of reuse patterns.  • Reduces cache miss variance, making the generated traces more realistic for downstream work‑loads.  • Provides an interpretable interface for inspecting which objects are being reused.
+Status legend: `queued` → `wired` → `running` → `closed-{positive,negative,marginal}`.
 
 ---
 
-### 24. Cache‑Aware Training Loss
+### 22. Hierarchical Trace Generation — `closed-marginal`
 
-**Why this is the breakthrough candidate:** The evaluation uses an LRU cache simulator to compute HRC‑MAE, but the generator does not see cache behavior during training. Incorporating a differentiable cache simulation (or a learned cache‑behavior predictor) into the loss encourages the generator to produce traces that are cache‑accurate.
+Phase / Markov / Stack-distance compound state in `markov_atlas.py`
+realises this idea. R155 192-state atlas held its own on alibaba but
+did not retake the corpus. Per-stream conditioning was the missing
+ingredient (folded into #27, #28).
+
+### 23. Explicit Long-Term Object Memory — `closed-marginal`
+
+`retrieval_memory.py` (IDEA #17) wires this. Bank-saturation issues
+(Gemini R3 P1 #2 / IDEA #117) addressed by `--retrieval-train-carry`.
+The mechanism is structurally sound but does not move the cachesim
+needle on its own; subsumed by atlas + chunk-ensemble.
+
+### 24. Cache-Aware Training Loss — `closed-superseded`
+
+The cachesim is now in the loop *post-hoc* via `chunk_ensemble.py` and
+*as a selector* via the multi-seed claim protocol. A fully
+differentiable LRU is not the bottleneck — see #29 for the
+non-differentiable RL replacement.
+
+### 25. Window-Boundary Alignment Loss — `closed-marginal`
+
+`chunk_stitching.py` (BS + OC sub-losses) wires this. Useful guard
+against cross-window drift in long rollouts; not race-decisive.
+
+### 26. Atlas-Fit IRD-Shape Loss (R284 followup) — `queued`
+
+Original wording preserved. Still the right idea: LLNL atlases hit a
+~0.10 LRU HRC-MAE per-trace floor on alibabaBlock_521 because the
+IRD distribution is approximated indirectly via state-conditioned rank
+PMFs. Direct objective on IRD shape during atlas fit closes some-or-
+all of the 2DIO gap. Implementation sketch unchanged. **Risk
+update:** generating per-epoch eval batches is expensive; gate behind
+`--atlas-fit-hrc-loss` flag and run every K epochs. **Promotion
+gate:** ≥10% per-trace LRU HRC-MAE drop on v521 with corpus mean
+unchanged or improved.
+
+---
+
+### 27. Multi-seed the IRD-renewal port across KV-shaped corpora — `queued`, **highest near-term ROI**
+
+**Targets:** Meta KV (LANL 0.0109 vs LLNL 0.05587, **80.5% gap**),
+Wikipedia (0.01146 vs 0.01727, **33.6%**), CloudPhysics (0.0267 vs
+0.0311, **14.1%**).
+
+**Why this is the breakthrough candidate:** LLNL ported LANL's
+breakthrough into `llgan/ird_renewal.py` after R285 disclosure but has
+not yet multi-seeded it on the three KV-shaped corpora where
+neural-atlas scale-sharpening over-concentrates rank=0 mass. LANL's
+recipe for Wikipedia (`ird_scale=32`, `independent_prob=0.10`,
+`rank_ird_buckets=0`) is published. Three claims should fall almost
+mechanically.
 
 **Implementation sketch:**
-1. Implement a lightweight, differentiable LRU (or splay) cache simulation built from tensor ops.  
-2. During training, run a short‑run of the simulator on a batch of generated windows and compute the HRC‑MAE against the target HRC curve derived from the char‑file.  
-3. Backpropagate this loss together with the standard GAN losses.
+1. Run `python3 -m llgan.ird_renewal --real-csv REF --n-records 1M
+   --independent-prob {0.05,0.08,0.10,0.12} --ird-scale {24,28,32,36}
+   --rank-ird-buckets {0,16,32,48} --seed {42,80,81,82}` on Wikipedia
+   ref. The 4×4×4×4 = 256-cell × 4-seed = 1024 evals is heavy; cut to
+   the LANL-published cell first (verify reproduction within range
+   0.000533) before sweeping.
+2. Repeat on `meta_kv_real.csv` and `cloudphysics_real.csv`. CP
+   has the 8-policy surface — use it.
+3. Post 4-seed tables to `RESPONSE-LLNL.md`.
 
-**Expected impact:**  • Directly aligns training with the downstream metric.  • Dramatically improves cache hit‑ratio fidelity, which is the main gap for full‑trace realism.  • Helps the GAN avoid generating long sequences that locally look correct but globally produce poor cache behavior.
+**Expected impact:** Meta KV 0.05587 → ~0.011 (ports LANL recipe
+verbatim). Wikipedia 0.01727 → ~0.0114. CloudPhysics 0.0311 → ~0.027.
+**Three retakes from one idea.**
+
+**Risk:** LANL's CloudPhysics seed-80 is an outlier (0.0295 dragging
+mean to 0.0267). LLNL might match or beat the mean while landing in
+the same high-variance basin. Mitigation: probe `rank_ird_buckets ∈
+{48,64,96}` to reduce the seed-80-class outlier and *land below 0.027
+with range < 0.002* — that is a clean retake on tighter uncertainty.
 
 ---
 
-### 25. Window‑Boundary Alignment Loss
+### 28. Per-stream IRD calibration with multi-stream references — `queued`
 
-**Why this is the breakthrough candidate:** Even with state carry, the model can drift when concatenating windows, producing subtle inconsistencies at boundaries. A simple alignment loss that penalizes discontinuities in key statistics (stride, size, reuse rate) between adjacent windows can guide the generator to produce smoother transitions.
+**Targets:** Wikipedia, Twitter, MSR Exchange — corpora whose real
+reference has distinct multi-stream rows.
+
+**Why:** Both LANL's IRD-renewal and LLNL's neural atlas pool all
+streams into a single empirical IRD. For corpora with heterogeneous
+streams (heavy-write tenant vs read-only tenant; CDN edge vs origin),
+per-stream IRD shapes diverge by 2-5× in tail. Pooling underfits the
+heavy stream and overfits the light one.
 
 **Implementation sketch:**
-1. After generating two adjacent windows, compute their aggregate statistics (mean stride, total size, reuse rate).  
-2. Compute an L1 loss between each statistic of window t and the corresponding statistic of window t+1.  
-3. Add this loss term to the overall generator objective with a small weight.
+1. Detect multi-stream structure in the reference CSV (`stream_id`
+   column or implicit per-tenant grouping).
+2. For each stream, fit an independent IRD distribution and an
+   independent rank-conditioned IRD if `rank_ird_buckets > 0`.
+3. At generation, sample which stream produced the next event from a
+   stream weight vector (or honour `n-streams` parallel rollouts), and
+   draw IRD from that stream's distribution.
+4. Add `--per-stream` flag to both `ird_renewal.py` and
+   `neural_atlas.py`.
 
-**Expected impact:**  • Produces more natural long‑trace flows.  • Reduces the need for manual chunk stitching and makes the generator's output directly usable for long‑trace evaluation.
+**Expected impact:** Closes the structural gap on heterogeneous
+corpora. Wikipedia (LANL global-renewal best, but heterogeneous
+multi-stream) is the strongest candidate: ~10-15% drop expected, which
+**moves the row to LLNL's column.**
+
+**Risk:** Single-stream corpora won't benefit; flag must default off.
+LANL has not published per-stream variants on Wikipedia, so there is
+free space.
 
 ---
 
-### 26. Atlas-Fit IRD-Shape Loss (R284 followup)
+### 29. Black-box cachesim optimisation in chunk-ensemble — `queued`
 
-**Why this is the breakthrough candidate:** R284.X (R270 capacity, 192 states) and R284.Y (low capacity, 6 states) both showed the LLNL atlas hits a per-trace floor of ~0.10 LRU HRC-MAE on alibabaBlock_521 — *capacity is not the bottleneck.* 2DIO achieves 0.02–0.05 by directly parameterizing the IRD distribution with a 3-param analytical model. The LLNL atlas approximates that shape indirectly via state-conditioned rank PMFs and pays a 2–5× MAE penalty for the indirection. The fix is to add a direct objective on the IRD shape during atlas fit.
+**Targets:** Alibaba (4.7% gap), Tencent (1.3% gap), Twitter (13.1%
+gap) — all already won by LANL via chunk-surface selectors.
+
+**Why:** The current `chunk_ensemble.py` greedy guard pass evaluates
+every donor at every chunk and keeps the best. With a 6-policy
+cachesim call per candidate, this is O(donors × chunks × policies ×
+caps). It picks the *one-step locally optimal* swap — provably worse
+than coordinate descent, let alone CMA-ES or RL.
 
 **Implementation sketch:**
-1. During `neural_atlas fit`, after each epoch, generate a small batch (e.g. 100k records) from the current atlas using the manifest's actual eval cache sizes.
-2. Compute LRU stack-distance histogram on both real and generated batches; sum-MAE over the 43 fine bins (or directly over the cumulative HRC at the eval sizes).
-3. Add this MAE as an auxiliary loss term, weighted ~0.1× the trans_loss, with a slow ramp-up after epoch 100 (so the rank PMF is roughly fit before the IRD-shape gradient kicks in).
-4. *Alternative (cheaper):* Maintain a running bootstrap estimate of the real IRD shape and project the generator's predicted PMF onto that target via KL/EMD instead of running cachesim per epoch.
+1. Replace the greedy pass with two-stage optimisation:
+   a. **Stage 1 (CMA-ES, 1024 evals):** parameterise the swap policy
+      as a soft selector — donor weights as Dirichlet logits; let
+      CMA-ES tune the weights against cachesim mean HRC-MAE on a
+      held-out 200k validation slice of the real ref.
+   b. **Stage 2 (greedy refine, 100 chunks):** apply current greedy
+      pass over the CMA-ES initialisation.
+2. Cache `cachesim` calls keyed on `(chunk_hash, policy, cap)` — 95%
+   of evals across the search are repeats.
+3. Score on the **mean over a subset of seed indices** so per-seed
+   overfitting doesn't sneak in.
 
-**Expected impact:** • Closes some-or-all of the 2DIO per-trace gap without abandoning the corpus-fit strength. • Gives an architectural path to *learn* what 2DIO hand-designs — atlases that are simultaneously corpus-general and IRD-faithful. • Worst case: confirms the gap is fundamental (which is itself a paper).
+**Expected impact:** 5-10% additional drop on the chunk-ensemble
+contribution alone, on top of whatever the base atlas gives. Combined
+with #27/#28, retakes Alibaba and Tencent outright (and probably
+Twitter once paired with the right atlas base).
 
-**Risk:** generating per-epoch eval batches is expensive; mitigations are to keep the inner batch small (100k), eval only every K epochs, and gate behind a `--atlas-fit-hrc-loss` flag so existing recipes stay unchanged.
+**Risk:** Hyperparameter search overfits the validation slice. Hold
+out 4 fresh seeds (46/47/48/49) for the *promotion test* — never let
+CMA-ES see them.
 
 ---
+
+### 30. Workload-class router (atlas vs IRD-renewal) — `queued`
+
+**Why:** The LANL leaderboard exposes a clear architectural split.
+Storage corpora (Alibaba, Tencent, MSR Exchange, Baleen24) are best
+served by phase-conditioned atlases with LRU stack decoders. KV/CDN
+corpora (CloudPhysics, Wikipedia, Meta KV, Meta CDN) are best served
+by IRD-renewal because their HRC has cliff structure that scale-
+sharpened atlases over-concentrate. Twitter sits between.
+
+**Implementation sketch:**
+1. Compute four corpus descriptors offline: median IRD, IRD coefficient
+   of variation, rank=0 mass, and reuse-vs-new ratio.
+2. Train a 2-class classifier (storage vs KV) on the four descriptors
+   from labelled corpora (Alibaba/Tencent/MSR storage; Wiki/MetaKV/CP
+   KV; Twitter, Baleen24 unlabeled tertiary).
+3. At generation time, predict class and route to neural-atlas or
+   ird-renewal pipeline.
+4. Bonus: emit a `corpus_type` field in the manifest header so the
+   tooling can pick the right path automatically.
+
+**Expected impact:** Reduces "wrong recipe on wrong corpus" errors.
+The Twitter and Baleen24 retakes likely fall to whichever pipeline the
+classifier assigns. Removes a class of "we used the storage recipe on
+a KV corpus" failures that have appeared in the round logs.
+
+**Risk:** Two-class is too coarse for tertiary corpora. Mitigation:
+ablate by training a 3-class with a "blend" tier, or expose a
+`--blend-fraction` knob that mixes both pipelines.
+
+---
+
+### 31. Per-policy decoder ensemble — `queued`
+
+**Targets:** all corpora; specifically the cases where the
+multi-policy mean HRC-MAE hides a lopsided per-policy profile.
+
+**Why:** A generator that wins LRU/ARC by 30% but loses SIEVE by 50%
+can have the same mean HRC-MAE as one that's mediocre on all six. The
+mean is the race metric, but it hides which locality structure each
+generator gets right. SIEVE rewards adjacent-duplicate sequencing;
+ARC rewards balance between recency and frequency; SLRU rewards stable
+hot-set; CAR rewards CLOCK-bit dynamics. **Different policies require
+different generation knobs.**
+
+**Implementation sketch:**
+1. Compute per-policy HRC-MAE for each candidate and identify which
+   policies dominate the mean for each corpus.
+2. For the worst policy, fit a *post-hoc decoder pass* tuned for that
+   policy's invariants:
+   - SIEVE → adjacency injector (`stack_adj_dup_prob` swept against
+     SIEVE only).
+   - LRU → IRD shape (the standard knob).
+   - ARC → recency/frequency balance (vary tail-reuse vs hot-pool
+     mix).
+3. Ensemble: generate K=3 candidates with different per-policy
+   tunings, then pick per-chunk the one with lowest cachesim mean on
+   that chunk's slice.
+
+**Expected impact:** 3-7% mean drop, drawn from policies that
+contribute most to the current MAE. Especially useful where LANL's
+chunk-ensemble has the lead but per-policy spread is wide (Twitter,
+Baleen24).
+
+**Risk:** Over-fits to the policy-specific heuristics; multi-seed
+range may grow. Mitigation: only ensemble when per-seed range is
+already tight; abandon if range exceeds 0.001.
+
+---
+
+### 32. Hybrid atlas + IRD-renewal generator — `queued`
+
+**Targets:** all 9 corpora; especially the "neither pure atlas nor
+pure IRD-renewal wins" middle ground (Twitter, Meta CDN, Baleen24).
+
+**Why:** The neural atlas decides *action class* (NEW vs REUSE) well
+because it conditions on the per-file profile, but its rank PMF over-
+concentrates. IRD-renewal nails the IRD shape but ignores per-file
+conditioning. The natural composition: **atlas decides the action
+class; IRD-renewal decides the rank.**
+
+**Implementation sketch:**
+1. At each step, run the trained `neural_atlas` to sample
+   `next_state ∈ {NEW, REUSE_b1..REUSE_b5}`.
+2. If NEW, allocate a fresh ID via the existing path.
+3. If REUSE, **ignore** the atlas's per-state rank PMF; instead, pull
+   an IRD draw from the per-state empirical IRD distribution and read
+   the LRU stack at that rank.
+4. Keep the 4-seed protocol; ablate against pure-atlas and pure-IRD
+   on each corpus.
+
+**Expected impact:** The hybrid combines corpus-generalization (atlas
+strength) with IRD fidelity (renewal strength). On Twitter and
+Baleen24 — where neither pure pipeline holds the lead — this should
+land in the LANL column or beat it. On the IRD-decisive corpora the
+hybrid should at minimum match #27.
+
+**Risk:** Per-state IRD distributions in the training corpus have
+small support for the rare states (REUSE_b5). Mitigation: smooth with
+a Dirichlet prior or fall back to the marginal IRD when state support
+< 100 examples.
+
+---
+
+### 33. Direct IRD parametrisation à la 2DIO — `queued`, *2DIO comparison class*
+
+**Target:** the 2DIO bar (per-trace HRC-MAE 0.02–0.05) on
+alibabaBlock_521 and the four CloudPhysics traces named in
+`LEADER-BOARD.md`. LLNL's atlas hits a 0.10 floor on v521 regardless
+of capacity (R284.X 192 states; R284.Y 6 states). **Capacity is not
+the bottleneck.**
+
+**Why:** 2DIO directly parameterises the IRD distribution with a
+3-parameter analytical form (heavy-tail mixture). LLNL's atlas
+approximates that shape *indirectly* through state-conditioned rank
+PMFs and pays a 2–5× MAE penalty for the indirection.
+
+**Implementation sketch:**
+1. New module `llgan/two_dio.py`. Per-trace fit of a 3-parameter IRD
+   model (Pareto + log-normal mixture; or whatever `paper/2DIO.pdf`
+   describes — re-derive, do not hand-copy).
+2. Per-trace generation: roll out via IRD draws from the fitted
+   parameters; LRU stack at that rank.
+3. Multi-trace evaluation: report per-trace LRU HRC-MAE on the five
+   benchmark traces (v521, w11/w24/w44/w82) under the same conditions
+   2DIO does.
+
+**Expected impact:** First LLNL number in the 2DIO comparison class.
+Even matching 0.05 (the looser 2DIO bound) is a paper. Beating 0.02
+on any of the five traces is **a publishable result** and sets up an
+external positioning for the next NSF cycle.
+
+**Risk:** This is a different metric class from the corpus race;
+spending compute here trades against retaking the 9 corpora. Gate
+behind explicit user request; do not autoschedule.
+
+---
+
+### Operating notes
+
+1. **Highest near-term ROI:** #27 (port LANL's published recipes to
+   3 corpora; expected to flip 3 rows in one round each). Do this
+   first.
+2. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
+   Once #27 is banked, this is the structural bet that has the
+   highest probability of taking back Twitter/Meta CDN/Baleen24.
+3. **Methodology guard:** every claim still requires four seeds with
+   mean and range. Tightness of range is part of the claim — a 0.001
+   range with mean 0.027 outranks a 0.005 range with mean 0.026.
+4. **Read [PEER-REVIEW-LANL.md](PEER-REVIEW-LANL.md) Round 68
+   first.** LANL flagged that `chunk_ensemble.py` swaps both obj_id
+   *and size*. Either preserve base size exactly or update the
+   method description before banking the next chunk-ensemble row.
+5. **What we do not need more of:** new GAN-track ideas, new
+   training-time scalar knobs without a structural mechanism, scout
+   sweeps that don't produce a 4-seed promotion. The race is
+   structural.
 
