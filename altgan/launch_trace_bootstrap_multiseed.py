@@ -55,7 +55,7 @@ def _mean_token_from_json_text(path: Path) -> tuple[str, float]:
 
     `llgan.cachesim_eval` writes JSON via Python's `json.dumps()` which may choose
     either fixed-point or scientific notation; LANL docs want the exact token
-    string so it can be pasted verbatim.
+    string so it can be pasted verbatim (formatting included).
     """
 
     text = path.read_text()
@@ -64,12 +64,7 @@ def _mean_token_from_json_text(path: Path) -> tuple[str, float]:
         if m:
             token = m.group(1)
             d = Decimal(token)
-            # Preserve the exact JSON numeric value but render without scientific notation
-            # so the docs stay readable.
-            as_fixed = format(d, "f")
-            if "." in as_fixed:
-                as_fixed = as_fixed.rstrip("0").rstrip(".") or "0"
-            return as_fixed, float(d)
+            return token, float(d)
 
     # Fallback: parse as JSON (loses formatting), but still returns a value.
     return f"{_mean_from_json(path):.10f}", _mean_from_json(path)
