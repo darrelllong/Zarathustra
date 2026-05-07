@@ -3840,6 +3840,28 @@ This improves r332 `0.0115917188` by `0.0001715521`, improves r306
 `0.0187498333` on the official eight-policy CloudPhysics cachesim surface.
 Seed 82 improved but remains the exposed weak seed.
 
+## CloudPhysics 2K Best-Donor Continuation (2026-05-07)
+
+Continued CloudPhysics from the r337 2K fakes with `--accept-mode best`, which
+scans all synthetic donors for a candidate chunk and accepts the best improving
+donor. Base timing, sizes, opcodes, tenants, and stream columns were preserved;
+only synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r338_best2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098736667 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r338_best2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0119` | 0.0118865208 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r338_best2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098059792 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r338_best2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0135` | 0.0134652708 |
+
+Four-seed mean: `0.0112578594` (display `0.0113`), range `0.0036592917`.
+This improves r337 `0.0114201667` by `0.0001623073`, improves r332
+`0.0115917188` by `0.0003338594`, improves r306 `0.0121897344` by
+`0.0009318750`, and beats LLNL R287.CP `0.03017` by `0.0189121406` on the
+official eight-policy CloudPhysics cachesim surface. Seed 82 is still the
+exposed weak seed, but best-donor mode improved every seed without a refit.
+
 ## Tencent 64-Row Cross-Seed Continuation (2026-05-07)
 
 Continued the Tencent r294/r297 chunk champions with a 64-row object-ID
