@@ -504,9 +504,18 @@ def summarize_structured_rows(
     if len(first_numeric) > 1:
         diffs = [first_numeric[i] - first_numeric[i - 1] for i in range(1, len(first_numeric))]
         nonneg = sum(1 for d in diffs if d >= 0)
+        # If column 0 is hash-keyed (e.g. wiki.2007.sort.hash.csv decimal-
+        # encoded uint64), diffs are uniform on [0, 2^64) and diff_stats are
+        # meaningless. Detect via median absolute non-zero diff > 1 TiB,
+        # mirroring summarize_request_fields. Null diff_stats when contaminated
+        # so downstream R aggregation doesn't propagate hash garbage as
+        # "first_numeric_diff_*" family-level features.
+        nonzero_abs = sorted(abs(d) for d in diffs if d != 0)
+        is_hash_col = bool(nonzero_abs) and nonzero_abs[len(nonzero_abs) // 2] > (1 << 40)
         time_like = {
             "monotone_nonnegative_ratio": nonneg / len(diffs) if diffs else None,
-            "diff_stats": summarize_numeric(diffs),
+            "first_numeric_kind": "hash" if is_hash_col else "value",
+            "diff_stats": None if is_hash_col else summarize_numeric(diffs),
         }
     return {
         "parser": parser_name,

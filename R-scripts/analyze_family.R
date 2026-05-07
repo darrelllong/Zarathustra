@@ -254,6 +254,15 @@ compute_kmeans_diagnostics <- function(cluster_matrix) {
     return(list(best_k = NA_integer_, table = data.frame()))
   }
 
+  # Standardize features before K-means so within-SS reflects relative
+  # structure, not the absolute scale of whichever feature happens to be
+  # largest (e.g. abs_stride at ~1e9, obj_id_top1 at ~1e15). Without this,
+  # tot_withinss reads as 1e25 and is dominated by one column.
+  col_sd <- apply(cluster_matrix, 2, stats::sd, na.rm = TRUE)
+  col_sd[!is.finite(col_sd) | col_sd <= 1e-12] <- 1
+  cluster_matrix <- scale(cluster_matrix, center = TRUE, scale = col_sd)
+  cluster_matrix[!is.finite(cluster_matrix)] <- 0
+
   diag_matrix <- cluster_matrix
   if (nrow(diag_matrix) > 1200) {
     idx <- sort(sample(seq_len(nrow(diag_matrix)), 1200L))
@@ -428,6 +437,12 @@ compute_outlier_decomposition <- function(df, usable_numeric, outliers, limit = 
     vals <- suppressWarnings(as.numeric(row[1, feature_cols, drop = TRUE]))
     names(vals) <- feature_cols
     z <- (vals - centers) / scales
+    # Cap displayed z-scores at +/-100. Values beyond that mean the column has
+    # a degenerate scale (MAD ~= 0, e.g. mostly-zero column with one extreme
+    # value, or hash-domain numeric column). The literal magnitude is not
+    # informative — clamp so the reader knows it's saturated.
+    z[is.finite(z) & z >  100] <-  100
+    z[is.finite(z) & z < -100] <- -100
     finite <- is.finite(z)
     if (!any(finite)) {
       return(NULL)
