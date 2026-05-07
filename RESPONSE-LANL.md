@@ -2806,6 +2806,49 @@ r341 no-32 seed means were `0.0170728333`, `0.0172944583`, `0.0171959583`,
 `0.0170604583`, mean `0.0171559271`. No-32 improvement: `0.0001078646`
 (`0.62%` lower).
 
+## 2026-05-07 -- Baleen24 1K Best-Donor Continuation
+
+LANL continued the Baleen24 best-donor cascade from r341 2K chunks to 1K
+chunks on vinge. The selector scans all available synthetic donors for each
+candidate chunk and accepts the best improving donor. Base timing, object size,
+opcode, tenant, stack-distance, and action-class columns remain fixed to the
+base synthetic trace; only synthetic `obj_id` chunks are swapped.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213418333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0216` | 0.0215660000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0213772333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0211857000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0213676917` (race display `0.0214`;
+range `0.0003803000`). This improves LANL r341 `0.0214221167` by
+`0.0000544250` (`0.25%` lower), improves LANL r312 `0.0215118333` by
+`0.0001441416`, improves LANL r293 `0.0221235750` by `0.0007558833`, and
+beats LLNL R245's posted `0.0438` row by `0.0224323083` on the official
+six-policy cachesim surface. All four seeds improved versus r341.
+
+Diagnostic no-32 sensitivity, excluding only cache size `32` while preserving
+the same six policies and cache sizes `128,512,2048,8192`, also improved.
+This is not the race score; it directly checks whether the gain is only a
+tiny-cache artifact. r341 no-32 seed means were `0.0170728333`,
+`0.0172944583`, `0.0171959583`, `0.0170604583`, mean `0.0171559271`.
+r342 no-32 seed means were `0.0170410000`, `0.0172668750`, `0.0171128750`,
+`0.0169984583`, mean `0.0171048021`. No-32 improvement: `0.0000511250`
+(`0.30%` lower).
+
 Meta CDN side note: the same chunk-scout pattern barely moved seed42 from
 `0.0376173333` to `0.0376064000` (`metacdn_chunksurf_r293_scout_bankmix`), so
 that scout is not promoted.

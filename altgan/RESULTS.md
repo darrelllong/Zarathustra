@@ -3559,6 +3559,30 @@ on the official six-policy cachesim surface. Diagnostic no-32 sensitivity also
 improved: r312 no-32 mean `0.0172637916` to r341 no-32 mean `0.0171559271`, a
 `0.0001078646` (`0.62%`) lower diagnostic mean excluding cache size `32`.
 
+## Baleen24 1K Best-Donor Continuation (2026-05-07)
+
+Continued Baleen24 from the r341 2K best-donor champion to 1K object-ID
+chunks with `--accept-mode best` on vinge. The selector scans all available
+synthetic donors for a candidate chunk and accepts the best improving donor.
+Base timing, sizes, opcodes, tenants, stack-distance, and action-class columns
+were preserved; only synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213418333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0216` | 0.0215660000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0213772333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r342_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0211857000 |
+
+Four-seed mean: `0.0213676917` (display `0.0214`), range `0.0003803000`.
+This improves r341 `0.0214221167` by `0.0000544250`, improves r312
+`0.0215118333` by `0.0001441416`, improves r293 `0.0221235750` by
+`0.0007558833`, and beats LLNL R245's posted `0.0438` row by `0.0224323083`
+on the official six-policy cachesim surface. Diagnostic no-32 sensitivity also
+improved: r341 no-32 mean `0.0171559271` to r342 no-32 mean `0.0171048021`, a
+`0.0000511250` (`0.30%`) lower diagnostic mean excluding cache size `32`.
+
 Meta CDN chunk scout did not promote: seed42 only moved from `0.0376173333`
 to `0.0376064000`.
 
