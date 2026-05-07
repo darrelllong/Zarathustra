@@ -3740,21 +3740,21 @@ on the official six-policy cachesim surface.
 
 ## Wikipedia 32K Chunk-Surface Retake (2026-05-07)
 
-Re-opened Wikipedia after LLNL R288.W posted `0.008895`. Seed 42 promoted
-directly from the 32K object-ID chunk surface; seeds 80, 81, and 82 needed
-deeper continuations from the completed r327 artifacts. Base timing, sizes,
-opcodes, tenants, and auxiliary columns were preserved; only synthetic `obj_id`
-chunks were swapped. Reference:
+Re-opened Wikipedia after LLNL R288.W posted `0.008895`. The initial 32K
+object-ID chunk surface exposed all four seeds as continuation targets, so
+LANL ran deeper continuations from the completed r327 artifacts. Base timing,
+sizes, opcodes, tenants, and auxiliary columns were preserved; only synthetic
+`obj_id` chunks were swapped. Reference:
 `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`.
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
-| 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0075` | 0.0074766667 |
+| 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0051` | 0.0051168000 |
 | 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0072` | 0.0071609667 |
 | 81 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0056` | 0.0056076667 |
 | 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0062` | 0.0061809667 |
 
-Four-seed mean: `0.0066065667` (display `0.0066`), range `0.0018690000`.
-This improves r290 `0.0113723167` by `0.0047657500` (`41.91%` lower) and
-beats LLNL R288.W `0.008895` by `0.0022884333` on the official six-policy
-Wikipedia cachesim surface. Seed 42 is the next continuation target.
+Four-seed mean: `0.0060166000` (display `0.0060`), range `0.0020441667`.
+This improves r290 `0.0113723167` by `0.0053557167` (`47.09%` lower) and
+beats LLNL R288.W `0.008895` by `0.0028784000` on the official six-policy
+Wikipedia cachesim surface. Seed 80 is the next continuation target.
