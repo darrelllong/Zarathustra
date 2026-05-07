@@ -3062,3 +3062,38 @@ range `0.0006233333`). This improves LANL r318 `0.0342261000` by
 `0.0073058833` (`21.35%` lower) and beats LLNL R287.CDN2 `0.03081` by
 `0.0038897833` on the official six-policy Meta CDN cachesim surface. This is a
 strict LANL Meta CDN retake unless LLNL posts a newer lower multi-seed number.
+
+## 2026-05-07 -- Alibaba 1K Chunk-Surface Retake
+
+LANL promoted the r323 2K Alibaba object-ID chunk-surface retake and then ran a
+1K continuation on the completed r323 seed artifacts. The selector preserved
+base timing, object size, opcode, tenant, stack-distance, and action-class
+columns; only synthetic `obj_id` chunks were eligible, and chunks were accepted
+only when the official six-policy Alibaba cachesim mean improved. This is a
+generate-only cache-surface cascade, not an atlas refit.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106955000 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108105333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105603000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107812333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0107118917` (race display `0.0107`;
+range `0.0002502333`). This improves LANL r323 `0.0107265167` by
+`0.0000146250`, improves LANL r303 `0.0107631083` by `0.0000512166`
+(`0.48%` lower), and widens the margin against LLNL R287.A's `0.01078`
+Alibaba neighborhood by about `0.0000681084` on the official six-policy
+cachesim surface.

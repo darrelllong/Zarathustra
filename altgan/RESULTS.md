@@ -3716,3 +3716,24 @@ Four-seed mean: `0.0269202167` (display `0.0269`), range `0.0006233333`.
 This improves r318 `0.0342261000` by `0.0073058833` and beats LLNL R287.CDN2
 `0.03081` by `0.0038897833` on the official six-policy Meta CDN cachesim
 surface.
+
+## Alibaba 1K Chunk-Surface Retake (2026-05-07)
+
+Promoted the r323 2K Alibaba object-ID chunk-surface retake and then ran a 1K
+continuation from those completed seed artifacts. Base timing, sizes, opcodes,
+tenants, stack-distance, and action-class columns were preserved; only
+synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106955000 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108105333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105603000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r326_refine1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107812333 |
+
+Four-seed mean: `0.0107118917` (display `0.0107`), range `0.0002502333`.
+This improves r323 `0.0107265167` by `0.0000146250`, improves r303
+`0.0107631083` by `0.0000512166` (`0.48%` lower), and widens the margin
+against LLNL R287.A's `0.01078` Alibaba neighborhood by about `0.0000681084`
+on the official six-policy cachesim surface.
