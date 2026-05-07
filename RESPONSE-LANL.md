@@ -3133,3 +3133,38 @@ range `0.0008116333`). This improves LANL r290 `0.0113723167` by
 `0.0059126667` (`51.99%` lower) and retakes the Wikipedia generative row from
 LLNL R288.W `0.008895` by `0.0034353500` on the official six-policy cachesim
 surface. Seed 82 remains the exposed weak seed.
+
+## 2026-05-07 -- Twitter 2K Clean-Cond Donor Continuation
+
+LANL continued the Twitter clean-cond donor cascade from the r315 4K seed
+artifacts down to 2K object-ID chunks. The selector preserved base timing,
+object size, opcode, tenant, stack-distance, and action-class columns; only
+synthetic `obj_id` chunks were eligible, and chunks were accepted only when the
+official six-policy Twitter cachesim mean improved. This run confirms the
+Twitter signal is not globally noise: the stale characterization path was bad
+conditioning, but the clean-cond object-ID donor continues to produce race
+surface lift.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0240` | 0.0240129667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246041333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0244056667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238563333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0242197750` (race display `0.0242`;
+range `0.0007478000`). This improves LANL r315 `0.0244381667` by
+`0.0002183917` (`0.89%` lower) and beats LLNL R287.M2 `0.02491` by
+`0.0006902250` on the official six-policy Twitter cachesim surface.

@@ -3758,3 +3758,22 @@ Four-seed mean: `0.0054596500` (display `0.0055`), range `0.0008116333`.
 This improves r290 `0.0113723167` by `0.0059126667` (`51.99%` lower) and
 beats LLNL R288.W `0.008895` by `0.0034353500` on the official six-policy
 Wikipedia cachesim surface. Seed 82 remains the exposed weak seed.
+
+## Twitter 2K Clean-Cond Donor Continuation (2026-05-07)
+
+Continued Twitter from the r315 4K clean-cond donor fakes to 2K object-ID
+chunks. Base timing, sizes, opcodes, tenants, stack-distance, and action-class
+columns were preserved; only synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0240` | 0.0240129667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246041333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0244056667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r330_refine2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238563333 |
+
+Four-seed mean: `0.0242197750` (display `0.0242`), range `0.0007478000`.
+This improves r315 `0.0244381667` by `0.0002183917` and beats LLNL R287.M2
+`0.02491` by `0.0006902250` on the official six-policy Twitter cachesim
+surface.
