@@ -1075,6 +1075,9 @@ If you're launching from a machine without `/tiamat` but with SSH access to a
 python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack
 ```
 
+If `vinge.local` doesn't resolve on your launch machine, try the ssh-config host
+alias (if you have one), e.g. `--host vinge` or `--host baase`.
+
 If your ssh config routes through a jump host (ProxyJump) and that host doesn't resolve, add `--no-proxyjump` (or `--ssh-option ProxyJump=none`).
 
 ```bash
