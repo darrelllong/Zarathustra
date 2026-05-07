@@ -3,7 +3,11 @@
     "allow": [
       "Bash(ssh -i ~/.ssh/id_rsa -A baase.local *)",
       "Bash(ssh -i ~/.ssh/id_rsa -A vinge.local *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git commit -m *)",
+      "Bash(git push origin main)",
+      "Bash(git rm *)"
     ]
   }
 }
