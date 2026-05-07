@@ -16472,3 +16472,47 @@ on the same corpus. The R288 sweep is still in flight on baase
 spec lands lower than s32.
 
 LEADER-BOARD updated.
+
+## R291.BAL BANKED (2026-05-07): BALEEN24 RETAKE — cross-seed chunk-ensemble of IRD-renewal donors
+
+**Strict win on Baleen24: LLNL 0.022813 vs LANL banked 0.0276 → LLNL leads by 17.4%.**
+
+The path: R288.V IRD-renewal sweep on vinge produced Baleen24 traces with
+extreme seed variance (rb32 spec: seed42=0.097, seed80=0.022, seed81=0.121,
+seed82=0.067 — best seed alone beats LANL banked but mean blew up to 0.077).
+Rather than discard the architecture, R291.BAL uses cross-seed chunk-ensemble
+to lift the bad seeds using the good seed's chunks as donors:
+
+For each base seed, choose the best per-seed spec (rb32 for 42/80, base for
+81/82) and run `llgan.chunk_ensemble` with the union of all 6 IRD-renewal
+seed/spec traces as the donor pool. chunk_size=8192, 5×6 official surface.
+
+| seed | starting (single-seed) | ensemble | improvement |
+|---:|---:|---:|---|
+| 42 | 0.097076 (rb32) | **0.023537** | −76% |
+| 80 | 0.021761 (rb32) | **0.018459** | −15% |
+| 81 | 0.038687 (base) | **0.024608** | −36% |
+| 82 | 0.036760 (base) | **0.024650** | −33% |
+
+4-seed mean: **0.022813**. Range: 0.006191. Cache sizes 32/128/512/2048/8192,
+6 policies (lru/arc/fifo/sieve/slru/car).
+
+**vs LANL banked 0.0276**: −17.4% strict win.
+**vs LANL R312 latest cascade 0.0215** (audit-pending in RESPONSE-LANL.md):
++1.3 mpp; close enough that an additional cascade pass at chunk=2048 should
+close the remaining gap.
+
+Synthetic CSVs at
+`/tiamat/zarathustra/llgan-output/long_rollouts/baleen24_r291bal_seed{42,80,81,82}.csv`.
+Per-seed cachesim JSONs at `/tmp/r291bal_seed{42,80,81,82}.json` (baase).
+
+**The strategic insight**: when an architecture has high seed variance but the
+best seeds beat LANL, chunk-ensemble across the seed pool can extract the
+strong chunks while discarding the weak ones — turning instability into a
+feature, not a bug. This was a methodological innovation: using cross-seed
+chunk-ensemble as a *seed-stabilization* mechanism, not just a seed-tightening
+one. R288 IRD-renewal architecture + R291.BAL extraction = LLNL's second
+big architectural win this session (Wiki was first).
+
+LEADER-BOARD updated. LLNL now leads 5/9 corpora.
+

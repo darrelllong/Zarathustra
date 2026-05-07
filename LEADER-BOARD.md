@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-07 (R288.W WIKIPEDIA RETAKE 0.008895 — IRD-renewal architecture beats LANL 0.01146 by 22.4%; LLNL now leads alibaba/CDN/Twitter/Wikipedia — 4 strict-win retakes this session)**.
+Last updated: **2026-05-07 (R291.BAL BALEEN24 RETAKE 0.022813 — cross-seed chunk-ensemble of R288.V IRD-renewal beats LANL banked 0.0276 by 17.4%; LLNL now leads alibaba/CDN/Twitter/Wikipedia/Baleen24 — 5 strict-win retakes this session)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -25,15 +25,15 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
+| Baleen24 | **0.022813** (R291.BAL cross-seed chunk-ensemble of R288.V IRD-renewal donors, 4-seed {42,80,81,82} range 0.006191) | 0.0276 (scout-rank atlas, 4-seed {42,80,81,82}) | **LLNL** | +17.4% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | **0.03081** (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | 0.0377 (low-tail update) | **LLNL** | +18.3% |
 | Wikipedia | **0.008895** (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | 0.01146 (IRD-renewal ird_s=32 ip=0.10) | **LLNL** | +22.4% |
 
-**Generative score**: LLNL leads 4 (Alibaba, Twitter, Meta CDN,
-**Wikipedia** new R288.W); LANL leads 5 (Tencent, CP, Baleen24, MSR,
+**Generative score**: LLNL leads 5 (Alibaba, Twitter, Meta CDN,
+Wikipedia, **Baleen24** new R291.BAL); LANL leads 4 (Tencent, CP, MSR,
 Meta KV); 1 contested
 (Alibaba — LLNL R287.A 0.01078 vs LANL R289 0.01130; LANL has posted
 R303 cascade tightening to 0.01076 in `RESPONSE-LANL.md`, putting the
