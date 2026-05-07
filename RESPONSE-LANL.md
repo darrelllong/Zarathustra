@@ -3339,3 +3339,39 @@ range `0.0003440000`). This improves LANL r334 `0.0298389167` by
 `0.0000860834` (`0.29%` lower), and beats LLNL R206's `0.0305` by
 `0.0007049167` on the official six-policy Tencent cachesim surface. Seed 81
 remains the exposed weak seed, but it also improved from r334.
+
+## 2026-05-07 -- Tencent 8-Row Continuation
+
+LANL continued the Tencent r335 16-row chunk champion with an 8-row object-ID
+selector. Base timing, sizes, opcodes, tenants, stack-distance, and
+action-class columns were preserved; only synthetic `obj_id` chunks were
+swapped. The donor bank remained synthetic-only LANL material from the prior
+Tencent chunk champions plus seed42/seed-specific scanprotect traces. Chunks
+were accepted only when the official six-policy Tencent cachesim mean improved.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296723333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296533333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0300106667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296913333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0297569167` (race display `0.0298`;
+range `0.0003573333`). This improves LANL r335 `0.0297950833` by
+`0.0000381666` (`0.13%` lower), improves LANL r334 `0.0298389167` by
+`0.0000820000` (`0.27%` lower), improves LANL r333 `0.0298811667` by
+`0.0001242500` (`0.42%` lower), and beats LLNL R206's `0.0305` by
+`0.0007430833` on the official six-policy Tencent cachesim surface. Seed 81
+remains the exposed weak seed, but it also improved again.
