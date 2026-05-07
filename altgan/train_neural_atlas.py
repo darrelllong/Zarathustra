@@ -19,7 +19,7 @@ sys.path.insert(0, str(_LLGAN))
 from llgan.dataset import (  # noqa: E402
     _READERS,
     load_file_characterizations as _llgan_load_file_characterizations,
-    profile_to_cond_vector,
+    profile_to_cond_vector as _llgan_profile_to_cond_vector,
 )
 
 from .neural_atlas import fit_neural_atlas  # noqa: E402
@@ -172,7 +172,7 @@ def _cond_lookup_keys(name_or_path: str) -> list[str]:
 
 
 def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
-    lookup = _llgan_load_file_characterizations(jsonl_path, cond_dim=cond_dim)
+    lookup = _load_lanl_file_characterizations(jsonl_path, cond_dim=cond_dim)
     with open(jsonl_path) as fh:
         for line in fh:
             try:
@@ -186,10 +186,46 @@ def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
             path = row.get("path", "")
             if not rel and not path:
                 continue
-            vec = torch.tensor(profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
+            vec = torch.tensor(_profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
             for key in _char_row_keys(rel, path):
                 lookup[key] = vec
     return lookup
+
+
+def _load_lanl_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
+    raw_lookup = _llgan_load_file_characterizations(jsonl_path, cond_dim=cond_dim)
+    with open(jsonl_path) as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            profile = row.get("profile")
+            rel = row.get("rel_path", "")
+            if not profile or not rel:
+                continue
+            basename = Path(rel).name
+            vec = torch.tensor(_profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
+            raw_lookup[basename] = vec
+            for ext in (".zst", ".gz"):
+                if basename.endswith(ext):
+                    raw_lookup[basename[: -len(ext)]] = vec
+    return raw_lookup
+
+
+def _profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> list[float]:
+    return _llgan_profile_to_cond_vector(_sanitize_hash_key_profile(profile), cond_dim)
+
+
+def _sanitize_hash_key_profile(profile: dict) -> dict:
+    """Neutralize address-stride conditioning for hash-keyed object IDs."""
+    if profile.get("obj_id_kind") != "hash":
+        return profile
+    clean = dict(profile)
+    clean["forward_seek_ratio"] = 0.5
+    clean["backward_seek_ratio"] = 0.5
+    clean["signed_stride_lag1_autocorr"] = 0.0
+    return clean
 
 
 def _parse_int_list(text: str) -> list[int]:

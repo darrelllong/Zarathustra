@@ -15,12 +15,16 @@ _LLGAN = _ROOT / "llgan"
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_LLGAN))
 
-from llgan.dataset import _READERS, load_file_characterizations  # noqa: E402
+from llgan.dataset import _READERS  # noqa: E402
 
 from .neural_atlas import NeuralAtlasModel  # noqa: E402
 from .neural_marks import fit_mark_head  # noqa: E402
 from .train import _collect_files  # noqa: E402
-from .train_neural_atlas import _lookup_cond, _manifest_source_names  # noqa: E402
+from .train_neural_atlas import (  # noqa: E402
+    _load_file_characterizations,
+    _lookup_cond,
+    _manifest_source_names,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -66,7 +70,7 @@ def main() -> int:
     args = _parse_args()
     model = NeuralAtlasModel.load(args.model)
     reader = _READERS[args.fmt]
-    cond_lookup = load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
+    cond_lookup = _load_file_characterizations(args.char_file, cond_dim=args.cond_dim)
     paths = _select_paths(args)
     frames = []
     conds = []
