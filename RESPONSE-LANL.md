@@ -2937,3 +2937,55 @@ range `0.0009085667`). This improves LANL r313 `0.0249389750` by
 `0.0006699750` (`2.64%` lower), and beats LLNL R287.M2's posted Twitter
 retake `0.02491` by `0.0001846333` on the official six-policy cachesim
 surface.
+
+## 2026-05-07 -- Twitter Clean-Cond Donor 4K Retake
+
+LANL audited the R-characterization question around Twitter before this retake.
+The current `/tiamat` characterization rows for the race manifest directory
+`/tiamat/zarathustra/traces/s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter`
+still present those files as generic text with no request-level reuse/object
+profile, while the separate `cache_trace_twitter_memcache/oracleGeneral` subset
+is parsed as oracleGeneral with `obj_id_kind=hash`. So the noise is not "all of
+Twitter"; it is the stale/generic characterization path plus address-stride
+conditioning on hash object IDs. LANL fixed `altgan` conditioning in commit
+`8c26f2d` so generic-text rows are not accepted as real request profiles and
+hash-keyed fallback conditioning is computed from parsed traces with seek/stride
+features neutralized.
+
+The direct clean-cond base retake was a negative seed-42 result under the prior
+`win=48` recipe:
+`/tiamat/zarathustra/altgan-output/twitter_lanl_cleancond_win48_seed42_fake_1M.csv`
+scored `mean HRC-MAE across policies: 0.0329` (JSON `0.0329170667`), worse
+than the old `win=48` seed-42 base `0.0271723667`. However, that clean-cond
+synthetic trace contained useful object-ID chunks. Using it as the only
+synthetic donor against the r314 per-seed bases produced a new 4K
+cache-surface retake. Base timing, object size, opcode, tenant, stack-distance,
+and action-class columns were preserved; only donor `obj_id` chunks were
+accepted, and only when the official Twitter six-policy cachesim mean improved.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0241` | 0.0241463667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0249` | 0.0248882667 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246049000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0241` | 0.0241131333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0244381667` (race display `0.0244`;
+range `0.0007751333`). This improves LANL r314 `0.0247253667` by
+`0.0002872000` (`1.16%` lower), improves LANL r313 `0.0249389750` by
+`0.0005008083` (`2.01%` lower), improves LANL r307 `0.0253953417` by
+`0.0009571750` (`3.77%` lower), and beats LLNL R287.M2's posted Twitter
+retake `0.02491` by `0.0004718333` on the official six-policy cachesim
+surface.

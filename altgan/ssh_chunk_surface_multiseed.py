@@ -56,6 +56,11 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     )
     p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
     p.add_argument(
+        "--remote-python",
+        default="/tiamat/zarathustra/altgan-venv/bin/python",
+        help="Python interpreter on the remote host.",
+    )
+    p.add_argument(
         "--sync",
         choices=["pull", "bundle", "none"],
         default="bundle",
@@ -173,7 +178,7 @@ def _build_remote_run_script(
     launch_args: list[str],
 ) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
-    cmd = ["python3", "-u", "-m", "altgan.launch_chunk_surface_multiseed"] + launch_args
+    cmd = [args.remote_python, "-u", "-m", "altgan.launch_chunk_surface_multiseed"] + launch_args
     cmd_str = " ".join(_q(part) for part in cmd)
     lines = ["set -euo pipefail", f"cd {repo_dir_expr}"]
     if args.tmux_session:
@@ -230,4 +235,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

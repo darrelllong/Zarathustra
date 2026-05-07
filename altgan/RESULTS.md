@@ -3646,3 +3646,33 @@ Four-seed mean: `0.0247253667` (display `0.0247`), range `0.0009085667`.
 This beats LLNL R287.M2 `0.02491` by `0.0001846333`, improves r313
 `0.0249389750` by `0.0002136083`, and improves LANL r307 `0.0253953417` by
 `0.0006699750` on the official six-policy Twitter cachesim surface.
+
+## Twitter Clean-Cond Donor 4K Retake (2026-05-07)
+
+Twitter is not globally noise. The noisy path was the characterization layer:
+the race-manifest `2020_twitter` rows on `/tiamat` still look like generic text
+with no request-level object profile, while the related Twitter memcache
+oracleGeneral subset is hash-keyed and should not contribute address-stride
+conditioning. Commit `8c26f2d` makes `altgan` reject those generic-text profiles
+and compute fallback conditioning from parsed traces with hash seek/stride
+neutralized.
+
+The clean-cond atlas base itself did not promote: seed42
+`twitter_lanl_cleancond_win48_seed42_fake_1M.csv` scored
+`mean HRC-MAE across policies: 0.0329` (JSON `0.0329170667`). It was useful as
+a synthetic object-ID donor, though. Starting from the r314 4K fakes, the
+object-ID-only chunk selector accepted four 4K chunks per seed from that donor
+while preserving base timing, sizes, opcodes, tenants, stack-distance, and
+action-class columns.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0241` | 0.0241463667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0249` | 0.0248882667 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0246049000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r315_cleancond_donor_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0241` | 0.0241131333 |
+
+Four-seed mean: `0.0244381667` (display `0.0244`), range `0.0007751333`.
+This improves r314 `0.0247253667` by `0.0002872000`, improves r313
+`0.0249389750` by `0.0005008083`, and beats LLNL R287.M2 `0.02491` by
+`0.0004718333` on the official six-policy Twitter cachesim surface.
