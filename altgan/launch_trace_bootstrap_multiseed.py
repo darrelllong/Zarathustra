@@ -111,6 +111,58 @@ class SeedResult:
     mean_hrc_mae_token: str
 
 
+def _candidate_output_paths(
+    *,
+    corpus: str,
+    output_root: Path,
+    eval_root: Path,
+    mode: str,
+    chunk_size: int,
+    retime: bool,
+    seed: int,
+    records_tag: str,
+    policy_count: int,
+) -> tuple[tuple[Path, Path], tuple[Path, Path]]:
+    """Return (preferred_paths, legacy_paths) for (fake_csv, report_json).
+
+    Earlier runs and hand-written docs sometimes omitted the `_{retime_tag}` infix
+    (e.g. `...shuffle65536_seed42...`) even though later tooling standardized on
+    `...shuffle65536_nort_seed42...`. To avoid duplicating artifacts and to make
+    `--skip-existing` robust across naming eras, we support both patterns.
+    """
+
+    retime_tag = "ret" if retime else "nort"
+    fake_preferred = output_root / (
+        f"{corpus}_lanl_boot_{mode}{chunk_size}_{retime_tag}_seed{seed}_fake_{records_tag}.csv"
+    )
+    report_preferred = eval_root / (
+        f"{corpus}_lanl_boot_{mode}{chunk_size}_{retime_tag}_seed{seed}_official{policy_count}.json"
+    )
+
+    fake_legacy = output_root / (
+        f"{corpus}_lanl_boot_{mode}{chunk_size}_seed{seed}_fake_{records_tag}.csv"
+    )
+    report_legacy = eval_root / (
+        f"{corpus}_lanl_boot_{mode}{chunk_size}_seed{seed}_official{policy_count}.json"
+    )
+    return (fake_preferred, report_preferred), (fake_legacy, report_legacy)
+
+
+def _select_existing_or_preferred(
+    *,
+    preferred: tuple[Path, Path],
+    legacy: tuple[Path, Path],
+) -> tuple[Path, Path]:
+    """Choose existing (preferred > legacy) else preferred."""
+    pref_fake, pref_report = preferred
+    leg_fake, leg_report = legacy
+    if pref_fake.exists() and pref_report.exists():
+        return preferred
+    if leg_fake.exists() and leg_report.exists():
+        return legacy
+    return preferred
+
+
 def _markdown_snippet(
     *,
     corpus: str,
@@ -227,20 +279,23 @@ def main() -> int:
         _mkdir_or_die(output_root, label="output-root")
         _mkdir_or_die(eval_root, label="eval-root")
 
-    retime_tag = "ret" if args.retime else "nort"
     records_tag = _records_label(args.n_records)
     policy_count = len([p for p in args.policies.split(",") if p.strip()])
 
     results: list[SeedResult] = []
     for seed in args.seeds:
-        fake_csv = output_root / (
-            f"{args.corpus}_lanl_boot_{args.mode}{args.chunk_size}_{retime_tag}"
-            f"_seed{seed}_fake_{records_tag}.csv"
+        preferred, legacy = _candidate_output_paths(
+            corpus=args.corpus,
+            output_root=output_root,
+            eval_root=eval_root,
+            mode=args.mode,
+            chunk_size=int(args.chunk_size),
+            retime=bool(args.retime),
+            seed=int(seed),
+            records_tag=records_tag,
+            policy_count=policy_count,
         )
-        report_json = eval_root / (
-            f"{args.corpus}_lanl_boot_{args.mode}{args.chunk_size}_{retime_tag}"
-            f"_seed{seed}_official{policy_count}.json"
-        )
+        fake_csv, report_json = _select_existing_or_preferred(preferred=preferred, legacy=legacy)
 
         if args.skip_existing and not args.dry_run:
             if fake_csv.exists() and report_json.exists():
