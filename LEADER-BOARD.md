@@ -26,7 +26,7 @@ The race has two metric classes:
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.03017 (R287.CP chunk-ensemble guard pass on R283.H base, 8-pol multi-seed range 0.000213) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −13.0% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
-| MSR Exchange | 0.00921 (R282.F: R270 atlas + scale=1.3) | **0.00484** (hp=0.25 rank=1.0 min_age=16; 6-pol 4-seed {42,80,81,82}, range 0.0000631) | **LANL** | −47.5% |
+| MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02881** (R287.M chunk-ensemble guard pass on R281.K base, 4-seed range 0.000176) | **0.02547** (R288 chunk-ensemble) | **LANL** | −13.1% |
 | Meta KV | **0.05587** (R281.K scale=0.001 multi-seed, range 0.000417) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25; 4-seed) | **LANL** | −80.5% |
 | Meta CDN | **0.04625** (R281.K scale=0.001 multi-seed, range 0.000378) | **0.0377** (low-tail update; 4-seed {42,80,81,82}) | **LANL** | −18.5% |
