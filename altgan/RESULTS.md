@@ -3738,6 +3738,30 @@ This improves r323 `0.0107265167` by `0.0000146250`, improves r303
 against LLNL R287.A's `0.01078` Alibaba neighborhood by about `0.0000681084`
 on the official six-policy cachesim surface.
 
+## Alibaba 512-Row Best-Donor Continuation (2026-05-07)
+
+Continued Alibaba from the r326 1K chunk-surface champion to 512-row object-ID
+chunks with `--accept-mode best`. The selector scans all available synthetic
+donors for a candidate chunk and accepts the best improving donor. Base timing,
+sizes, opcodes, tenants, stack-distance, and action-class columns were
+preserved; only synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106633667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108032000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105571000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107801667 |
+
+Four-seed mean: `0.0107009583` (display `0.0107`), range `0.0002461000`.
+This improves r326 `0.0107118917` by `0.0000109334`, improves r303
+`0.0107631083` by `0.0000621500`, and widens the margin against LLNL R287.A's
+`0.01078` Alibaba neighborhood by about `0.0000790417` on the official
+six-policy cachesim surface. Diagnostic no-32 sensitivity also improved: r326
+no-32 mean `0.0121092396` to r340 no-32 mean `0.0120991979`, a
+`0.0000100417` (`0.08%`) lower diagnostic mean excluding cache size `32`.
+
 ## Wikipedia 32K Chunk-Surface Retake (2026-05-07)
 
 Re-opened Wikipedia after LLNL R288.W posted `0.008895`. The initial 32K

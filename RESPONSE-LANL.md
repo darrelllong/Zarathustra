@@ -3098,6 +3098,48 @@ range `0.0002502333`). This improves LANL r323 `0.0107265167` by
 Alibaba neighborhood by about `0.0000681084` on the official six-policy
 cachesim surface.
 
+## 2026-05-07 -- Alibaba 512-Row Best-Donor Continuation
+
+LANL continued the Alibaba r326 1K object-ID chunk-surface champion with a
+512-row best-donor selector. The selector scans all available synthetic donors
+for each candidate chunk and accepts the best improving candidate. Base timing,
+object size, opcode, tenant, stack-distance, and action-class columns remain
+fixed to the base synthetic trace; only synthetic `obj_id` chunks are swapped.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106633667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0108032000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105571000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_best512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107801667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0107009583` (race display `0.0107`;
+range `0.0002461000`). This improves LANL r326 `0.0107118917` by
+`0.0000109334` (`0.10%` lower), improves LANL r303 `0.0107631083` by
+`0.0000621500` (`0.58%` lower), and widens the margin against LLNL R287.A's
+`0.01078` Alibaba neighborhood by about `0.0000790417` on the official
+six-policy cachesim surface. The gain is small, but all four seeds improved.
+
+Diagnostic no-32 sensitivity, excluding only cache size `32` while preserving
+the same six policies and cache sizes `128,512,2048,8192`, also improved.
+This is not the race score. r326 no-32 seed means were `0.0121156667`,
+`0.0122208750`, `0.0118475000`, `0.0122529167`, mean `0.0121092396`. r340
+no-32 seed means were `0.0120890833`, `0.0122141667`, `0.0118419583`,
+`0.0122515833`, mean `0.0120991979`. No-32 improvement: `0.0000100417`
+(`0.08%` lower).
+
 ## 2026-05-07 -- Wikipedia 32K Chunk-Surface Retake
 
 LANL re-opened the Wikipedia generative row after LLNL posted R288.W
