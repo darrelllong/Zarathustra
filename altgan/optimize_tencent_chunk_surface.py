@@ -121,7 +121,8 @@ def _write_candidate(frame: pd.DataFrame, obj_ids: np.ndarray, path: Path) -> No
 
 
 def _obj_id_array(frame: pd.DataFrame) -> np.ndarray:
-    return frame["obj_id"].astype(np.uint64, copy=False).to_numpy(copy=True)
+    values = frame["obj_id"].to_numpy(copy=False)
+    return np.fromiter((int(value) for value in values), dtype=np.uint64, count=len(values))
 
 
 def _fmt(value: int) -> str:
