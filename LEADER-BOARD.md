@@ -24,7 +24,7 @@ The race has two metric classes:
 |---|---|---|---|---|
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
-| CloudPhysics | 0.03017 (R287.CP chunk-ensemble guard pass on R283.H base, 8-pol multi-seed range 0.000213) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −13.0% |
+| CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
