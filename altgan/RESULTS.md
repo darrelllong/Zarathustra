@@ -3826,6 +3826,31 @@ This improves r315 `0.0244381667` by `0.0002183917` and beats LLNL R287.M2
 `0.02491` by `0.0006902250` on the official six-policy Twitter cachesim
 surface.
 
+## Twitter 1K Best-Donor Continuation (2026-05-07)
+
+Continued Twitter from the r330 2K clean-cond donor cascade to 1K object-ID
+chunks with `--accept-mode best` on baase. The donor bank stayed LANL
+synthetic-only: prior Twitter chunk stages, the clean-cond donor trace, and
+the pre-clean-cond `win=48` atlas fakes. Base timing, sizes, opcodes, tenants,
+stack-distance, and action-class columns were preserved; only synthetic
+`obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238098667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0242877333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0242` | 0.0242106333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0236165333 |
+
+Four-seed mean: `0.0239811917` (display `0.0240`), range `0.0006712000`.
+This improves r330 `0.0242197750` by `0.0002385833`, improves r315
+`0.0244381667` by `0.0004569750`, and beats LLNL R287.M2 `0.02491` by
+`0.0009288083` on the official six-policy Twitter cachesim surface.
+Diagnostic no-32 sensitivity also improved: r330 no-32 mean `0.0247150313` to
+r343 no-32 mean `0.0244217187`, a `0.0002933126` (`1.19%`) lower diagnostic
+mean excluding cache size `32`.
+
 ## CloudPhysics 8K Cascade Tightening (2026-05-07)
 
 Continued CloudPhysics from the r306 16K fakes to 8K object-ID chunks on the

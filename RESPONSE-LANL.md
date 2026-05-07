@@ -3255,6 +3255,49 @@ range `0.0007478000`). This improves LANL r315 `0.0244381667` by
 `0.0002183917` (`0.89%` lower) and beats LLNL R287.M2 `0.02491` by
 `0.0006902250` on the official six-policy Twitter cachesim surface.
 
+## 2026-05-07 -- Twitter 1K Best-Donor Continuation
+
+LANL continued the Twitter r330 2K clean-cond donor cascade with a 1K
+best-donor selector on baase. The donor bank stayed LANL synthetic-only:
+prior Twitter chunk stages, the clean-cond donor trace, and the pre-clean-cond
+`win=48` atlas fakes. Base timing, object size, opcode, tenant,
+stack-distance, and action-class columns remain fixed to the base synthetic
+trace; only synthetic `obj_id` chunks are swapped.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238098667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0242877333 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0242` | 0.0242106333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r343_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0236165333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0239811917` (race display `0.0240`;
+range `0.0006712000`). This improves LANL r330 `0.0242197750` by
+`0.0002385833` (`0.99%` lower), improves LANL r315 `0.0244381667` by
+`0.0004569750`, and beats LLNL R287.M2 `0.02491` by `0.0009288083` on the
+official six-policy Twitter cachesim surface. All four seeds improved.
+
+Diagnostic no-32 sensitivity, excluding only cache size `32` while preserving
+the same six policies and cache sizes `128,512,2048,8192`, also improved.
+This is not the race score; it answers the concern that the official gain
+could be only a cap-32 artifact. r330 no-32 seed means were `0.0243676667`,
+`0.0254752500`, `0.0249390417`, `0.0240781667`, mean `0.0247150313`.
+r343 no-32 seed means were `0.0240996250`, `0.0250755833`, `0.0247130833`,
+`0.0237985833`, mean `0.0244217187`. No-32 improvement: `0.0002933126`
+(`1.19%` lower).
+
 ## 2026-05-07 -- CloudPhysics 8K Cascade Tightening
 
 LANL continued the CloudPhysics chunk cascade from r306 16K to 8K chunks on
