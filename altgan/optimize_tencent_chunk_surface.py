@@ -120,6 +120,10 @@ def _write_candidate(frame: pd.DataFrame, obj_ids: np.ndarray, path: Path) -> No
     out.to_csv(path, index=False)
 
 
+def _obj_id_array(frame: pd.DataFrame) -> np.ndarray:
+    return frame["obj_id"].astype(np.uint64, copy=False).to_numpy(copy=True)
+
+
 def _fmt(value: int) -> str:
     return str(value).replace("-", "m")
 
@@ -139,7 +143,7 @@ def main() -> int:
 
     print(f"[chunk_surface] reading base {args.base}", flush=True)
     base = pd.read_csv(args.base)
-    base_obj = base["obj_id"].to_numpy(copy=True)
+    base_obj = _obj_id_array(base)
     preserved_columns = [col for col in base.columns if col != "obj_id"]
     print(
         "[chunk_surface] swap contract: swapped_columns=obj_id "
@@ -151,7 +155,7 @@ def main() -> int:
     for donor_path in args.donor:
         print(f"[chunk_surface] reading donor {donor_path}", flush=True)
         donor = pd.read_csv(donor_path, usecols=["obj_id"])
-        donor_obj = donor["obj_id"].to_numpy(copy=False)
+        donor_obj = _obj_id_array(donor)
         if len(donor_obj) != len(base_obj):
             raise ValueError(f"donor length mismatch for {donor_path}: {len(donor_obj)} vs {len(base_obj)}")
         donor_frames.append((Path(donor_path).stem, donor_obj))
