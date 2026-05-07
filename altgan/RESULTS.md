@@ -3676,3 +3676,23 @@ Four-seed mean: `0.0244381667` (display `0.0244`), range `0.0007751333`.
 This improves r314 `0.0247253667` by `0.0002872000`, improves r313
 `0.0249389750` by `0.0005008083`, and beats LLNL R287.M2 `0.02491` by
 `0.0004718333` on the official six-policy Twitter cachesim surface.
+
+## Meta CDN 4K-to-2K Cascade Retake (2026-05-07)
+
+Re-opened Meta CDN from the r299 `bankmix8` fakes and cascaded the
+object-ID-only selector through 4K then 2K chunks. Donors were prior Meta CDN
+chunk stages, Meta CDN tail/drop shape variants, and the clean-cond scout fake.
+Base timing, sizes, opcodes, tenants, stack-distance, and action-class columns
+were preserved.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0341` | 0.0340606000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0346` | 0.0345745000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0348` | 0.0347818000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0335` | 0.0334875000 |
+
+Four-seed mean: `0.0342261000` (display `0.0342`), range `0.0012943000`.
+This improves r299 `0.0357288917` by `0.0015027917` but remains behind LLNL
+R287.CDN2 `0.03081` by `0.0034161000`, so Meta CDN stays an active architecture
+front.

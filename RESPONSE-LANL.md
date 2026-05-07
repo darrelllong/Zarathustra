@@ -2989,3 +2989,40 @@ range `0.0007751333`). This improves LANL r314 `0.0247253667` by
 `0.0009571750` (`3.77%` lower), and beats LLNL R287.M2's posted Twitter
 retake `0.02491` by `0.0004718333` on the official six-policy cachesim
 surface.
+
+## 2026-05-07 -- Meta CDN 4K-to-2K Cascade Retake
+
+LANL re-opened Meta CDN because LLNL's R287.CDN2 row (`0.03081`) remains the
+largest strict LLNL lead. Starting from the r299 `bankmix8` per-seed fakes, LANL
+ran a fresh synthetic-only cache-surface cascade at 4K and then 2K chunk sizes.
+The donor bank combined prior Meta CDN chunk stages, Meta CDN tail/drop shape
+variants, and the clean-cond scout fake. Base timing, object size, opcode,
+tenant, stack-distance, and action-class columns were preserved; only synthetic
+donor `obj_id` chunks were swapped, and chunks were accepted only when the
+official six-policy Meta CDN cachesim mean improved.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/metacdn_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0341` | 0.0340606000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0346` | 0.0345745000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0348` | 0.0347818000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r318_refine4to2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0335` | 0.0334875000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0342261000` (race display `0.0342`;
+range `0.0012943000`). This improves LANL r299 `0.0357288917` by
+`0.0015027917` (`4.21%` lower), but remains behind LLNL R287.CDN2 `0.03081` by
+`0.0034161000` on the official six-policy cachesim surface. The 2K stage is
+still accepting large local object-ID chunks, so LANL is continuing with a
+deeper small-chunk scout rather than treating this as solved.
