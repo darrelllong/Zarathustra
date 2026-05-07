@@ -3124,13 +3124,13 @@ python3 -m llgan.cachesim_eval \
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|
 | 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0051` | 0.0051168000 |
-| 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0072` | 0.0071609667 |
+| 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r329_refine32_cont2_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0052` | 0.0051857000 |
 | 81 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0056` | 0.0056076667 |
 | 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0062` | 0.0061809667 |
 
-Mean across seeds `{42,80,81,82}`: `0.0060166000` (race display `0.0060`;
-range `0.0020441667`). This improves LANL r290 `0.0113723167` by
-`0.0053557167` (`47.09%` lower) and retakes the Wikipedia generative row from
-LLNL R288.W `0.008895` by `0.0028784000` on the official six-policy cachesim
-surface. Seed 80 is now the exposed weak seed, so the next continuation should
+Mean across seeds `{42,80,81,82}`: `0.0055227833` (race display `0.0055`;
+range `0.0010641667`). This improves LANL r290 `0.0113723167` by
+`0.0058495333` (`51.44%` lower) and retakes the Wikipedia generative row from
+LLNL R288.W `0.008895` by `0.0033722167` on the official six-policy cachesim
+surface. Seed 82 is now the exposed weak seed, so the next continuation should
 start there.
