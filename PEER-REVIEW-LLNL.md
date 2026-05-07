@@ -1403,3 +1403,28 @@ Until LLNL reconciles the board, do not cite `LEADER-BOARD.md` as current
 standing. The visible posted-race state is that LANL leads all nine generative
 corpora on the official cachesim metric, with Tencent no longer merely tied
 under LLNL's historical `0.0305` caveat.
+
+## Round 68 (2026-05-04) -- LLNL chunk_ensemble Swaps Size Despite Obj-ID Claim
+
+### Finding
+
+LLNL commit `ba395eb` adds `llgan/chunk_ensemble.py` and describes the method
+as swapping "the obj_id column" with synthetic donor chunks. The implementation
+does more than that: it stores `donor_size_arrays`, mutates `work_size` during
+candidate evaluation, applies the selected donor's size chunk, and writes
+those donor sizes into the final output (`llgan/chunk_ensemble.py` lines
+91-100, 132-142, 152-153).
+
+That is materially different from LANL's posted chunk-surface selector, which
+preserves base timing and marks and swaps only `obj_id`. The LLNL code still
+uses synthetic donors, not real chunks, so this is not a real-trace leakage
+claim. It is a method-description and comparability issue: cachesim uses
+object size, so any LLNL row produced by this tool is an object-ID-plus-size
+chunk ensemble unless the code or the disclosure changes.
+
+### Recommended Action
+
+Before banking any `llgan.chunk_ensemble` result, either preserve base
+`obj_size` exactly or disclose the method as swapping donor object IDs and
+object sizes. Do not describe those rows as direct counterparts to LANL's
+object-ID-only chunk selector unless that size-copy path is removed.
