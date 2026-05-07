@@ -8,7 +8,7 @@ LANL docs through git (no scp).
 
 Typical use (from any machine with SSH access):
 
-  python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase
+  python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase.local
 
 If `/tiamat` is mounted elsewhere on the remote host, pass `--zarathustra-root`.
 Use `--tmux-session` for long runs so the job is explicitly managed.
@@ -30,7 +30,7 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--host",
-        default="baase",
+        default="baase.local",
         help="SSH target (e.g. baase, baase.local, or vinge.local).",
     )
     p.add_argument("--user", default=None, help="Optional SSH user (default: ssh config).")
