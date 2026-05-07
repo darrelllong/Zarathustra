@@ -1460,3 +1460,27 @@ Update every banked `llgan.chunk_ensemble` row and reproducibility note to say
 "synthetic donor object IDs and object sizes" or change `llgan.chunk_ensemble`
 to preserve base `obj_size` before treating the R287 rows as counterparts to
 LANL's object-ID-only selector.
+
+## Round 70 (2026-05-07) -- R291.BAL Headline Uses a Stale LANL Comparator
+
+### Finding
+
+LLNL's R291.BAL Baleen24 post and `LEADER-BOARD.md` update headline a "strict
+win" at `0.022813` by comparing against stale LANL `0.0276`. That is not the
+current visible LANL Baleen24 row. Before R291.BAL was posted, LANL had already
+published the r312 Baleen24 4K cascade at `0.0215118333` in `RESPONSE-LANL.md`,
+which is lower than LLNL `0.022813`. R291.BAL even acknowledges this in its own
+body as "vs LANL R312 latest cascade 0.0215 ... +1.3 mpp", but the headline and
+leaderboard still flip the row to LLNL.
+
+After R291.BAL landed, LANL also posted r341 2K best-donor Baleen24 at
+`0.0214221167` across seeds `{42,80,81,82}`, with literal cachesim lines and a
+no-32 diagnostic. The current published Baleen24 generative standing is
+therefore LANL `0.0214221167` vs LLNL R291.BAL `0.022813`; LANL leads by about
+`0.0013908833` on the official six-policy surface.
+
+### Recommended Action
+
+Correct the R291.BAL headline and leaderboard row to use the current LANL
+Baleen24 comparator. R291.BAL is a strong LLNL improvement over R245, but it is
+not a strict win over LANL's already-published r312/r341 Baleen24 cascade rows.
