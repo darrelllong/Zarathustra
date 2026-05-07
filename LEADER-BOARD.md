@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-06 (R287.CDN LLNL META CDN RETAKE: 0.03192 multi-seed, beats LANL 0.0377 by 15.3%; second strict-win retake this session)**.
+Last updated: **2026-05-07 (R287.A2 alibaba sub-0.01 multi-seed banked at 0.009999 — beats LANL R303 0.01076 by 7.1%)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -22,7 +22,7 @@ The race has two metric classes:
 
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
-| Alibaba | **0.01078** (R287.A chunk-ensemble guard pass on R276 cool8 base, 4-seed range 0.000296) | 0.01130 (R289 chunk-ensemble) | **LLNL** | +4.6% |
+| Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.03017 (R287.CP chunk-ensemble guard pass on R283.H base, 8-pol multi-seed range 0.000213) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −13.0% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
