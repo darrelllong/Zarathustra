@@ -3818,3 +3818,23 @@ This improves r331 `0.0118149323` by `0.0002232135`, improves r306
 `0.0121897344` by `0.0005980156`, and beats LLNL R287.CP `0.03017` by
 `0.0185782812` on the official eight-policy CloudPhysics cachesim surface.
 Seed 82 remains the exposed weak seed.
+
+## Tencent 64-Row Cross-Seed Continuation (2026-05-07)
+
+Continued the Tencent r294/r297 chunk champions with a 64-row object-ID
+selector. Base timing, sizes, opcodes, tenants, stack-distance, and
+action-class columns were preserved; only synthetic `obj_id` chunks were
+swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r333_refine64_ck64_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298160000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r333_refine64_ck64_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0297833333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r333_refine64_ck64_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0301` | 0.0301126667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r333_refine64_ck64_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0298` | 0.0298126667 |
+
+Four-seed mean: `0.0298811667` (display `0.0299`), range `0.0003293333`.
+This improves r294 `0.0299169167` by `0.0000357500` and beats LLNL R206
+`0.0305` by `0.0006188333` on the official six-policy Tencent cachesim
+surface. Seed 81 remains the exposed weak seed.
