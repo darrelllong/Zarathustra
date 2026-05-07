@@ -2900,3 +2900,40 @@ R281.K's posted Meta CDN row `0.04625`, LANL's exact mean is lower by
 Tencent side note: a capped 64-row seed81 scout
 `tencent_chunksurf_r297_seed81_64cap` moved only `0.0301573333` to
 `0.0301500000` after 600 evals, so it is not a multi-seed promotion path yet.
+
+## 2026-05-07 -- Twitter 4K Chunk-Surface Retake
+
+LANL retook Twitter after LLNL's R287.M2 `0.02491` move by cascading the
+object-ID-only cache-surface selector from the r313 8K fakes to 4K chunks.
+The donor bank was narrowed to the prior Twitter chunk-surface fakes and the
+LANL synthetic Twitter donors that actually helped in r313. Base timing,
+object size, opcode, tenant, stack-distance, and action-class columns were
+preserved; only synthetic donor `obj_id` chunks were swapped. Invalid legacy
+donor chunks whose IDs do not parse through `cachesim` were skipped rather
+than accepted.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0244059667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0252653000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0249` | 0.0248734667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0243567333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0247253667` (race display `0.0247`;
+range `0.0009085667`). This improves LANL r313 `0.0249389750` by
+`0.0002136083` (`0.86%` lower), improves LANL r307 `0.0253953417` by
+`0.0006699750` (`2.64%` lower), and beats LLNL R287.M2's posted Twitter
+retake `0.02491` by `0.0001846333` on the official six-policy cachesim
+surface.

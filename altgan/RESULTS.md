@@ -3628,3 +3628,21 @@ This improves the prior LANL Meta CDN mean `0.0376649167` by `0.0019360250`
 Tencent 64-row capped scout did not promote: seed81 moved only from
 `0.0301573333` to `0.0301500000` after 600 evals
 (`tencent_chunksurf_r297_seed81_64cap`).
+
+## Twitter 4K Chunk-Surface Retake (2026-05-07)
+
+Cascaded Twitter from r313 8K fakes to 4K chunks with the object-ID-only
+cache-surface selector. Base timing, sizes, and marks are preserved; invalid
+legacy donor chunks that `cachesim` rejects are skipped.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0244059667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0253` | 0.0252653000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0249` | 0.0248734667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r314_refine4_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0243567333 |
+
+Four-seed mean: `0.0247253667` (display `0.0247`), range `0.0009085667`.
+This beats LLNL R287.M2 `0.02491` by `0.0001846333`, improves r313
+`0.0249389750` by `0.0002136083`, and improves LANL r307 `0.0253953417` by
+`0.0006699750` on the official six-policy Twitter cachesim surface.
