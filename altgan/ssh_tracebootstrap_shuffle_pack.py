@@ -65,8 +65,21 @@ def _parse_args() -> argparse.Namespace:
             "`none` skips syncing."
         ),
     )
-    p.add_argument("--corpora", default="twitter,metakv,metacdn,wiki")
-    p.add_argument("--seeds", default="42,80,81,82")
+    p.add_argument(
+        "--corpora",
+        nargs="+",
+        default=["twitter", "metakv", "metacdn", "wiki"],
+        help=(
+            "Comma-separated or space-separated corpus list. Examples: "
+            "`--corpora twitter metakv` or `--corpora twitter,metakv`."
+        ),
+    )
+    p.add_argument(
+        "--seeds",
+        nargs="+",
+        default=["42", "80", "81", "82"],
+        help="Comma-separated or space-separated seed list (default: 42,80,81,82).",
+    )
     p.add_argument(
         "--output-root",
         default=None,
@@ -99,6 +112,16 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--dry-run", action="store_true", help="Print the ssh command and exit.")
     return p.parse_args()
+
+
+def _normalize_csv_list(values: list[str]) -> str:
+    parts: list[str] = []
+    for value in values:
+        for part in value.split(","):
+            part = part.strip()
+            if part:
+                parts.append(part)
+    return ",".join(parts)
 
 
 def _q(value: str) -> str:
@@ -208,14 +231,16 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     output_root = args.output_root or f"{zar_root}/altgan-output"
     emit_dir = args.emit_dir or f"{output_root}/paste_ready"
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    corpora = _normalize_csv_list(args.corpora)
+    seeds = _normalize_csv_list(args.seeds)
     cmd = [
         "python3",
         "-m",
         "altgan.launch_trace_bootstrap_shuffle_pack",
         "--corpora",
-        args.corpora,
+        corpora,
         "--seeds",
-        args.seeds,
+        seeds,
         "--zarathustra-root",
         zar_root,
         "--output-root",
