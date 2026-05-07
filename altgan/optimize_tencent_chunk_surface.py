@@ -122,7 +122,9 @@ def _write_candidate(frame: pd.DataFrame, obj_ids: np.ndarray, path: Path) -> No
 
 def _obj_id_array(frame: pd.DataFrame) -> np.ndarray:
     values = frame["obj_id"].to_numpy(copy=False)
-    return np.fromiter((int(value) for value in values), dtype=np.uint64, count=len(values))
+    # Some legacy synthetic donors use IDs above uint64.  Keep object IDs as
+    # Python ints so the selector can splice/write them without numeric casts.
+    return np.array([int(value) for value in values], dtype=object)
 
 
 def _fmt(value: int) -> str:
