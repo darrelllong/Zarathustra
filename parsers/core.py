@@ -413,8 +413,24 @@ def summarize_request_fields(
         out["reuse_ratio"] = (len(reuse) / len(deltas)) if deltas else None
         out["forward_seek_ratio"] = (sum(1 for d in deltas if d > 0) / len(deltas)) if deltas else None
         out["backward_seek_ratio"] = (sum(1 for d in deltas if d < 0) / len(deltas)) if deltas else None
-        out["abs_stride_stats"] = summarize_numeric([abs(d) for d in deltas]) if deltas else None
-        out["signed_stride_lag1_autocorr"] = lag_autocorr([float(d) for d in deltas], 1) if deltas else None
+        # Detect hash-keyed obj_ids. Storage LBAs are bounded by physical disk
+        # size; no real storage system has 256 TB of LBAs in a single trace.
+        # Hash IDs (Meta KV, Wikipedia, Twitter, KV-mode CloudPhysics) are
+        # uniform on [0, 2^64), so any value above 2^48 marks the trace as
+        # hash-keyed. Stride statistics on hash differences are uniform on
+        # [0, 2^64) and meaningless — emit null instead.
+        _HASH_KEY_THRESHOLD = 1 << 48  # 256 TiB
+        try:
+            is_hash_keyed = any(int(x) >= _HASH_KEY_THRESHOLD for x in obj_id)
+        except (TypeError, ValueError):
+            is_hash_keyed = False
+        out["obj_id_kind"] = "hash" if is_hash_keyed else "lba"
+        if is_hash_keyed:
+            out["abs_stride_stats"] = None
+            out["signed_stride_lag1_autocorr"] = None
+        else:
+            out["abs_stride_stats"] = summarize_numeric([abs(d) for d in deltas]) if deltas else None
+            out["signed_stride_lag1_autocorr"] = lag_autocorr([float(d) for d in deltas], 1) if deltas else None
     if tenant:
         out["tenant_summary"] = summarize_counter(Counter(tenant), len(tenant), topk=10)
     return out
