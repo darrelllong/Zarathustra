@@ -45,24 +45,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.213 |
-| Block/random distance ratio | 0.624 |
+| Block/random distance ratio | 0.604 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 30840114708714662785974272 | 0.926 |
-| 3 | 18434738158040759272472576 | 0.853 |
-| 4 | 15017299644441826561097728 | 0.799 |
-| 5 | 13645872068057865968943104 | 0.484 |
-| 6 | 11181582200286216175222784 | 0.507 |
-| 7 | 10774271451068975592505344 | 0.483 |
-| 8 | 9209771237397439772098560 | 0.52 |
-| 9 | 8891733624327798144368640 | 0.497 |
-| 10 | 8807546824397700204593152 | 0.482 |
-| 11 | 8770858813238946398470144 | 0.442 |
-| 12 | 8760500690491876812259328 | 0.443 |
+| 2 | 117052.7 | 0.685 |
+| 3 | 97483.51 | 0.574 |
+| 4 | 87717.17 | 0.232 |
+| 5 | 80430.71 | 0.234 |
+| 6 | 75946.44 | 0.238 |
+| 7 | 72086.57 | 0.242 |
+| 8 | 68608.5 | 0.251 |
+| 9 | 64018.5 | 0.19 |
+| 10 | 61641.42 | 0.168 |
+| 11 | 58811.48 | 0.174 |
+| 12 | 56599.71 | 0.184 |
 
 ## Strongest Correlations
 
@@ -104,14 +104,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/10K/tencentBlock_3330.oracleGeneral.zst | 1356.781 | ts_duration (z=272.178); iat_mean (z=271.493) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25497.oracleGeneral.zst | 609.951 | iat_mean (z=314756.6); iat_std (z=142360) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_11839.oracleGeneral.zst | 529.65 | abs_stride_q90 (z=176.496); abs_stride_std (z=166.49) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/100K/tencentBlock_12500.oracleGeneral.zst | 251.79 | abs_stride_mean (z=132.253); abs_stride_std (z=106.139) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_26060.oracleGeneral.zst | 232.744 | iat_mean (z=207343); iat_std (z=101576) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25489.oracleGeneral.zst | 228.65 | iat_mean (z=195782.8); iat_std (z=101101) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25302.oracleGeneral.zst | 167.319 | iat_mean (z=110150); iat_std (z=86988.93) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25518.oracleGeneral.zst | 166.842 | iat_mean (z=95092.79); iat_std (z=82067.38) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/10K/tencentBlock_3330.oracleGeneral.zst | 1356.781 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25497.oracleGeneral.zst | 609.951 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1M/tencentBlock_11839.oracleGeneral.zst | 529.65 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/100K/tencentBlock_12500.oracleGeneral.zst | 251.79 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_26060.oracleGeneral.zst | 232.744 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25489.oracleGeneral.zst | 228.65 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25302.oracleGeneral.zst | 167.319 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_tencentBlock/1K/tencentBlock_25518.oracleGeneral.zst | 166.842 | ts_duration (z=100); iat_mean (z=100) |
 
 ## Outlier Sensitivity
 

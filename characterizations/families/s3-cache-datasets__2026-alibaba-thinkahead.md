@@ -17,6 +17,7 @@
 
 ## GAN Guidance
 
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Opcode balance is extremely read-skewed; generation should not assume symmetric read/write behavior.
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
@@ -44,24 +45,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.238 |
-| Block/random distance ratio | 1.039 |
-| Sampling recommendation | random_sampling_is_less_problematic |
+| Block/random distance ratio | 0.724 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 106776690978223506325504 | 0.938 |
-| 3 | 35431607872077827145728 | 0.87 |
-| 4 | 19829828452379996979200 | 0.882 |
-| 5 | 5302177802903527358464 | 0.907 |
-| 6 | 5251942494705387831296 | 0.823 |
-| 7 | 5203954043661199605760 | 0.848 |
-| 8 | 5143464622124497371136 | 0.808 |
-| 9 | 5202446310692827955200 | 0.557 |
-| 10 | 5141956889156126769152 | 0.516 |
-| 11 | 5141930915724050563072 | 0.588 |
-| 12 | 5141912746800728506368 | 0.598 |
+| 2 | 766.487 | 0.635 |
+| 3 | 594.881 | 0.567 |
+| 4 | 514.56 | 0.196 |
+| 5 | 429.166 | 0.19 |
+| 6 | 363.484 | 0.214 |
+| 7 | 292.402 | 0.216 |
+| 8 | 247.901 | 0.206 |
+| 9 | 217.155 | 0.242 |
+| 10 | 191.875 | 0.272 |
+| 11 | 167.611 | 0.277 |
+| 12 | 146.948 | 0.217 |
 
 ## Strongest Correlations
 
@@ -103,14 +104,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c17.oracleGeneral.zst | 36.679 | abs_stride_q50 (z=1249998189); abs_stride_mean (z=631226.5) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c4.oracleGeneral.zst | 35.349 | abs_stride_std (z=109335.4); iat_std (z=29316.91) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c25.oracleGeneral.zst | 15.343 | iat_lag1_autocorr (z=420.801); object_top10_share (z=17.238) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c15.oracleGeneral.zst | 12.976 | iat_std (z=5715.798); abs_stride_std (z=5389.91) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c17.oracleGeneral.zst | 36.679 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c4.oracleGeneral.zst | 35.349 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c25.oracleGeneral.zst | 15.343 | iat_lag1_autocorr (z=100); object_top10_share (z=17.238) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c15.oracleGeneral.zst | 12.976 | ts_duration (z=100); iat_mean (z=100) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c14.oracleGeneral.zst | 10.336 | object_top10_share (z=16.857); object_unique (z=-12.05) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c3.oracleGeneral.zst | 2.192 | iat_mean (z=5.667); ts_duration (z=5.667) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c26.oracleGeneral.zst | 1.982 | abs_stride_q99 (z=55.42); abs_stride_std (z=38.067) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c21.oracleGeneral.zst | 1.958 | abs_stride_q90 (z=114583.3); abs_stride_mean (z=89459.59) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2026-alibaba-thinkahead/c21.oracleGeneral.zst | 1.958 | size_bytes (z=100); ts_duration (z=100) |
 
 ## Outlier Sensitivity
 

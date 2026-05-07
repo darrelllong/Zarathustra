@@ -43,24 +43,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.337 |
-| Block/random distance ratio | 0.339 |
+| Block/random distance ratio | 0.326 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 14921684591957014528 | 0.976 |
-| 3 | 13569605214776494080 | 0.843 |
-| 4 | 223420333441869952 | 0.847 |
-| 5 | 13489379162946998272 | 0.693 |
-| 6 | 143194281612374240 | 0.697 |
-| 7 | 145289363867156384 | 0.585 |
-| 8 | 121658415783095664 | 0.536 |
-| 9 | 115367004443761296 | 0.558 |
-| 10 | 112800421530280720 | 0.544 |
-| 11 | 111745680703889296 | 0.527 |
-| 12 | 111965629863014432 | 0.512 |
+| 2 | 9536.505 | 0.475 |
+| 3 | 7432.596 | 0.341 |
+| 4 | 6760.718 | 0.321 |
+| 5 | 5856.187 | 0.243 |
+| 6 | 5212.714 | 0.35 |
+| 7 | 5151.665 | 0.282 |
+| 8 | 4360.873 | 0.299 |
+| 9 | 4267.962 | 0.316 |
+| 10 | 3899.106 | 0.318 |
+| 11 | 3778.137 | 0.311 |
+| 12 | 3493.062 | 0.318 |
 
 ## Strongest Correlations
 
@@ -102,14 +102,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| Baleen24/extracted/storage_0.1_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
-| Baleen24/extracted/storage_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
-| Baleen24/extracted/storage/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=5241.8); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage_0.1_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=100); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage_10/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=100); iat_q99 (z=30.567) |
+| Baleen24/extracted/storage/storage/201910/Region2/full_0.2_0.1.trace | 47.488 | obj_size_min (z=100); iat_q99 (z=30.567) |
 | Baleen24/extracted/storage_0.1_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
 | Baleen24/extracted/storage_10/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
 | Baleen24/extracted/storage/storage/202110/Region4/full_0.1_0.1.trace | 45.75 | obj_size_min (z=50.88); obj_size_q99 (z=-38.605) |
-| Baleen24/extracted/storage_all_Region3/201910/Region3/full.trace | 27.506 | obj_size_min (z=5241.8); sample_record_rate (z=2302.995) |
-| Baleen24/extracted/storage_0.1_10/storage/201910/Region3/full_0.3_0.1.trace | 15.964 | obj_size_min (z=5241.8); obj_size_std (z=-14.395) |
+| Baleen24/extracted/storage_all_Region3/201910/Region3/full.trace | 27.506 | size_bytes (z=100); sample_record_rate (z=100) |
+| Baleen24/extracted/storage_0.1_10/storage/201910/Region3/full_0.3_0.1.trace | 15.964 | obj_size_min (z=100); obj_size_std (z=-14.395) |
 
 ## Outlier Sensitivity
 

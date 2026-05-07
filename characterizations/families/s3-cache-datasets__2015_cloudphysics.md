@@ -42,24 +42,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.199 |
-| Block/random distance ratio | 1.063 |
+| Block/random distance ratio | 1.02 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 49052887092172562432 | 0.984 |
-| 3 | 15368729563236937728 | 0.797 |
-| 4 | 12912626014622765056 | 0.58 |
-| 5 | 8941009339380649984 | 0.586 |
-| 6 | 8379242046393213952 | 0.584 |
-| 7 | 6429900090119562240 | 0.511 |
-| 8 | 5633291997797392384 | 0.462 |
-| 9 | 5354161389259911168 | 0.328 |
-| 10 | 5041817950921132032 | 0.342 |
-| 11 | 5215303383398615040 | 0.287 |
-| 12 | 2740304326993541120 | 0.373 |
+| 2 | 2579.181 | 0.744 |
+| 3 | 2215.786 | 0.16 |
+| 4 | 1907.057 | 0.223 |
+| 5 | 1682.286 | 0.148 |
+| 6 | 1470.369 | 0.177 |
+| 7 | 1303.246 | 0.149 |
+| 8 | 1181.003 | 0.127 |
+| 9 | 1077.978 | 0.146 |
+| 10 | 1005.802 | 0.165 |
+| 11 | 946.776 | 0.174 |
+| 12 | 886.211 | 0.147 |
 
 ## Strongest Correlations
 
@@ -101,14 +101,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w54.oracleGeneral.bin.zst | 100.513 | abs_stride_q50 (z=36043.11); abs_stride_mean (z=1501.477) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w11.oracleGeneral.bin.zst | 56.144 | obj_size_mean (z=102.776); obj_size_q90 (z=84) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w86.oracleGeneral.bin.zst | 42.207 | iat_std (z=173.5); iat_q99 (z=68.18) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w54.oracleGeneral.bin.zst | 100.513 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w11.oracleGeneral.bin.zst | 56.144 | obj_size_mean (z=100); obj_size_q90 (z=84) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w86.oracleGeneral.bin.zst | 42.207 | iat_std (z=100); iat_q99 (z=68.18) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w08.oracleGeneral.bin.zst | 14.829 | obj_size_mean (z=92.757); obj_size_q90 (z=41.333) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w46.oracleGeneral.bin.zst | 6.352 | iat_std (z=84.724); reuse_ratio (z=80.667) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w92.oracleGeneral.bin.zst | 6.035 | ts_duration (z=7.928); iat_mean (z=7.928) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w28.oracleGeneral.bin.zst | 5.685 | iat_q99 (z=24); iat_mean (z=13.826) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w21.oracleGeneral.bin.zst | 4.973 | sample_record_rate (z=128.791); burstiness_cv (z=12.306) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2015_cloudphysics/w21.oracleGeneral.bin.zst | 4.973 | sample_record_rate (z=100); burstiness_cv (z=12.306) |
 
 ## Outlier Sensitivity
 

@@ -41,27 +41,27 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 4 |
-| Best silhouette K | 4 |
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.346 |
-| Block/random distance ratio | 0.824 |
+| Block/random distance ratio | 0.849 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 340593544697580116508672 | 0.497 |
-| 3 | 203235772159621146345472 | 0.476 |
-| 4 | 147543836690037965062144 | 0.507 |
-| 5 | 106759950796275908083712 | 0.489 |
-| 6 | 78884462175117018923008 | 0.49 |
-| 7 | 71421683257427699433472 | 0.432 |
-| 8 | 54982145782752600915968 | 0.458 |
-| 9 | 48687915632673557577728 | 0.42 |
-| 10 | 44708244350241827979264 | 0.416 |
-| 11 | 38490358285626041696256 | 0.384 |
-| 12 | 35389128099475685900288 | 0.427 |
+| 2 | 2902.873 | 0.663 |
+| 3 | 2167.192 | 0.236 |
+| 4 | 1942.963 | 0.204 |
+| 5 | 1813.143 | 0.148 |
+| 6 | 1696.894 | 0.151 |
+| 7 | 1571.675 | 0.153 |
+| 8 | 1501.666 | 0.128 |
+| 9 | 1424.469 | 0.128 |
+| 10 | 1336.512 | 0.121 |
+| 11 | 1287.282 | 0.123 |
+| 12 | 1236.718 | 0.137 |
 
 ## Strongest Correlations
 
@@ -103,9 +103,9 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-46-AM.trace.csv.gz | 68.049 | response_time_q50 (z=109.039); abs_stride_q50 (z=91.264) |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-31-AM.trace.csv.gz | 28.044 | response_time_q50 (z=117.657); abs_stride_q50 (z=77.024) |
-| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.02-37-PM.trace.csv.gz | 9.58 | response_time_q99 (z=137.213); response_time_std (z=27.946) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-46-AM.trace.csv.gz | 68.049 | response_time_q50 (z=100); abs_stride_q50 (z=91.264) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.03-31-AM.trace.csv.gz | 28.044 | response_time_q50 (z=100); abs_stride_q50 (z=77.024) |
+| MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.02-37-PM.trace.csv.gz | 9.58 | response_time_q99 (z=100); response_time_std (z=27.946) |
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.06-17-AM.trace.csv.gz | 9.481 | obj_size_mean (z=5.53); response_time_q90 (z=-5.419) |
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.08-49-AM.trace.csv.gz | 8.615 | response_time_q99 (z=19.479); response_time_q50 (z=14.549) |
 | MSR/Exchange-Server-Traces/Exchange/Exchange.12-13-2007.04-01-AM.trace.csv.gz | 6.671 | response_time_q50 (z=81.5); abs_stride_q50 (z=27.209) |

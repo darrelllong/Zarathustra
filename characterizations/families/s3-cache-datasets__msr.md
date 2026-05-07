@@ -42,24 +42,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.369 |
-| Block/random distance ratio | 1.148 |
+| Block/random distance ratio | 1.25 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 735142116474531584 | 0.892 |
-| 3 | 385853306064195904 | 0.823 |
-| 4 | 263979881798210144 | 0.687 |
-| 5 | 254384194195490912 | 0.454 |
-| 6 | 238295237804183968 | 0.472 |
-| 7 | 232679909934106368 | 0.495 |
-| 8 | 45875923665502288 | 0.492 |
-| 9 | 44496907444467160 | 0.451 |
-| 10 | 8255584631464259 | 0.445 |
-| 11 | 7043618903229643 | 0.402 |
-| 12 | 42233043697083384 | 0.488 |
+| 2 | 596.067 | 0.551 |
+| 3 | 475.898 | 0.468 |
+| 4 | 388.267 | 0.487 |
+| 5 | 305.824 | 0.256 |
+| 6 | 242.863 | 0.26 |
+| 7 | 203.72 | 0.272 |
+| 8 | 175.475 | 0.278 |
+| 9 | 153.862 | 0.281 |
+| 10 | 136.816 | 0.219 |
+| 11 | 120.041 | 0.229 |
+| 12 | 102.346 | 0.216 |
 
 ## Strongest Correlations
 
@@ -101,13 +101,13 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_lcs/msr/rsrch_2.csv.lcs.zst | 18.771 | iat_std (z=317.09); abs_stride_q90 (z=48.684) |
-| s3-cache-datasets/cache_dataset_lcs/msr/wdev_3.csv.lcs.zst | 18.228 | iat_q99 (z=7122); iat_std (z=2316.747) |
-| s3-cache-datasets/cache_dataset_lcs/msr/wdev_1.csv.lcs.zst | 13.692 | iat_q99 (z=7114.74); iat_std (z=1831.977) |
-| s3-cache-datasets/cache_dataset_lcs/msr/mds_1.csv.lcs.zst | 12.148 | abs_stride_q90 (z=174.789); abs_stride_mean (z=37.202) |
-| s3-cache-datasets/cache_dataset_lcs/msr/usr_1.csv.lcs.zst | 11.355 | abs_stride_q90 (z=152.157); size_bytes (z=49.825) |
-| s3-cache-datasets/cache_dataset_lcs/msr/prxy_1.csv.lcs.zst | 4.654 | sample_record_rate (z=440.297); size_bytes (z=62.331) |
-| s3-cache-datasets/cache_dataset_lcs/msr/prn_1.csv.lcs.zst | 1.861 | sample_record_rate (z=188.108); abs_stride_q90 (z=37.48) |
+| s3-cache-datasets/cache_dataset_lcs/msr/rsrch_2.csv.lcs.zst | 18.771 | iat_std (z=100); abs_stride_q90 (z=48.684) |
+| s3-cache-datasets/cache_dataset_lcs/msr/wdev_3.csv.lcs.zst | 18.228 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/msr/wdev_1.csv.lcs.zst | 13.692 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/msr/mds_1.csv.lcs.zst | 12.148 | abs_stride_q90 (z=100); abs_stride_mean (z=37.202) |
+| s3-cache-datasets/cache_dataset_lcs/msr/usr_1.csv.lcs.zst | 11.355 | abs_stride_q90 (z=100); size_bytes (z=49.825) |
+| s3-cache-datasets/cache_dataset_lcs/msr/prxy_1.csv.lcs.zst | 4.654 | sample_record_rate (z=100); size_bytes (z=62.331) |
+| s3-cache-datasets/cache_dataset_lcs/msr/prn_1.csv.lcs.zst | 1.861 | sample_record_rate (z=100); abs_stride_q90 (z=37.48) |
 | s3-cache-datasets/cache_dataset_lcs/msr/web_3.csv.lcs.zst | 1.837 | signed_stride_lag1_autocorr (z=4.569); iat_q99 (z=4.53) |
 
 ## Outlier Sensitivity

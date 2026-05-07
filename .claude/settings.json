@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh -i ~/.ssh/id_rsa -A baase.local *)",
+      "Bash(ssh -i ~/.ssh/id_rsa -A vinge.local *)",
+      "Bash(git add *)"
+    ]
+  }
+}

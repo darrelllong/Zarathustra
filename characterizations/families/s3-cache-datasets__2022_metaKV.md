@@ -44,25 +44,25 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 7 |
+| Best silhouette K | 7 |
 | PCA variance explained by PC1 | 0.518 |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 116914040134050611200 | 0.848 |
-| 3 | 9855405250063163392 | 0.813 |
-| 4 | 8973818133917656064 | 0.791 |
-| 5 | 1523060352168586752 | 0.806 |
-| 6 | 1509158103059552256 | 0.716 |
-| 7 | 613253242332020480 | 0.678 |
-| 8 | 256375850446051520 | 0.66 |
-| 9 | 611159267163318272 | 0.675 |
-| 10 | 255109242363983360 | 0.487 |
-| 11 | 610595999650635136 | 0.549 |
-| 12 | 1367777674699962 | 0.527 |
+| 2 | 108.17 | 0.476 |
+| 3 | 75.304 | 0.49 |
+| 4 | 50.759 | 0.51 |
+| 5 | 32.924 | 0.549 |
+| 6 | 15.871 | 0.571 |
+| 7 | 6.671 | 0.592 |
+| 8 | 5.099 | 0.562 |
+| 9 | 4.468 | 0.492 |
+| 10 | 4.194 | 0.519 |
+| 11 | 2.485 | 0.458 |
+| 12 | 2.342 | 0.494 |
 
 ## Strongest Correlations
 
@@ -104,10 +104,10 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_04.csv.zst | 18.717 | first_numeric_diff_std (z=974671070); first_numeric_diff_mean (z=-6423502) |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | 12.2 | first_numeric_diff_std (z=628590028); first_numeric_diff_mean (z=461513) |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202206/kvcache_traces_4.csv.zst | 9.01 | first_numeric_diff_std (z=199118.3); first_numeric_diff_mean (z=10553.33) |
-| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_02.csv.zst | 2.588 | first_numeric_diff_std (z=567731696); first_numeric_diff_mean (z=1509536) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_04.csv.zst | 18.717 | first_numeric_diff_mean (z=-100); first_numeric_diff_std (z=100) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | 12.2 | first_numeric_diff_mean (z=100); first_numeric_diff_std (z=100) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202206/kvcache_traces_4.csv.zst | 9.01 | first_numeric_diff_mean (z=100); first_numeric_diff_std (z=100) |
+| s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202312/flat_kvcache_02.csv.zst | 2.588 | first_numeric_diff_mean (z=100); first_numeric_diff_std (z=100) |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202401_kv_traces_all_sort.csv.zst | 2.345 | size_bytes (z=10.247); schema_high_cardinality_cols (z=2.222) |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_1.csv.zst | 1.95 | schema_high_cardinality_cols (z=2.222); schema_column_count (z=1) |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/kvcache_202401/kvcache_traces_2.csv.zst | 1.95 | schema_high_cardinality_cols (z=2.222); schema_column_count (z=1) |

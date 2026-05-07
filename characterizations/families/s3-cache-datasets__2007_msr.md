@@ -39,25 +39,25 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 6 |
+| Best silhouette K | 6 |
 | PCA variance explained by PC1 | 0.222 |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 231644117329442167062528 | 0.693 |
-| 3 | 56263123749828374298624 | 0.647 |
-| 4 | 37631854305759727714304 | 0.55 |
-| 5 | 21165546246712854577152 | 0.467 |
-| 6 | 25560639433283798564864 | 0.47 |
-| 7 | 10787884173284381556736 | 0.339 |
-| 8 | 5544227565860910268416 | 0.341 |
-| 9 | 5041157060940396494848 | 0.279 |
-| 10 | 778120972032027656192 | 0.272 |
-| 11 | 2192441948255788204032 | 0.172 |
-| 12 | 91237103860140441600 | 0.138 |
+| 2 | 312.94 | 0.134 |
+| 3 | 241.934 | 0.176 |
+| 4 | 189.872 | 0.185 |
+| 5 | 147.525 | 0.195 |
+| 6 | 110.618 | 0.211 |
+| 7 | 87.403 | 0.165 |
+| 8 | 66.171 | 0.163 |
+| 9 | 46.816 | 0.169 |
+| 10 | 29.193 | 0.144 |
+| 11 | 20.896 | 0.089 |
+| 12 | 12.006 | 0.071 |
 
 ## Strongest Correlations
 
@@ -101,11 +101,11 @@
 |---|---:|---|
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_0.oracleGeneral.zst | 8.585 | abs_stride_q50 (z=31.878); iat_lag1_autocorr (z=17.217) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prxy_1.oracleGeneral.zst | 6.021 | sample_record_rate (z=74.136); size_bytes (z=20.089) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_4.oracleGeneral.zst | 3.263 | iat_std (z=238.856); iat_mean (z=12.74) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_4.oracleGeneral.zst | 3.263 | iat_std (z=100); iat_mean (z=12.74) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_usr_1.oracleGeneral.zst | 3.129 | abs_stride_q50 (z=49.43); iat_lag1_autocorr (z=17.257) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_1.oracleGeneral.zst | 3.091 | abs_stride_q50 (z=7306.769); abs_stride_mean (z=7.669) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_proj_1.oracleGeneral.zst | 3.091 | abs_stride_q50 (z=100); abs_stride_mean (z=7.669) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_web_2.oracleGeneral.zst | 2.873 | iat_std (z=88.266); iat_mean (z=12.571) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_src1_0.oracleGeneral.zst | 2.632 | iat_std (z=197.55); ts_duration (z=12.916) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_src1_0.oracleGeneral.zst | 2.632 | iat_std (z=100); ts_duration (z=12.916) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2007_msr/msr_prn_0.oracleGeneral.zst | 2.299 | reuse_ratio (z=26.571); iat_lag1_autocorr (z=11.693) |
 
 ## Outlier Sensitivity

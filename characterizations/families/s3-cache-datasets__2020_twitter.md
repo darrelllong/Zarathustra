@@ -43,24 +43,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.358 |
-| Block/random distance ratio | 0.976 |
+| Block/random distance ratio | 0.965 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 124045774398975082496 | 0.686 |
-| 3 | 65350650620074082304 | 0.571 |
-| 4 | 36920155211800813568 | 0.536 |
-| 5 | 20763070938147893248 | 0.589 |
-| 6 | 13433804512477689856 | 0.607 |
-| 7 | 11228979182596171776 | 0.627 |
-| 8 | 10763491306708508672 | 0.638 |
-| 9 | 2633733273857393152 | 0.653 |
-| 10 | 2314746539498652672 | 0.651 |
-| 11 | 2117431751471579392 | 0.662 |
-| 12 | 1395035212673251584 | 0.651 |
+| 2 | 919.991 | 0.514 |
+| 3 | 752.296 | 0.477 |
+| 4 | 599.604 | 0.386 |
+| 5 | 487.744 | 0.244 |
+| 6 | 411.436 | 0.257 |
+| 7 | 371.102 | 0.253 |
+| 8 | 314.512 | 0.205 |
+| 9 | 269.019 | 0.238 |
+| 10 | 236.048 | 0.243 |
+| 11 | 210.716 | 0.227 |
+| 12 | 192.296 | 0.252 |
 
 ## Strongest Correlations
 
@@ -102,11 +102,11 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.914 | obj_size_q50 (z=328.116); obj_size_q90 (z=262.205) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.914 | obj_size_mean (z=100); obj_size_std (z=100) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster25.oracleGeneral.sample10.zst | 15.608 | object_top1_share (z=41.299); object_top10_share (z=14.74) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster10.oracleGeneral.sample10.zst | 14.961 | tenant_top1_share (z=-30.5); iat_lag1_autocorr (z=-21.666) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 10.477 | obj_size_q99 (z=127.238); obj_size_std (z=124.266) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 10.395 | obj_size_q50 (z=216.916); obj_size_q90 (z=130.476) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 10.477 | obj_size_std (z=100); obj_size_q50 (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 10.395 | obj_size_std (z=100); obj_size_q50 (z=100) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster26.oracleGeneral.sample10.zst | 9.061 | iat_lag1_autocorr (z=-21.089); iat_mean (z=20.267) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster35.oracleGeneral.sample10.zst | 9.056 | forward_seek_ratio (z=-23); reuse_ratio (z=20.603) |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster2.oracleGeneral.sample10.zst | 8.537 | forward_seek_ratio (z=-17.518); object_top1_share (z=16.701) |

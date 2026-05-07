@@ -16,6 +16,7 @@
 ## GAN Guidance
 
 - High cross-file heterogeneity; favor regime conditioning or multiple family-specific GAN runs over a single unconditional model.
+- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Strongest feature coupling in this pass: disk_usage_mean vs disk_usage_q50 (corr=0.99).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
 
@@ -40,24 +41,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.343 |
-| Block/random distance ratio | 0.927 |
-| Sampling recommendation | random_sampling_is_less_problematic |
+| Block/random distance ratio | 0.776 |
+| Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 195810803606930 | 0.958 |
-| 3 | 186061846324530 | 0.569 |
-| 4 | 144404672804336 | 0.541 |
-| 5 | 140332721578752 | 0.535 |
-| 6 | 137733943289425 | 0.5 |
-| 7 | 28373599791816 | 0.533 |
-| 8 | 26136491130196 | 0.477 |
-| 9 | 25076158489026 | 0.452 |
-| 10 | 24186362203727 | 0.451 |
-| 11 | 23449647611079 | 0.458 |
-| 12 | 13936928337521 | 0.416 |
+| 2 | 87033.16 | 0.925 |
+| 3 | 72616.91 | 0.862 |
+| 4 | 68119.44 | 0.228 |
+| 5 | 65244.75 | 0.307 |
+| 6 | 58640.35 | 0.276 |
+| 7 | 54959.5 | 0.275 |
+| 8 | 54656.34 | 0.224 |
+| 9 | 46065.1 | 0.231 |
+| 10 | 40824.83 | 0.265 |
+| 11 | 39793.85 | 0.264 |
+| 12 | 39259.06 | 0.251 |
 
 ## Strongest Correlations
 
@@ -99,14 +100,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| tencent/Cloud_Disk_dataset/disk_load_data/e2f36e2d-bbb1-40b4-a244-217dc1e858b2 | 3628.767 | disk_usage_mean (z=1015.145); disk_usage_q50 (z=943.667) |
-| tencent/Cloud_Disk_dataset/disk_load_data/0542e5a2-5d01-4384-9855-377bc518bfee | 2544.877 | write_bw_q90 (z=1227.048); write_iops_q99 (z=1201.247) |
-| tencent/Cloud_Disk_dataset/disk_load_data/90f2be84-2425-4bd6-b811-a18e54606acd | 1789.964 | write_iops_mean (z=31386.37); total_iops_mean (z=24957.62) |
-| tencent/Cloud_Disk_dataset/disk_load_data/5c52932a-00a3-408b-84e5-a68fb2c6ec9f | 1595.924 | write_iops_mean (z=31180.8); total_iops_mean (z=24123.63) |
-| tencent/Cloud_Disk_dataset/disk_load_data/cff8ae8d-e084-4c31-8c93-5262ddc5af30 | 1360.473 | write_iops_q99 (z=6964.578); total_iops_q99 (z=4331.773) |
-| tencent/Cloud_Disk_dataset/disk_load_data/c8ad9779-f1bb-4ed2-9437-fa8503a19a9d | 1258.802 | write_iops_mean (z=8154.778); total_iops_mean (z=6529.007) |
-| tencent/Cloud_Disk_dataset/disk_load_data/59d89b6e-c4b0-4df5-bcb8-0b650f770d33 | 791.352 | write_iops_mean (z=16109.07); total_iops_mean (z=14190.67) |
-| tencent/Cloud_Disk_dataset/disk_load_data/e8cc7217-02a7-41ce-afc1-09f9f802ebcb | 755.589 | write_bw_q90 (z=818.619); write_iops_q99 (z=630.708) |
+| tencent/Cloud_Disk_dataset/disk_load_data/e2f36e2d-bbb1-40b4-a244-217dc1e858b2 | 3628.767 | read_iops_q99 (z=100); write_iops_mean (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/0542e5a2-5d01-4384-9855-377bc518bfee | 2544.877 | read_iops_q99 (z=100); write_iops_mean (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/90f2be84-2425-4bd6-b811-a18e54606acd | 1789.964 | read_iops_mean (z=100); read_iops_q99 (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/5c52932a-00a3-408b-84e5-a68fb2c6ec9f | 1595.924 | read_iops_mean (z=100); read_iops_q99 (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/cff8ae8d-e084-4c31-8c93-5262ddc5af30 | 1360.473 | read_iops_mean (z=100); read_iops_q99 (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/c8ad9779-f1bb-4ed2-9437-fa8503a19a9d | 1258.802 | read_iops_mean (z=100); read_iops_q99 (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/59d89b6e-c4b0-4df5-bcb8-0b650f770d33 | 791.352 | read_iops_mean (z=100); read_iops_q99 (z=100) |
+| tencent/Cloud_Disk_dataset/disk_load_data/e8cc7217-02a7-41ce-afc1-09f9f802ebcb | 755.589 | read_iops_mean (z=100); read_iops_q99 (z=100) |
 
 ## Notable Files
 

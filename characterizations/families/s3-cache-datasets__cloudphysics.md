@@ -17,7 +17,6 @@
 ## GAN Guidance
 
 - Family spans multiple encodings; keep format-aware preprocessing and avoid blindly pooling structured-table and request-sequence variants.
-- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: ts_duration vs iat_mean (corr=1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
@@ -45,24 +44,24 @@
 | K-means selected K | 3 |
 | Best silhouette K | 3 |
 | PCA variance explained by PC1 | 0.282 |
-| Block/random distance ratio | 0.804 |
-| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+| Block/random distance ratio | 0.951 |
+| Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 64198718851476414464 | 0.861 |
-| 3 | 17620092236779698176 | 0.868 |
-| 4 | 7204102018602645504 | 0.808 |
-| 5 | 5200152786371604480 | 0.734 |
-| 6 | 2872472886918460928 | 0.729 |
-| 7 | 2122115946228761088 | 0.613 |
-| 8 | 1881243600346949120 | 0.636 |
-| 9 | 1663673762052548608 | 0.589 |
-| 10 | 1569006735741307392 | 0.486 |
-| 11 | 1167568130608715008 | 0.511 |
-| 12 | 1506528322292702464 | 0.496 |
+| 2 | 2004.361 | 0.499 |
+| 3 | 1641.846 | 0.511 |
+| 4 | 1400.718 | 0.178 |
+| 5 | 1235.771 | 0.185 |
+| 6 | 1092.698 | 0.186 |
+| 7 | 930.205 | 0.195 |
+| 8 | 846.743 | 0.184 |
+| 9 | 839.334 | 0.2 |
+| 10 | 700.352 | 0.213 |
+| 11 | 637.922 | 0.216 |
+| 12 | 576.47 | 0.221 |
 
 ## Strongest Correlations
 
@@ -104,9 +103,9 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w54_vscsi2.vscsitrace.lcs.zst | 82.267 | abs_stride_q99 (z=1018.93); abs_stride_std (z=805.733) |
-| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w86_vscsi1.vscsitrace.lcs.zst | 60.969 | iat_std (z=286.128); ts_duration (z=127.171) |
-| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w05_vscsi1.vscsitrace.lcs.zst | 13.053 | abs_stride_q90 (z=204.799); abs_stride_mean (z=187.871) |
+| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w54_vscsi2.vscsitrace.lcs.zst | 82.267 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w86_vscsi1.vscsitrace.lcs.zst | 60.969 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/cloudphysics/w05_vscsi1.vscsitrace.lcs.zst | 13.053 | abs_stride_mean (z=100); abs_stride_q90 (z=100) |
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w93_vscsi2.vscsitrace.lcs.zst | 11.904 | iat_q99 (z=43); ts_duration (z=37.555) |
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w12_vscsi1.vscsitrace.lcs.zst | 9.903 | abs_stride_q90 (z=57.923); object_top10_share (z=29.409) |
 | s3-cache-datasets/cache_dataset_lcs/cloudphysics/w28_vscsi2.vscsitrace.lcs.zst | 7.729 | ts_duration (z=27.683); iat_mean (z=27.683) |

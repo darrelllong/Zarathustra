@@ -40,27 +40,27 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 11 |
+| Best silhouette K | 11 |
 | PCA variance explained by PC1 | 0.274 |
-| Block/random distance ratio | 0.678 |
+| Block/random distance ratio | 0.669 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 1115731198562949660672 | 0.977 |
-| 3 | 648575049005363888128 | 0.941 |
-| 4 | 622952439118409891840 | 0.779 |
-| 5 | 504104469511542931456 | 0.791 |
-| 6 | 496918499784578826240 | 0.79 |
-| 7 | 495712727490412281856 | 0.718 |
-| 8 | 200736652740751982592 | 0.722 |
-| 9 | 199528512111614427136 | 0.724 |
-| 10 | 494945741504243236864 | 0.612 |
-| 11 | 198939014722948497408 | 0.612 |
-| 12 | 198812720734478630912 | 0.617 |
+| 2 | 21789.61 | 0.296 |
+| 3 | 17558.91 | 0.303 |
+| 4 | 15242.53 | 0.338 |
+| 5 | 13741.27 | 0.295 |
+| 6 | 12640.19 | 0.299 |
+| 7 | 11720.49 | 0.302 |
+| 8 | 10806.03 | 0.323 |
+| 9 | 10449.68 | 0.33 |
+| 10 | 9690.236 | 0.34 |
+| 11 | 8889.913 | 0.353 |
+| 12 | 8012.502 | 0.274 |
 
 ## Strongest Correlations
 
@@ -102,14 +102,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_lcs/alibaba/809.lcs.zst | 760.456 | iat_mean (z=267650.8); iat_std (z=100006.2) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/791.lcs.zst | 322.295 | abs_stride_q90 (z=292.244); abs_stride_mean (z=177.298) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/811.lcs.zst | 114.764 | iat_mean (z=44878.13); iat_std (z=22241.43) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/893.lcs.zst | 73.588 | opcode_switch_ratio (z=408.5); abs_stride_mean (z=95.709) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/816.lcs.zst | 67.762 | iat_mean (z=27235.56); iat_std (z=22950.63) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/796.lcs.zst | 45.401 | reuse_ratio (z=832); abs_stride_q90 (z=69.654) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/4.lcs.zst | 42.333 | sample_record_rate (z=615.205); opcode_switch_ratio (z=479.5) |
-| s3-cache-datasets/cache_dataset_lcs/alibaba/805.lcs.zst | 39.705 | iat_std (z=4755.967); ts_duration (z=4089.091) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/809.lcs.zst | 760.456 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/791.lcs.zst | 322.295 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/811.lcs.zst | 114.764 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/893.lcs.zst | 73.588 | opcode_switch_ratio (z=100); abs_stride_mean (z=95.709) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/816.lcs.zst | 67.762 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/796.lcs.zst | 45.401 | reuse_ratio (z=100); abs_stride_q90 (z=69.654) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/4.lcs.zst | 42.333 | size_bytes (z=100); sample_record_rate (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/alibaba/805.lcs.zst | 39.705 | ts_duration (z=100); iat_mean (z=100) |
 
 ## Outlier Sensitivity
 

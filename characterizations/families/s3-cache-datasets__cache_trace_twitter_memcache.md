@@ -46,24 +46,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.287 |
-| Block/random distance ratio | 0.882 |
+| Block/random distance ratio | 0.908 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 10665953271003616378880 | 0.818 |
-| 3 | 4848316475069916250112 | 0.797 |
-| 4 | 3766990776475754954752 | 0.716 |
-| 5 | 1678011637416472870912 | 0.721 |
-| 6 | 1389404013759730548736 | 0.67 |
-| 7 | 862976070920732147712 | 0.667 |
-| 8 | 689247425690496925696 | 0.652 |
-| 9 | 662271863246912356352 | 0.654 |
-| 10 | 1274072306881850245120 | 0.602 |
-| 11 | 647507709809787797504 | 0.612 |
-| 12 | 166554408206308442112 | 0.647 |
+| 2 | 3192.002 | 0.505 |
+| 3 | 2700.722 | 0.256 |
+| 4 | 2210.975 | 0.259 |
+| 5 | 1942.597 | 0.223 |
+| 6 | 1702.57 | 0.232 |
+| 7 | 1513.748 | 0.245 |
+| 8 | 1386.511 | 0.222 |
+| 9 | 1259.492 | 0.22 |
+| 10 | 1157.744 | 0.225 |
+| 11 | 1122.796 | 0.22 |
+| 12 | 1037.949 | 0.231 |
 
 ## Strongest Correlations
 
@@ -105,14 +105,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster10.oracleGeneral.sample100.zst | 49.764 | iat_mean (z=193.5); ts_duration (z=193.5) |
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/cluster50.oracleGeneral.zst | 31.96 | obj_size_q50 (z=371.833); obj_size_q90 (z=263.834) |
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample10/cluster50.oracleGeneral.sample10.zst | 30.549 | obj_size_q50 (z=339.08); obj_size_q90 (z=264.116) |
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster50.oracleGeneral.sample100.zst | 28.475 | obj_size_q90 (z=204.09); obj_size_std (z=158.084) |
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster26.oracleGeneral.sample100.zst | 17.941 | iat_mean (z=136.917); ts_duration (z=136.917) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster10.oracleGeneral.sample100.zst | 49.764 | ts_duration (z=100); iat_zero_ratio (z=-100) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/cluster50.oracleGeneral.zst | 31.96 | obj_size_mean (z=100); obj_size_std (z=100) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample10/cluster50.oracleGeneral.sample10.zst | 30.549 | obj_size_mean (z=100); obj_size_std (z=100) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster50.oracleGeneral.sample100.zst | 28.475 | ts_duration (z=100); iat_zero_ratio (z=-100) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster26.oracleGeneral.sample100.zst | 17.941 | ts_duration (z=100); iat_zero_ratio (z=-100) |
 | s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample10/cluster25.oracleGeneral.sample10.zst | 16.393 | object_top1_share (z=42.086); object_top10_share (z=13.802) |
 | s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample100/cluster45.oracleGeneral.sample100.zst | 11.527 | iat_mean (z=87.833); ts_duration (z=87.833) |
-| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample10/cluster49.oracleGeneral.sample10.zst | 11.407 | obj_size_q50 (z=224.173); obj_size_q90 (z=131.43) |
+| s3-cache-datasets/cache_trace_twitter_memcache/oracleGeneral/sample10/cluster49.oracleGeneral.sample10.zst | 11.407 | obj_size_q50 (z=100); obj_size_q90 (z=100) |
 
 ## Outlier Sensitivity
 

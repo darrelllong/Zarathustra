@@ -16,7 +16,6 @@
 
 ## GAN Guidance
 
-- Sequential blocks are much more internally coherent than random file batches; block or curriculum sampling is likely safer than pure iid file sampling.
 - Write pressure is material; preserve write bursts and opcode transitions in conditioning.
 - Strongest feature coupling in this pass: iat_std vs iat_q99 (corr=0.98).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
@@ -43,24 +42,24 @@
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.287 |
-| Block/random distance ratio | 0.83 |
-| Sampling recommendation | block_sampling_preserves_temporal_coherence |
+| Block/random distance ratio | 0.879 |
+| Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 1077990332336532357120 | 0.985 |
-| 3 | 787620042204492726272 | 0.95 |
-| 4 | 380718289478432784384 | 0.9 |
-| 5 | 352294003898296696832 | 0.889 |
-| 6 | 262720201087332843520 | 0.849 |
-| 7 | 252262319040133824512 | 0.767 |
-| 8 | 244093063247681748992 | 0.71 |
-| 9 | 250795851254761881600 | 0.673 |
-| 10 | 242637320322171371520 | 0.674 |
-| 11 | 238321780518922256384 | 0.597 |
-| 12 | 236854029919949848576 | 0.534 |
+| 2 | 81546.88 | 0.839 |
+| 3 | 70979.59 | 0.289 |
+| 4 | 64324.07 | 0.324 |
+| 5 | 56231.37 | 0.224 |
+| 6 | 52306.67 | 0.226 |
+| 7 | 48864.71 | 0.233 |
+| 8 | 46961.23 | 0.237 |
+| 9 | 45086.63 | 0.14 |
+| 10 | 40294.37 | 0.208 |
+| 11 | 41896.02 | 0.163 |
+| 12 | 40480.8 | 0.194 |
 
 ## Strongest Correlations
 
@@ -102,14 +101,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25829.lcs.zst | 555.808 | iat_mean (z=396982.6); iat_std (z=303290) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25497.lcs.zst | 513.913 | iat_mean (z=521134.7); iat_std (z=169408.8) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/11839.lcs.zst | 465.648 | abs_stride_std (z=146.902); abs_stride_q99 (z=127.571) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/12500.lcs.zst | 461.611 | abs_stride_q90 (z=193.877); abs_stride_mean (z=140.028) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/21369.lcs.zst | 404.428 | abs_stride_mean (z=137.012); abs_stride_std (z=126.829) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25489.lcs.zst | 278.678 | iat_mean (z=324153.3); iat_std (z=120310.8) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/3330.lcs.zst | 273.502 | abs_stride_q99 (z=127.557); abs_stride_std (z=125.115) |
-| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25800.lcs.zst | 226.331 | iat_mean (z=188225.4); iat_std (z=171633.8) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25829.lcs.zst | 555.808 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25497.lcs.zst | 513.913 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/11839.lcs.zst | 465.648 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/12500.lcs.zst | 461.611 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/21369.lcs.zst | 404.428 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25489.lcs.zst | 278.678 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/3330.lcs.zst | 273.502 | abs_stride_std (z=100); abs_stride_q99 (z=100) |
+| s3-cache-datasets/cache_dataset_lcs/tencentBlock/25800.lcs.zst | 226.331 | ts_duration (z=100); iat_mean (z=100) |
 
 ## Outlier Sensitivity
 

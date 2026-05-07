@@ -40,27 +40,27 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 5 |
+| Best silhouette K | 5 |
 | PCA variance explained by PC1 | 0.219 |
-| Block/random distance ratio | 0.545 |
+| Block/random distance ratio | 0.527 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 17366892647652245882535936 | 0.881 |
-| 3 | 9438996643215217885446144 | 0.797 |
-| 4 | 5420951043535495896236032 | 0.78 |
-| 5 | 4135037713399320680595456 | 0.775 |
-| 6 | 4225221846738098855084032 | 0.695 |
-| 7 | 3289008419059508355006464 | 0.666 |
-| 8 | 3152888840553245471408128 | 0.632 |
-| 9 | 3095231218888217009848320 | 0.434 |
-| 10 | 3052330031702617618382848 | 0.437 |
-| 11 | 3016717209072445257940992 | 0.465 |
-| 12 | 2803767208156508209545216 | 0.341 |
+| 2 | 26620.13 | 0.386 |
+| 3 | 22677.78 | 0.397 |
+| 4 | 19622.87 | 0.424 |
+| 5 | 17430.27 | 0.448 |
+| 6 | 16042.5 | 0.406 |
+| 7 | 14798.64 | 0.41 |
+| 8 | 13480.59 | 0.267 |
+| 9 | 12862.59 | 0.265 |
+| 10 | 11981.98 | 0.266 |
+| 11 | 11112.65 | 0.276 |
+| 12 | 10330.18 | 0.273 |
 
 ## Strongest Correlations
 
@@ -102,14 +102,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| alibaba/1K/alibabaBlock_809.oracleGeneral.zst | 675.801 | iat_q90 (z=173029.6); iat_mean (z=109502.7) |
-| alibaba/alibabaBlock_207.oracleGeneral.zst | 102.5 | abs_stride_q99 (z=343.168); abs_stride_std (z=230.713) |
-| alibaba/1K/alibabaBlock_811.oracleGeneral.zst | 99.492 | iat_q90 (z=37947.8); iat_mean (z=23906.63) |
-| alibaba/1K/alibabaBlock_816.oracleGeneral.zst | 82.432 | iat_std (z=18020.07); iat_q99 (z=16200.08) |
-| alibaba/alibabaBlock_791.oracleGeneral.zst | 60.827 | abs_stride_std (z=159.681); abs_stride_mean (z=133.707) |
-| alibaba/alibabaBlock_369.oracleGeneral.zst | 50.437 | abs_stride_q99 (z=202.187); abs_stride_std (z=152.851) |
-| alibaba/alibabaBlock_771.oracleGeneral.zst | 41.62 | abs_stride_q50 (z=49912.17); abs_stride_mean (z=101.651) |
-| alibaba/10K/alibabaBlock_805.oracleGeneral.zst | 29.965 | abs_stride_q50 (z=33193.55); iat_q99 (z=4175.6) |
+| alibaba/1K/alibabaBlock_809.oracleGeneral.zst | 675.801 | ts_duration (z=100); iat_mean (z=100) |
+| alibaba/alibabaBlock_207.oracleGeneral.zst | 102.5 | abs_stride_std (z=100); abs_stride_q99 (z=100) |
+| alibaba/1K/alibabaBlock_811.oracleGeneral.zst | 99.492 | ts_duration (z=100); iat_mean (z=100) |
+| alibaba/1K/alibabaBlock_816.oracleGeneral.zst | 82.432 | ts_duration (z=100); iat_mean (z=100) |
+| alibaba/alibabaBlock_791.oracleGeneral.zst | 60.827 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| alibaba/alibabaBlock_369.oracleGeneral.zst | 50.437 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| alibaba/alibabaBlock_771.oracleGeneral.zst | 41.62 | abs_stride_mean (z=100); abs_stride_q50 (z=100) |
+| alibaba/10K/alibabaBlock_805.oracleGeneral.zst | 29.965 | ts_duration (z=100); iat_mean (z=100) |
 
 ## Outlier Sensitivity
 

@@ -42,27 +42,27 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 5 |
+| Best silhouette K | 5 |
 | PCA variance explained by PC1 | 0.219 |
-| Block/random distance ratio | 0.571 |
+| Block/random distance ratio | 0.529 |
 | Sampling recommendation | block_sampling_preserves_temporal_coherence |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 17361906506061225952018432 | 0.884 |
-| 3 | 9439268086990004914487296 | 0.797 |
-| 4 | 5421116206412136687075328 | 0.78 |
-| 5 | 4968402142448692781645824 | 0.721 |
-| 6 | 3623888829815703342153728 | 0.778 |
-| 7 | 3289078135122815751290880 | 0.667 |
-| 8 | 3152950977043638601646080 | 0.633 |
-| 9 | 3095274466820970202005504 | 0.434 |
-| 10 | 3052663125002519729668096 | 0.412 |
-| 11 | 3016765134300148374962176 | 0.465 |
-| 12 | 2997584362132720328900608 | 0.4 |
+| 2 | 26647.37 | 0.386 |
+| 3 | 22702.11 | 0.397 |
+| 4 | 19646.43 | 0.424 |
+| 5 | 17451.56 | 0.448 |
+| 6 | 16054.79 | 0.407 |
+| 7 | 15163.78 | 0.412 |
+| 8 | 13518.68 | 0.262 |
+| 9 | 12430.99 | 0.267 |
+| 10 | 11897.49 | 0.265 |
+| 11 | 11116.76 | 0.269 |
+| 12 | 10646.8 | 0.285 |
 
 ## Strongest Correlations
 
@@ -104,14 +104,14 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_809.oracleGeneral.zst | 676.741 | iat_q90 (z=173029.6); iat_mean (z=109473.6) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_207.oracleGeneral.zst | 102.674 | abs_stride_q99 (z=345.278); abs_stride_std (z=230.293) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_811.oracleGeneral.zst | 99.494 | iat_q90 (z=37947.8); iat_mean (z=23900.27) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_816.oracleGeneral.zst | 82.477 | iat_std (z=18030.15); iat_q99 (z=16200.08) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_791.oracleGeneral.zst | 60.919 | abs_stride_std (z=159.39); abs_stride_mean (z=133.708) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_369.oracleGeneral.zst | 50.513 | abs_stride_q99 (z=203.433); abs_stride_std (z=152.572) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_771.oracleGeneral.zst | 41.674 | abs_stride_q50 (z=48329.38); abs_stride_mean (z=101.652) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/10K/alibabaBlock_805.oracleGeneral.zst | 29.994 | abs_stride_q50 (z=32140.92); iat_q99 (z=4175.6) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_809.oracleGeneral.zst | 676.741 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_207.oracleGeneral.zst | 102.674 | abs_stride_std (z=100); abs_stride_q99 (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_811.oracleGeneral.zst | 99.494 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/1K/alibabaBlock_816.oracleGeneral.zst | 82.477 | ts_duration (z=100); iat_mean (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_791.oracleGeneral.zst | 60.919 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_369.oracleGeneral.zst | 50.513 | abs_stride_mean (z=100); abs_stride_std (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/alibabaBlock_771.oracleGeneral.zst | 41.674 | abs_stride_mean (z=100); abs_stride_q50 (z=100) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_alibabaBlock/10K/alibabaBlock_805.oracleGeneral.zst | 29.994 | ts_duration (z=100); iat_mean (z=100) |
 
 ## Outlier Sensitivity
 

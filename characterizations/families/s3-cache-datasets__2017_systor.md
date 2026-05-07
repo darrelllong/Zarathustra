@@ -79,7 +79,7 @@
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN3.csv.sort.zst | 3.999 | iat_std (z=497.523); burstiness_cv (z=49.26) |
+| s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN3.csv.sort.zst | 3.999 | iat_std (z=100); burstiness_cv (z=49.26) |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN4.csv.sort.zst | 3.698 | reuse_ratio (z=3.727); iat_q50 (z=2.67) |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN6.csv.sort.zst | 2.256 | iat_q50 (z=-4.239); object_top10_share (z=2.803) |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN0.csv.sort.zst | 2.067 | abs_stride_q50 (z=46.51); obj_size_mean (z=9.822) |

@@ -38,25 +38,25 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 2 |
-| Best silhouette K | 2 |
+| K-means selected K | 5 |
+| Best silhouette K | 5 |
 | PCA variance explained by PC1 | 0.515 |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 138097277494976479232 | 0.985 |
-| 3 | 137107353725581656064 | 0.814 |
-| 4 | 137057435953505189888 | 0.662 |
-| 5 | 137040024146018451456 | 0.583 |
-| 6 | 137026875258400292864 | 0.542 |
-| 7 | 137021644620906151936 | 0.543 |
-| 8 | 137016744878439809024 | 0.543 |
-| 9 | 137014214651307835392 | 0.524 |
-| 10 | 137012309391919448064 | 0.526 |
-| 11 | 6957211540943050752 | 0.531 |
-| 12 | 137009225725673537536 | 0.553 |
+| 2 | 201.188 | 0.943 |
+| 3 | 28.007 | 0.971 |
+| 4 | 18.285 | 0.97 |
+| 5 | 8.994 | 0.975 |
+| 6 | 10.25 | 0.814 |
+| 7 | 10.246 | 0.667 |
+| 8 | 10.245 | 0.592 |
+| 9 | 0.523 | 0.597 |
+| 10 | 10.244 | 0.548 |
+| 11 | 10.243 | 0.563 |
+| 12 | 10.243 | 0.543 |
 
 ## Strongest Correlations
 
@@ -82,12 +82,12 @@
 |---|---:|---|
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster2_16TB/20240129.sort.csv.zst | 76.11 | schema_high_cardinality_cols (z=-8.872); size_bytes (z=-3.967) |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster2_16TB/20240219.sort.csv.zst | 76.11 | schema_high_cardinality_cols (z=-8.872); size_bytes (z=-4.93) |
-| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster3_18TB.sort.parquet | 44.836 | size_bytes (z=746.137); sample_records (z=0) |
-| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster1_16TB.sort.parquet | 42.69 | size_bytes (z=728.5); sample_records (z=0) |
-| s3-cache-datasets/cache_dataset_txt/2024_google/cluster3_18TB.sort.csv.zst | 37.545 | size_bytes (z=684.3); sample_records (z=0) |
-| s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB.sort.csv.zst | 34.2 | size_bytes (z=653.92); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster3_18TB.sort.parquet | 44.836 | size_bytes (z=100); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster1_16TB.sort.parquet | 42.69 | size_bytes (z=100); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_txt/2024_google/cluster3_18TB.sort.csv.zst | 37.545 | size_bytes (z=100); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB.sort.csv.zst | 34.2 | size_bytes (z=100); sample_records (z=0) |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster2_16TB/20240213.sort.csv.zst | 26.785 | schema_high_cardinality_cols (z=-5.323); size_bytes (z=-3.504) |
-| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster2_16TB.sort.parquet | 14.392 | size_bytes (z=430.421); sample_records (z=0) |
+| s3-cache-datasets/cache_dataset_parquet/2024_google/cluster2_16TB.sort.parquet | 14.392 | size_bytes (z=100); sample_records (z=0) |
 
 ## Notable Files
 
