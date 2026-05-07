@@ -140,6 +140,12 @@ def main() -> int:
     print(f"[chunk_surface] reading base {args.base}", flush=True)
     base = pd.read_csv(args.base)
     base_obj = base["obj_id"].to_numpy(copy=True)
+    preserved_columns = [col for col in base.columns if col != "obj_id"]
+    print(
+        "[chunk_surface] swap contract: swapped_columns=obj_id "
+        f"preserved_base_columns={','.join(preserved_columns)}",
+        flush=True,
+    )
 
     donor_frames: list[tuple[str, np.ndarray]] = []
     for donor_path in args.donor:
@@ -250,6 +256,12 @@ def main() -> int:
     final_report = _evaluate_fake(binary, final_fake, real_by, args.cache_sizes, args.policies)
     final_json.write_text(json.dumps(final_report, indent=2))
     moves_json.write_text(json.dumps({
+        "swap_contract": {
+            "swapped_columns": ["obj_id"],
+            "preserved_base_columns": preserved_columns,
+            "donor_columns_read": ["obj_id"],
+            "real_columns_read": [],
+        },
         "base": args.base,
         "donors": args.donor,
         "seed": args.seed,
