@@ -8,7 +8,7 @@ LANL docs through git (no scp).
 
 Typical use (from any machine with SSH access):
 
-  python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host vinge.local
+  python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase
 
 If `/tiamat` is mounted elsewhere on the remote host, pass `--zarathustra-root`.
 Use `--tmux-session` for long runs so the job is explicitly managed.
@@ -24,8 +24,15 @@ from pathlib import Path
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--host", default="vinge.local", help="SSH target (e.g. vinge.local or baase.local).")
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "--host",
+        default="baase",
+        help="SSH target (e.g. baase, baase.local, or vinge.local).",
+    )
     p.add_argument("--user", default=None, help="Optional SSH user (default: ssh config).")
     p.add_argument("--ssh-key", default="~/.ssh/id_rsa", help="Path to RSA key (default: ~/.ssh/id_rsa).")
     p.add_argument(
@@ -57,7 +64,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--sync",
         choices=["pull", "bundle", "none"],
-        default="pull",
+        default="bundle",
         help=(
             "How to sync the remote repo before running: "
             "`pull` runs `git pull --rebase origin main` on the remote; "
@@ -312,6 +319,15 @@ def main() -> int:
         remote_cmd = tmux_cmd
 
     if args.dry_run:
+        if args.sync == "bundle":
+            sync_script = _build_remote_sync_script(args=args, ref="main")
+            sync_cmd = (
+                f"git bundle create -q - main | "
+                f"{ssh_prefix} bash -lc {_q(sync_script)}"
+            )
+            print("# bundle sync:")
+            print(sync_cmd)
+            print("# run:")
         print(remote_cmd)
         if args.tmux_session:
             key = str(Path(args.ssh_key).expanduser())
