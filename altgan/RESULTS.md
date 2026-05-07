@@ -3535,6 +3535,30 @@ This improves r311 `0.0215516667` by `0.0000398334`, improves r310
 `0.0060687417`, and beats LLNL R245's posted `0.0438` row by `0.0222881667`
 on the official six-policy cachesim surface.
 
+## Baleen24 2K Best-Donor Continuation (2026-05-07)
+
+Continued Baleen24 from the r312 4K chunk-surface champion to 2K object-ID
+chunks with `--accept-mode best` on vinge. The selector scans all available
+synthetic donors for a candidate chunk and accepts the best improving donor.
+Base timing, sizes, opcodes, tenants, stack-distance, and action-class columns
+were preserved; only synthetic `obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r341_best2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0213831333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r341_best2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0216` | 0.0216042000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r341_best2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0214530333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r341_best2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0212481000 |
+
+Four-seed mean: `0.0214221167` (display `0.0214`), range `0.0003561000`.
+This improves r312 `0.0215118333` by `0.0000897166`, improves r311
+`0.0215516667` by `0.0001295500`, improves r293 `0.0221235750` by
+`0.0007014583`, and beats LLNL R245's posted `0.0438` row by `0.0223778833`
+on the official six-policy cachesim surface. Diagnostic no-32 sensitivity also
+improved: r312 no-32 mean `0.0172637916` to r341 no-32 mean `0.0171559271`, a
+`0.0001078646` (`0.62%`) lower diagnostic mean excluding cache size `32`.
+
 Meta CDN chunk scout did not promote: seed42 only moved from `0.0376173333`
 to `0.0376064000`.
 
