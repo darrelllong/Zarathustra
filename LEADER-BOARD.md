@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-07 (R287.A2 alibaba sub-0.01 multi-seed banked at 0.009999 — beats LANL R303 0.01076 by 7.1%)**.
+Last updated: **2026-05-07 (R287.A2 alibaba sub-0.01 0.009999 + R287.CDN2 Meta CDN 0.03081; LLNL leads alibaba +7.1% & Meta CDN +18.3%)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -29,7 +29,7 @@ The race has two metric classes:
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02881** (R287.M chunk-ensemble guard pass on R281.K base, 4-seed range 0.000176) | **0.02547** (R288 chunk-ensemble) | **LANL** | −13.1% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
-| Meta CDN | **0.03192** (R287.CDN chunk-ensemble guard pass on R281.K base, 4-seed range 0.000078) | 0.0377 (low-tail update) | **LLNL** | +15.3% |
+| Meta CDN | **0.03081** (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | 0.0377 (low-tail update) | **LLNL** | +18.3% |
 | Wikipedia | 0.01707 (R287.W chunk-ensemble guard pass on R280.I base, multi-seed range 0.000246) | **0.01146** (IRD-renewal ird_s=32 ip=0.10) | **LANL** | −32.9% |
 
 **Generative score**: LLNL leads 0 corpora; LANL leads 8 (Tencent, CP,
