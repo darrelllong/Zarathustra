@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-04 (post R288/R289 LANL chunk-ensemble counter-attack; alibaba gap widens to 9.2%, Twitter to 13.3%)**.
+Last updated: **2026-05-06 (R287.M LLNL Twitter chunk-ensemble banked at 0.02881; gap to LANL closed by 0.2pp)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -27,7 +27,7 @@ The race has two metric classes:
 | CloudPhysics | 0.0311 (R283.H: R237 atlas + scale=0.7; 8-pol multi-seed, range 0.000469) | **0.0267** (rank-conditioned IRD-renewal, 8-pol 4-seed {42,80,81,82}) | **LANL** | −14.1% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
 | MSR Exchange | 0.00921 (R282.F: R270 atlas + scale=1.3) | **0.00484** (hp=0.25 rank=1.0 min_age=16; 6-pol 4-seed {42,80,81,82}, range 0.0000631) | **LANL** | −47.5% |
-| Twitter | **0.02936** (R281.K scale=0.001 multi-seed, range 0.000121) | **0.02547** (R288 chunk-ensemble refine on win=48 base, 4-seed {42,80,81,82}, range 0.000219) | **LANL** | −13.3% |
+| Twitter | **0.02881** (R287.M chunk-ensemble guard pass on R281.K base, 4-seed range 0.000176) | **0.02547** (R288 chunk-ensemble) | **LANL** | −13.1% |
 | Meta KV | **0.05587** (R281.K scale=0.001 multi-seed, range 0.000417) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25; 4-seed) | **LANL** | −80.5% |
 | Meta CDN | **0.04625** (R281.K scale=0.001 multi-seed, range 0.000378) | **0.0377** (low-tail update; 4-seed {42,80,81,82}) | **LANL** | −18.5% |
 | Wikipedia | 0.01727 (R280.I scale=4.5 multi-seed, range 0.000132) | **0.01146** (IRD-renewal ird_s=32 ip=0.10; 4-seed {42,80,81,82}, range 0.000533) | **LANL** | −33.6% |
