@@ -3102,9 +3102,9 @@ cachesim surface.
 
 LANL re-opened the Wikipedia generative row after LLNL posted R288.W
 `0.008895`. The first 32K object-ID chunk-surface scout dropped seed 42 to
-`0.0074766667`; the initial multi-seed promotion exposed seed 80 as the weak
-seed, so LANL immediately ran a deeper seed-80 continuation from the completed
-r327 artifact. The selector preserved base timing, sizes, opcodes, tenants,
+`0.0074766667`; the initial multi-seed promotion exposed seeds 80 and 82 as
+weak seeds, so LANL immediately ran deeper continuations from the completed
+r327 artifacts. The selector preserved base timing, sizes, opcodes, tenants,
 and any auxiliary columns; only synthetic `obj_id` chunks were eligible, and
 chunks were accepted only when the official six-policy Wikipedia cachesim mean
 improved.
@@ -3126,11 +3126,11 @@ python3 -m llgan.cachesim_eval \
 | 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0075` | 0.0074766667 |
 | 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0072` | 0.0071609667 |
 | 81 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0085` | 0.0085212000 |
-| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0090` | 0.0089644333 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0062` | 0.0061809667 |
 
-Mean across seeds `{42,80,81,82}`: `0.0080308167` (race display `0.0080`;
-range `0.0018034666`). This improves LANL r290 `0.0113723167` by
-`0.0033415000` (`29.38%` lower) and retakes the Wikipedia generative row from
-LLNL R288.W `0.008895` by `0.0008641833` on the official six-policy cachesim
-surface. Seed 82 is now the exposed weak seed, so the next continuation should
+Mean across seeds `{42,80,81,82}`: `0.0073349500` (race display `0.0073`;
+range `0.0023402333`). This improves LANL r290 `0.0113723167` by
+`0.0040373667` (`35.50%` lower) and retakes the Wikipedia generative row from
+LLNL R288.W `0.008895` by `0.0015600500` on the official six-policy cachesim
+surface. Seed 81 is now the exposed weak seed, so the next continuation should
 start there.

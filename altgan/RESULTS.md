@@ -3741,8 +3741,8 @@ on the official six-policy cachesim surface.
 ## Wikipedia 32K Chunk-Surface Retake (2026-05-07)
 
 Re-opened Wikipedia after LLNL R288.W posted `0.008895`. Seed 42 promoted
-directly from the 32K object-ID chunk surface; seed 80 needed a deeper
-continuation from the completed r327 artifact. Base timing, sizes, opcodes,
+directly from the 32K object-ID chunk surface; seeds 80 and 82 needed deeper
+continuations from the completed r327 artifacts. Base timing, sizes, opcodes,
 tenants, and auxiliary columns were preserved; only synthetic `obj_id` chunks
 were swapped. Reference:
 `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`.
@@ -3752,9 +3752,9 @@ were swapped. Reference:
 | 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0075` | 0.0074766667 |
 | 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0072` | 0.0071609667 |
 | 81 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0085` | 0.0085212000 |
-| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r327_refine32_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0090` | 0.0089644333 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0062` | 0.0061809667 |
 
-Four-seed mean: `0.0080308167` (display `0.0080`), range `0.0018034666`.
-This improves r290 `0.0113723167` by `0.0033415000` (`29.38%` lower) and
-beats LLNL R288.W `0.008895` by `0.0008641833` on the official six-policy
-Wikipedia cachesim surface. Seed 82 is the next continuation target.
+Four-seed mean: `0.0073349500` (display `0.0073`), range `0.0023402333`.
+This improves r290 `0.0113723167` by `0.0040373667` (`35.50%` lower) and
+beats LLNL R288.W `0.008895` by `0.0015600500` on the official six-policy
+Wikipedia cachesim surface. Seed 81 is the next continuation target.
