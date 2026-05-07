@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-07 (R287.A2 alibaba sub-0.01 0.009999 + R287.CDN2 Meta CDN 0.03081; LLNL leads alibaba +7.1% & Meta CDN +18.3%)**.
+Last updated: **2026-05-07 (R287.M2 TWITTER RETAKE 0.02491; LLNL leads alibaba/CDN/Twitter — 3 strict-win retakes this session)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -27,7 +27,7 @@ The race has two metric classes:
 | CloudPhysics | 0.03017 (R287.CP chunk-ensemble guard pass on R283.H base, 8-pol multi-seed range 0.000213) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −13.0% |
 | Baleen24 | 0.0438 (R245: hp=0.35 K=75 adj=0.55 tp=0.05 mf=0.5 rp=0.15 win=2) | **0.0276** (scout-rank atlas, 4-seed {42,80,81,82}) | **LANL** | −37.0% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
-| Twitter | **0.02881** (R287.M chunk-ensemble guard pass on R281.K base, 4-seed range 0.000176) | **0.02547** (R288 chunk-ensemble) | **LANL** | −13.1% |
+| Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | **0.03081** (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | 0.0377 (low-tail update) | **LLNL** | +18.3% |
 | Wikipedia | 0.01707 (R287.W chunk-ensemble guard pass on R280.I base, multi-seed range 0.000246) | **0.01146** (IRD-renewal ird_s=32 ip=0.10) | **LANL** | −32.9% |
