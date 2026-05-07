@@ -3237,6 +3237,40 @@ range `0.0034748333`). This improves LANL r331 `0.0118149323` by
 `0.0185782812` on the official eight-policy CloudPhysics cachesim surface.
 Seed 82 remains the exposed weak seed.
 
+## 2026-05-07 -- CloudPhysics 2K Cascade Continuation
+
+LANL continued the CloudPhysics object-ID cascade from r332 4K to 2K chunks on
+the same official eight-policy surface. The selector preserved timing, object
+size, opcode, tenant, and stream columns; only synthetic `obj_id` chunks were
+eligible, and chunks were accepted only when the official CloudPhysics
+cachesim mean improved.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Official eight-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r337_refine2_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099769792 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r337_refine2_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0122` | 0.0121993333 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r337_refine2_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100270625 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r337_refine2_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0135` | 0.0134772917 |
+
+Mean across seeds `{42,80,81,82}`: `0.0114201667` (race display `0.0114`;
+range `0.0035003125`). This improves LANL r332 `0.0115917188` by
+`0.0001715521` (`1.48%` lower), improves LANL r306 `0.0121897344` by
+`0.0007695677` (`6.31%` lower), and beats LLNL R287.CP `0.03017` by
+`0.0187498333` on the official eight-policy CloudPhysics cachesim surface.
+Seed 82 improved but remains the exposed weak seed.
+
 ## 2026-05-07 -- Tencent 64-Row Cross-Seed Continuation
 
 LANL re-opened the current Tencent chunk champion with a smaller 64-row
