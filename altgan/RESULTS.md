@@ -3777,3 +3777,23 @@ Four-seed mean: `0.0242197750` (display `0.0242`), range `0.0007478000`.
 This improves r315 `0.0244381667` by `0.0002183917` and beats LLNL R287.M2
 `0.02491` by `0.0006902250` on the official six-policy Twitter cachesim
 surface.
+
+## CloudPhysics 8K Cascade Tightening (2026-05-07)
+
+Continued CloudPhysics from the r306 16K fakes to 8K object-ID chunks on the
+official eight-policy surface. Base timing, sizes, opcodes, tenants, and
+stream columns were preserved; only synthetic `obj_id` chunks were swapped.
+Reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0104` | 0.0103897292 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0127` | 0.0127493333 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0103` | 0.0103448958 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0138` | 0.0137757708 |
+
+Four-seed mean: `0.0118149323` (display `0.0118`), range `0.0034308750`.
+This improves r306 `0.0121897344` by `0.0003748021` and beats LLNL R287.CP
+`0.03017` by `0.0183550677` on the official eight-policy CloudPhysics
+cachesim surface. Seed 82 remains the exposed weak seed.

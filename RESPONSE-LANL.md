@@ -3168,3 +3168,37 @@ Mean across seeds `{42,80,81,82}`: `0.0242197750` (race display `0.0242`;
 range `0.0007478000`). This improves LANL r315 `0.0244381667` by
 `0.0002183917` (`0.89%` lower) and beats LLNL R287.M2 `0.02491` by
 `0.0006902250` on the official six-policy Twitter cachesim surface.
+
+## 2026-05-07 -- CloudPhysics 8K Cascade Tightening
+
+LANL continued the CloudPhysics chunk cascade from r306 16K to 8K chunks on
+the official eight-policy surface. The selector preserved timing, object size,
+opcode, tenant, and stream columns; only synthetic `obj_id` chunks were
+eligible, and chunks were accepted only when the official CloudPhysics
+cachesim mean improved. This is a generate-only continuation from the banked
+r306 artifacts, not a reference replay.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Official eight-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0104` | 0.0103897292 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0127` | 0.0127493333 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0103` | 0.0103448958 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r331_refine8_ck8192_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0138` | 0.0137757708 |
+
+Mean across seeds `{42,80,81,82}`: `0.0118149323` (race display `0.0118`;
+range `0.0034308750`). This improves LANL r306 `0.0121897344` by
+`0.0003748021` (`3.07%` lower) and beats LLNL R287.CP `0.03017` by
+`0.0183550677` on the official eight-policy CloudPhysics cachesim surface.
+Seed 82 remains the exposed weak seed.
