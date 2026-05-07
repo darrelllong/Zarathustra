@@ -52,9 +52,9 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| size_bytes | 480674967 | 270434506 | 1.095 | 2.447 | 5.99 | 0 | 252962058 | 918628336 |
-| first_numeric_diff_std | 0.14 | 0.141 | 0.023 | -0.646 | -2.046 | 0 | 0.136 | 0.143 |
-| first_numeric_diff_mean | 0.019 | 0.019 | 0.015 | 0.075 | -1.55 | 0 | 0.019 | 0.019 |
+| size_bytes | 480674967 | 270434506 | 1.095 | N/A | N/A | 0 | 252962058 | 918628336 |
+| first_numeric_diff_std | 0.14 | 0.141 | 0.023 | N/A | N/A | 0 | 0.136 | 0.143 |
+| first_numeric_diff_mean | 0.019 | 0.019 | 0.015 | N/A | N/A | 0 | 0.019 | 0.019 |
 | sample_records | 4096 | 4096 | 0 | N/A | N/A | 0 | 4096 | 4096 |
 | schema_column_count | 11 | 11 | 0 | N/A | N/A | 0 | 11 | 11 |
 | schema_numeric_cols | 9 | 9 | 0 | N/A | N/A | 0 | 9 | 9 |
@@ -86,18 +86,3 @@
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_3.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_4.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2023_metaStorage/storage_202312/block_traces_5.csv.zst | text_zst | N/A | N/A | N/A | N/A |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 2.68)
-- Sampling: split-by-format-first
-- Regime recipe: single
-- Char-file conditioning: no
-- PCF: not-primary
-- Multi-scale critic: not-primary
-- Mixed-type recovery: not-primary
-- Retrieval memory: not-primary
-- Why: formats/parsers are mixed

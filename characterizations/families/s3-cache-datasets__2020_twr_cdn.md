@@ -47,9 +47,9 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| schema_mixed_cols | 0.333 | 0 | 1.732 | 1.732 | N/A | 0 | 0 | 0.8 |
-| size_bytes | 174943937567 | 231608521285 | 0.854 | -1.461 | N/A | 0 | 50716665623 | 276505376023 |
-| schema_numeric_cols | 3.667 | 4 | 0.157 | -1.732 | N/A | 0 | 3.2 | 4 |
+| schema_mixed_cols | 0.333 | 0 | 1.732 | N/A | N/A | 0 | 0 | 0.8 |
+| size_bytes | 174943937567 | 231608521285 | 0.854 | N/A | N/A | 0 | 50716665623 | 276505376023 |
+| schema_numeric_cols | 3.667 | 4 | 0.157 | N/A | N/A | 0 | 3.2 | 4 |
 | sample_records | 4096 | 4096 | 0 | N/A | N/A | 0 | 4096 | 4096 |
 | schema_column_count | 14 | 14 | 0 | N/A | N/A | 0 | 14 | 14 |
 | schema_high_cardinality_cols | 8 | 8 | 0 | N/A | N/A | 0 | 8 | 8 |
@@ -68,18 +68,3 @@
 | s3-cache-datasets/cache_dataset_parquet/2020_twr_cdn/2020_twr_cdn.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_parquet/2020_twr_cdn/2020_twr_cdn.sample100.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2020_twr_cdn.zst | text_zst | N/A | N/A | N/A | N/A |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 2.573)
-- Sampling: split-by-format-first
-- Regime recipe: single
-- Char-file conditioning: no
-- PCF: not-primary
-- Multi-scale critic: not-primary
-- Mixed-type recovery: not-primary
-- Retrieval memory: not-primary
-- Why: formats/parsers are mixed

@@ -5,7 +5,7 @@
 - Formats: oracle_general
 - Parsers: oracle_general
 - ML Use Cases: request_sequence
-- Heterogeneity Score: 0.634
+- Heterogeneity Score: 0.933
 - Suggested GAN Modes: 1
 - Split By Format: no
 
@@ -20,14 +20,14 @@
 - Burstiness is high; inter-arrival and FFT/ACF losses should stay heavily weighted.
 - Strongest feature coupling in this pass: ts_duration vs iat_zero_ratio (corr=-1).
 - A small set of files are strong multivariate outliers; consider holding them out for ablation or separate mode inspection.
-- Current characterization suggests extra conditioning value from: object_unique, signed_stride_lag1_autocorr, obj_size_std.
+- Current characterization suggests extra conditioning value from: object_unique, obj_size_std.
 
 ## Conditioning Audit
 
 | Item | Value |
 |---|---|
 | Near-constant current conditioning features | write_ratio, iat_q50, opcode_switch_ratio, tenant_unique |
-| Recommended candidate additions | object_unique, signed_stride_lag1_autocorr, obj_size_std |
+| Recommended candidate additions | object_unique, obj_size_std |
 | Highly redundant current pairs | reuse_ratio vs forward_seek_ratio (-0.998); reuse_ratio vs backward_seek_ratio (-0.998); forward_seek_ratio vs backward_seek_ratio (0.993) |
 
 ## Format Breakdown
@@ -42,29 +42,25 @@
 |---|---|
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
-| DBSCAN clusters | 1 |
-| DBSCAN noise fraction | 0.074 |
-| Ordered PC1 changepoints | 0 |
-| PCA variance explained by PC1 | 0.292 |
-| Hurst exponent on ordered PC1 | 0.5 |
-| Block/random distance ratio | 1.133 |
+| PCA variance explained by PC1 | 0.358 |
+| Block/random distance ratio | 0.976 |
 | Sampling recommendation | random_sampling_is_less_problematic |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 61693954746090695324043153175339859968 | 0.803 |
-| 3 | 44962931981881171325324723553359101952 | 0.504 |
-| 4 | 40173071196567184267151186411237933056 | 0.505 |
-| 5 | 37922609639450106903966986443409063936 | 0.279 |
-| 6 | 16467299134758093709065041870755725312 | 0.285 |
-| 7 | 15393179163499718411050880512921960448 | 0.264 |
-| 8 | 12217395539109555052375819068366651392 | 0.287 |
-| 9 | 11208461316520716739929368209802657792 | 0.348 |
-| 10 | 10712787949052197130401572300485820416 | 0.302 |
-| 11 | 9725614863188632074123102456490491904 | 0.327 |
-| 12 | 4738810408117532063879937679664611328 | 0.34 |
+| 2 | 124045774398975082496 | 0.686 |
+| 3 | 65350650620074082304 | 0.571 |
+| 4 | 36920155211800813568 | 0.536 |
+| 5 | 20763070938147893248 | 0.589 |
+| 6 | 13433804512477689856 | 0.607 |
+| 7 | 11228979182596171776 | 0.627 |
+| 8 | 10763491306708508672 | 0.638 |
+| 9 | 2633733273857393152 | 0.653 |
+| 10 | 2314746539498652672 | 0.651 |
+| 11 | 2117431751471579392 | 0.662 |
+| 12 | 1395035212673251584 | 0.651 |
 
 ## Strongest Correlations
 
@@ -83,52 +79,52 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| obj_size_q50 | 1213.102 | 124 | 3.511 | 4.77 | 23.58 | 0 | 44.6 | 952.4 |
-| obj_size_q90 | 5572.667 | 506 | 3.2 | 4.61 | 23.236 | 0 | 67.4 | 4860.45 |
-| obj_size_mean | 2169.323 | 337.486 | 2.984 | 4.342 | 19.867 | 0 | 56.318 | 2287.172 |
-| iat_q99 | 0.131 | 0 | 2.591 | 2.266 | 3.26 | 0 | 0 | 1 |
-| obj_size_std | 2902.36 | 204.103 | 2.477 | 3.755 | 15.608 | 0 | 16.849 | 7082.353 |
-| obj_size_q99 | 11552.8 | 972.65 | 2.179 | 2.972 | 8.82 | 0 | 97 | 35029.43 |
-| object_top1_share | 0.043 | 0.014 | 2.06 | 4.194 | 21.022 | 0 | 0.001 | 0.095 |
-| reuse_ratio | 0.099 | 0.037 | 1.654 | 2.608 | 7.001 | 0 | 0.001 | 0.343 |
-| iat_lag1_autocorr | -0.006 | -0.003 | 1.521 | -2.928 | 8.354 | 0 | -0.013 | -0.001 |
-| ts_duration | 25.463 | 12 | 1.492 | 2.887 | 8.135 | 0 | 4 | 53.5 |
-| iat_mean | 0.006 | 0.003 | 1.492 | 2.887 | 8.135 | 0 | 0.001 | 0.013 |
-| object_top10_share | 0.124 | 0.064 | 1.277 | 2.827 | 11.796 | 0 | 0.005 | 0.295 |
-| sample_record_rate | 495.862 | 341.333 | 0.933 | 1.654 | 3.102 | 0 | 78.011 | 1024 |
-| size_bytes | 2819414838 | 1949975838 | 0.928 | 1.877 | 4.513 | 0 | 420565252 | 6285663942 |
-| obj_size_min | 33.593 | 29 | 0.722 | 2.638 | 10.202 | 0 | 12.3 | 52.6 |
-| iat_std | 0.066 | 0.054 | 0.634 | 1.816 | 3.291 | 0 | 0.031 | 0.113 |
-| object_unique | 2020.074 | 1859 | 0.512 | 0.438 | -0.441 | 0 | 1061.4 | 3729.7 |
-| burstiness_cv | 20.019 | 18.446 | 0.489 | 0.599 | 0.013 | 0 | 8.752 | 31.98 |
+| obj_size_q50 | 1213.102 | 124 | 3.511 | N/A | N/A | 0 | 44.6 | 952.4 |
+| obj_size_q90 | 5572.667 | 506 | 3.2 | N/A | N/A | 0 | 67.4 | 4860.45 |
+| obj_size_mean | 2169.323 | 337.486 | 2.984 | N/A | N/A | 0 | 56.318 | 2287.172 |
+| iat_q99 | 0.131 | 0 | 2.591 | N/A | N/A | 0 | 0 | 1 |
+| obj_size_std | 2902.36 | 204.103 | 2.477 | N/A | N/A | 0 | 16.849 | 7082.353 |
+| obj_size_q99 | 11552.8 | 972.65 | 2.179 | N/A | N/A | 0 | 97 | 35029.43 |
+| object_top1_share | 0.043 | 0.014 | 2.06 | N/A | N/A | 0 | 0.001 | 0.095 |
+| reuse_ratio | 0.099 | 0.037 | 1.654 | N/A | N/A | 0 | 0.001 | 0.343 |
+| iat_lag1_autocorr | -0.006 | -0.003 | 1.521 | N/A | N/A | 0 | -0.013 | -0.001 |
+| ts_duration | 25.463 | 12 | 1.492 | N/A | N/A | 0 | 4 | 53.5 |
+| iat_mean | 0.006 | 0.003 | 1.492 | N/A | N/A | 0 | 0.001 | 0.013 |
+| object_top10_share | 0.124 | 0.064 | 1.277 | N/A | N/A | 0 | 0.005 | 0.295 |
+| sample_record_rate | 495.862 | 341.333 | 0.933 | N/A | N/A | 0 | 78.011 | 1024 |
+| size_bytes | 2819414838 | 1949975838 | 0.928 | N/A | N/A | 0 | 420565252 | 6285663942 |
+| obj_size_min | 33.593 | 29 | 0.722 | N/A | N/A | 0 | 12.3 | 52.6 |
+| iat_std | 0.066 | 0.054 | 0.634 | N/A | N/A | 0 | 0.031 | 0.113 |
+| object_unique | 2020.074 | 1859 | 0.512 | N/A | N/A | 0 | 1061.4 | 3729.7 |
+| burstiness_cv | 20.019 | 18.446 | 0.489 | N/A | N/A | 0 | 8.752 | 31.98 |
 
 ## Outlier Files
 
 | rel_path | outlier_score | top drivers |
 |---|---:|---|
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.948 | obj_size_q50 (z=328.116); obj_size_q90 (z=262.205) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster10.oracleGeneral.sample10.zst | 16.601 | tenant_top1_share (z=-30.5); iat_lag1_autocorr (z=-21.666) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster35.oracleGeneral.sample10.zst | 16.008 | abs_stride_q90 (z=-30.349); forward_seek_ratio (z=-23) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster2.oracleGeneral.sample10.zst | 11.133 | forward_seek_ratio (z=-17.518); abs_stride_q50 (z=-16.921) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster25.oracleGeneral.sample10.zst | 10.257 | object_top1_share (z=41.299); object_top10_share (z=14.74) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 9.791 | obj_size_q50 (z=216.916); obj_size_q90 (z=130.476) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 9.633 | obj_size_q99 (z=127.238); obj_size_std (z=124.266) |
-| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster26.oracleGeneral.sample10.zst | 7.649 | iat_lag1_autocorr (z=-21.089); iat_mean (z=20.267) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster50.oracleGeneral.sample10.zst | 29.914 | obj_size_q50 (z=328.116); obj_size_q90 (z=262.205) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster25.oracleGeneral.sample10.zst | 15.608 | object_top1_share (z=41.299); object_top10_share (z=14.74) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster10.oracleGeneral.sample10.zst | 14.961 | tenant_top1_share (z=-30.5); iat_lag1_autocorr (z=-21.666) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster8.oracleGeneral.sample10.zst | 10.477 | obj_size_q99 (z=127.238); obj_size_std (z=124.266) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster49.oracleGeneral.sample10.zst | 10.395 | obj_size_q50 (z=216.916); obj_size_q90 (z=130.476) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster26.oracleGeneral.sample10.zst | 9.061 | iat_lag1_autocorr (z=-21.089); iat_mean (z=20.267) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster35.oracleGeneral.sample10.zst | 9.056 | forward_seek_ratio (z=-23); reuse_ratio (z=20.603) |
+| s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster2.oracleGeneral.sample10.zst | 8.537 | forward_seek_ratio (z=-17.518); object_top1_share (z=16.701) |
 
 ## Outlier Sensitivity
 
 | N Removed | Metric | Baseline Median | Trimmed Median | Relative Shift |
 |---:|---|---:|---:|---:|
 | 10 | obj_size_std | 204.103 | 186.615 | -0.086 |
-| 5 | reuse_ratio | 0.038 | 0.035 | -0.075 |
 | 10 | burstiness_cv | 18.446 | 19.74 | 0.07 |
 | 10 | reuse_ratio | 0.038 | 0.036 | -0.046 |
 | 1 | obj_size_std | 204.103 | 194.906 | -0.045 |
-| 3 | obj_size_std | 204.103 | 194.906 | -0.045 |
+| 3 | obj_size_std | 204.103 | 213.3 | 0.045 |
 | 5 | obj_size_std | 204.103 | 194.906 | -0.045 |
-| 3 | burstiness_cv | 18.446 | 19.268 | 0.045 |
+| 5 | burstiness_cv | 18.446 | 19.268 | 0.045 |
 | 10 | object_unique | 1859 | 1933 | 0.04 |
 | 3 | reuse_ratio | 0.038 | 0.037 | -0.016 |
+| 1 | reuse_ratio | 0.038 | 0.038 | 0.016 |
 
 ## Notable Files
 
@@ -142,19 +138,3 @@
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster27.oracleGeneral.sample10.zst | oracle_general | 0 | 0.05 | 31.98 | 4 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster46.oracleGeneral.sample10.zst | oracle_general | 0 | 0.006 | 31.98 | 4 |
 | s3-cache-datasets/cache_dataset_oracleGeneral/2020_twitter/cluster16.oracleGeneral.sample10.zst | oracle_general | 0 | 0.104 | 31.98 | 4 |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 2.059)
-- Sampling: random-ok
-- Regime recipe: single
-- Char-file conditioning: yes
-- PCF: validated
-- Multi-scale critic: promising
-- Mixed-type recovery: promising
-- Retrieval memory: mixed
-- Why: burstiness is materially above the calmer families
-- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

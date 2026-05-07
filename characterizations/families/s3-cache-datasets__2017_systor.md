@@ -56,24 +56,24 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| iat_std | 1.091 | 0.022 | 2.414 | 2.449 | 6 | 0 | 0.003 | 3.249 |
-| abs_stride_q50 | 72462262955 | 8564356096 | 2.127 | 2.42 | 5.882 | 0 | 445407488 | 208377025280 |
-| burstiness_cv | 11.68 | 2.943 | 1.942 | 2.44 | 5.964 | 0 | 1.334 | 30.762 |
-| ts_duration | 95.122 | 28.281 | 1.87 | 2.424 | 5.904 | 0 | 9.171 | 247.913 |
-| iat_mean | 0.023 | 0.007 | 1.87 | 2.424 | 5.904 | 0 | 0.002 | 0.061 |
-| reuse_ratio | 0.002 | 0.001 | 1.167 | 1.187 | 0.67 | 0 | 0 | 0.005 |
-| obj_size_q90 | 60074.67 | 32768 | 0.924 | 0.893 | -1.875 | 0 | 16384 | 131072 |
-| sample_record_rate | 217.795 | 149.05 | 0.85 | 0.594 | -1.71 | 0 | 57.694 | 446.641 |
-| obj_size_mean | 22318.75 | 13207.69 | 0.738 | 0.951 | -1.763 | 0 | 10308.12 | 43440.44 |
-| iat_q99 | 0.088 | 0.101 | 0.716 | -0.351 | -2.044 | 0 | 0.014 | 0.149 |
-| iat_lag1_autocorr | 0.075 | 0.089 | 0.7 | -0.539 | -1.155 | 0 | 0.012 | 0.124 |
-| iat_zero_ratio | 0.001 | 0.001 | 0.601 | -0.224 | -1.864 | 0 | 0 | 0.002 |
-| write_ratio | 0.469 | 0.479 | 0.564 | 0.185 | -1.723 | 0 | 0.19 | 0.739 |
-| iat_q90 | 0.014 | 0.014 | 0.502 | 0.073 | -1.85 | 0 | 0.006 | 0.021 |
-| object_top1_share | 0.007 | 0.006 | 0.481 | 0.364 | -0.326 | 0 | 0.004 | 0.01 |
-| obj_size_std | 34254.03 | 30237.28 | 0.437 | 0.452 | -1.759 | 0 | 20309.48 | 52215.34 |
-| object_top10_share | 0.035 | 0.033 | 0.425 | -0.166 | 0.478 | 0 | 0.021 | 0.051 |
-| abs_stride_mean | 507137153926 | 480827761082 | 0.392 | 0.285 | -1.968 | 0 | 300684856942 | 739898843755 |
+| iat_std | 1.091 | 0.022 | 2.414 | N/A | N/A | 0 | 0.003 | 3.249 |
+| abs_stride_q50 | 72462262955 | 8564356096 | 2.127 | N/A | N/A | 0 | 445407488 | 208377025280 |
+| burstiness_cv | 11.68 | 2.943 | 1.942 | N/A | N/A | 0 | 1.334 | 30.762 |
+| ts_duration | 95.122 | 28.281 | 1.87 | N/A | N/A | 0 | 9.171 | 247.913 |
+| iat_mean | 0.023 | 0.007 | 1.87 | N/A | N/A | 0 | 0.002 | 0.061 |
+| reuse_ratio | 0.002 | 0.001 | 1.167 | N/A | N/A | 0 | 0 | 0.005 |
+| obj_size_q90 | 60074.67 | 32768 | 0.924 | N/A | N/A | 0 | 16384 | 131072 |
+| sample_record_rate | 217.795 | 149.05 | 0.85 | N/A | N/A | 0 | 57.694 | 446.641 |
+| obj_size_mean | 22318.75 | 13207.69 | 0.738 | N/A | N/A | 0 | 10308.12 | 43440.44 |
+| iat_q99 | 0.088 | 0.101 | 0.716 | N/A | N/A | 0 | 0.014 | 0.149 |
+| iat_lag1_autocorr | 0.075 | 0.089 | 0.7 | N/A | N/A | 0 | 0.012 | 0.124 |
+| iat_zero_ratio | 0.001 | 0.001 | 0.601 | N/A | N/A | 0 | 0 | 0.002 |
+| write_ratio | 0.469 | 0.479 | 0.564 | N/A | N/A | 0 | 0.19 | 0.739 |
+| iat_q90 | 0.014 | 0.014 | 0.502 | N/A | N/A | 0 | 0.006 | 0.021 |
+| object_top1_share | 0.007 | 0.006 | 0.481 | N/A | N/A | 0 | 0.004 | 0.01 |
+| obj_size_std | 34254.03 | 30237.28 | 0.437 | N/A | N/A | 0 | 20309.48 | 52215.34 |
+| object_top10_share | 0.035 | 0.033 | 0.425 | N/A | N/A | 0 | 0.021 | 0.051 |
+| abs_stride_mean | 507137153926 | 480827761082 | 0.392 | N/A | N/A | 0 | 300684856942 | 739898843755 |
 
 ## Outlier Files
 
@@ -111,19 +111,3 @@
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN1.csv.sort.zst | text_zst | 0.642 | 0 | 2.702 | 38.485 |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN0.csv.sort.zst | text_zst | 0.198 | 0.001 | 1.361 | 9.233 |
 | s3-cache-datasets/cache_dataset_txt/2017_systor/2016_LUN2.csv.sort.zst | text_zst | 0.181 | 0 | 1.307 | 9.109 |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 1.208)
-- Sampling: random-ok
-- Regime recipe: single
-- Char-file conditioning: yes
-- PCF: validated
-- Multi-scale critic: promising
-- Mixed-type recovery: promising
-- Retrieval memory: mixed
-- Why: no single pathological axis dominates this family
-- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

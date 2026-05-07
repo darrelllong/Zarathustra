@@ -50,9 +50,9 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| schema_mixed_cols | 0.286 | 0 | 1.708 | 1.23 | -0.84 | 0 | 0 | 1 |
-| size_bytes | 85797886 | 50373819 | 1.287 | 1.94 | 4.081 | 0 | 8647536 | 190931390 |
-| schema_high_cardinality_cols | 4.143 | 4 | 0.091 | 2.646 | 7 | 0 | 4 | 4.4 |
+| schema_mixed_cols | 0.286 | 0 | 1.708 | N/A | N/A | 0 | 0 | 1 |
+| size_bytes | 85797886 | 50373819 | 1.287 | N/A | N/A | 0 | 8647536 | 190931390 |
+| schema_high_cardinality_cols | 4.143 | 4 | 0.091 | N/A | N/A | 0 | 4 | 4.4 |
 | sample_records | 4096 | 4096 | 0 | N/A | N/A | 0 | 4096 | 4096 |
 | schema_column_count | 9 | 9 | 0 | N/A | N/A | 0 | 9 | 9 |
 | schema_numeric_cols | 4 | 4 | 0 | N/A | N/A | 0 | 4 | 4 |
@@ -86,18 +86,3 @@
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/prestage-mon01.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/stage-dal09.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_parquet/2017_docker/syd01.parquet | parquet | N/A | N/A | N/A | N/A |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 2.68)
-- Sampling: random-ok
-- Regime recipe: single
-- Char-file conditioning: no
-- PCF: not-primary
-- Multi-scale critic: not-primary
-- Mixed-type recovery: not-primary
-- Retrieval memory: not-primary
-- Why: no single pathological axis dominates this family

@@ -5,7 +5,7 @@
 - Formats: oracle_general, text_zst
 - Parsers: generic_text, oracle_general
 - ML Use Cases: request_sequence, structured_table
-- Heterogeneity Score: 0.656
+- Heterogeneity Score: 0.698
 - Suggested GAN Modes: 1
 - Split By Format: yes
 
@@ -44,27 +44,25 @@
 
 | Item | Value |
 |---|---|
-| K-means selected K | 3 |
-| Best silhouette K | 3 |
-| DBSCAN clusters | 1 |
-| DBSCAN noise fraction | 0.044 |
+| K-means selected K | 2 |
+| Best silhouette K | 2 |
 | PCA variance explained by PC1 | 0.518 |
 
 ### K Selection
 
 | K | Within-SS | Silhouette |
 |---:|---:|---:|
-| 2 | 306432730406275055616 | 0.662 |
+| 2 | 116914040134050611200 | 0.848 |
 | 3 | 9855405250063163392 | 0.813 |
-| 4 | 2404647468314093568 | 0.807 |
+| 4 | 8973818133917656064 | 0.791 |
 | 5 | 1523060352168586752 | 0.806 |
 | 6 | 1509158103059552256 | 0.716 |
-| 7 | 626772848742221312 | 0.657 |
+| 7 | 613253242332020480 | 0.678 |
 | 8 | 256375850446051520 | 0.66 |
 | 9 | 611159267163318272 | 0.675 |
-| 10 | 254846892040225408 | 0.495 |
-| 11 | 1750420373533485 | 0.636 |
-| 12 | 254342005072965312 | 0.4 |
+| 10 | 255109242363983360 | 0.487 |
+| 11 | 610595999650635136 | 0.549 |
+| 12 | 1367777674699962 | 0.527 |
 
 ## Strongest Correlations
 
@@ -83,24 +81,24 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| size_bytes | 5386562872 | 1508857174 | 1.643 | 3.441 | 12.909 | 0 | 954362283 | 7542216423 |
+| size_bytes | 5386562872 | 1508857174 | 1.643 | N/A | N/A | 0 | 954362283 | 7542216423 |
 | sample_records | 4096 | 4096 | 0 | N/A | N/A | 0 | 4096 | 4096 |
 | ttl_present | 0 | 0 | N/A | N/A | N/A | 0 | 0 | 0 |
-| first_numeric_diff_mean | -216.401 | 0.006 | 4.808 | -3.898 | 17.429 | 0.179 | -700.158 | 140.468 |
-| first_numeric_diff_q50 | 0.522 | 0 | 4.796 | 4.796 | 23 | 0.179 | 0 | 0 |
-| first_numeric_diff_q90 | 2223170 | 0 | 1.654 | 2.424 | 7.298 | 0.179 | 0 | 5760843 |
-| first_numeric_diff_std | 1831022 | 0.079 | 1.58 | 1.5 | 1.038 | 0.179 | 0.072 | 6105965 |
-| schema_high_cardinality_cols | 4.826 | 4 | 0.373 | 1.155 | -0.334 | 0.179 | 3.2 | 8 |
-| schema_column_count | 7.304 | 8 | 0.272 | 0.222 | -1.534 | 0.179 | 5 | 10 |
-| schema_numeric_cols | 6.043 | 7 | 0.271 | -0.076 | -1.764 | 0.179 | 4 | 8 |
-| first_numeric_monotone_ratio | 0.815 | 1 | 0.245 | -0.167 | -2.098 | 0.179 | 0.596 | 1 |
+| first_numeric_diff_mean | -216.401 | 0.006 | 4.808 | N/A | N/A | 0.179 | -700.158 | 140.468 |
+| first_numeric_diff_q50 | 0.522 | 0 | 4.796 | N/A | N/A | 0.179 | 0 | 0 |
+| first_numeric_diff_q90 | 2223170 | 0 | 1.654 | N/A | N/A | 0.179 | 0 | 5760843 |
+| first_numeric_diff_std | 1831022 | 0.079 | 1.58 | N/A | N/A | 0.179 | 0.072 | 6105965 |
+| schema_high_cardinality_cols | 4.826 | 4 | 0.373 | N/A | N/A | 0.179 | 3.2 | 8 |
+| schema_column_count | 7.304 | 8 | 0.272 | N/A | N/A | 0.179 | 5 | 10 |
+| schema_numeric_cols | 6.043 | 7 | 0.271 | N/A | N/A | 0.179 | 4 | 8 |
+| first_numeric_monotone_ratio | 0.815 | 1 | 0.245 | N/A | N/A | 0.179 | 0.596 | 1 |
 | schema_mixed_cols | 0 | 0 | N/A | N/A | N/A | 0.179 | 0 | 0 |
-| write_ratio | 0 | 0 | 2.236 | 2.236 | 5 | 0.821 | 0 | 0 |
-| opcode_switch_ratio | 0 | 0 | 2.236 | 2.236 | 5 | 0.821 | 0 | 0.001 |
-| abs_stride_q99 | 2306924135909836288 | 3308198 | 2.236 | 2.236 | 5 | 0.821 | 1463009 | 6920772407722315776 |
-| abs_stride_mean | 84670744032755536 | 160497.9 | 2.236 | 2.236 | 5 | 0.821 | 73271.65 | 254012232097961184 |
-| abs_stride_std | 378807968703555968 | 635677.8 | 2.236 | 2.236 | 5 | 0.821 | 366879.8 | 1136423906109274240 |
-| abs_stride_q90 | 69.72 | 13.6 | 2.02 | 2.223 | 4.953 | 0.821 | 0 | 198.28 |
+| write_ratio | 0 | 0 | 2.236 | N/A | N/A | 0.821 | 0 | 0 |
+| opcode_switch_ratio | 0 | 0 | 2.236 | N/A | N/A | 0.821 | 0 | 0.001 |
+| ts_duration | 4 | 1 | 1.262 | N/A | N/A | 0.821 | 0 | 9.6 |
+| iat_mean | 0.001 | 0 | 1.262 | N/A | N/A | 0.821 | 0 | 0.002 |
+| iat_std | 0.022 | 0.016 | 1.089 | N/A | N/A | 0.821 | 0 | 0.048 |
+| obj_size_q90 | 1859.8 | 994 | 0.798 | N/A | N/A | 0.821 | 669 | 3479 |
 
 ## Outlier Files
 
@@ -142,19 +140,3 @@
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202206_kv_traces_all.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202210_kv_traces_all_sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2022_metaKV/202312_kv_traces_all.csv.zst | text_zst | N/A | N/A | N/A | N/A |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 37.034)
-- Sampling: split-by-format-first
-- Regime recipe: single
-- Char-file conditioning: yes
-- PCF: validated
-- Multi-scale critic: promising
-- Mixed-type recovery: promising
-- Retrieval memory: mixed
-- Why: reuse/locality is not negligible; burstiness is materially above the calmer families; formats/parsers are mixed
-- Candidate conditioning additions: object_unique,signed_stride_lag1_autocorr,obj_size_std

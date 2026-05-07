@@ -40,8 +40,6 @@
 |---|---|
 | K-means selected K | 2 |
 | Best silhouette K | 2 |
-| DBSCAN clusters | 2 |
-| DBSCAN noise fraction | 0.052 |
 | PCA variance explained by PC1 | 0.515 |
 
 ### K Selection
@@ -53,12 +51,12 @@
 | 4 | 137057435953505189888 | 0.662 |
 | 5 | 137040024146018451456 | 0.583 |
 | 6 | 137026875258400292864 | 0.542 |
-| 7 | 6983958577416497152 | 0.615 |
-| 8 | 137016736640469139456 | 0.543 |
-| 9 | 6961647027463412736 | 0.548 |
-| 10 | 6979172260604485632 | 0.613 |
-| 11 | 137010393504188350464 | 0.541 |
-| 12 | 137010716208710008832 | 0.546 |
+| 7 | 137021644620906151936 | 0.543 |
+| 8 | 137016744878439809024 | 0.543 |
+| 9 | 137014214651307835392 | 0.524 |
+| 10 | 137012309391919448064 | 0.526 |
+| 11 | 6957211540943050752 | 0.531 |
+| 12 | 137009225725673537536 | 0.553 |
 
 ## Strongest Correlations
 
@@ -70,8 +68,8 @@
 
 | Metric | Mean | Median | CV | Skew | Kurtosis | Missing | Q10 | Q90 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| size_bytes | 960705382 | 363288338 | 3.807 | 5.832 | 33.44 | 0 | 210285056 | 402019745 |
-| schema_high_cardinality_cols | 8.917 | 9 | 0.063 | -7.824 | 63.529 | 0 | 9 | 9 |
+| size_bytes | 960705382 | 363288338 | 3.807 | N/A | N/A | 0 | 210285056 | 402019745 |
+| schema_high_cardinality_cols | 8.917 | 9 | 0.063 | N/A | N/A | 0 | 9 | 9 |
 | sample_records | 4096 | 4096 | 0 | N/A | N/A | 0 | 4096 | 4096 |
 | schema_column_count | 16 | 16 | 0 | N/A | N/A | 0 | 16 | 16 |
 | schema_numeric_cols | 10 | 10 | 0 | N/A | N/A | 0 | 10 | 10 |
@@ -103,18 +101,3 @@
 | s3-cache-datasets/cache_dataset_parquet/2024_google/cluster3_18TB.sort.sample100.parquet | parquet | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB.sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
 | s3-cache-datasets/cache_dataset_txt/2024_google/cluster1_16TB/20240115.sort.csv.zst | text_zst | N/A | N/A | N/A | N/A |
-
-
-
-
-## Model-Aware Guidance
-
-- Closest learned anchor: tencent_block (distance 2.68)
-- Sampling: split-by-format-first
-- Regime recipe: single
-- Char-file conditioning: no
-- PCF: not-primary
-- Multi-scale critic: not-primary
-- Mixed-type recovery: not-primary
-- Retrieval memory: not-primary
-- Why: formats/parsers are mixed
