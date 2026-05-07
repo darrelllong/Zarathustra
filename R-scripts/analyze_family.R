@@ -875,13 +875,30 @@ plot_family_metrics <- function(df, out_dir, cor_mat = NULL, pca_bundle = NULL) 
   dev.off()
 
   if (!is.null(cor_mat) && ncol(cor_mat) >= 2) {
-    png(file.path(out_dir, "correlation_heatmap.png"), width = 1200, height = 1200)
-    if (package_available("corrplot")) {
-      corrplot::corrplot(cor_mat, method = "color", tl.cex = 0.7, type = "upper")
-    } else {
-      heatmap(cor_mat, symm = TRUE)
+    # Drop rows/cols that are entirely NA (e.g. abs_stride_* on hash-keyed
+    # families) so heatmap()/hclust() don't choke on NA/NaN/Inf in C.
+    finite_rows <- rowSums(is.finite(cor_mat)) > 1
+    cor_clean <- cor_mat[finite_rows, finite_rows, drop = FALSE]
+    cor_clean[!is.finite(cor_clean)] <- 0
+    if (ncol(cor_clean) >= 2) {
+      png(file.path(out_dir, "correlation_heatmap.png"), width = 1200, height = 1200)
+      if (package_available("corrplot")) {
+        tryCatch(
+          corrplot::corrplot(cor_clean, method = "color", tl.cex = 0.7, type = "upper"),
+          error = function(e) {
+            plot.new(); title(main = "correlation heatmap unavailable"); text(0.5, 0.5, conditionMessage(e))
+          }
+        )
+      } else {
+        tryCatch(
+          heatmap(cor_clean, symm = TRUE),
+          error = function(e) {
+            plot.new(); title(main = "correlation heatmap unavailable"); text(0.5, 0.5, conditionMessage(e))
+          }
+        )
+      }
+      dev.off()
     }
-    dev.off()
   }
 
   if (!is.null(pca_bundle) && "PC1" %in% names(pca_bundle$scores) && "PC2" %in% names(pca_bundle$scores)) {
