@@ -30,7 +30,7 @@ The race has two metric classes:
 | Twitter | **0.02881** (R287.M chunk-ensemble guard pass on R281.K base, 4-seed range 0.000176) | **0.02547** (R288 chunk-ensemble) | **LANL** | −13.1% |
 | Meta KV | **0.05587** (R281.K scale=0.001 multi-seed, range 0.000417) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25; 4-seed) | **LANL** | −80.5% |
 | Meta CDN | **0.04625** (R281.K scale=0.001 multi-seed, range 0.000378) | **0.0377** (low-tail update; 4-seed {42,80,81,82}) | **LANL** | −18.5% |
-| Wikipedia | 0.01727 (R280.I scale=4.5 multi-seed, range 0.000132) | **0.01146** (IRD-renewal ird_s=32 ip=0.10; 4-seed {42,80,81,82}, range 0.000533) | **LANL** | −33.6% |
+| Wikipedia | 0.01707 (R287.W chunk-ensemble guard pass on R280.I base, multi-seed range 0.000246) | **0.01146** (IRD-renewal ird_s=32 ip=0.10) | **LANL** | −32.9% |
 
 **Generative score**: LLNL leads 0 corpora; LANL leads 9 (Alibaba, Tencent, CP, Baleen24, MSR, Twitter,
 Meta KV, Meta CDN, Wikipedia); tied 0.
