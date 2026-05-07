@@ -300,6 +300,15 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     return "\n".join(script_lines)
 
 
+def _remote_cmd_for(*, args: argparse.Namespace, remote_script: str) -> str:
+    ssh_prefix = _remote_shell(args=args)
+    if args.tmux_session:
+        session = args.tmux_session
+        inner = f"tmux new-session -d -s {shlex.quote(session)} bash -lc {shlex.quote(remote_script)}"
+        return f"{ssh_prefix} bash -lc {_q(inner)}"
+    return f"{ssh_prefix} bash -lc {_q(remote_script)}"
+
+
 def main() -> int:
     args = _parse_args()
     if args.push and not args.commit:
@@ -307,16 +316,7 @@ def main() -> int:
 
     remote_script = _build_remote_script(args=args)
     ssh_prefix = _remote_shell(args=args)
-    remote_cmd = f"{ssh_prefix} bash -lc {_q(remote_script)}"
-
-    if args.tmux_session:
-        session = args.tmux_session
-        # Run the remote command in tmux so the job is explicit + managed.
-        tmux_cmd = (
-            f"{ssh_prefix} bash -lc "
-            f"{_q(f'tmux new-session -d -s {shlex.quote(session)} bash -lc {shlex.quote(remote_script)}')}"
-        )
-        remote_cmd = tmux_cmd
+    remote_cmd = _remote_cmd_for(args=args, remote_script=remote_script)
 
     if args.dry_run:
         if args.sync == "bundle":
@@ -344,18 +344,38 @@ def main() -> int:
     print(f"[ssh_tracebootstrap] dispatch -> {args.host}", flush=True)
     if args.sync == "bundle":
         bundle_bytes = _create_local_bundle_bytes(ref="main")
-        sync_script = _build_remote_sync_script(args=args, ref="main")
-        ssh_argv = _ssh_argv(args=args)
-        # 1) Sync the remote repo to the local `main` tip via bundle streamed over SSH.
-        sync_res = subprocess.run(
-            [*ssh_argv, "bash", "-lc", sync_script],
-            input=bundle_bytes,
-        )
-        if sync_res.returncode != 0:
-            return sync_res.returncode
-        # 2) Run the actual pack command on the now-synced remote repo (tmux or direct).
-        run_res = subprocess.run(remote_cmd, shell=True)
-        return run_res.returncode
+
+        def _sync_and_run(ns: argparse.Namespace) -> int:
+            sync_script = _build_remote_sync_script(args=ns, ref="main")
+            ssh_argv = _ssh_argv(args=ns)
+            # 1) Sync the remote repo to the local `main` tip via bundle streamed over SSH.
+            sync_res = subprocess.run(
+                [*ssh_argv, "bash", "-lc", sync_script],
+                input=bundle_bytes,
+            )
+            if sync_res.returncode != 0:
+                return sync_res.returncode
+            # 2) Run the actual pack command on the now-synced remote repo (tmux or direct).
+            run_res = subprocess.run(
+                _remote_cmd_for(args=ns, remote_script=remote_script),
+                shell=True,
+            )
+            return run_res.returncode
+
+        code = _sync_and_run(args)
+        if code != 0 and not args.no_proxyjump:
+            # Common failure mode: ssh-config forces ProxyJump through a host
+            # that is not resolvable from the current network. Retry once
+            # without ProxyJump to reduce operator friction.
+            print(
+                "[ssh_tracebootstrap] NOTE: bundle sync failed; retrying with --no-proxyjump (ProxyJump=none).",
+                file=sys.stderr,
+                flush=True,
+            )
+            retry_args = argparse.Namespace(**vars(args))
+            retry_args.no_proxyjump = True
+            return _sync_and_run(retry_args)
+        return code
 
     return subprocess.run(remote_cmd, shell=True).returncode
 
