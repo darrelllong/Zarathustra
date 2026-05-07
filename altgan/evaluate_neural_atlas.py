@@ -29,7 +29,11 @@ from .neural_atlas import (  # noqa: E402
     _rank_pmfs,
     _state_id_with_dist,
 )
-from .train_neural_atlas import _cond_lookup_keys, _load_file_characterizations  # noqa: E402
+from .train_neural_atlas import (  # noqa: E402
+    _cond_lookup_keys,
+    _frame_to_cond_vector,
+    _load_file_characterizations,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -283,7 +287,12 @@ def main() -> int:
 
     conds = None
     if source_names:
-        conds = np.vstack([_lookup_cond(cond_lookup, name, args.cond_dim) for name in source_names])
+        conds = _resolve_source_conds(
+            cond_lookup,
+            source_names,
+            real_df,
+            args.cond_dim,
+        )
 
     saved_rank_pmfs = getattr(model, "rank_pmf_by_state", None)
     if args.stack_rank_pmf_target_real:
@@ -599,6 +608,35 @@ def _source_names_from_manifest(manifest: dict) -> list[str]:
             continue
         names.append(Path(entries[0]["path"]).name)
     return names
+
+
+def _resolve_source_conds(
+    cond_lookup: dict,
+    source_names: list[str],
+    real_df,
+    cond_dim: int,
+) -> np.ndarray:
+    conds = []
+    fallback = 0
+    for idx, name in enumerate(source_names):
+        try:
+            cond = _lookup_cond(cond_lookup, name, cond_dim)
+        except KeyError:
+            if "stream_id" in real_df.columns:
+                stream_df = real_df[real_df["stream_id"] == idx]
+            else:
+                stream_df = real_df
+            cond = _frame_to_cond_vector(stream_df, Path(name), cond_dim)
+            if cond is None:
+                raise
+            fallback += 1
+        conds.append(cond)
+    if fallback:
+        print(
+            "[altgan.evaluate_neural_atlas] computed "
+            f"{fallback} conditioning vectors from sampled real streams"
+        )
+    return np.vstack(conds).astype(np.float32)
 
 
 def _footprint_target_curves(real_df, n_streams: int, n_bins: int = 10) -> list[list[int]]:

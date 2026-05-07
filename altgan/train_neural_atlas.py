@@ -18,7 +18,6 @@ sys.path.insert(0, str(_LLGAN))
 
 from llgan.dataset import (  # noqa: E402
     _READERS,
-    load_file_characterizations as _llgan_load_file_characterizations,
     profile_to_cond_vector as _llgan_profile_to_cond_vector,
 )
 
@@ -91,17 +90,27 @@ def main() -> int:
     conds = []
     names = []
     missing = []
+    fallback_conds = 0
     for i, path in enumerate(paths, start=1):
         cond = _lookup_cond(cond_lookup, path, args.cond_dim)
+        print(f"[altgan.train_neural_atlas] reading {i}/{len(paths)} {path}")
+        frame = reader(str(path), args.records_per_file)
+        if cond is None:
+            cond = _frame_to_cond_vector(frame, path, args.cond_dim)
+            fallback_conds += 1
         if cond is None:
             missing.append(path.name)
             continue
-        print(f"[altgan.train_neural_atlas] reading {i}/{len(paths)} {path}")
-        frames.append(reader(str(path), args.records_per_file))
+        frames.append(frame)
         conds.append(cond)
         names.append(path.name)
     if missing:
         print(f"[altgan.train_neural_atlas] skipped {len(missing)} files without char profiles")
+    if fallback_conds:
+        print(
+            "[altgan.train_neural_atlas] computed "
+            f"{fallback_conds} conditioning vectors from parsed traces"
+        )
     if not frames:
         raise RuntimeError("no files had usable conditioning profiles")
 
@@ -182,6 +191,8 @@ def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
             profile = row.get("profile")
             if not profile:
                 continue
+            if not _has_request_conditioning(profile):
+                continue
             rel = row.get("rel_path", "")
             path = row.get("path", "")
             if not rel and not path:
@@ -193,7 +204,7 @@ def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
 
 
 def _load_lanl_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
-    raw_lookup = _llgan_load_file_characterizations(jsonl_path, cond_dim=cond_dim)
+    raw_lookup = {}
     with open(jsonl_path) as fh:
         for line in fh:
             try:
@@ -202,7 +213,7 @@ def _load_lanl_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> di
                 continue
             profile = row.get("profile")
             rel = row.get("rel_path", "")
-            if not profile or not rel:
+            if not profile or not rel or not _has_request_conditioning(profile):
                 continue
             basename = Path(rel).name
             vec = torch.tensor(_profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
@@ -217,6 +228,97 @@ def _profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> list[float]:
     return _llgan_profile_to_cond_vector(_sanitize_hash_key_profile(profile), cond_dim)
 
 
+def _has_request_conditioning(profile: dict) -> bool:
+    request_keys = {
+        "reuse_ratio",
+        "burstiness_cv",
+        "write_ratio",
+        "opcode_switch_ratio",
+        "iat_stats",
+        "obj_size_stats",
+        "tenant_summary",
+        "obj_id_summary",
+    }
+    return any(key in profile for key in request_keys)
+
+
+def _frame_to_cond_vector(df, path: Path | str, cond_dim: int = 10) -> np.ndarray | None:
+    if df is None or len(df) == 0:
+        return None
+    profile: dict = {}
+    path = Path(path)
+
+    if "opcode" in df.columns:
+        ops = df["opcode"].astype(str).str.lower().to_numpy()
+        is_write = np.array([op.startswith("w") or op in {"13", "write"} for op in ops], dtype=bool)
+        profile["write_ratio"] = float(is_write.mean()) if len(is_write) else 0.0
+        profile["opcode_switch_ratio"] = (
+            float(np.mean(ops[1:] != ops[:-1])) if len(ops) > 1 else 0.0
+        )
+    else:
+        profile["write_ratio"] = 0.0
+        profile["opcode_switch_ratio"] = 0.0
+
+    if "ts" in df.columns:
+        ts = _numeric_array(df["ts"])
+        if len(ts) > 1:
+            iat = np.diff(ts)
+            iat = iat[np.isfinite(iat)]
+            iat = np.maximum(iat, 0.0)
+        else:
+            iat = np.array([], dtype=np.float64)
+        profile["iat_stats"] = {"q50": _quantile(iat, 0.5)}
+        profile["iat_lag1_autocorr"] = _lag1_autocorr(iat)
+        mean_iat = float(np.mean(iat)) if len(iat) else 0.0
+        profile["burstiness_cv"] = float(np.std(iat) / mean_iat) if mean_iat > 0 else 1.0
+    else:
+        profile["iat_stats"] = {"q50": 0.0}
+        profile["iat_lag1_autocorr"] = 0.0
+        profile["burstiness_cv"] = 1.0
+
+    if "obj_size" in df.columns:
+        sizes = _numeric_array(df["obj_size"])
+        profile["obj_size_stats"] = {
+            "q50": _quantile(sizes, 0.5, default=4096.0),
+            "std": float(np.std(sizes)) if len(sizes) else 0.0,
+        }
+    else:
+        profile["obj_size_stats"] = {"q50": 4096.0, "std": 0.0}
+
+    if "tenant" in df.columns:
+        profile["tenant_summary"] = {"unique": int(df["tenant"].nunique(dropna=True))}
+    else:
+        profile["tenant_summary"] = {"unique": 1}
+
+    if "obj_id" in df.columns:
+        obj_series = df["obj_id"]
+        profile["reuse_ratio"] = float(obj_series.duplicated().mean()) if len(obj_series) else 0.0
+        profile["obj_id_summary"] = {"unique": int(obj_series.nunique(dropna=True))}
+        obj_id_kind = "hash" if _looks_hash_keyed(path, obj_series) else "address"
+        profile["obj_id_kind"] = obj_id_kind
+        if obj_id_kind == "hash":
+            profile["forward_seek_ratio"] = 0.5
+            profile["backward_seek_ratio"] = 0.5
+            profile["signed_stride_lag1_autocorr"] = 0.0
+            profile["abs_stride_stats"] = None
+        else:
+            obj = _numeric_array(obj_series)
+            diffs = np.diff(obj) if len(obj) > 1 else np.array([], dtype=np.float64)
+            diffs = diffs[np.isfinite(diffs)]
+            profile["forward_seek_ratio"] = float(np.mean(diffs > 0)) if len(diffs) else 0.5
+            profile["backward_seek_ratio"] = float(np.mean(diffs < 0)) if len(diffs) else 0.5
+            signed = np.sign(diffs) * np.log1p(np.abs(diffs)) if len(diffs) else diffs
+            profile["signed_stride_lag1_autocorr"] = _lag1_autocorr(signed)
+    else:
+        profile["reuse_ratio"] = 0.0
+        profile["obj_id_summary"] = {"unique": 1}
+        profile["forward_seek_ratio"] = 0.5
+        profile["backward_seek_ratio"] = 0.5
+        profile["signed_stride_lag1_autocorr"] = 0.0
+
+    return np.asarray(_profile_to_cond_vector(profile, cond_dim), dtype=np.float32)
+
+
 def _sanitize_hash_key_profile(profile: dict) -> dict:
     """Neutralize address-stride conditioning for hash-keyed object IDs."""
     if profile.get("obj_id_kind") != "hash":
@@ -226,6 +328,56 @@ def _sanitize_hash_key_profile(profile: dict) -> dict:
     clean["backward_seek_ratio"] = 0.5
     clean["signed_stride_lag1_autocorr"] = 0.0
     return clean
+
+
+def _looks_hash_keyed(path: Path, obj_series) -> bool:
+    lower = str(path).lower()
+    if any(token in lower for token in ("twitter", "metakv", "metacdn", "meta", "wiki")):
+        return True
+    sample = _numeric_array(obj_series.head(min(len(obj_series), 4096)))
+    if len(sample) < 2:
+        return False
+    finite = sample[np.isfinite(sample)]
+    if len(finite) < 2:
+        return False
+    unique_ratio = len(np.unique(finite)) / len(finite)
+    max_abs = float(np.max(np.abs(finite)))
+    diffs = np.abs(np.diff(finite))
+    med_diff = float(np.median(diffs[np.isfinite(diffs)])) if len(diffs) else 0.0
+    return unique_ratio > 0.95 and max_abs > 1e12 and med_diff > 1e9
+
+
+def _numeric_array(series) -> np.ndarray:
+    vals = []
+    for raw in series.to_numpy():
+        try:
+            vals.append(float(raw))
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return np.asarray(vals, dtype=np.float64)
+
+
+def _quantile(values: np.ndarray, q: float, default: float = 0.0) -> float:
+    if len(values) == 0:
+        return float(default)
+    finite = values[np.isfinite(values)]
+    if len(finite) == 0:
+        return float(default)
+    return float(np.quantile(finite, q))
+
+
+def _lag1_autocorr(values: np.ndarray) -> float:
+    if len(values) < 3:
+        return 0.0
+    finite = values[np.isfinite(values)]
+    if len(finite) < 3:
+        return 0.0
+    a = finite[:-1]
+    b = finite[1:]
+    if float(np.std(a)) == 0.0 or float(np.std(b)) == 0.0:
+        return 0.0
+    corr = float(np.corrcoef(a, b)[0, 1])
+    return corr if np.isfinite(corr) else 0.0
 
 
 def _parse_int_list(text: str) -> list[int]:
