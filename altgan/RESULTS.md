@@ -3862,6 +3862,31 @@ This improves r337 `0.0114201667` by `0.0001623073`, improves r332
 official eight-policy CloudPhysics cachesim surface. Seed 82 is still the
 exposed weak seed, but best-donor mode improved every seed without a refit.
 
+## CloudPhysics 1K Best-Donor Continuation (2026-05-07)
+
+Continued CloudPhysics from the r338 2K best-donor fakes to 1K object-ID
+chunks with `--accept-mode best`. The selector scans all available synthetic
+donors for a candidate chunk and accepts the best improving donor. Base timing,
+sizes, opcodes, tenants, and stream columns were preserved; only synthetic
+`obj_id` chunks were swapped. Reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0097` | 0.0097387500 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0118` | 0.0117798958 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0097` | 0.0096568542 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0133` | 0.0133186875 |
+
+Four-seed mean: `0.0111235469` (display `0.0111`), range `0.0036618333`.
+This improves r338 `0.0112578594` by `0.0001343125`, improves r337
+`0.0114201667` by `0.0002966198`, improves r332 `0.0115917188` by
+`0.0004681719`, improves r306 `0.0121897344` by `0.0010661875`, and beats
+LLNL R287.CP `0.03017` by `0.0190464531` on the official eight-policy
+CloudPhysics cachesim surface. Diagnostic no-32 sensitivity also improved:
+r338 no-32 mean `0.0097575937` to r339 no-32 mean `0.0095860688`, a
+`0.0001715249` (`1.76%`) lower diagnostic mean excluding cache size `32`.
+
 ## Tencent 64-Row Cross-Seed Continuation (2026-05-07)
 
 Continued the Tencent r294/r297 chunk champions with a 64-row object-ID

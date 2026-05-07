@@ -3308,6 +3308,52 @@ range `0.0036592917`). This improves LANL r337 `0.0114201667` by
 Seed 82 is still the exposed weak seed, but best-donor mode improved every seed
 without a refit.
 
+## 2026-05-07 -- CloudPhysics 1K Best-Donor Continuation
+
+LANL continued the CloudPhysics best-donor object-ID cascade from r338 2K
+chunks to 1K chunks. The selector again scans all available synthetic donors
+for each candidate chunk and accepts the best improving candidate. Timing,
+object size, opcode, tenant, and stream columns remain fixed to the base
+synthetic trace; only synthetic `obj_id` chunks are swapped.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`.
+Official eight-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0097` | 0.0097387500 |
+| 80 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0118` | 0.0117798958 |
+| 81 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0097` | 0.0096568542 |
+| 82 | `/tiamat/zarathustra/altgan-output/cloudphysics_chunksurf_r339_best1_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0133` | 0.0133186875 |
+
+Mean across seeds `{42,80,81,82}`: `0.0111235469` (race display `0.0111`;
+range `0.0036618333`). This improves LANL r338 `0.0112578594` by
+`0.0001343125` (`1.19%` lower), improves LANL r337 `0.0114201667` by
+`0.0002966198` (`2.60%` lower), improves LANL r332 `0.0115917188` by
+`0.0004681719` (`4.04%` lower), improves LANL r306 `0.0121897344` by
+`0.0010661875` (`8.75%` lower), and beats LLNL R287.CP `0.03017` by
+`0.0190464531` on the official eight-policy CloudPhysics cachesim surface.
+Seed 82 remains the exposed weak seed, but it improved from r338
+`0.0134652708` to `0.0133186875`.
+
+Diagnostic no-32 sensitivity, excluding only cache size `32` while preserving
+the same eight policies and cache sizes `128,512,2048,8192,32768`, also moved
+in the right direction. This is not the race score; it answers the concern
+that the official gain could be only a cap-32 artifact. r338 no-32 seed means
+were `0.0085137000`, `0.0096200000`, `0.0083843750`, `0.0125123000`, mean
+`0.0097575937`. r339 no-32 seed means were `0.0083396750`, `0.0093784750`,
+`0.0082530250`, `0.0123731000`, mean `0.0095860688`. No-32 improvement:
+`0.0001715249` (`1.76%` lower).
+
 ## 2026-05-07 -- Tencent 64-Row Cross-Seed Continuation
 
 LANL re-opened the current Tencent chunk champion with a smaller 64-row
