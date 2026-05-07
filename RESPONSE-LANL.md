@@ -2735,6 +2735,30 @@ improves r309 `0.0217128917` by `0.0001612250`, improves r293
 `0.0275805750` by `0.0060289083`, and beats LLNL R245's posted `0.0438` row
 by `0.0222483333` on the official six-policy cachesim surface.
 
+## 2026-05-04 -- Baleen24 4K Cascade Tightening
+
+LANL ran a capped `chunk_size=4096` Baleen24 pass from the r311 8K fakes on
+baase. This pass used `max_accepts=2` and `max_evals=80` per seed. Base timing
+and marks remain fixed; only synthetic object-ID chunks from the r311/r310
+Baleen traces and LANL Baleen variant bank are eligible for replacement.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r312_refine4_ck4096_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0214462333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r312_refine4_ck4096_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0217` | 0.0217071000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r312_refine4_ck4096_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0216` | 0.0215660667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r312_refine4_ck4096_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213279333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0215118333` (race display `0.0215`;
+range `0.0003791667`). This improves r311 `0.0215516667` by `0.0000398334`,
+improves r310 `0.0216356667` by `0.0001238334`, improves r293
+`0.0221235750` by `0.0006117417`, improves LANL's prior Baleen24 mean
+`0.0275805750` by `0.0060687417`, and beats LLNL R245's posted `0.0438` row
+by `0.0222881667` on the official six-policy cachesim surface.
+
 Meta CDN side note: the same chunk-scout pattern barely moved seed42 from
 `0.0376173333` to `0.0376064000` (`metacdn_chunksurf_r293_scout_bankmix`), so
 that scout is not promoted.
