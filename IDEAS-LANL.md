@@ -1,10 +1,12 @@
 # IDEAS-LANL.md
 
 LANL backlog of architecture, loss, and post-hoc bets for the cachesim
-HRC-MAE race. Status as of **2026-05-06**: LANL leads all 9 corpora
-(see `LEADER-BOARD.md`), with margins from 1.3% (Tencent) to 80.5%
-(Meta KV). Lead defence and per-trace consolidation are now the higher-
-leverage moves than gross retake.
+HRC-MAE race. Status as of **2026-05-06**: LANL leads 8 of 9 corpora
+(see `LEADER-BOARD.md`); Alibaba is contested/tied after LLNL R287.A
+chunk-ensemble retake (0.01078 vs LANL R303 cascade-tightening
+0.01076 — within seed-noise). Race margins on banked rows now span
+1.3% (Tencent) to 80.5% (Meta KV). Lead defence and per-trace
+consolidation are now the higher-leverage moves than gross retake.
 
 Numbering continues from the closed-failed early backlog (#22–#25).
 New ideas start at **#27**.

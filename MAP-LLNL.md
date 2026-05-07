@@ -6,6 +6,17 @@ load-bearing invariants you must respect when changing them.
 
 Last refreshed: 2026-04-29 23:35 PDT (during v234d Phase 2.5 G-warm).
 
+> **Stale (2026-05-06 audit):** This map predates the cachesim-race pivot
+> and the introduction of `llgan/neural_atlas.py`, `llgan/chunk_ensemble.py`,
+> `llgan/cachesim_eval.py`, `llgan/ird_renewal.py`, `llgan/markov_atlas.py`,
+> `llgan/cachesim_3way.py`, `llgan/diag_hrc.py`, `llgan/ird_diag.py`,
+> `llgan/burst_probe.py`, and `tools/cachesim/` (Rust 6-policy simulator).
+> The 9-corpus generative race (R287.A/R287.CP/R287.M/R287.W banked) and
+> the R270-architecture neural atlas family are not reflected below. Use
+> the current README + LEADER-BOARD for race-state navigation; consult
+> this map only for the GAN-era pipeline (`train.py`, `model.py`,
+> `eval.py`, `frozen_sweep.py`, `long_rollout_eval.py`). Refresh pending.
+
 ---
 
 ## 1. Top-level data flow

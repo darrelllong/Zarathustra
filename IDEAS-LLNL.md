@@ -1,10 +1,12 @@
 # IDEAS-LLNL.md
 
 LLNL backlog of architecture, loss, and post-hoc bets for the cachesim
-HRC-MAE race. Status as of **2026-05-06**: LANL leads all 9 corpora
-(see `LEADER-BOARD.md`). Every idea here is judged by *expected
-multi-seed mean cachesim HRC-MAE delta vs the standing LANL claim*,
-not by training-time diagnostics.
+HRC-MAE race. Status as of **2026-05-06**: LANL leads 8 of 9 corpora;
+Alibaba is contested/tied (LLNL R287.A 0.01078 vs LANL R303 cascade-
+tightening 0.01076 — within seed-noise; see `LEADER-BOARD.md` audit
+note). Every idea here is judged by *expected multi-seed mean cachesim
+HRC-MAE delta vs the standing LANL claim*, not by training-time
+diagnostics.
 
 Numbering continues from the closed-failed GAN-era backlog (#22–#25
 addressed by current implementation, #26 still open). New ideas start

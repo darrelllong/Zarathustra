@@ -109,14 +109,25 @@ Round entries append to `RESPONSE-LLNL.md` with this skeleton:
 
 Commit message format: `R<NNN>: <corpus> <claim or NEGATIVE>; <one-line summary>`.
 
-## CURRENT STATE (as of charter commit)
-- Alibaba: LLNL 0.0131 (R248) leads LANL 0.0143 +8.4%. Defend.
-- Tencent: LANL ~0.0001 (TraceBootstrap). Race-defining.
-- CloudPhysics: LANL ~0.0000 (TraceBootstrap). Race-defining.
-- Baleen24: LANL 0.0291 (scout atlas) vs LLNL 0.0438. Need fit-time work.
-- MSR: LANL 0.0131 (scout atlas) vs LLNL 0.0253. Need fit-time work.
+## CURRENT STATE (as of 2026-05-06 audit)
+- Alibaba: LLNL R287.A 0.01078 vs LANL R303 cascade 0.01076 — **contested/tied**
+  within seed-noise (LLNL half-range 0.000148; LANL half-range 0.000120).
+- Tencent: LANL R287 0.03010 banked (R294 cascade 0.02992 posted, audit-pending)
+  vs LLNL 0.0305 (R206, unverified). LANL leads.
+- CloudPhysics: LANL 0.0267 (rank-conditioned IRD-renewal) vs LLNL R287.CP 0.03017
+  → 13% gap. LANL leads.
+- Baleen24: LANL 0.0276 (R298 cascade 0.02151 posted) vs LLNL R245 0.0438 → 37%
+  gap. LANL leads.
+- MSR Exchange: LANL 0.00484 (Round 70 banked; R??? cascade 0.00433 posted) vs
+  LLNL R282.F 0.00921 → 47.5% gap. LANL leads.
+- Twitter: LANL 0.02547 (R288 cascade) vs LLNL R287.M 0.02881 → 13.1% gap. LANL leads.
+- Meta KV: LANL 0.0109 vs LLNL R281.K 0.05587 → 80.5% gap. LANL leads.
+- Meta CDN: LANL 0.0377 vs LLNL R281.K 0.04625 → 18.5% gap. LANL leads.
+- Wikipedia: LANL 0.01146 vs LLNL R287.W 0.01707 → 32.9% gap. LANL leads.
 
-Score 1-of-5. Methodology arms race in progress (TraceBootstrap, scout-rank).
+Score 0-of-9 leaders, 1 contested. Methodology: chunk-ensemble guard pass +
+multi-seed (4 seeds {42,80,81,82}, mean+range required). TraceBootstrap is
+saturated 0.0000-class theatre on both sides.
 
 ## START
 1. `cd ~/LLNL/Zarathustra && git pull --rebase origin main`

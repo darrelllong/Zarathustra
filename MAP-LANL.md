@@ -7,6 +7,15 @@ when code paths, promoted recipes, or long-rollout conclusions change.
 Last refreshed: 2026-05-01, during the Tencent/Alibaba cache-sim race loop
 after the Alibaba hp `.44,k200` bridge.
 
+> **Stale (2026-05-06 audit):** Tencent/Alibaba sections describe the
+> hp/k bridge state at 2026-05-01. Since then, LANL has posted
+> R294 Tencent Cross-Seed 128-Chunk Ensemble (0.02992), R298 Baleen24
+> cascade (0.02151), and R303 Alibaba 4K Cascade (0.01076) in
+> `RESPONSE-LANL.md`. LLNL has banked R287.A/R287.CP/R287.M/R287.W
+> chunk-ensemble retakes. Consult the current LEADER-BOARD for
+> race-state; this map's `## Current Tencent/Alibaba` sections need a
+> refresh against the cascade tightening rounds.
+
 ---
 
 ## Operating Contract

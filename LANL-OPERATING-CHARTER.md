@@ -113,33 +113,33 @@ ledger format.
 Commit message format: `LANL: post <corpus> <lever> <overtake|tie-break|update>`
 or `altgan: <feature/fix>`.
 
-## CURRENT STATE (as of 2026-05-03 MSR retake)
-- Alibaba: LANL `0.0118763500` (display `0.0119`) via hot-pool cooldown
-  beats LLNL R248/R250-R252 `0.0131138583` by `9.4%`. The older LANL
-  `0.0142609500` panel was a superseded decimal-correction result; do not
-  route next work from that stale loss line. Defend the cooldown/admission
-  architecture and look for scout integration only if it preserves the
-  SIEVE/SLRU win.
-- Tencent: you ~0.0001 via TraceBootstrap. LLNL R259g ported the same
-  bootstrap architecture and reports bootstrap `0.0000`, so this is no longer
-  a differentiating generative lead unless the race explicitly accepts
-  trace-bootstrap methodology.
-- CloudPhysics: you ~0.0000 via TraceBootstrap (8-pol). LLNL R259g also
-  reports bootstrap `0.0000`, so CP is methodology-neutral until a
-  non-bootstrap generator claim lands.
-- Baleen24: you `0.0275805750` (display `0.0276`) via the
-  noise-regularized phase8/time4/size4 rank-half atlas; this supersedes the
-  old `0.0290586250` scout atlas and leads LLNL R245 `0.0438`.
-- MSR Exchange: you `0.0100366000` (display `0.0100`) via the
-  noise-matched phase-2/time-4/size-4 altgan atlas retakes LLNL R273's posted
-  `0.0105`. The older LANL `0.0131` scout-rank panel is superseded.
+## CURRENT STATE (as of 2026-05-06 audit)
+- Alibaba: LANL R289 banked `0.01130`; **LANL R303 cascade tightening posted
+  `0.01076`** (audit-pending integration). LLNL R287.A chunk-ensemble retook
+  with `0.01078`. Means within seed-noise → contested. Promote R303 cascade
+  to a banked row to flip the per-corpus column back to LANL.
+- Tencent: LANL R287 banked `0.03010`; **R294 Cross-Seed 128-Chunk cascade
+  posted `0.02992`** (audit-pending). LLNL `0.0305` historical/unverified.
+  LANL leads; widen to ~5% with R294 banking.
+- CloudPhysics: LANL `0.0267` rank-conditioned IRD-renewal; LLNL R287.CP
+  chunk-ensemble closed gap to `0.03017` (now 13%). High-variance LANL row
+  (range 0.0045) is the soft spot — variance-tightening is the defence.
+- Baleen24: LANL banked `0.0276`; cascade tightening posted to `0.02151`
+  in `RESPONSE-LANL.md` (audit-pending). LLNL `0.0438` (R245). LANL leads
+  37%.
+- MSR Exchange: LANL Round-70 banked `0.00484`; chunk-ensemble retake
+  posted `0.00433` (audit-pending). LLNL R282.F `0.00921`. LANL leads 47.5%.
+- Twitter: LANL `0.02547`; LLNL R287.M `0.02881`. LANL leads 13.1%.
+- Meta KV: LANL `0.0109`; LLNL R281.K `0.05587`. LANL leads 80.5%.
+- Meta CDN: LANL `0.0377`; LLNL R281.K `0.04625`. LANL leads 18.5%.
+- Wikipedia: LANL `0.01146`; LLNL R287.W `0.01707`. LANL leads 32.9%.
 
-Generative ledger: LANL leads Alibaba, Baleen24, and MSR Exchange; Tencent is
-still contested around the old neural tier unless bootstrap is counted; CP
-needs a non-bootstrap claim. Bootstrap ledger is now published by LANL on all
-five corpora after the 2026-05-03 missing-corpus completion, so LLNL no longer
-has "LANL not published" bootstrap-only entries. Defend measured generative
-leads and press the next architectural front, not the stale Alibaba gap.
+Generative ledger: LANL leads 8 of 9 (Tencent, CP, Baleen24, MSR, Twitter,
+Meta KV, Meta CDN, Wikipedia). Alibaba is contested after LLNL R287.A;
+LANL R303 cascade puts it back inside seed-noise. TraceBootstrap is
+saturated 0.0000-class on both sides — no longer differentiating.
+Defence priorities: bank R294/R298/R303-class cascade tightenings,
+formally close the Alibaba contest, harden CP against LLNL retake.
 
 ## START
 1. `cd ~/LANL/Zarathustra && git pull --rebase origin main`
