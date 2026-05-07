@@ -59,10 +59,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -74,6 +76,7 @@ class SeedResult:
     cachesim_json: Path
     cachesim_line: str | None
     mean: float | None
+    mean_token: str | None
 
 
 @dataclass(frozen=True)
@@ -251,14 +254,40 @@ def _extract_cachesim_mean_line(output: str) -> str | None:
     return None
 
 
-def _read_mean(json_path: Path) -> float | None:
+_NUMBER_RE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+
+def _mean_token_from_json_text(json_path: Path) -> tuple[str | None, float | None]:
+    """Return the *literal* mean token used in the cachesim JSON plus a float value.
+
+    LANL docs want the exact numeric token emitted by `llgan.cachesim_eval` so it
+    can be pasted verbatim (including scientific notation / trailing digits).
+    """
     if not json_path.exists():
-        return None
+        return None, None
     try:
-        data = json.loads(json_path.read_text())
-        return float(data.get("mean_hrc_mae", data.get("mean", float("nan"))))
+        text = json_path.read_text()
     except Exception:
-        return None
+        return None, None
+
+    for field in ("mean_hrc_mae", "mean"):
+        m = re.search(rf"\"{re.escape(field)}\"\s*:\s*({_NUMBER_RE})", text)
+        if m:
+            token = m.group(1)
+            try:
+                return token, float(Decimal(token))
+            except Exception:
+                return token, None
+
+    # Fallback: parse as JSON (formatting may be lost).
+    try:
+        data = json.loads(text)
+        value = data.get("mean_hrc_mae", data.get("mean", None))
+        if value is None:
+            return None, None
+        return f"{float(value):.10f}", float(value)
+    except Exception:
+        return None, None
 
 
 def _format_markdown(
@@ -287,24 +316,27 @@ def _format_markdown(
     lines.append("| spec | seed | fake CSV | literal cachesim mean line | JSON mean |")
     lines.append("|---|---:|---|---|---:|")
     for r in results:
-        mean_cell = f"{r.mean:.10f}" if r.mean is not None else ""
+        mean_cell = r.mean_token if r.mean_token is not None else ""
         cachesim_cell = f"`{r.cachesim_line}`" if r.cachesim_line else ""
         lines.append(f"| `{r.spec}` | {r.seed} | `{r.fake}` | {cachesim_cell} | {mean_cell} |")
 
-    by_spec: dict[str, list[float]] = {}
+    by_spec: dict[str, list[Decimal]] = {}
     for r in results:
-        if r.mean is None:
+        if r.mean_token is None:
             continue
-        by_spec.setdefault(r.spec, []).append(r.mean)
+        try:
+            by_spec.setdefault(r.spec, []).append(Decimal(r.mean_token))
+        except Exception:
+            continue
 
     if by_spec:
         lines.append("")
         lines.append("| spec | mean across seeds | range |")
         lines.append("|---|---:|---:|")
-        for spec, means in sorted(by_spec.items(), key=lambda kv: sum(kv[1]) / len(kv[1])):
-            m = sum(means) / len(means)
-            rng = max(means) - min(means)
-            lines.append(f"| `{spec}` | `{m:.10f}` | `{rng:.10f}` |")
+        for spec, means in sorted(by_spec.items(), key=lambda kv: sum(kv[1]) / max(1, len(kv[1]))):
+            m = sum(means) / max(1, len(means))
+            rng = max(means) - min(means) if means else Decimal(0)
+            lines.append(f"| `{spec}` | `{float(m):.10f}` | `{float(rng):.10f}` |")
 
     lines.append("")
     return "\n".join(lines)
@@ -341,10 +373,15 @@ def main() -> int:
                 output = _run_capture(_cachesim_cmd(args, fake, cs_json), env, args.dry_run)
                 cachesim_line = _extract_cachesim_mean_line(output)
 
-            mean = _read_mean(cs_json)
+            mean_token, mean = _mean_token_from_json_text(cs_json)
             if mean is not None:
                 seed_means.append(mean)
-            print(f"[irdr_sweep] {tag}: {mean:.7f}" if mean is not None else f"[irdr_sweep] {tag}: pending", flush=True)
+            if mean is not None and mean_token is not None:
+                print(f"[irdr_sweep] {tag}: {mean_token}", flush=True)
+            elif mean is not None:
+                print(f"[irdr_sweep] {tag}: {mean:.10f}", flush=True)
+            else:
+                print(f"[irdr_sweep] {tag}: pending", flush=True)
             all_seed_results.append(
                 SeedResult(
                     spec=spec.name,
@@ -353,6 +390,7 @@ def main() -> int:
                     cachesim_json=cs_json,
                     cachesim_line=cachesim_line,
                     mean=mean,
+                    mean_token=mean_token,
                 )
             )
 

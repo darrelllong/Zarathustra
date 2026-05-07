@@ -81,6 +81,9 @@ python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --emit-summary-json-dir /tmp/tracebootstrap_shuffle_snips
 ```
 
+To update the in-repo marker blocks (and optionally `git commit`/`git push`), add:
+`--update-lanl-docs --commit --push` (run on a `/tiamat` host, or via the SSH dispatcher).
+
 ## Chunk-surface (Twitter retake)
 
 Twitter is currently a high-leverage corpus when the leaderboard gap is small.
@@ -115,7 +118,8 @@ python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r30
 ## IRD-renewal (Wikipedia / CloudPhysics)
 
 The IRD-renewal sweep launcher can also emit/append paste-ready Markdown tables
-with the per-seed literal cachesim mean line + exact JSON mean:
+with the per-seed literal cachesim mean line + exact JSON mean token (verbatim
+from the `llgan.cachesim_eval` JSON):
 
 ```bash
 python3 -m altgan.launch_ird_renewal_sweep \
