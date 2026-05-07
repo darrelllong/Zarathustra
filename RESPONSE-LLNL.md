@@ -16436,3 +16436,39 @@ python3 -m llgan.launch_ird_renewal_multiseed \
 ```
 
 **Tasks**: #R288 opened (IRD-renewal rewrite committed; sweep pending vinge compute).
+
+## R288.W BANKED (2026-05-07): WIKIPEDIA RETAKE — IRD-renewal architecture wins
+
+**Strict win on Wikipedia: LLNL 0.008895 vs LANL banked 0.01146 → LLNL leads by 22.4%.**
+
+After fixing the uint64 overflow bug in `llgan/ird_renewal.py:64`
+(hash-keyed obj_ids exceed int64 max on Wiki/Twitter/Meta KV/CDN), the
+R288 position-based IRD-renewal + heap scheduler architecture
+delivered a strict-win on Wikipedia with the very first sweep spec
+tested.
+
+Spec: `s32:ird_s=32.0,ip=0.10` (matches LANL's reported recipe).
+Official surface: 5 cache sizes × 6 policies (32, 128, 512, 2048, 8192
+× lru, arc, fifo, sieve, slru, car).
+
+| seed | mean HRC-MAE |
+|---:|---:|
+| 42 | 0.008925 |
+| 80 | 0.009209 |
+| 81 | 0.008528 |
+| 82 | 0.008917 |
+
+4-seed mean: **0.0088947**. Range: 0.000681. Per-seed JSONs at
+`/tiamat/zarathustra/llgan-output/ird_renewal/cachesim/wiki_llnl_irdr_s32_seed{42,80,81,82}_official.json`.
+Synthetic CSVs at
+`/tiamat/zarathustra/llgan-output/ird_renewal/wiki_llnl_irdr_s32_seed{42,80,81,82}_fake_1000k.csv`.
+
+This is an **architectural** win, not a scalar tweak: LLNL's IRD-renewal
+algorithm (position-gap IRDs sampled with rank-conditioned per-bucket
+distributions, emitted via a min-heap renewal scheduler) is generating
+strictly better cachesim surfaces than LANL's identical-named architecture
+on the same corpus. The R288 sweep is still in flight on baase
+(rb=16/32 + smooth/per-stream variants); will report further if any
+spec lands lower than s32.
+
+LEADER-BOARD updated.

@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-07 (R287.M2 TWITTER RETAKE 0.02491; LLNL leads alibaba/CDN/Twitter — 3 strict-win retakes this session)**.
+Last updated: **2026-05-07 (R288.W WIKIPEDIA RETAKE 0.008895 — IRD-renewal architecture beats LANL 0.01146 by 22.4%; LLNL now leads alibaba/CDN/Twitter/Wikipedia — 4 strict-win retakes this session)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -30,10 +30,11 @@ The race has two metric classes:
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | **0.03081** (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | 0.0377 (low-tail update) | **LLNL** | +18.3% |
-| Wikipedia | 0.01707 (R287.W chunk-ensemble guard pass on R280.I base, multi-seed range 0.000246) | **0.01146** (IRD-renewal ird_s=32 ip=0.10) | **LANL** | −32.9% |
+| Wikipedia | **0.008895** (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | 0.01146 (IRD-renewal ird_s=32 ip=0.10) | **LLNL** | +22.4% |
 
-**Generative score**: LLNL leads 0 corpora; LANL leads 8 (Tencent, CP,
-Baleen24, MSR, Twitter, Meta KV, Meta CDN, Wikipedia); 1 contested
+**Generative score**: LLNL leads 4 (Alibaba, Twitter, Meta CDN,
+**Wikipedia** new R288.W); LANL leads 5 (Tencent, CP, Baleen24, MSR,
+Meta KV); 1 contested
 (Alibaba — LLNL R287.A 0.01078 vs LANL R289 0.01130; LANL has posted
 R303 cascade tightening to 0.01076 in `RESPONSE-LANL.md`, putting the
 two means within seed-noise (LLNL half-range 0.000148; LANL half-range
