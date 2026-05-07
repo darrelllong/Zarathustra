@@ -138,6 +138,24 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--commit",
+        action="store_true",
+        help=(
+            "After updating LANL docs, `git add` + `git commit` the changes. "
+            "Requires --update-lanl-docs."
+        ),
+    )
+    p.add_argument(
+        "--push",
+        action="store_true",
+        help="After committing, `git push origin main`. Requires --commit.",
+    )
+    p.add_argument(
+        "--commit-message",
+        default="LANL: publish TraceBootstrap shuffle panels",
+        help="Commit message used with --commit.",
+    )
+    p.add_argument(
         "--response-lanl-md",
         default=None,
         help="Path to RESPONSE-LANL.md (default: auto-detect from repo root).",
@@ -168,6 +186,11 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    if args.push and not args.commit:
+        raise SystemExit("--push requires --commit.")
+    if args.commit and not args.update_lanl_docs:
+        raise SystemExit("--commit requires --update-lanl-docs (docs must be updated in-repo).")
+
     corpora = [c.strip() for c in args.corpora.split(",") if c.strip()]
     unknown = [c for c in corpora if c not in _PRESETS]
     if unknown:
@@ -194,6 +217,7 @@ def main() -> int:
 
     response_path = None
     results_path = None
+    repo_root = None
     if args.update_lanl_docs:
         repo_root = _default_repo_root()
         response_path = Path(args.response_lanl_md) if args.response_lanl_md else (repo_root / "RESPONSE-LANL.md")
@@ -294,6 +318,26 @@ def main() -> int:
         for corpus, code in failures:
             print(f"- {corpus}: exit {code}", file=sys.stderr, flush=True)
         return failures[0][1] if failures[0][1] != 0 else 1
+
+    if args.commit:
+        assert repo_root is not None
+        commit_msg = args.commit_message
+        docs_to_add = [
+            str(Path("RESPONSE-LANL.md")),
+            str(Path("altgan") / "RESULTS.md"),
+        ]
+        print("\n[git] Committing LANL doc updates...", flush=True)
+        subprocess.run(["git", "status", "--porcelain"], cwd=repo_root, check=True)
+        subprocess.run(["git", "add", *docs_to_add], cwd=repo_root, check=True)
+        # Only commit if there is something staged/changed.
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=repo_root).returncode
+        changed = subprocess.run(["git", "diff", "--quiet"], cwd=repo_root).returncode
+        if staged == 0 and changed == 0:
+            print("[git] No doc changes detected; skipping commit.", flush=True)
+        else:
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=repo_root, check=False)
+            if args.push:
+                subprocess.run(["git", "push", "origin", "main"], cwd=repo_root, check=True)
 
     return 0
 

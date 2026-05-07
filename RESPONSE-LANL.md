@@ -1094,15 +1094,15 @@ python3 -m altgan.launch_trace_bootstrap_shuffle_pack \
 ### TraceBootstrap shuffle panels (auto-generated)
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METAKV -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METAKV -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METACDN -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs` on a `/tiamat` host)_
+_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (default corpora fills all blocks), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METACDN -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_WIKI -->
