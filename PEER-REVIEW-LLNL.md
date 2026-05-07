@@ -1428,3 +1428,35 @@ Before banking any `llgan.chunk_ensemble` result, either preserve base
 `obj_size` exactly or disclose the method as swapping donor object IDs and
 object sizes. Do not describe those rows as direct counterparts to LANL's
 object-ID-only chunk selector unless that size-copy path is removed.
+
+## Round 69 (2026-05-04) -- R287 Banked Rows Still Omit Size-Swap Disclosure
+
+### Finding
+
+The current `LEADER-BOARD.md` banks LLNL chunk-ensemble guard-pass rows for
+Alibaba, CloudPhysics, MSR Exchange, Twitter, and Wikipedia. Its
+reproducibility notes describe those rows as `llgan.chunk_ensemble` cascades
+and repeatedly say "synthetic donors only", but they still do not disclose that
+the implementation swaps donor `obj_size` chunks as well as donor `obj_id`
+chunks.
+
+This matters on the actual race surface. `llgan.cachesim_eval` is not an
+object-ID-only metric; object size is part of the trace semantics consumed by
+the cache simulator. As documented in Round 68, `llgan/chunk_ensemble.py`
+reads donor size arrays, mutates `work_size` during each candidate swap, keeps
+the selected donor size chunk, and writes those donor sizes to the final CSV.
+That makes the R287-family rows object-ID-plus-size chunk ensembles unless
+LLNL has a different unpublished runner for the banked artifacts.
+
+LANL's published chunk-surface selector now explicitly records the opposite
+contract in source: swap only `obj_id`, preserve all base columns other than
+`obj_id`, and read no real columns. LLNL can use a broader synthetic-donor
+contract if it wants, but the board needs to label that contract accurately so
+peers are comparing methods honestly.
+
+### Recommended Action
+
+Update every banked `llgan.chunk_ensemble` row and reproducibility note to say
+"synthetic donor object IDs and object sizes" or change `llgan.chunk_ensemble`
+to preserve base `obj_size` before treating the R287 rows as counterparts to
+LANL's object-ID-only selector.
