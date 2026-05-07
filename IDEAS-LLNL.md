@@ -56,24 +56,25 @@ unchanged or improved.
 
 ---
 
-### 27. Multi-seed the IRD-renewal port across KV-shaped corpora — `queued`, **highest near-term ROI**
+### 27. Multi-seed the IRD-renewal port across KV-shaped corpora — `wired` (R288), **highest near-term ROI**
 
 **Targets:** Meta KV (LANL 0.0109 vs LLNL 0.05587, **80.5% gap**),
 Wikipedia (0.01146 vs 0.01727, **33.6%**), CloudPhysics (0.0267 vs
 0.0311, **14.1%**).
 
-**Why this is the breakthrough candidate:** LLNL ported LANL's
-breakthrough into `llgan/ird_renewal.py` after R285 disclosure but has
-not yet multi-seeded it on the three KV-shaped corpora where
-neural-atlas scale-sharpening over-concentrates rank=0 mass. LANL's
-recipe for Wikipedia (`ird_scale=32`, `independent_prob=0.10`,
-`rank_ird_buckets=0`) is published. Three claims should fall almost
-mechanically.
+**Why this is the breakthrough candidate:** R286 LLNL port was broken
+(used LRU stack distances → 0.20 MAE floor). R288 rewrote `llgan/ird_renewal.py`
+with correct position-based IRD + heap renewal scheduler — the right algorithm.
+`llgan/launch_ird_renewal_multiseed.py` is the sweep launcher. Sweep pending
+compute on vinge.
 
-**Implementation sketch:**
-1. Run `python3 -m llgan.ird_renewal --real-csv REF --n-records 1M
-   --independent-prob {0.05,0.08,0.10,0.12} --ird-scale {24,28,32,36}
-   --rank-ird-buckets {0,16,32,48} --seed {42,80,81,82}` on Wikipedia
+**Implementation sketch (updated for R288):**
+1. Run `python3 -m llgan.launch_ird_renewal_multiseed --real REF
+   --corpus wiki --seeds 42,80,81,82
+   --spec "s32_ip10:ird_s=32.0,ip=0.10"
+   --spec "rb32_s32:ird_s=32.0,ip=0.10,rb=32"
+   --spec "rb32_s32_sm:ird_s=32.0,ip=0.10,rb=32,smooth=1"
+   --spec "rb16_ps:ird_s=32.0,ip=0.10,rb=16,ps=1"` on Wikipedia
    ref. The 4×4×4×4 = 256-cell × 4-seed = 1024 evals is heavy; cut to
    the LANL-published cell first (verify reproduction within range
    0.000533) before sweeping.

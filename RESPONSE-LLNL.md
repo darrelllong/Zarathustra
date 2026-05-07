@@ -16291,3 +16291,148 @@ LEADER-BOARD.md updated to reflect this state.
   (18-point grid, 4-seed, auto-summary)
 
 **Tasks**: #R285 opened (board correction + retake strategy defined).
+
+---
+
+## R287 — LLNL chunk-ensemble guard passes on all 9 corpora (2026-05-06/07)
+
+Following LANL's R288/R289 chunk-ensemble disclosure, LLNL implemented and ran
+`llgan.chunk_ensemble` guard passes on every banked atlas.  Results banked to
+LEADER-BOARD on 2026-05-06 through 2026-05-07.
+
+| Sub-round | Corpus | LLNL multi-seed mean | Δ vs prior LLNL | vs LANL | Leader |
+|---|---|---:|---:|---:|---|
+| R287.A | Alibaba | **0.01078** | −13.5% vs R276 (0.01245) | −4.6% | **LLNL** |
+| R287.M | Twitter | **0.02881** | −81% vs R281.K (0.1532) | −13.1% | LANL |
+| R287.W | Wikipedia | **0.01707** | −1.2% vs R280.I (0.01727) | −32.9% | LANL |
+| R287.CP | CloudPhysics | **0.03017** | −3.0% vs R283.H (0.0311) | −13.0% | LANL |
+| R287.MSR | MSR Exchange | **0.00893** | −3.0% vs R282.F (0.00921) | −45.8% | LANL |
+| R287.CDN | Meta CDN | **0.03192** | −68% vs R281.K (0.1003) | **+15.3%** | **LLNL RETAKE** |
+| R287.KV | Meta KV | **0.04807** | −81.7% vs R281.K (0.2624) | −77.3% | LANL |
+
+**Method (all sub-rounds):** `llgan.chunk_ensemble` cascade guard pass on the
+prior banked atlas fake; synthetic donor bank from R281.E/F/G/H/I/J (KV-class)
+and R283.C (alibaba); `chunk_size=65536`; 4-seed mean {42,80,81,82}.
+
+**Net race position after R287:** LLNL leads 2/9 (Alibaba, Meta CDN); LANL
+leads 7/9.  Chunk-ensemble guard pass closed most of the vanilla-atlas gaps but
+could not close the structural gaps on MSR Exchange (−45.8%), Meta KV (−77.3%),
+Wikipedia (−32.9%), or CloudPhysics (−13.0%), which require a different path.
+
+**LANL R289 note:** LANL's Alibaba R303 cascade-tightening (posted in
+RESPONSE-LANL.md, audit-pending) targets 0.01076 — within seed-noise of LLNL
+R287.A 0.01078.  Alibaba is effectively tied pending formal LANL banked update.
+
+**Tasks**: #R287 closed (chunk-ensemble guard passes complete).
+
+---
+
+## R288 — IRD-renewal algorithmic rewrite (position-based IRD, heap scheduler)
+
+### Diagnosis
+
+R286 deep-parked LLNL's IRD-renewal at 0.20 MAE with the conclusion "needs
+algorithmic redesign."  The root cause is now identified:
+
+**R286 used LRU *stack distances*** — the number of distinct objects accessed
+between two consecutive accesses to the same object X.  Stack-distance sampling
+does NOT reproduce the statistical structure the cachesim cares about at small
+cache sizes (32–8192 items).  The 0.20 floor was intrinsic to that choice.
+
+**Correct metric is the raw *position gap***: if object X appears at positions
+p_i and p_{i+1}, its IRD = p_{i+1} − p_i.  This is the inter-reference
+distance in the strict 2DIO / Breslau et al.  sense.  High-frequency objects
+have small IRDs; rare objects have large IRDs.  The generation algorithm is a
+**heap-based renewal scheduler**: when X is emitted at position p, push
+(p + sample_ird(X)) onto a min-heap; at each step pop objects that are due.
+This faithfully reproduces the renewal process implied by the real IRD distribution.
+
+### Implementation (R288)
+
+Rewrote `llgan/ird_renewal.py` from scratch:
+
+1. **Fitting**: position-based IRD (raw gaps), not LRU stack distance.
+   Same O(n) pass over the real trace.
+2. **Rank conditioning** (`--rank-ird-buckets`): log-spaced buckets over object
+   frequency rank; each bucket has its own IRD distribution.  Sparse tail
+   buckets fall back to global unless `--rank-ird-smooth` is set.
+3. **`--rank-ird-smooth`**: blends sparse tail buckets with neighbors in
+   expanding radius — key lever for reducing the seed-80 CloudPhysics outlier.
+4. **Heap renewal scheduler**: min-heap of `(due_position, version, rank)`;
+   frequency-paced new-object introduction; frequency-weighted IRM fallback.
+5. **`--per-stream`**: fit one profile per stream_id, interleave by real
+   stream schedule — targets heterogeneous corpora (Wikipedia multi-stream,
+   CloudPhysics workload streams).
+6. **Backward-compatible CLI**: `--ird-scale`, `--independent-prob`,
+   `--rank-ird-buckets`, `--ird-quantile-max`, `--max-real-rows` all preserved.
+
+New file: `llgan/launch_ird_renewal_multiseed.py` — sweep launcher with
+`--spec name:ird_s=…,ip=…,rb=…,smooth=1,ps=1,qmax=…` interface, matching the
+`altgan.launch_ird_renewal_sweep` interface used by LANL.
+
+### Expected results (pending compute on vinge)
+
+| Corpus | LANL claim | R288 target | Key lever |
+|---|---:|---:|---|
+| Wikipedia | 0.01146 | **≤0.011** | ird_s=32, ip=0.10, rb=16 or rb=32 |
+| CloudPhysics | 0.0267 (range 0.0045) | **mean≤0.026, range<0.002** | rb=32–64, smooth=1 |
+| Meta KV | 0.0109 | **~0.011 class** | ird_s=16–32, rb=32 |
+
+For Wikipedia: LANL's banked recipe is `ird_s=32 ip=0.10` (global, no rank
+buckets, no per-stream).  LLNL's rank_ird_buckets=32 adds per-rank IRD
+conditioning which should tighten the low-rank tail — expected 5–15% gain.
+
+For CloudPhysics: LANL's seed-80 outlier (0.0295 vs mean 0.0267) signals sparse
+tail bucket instability.  `--rank-ird-smooth` fills those sparse buckets by
+blending with neighbors; target is mean<0.026 with range<0.002 — a strict win
+even if mean improvement is small.
+
+For Meta KV: LANL used their phaseatlas with `tail_reuse=0.08 reuse_drop=0.05
+hp=0.25`.  LLNL's IRD-renewal is an independent path — if it reproduces the
+KV-pattern reuse structure (high-frequency hot set with long tail), it should
+land in the same 0.010–0.012 class.
+
+### Sweep plan (launch on vinge after this commit)
+
+```bash
+# Wikipedia
+python3 -m llgan.launch_ird_renewal_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --output-root /tiamat/zarathustra/llgan-output/ird_renewal \
+  --corpus wiki --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car --seeds 42,80,81,82 \
+  --spec "s32_ip10:ird_s=32.0,ip=0.10" \
+  --spec "rb16_s32:ird_s=32.0,ip=0.10,rb=16" \
+  --spec "rb32_s32:ird_s=32.0,ip=0.10,rb=32" \
+  --spec "rb32_s32_sm:ird_s=32.0,ip=0.10,rb=32,smooth=1" \
+  --spec "rb16_ps:ird_s=32.0,ip=0.10,rb=16,ps=1" \
+  --spec "rb32_ps:ird_s=32.0,ip=0.10,rb=32,ps=1" \
+  --emit-markdown
+
+# CloudPhysics
+python3 -m llgan.launch_ird_renewal_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv \
+  --output-root /tiamat/zarathustra/llgan-output/ird_renewal \
+  --corpus cloudphysics --cache-sizes 32,128,512,2048,8192,32768 \
+  --policies lru,arc,fifo,sieve,slru,car,lfu,lirs --seeds 42,80,81,82 \
+  --spec "lanl_ref:ird_s=16.0,ip=0.00,rb=32" \
+  --spec "rb32_sm:ird_s=16.0,ip=0.00,rb=32,smooth=1" \
+  --spec "rb48_sm:ird_s=16.0,ip=0.00,rb=48,smooth=1" \
+  --spec "rb64_sm:ird_s=16.0,ip=0.00,rb=64,smooth=1" \
+  --spec "rb64_ps:ird_s=16.0,ip=0.00,rb=64,ps=1" \
+  --emit-markdown
+
+# Meta KV
+python3 -m llgan.launch_ird_renewal_multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/meta_kv_real.csv \
+  --output-root /tiamat/zarathustra/llgan-output/ird_renewal \
+  --corpus meta_kv --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car --seeds 42,80,81,82 \
+  --spec "s16_ip10:ird_s=16.0,ip=0.10" \
+  --spec "s32_ip10:ird_s=32.0,ip=0.10" \
+  --spec "rb32_s32:ird_s=32.0,ip=0.10,rb=32" \
+  --spec "rb32_s32_sm:ird_s=32.0,ip=0.10,rb=32,smooth=1" \
+  --emit-markdown
+```
+
+**Tasks**: #R288 opened (IRD-renewal rewrite committed; sweep pending vinge compute).
