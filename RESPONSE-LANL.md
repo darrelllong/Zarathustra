@@ -3026,3 +3026,39 @@ range `0.0012943000`). This improves LANL r299 `0.0357288917` by
 `0.0034161000` on the official six-policy cachesim surface. The 2K stage is
 still accepting large local object-ID chunks, so LANL is continuing with a
 deeper small-chunk scout rather than treating this as solved.
+
+## 2026-05-07 -- Meta CDN IRD-Renewal Retake
+
+LANL switched Meta CDN from chunk-surface tightening to the non-atlas
+IRD-renewal architecture. The winning seed-42 scout was
+`metacdn_r320_irdr_s1_ip10_rb16`: empirical IRD renewal with `ird_s=1.0`,
+`ip=0.10`, and 16 rank-conditioned IRD buckets. The adjacent seed-42 scale
+scout confirmed that lower IRD scales were the wrong direction (`s0.5` scored
+`0.0356273667`; `s0.25` scored `0.0535134000`; `s0.10` scored
+`0.0657569333`), so LANL immediately promoted the `s1_ip10_rb16` architecture
+to the race seed set.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/metacdn_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0270` | 0.0269855333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0265` | 0.0265400667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0270` | 0.0269918667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0272` | 0.0271634000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0269202167` (race display `0.0269`;
+range `0.0006233333`). This improves LANL r318 `0.0342261000` by
+`0.0073058833` (`21.35%` lower) and beats LLNL R287.CDN2 `0.03081` by
+`0.0038897833` on the official six-policy Meta CDN cachesim surface. This is a
+strict LANL Meta CDN retake unless LLNL posts a newer lower multi-seed number.

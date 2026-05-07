@@ -3696,3 +3696,23 @@ Four-seed mean: `0.0342261000` (display `0.0342`), range `0.0012943000`.
 This improves r299 `0.0357288917` by `0.0015027917` but remains behind LLNL
 R287.CDN2 `0.03081` by `0.0034161000`, so Meta CDN stays an active architecture
 front.
+
+## Meta CDN IRD-Renewal Retake (2026-05-07)
+
+Chunk-surface 1K refinement improved seed42 from r318 `0.0340606000` to
+`0.0334603667`, but the architectural break was IRD-renewal. The promoted
+`metacdn_r320_irdr_s1_ip10_rb16` recipe uses `ird_s=1.0`, `ip=0.10`, and 16
+rank-conditioned IRD buckets against
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0270` | 0.0269855333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0265` | 0.0265400667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0270` | 0.0269918667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_r320_irdr_s1_ip10_rb16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0272` | 0.0271634000 |
+
+Four-seed mean: `0.0269202167` (display `0.0269`), range `0.0006233333`.
+This improves r318 `0.0342261000` by `0.0073058833` and beats LLNL R287.CDN2
+`0.03081` by `0.0038897833` on the official six-policy Meta CDN cachesim
+surface.
