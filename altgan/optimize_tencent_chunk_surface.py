@@ -58,6 +58,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--max-evals", type=int, default=0,
                    help="Stop after this many candidate/base evaluations; 0 means no cap.")
     p.add_argument("--min-improvement", type=float, default=1e-6)
+    p.add_argument("--accept-mode", choices=["first", "best"], default="first",
+                   help="Accept the first improving donor per chunk, or scan all donors and accept the best.")
     p.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     p.add_argument("--policies", default=DEFAULT_POLICIES)
     p.add_argument("--keep-candidates", action="store_true")
@@ -197,6 +199,10 @@ def main() -> int:
                     break
                 start = chunks[chunk_ix]
                 end = min(n, start + chunk_size)
+                best_chunk_obj = None
+                best_chunk_report = None
+                best_chunk_mean = best_mean
+                best_chunk_donor = None
                 for donor_name, donor_obj in donor_frames:
                     if args.max_evals and eval_count >= args.max_evals:
                         stop_search = True
@@ -227,6 +233,13 @@ def main() -> int:
                         flush=True,
                     )
                     if mean + args.min_improvement < best_mean:
+                        if args.accept_mode == "best":
+                            if mean + args.min_improvement < best_chunk_mean:
+                                best_chunk_obj = trial_obj
+                                best_chunk_report = report
+                                best_chunk_mean = mean
+                                best_chunk_donor = donor_name
+                            continue
                         current_obj = trial_obj
                         best_report = report
                         best_mean = mean
@@ -245,6 +258,29 @@ def main() -> int:
                             flush=True,
                         )
                         break
+                if (
+                    args.accept_mode == "best"
+                    and best_chunk_obj is not None
+                    and best_chunk_report is not None
+                    and best_chunk_donor is not None
+                ):
+                    current_obj = best_chunk_obj
+                    best_report = best_chunk_report
+                    best_mean = best_chunk_mean
+                    pass_accepts += 1
+                    accepted.append({
+                        "chunk_size": chunk_size,
+                        "pass": pass_ix + 1,
+                        "start": start,
+                        "end": end,
+                        "donor": best_chunk_donor,
+                        "mean": best_mean,
+                    })
+                    print(
+                        f"[chunk_surface] ACCEPT start={start} end={end} "
+                        f"donor={best_chunk_donor} best={best_mean:.10f}",
+                        flush=True,
+                    )
                 if stop_search:
                     print(
                         f"[chunk_surface] max evals reached eval_count={eval_count} "
@@ -287,6 +323,7 @@ def main() -> int:
         "cache_sizes": args.cache_sizes,
         "policies": args.policies,
         "eval_label": eval_label,
+        "accept_mode": args.accept_mode,
         "max_evals": args.max_evals,
         "accepted": accepted,
         "eval_count": eval_count,

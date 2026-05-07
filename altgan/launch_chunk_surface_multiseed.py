@@ -176,6 +176,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--max-evals", type=int, default=0)
     p.add_argument("--min-improvement", type=float, default=1e-6)
     p.add_argument(
+        "--accept-mode",
+        choices=["first", "best"],
+        default="first",
+        help="Per chunk, accept the first improving donor or scan all donors and accept the best.",
+    )
+    p.add_argument(
         "--emit-markdown",
         action="store_true",
         help="Print a ready-to-paste markdown snippet (table + mean/range).",
@@ -301,6 +307,8 @@ def main() -> int:
                 str(args.max_evals),
                 "--min-improvement",
                 str(args.min_improvement),
+                "--accept-mode",
+                args.accept_mode,
                 "--cache-sizes",
                 args.cache_sizes,
                 "--policies",
