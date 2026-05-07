@@ -60,7 +60,8 @@ class IrdProfile(NamedTuple):
 def fit_profile(path: str, max_rows: int = 0, ird_quantile_max: float = 1.0,
                 stream_col: str | None = None) -> IrdProfile:
     rows = _read_csv(path, max_rows)
-    obj_ids = np.array([int(r[2]) for r in rows], dtype=np.int64)
+    # obj_id may be hash-keyed (uint64, > int64 max) on Wiki/Twitter/Meta KV/CDN.
+    obj_ids = np.array([int(r[2]) for r in rows], dtype=np.uint64)
     obj_sizes = np.array([int(r[3]) for r in rows], dtype=np.int64)
     streams_col = 0
     if stream_col:
