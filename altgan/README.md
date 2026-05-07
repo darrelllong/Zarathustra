@@ -81,6 +81,37 @@ python -m altgan.launch_trace_bootstrap_shuffle_pack \
   --emit-summary-json-dir /tmp/tracebootstrap_shuffle_snips
 ```
 
+## Chunk-surface (Twitter retake)
+
+Twitter is currently a high-leverage corpus when the leaderboard gap is small.
+For a one-shot tightening starting from the current LANL r307 16K fakes, run on
+`baase` / `vinge`:
+
+```bash
+python3 -m altgan.launch_twitter_r307_refine8 \
+  --tag-prefix twitter_chunksurf_r308_refine8 \
+  --pipeline 8192,4096 \
+  --max-accepts 8 \
+  --max-evals 250 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
+
+If you need to run from a laptop without `/tiamat`, use the SSH dispatcher:
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r308_refine -- \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/twitter_chunksurf_r307_refine16_ck16384_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/twitter_chunksurf_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/twitter*_seed42_fake_*.csv" \
+  --tag-prefix twitter_chunksurf_r308_refine8 \
+  --pipeline 8192,4096 \
+  --max-accepts 8 \
+  --max-evals 250 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
+
 ## IRD-renewal (Wikipedia / CloudPhysics)
 
 The IRD-renewal sweep launcher can also emit/append paste-ready Markdown tables
