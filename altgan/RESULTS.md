@@ -3752,9 +3752,9 @@ sizes, opcodes, tenants, and auxiliary columns were preserved; only synthetic
 | 42 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0051` | 0.0051168000 |
 | 80 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r329_refine32_cont2_ck32768_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0052` | 0.0051857000 |
 | 81 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0056` | 0.0056076667 |
-| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r328_refine32_cont_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0062` | 0.0061809667 |
+| 82 | `/tiamat/zarathustra/altgan-output/wiki_chunksurf_r329_refine32_cont2_ck32768_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0059` | 0.0059284333 |
 
-Four-seed mean: `0.0055227833` (display `0.0055`), range `0.0010641667`.
-This improves r290 `0.0113723167` by `0.0058495333` (`51.44%` lower) and
-beats LLNL R288.W `0.008895` by `0.0033722167` on the official six-policy
-Wikipedia cachesim surface. Seed 82 is the next continuation target.
+Four-seed mean: `0.0054596500` (display `0.0055`), range `0.0008116333`.
+This improves r290 `0.0113723167` by `0.0059126667` (`51.99%` lower) and
+beats LLNL R288.W `0.008895` by `0.0034353500` on the official six-policy
+Wikipedia cachesim surface. Seed 82 remains the exposed weak seed.
