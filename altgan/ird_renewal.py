@@ -85,6 +85,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--heap-mode", choices=("due", "priority"), default="due",
                    help="due preserves LANL's paced renewal heap; priority pops the smallest "
                         "scheduled sleep key on each dependent arrival, matching 2DIO Gen-from-IRD.")
+    p.add_argument("--priority-singletons-as-infinite", action="store_true",
+                   help="In priority heap mode, keep count-1 objects out of the finite-IRD heap "
+                        "and emit them from a shuffled singleton pool, approximating 2DIO's IRD=inf branch.")
+    p.add_argument("--priority-singleton-prob", type=float, default=-1.0,
+                   help="Overall probability of drawing from the priority singleton pool; negative "
+                        "uses the empirical singleton access fraction.")
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
@@ -169,6 +175,17 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     total_remaining = int(remaining.sum())
     unique_seen = 0
     heap_mode = getattr(args, "heap_mode", "due")
+    priority_singletons_as_infinite = (
+        heap_mode == "priority" and bool(getattr(args, "priority_singletons_as_infinite", False))
+    )
+    singleton_order = np.flatnonzero(counts == 1).astype(np.int64, copy=False)
+    if priority_singletons_as_infinite and len(singleton_order) > 0:
+        rng.shuffle(singleton_order)
+    singleton_cursor = 0
+    singleton_prob = float(getattr(args, "priority_singleton_prob", -1.0))
+    if singleton_prob < 0:
+        singleton_prob = len(singleton_order) / max(float(args.n_records), 1.0)
+    singleton_prob = min(max(singleton_prob, 0.0), 1.0)
 
     def sample_ird(rank: int) -> int:
         source = profile.irds
@@ -265,8 +282,19 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             return None
         return int(candidates[int(rng.integers(0, len(candidates)))])
 
+    def next_singleton_rank() -> int | None:
+        nonlocal singleton_cursor
+        while singleton_cursor < len(singleton_order):
+            rank = int(singleton_order[singleton_cursor])
+            singleton_cursor += 1
+            if remaining[rank] > 0 and not seen[rank]:
+                return rank
+        return None
+
     if heap_mode == "priority":
         for rank in range(footprint):
+            if priority_singletons_as_infinite and counts[rank] <= 1:
+                continue
             if remaining[rank] > 0:
                 versions[rank] += 1
                 heapq.heappush(due_heap, (sample_ird(rank), int(versions[rank]), int(rank)))
@@ -278,7 +306,9 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             rank = None
             due_key = pos
             from_dependent = False
-            if rng.random() < args.independent_prob:
+            if priority_singletons_as_infinite and rng.random() < singleton_prob:
+                rank = next_singleton_rank()
+            if rank is None and rng.random() < args.independent_prob:
                 rank = sample_frequency_rank(allow_unseen=True)
             if rank is None:
                 popped = pop_priority()

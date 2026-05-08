@@ -98,6 +98,8 @@ class Spec:
     new_debt_priority: float = 0.85
     dependent_admit_prob: float = 1.0
     heap_mode: str = "due"
+    priority_singletons_as_infinite: bool = False
+    priority_singleton_prob: float = -1.0
 
 
 def _parse_spec(text: str) -> Spec:
@@ -119,6 +121,9 @@ def _parse_spec(text: str) -> Spec:
         "debt": "new_debt_priority",
         "admit": "dependent_admit_prob",
         "heap": "heap_mode",
+        "inf1": "priority_singletons_as_infinite",
+        "singleton_prob": "priority_singleton_prob",
+        "sp": "priority_singleton_prob",
     }
     fields = {f.name: f for f in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs: dict[str, object] = {"name": name}
@@ -160,6 +165,10 @@ def _auto_name(spec: Spec) -> str:
         parts.append(f"fa{spec.frequency_alpha:g}")
     if spec.heap_mode != "due":
         parts.append(spec.heap_mode)
+    if spec.priority_singletons_as_infinite:
+        parts.append("inf1")
+    if spec.priority_singleton_prob >= 0:
+        parts.append(f"sp{spec.priority_singleton_prob:g}")
     return "_".join(parts)
 
 
@@ -209,6 +218,10 @@ def _renewal_cmd(
         "--heap-mode", spec.heap_mode,
         "--progress-interval", str(args.progress_interval),
     ]
+    if spec.priority_singletons_as_infinite:
+        cmd.append("--priority-singletons-as-infinite")
+    if spec.priority_singleton_prob >= 0:
+        cmd += ["--priority-singleton-prob", str(spec.priority_singleton_prob)]
     if spec.rank_ird_buckets > 0:
         cmd += ["--rank-ird-buckets", str(spec.rank_ird_buckets)]
     if spec.per_stream:
