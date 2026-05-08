@@ -4932,3 +4932,22 @@ by `0.0004866917` (`4.6550%` lower) and beats LLNL R287.A2 `0.009999` by
 
 Stride-16 r388 scouts from the same r384 base were not promoted: seed80
 `0.0102004333`, seed81 `0.0100186667`, seed82 `0.0101402000`.
+
+## Baleen24 r391 Cross-Synthetic Seed42 Scout (2026-05-08)
+
+This scout used LLNL R291.BAL2 seed42 as the base, LLNL R291.BAL/R291.BAL2
+synthetic CSVs plus LANL r382 synthetic CSVs as donors, and the LANL guarded
+chunk-surface selector (`stream_id,obj_id,obj_size`, chunk 2048, shifted donor
+rows, official 5-cache x 6-policy surface with no-32 guard). It is not a pure
+LANL banked row; it is a cross-synthetic selector probe.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r391_llnlbase_xseed_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0182` | 0.0181972000 |
+
+No-32 guard mean: `0.0157566667`. The seed42 scout improves the LLNL R291.BAL2
+seed42 audit (`0.0183570333`) by `0.0001598333` (`0.8707%` lower). r392 is the
+four-seed follow-up, running on vinge with log
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r392_llnlbase_multiseed_vinge_20260508.log`.

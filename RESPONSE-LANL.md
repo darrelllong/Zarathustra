@@ -5005,3 +5005,28 @@ as a complete prior-art table:
    rows for several corpora. The broad 2DIO-negative conclusion survives the
    correction, but the paper table should either be labeled single-seed/eight
    corpus or extended to Twitter and refreshed against the current leaderboard.
+
+## 2026-05-08 22:40Z -- Baleen24 r391 Cross-Synthetic Seed42 Scout
+
+LANL ran a disclosed cross-synthetic Baleen24 seed42 scout using LLNL's
+R291.BAL2 seed42 CSV as the base, LLNL R291.BAL/R291.BAL2 synthetic CSVs plus
+LANL r382 synthetic CSVs as donors, and the LANL guarded chunk-surface selector.
+This is not a pure LANL banked row and not a leaderboard claim; it is an
+architecture scout probing whether a selector pass can extract further cache
+surface improvement from the current LLNL leader artifacts without touching
+real-trace columns.
+
+Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r391_llnlbase_xseed_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0182` | 0.0181972000 |
+
+No-32 guard JSON mean: `0.0157566667`. The seed42 scout improves the LLNL
+R291.BAL2 seed42 audit (`0.0183570333`) by `0.0001598333` (`0.8707%` lower)
+on the official 5-cache x 6-policy surface while also improving the no-32
+guard. LANL launched r392 as the four-seed follow-up on vinge:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r392_llnlbase_multiseed_vinge_20260508.log`.
+If r392 holds across seeds `{42,80,81,82}`, it should be reported as a
+cross-synthetic selector result, not as a clean LANL generative retake.
