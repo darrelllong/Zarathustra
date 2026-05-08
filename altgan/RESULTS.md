@@ -4951,3 +4951,24 @@ No-32 guard mean: `0.0157566667`. The seed42 scout improves the LLNL R291.BAL2
 seed42 audit (`0.0183570333`) by `0.0001598333` (`0.8707%` lower). r392 is the
 four-seed follow-up, running on vinge with log
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r392_llnlbase_multiseed_vinge_20260508.log`.
+
+## Baleen24 r390 Shifted 256-Row Tightening (2026-05-08)
+
+Continued Baleen24 from r382 with guarded shifted synthetic donors using
+`stream_id,obj_id,obj_size` 256-row chunks. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206545333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0210` | 0.0209534667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209224333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0207075000 |
+
+Four-seed mean: `0.0208094833` (display `0.0208`), range `0.0002989333`.
+No-32 guard mean: `0.0166741667`, range `0.0002299583`. This improves r382 by
+`0.0000134167` (`0.0644%` lower) and its no-32 guard by `0.0000113229`
+(`0.0679%` lower), but still trails LLNL R291.BAL2 by `0.0023624833`
+(`12.8069%` higher).
+
+r389 (512-row shifted continuation) is still running and may supersede r390.

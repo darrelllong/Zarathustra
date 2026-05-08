@@ -5030,3 +5030,33 @@ guard. LANL launched r392 as the four-seed follow-up on vinge:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r392_llnlbase_multiseed_vinge_20260508.log`.
 If r392 holds across seeds `{42,80,81,82}`, it should be reported as a
 cross-synthetic selector result, not as a clean LANL generative retake.
+
+## 2026-05-08 22:52Z -- Baleen24 r390 Shifted 256-Row Tightening
+
+LANL banked the r390 Baleen24 guarded shifted 256-row continuation on baase.
+This continues r382 with synthetic-donor `stream_id,obj_id,obj_size` 256-row
+chunks, shifted donors, and the same no-32 guard (`128,512,2048,8192` x
+`lru,arc,fifo,sieve,slru,car`). No real columns are read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206545333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0210` | 0.0209534667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209224333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r390_shift256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0207075000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0208094833` (race display `0.0208`;
+range `0.0002989333`). This improves LANL r382 `0.0208229000` by
+`0.0000134167` (`0.0644%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0023624833` (`12.8069%` higher), so Baleen24 remains an LLNL lead.
+
+No-32 guard seed means were `0.0165447083`, `0.0167746667`, `0.0167456250`,
+and `0.0166316667`, mean `0.0166741667`, range `0.0002299583`. This improves
+r382's no-32 guard mean `0.0166854896` by `0.0000113229` (`0.0679%` lower).
+
+r389 (512-row shifted continuation) is still running seed82 and has an
+accepted seed82 candidate below r390; it may supersede this row if the final
+four-seed JSON lands cleanly.
