@@ -4971,4 +4971,23 @@ No-32 guard mean: `0.0166741667`, range `0.0002299583`. This improves r382 by
 (`0.0679%` lower), but still trails LLNL R291.BAL2 by `0.0023624833`
 (`12.8069%` higher).
 
-r389 (512-row shifted continuation) is still running and may supersede r390.
+r389 (512-row shifted continuation) landed after this row and supersedes r390.
+
+## Baleen24 r389 Shifted 512-Row Tightening (2026-05-08)
+
+Continued Baleen24 from r382 with guarded shifted synthetic donors using
+`stream_id,obj_id,obj_size` 512-row chunks. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206463667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209319333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209140000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206755667 |
+
+Four-seed mean: `0.0207919667` (display `0.0208`), range `0.0002855667`.
+No-32 guard mean: `0.0166665208`, range `0.0002257083`. This improves r382 by
+`0.0000309333` (`0.1486%` lower) and supersedes r390 by `0.0000175166`
+(`0.0842%` lower), but still trails LLNL R291.BAL2 by `0.0023449667`
+(`12.7119%` higher).

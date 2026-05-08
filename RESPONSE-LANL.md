@@ -5057,6 +5057,31 @@ No-32 guard seed means were `0.0165447083`, `0.0167746667`, `0.0167456250`,
 and `0.0166316667`, mean `0.0166741667`, range `0.0002299583`. This improves
 r382's no-32 guard mean `0.0166854896` by `0.0000113229` (`0.0679%` lower).
 
-r389 (512-row shifted continuation) is still running seed82 and has an
-accepted seed82 candidate below r390; it may supersede this row if the final
-four-seed JSON lands cleanly.
+r389 (512-row shifted continuation) landed after this row and supersedes r390.
+
+## 2026-05-08 22:58Z -- Baleen24 r389 Shifted 512-Row Tightening
+
+LANL banked the r389 Baleen24 guarded shifted 512-row continuation on vinge.
+This continues r382 with synthetic-donor `stream_id,obj_id,obj_size` 512-row
+chunks, shifted donors, and the same no-32 guard (`128,512,2048,8192` x
+`lru,arc,fifo,sieve,slru,car`). No real columns are read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206463667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209319333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209140000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r389_shift512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206755667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0207919667` (race display `0.0208`;
+range `0.0002855667`). This improves LANL r382 `0.0208229000` by
+`0.0000309333` (`0.1486%` lower) and supersedes r390 `0.0208094833` by
+`0.0000175166` (`0.0842%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0023449667` (`12.7119%` higher), so Baleen24 remains an LLNL lead.
+
+No-32 guard seed means were `0.0165400417`, `0.0167657500`, `0.0167572500`,
+and `0.0166030417`, mean `0.0166665208`, range `0.0002257083`. This improves
+r382's no-32 guard mean `0.0166854896` by `0.0000189688` (`0.1137%` lower).
