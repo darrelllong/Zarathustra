@@ -4814,6 +4814,10 @@ Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
 Contract: synthetic-donor `obj_id,obj_size` chunk swaps; base synthetic
 `stream_id`, `ts`, `opcode`, `tenant`, `stack_distance`, and `action_class`
 are preserved; no real columns are read.
+Current `tools/cachesim` scores time-sorted `(stream_id,obj_id)` cache keys
+and ignores `obj_size`, so this row's score movement is not caused by bytes.
+The size splice is a trace-coherence contract; the score-relevant follow-up is
+`stream_id,obj_id,obj_size`.
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|

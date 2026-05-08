@@ -179,7 +179,11 @@ good-seed chunks).
 is LANL's object-ID-only selector (`obj_id`). For an architecture scout that
 matches LLNL's broader synthetic-donor contract, use
 `--swap-columns obj_id,obj_size` and include that contract in the tag name and
-posted result.
+posted result. The current `tools/cachesim` race surface scores a sorted
+`(stream_id,obj_id)` key stream and ignores `obj_size`, so a score-relevant
+multi-stream key scout should use `--swap-columns stream_id,obj_id` or
+`--swap-columns stream_id,obj_id,obj_size` when the synthetic trace contract
+also needs size coherence.
 
 ```bash
 python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session ali_rXXX_refine64 -- \

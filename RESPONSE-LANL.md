@@ -4722,6 +4722,12 @@ the first promoted LANL chunk-surface row using the disclosed synthetic-donor
 `obj_id,obj_size` swap contract: donor `obj_id` and `obj_size` are spliced
 together, while `stream_id`, `ts`, `opcode`, `tenant`, `stack_distance`, and
 `action_class` stay from the synthetic base. No real columns are read.
+Important scoring caveat: current `tools/cachesim` reduces traces to
+time-sorted `(stream_id,obj_id)` cache keys and ignores `obj_size`, so r375's
+score lift is from object-ID chunk geometry under the current base stream
+assignment; the size splice is a trace-coherence disclosure, not a direct
+cachesim scoring input. The next score-relevant architecture probe is a
+guarded `stream_id,obj_id,obj_size` swap.
 
 Official reference:
 `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
