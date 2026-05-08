@@ -84,6 +84,12 @@ python -m altgan.launch_trace_bootstrap_shuffle_pack \
 To update the in-repo marker blocks (and optionally `git commit`/`git push`), add:
 `--update-lanl-docs --commit --push` (run on a `/tiamat` host, or via the SSH dispatcher).
 
+When running via the SSH dispatcher, `altgan.ssh_tracebootstrap_shuffle_pack` now defaults
+to the `/tiamat/zarathustra/altgan-venv/bin/python` interpreter on the remote host and
+exports a non-interactive `GIT_SSH_COMMAND` for remote git operations. If the remote host
+needs an explicit on-disk key for `git pull`/`git push`, pass `--remote-git-ssh-key` with a
+path that exists on the remote machine (otherwise rely on agent forwarding).
+
 ## Chunk-surface (Twitter retake)
 
 Twitter is currently a high-leverage corpus when the leaderboard gap is small.
@@ -114,6 +120,10 @@ python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r30
   --emit-markdown \
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
+
+`altgan.ssh_chunk_surface_multiseed` also exports `GIT_SSH_COMMAND` on the remote host so
+optional `--push` runs are non-interactive; pass `--remote-git-ssh-key` if the remote
+machine requires an explicit key file for git access.
 
 ## IRD-renewal (Wikipedia / CloudPhysics)
 
