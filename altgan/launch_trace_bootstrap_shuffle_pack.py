@@ -101,7 +101,7 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--corpora",
-        default="twitter,metakv,metacdn,wiki",
+        default="twitter,metakv,metacdn",
         help=f"Comma-separated subset of: {','.join(sorted(_PRESETS))}",
     )
     p.add_argument("--seeds", default="42,80,81,82")

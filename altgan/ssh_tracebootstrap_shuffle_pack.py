@@ -75,7 +75,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--corpora",
         nargs="+",
-        default=["twitter", "metakv", "metacdn", "wiki"],
+        default=["twitter", "metakv", "metacdn"],
         help=(
             "Comma-separated or space-separated corpus list. Examples: "
             "`--corpora twitter metakv` or `--corpora twitter,metakv`."
