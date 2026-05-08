@@ -183,6 +183,14 @@ def _parse_args() -> argparse.Namespace:
         default="",
         help="Comma-separated glob patterns for donor fake CSVs (supports {seed}).",
     )
+    p.add_argument(
+        "--cross-seed-donors",
+        action="store_true",
+        help=(
+            "Expand donor templates/globs across *all* seeds and use the combined pool for every target seed. "
+            "This enables cross-seed stabilization (e.g., letting seed80 borrow chunks from seed42 donors)."
+        ),
+    )
     p.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
     p.add_argument("--tag-prefix", default="chunksurf")
     p.add_argument(
@@ -269,21 +277,24 @@ def main() -> int:
         n_k = max(n_rows // 1000, 1) if not args.dry_run else 0
 
         donors: list[Path] = []
+        donor_seeds = list(args.seeds) if args.cross_seed_donors else [seed]
         for template in donor_templates:
-            donors.append(Path(_render_template(template, seed=seed)))
+            for donor_seed in donor_seeds:
+                donors.append(Path(_render_template(template, seed=donor_seed)))
         for pattern in donor_globs:
-            rendered = _render_template(pattern, seed=seed)
-            matches = sorted(
-                (Path(p) for p in glob.glob(rendered)),
-                key=lambda p: str(p),
-            )
-            if matches:
-                donors.extend(matches)
-            elif args.dry_run:
-                # In dry-run mode we often don't have `/tiamat/...` mounted
-                # locally; keep the rendered glob so the user can sanity-check
-                # which donor patterns would be expanded on the remote host.
-                donors.append(Path(rendered))
+            for donor_seed in donor_seeds:
+                rendered = _render_template(pattern, seed=donor_seed)
+                matches = sorted(
+                    (Path(p) for p in glob.glob(rendered)),
+                    key=lambda p: str(p),
+                )
+                if matches:
+                    donors.extend(matches)
+                elif args.dry_run:
+                    # In dry-run mode we often don't have `/tiamat/...` mounted
+                    # locally; keep the rendered glob so the user can sanity-check
+                    # which donor patterns would be expanded on the remote host.
+                    donors.append(Path(rendered))
 
         # Preserve order but de-dupe paths.
         unique_donors: list[Path] = []

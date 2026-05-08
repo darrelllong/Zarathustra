@@ -144,6 +144,34 @@ python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r36
 optional `--push` runs are non-interactive; pass `--remote-git-ssh-key` if the remote
 machine requires an explicit key file for git access.
 
+## Chunk-surface (Alibaba retake)
+
+As of 2026-05-08, the only plausible remaining strict-loss front is Alibaba
+(LLNL has a banked ~`0.0100` row; LANL is at ~`0.01069`). The fastest next probe
+is a cross-seed donor pool continuation from the current LANL best-donor 256-row
+champion with the no-32 guard enabled.
+
+`--cross-seed-donors` expands any `{seed}` donor globs across the full seed set
+and uses the combined donor pool for every target seed (seed stabilization via
+good-seed chunks).
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session ali_r366_best128_xseed -- \
+  --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba*_seed{seed}_fake_*.csv" \
+  --cross-seed-donors \
+  --tag-prefix alibaba_chunksurf_r366_best128_xseed \
+  --pipeline 128 \
+  --accept-mode best \
+  --max-accepts 8 \
+  --max-evals 300 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
+
 ## IRD-renewal (Wikipedia / CloudPhysics)
 
 The IRD-renewal sweep launcher can also emit/append paste-ready Markdown tables
