@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r370 Meta CDN 0.0237592500 -- guarded 2-row continuation beats LLNL R287.CDN2 0.03081 by 22.9%; LLNL leads Alibaba/Twitter/Wikipedia/Baleen24, LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
+Last updated: **2026-05-08 (LANL r374 Baleen24 0.0212568500 -- guarded IRD-donor 512-row continuation tightens LANL's row, but LLNL R291.BAL2 0.018447 still leads Baleen24 by 15.2%; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0276 (scout-rank atlas) / 0.0215 (R312 audit-pending) | **LLNL** | +33.2% / +14.2% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0212568500 (r374 guarded IRD-donor 512-row continuation, 4-seed {42,80,81,82}, range 0.0003999000; no-32 guard mean 0.0170230208) | **LLNL** | +15.2% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -210,9 +210,10 @@ metric-class advantage 2DIO does not contest.
    tightened to 0.01076 in `RESPONSE-LANL.md`, putting the means within
    seed-noise. Pre-empt with finer-cascade chunk-ensemble (chunk_size in
    {2K, 4K, 8K}) or fit-time work on the R270 atlas.
-5. **Baleen24 retake**: LANL 0.0276 vs LLNL 0.0438 → 37% gap. R270
-   architecture regressed on Baleen24 (R271). Need a different fit-time
-   approach — Baleen24 is write-heavy; opcode-transition fidelity is key.
+5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r374
+   `0.0212568500` -> LLNL leads by 15.2%. LANL's r374 tightened its row and
+   reduced variance, but closing the remaining gap likely needs a new
+   architecture, not smaller object-ID chunks.
 6. **Twitter / Meta KV / Meta CDN**: LLNL leads Twitter by 2.2%; LANL leads
    Meta KV by 77.3% and Meta CDN by 22.9% after r370. LLNL's R281 claims
    were vanilla atlas with poor reuse; R287.M closed most of the Twitter gap.

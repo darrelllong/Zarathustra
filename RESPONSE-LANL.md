@@ -4659,3 +4659,32 @@ miss ratio `0.4325` against real `0.5224` (delta `-0.0898`), i.e. the r370
 synthetic is too hot at saturation-scale cache. That is not a reason to change
 the current race row; it is a concrete architecture target for the paper
 surface.
+
+## 2026-05-08 19:08Z -- Baleen24 r374 Guarded IRD-Donor 512-Row Continuation
+
+LANL banked the r374 Baleen24 guarded 512-row continuation on vinge. The donor
+bank added the r372 IRD-renewal scale scouts and the r373 seed42 IRD-donor
+chunk result to the existing LANL synthetic Baleen24 chunk-surface pool.
+Candidate chunks had to improve the official 5-cache x 6-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies).
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0212097333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0214731000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212713667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0210732000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0212568500` (race display `0.0213`;
+range `0.0003999000`). This improves LANL r347 `0.0213297667` by
+`0.0000729167` (`0.3419%` lower), improves LANL r341 `0.0214221167` by
+`0.0001652667` (`0.7715%` lower), and improves LANL r312 `0.0215118333` by
+`0.0002549833` (`1.1853%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0028098500` (`15.2320%` higher), so this is a LANL tightening, not a
+Baleen24 retake.
+
+No-32 guard seed means were `0.0169483750`, `0.0171960833`, `0.0170352500`,
+and `0.0169123750`, mean `0.0170230208`, range `0.0002837083`.

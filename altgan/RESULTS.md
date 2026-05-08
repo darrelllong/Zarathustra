@@ -4769,3 +4769,22 @@ Literal line: `mean HRC-MAE across policies: 0.0370`. Exact JSON mean:
 The same seed is `0.0231519667` on the official legacy ladder. The
 footprint-scaled ladder exposes large-cache hotness error; at cache `524288`,
 most policies have fake miss ratio `0.4325` against real `0.5224`.
+
+## Baleen24 r374 Guarded IRD-Donor 512-Row Continuation (2026-05-08)
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0212097333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0214731000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212713667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r374_irddonor512m_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0210732000 |
+
+Four-seed mean: `0.0212568500` (display `0.0213`), range `0.0003999000`.
+This improves r347 `0.0213297667` by `0.0000729167`, improves r341
+`0.0214221167` by `0.0001652667`, and improves r312 `0.0215118333` by
+`0.0002549833`. It still trails LLNL R291.BAL2 `0.018447` by `0.0028098500`
+(`15.2320%` higher), so it is banked as a LANL tightening, not a retake.
+
+No-32 guard mean: `0.0170230208`, range `0.0002837083`.
