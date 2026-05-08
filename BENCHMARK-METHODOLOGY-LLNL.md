@@ -98,31 +98,55 @@ yet captured" from "fundamentally unpredictable one-shot variance."
 
 ## What a better protocol would look like
 
-1. **Per-corpus cache-size ladders scaled to the real trace's stack-distance
-   percentiles**, e.g., `[p1, p10, p25, p50, p75, p90, p99]` of the real LRU
-   stack-distance distribution. This makes each cache size measure a
-   *different structural slice*, eliminates the inclusion-redundancy, and
-   covers the full meaningful range for each corpus regardless of its
-   working-set scale.
+### Proposed cache-size rule (Long, 2026-05-08)
 
-2. **Cache sizes at production-realistic scales**: with 128 GB of host RAM
-   available, individual cachesim runs at cache=10⁶ are trivially affordable
-   (~64 MB working memory). The current upper bound of 8,192 (or 32,768) was
-   set when 32-bit RAM constrained the simulator, not because it represents
-   any real workload. A production CDN or KV cache holds 10⁶–10⁹ objects.
+> **Cache sizes shall be powers of two from 1 up to the smallest power of
+> two strictly greater than the trace's working-set footprint** (i.e.,
+> `2^⌈log₂(N+1)⌉` where N = number of distinct objects in the trace).
 
-3. **Per-corpus prediction-floor reporting**: alongside the absolute mean
+Rationale:
+- **Self-scaling** to each corpus — Wiki (footprint 492k) ends at 2^19 =
+  524,288; Baleen24 (footprint 148k) ends at 2^18 = 262,144. No fixed ladder
+  is appropriate across corpora with 13× working-set range.
+- **Coverage**: spans from the trivial extreme (cache=1, measures only
+  adjacent-duplicate rate) to the saturation extreme (cache > footprint,
+  every reuse hits). Captures the full HRC dynamic range per corpus.
+- **Deterministic / unambiguous**: no policy choices, no percentile
+  thresholds, just `footprint` and `log₂`. Both teams can compute it
+  identically from the real CSV.
+- **Tractable on 128 GB hosts**: cache = 524,288 needs ~32 MB working memory
+  per cachesim instance; ~20 cache sizes per corpus increase per-trace eval
+  time roughly 4× over the current 5-size surface (still seconds per
+  multi-policy run on a Rust simulator).
+
+Per-corpus ladders under this rule (from observed footprints):
+
+| Corpus | Footprint | Largest cache | Ladder length |
+|---|---:|---:|---:|
+| Alibaba | 693,535 | 2^20 = 1,048,576 | 21 |
+| Tencent | 38,507 (100k) / TBD (1M) | 2^16 (or larger if footprint exceeds) | ~17 |
+| CloudPhysics | 469,369 | 2^19 = 524,288 | 20 |
+| Baleen24 | 147,783 | 2^18 = 262,144 | 19 |
+| MSR Exchange | 507,523 | 2^19 = 524,288 | 20 |
+| Meta KV | 190,110 | 2^18 = 262,144 | 19 |
+| Meta CDN | 417,390 | 2^19 = 524,288 | 20 |
+| Wikipedia | 492,052 | 2^19 = 524,288 | 20 |
+
+### Other corrections
+
+1. **Per-corpus prediction-floor reporting**: alongside the absolute mean
    HRC-MAE, report the gap to the Bayes-optimal generator over summary
    statistics (IRD distribution + rank PMF + frequency histogram). This
    reframes "LANL beats LLNL by 0.001" as "LANL closes 18% of the remaining
    structure-prediction gap that LLNL doesn't" — which is what the number
    actually means.
 
-4. **Drop arithmetic mean across correlated cache sizes** in favor of the
-   integral of |HRC_real(c) − HRC_fake(c)| over log-cache-size, normalized by
-   the local dynamic range. This treats each cache size as a measurement of
-   *additional* prediction quality in its discriminative band, not a duplicate
-   of its neighbor.
+2. **Drop arithmetic mean across correlated cache sizes** in favor of the
+   integral of |HRC_real(c) − HRC_fake(c)| over log-cache-size, normalized
+   by the local dynamic range. This treats each cache size as a measurement
+   of *additional* prediction quality in its discriminative band, not a
+   duplicate of its neighbor. (Equivalent to a Riemann sum on log scale, which
+   is the natural measure for power-of-two ladders.)
 
 ## Why this matters for the paper
 
