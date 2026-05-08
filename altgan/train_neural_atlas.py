@@ -25,6 +25,19 @@ from .neural_atlas import fit_neural_atlas  # noqa: E402
 from .train import _collect_files  # noqa: E402
 
 
+_HASH_KEY_NAME_TOKENS = (
+    "twitter",
+    "metakv",
+    "meta_kv",
+    "meta-kv",
+    "metacdn",
+    "meta_cdn",
+    "meta-cdn",
+    "wikipedia",
+    "wiki",
+)
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     src = p.add_mutually_exclusive_group(required=True)
@@ -197,7 +210,10 @@ def _load_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> dict:
             path = row.get("path", "")
             if not rel and not path:
                 continue
-            vec = torch.tensor(_profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
+            vec = torch.tensor(
+                _profile_to_cond_vector(profile, cond_dim, rel, path),
+                dtype=torch.float32,
+            )
             for key in _char_row_keys(rel, path):
                 lookup[key] = vec
     return lookup
@@ -216,7 +232,10 @@ def _load_lanl_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> di
             if not profile or not rel or not _has_request_conditioning(profile):
                 continue
             basename = Path(rel).name
-            vec = torch.tensor(_profile_to_cond_vector(profile, cond_dim), dtype=torch.float32)
+            vec = torch.tensor(
+                _profile_to_cond_vector(profile, cond_dim, rel),
+                dtype=torch.float32,
+            )
             raw_lookup[basename] = vec
             for ext in (".zst", ".gz"):
                 if basename.endswith(ext):
@@ -224,8 +243,15 @@ def _load_lanl_file_characterizations(jsonl_path: str, cond_dim: int = 10) -> di
     return raw_lookup
 
 
-def _profile_to_cond_vector(profile: dict, cond_dim: int = 10) -> list[float]:
-    return _llgan_profile_to_cond_vector(_sanitize_hash_key_profile(profile), cond_dim)
+def _profile_to_cond_vector(
+    profile: dict,
+    cond_dim: int = 10,
+    *source_names: str,
+) -> list[float]:
+    return _llgan_profile_to_cond_vector(
+        _sanitize_hash_key_profile(profile, source_names),
+        cond_dim,
+    )
 
 
 def _has_request_conditioning(profile: dict) -> bool:
@@ -319,20 +345,28 @@ def _frame_to_cond_vector(df, path: Path | str, cond_dim: int = 10) -> np.ndarra
     return np.asarray(_profile_to_cond_vector(profile, cond_dim), dtype=np.float32)
 
 
-def _sanitize_hash_key_profile(profile: dict) -> dict:
+def _sanitize_hash_key_profile(
+    profile: dict,
+    source_names: tuple[str, ...] = (),
+) -> dict:
     """Neutralize address-stride conditioning for hash-keyed object IDs."""
-    if profile.get("obj_id_kind") != "hash":
+    is_hash_keyed = profile.get("obj_id_kind") == "hash" or any(
+        _name_looks_hash_keyed(name) for name in source_names
+    )
+    if not is_hash_keyed:
         return profile
     clean = dict(profile)
+    clean["obj_id_kind"] = "hash"
     clean["forward_seek_ratio"] = 0.5
     clean["backward_seek_ratio"] = 0.5
     clean["signed_stride_lag1_autocorr"] = 0.0
+    clean["abs_stride_stats"] = None
     return clean
 
 
 def _looks_hash_keyed(path: Path, obj_series) -> bool:
     lower = str(path).lower()
-    if any(token in lower for token in ("twitter", "metakv", "metacdn", "meta", "wiki")):
+    if any(token in lower for token in _HASH_KEY_NAME_TOKENS):
         return True
     sample = _numeric_array(obj_series.head(min(len(obj_series), 4096)))
     if len(sample) < 2:
@@ -345,6 +379,10 @@ def _looks_hash_keyed(path: Path, obj_series) -> bool:
     diffs = np.abs(np.diff(finite))
     med_diff = float(np.median(diffs[np.isfinite(diffs)])) if len(diffs) else 0.0
     return unique_ratio > 0.95 and max_abs > 1e12 and med_diff > 1e9
+
+
+def _name_looks_hash_keyed(name: str) -> bool:
+    return any(token in str(name).lower() for token in _HASH_KEY_NAME_TOKENS)
 
 
 def _numeric_array(series) -> np.ndarray:
