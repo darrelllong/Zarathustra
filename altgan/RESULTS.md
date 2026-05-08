@@ -4695,3 +4695,26 @@ Atlas:
 Four-seed mean: `0.0137603667` (display `0.0138`), range `0.0009696000`.
 This is worse than incumbent Meta KV tail08 `0.0108672417` by `0.0028931250`
 (`26.6224%` higher), so this clean-condition refit is rejected.
+
+## Meta CDN IRD-Seeded 2-Row Guarded Continuation (2026-05-08)
+
+Continued Meta CDN from r369 with a guarded 2-row object-ID selector.
+Reference: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0231519667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0231` | 0.0231110000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0245` | 0.0244686000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0243054333 |
+
+Four-seed mean: `0.0237592500` (display `0.0238`), range `0.0013576000`.
+This improves r369 `0.0237821583` by `0.0000229083` (`0.0963%` lower),
+improves r366 `0.0238064750` by `0.0000472250` (`0.1984%` lower), improves
+r365 `0.0238555667` by `0.0000963167` (`0.4037%` lower), improves r320
+`0.0269202167` by `0.0031609667` (`11.7420%` lower), and beats LLNL
+R287.CDN2 `0.03081` by `0.0070507500` (`22.8846%` lower) on the official
+six-policy surface.
+
+No-32 guard mean improved from r369 `0.0215056146` to `0.0214763021`, a
+`0.0000293125` (`0.1363%`) lower diagnostic mean.
