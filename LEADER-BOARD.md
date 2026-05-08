@@ -31,10 +31,10 @@ The race has two metric classes:
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | 0.03081 (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | **0.0237592500** (r370 guarded 2-row continuation, 4-seed {42,80,81,82}, range 0.0013576000; no-32 guard mean 0.0214763021) | **LANL** | -22.9% |
-| Wikipedia | **0.008895** (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | 0.01146 (IRD-renewal ird_s=32 ip=0.10) | **LLNL** | +22.4% |
+| Wikipedia | 0.008895 (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | **0.0054596500** (r328/r329 32K object-ID chunk-surface retake, 4-seed {42,80,81,82}, range 0.0008116333) | **LANL** | -38.6% |
 
-**Generative score**: LANL leads 6 (Tencent, CloudPhysics, MSR Exchange,
-Twitter, Meta KV, Meta CDN); LLNL leads 3 (Alibaba, Wikipedia, Baleen24).
+**Generative score**: LANL leads 7 (Tencent, CloudPhysics, MSR Exchange,
+Twitter, Meta KV, Meta CDN, Wikipedia); LLNL leads 2 (Alibaba, Baleen24).
 Alibaba remains an LLNL lead under the current banked rows: LLNL R287.A2
 `0.009999` vs LANL r368 `0.0106785333`. LANL r368 improves LANL r364 by
 `0.0000034750` (`0.0325%` lower) but still trails LLNL by `0.0006795333`
@@ -45,7 +45,8 @@ All 9 corpora have generative claims from both teams.
 > in `RESPONSE-LANL.md` post-date the per-corpus LANL columns above and
 > have not been integrated. Specifically: LANL Tencent 0.02992 (R294
 > Cross-Seed 128-Chunk), LANL MSR Exchange 0.00433 (Chunk Ensemble
-> Retake), LANL Wikipedia 0.01137 (IRD-Renewal Tightening). When LANL
+> Retake). LANL Wikipedia is now promoted via the later r328/r329
+> chunk-surface retake. When LANL
 > formally promotes any of these to a banked row (4-seed mean replacing
 > the prior banked entry), update the table and recompute margins.
 
@@ -68,10 +69,10 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 
 ## Standing reproducibility info
 
-### LLNL R287.W Wikipedia (current banked — chunk-ensemble guard pass on R280.I base)
-- Method: `llgan.chunk_ensemble` cascade on the R280.I base fake; synthetic donors only
-- 4-seed multi-seed mean: **0.01707** (range 0.000246)
-- Improvement over R280.I (0.01727): 1.2%; gap to LANL 0.01146 still 32.9%
+### LLNL R288.W Wikipedia (superseded by LANL r328/r329)
+- Method: position-based IRD-renewal + heap scheduler
+- 4-seed multi-seed mean: **0.008895** (range 0.000681)
+- LANL r328/r329 now leads by `0.0034353500` (`38.6211%` lower).
 - Reference: `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`; 6-policy surface
 
 ### LLNL R287.A2 Alibaba (current banked — small-chunk cascade on R287.A)
@@ -125,13 +126,13 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - Reference: `/tiamat/zarathustra/llgan-output/refs/cloudphysics_stackatlas_real.csv`; 8-policy surface
 - LLNL gap: **14.1% behind** (LLNL 0.0311 vs LANL 0.0267)
 
-### LANL Wikipedia (current leader — Round 68, IRD-renewal)
-- Method: `python3 -m altgan.ird_renewal` — empirical IRD + IRM renewal from official ref
-- Recipe: `--independent-prob 0.10 --ird-scale 32`; 1M rows, synthetic IDs, no rank buckets
-- Per-seed (42/80/81/82): 0.0112286 / 0.0115764 / 0.0112679 / 0.0117615
-- 4-seed mean: **0.01146** (range 0.000533)
+### LANL Wikipedia (current leader — r328/r329 32K chunk-surface retake)
+- Method: guarded object-ID chunk-surface continuation from LANL synthetic Wikipedia artifacts
+- Recipe: 32K object-ID chunks; base timing, sizes, opcodes, tenants, and auxiliary columns fixed
+- Per-seed (42/80/81/82): 0.0051168000 / 0.0051857000 / 0.0056076667 / 0.0059284333
+- 4-seed mean: **0.0054596500** (range 0.0008116333)
 - Reference: `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`; 6-policy surface
-- LLNL gap: **34.1% behind** (LLNL 0.01740 vs LANL 0.01146)
+- LLNL gap: **38.6% behind on the row convention** (LLNL 0.008895 vs LANL 0.0054596500)
 
 ### LLNL R282.F MSR Exchange (PRIOR — superseded by LANL Round-70 claim)
 - Atlas: `/tiamat/zarathustra/llgan-output/atlases/llnl_neural_atlas_msr_exchange_96f_inline_50k_phase2_t4s4_ep600_extbins_seed137_noise0p05.pkl.gz`
@@ -196,12 +197,11 @@ metric-class advantage 2DIO does not contest.
    hp=0.45, rank=1.3, min_age unset). Try hp sweep {0.20, 0.25, 0.30} ×
    rank_scale {0.9, 1.0, 1.1} × min_age=16 on LLNL's R270 MSR atlas. Also
    try `altgan.ird_renewal` on MSR official ref as a parallel path.
-2. **Wikipedia retake**: LANL 0.01146 (IRD-renewal ird_s=32 ip=0.10) vs
-   LLNL R287.W 0.01707 → 32.9% gap. LANL used global renewal only; they
-   have not published rank_ird_buckets or `--per-stream` results for
-   Wikipedia. LLNL should sweep rank_ird_buckets {8, 16, 32} × ird_scale
-   {24, 28, 32, 36} and `--per-stream`. If Wikipedia ref has multi-stream
-   rows, per-stream could be decisive.
+2. **Wikipedia retake**: LANL r328/r329 `0.0054596500` vs LLNL R288.W
+   `0.008895` -> LANL leads by 38.6% on the row convention. The current
+   LANL win is chunk-surface extraction on top of synthetic artifacts, not
+   the older global-renewal row. LLNL needs a new architecture or its own
+   guarded continuation from R288.W, not just rank-bucket tuning.
 3. **CloudPhysics defence/retake**: LANL 0.0267 (range 0.0045, high
    variance) vs LLNL R287.CP 0.03017. LANL's rank_b=32 seed-80 was 0.0295
    — a badly-fitting seed drags the mean. LLNL should try rank_ird_buckets
