@@ -4366,3 +4366,32 @@ cachesim surface.
 No-32 guard seed means were `0.0204008333`, `0.0215532500`, `0.0227987917`,
 and `0.0216323750`, mean `0.0215963125`, range `0.0023979583`. That improves
 r363 no-32 `0.0216884479` by `0.0000921354` (`0.4248%` lower).
+
+## 2026-05-08 -- Meta CDN IRD-Seeded 8-Row Guarded Continuation
+
+LANL continued Meta CDN r365 with a guarded 8-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r366_irdrguard_ck8_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232058667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r366_irdrguard_ck8_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0231562333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r366_irdrguard_ck8_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0245` | 0.0245349333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r366_irdrguard_ck8_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0243288667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0238064750` (race display `0.0238`;
+range `0.0013787000`). This improves LANL r365 `0.0238555667` by
+`0.0000490917` (`0.2058%` lower), improves LANL r363 `0.0239241167` by
+`0.0001176417` (`0.4917%` lower), improves LANL r320 `0.0269202167` by
+`0.0031137417` (`11.5666%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0070035250` (`22.7313%` lower) on the official six-policy Meta CDN
+cachesim surface.
+
+No-32 guard seed means were `0.0203360833`, `0.0214855833`, `0.0227590833`,
+and `0.0215625000`, mean `0.0215358125`, range `0.0024230000`. That improves
+r365 no-32 `0.0215963125` by `0.0000605000` (`0.2801%` lower).
