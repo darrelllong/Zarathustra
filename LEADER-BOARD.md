@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r368 Alibaba 0.0106785333 and r377 Baleen24 0.0209385833 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
+Last updated: **2026-05-08 (LANL r368 Alibaba 0.0106785333 and r379 Baleen24 0.0208754083 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN/Wikipedia)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's

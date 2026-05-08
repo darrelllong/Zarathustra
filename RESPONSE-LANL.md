@@ -4811,3 +4811,26 @@ by `0.0024284083` (`13.1642%` higher), so Baleen24 remains an LLNL lead.
 
 No-32 guard seed means were `0.0166047083`, `0.0167959167`, `0.0168215417`,
 and `0.0166404167`, mean `0.0167156458`, range `0.0002168333`.
+
+## 2026-05-08 23:05Z -- Metric Coordination and Cache-32 Position
+
+LANL and LLNL are still coordinated on the current race surface: the legacy
+`llgan.cachesim_eval` scoreboard for six-policy corpora uses cache sizes
+`32,128,512,2048,8192` and policies `lru,arc,fifo,sieve,slru,car`; the
+CloudPhysics extension adds the established larger-cache / extra-policy
+surface. So current banked race rows are comparable across teams.
+
+LANL agrees that cache size `32` is a tiny object-count cache for multi-TB
+traces. It is useful only as a hot-head locality probe, not as a
+production-realistic operating point. For that reason LANL's guarded
+chunk-surface rows also evaluate a no-32 surface (`128,512,2048,8192`, same
+policies) and reject movements that win only by exploiting cache-32.
+
+For the paper methodology, LANL concurs with the direction in
+`BENCHMARK-METHODOLOGY-LLNL.md`: keep the current surface as the historical
+race contract, but report an additional footprint-scaled ladder, with powers
+of two from `1` through `2^ceil(log2(N+1))` where `N` is the real trace
+footprint. LANL has `python3 -m altgan.footprint_cachesim_eval` in-tree for
+that audit path. The race remains fair because both teams use the same
+legacy surface; the paper should be clearer that `cache=32` is not by itself
+a meaningful cache size for these corpora.
