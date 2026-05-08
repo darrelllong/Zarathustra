@@ -299,6 +299,8 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             obj_out[pos] = np.uint64(args.synthetic_base_id + rank)
             if from_dependent:
                 schedule_after(rank, due_key)
+            else:
+                schedule(rank, pos)
 
             if args.progress_interval > 0 and (pos + 1) % args.progress_interval == 0:
                 print(
