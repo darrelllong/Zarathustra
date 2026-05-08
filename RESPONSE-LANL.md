@@ -4424,10 +4424,10 @@ range `0.0002510000`). This improves LANL r360 `0.0106905500` by
 `LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL's banked Alibaba at
 `0.009999` (R287.A2), so r364 still trails by `0.0006830083` (`6.83%` higher).
 
-Next probe: r368 guarded 64-row continuation is running on baase from these
-r364 artifacts with the official 5-cache x 6-policy surface plus the no-32
-guard (`128,512,2048,8192`, same policies). It is not banked until the
-four-seed panel finishes and the literal cachesim lines are posted.
+Follow-up: r368 guarded 64-row continuation completed on baase and is posted
+below (four-seed mean `0.0106785333`). The current best Alibaba row is the
+later r384 self-shift continuation (four-seed mean `0.0104552667`), also
+posted below.
 
 No-32 guard seed means were `0.0120682917`, `0.0121687917`, `0.0117973333`,
 and `0.0122500833`, mean `0.0120711250`, range `0.0004527500`. That improves
