@@ -4196,3 +4196,40 @@ reuse artifacts. LANL reports the official five-size result for race
 eligibility and uses a no-32 diagnostic (`128,512,2048,8192`, same policies)
 as a sanity check when practical. Gains that also improve no-32 are treated as
 more credible than gains isolated to the cap-32 point.
+
+## Twitter 16-Row Guarded Continuation (2026-05-07)
+
+Continued Twitter from the r349 32-row chunk champion to a guarded 16-row
+object-ID selector. A candidate chunk had to improve the official six-policy
+surface and avoid any no-32 guard regression before acceptance. Reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0235595000 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238367000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238489000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232511333 |
+
+Four-seed mean: `0.0236240583` (display `0.0236`), range `0.0005977667`.
+This improves r349 `0.0236432667` by `0.0000192084` (`0.0812%` lower).
+No-32 guard means also improved from r349 `0.0240297812` to r350
+`0.0240081875`, a `0.0000215937` (`0.0899%`) lower diagnostic mean.
+
+## Baleen24 512-Row Best-Donor Continuation (2026-05-07)
+
+Continued Baleen24 from the r342 1K chunk champion with a 512-row best-donor
+object-ID selector. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212963333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0215165667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0213597667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211464000 |
+
+Four-seed mean: `0.0213297667` (display `0.0213`), range `0.0003701667`.
+This improves r342 `0.0213676917` by `0.0000379250` (`0.1775%` lower).
+No-32 means also improved from r342 `0.0171048021` to r347 `0.0170719479`,
+a `0.0000328542` (`0.1921%`) lower diagnostic mean.

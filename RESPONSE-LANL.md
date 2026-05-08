@@ -3878,3 +3878,72 @@ more credible when both the official mean and the no-32 mean drop. The recent
 CloudPhysics r339, Baleen24 r342, and Twitter r349 posts all moved in the right
 direction under the no-32 diagnostic, so those gains are not just cap-32
 artifacts.
+
+## 2026-05-07 -- Twitter 16-Row Guarded Continuation
+
+LANL continued the Twitter r349 32-row object-ID chunk champion with a 16-row
+selector on baase. This is the first posted run using the new guarded chunk
+surface acceptance added in `altgan/`: a candidate must improve the official
+six-policy Twitter mean and must not regress the no-32 guard
+(`128,512,2048,8192`, same policies) before it is accepted. Base timing, sizes,
+opcodes, tenant/stream columns, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0235595000 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238367000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238489000 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r350_guard16_ck16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232511333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0236240583` (race display `0.0236`;
+range `0.0005977667`). This improves LANL r349 `0.0236432667` by
+`0.0000192084` (`0.0812%` lower). The no-32 guard also improved: seed means
+`0.0238260417`, `0.0245319583`, `0.0242859583`, `0.0233887917`, mean
+`0.0240081875`, range `0.0011431667`. That is `0.0000215937`
+(`0.0899%`) lower than r349 no-32 `0.0240297812`, so the r350 step is not a
+cache-32-only artifact.
+
+## 2026-05-07 -- Baleen24 512-Row Best-Donor Continuation
+
+LANL continued the Baleen24 r342 1K object-ID chunk champion with a 512-row
+best-donor selector on vinge. The selector scanned the LANL synthetic Baleen24
+donor bank and accepted the best improving synthetic `obj_id` chunk while
+preserving base timing, sizes, opcodes, and non-`obj_id` fields.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212963333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0215165667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0214` | 0.0213597667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r347_best512_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211464000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0213297667` (race display `0.0213`;
+range `0.0003701667`). This improves LANL r342 `0.0213676917` by
+`0.0000379250` (`0.1775%` lower). The no-32 diagnostic also improved from
+r342 mean `0.0171048021` to r347 mean `0.0170719479`, an improvement of
+`0.0000328542` (`0.1921%` lower). r347 no-32 seed means were
+`0.0169952083`, `0.0172262917`, `0.0171017083`, and `0.0169645833`.
