@@ -4831,3 +4831,27 @@ This improves r374 `0.0212568500` by `0.0002410333` (`1.1339%` lower), but
 still trails LLNL R291.BAL2 `0.018447` by `0.0025688167` (`13.9254%` higher).
 
 No-32 guard mean: `0.0168250625`, range `0.0002407500`.
+
+## Baleen24 r377 ID+Size 1024-Row Continuation (2026-05-08)
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+Contract: synthetic-donor `obj_id,obj_size` chunk swaps; base synthetic
+`stream_id`, `ts`, `opcode`, `tenant`, `stack_distance`, and `action_class`
+are preserved; no real columns are read.
+Current `tools/cachesim` scores time-sorted `(stream_id,obj_id)` cache keys
+and ignores `obj_size`, so this row's score movement is not caused by bytes.
+The score-relevant follow-up is r379 `stream_id,obj_id,obj_size`, now running
+on vinge.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r377_idsize1024_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0208` | 0.0207947333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r377_idsize1024_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0210879000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r377_idsize1024_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0210734333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r377_idsize1024_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0208` | 0.0207982667 |
+
+Four-seed mean: `0.0209385833` (display `0.0209`), range `0.0002931667`.
+This improves r375 `0.0210158167` by `0.0000772334` (`0.3675%` lower), but
+still trails LLNL R291.BAL2 `0.018447` by `0.0024915833` (`13.5067%` higher).
+
+No-32 guard mean: `0.0167670937`, range `0.0002615417`.

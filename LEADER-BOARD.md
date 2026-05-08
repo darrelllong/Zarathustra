@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r368 Alibaba 0.0106785333 and r375 Baleen24 0.0210158167 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
+Last updated: **2026-05-08 (LANL r368 Alibaba 0.0106785333 and r377 Baleen24 0.0209385833 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.0106785333 (r368 guarded 64-row continuation, 4-seed {42,80,81,82}, range 0.0002482667; no-32 guard mean 0.0120662917) | **LLNL** | +6.8% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0210158167 (r375 guarded ID+size 2048-row continuation, 4-seed {42,80,81,82}, range 0.0003189333; no-32 guard mean 0.0168250625) | **LLNL** | +13.9% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0209385833 (r377 guarded ID+size 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002931667; no-32 guard mean 0.0167670937) | **LLNL** | +13.5% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
