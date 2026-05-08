@@ -55,7 +55,11 @@ def _parse_args() -> argparse.Namespace:
             "`vinge` and DNS for the jump host is unavailable."
         ),
     )
-    p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
+    p.add_argument(
+        "--repo-dir",
+        default="/home/darrell/Zarathustra",
+        help="Repo path on remote host (will probe common alternates if missing).",
+    )
     p.add_argument(
         "--remote-python",
         default="/tiamat/zarathustra/altgan-venv/bin/python",
@@ -169,6 +173,27 @@ def _remote_repo_dir_expr(repo_dir: str) -> str:
     return _q(repo_dir)
 
 
+def _remote_cd_repo_snippet(*, args: argparse.Namespace) -> list[str]:
+    """Return bash lines that `cd` into the remote repo, probing common paths."""
+    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    return [
+        f"repo_dir_user={repo_dir_expr}",
+        "repo_dir=''",
+        'for cand in "$repo_dir_user" "$HOME/Zarathustra" "$HOME/LANL/Zarathustra" "/home/darrell/Zarathustra"; do',
+        '  if [ -d "$cand/.git" ]; then repo_dir="$cand"; break; fi',
+        "done",
+        'if [ -z "$repo_dir" ]; then',
+        "  echo '[ssh_tracebootstrap] ERROR: could not locate remote repo; tried:' >&2",
+        '  echo "  $repo_dir_user" >&2',
+        '  echo "  $HOME/Zarathustra" >&2',
+        '  echo "  $HOME/LANL/Zarathustra" >&2',
+        '  echo "  /home/darrell/Zarathustra" >&2',
+        "  exit 2",
+        "fi",
+        'cd "$repo_dir"',
+    ]
+
+
 def _remote_shell(*, args: argparse.Namespace) -> str:
     host = args.host if args.user is None else f"{args.user}@{args.host}"
     key = str(Path(args.ssh_key).expanduser())
@@ -249,12 +274,11 @@ def _create_local_bundle_bytes(*, ref: str) -> bytes:
 
 
 def _build_remote_sync_script(*, args: argparse.Namespace, ref: str) -> str:
-    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     remote_ref = f"refs/remotes/codex_sync/{ref}"
     git_ssh_export = _git_ssh_command_export(args=args)
     script_lines = [
         "set -euo pipefail",
-        f"cd {repo_dir_expr}",
+        *_remote_cd_repo_snippet(args=args),
         git_ssh_export,
         "bundle_path=$(mktemp)",
         "cat > \"$bundle_path\"",
@@ -271,7 +295,6 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     zar_root = args.zarathustra_root
     output_root = args.output_root or f"{zar_root}/altgan-output"
     emit_dir = args.emit_dir or f"{output_root}/paste_ready"
-    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     corpora = _normalize_csv_list(args.corpora)
     seeds = _normalize_csv_list(args.seeds)
     git_ssh_export = _git_ssh_command_export(args=args)
@@ -322,7 +345,7 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
 
     script_lines = [
         "set -euo pipefail",
-        f"cd {repo_dir_expr}",
+        *_remote_cd_repo_snippet(args=args),
         git_ssh_export,
         *(["git pull --rebase origin main"] if args.sync == "pull" else []),
         f"{_q(args.remote_python)} -V",

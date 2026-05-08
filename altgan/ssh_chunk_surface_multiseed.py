@@ -54,7 +54,11 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         action="store_true",
         help="Disable ssh ProxyJump by passing `-o ProxyJump=none`.",
     )
-    p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
+    p.add_argument(
+        "--repo-dir",
+        default="/home/darrell/Zarathustra",
+        help="Repo path on remote host (will probe common alternates if missing).",
+    )
     p.add_argument(
         "--remote-python",
         default="/tiamat/zarathustra/altgan-venv/bin/python",
@@ -115,6 +119,27 @@ def _remote_repo_dir_expr(repo_dir: str) -> str:
     return _q(repo_dir)
 
 
+def _remote_cd_repo_snippet(*, args: argparse.Namespace) -> list[str]:
+    """Return bash lines that `cd` into the remote repo, probing common paths."""
+    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    return [
+        f"repo_dir_user={repo_dir_expr}",
+        "repo_dir=''",
+        'for cand in "$repo_dir_user" "$HOME/Zarathustra" "$HOME/LANL/Zarathustra" "/home/darrell/Zarathustra"; do',
+        '  if [ -d "$cand/.git" ]; then repo_dir="$cand"; break; fi',
+        "done",
+        'if [ -z "$repo_dir" ]; then',
+        "  echo '[ssh_chunk_surface] ERROR: could not locate remote repo; tried:' >&2",
+        '  echo "  $repo_dir_user" >&2',
+        '  echo "  $HOME/Zarathustra" >&2',
+        '  echo "  $HOME/LANL/Zarathustra" >&2',
+        '  echo "  /home/darrell/Zarathustra" >&2',
+        "  exit 2",
+        "fi",
+        'cd "$repo_dir"',
+    ]
+
+
 def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
     host = args.host if args.user is None else f"{args.user}@{args.host}"
     key = str(Path(args.ssh_key).expanduser())
@@ -173,13 +198,12 @@ def _create_local_bundle_bytes(*, ref: str) -> bytes:
 
 
 def _build_remote_bundle_sync_script(*, args: argparse.Namespace, ref: str) -> str:
-    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     remote_ref = f"refs/remotes/codex_sync/{ref}"
     git_ssh_export = _git_ssh_command_export(args=args)
     return "\n".join(
         [
             "set -euo pipefail",
-            f"cd {repo_dir_expr}",
+            *_remote_cd_repo_snippet(args=args),
             git_ssh_export,
             "bundle_path=$(mktemp)",
             "cat > \"$bundle_path\"",
@@ -193,12 +217,11 @@ def _build_remote_bundle_sync_script(*, args: argparse.Namespace, ref: str) -> s
 
 
 def _build_remote_pull_sync_script(*, args: argparse.Namespace, ref: str) -> str:
-    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     git_ssh_export = _git_ssh_command_export(args=args)
     return "\n".join(
         [
             "set -euo pipefail",
-            f"cd {repo_dir_expr}",
+            *_remote_cd_repo_snippet(args=args),
             git_ssh_export,
             f"git checkout -B {shlex.quote(ref)} origin/{shlex.quote(ref)} || git checkout {shlex.quote(ref)}",
             "git pull --rebase origin main",
@@ -213,11 +236,10 @@ def _build_remote_run_script(
     args: argparse.Namespace,
     launch_args: list[str],
 ) -> str:
-    repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     git_ssh_export = _git_ssh_command_export(args=args)
     cmd = [args.remote_python, "-u", "-m", "altgan.launch_chunk_surface_multiseed"] + launch_args
     cmd_str = " ".join(_q(part) for part in cmd)
-    lines = ["set -euo pipefail", f"cd {repo_dir_expr}", git_ssh_export]
+    lines = ["set -euo pipefail", *_remote_cd_repo_snippet(args=args), git_ssh_export]
     if args.tmux_session:
         session = _q(args.tmux_session)
         # We always run tmux jobs detached so they are explicitly managed.

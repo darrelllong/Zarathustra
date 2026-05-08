@@ -121,6 +121,25 @@ python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r30
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
 
+To continue from a guarded 8-row champion down to 4 rows (Twitter is usually the
+highest-leverage when the leaderboard gap is small), keep the same donor bank,
+enable the no-32 guard, and run a single `--pipeline 4` stage:
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session tw_r364_guard4 -- \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --base-template "/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/twitter_chunksurf_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/twitter_cluster*_seed{seed}_fake_*.csv,/tiamat/zarathustra/altgan-output/twitter*_seed42_fake_*.csv" \
+  --tag-prefix twitter_chunksurf_r364_guard4 \
+  --pipeline 4 \
+  --max-accepts 8 \
+  --max-evals 250 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
+
 `altgan.ssh_chunk_surface_multiseed` also exports `GIT_SSH_COMMAND` on the remote host so
 optional `--push` runs are non-interactive; pass `--remote-git-ssh-key` if the remote
 machine requires an explicit key file for git access.

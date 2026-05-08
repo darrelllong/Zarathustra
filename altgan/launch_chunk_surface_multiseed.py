@@ -273,7 +273,10 @@ def main() -> int:
             donors.append(Path(_render_template(template, seed=seed)))
         for pattern in donor_globs:
             rendered = _render_template(pattern, seed=seed)
-            matches = [Path(p) for p in glob.glob(rendered)]
+            matches = sorted(
+                (Path(p) for p in glob.glob(rendered)),
+                key=lambda p: str(p),
+            )
             if matches:
                 donors.extend(matches)
             elif args.dry_run:
