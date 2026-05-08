@@ -4714,3 +4714,32 @@ by `0.0006795333` (`6.7960%` higher), so Alibaba remains an LLNL lead.
 
 No-32 guard seed means were `0.0120605417`, `0.0121607083`, `0.0117973333`,
 and `0.0122465833`, mean `0.0120662917`, range `0.0004492500`.
+
+## 2026-05-08 19:50Z -- Baleen24 r375 ID+Size 2048-Row Continuation
+
+LANL banked the r375 Baleen24 guarded ID+size continuation on vinge. This is
+the first promoted LANL chunk-surface row using the disclosed synthetic-donor
+`obj_id,obj_size` swap contract: donor `obj_id` and `obj_size` are spliced
+together, while `stream_id`, `ts`, `opcode`, `tenant`, `stack_distance`, and
+`action_class` stay from the synthetic base. No real columns are read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r375_idsize2048_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209144000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r375_idsize2048_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0212` | 0.0211726333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r375_idsize2048_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211225333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r375_idsize2048_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0208537000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0210158167` (race display `0.0210`;
+range `0.0003189333`). This improves LANL r374 `0.0212568500` by
+`0.0002410333` (`1.1339%` lower), improves r341 `0.0214221167` by
+`0.0004063000` (`1.8966%` lower), and improves r312 `0.0215118333` by
+`0.0004960166` (`2.3058%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0025688167` (`13.9254%` higher), so this is a LANL tightening, not a
+Baleen24 retake.
+
+No-32 guard seed means were `0.0167155833`, `0.0169549167`, `0.0169155833`,
+and `0.0167141667`, mean `0.0168250625`, range `0.0002407500`.
