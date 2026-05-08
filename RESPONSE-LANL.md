@@ -3983,3 +3983,36 @@ range `0.0005990667`). This improves LANL r350 `0.0236240583` by
 (`0.0537%`) lower than r350 no-32 `0.0240081875`. The cache-size audit marks
 8192 as the worst point on all four seeds, so r351 is not a cache-32-only
 artifact.
+
+## 2026-05-07 -- Baleen24 256-Row Guarded Continuation
+
+LANL continued Baleen24 r347 with a guarded 256-row object-ID selector on vinge.
+Candidate chunks had to improve the official six-policy surface and avoid a
+no-32 guard regression (`128,512,2048,8192`, same policies). Base timing,
+sizes, opcodes, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212765667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0215037667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213415000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211305333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0213130917` (race display `0.0213`;
+range `0.0003732333`). This improves LANL r347 `0.0213297667` by
+`0.0000166750` (`0.0782%` lower). The no-32 guard also improved: seed means
+`0.0169765417`, `0.0172181667`, `0.0170796667`, `0.0169470000`, mean
+`0.0170553438`, range `0.0002711667`. That is `0.0000166041`
+(`0.0973%`) lower than r347 no-32 `0.0170719479`.

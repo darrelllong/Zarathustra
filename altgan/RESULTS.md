@@ -4283,3 +4283,41 @@ Four-seed mean: `0.0236117250` (display `0.0236`), range
 (`0.0522%` lower). No-32 means also improved from r350 `0.0240081875` to
 r351 `0.0239953021`, a `0.0000128854` (`0.0537%`) lower diagnostic mean.
 The per-cache audit shows 8192, not 32, as the worst cache point on all seeds.
+
+## Baleen24 256-Row Guarded Continuation (2026-05-07)
+
+Continued Baleen24 from the r347 512-row champion with a guarded 256-row
+object-ID selector. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212765667 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0215037667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213415000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r351_guard256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211305333 |
+
+Four-seed mean: `0.0213130917` (display `0.0213`), range
+`0.0003732333`. This improves r347 `0.0213297667` by `0.0000166750`
+(`0.0782%` lower). No-32 means also improved from r347 `0.0170719479` to
+r351 `0.0170553438`, a `0.0000166041` (`0.0973%`) lower diagnostic mean.
+
+## Priority IRD Retake Rejects (2026-05-07)
+
+The priority heap reschedule fix and singleton branch were race-audited on
+Wikipedia and CloudPhysics. They are not contenders; both miss the current LANL
+champions by a wide margin, so do not spend more sweep budget on these exact
+specs without a structural change.
+
+| corpus/spec | official mean | official range | no-32/guard mean | guard range | verdict |
+|---|---:|---:|---:|---:|---|
+| `wiki_r352_priofix` / `priofix_s28_rb16` | 0.0820193750 | 0.0001478000 | 0.0716042604 | 0.0002957500 | reject |
+| `wiki_r353_prioinf1` / `prioinf1_s28_rb16` | 0.0771372500 | 0.0005019667 | 0.0673305000 | 0.0004753750 | reject |
+| `cloudphysics_r352_priofix` / `priofix_rb32_s16` | 0.0562868958 | 0.0004473958 | 0.0548442625 | 0.0007652750 | reject |
+| `cloudphysics_r353_prioinf1` / `prioinf1_rb32_s16` | 0.0648107760 | 0.0003094375 | 0.0626970125 | 0.0003195500 | reject |
+
+The singleton branch improved Wikipedia versus the fixed priority retake
+(`0.0771372500` vs `0.0820193750`) but remains far behind the posted LANL
+Wikipedia champion (`0.0054596500`). On CloudPhysics it regressed
+(`0.0648107760` vs `0.0562868958`) and both are far behind LANL r339
+(`0.0111235469`).
