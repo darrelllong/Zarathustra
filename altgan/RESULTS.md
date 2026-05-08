@@ -4260,3 +4260,7 @@ Baleen24 r351 job:
 `priofix_rb32_s16:ird_s=16,ip=0.00,rb=32,heap=priority`, official
 `32,128,512,2048,8192,32768` eight-policy surface plus no-32 guard
 `128,512,2048,8192,32768`.
+
+Follow-on `inf1=1` variants are queued behind those retakes:
+`wiki_r353_prioinf1` and `cloudphysics_r353_prioinf1`, with matching official
+and no-32 guard surfaces.
