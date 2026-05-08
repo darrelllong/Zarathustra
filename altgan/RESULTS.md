@@ -4600,3 +4600,31 @@ six-policy surface.
 
 No-32 guard mean improved from r365 `0.0215963125` to `0.0215358125`, a
 `0.0000605000` (`0.2801%`) lower diagnostic mean.
+
+## Alibaba 128-Row Best-Donor Continuation (2026-05-08)
+
+Continued Alibaba from r360 with a guarded 128-row object-ID selector.
+Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106480333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107728000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105281000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107791000 |
+
+Four-seed mean: `0.0106820083` (display `0.0107`), range `0.0002510000`.
+This improves r360 `0.0106905500` by `0.0000085417` (`0.0799%` lower),
+improves r340 `0.0107009583` by `0.0000189500` (`0.1771%` lower), improves
+r326 `0.0107118917` by `0.0000298834` (`0.2790%` lower), improves r303
+`0.0107631083` by `0.0000811000` (`0.7535%` lower), and widens the margin
+against LLNL R287.A's `0.01078` Alibaba neighborhood by `0.0000979917`
+(`0.9090%` lower) on the official six-policy surface.
+
+No-32 guard mean improved from r360 `0.0120802396` to `0.0120711250`, a
+`0.0000091146` (`0.0755%`) lower diagnostic mean.
+
+The r367 cross-seed donor-pool audit completed at `0.0106858083` with no-32
+guard mean `0.0120753333`; it did not beat r364, so the best Alibaba board
+position remains r364.

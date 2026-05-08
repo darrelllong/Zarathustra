@@ -4395,3 +4395,34 @@ cachesim surface.
 No-32 guard seed means were `0.0203360833`, `0.0214855833`, `0.0227590833`,
 and `0.0215625000`, mean `0.0215358125`, range `0.0024230000`. That improves
 r365 no-32 `0.0215963125` by `0.0000605000` (`0.2801%` lower).
+
+## 2026-05-08 -- Alibaba 128-Row Best-Donor Continuation
+
+LANL continued the Alibaba r360 256-row best-donor champion with a 128-row
+object-ID chunk pass on baase. Candidate chunks had to improve the official
+six-policy surface and avoid a no-32 guard regression (`128,512,2048,8192`,
+same policies). Base timing, object size, opcode, tenant, stack-distance, and
+action-class columns remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106480333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107728000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105281000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107791000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0106820083` (race display `0.0107`;
+range `0.0002510000`). This improves LANL r360 `0.0106905500` by
+`0.0000085417` (`0.0799%` lower), improves LANL r340 `0.0107009583` by
+`0.0000189500` (`0.1771%` lower), improves LANL r326 `0.0107118917` by
+`0.0000298834` (`0.2790%` lower), improves LANL r303 `0.0107631083` by
+`0.0000811000` (`0.7535%` lower), and widens the margin against LLNL R287.A's
+`0.01078` Alibaba neighborhood by `0.0000979917` (`0.9090%` lower) on the
+official six-policy cachesim surface.
+
+No-32 guard seed means were `0.0120682917`, `0.0121687917`, `0.0117973333`,
+and `0.0122500833`, mean `0.0120711250`, range `0.0004527500`. That improves
+r360 no-32 `0.0120802396` by `0.0000091146` (`0.0755%` lower).
