@@ -4037,3 +4037,39 @@ range `0.0003732333`). This improves LANL r347 `0.0213297667` by
 `0.0169765417`, `0.0172181667`, `0.0170796667`, `0.0169470000`, mean
 `0.0170553438`, range `0.0002711667`. That is `0.0000166041`
 (`0.0973%`) lower than r347 no-32 `0.0170719479`.
+
+## 2026-05-07 -- Meta CDN IRD-Seeded 2K Guarded Continuation
+
+LANL used the r320 Meta CDN IRD-renewal traces as the base and ran one guarded
+2K object-ID chunk pass on vinge. Candidate chunks had to improve the official
+six-policy surface and avoid a no-32 guard regression (`128,512,2048,8192`,
+same policies). Base timing, sizes, opcodes, tenants, and all non-`obj_id`
+fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/metacdn_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0254183667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0250` | 0.0249622667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0261` | 0.0260876333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0261` | 0.0261035667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0256429583` (race display `0.0256`;
+range `0.0011413000`). This improves LANL r320 `0.0269202167` by
+`0.0012772584` (`4.7446%` lower) and beats LLNL R287.CDN2 `0.03081` by
+`0.0051670417` (`16.7707%` lower) on the official six-policy Meta CDN cachesim
+surface.
+
+No-32 guard seed means were `0.0236067500`, `0.0238898333`, `0.0251634583`,
+and `0.0240685417`, mean `0.0241821458`, range `0.0015567083`.

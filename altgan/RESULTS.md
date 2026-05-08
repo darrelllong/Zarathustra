@@ -4342,3 +4342,24 @@ The singleton branch improved Wikipedia versus the fixed priority retake
 Wikipedia champion (`0.0054596500`). On CloudPhysics it regressed
 (`0.0648107760` vs `0.0562868958`) and both are far behind LANL r339
 (`0.0111235469`).
+
+## Meta CDN IRD-Seeded 2K Guarded Continuation (2026-05-07)
+
+Started from the r320 Meta CDN IRD-renewal traces and ran one guarded 2K
+object-ID chunk pass. Reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0254183667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0250` | 0.0249622667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0261` | 0.0260876333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r356_irdrguard_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0261` | 0.0261035667 |
+
+Four-seed mean: `0.0256429583` (display `0.0256`), range
+`0.0011413000`. This improves r320 `0.0269202167` by `0.0012772584`
+(`4.7446%` lower) and beats LLNL R287.CDN2 `0.03081` by `0.0051670417`
+(`16.7707%` lower) on the official six-policy surface.
+
+No-32 guard means: `0.0236067500`, `0.0238898333`, `0.0251634583`,
+`0.0240685417`; mean `0.0241821458`, range `0.0015567083`.
