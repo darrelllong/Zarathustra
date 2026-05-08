@@ -4920,3 +4920,39 @@ No-32 guard seed means were `0.0165524167`, `0.0167797917`, `0.0167769167`,
 and `0.0166328333`, mean `0.0166854896`, range `0.0002273750`. The no-32
 guard improves LANL r379's guard mean `0.0167156458` by `0.0000301562`
 (`0.1804%` lower).
+
+## 2026-05-08 21:39Z -- Alibaba r386 Self-Shift 32-Row Retake
+
+LANL banked the r386 Alibaba guarded self-shift continuation on baase/vinge.
+This continues r384 with synthetic self-donor `stream_id,obj_id,obj_size`
+chunks, 32-row chunks, and donor row shifts
+`-4096,-2048,-1024,-512,-256,-128,-64,-32,0,32,64,128,256,512,1024,2048,4096`.
+The acceptance surface is the official 5-cache x 6-policy Alibaba evaluator,
+with the no-32 guard (`128,512,2048,8192`, same policies) rejecting
+cache-32-only moves. No real columns are read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099355333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0101` | 0.0100678333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098775667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099933667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0099685750` (race display `0.0100`;
+range `0.0001902667`). This improves LANL r384 `0.0104552667` by
+`0.0004866917` (`4.6550%` lower), improves LANL r368 `0.0106785333` by
+`0.0007099583` (`6.6485%` lower), and beats LLNL R287.A2 `0.009999` by
+`0.0000304250` (`0.3043%` lower). Alibaba flips back to LANL by a narrow but
+race-eligible four-seed margin.
+
+No-32 guard seed means were `0.0111830417`, `0.0112955000`, `0.0109933750`,
+and `0.0112701250`, mean `0.0111855104`, range `0.0003021250`. The no-32
+guard improves LANL r384's guard mean `0.0117883229` by `0.0006028125`
+(`5.1136%` lower), so this is not a cache-32-only retake.
+
+The r388 stride-16 scouts from the same r384 base finished worse than r386
+on seeds 80/81/82 (`0.0102004333`, `0.0100186667`, `0.0101402000`) and are
+not promoted.

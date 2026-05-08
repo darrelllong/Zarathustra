@@ -4911,3 +4911,24 @@ Four-seed mean: `0.0208229000` (display `0.0208`), range `0.0002879667`.
 No-32 guard mean: `0.0166854896`, range `0.0002273750`. This improves r379
 by `0.0000525083` (`0.2515%` lower) but still trails LLNL R291.BAL2
 `0.018447` by `0.0023759000` (`12.8796%` higher).
+
+## Alibaba r386 Self-Shift 32-Row Retake (2026-05-08)
+
+Continued Alibaba from r384 with guarded self-donor shifted
+`stream_id,obj_id,obj_size` 32-row chunks. Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099355333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0101` | 0.0100678333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098775667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099933667 |
+
+Four-seed mean: `0.0099685750` (display `0.0100`), range `0.0001902667`.
+No-32 guard mean: `0.0111855104`, range `0.0003021250`. This improves r384
+by `0.0004866917` (`4.6550%` lower) and beats LLNL R287.A2 `0.009999` by
+`0.0000304250` (`0.3043%` lower), flipping Alibaba back to LANL.
+
+Stride-16 r388 scouts from the same r384 base were not promoted: seed80
+`0.0102004333`, seed81 `0.0100186667`, seed82 `0.0101402000`.
