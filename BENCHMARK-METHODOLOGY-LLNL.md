@@ -148,6 +148,65 @@ Per-corpus ladders under this rule (from observed footprints):
    duplicate of its neighbor. (Equivalent to a Riemann sum on log scale, which
    is the natural measure for power-of-two ladders.)
 
+## Working-set characterization per corpus (Coffman & Denning 1973)
+
+The "right" cache-size ladder per corpus is given directly by Denning's
+working-set theory. Per Coffman & Denning, *Operating Systems Theory*
+(1973), Chapter 7.3:
+
+- **s(T)** = mean working-set size at window T = lim_t E[|W(t,T)|]
+- **m(T)** = missing-page probability at window T = lim P[r_{t+1} ∉ W(t,T)]
+- **s(T+1) − s(T) = m(T)** (eq. 7.3.16; m(T) is the slope of s(T) vs T)
+- **F_p(LRU) ≅ m(T_p)** where **s(T_p) = p** (eq. 7.4.1; LRU-WS duality)
+
+The duality means: cache size *p* and window size *T_p* such that *s(T_p) = p*
+are conjugate variables. The LRU page-fault rate at memory size *p* equals
+the working-set miss rate at the corresponding window. So the "natural"
+cache-size ladder per corpus is the inverse of the corpus's s(T) curve at a
+chosen set of windows.
+
+We computed s(T) and m(T) on the real trace for each corpus (full 1M-record
+sliding-window scan, T ∈ {2^0...2^19, 999999}). Per-corpus summary:
+
+| Corpus | Footprint *n* | T_25 (s=n/4) | m(T_25) | T_50 (s=n/2) | Locality class |
+|---|---:|---:|---:|---:|---|
+| Tencent | 38,507 | **26,676** | 0.07 | 53,683 | Strong locality |
+| Baleen24 | 147,783 | 199,272 | 0.20 | 410,327 | Bimodal (dominant immediate-reuse) |
+| Meta KV | 190,110 | 237,560 | 0.20 | 509,662 | Bimodal (dominant immediate-reuse) |
+| Meta CDN | 417,390 | 174,337 | 0.55 | 342,524 | One-shot-dominated |
+| Wikipedia | 492,052 | 165,817 | 0.68 | 335,218 | One-shot-dominated |
+| Alibaba | 693,535 | 214,453 | 0.66 | 424,357 | One-shot-dominated |
+| CloudPhysics | 469,369 | 250,166 | 0.75 | 533,617 | One-shot-dominated |
+| MSR Exchange | 507,523 | 192,396 | 0.71 | 431,444 | One-shot-dominated |
+
+**Single per-trace metric**: **T_25** (the window size at which the working
+set covers one quarter of the footprint) is the most informative scalar
+descriptor. It varies smoothly across corpora, is finite for all of them
+(unlike T_m=0.5, which is undefined for traces whose miss rate never drops
+below 0.5), and corresponds via 7.4.1 directly to the cache size *n/4* —
+which is in the discriminative range for every corpus.
+
+**Three locality classes** are visible:
+
+1. **Strong-locality** (Tencent only): T_25 ≪ trace length; the working set
+   converges fast. IRD-renewal and stack-frequency models work well on these.
+2. **Bimodal** (Baleen24, Meta KV): m(T) drops sharply at very small T (high
+   immediate-reuse rate) and then plateaus. Generators that match the dist=0
+   reuse rate plus the plateau height match cachesim well.
+3. **One-shot-dominated** (Wiki, CDN, Alibaba, CP, MSR): m(T) stays
+   high (>0.45) across the entire window range. These traces have an
+   information-theoretic floor below which no generator can predict miss
+   rate from summary stats alone.
+
+**Implication for cache-size ladder design**: per the LRU-WS duality, choose
+windows T_i and use the corresponding cache sizes s(T_i). For paper
+clarity, log-spaced windows like {T_25, T_50, T_75, T_90, T_95} would yield
+five cache sizes that each measure a *different structural slice* of the
+trace — eliminating the inclusion-redundancy of the current power-of-2
+ladder. Or, equivalent and simpler: powers of 2 from 1 to 2^⌈log₂(n+1)⌉
+(Long's rule) — which under the LRU-WS duality corresponds to powers of 2
+in window size, and gives a clean enumeration.
+
 ## Empirical demonstration: Wikipedia seed 42, three claims
 
 We ran the proposed full power-of-2 ladder (1, 2, 4, ..., 524288; 20 sizes;
