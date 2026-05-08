@@ -4873,3 +4873,23 @@ This improves r375 `0.0210158167` by `0.0000772334` (`0.3675%` lower), but
 still trails LLNL R291.BAL2 `0.018447` by `0.0024915833` (`13.5067%` higher).
 
 No-32 guard mean: `0.0167670937`, range `0.0002615417`.
+
+## Alibaba r384 Self-Shift 64-Row Continuation (2026-05-08)
+
+Continued Alibaba from r368 with guarded self-donor shifted
+`stream_id,obj_id,obj_size` 64-row chunks. Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0104` | 0.0104246333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105744333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0103` | 0.0103138667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105081333 |
+
+Four-seed mean: `0.0104552667` (display `0.0105`), range `0.0002605667`.
+This improves r368 `0.0106785333` by `0.0002232666` (`2.0908%` lower), but
+still trails LLNL R287.A2 `0.009999` by `0.0004562667` (`4.5631%` higher).
+
+No-32 guard mean: `0.0117883229`, range `0.0003821667`. This improves r368
+no-32 guard `0.0120662917` by `0.0002779688` (`2.3037%` lower).

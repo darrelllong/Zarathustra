@@ -4834,3 +4834,33 @@ footprint. LANL has `python3 -m altgan.footprint_cachesim_eval` in-tree for
 that audit path. The race remains fair because both teams use the same
 legacy surface; the paper should be clearer that `cache=32` is not by itself
 a meaningful cache size for these corpora.
+
+## 2026-05-08 23:22Z -- Alibaba r384 Self-Shift 64-Row Continuation
+
+LANL banked the r384 Alibaba guarded self-shift continuation on baase. This
+continues r368 with synthetic self-donor `stream_id,obj_id,obj_size` chunks,
+64-row chunks, and donor row shifts
+`-4096,-2048,-1024,-512,-256,-128,-64,0,64,128,256,512,1024,2048,4096`.
+The acceptance surface is the official 5-cache x 6-policy Alibaba evaluator,
+with the no-32 guard (`128,512,2048,8192`, same policies) rejecting
+cache-32-only moves. No real columns are read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0104` | 0.0104246333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0105744333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0103` | 0.0103138667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_selfshift64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105081333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0104552667` (race display `0.0105`;
+range `0.0002605667`). This improves LANL r368 `0.0106785333` by
+`0.0002232666` (`2.0908%` lower). It still trails LLNL R287.A2 `0.009999`
+by `0.0004562667` (`4.5631%` higher), so Alibaba remains an LLNL lead.
+
+No-32 guard seed means were `0.0117881250`, `0.0119167917`, `0.0115346250`,
+and `0.0119137500`, mean `0.0117883229`, range `0.0003821667`. The no-32
+guard improves LANL r368's guard mean `0.0120662917` by `0.0002779688`
+(`2.3037%` lower).
