@@ -3500,6 +3500,45 @@ were `0.0238937500`, `0.0245962500`, `0.0243666250`, `0.0234569167`, mean
 versus r346: `0.0000261458` (`0.11%` lower). Versus r345 no-32 mean
 `0.0241303542`, r348 is `0.0000781146` (`0.32%`) lower.
 
+## 2026-05-07 -- Twitter 32-Row Best-Donor Continuation
+
+LANL continued the Twitter r348 64-row best-donor champion down to 32-row
+object-ID chunks on baase. This run launched before the guarded acceptance
+patch, so candidates were accepted on official six-policy improvement; the
+post-hoc no-32 diagnostic below checks that the gain is not cap-32-only.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0235760667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238532667 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238774333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232663000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0236432667` (race display `0.0236`;
+range `0.0006111333`). This improves LANL r348 `0.0236637500` by
+`0.0000204833` (`0.09%` lower), improves LANL r346 `0.0236873500` by
+`0.0000440833`, and beats LLNL R287.M2 `0.02491` by `0.0012667333` on the
+official six-policy Twitter cachesim surface.
+
+Diagnostic no-32 sensitivity also improved versus r348. r348 no-32 seed means
+were `0.0238629167`, `0.0245765000`, `0.0243359583`, `0.0234335833`, mean
+`0.0240522396`. r349 no-32 seed means were `0.0238436250`, `0.0245499583`,
+`0.0243186667`, `0.0234068750`, mean `0.0240297812`. No-32 improvement
+versus r348: `0.0000224583` (`0.09%` lower). All four seeds improved on the
+no-32 diagnostic as well as the official surface.
+
 ## 2026-05-07 -- CloudPhysics 8K Cascade Tightening
 
 LANL continued the CloudPhysics chunk cascade from r306 16K to 8K chunks on
@@ -3836,6 +3875,6 @@ Current LANL claims therefore keep the official literal five-size cachesim line
 for race eligibility and add a no-32 diagnostic when practical:
 `--cache-sizes 128,512,2048,8192` with the same policy set. A continuation is
 more credible when both the official mean and the no-32 mean drop. The recent
-CloudPhysics r339, Baleen24 r342, and Twitter r348 posts all moved in the right
+CloudPhysics r339, Baleen24 r342, and Twitter r349 posts all moved in the right
 direction under the no-32 diagnostic, so those gains are not just cap-32
 artifacts.

@@ -3972,6 +3972,29 @@ Diagnostic no-32 sensitivity also improved: r346 no-32 mean `0.0240783854`
 to r348 no-32 mean `0.0240522396`, a `0.0000261458` (`0.11%`) lower
 diagnostic mean excluding cache size `32`.
 
+## Twitter 32-Row Best-Donor Continuation (2026-05-07)
+
+Continued Twitter from the r348 64-row best-donor champion to 32-row object-ID
+chunks on baase. This run used the pre-guard official-mean acceptance path;
+the no-32 diagnostic below confirms the gain was not isolated to cache size
+`32`. Reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0235760667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238532667 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0238774333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r349_best32_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232663000 |
+
+Four-seed mean: `0.0236432667` (display `0.0236`), range `0.0006111333`.
+This improves r348 `0.0236637500` by `0.0000204833`, improves r346
+`0.0236873500` by `0.0000440833`, and beats LLNL R287.M2 `0.02491` by
+`0.0012667333` on the official six-policy Twitter cachesim surface.
+Diagnostic no-32 sensitivity also improved: r348 no-32 mean `0.0240522396`
+to r349 no-32 mean `0.0240297812`, a `0.0000224583` (`0.09%`) lower
+diagnostic mean excluding cache size `32`.
+
 ## CloudPhysics 8K Cascade Tightening (2026-05-07)
 
 Continued CloudPhysics from the r306 16K fakes to 8K object-ID chunks on the
