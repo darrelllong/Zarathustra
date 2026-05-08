@@ -71,6 +71,8 @@ def main() -> int:
 
     bracket_args = [
         sys.executable, "-u", "-m", "altgan.launch_msr_cachesim_bracket",
+        "--base-prefix",
+        "twitter_cluster_lanl",
         "--model", args.atlas,
         "--trace-dir", LLNL_TWITTER_TRACE_DIR,
         "--char-file", LLNL_TWITTER_CHAR,

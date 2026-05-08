@@ -121,6 +121,14 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--spec", action="append", type=_parse_spec, required=True)
     p.add_argument(
+        "--base-prefix",
+        default="msr_exchange_lanl",
+        help=(
+            "Prefix used for output artifact basenames. The default preserves historical "
+            "MSR naming; override this for other corpora (e.g. twitter_cluster_lanl)."
+        ),
+    )
+    p.add_argument(
         "--model",
         default="/tiamat/zarathustra/checkpoints/altgan/msr_exchange_phaseatlas_92x50k_h128_phase8_e900_seed17.pkl.gz",
     )
@@ -270,8 +278,12 @@ def main() -> int:
     ):
         env[key] = "1"
 
+    base_prefix = args.base_prefix
+    if base_prefix.endswith("_"):
+        base_prefix = base_prefix[:-1]
+
     for spec in args.spec:
-        base = f"msr_exchange_lanl_{spec.name}"
+        base = f"{base_prefix}_{spec.name}" if base_prefix else spec.name
         fake = root / f"{base}_fake_1M.csv"
         eval_json = root / f"{base}_eval_1M.json"
         cachesim_json = cache_root / f"{base}_official6.json"
