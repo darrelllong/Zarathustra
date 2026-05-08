@@ -241,6 +241,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated donor columns to splice in each chunk; default obj_id.",
     )
     p.add_argument(
+        "--write-columns",
+        default="",
+        help=(
+            "Optional comma-separated subset of base columns to write into candidate/final CSVs. "
+            "Forwarded to optimize_tencent_chunk_surface. Default writes all base columns."
+        ),
+    )
+    p.add_argument(
         "--donor-shifts",
         default="0",
         help=(
@@ -391,6 +399,8 @@ def main(argv: list[str] | None = None) -> int:
                 str(args.max_candidates_per_chunk),
                 "--swap-columns",
                 args.swap_columns,
+                "--write-columns",
+                args.write_columns,
                 f"--donor-shifts={args.donor_shifts}",
                 "--cache-sizes",
                 args.cache_sizes,

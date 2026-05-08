@@ -77,6 +77,18 @@ def _parse_args() -> argparse.Namespace:
                    ))
     p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
                    help="Comma-separated donor columns to splice; default obj_id.")
+    p.add_argument(
+        "--write-columns",
+        type=_parse_columns,
+        default=[],
+        help=(
+            "Optional comma-separated subset of base columns to write into candidate/final CSVs. "
+            "Default writes all base columns. Must include every column in --swap-columns. "
+            "For cachesim-only optimization you can usually restrict to `stream_id,obj_id,ts` "
+            "(plus any other swapped columns) to cut disk I/O substantially; note that omitting "
+            "`ts` makes cachesim fall back to row index ordering."
+        ),
+    )
     p.add_argument("--donor-shifts", type=_parse_ints, default=[0],
                    help=(
                        "Comma-separated row offsets for donor chunks. Default 0 preserves "
@@ -216,6 +228,22 @@ def main() -> int:
     base_swap = {column: _column_array(base, column) for column in swap_columns}
     base_len = len(next(iter(base_swap.values())))
     preserved_columns = [col for col in base.columns if col not in swap_columns]
+    write_columns = list(dict.fromkeys(args.write_columns))
+    if write_columns:
+        missing = [col for col in write_columns if col not in base.columns]
+        if missing:
+            raise ValueError(f"--write-columns contains unknown base column(s): {missing}")
+        missing_swapped = [col for col in swap_columns if col not in write_columns]
+        if missing_swapped:
+            raise ValueError(
+                "--write-columns must include all --swap-columns; missing: "
+                + ",".join(missing_swapped)
+            )
+        base_out = base[write_columns]
+        print(f"[chunk_surface] write-columns: {','.join(write_columns)}", flush=True)
+    else:
+        base_out = base
+        write_columns = list(base.columns)
     print(
         f"[chunk_surface] swap contract: swapped_columns={','.join(swap_columns)} "
         f"preserved_base_columns={','.join(preserved_columns)}",
@@ -260,7 +288,7 @@ def main() -> int:
         return 0
 
     current_swap = _copy_swap_values(base_swap)
-    _write_candidate(base, current_swap, candidate_path)
+    _write_candidate(base_out, current_swap, candidate_path)
     best_report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
     best_mean = float(best_report["mean_hrc_mae"])
     print(f"[chunk_surface] base mean {best_mean:.10f}", flush=True)
@@ -321,7 +349,7 @@ def main() -> int:
                         trial_swap = _copy_swap_values(current_swap)
                         for column in swap_columns:
                             trial_swap[column][start:end] = donor_swap[column][source_start:source_end]
-                        _write_candidate(base, trial_swap, candidate_path)
+                        _write_candidate(base_out, trial_swap, candidate_path)
                         eval_count += 1
                         try:
                             report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
@@ -468,7 +496,7 @@ def main() -> int:
     final_json = eval_root / f"{tag}_{eval_label}.json"
     final_guard_json = eval_root / f"{tag}_{args.guard_eval_label}.json" if guard_sizes else None
     moves_json = eval_root / f"{tag}_moves.json"
-    _write_candidate(base, current_swap, final_fake)
+    _write_candidate(base_out, current_swap, final_fake)
     final_report = _evaluate_fake(binary, final_fake, real_by, args.cache_sizes, args.policies)
     final_json.write_text(json.dumps(final_report, indent=2))
     final_guard_report = None
@@ -480,6 +508,7 @@ def main() -> int:
             "swapped_columns": swap_columns,
             "preserved_base_columns": preserved_columns,
             "donor_columns_read": swap_columns,
+            "base_columns_written": write_columns,
             "real_columns_read": [],
         },
         "base": args.base,
