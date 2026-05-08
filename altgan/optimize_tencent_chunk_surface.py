@@ -60,6 +60,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Suffix for eval JSONs; default is official<N policies>.")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--chunk-size", type=_parse_ints, default=[2048])
+    p.add_argument("--start-stride", type=int, default=0,
+                   help="Candidate start stride in rows; default 0 uses the current chunk size.")
     p.add_argument("--max-passes", type=int, default=1)
     p.add_argument("--max-accepts", type=int, default=128)
     p.add_argument("--max-evals", type=int, default=0,
@@ -267,10 +269,16 @@ def main() -> int:
     eval_count = 1
     stop_search = False
     for chunk_size in args.chunk_size:
-        chunks = list(range(0, n, chunk_size))
+        start_stride = args.start_stride if args.start_stride and args.start_stride > 0 else chunk_size
+        chunks = list(range(0, n, start_stride))
         rng = np.random.default_rng(args.seed + chunk_size)
         # Fixed seed order avoids favoring early trace regions while remaining reproducible.
         chunk_order = list(rng.permutation(len(chunks)))
+        print(
+            f"[chunk_surface] start grid chunk={chunk_size} stride={start_stride} "
+            f"candidates={len(chunks)}",
+            flush=True,
+        )
         for pass_ix in range(args.max_passes):
             pass_accepts = 0
             for chunk_ix in chunk_order:
@@ -465,6 +473,7 @@ def main() -> int:
         "donors": args.donor,
         "seed": args.seed,
         "chunk_sizes": args.chunk_size,
+        "start_stride": args.start_stride,
         "real": args.real,
         "cache_sizes": args.cache_sizes,
         "policies": args.policies,

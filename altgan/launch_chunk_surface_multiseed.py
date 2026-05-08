@@ -204,6 +204,12 @@ def _parse_args() -> argparse.Namespace:
         default=[65536],
         help="Comma-separated chunk sizes to run in sequence; output of each stage feeds the next.",
     )
+    p.add_argument(
+        "--start-stride",
+        type=int,
+        default=0,
+        help="Candidate start stride in rows; default 0 uses each stage chunk size.",
+    )
     p.add_argument("--cache-sizes", default="32,128,512,2048,8192")
     p.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car")
     p.add_argument("--guard-cache-sizes", default="")
@@ -360,6 +366,8 @@ def main() -> int:
                 str(seed),
                 "--chunk-size",
                 str(chunk_size),
+                "--start-stride",
+                str(args.start_stride),
                 "--max-passes",
                 str(args.max_passes),
                 "--max-accepts",
