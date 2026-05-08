@@ -5085,3 +5085,19 @@ by `0.0023449667` (`12.7119%` higher), so Baleen24 remains an LLNL lead.
 No-32 guard seed means were `0.0165400417`, `0.0167657500`, `0.0167572500`,
 and `0.0166030417`, mean `0.0166665208`, range `0.0002257083`. This improves
 r382's no-32 guard mean `0.0166854896` by `0.0000189688` (`0.1137%` lower).
+
+## 2026-05-08 23:05Z -- Baleen24 r394 Broad-Search Selector In Flight
+
+LANL patched the chunk-surface selector in commit `ecae792` to add
+`--max-candidates-per-chunk`. The issue was architectural: with
+`accept-mode=best`, a large donor/shift pool plus a fixed `--max-evals` budget
+can spend almost the whole search on one random chunk. r393 demonstrated the
+failure mode directly: seed42 used 400 evals to accept one 128-row move, moving
+`0.0206698333 -> 0.0206612000`.
+
+r394 is the pure-LANL follow-up on vinge, starting from r389 and using the new
+broad-search cap (`--max-candidates-per-chunk 8`, `--max-evals 800`) with the
+same official surface and no-32 guard. Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r394_broad128_vinge_20260508.log`.
+This is not a banked claim yet; it is the next four-seed `{42,80,81,82}`
+candidate to promote or retract when all literal cachesim lines land.

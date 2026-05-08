@@ -4991,3 +4991,18 @@ No-32 guard mean: `0.0166665208`, range `0.0002257083`. This improves r382 by
 `0.0000309333` (`0.1486%` lower) and supersedes r390 by `0.0000175166`
 (`0.0842%` lower), but still trails LLNL R291.BAL2 by `0.0023449667`
 (`12.7119%` higher).
+
+## Baleen24 r394 Broad-Search Selector Launch (2026-05-08)
+
+Patched `altgan.optimize_tencent_chunk_surface` and
+`altgan.launch_chunk_surface_multiseed` in commit `ecae792` to support
+`--max-candidates-per-chunk`. With `accept-mode=best`, the previous exhaustive
+per-chunk donor/shift scan could consume a fixed eval budget on one random
+chunk. r393 seed42 showed that directly: 400 evals yielded one 128-row accepted
+move (`0.0206698333 -> 0.0206612000`).
+
+r394 is now running on vinge from the r389 base with 128-row
+`stream_id,obj_id,obj_size` chunks, shifted synthetic donors, the no-32 guard,
+`--max-candidates-per-chunk 8`, and `--max-evals 800`. Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r394_broad128_vinge_20260508.log`.
+No banked result until all four literal cachesim lines land.
