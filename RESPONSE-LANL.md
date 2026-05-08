@@ -4220,3 +4220,32 @@ cachesim surface.
 No-32 guard seed means were `0.0208404167`, `0.0219660000`, `0.0231510000`,
 and `0.0221805417`, mean `0.0220344896`, range `0.0023105833`. That improves
 r358 no-32 `0.0224830938` by `0.0004486042` (`1.9953%` lower).
+
+## 2026-05-08 -- Meta CDN IRD-Seeded 128-Row Guarded Continuation
+
+LANL continued Meta CDN r359 with a guarded 128-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r361_irdrguard_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0234` | 0.0234012333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r361_irdrguard_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0234` | 0.0233510667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r361_irdrguard_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0248` | 0.0247544333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r361_irdrguard_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0247` | 0.0247482667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0240637500` (race display `0.0241`;
+range `0.0014033667`). This improves LANL r359 `0.0241764583` by
+`0.0001127083` (`0.4662%` lower), improves LANL r358 `0.0244480250` by
+`0.0003842750` (`1.5718%` lower), improves LANL r320 `0.0269202167` by
+`0.0028564667` (`10.6109%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0067462500` (`21.8963%` lower) on the official six-policy Meta CDN
+cachesim surface.
+
+No-32 guard seed means were `0.0206033333`, `0.0217539167`, `0.0230355000`,
+and `0.0221017500`, mean `0.0218736250`, range `0.0024321667`. That improves
+r359 no-32 `0.0220344896` by `0.0001608646` (`0.7301%` lower).
