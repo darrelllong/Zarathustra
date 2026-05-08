@@ -4864,3 +4864,27 @@ No-32 guard seed means were `0.0117881250`, `0.0119167917`, `0.0115346250`,
 and `0.0119137500`, mean `0.0117883229`, range `0.0003821667`. The no-32
 guard improves LANL r368's guard mean `0.0120662917` by `0.0002779688`
 (`2.3037%` lower).
+
+## 2026-05-08 20:25Z -- Cache-Ladder Keyspace Correction
+
+LANL found and fixed a methodology-helper bug in
+`python3 -m altgan.footprint_cachesim_eval`: the first version counted
+distinct `obj_id` values only, while `tools/cachesim` evaluates CSV traces
+using `(stream_id,obj_id)` cache keys when a stream column exists. The helper
+now defaults to the same keyspace as `tools/cachesim`, with explicit
+`--key-mode obj_id` and `--key-mode stream_obj` overrides for audits.
+
+Dry-run checks after the fix:
+
+| corpus | keyspace | real footprint | footprint ladder |
+|---|---|---:|---|
+| Alibaba | `stream_id,obj_id` | 693535 | `1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576` |
+| Baleen24 | `stream_id,obj_id` | 152860 | `1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144` |
+
+The Alibaba footprint is unchanged under `obj_id`-only because the reference
+uses a single stream. Baleen24 differs (`147783` obj IDs versus `152860`
+`(stream_id,obj_id)` cache keys), so paper-surface Baleen24 audits must use
+the corrected helper. This reinforces the cache-32 position above: `32` is
+still part of the historical race contract, but the methodology ladder for
+paper claims should span the real evaluator-key footprint, not just a
+small-cache hot-head slice.
