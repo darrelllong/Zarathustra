@@ -4424,10 +4424,10 @@ range `0.0002510000`). This improves LANL r360 `0.0106905500` by
 `LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL's banked Alibaba at
 `0.009999` (R287.A2), so r364 still trails by `0.0006830083` (`6.83%` higher).
 
-Next probe (not executed from this Codex sandbox because outbound SSH to
-`baase`/`vinge` is blocked): a guarded tightening continuation starting from
-these r364 artifacts down through chunk sizes `64,32,16,8` using
-`altgan.ssh_chunk_surface_multiseed` (see `altgan/README.md`).
+Next probe: r368 guarded 64-row continuation is running on baase from these
+r364 artifacts with the official 5-cache x 6-policy surface plus the no-32
+guard (`128,512,2048,8192`, same policies). It is not banked until the
+four-seed panel finishes and the literal cachesim lines are posted.
 
 No-32 guard seed means were `0.0120682917`, `0.0121687917`, `0.0117973333`,
 and `0.0122500833`, mean `0.0120711250`, range `0.0004527500`. That improves
@@ -4593,3 +4593,38 @@ rejects candidates that improve the official mean only by damaging that guard.
 The latest Meta CDN r370 result is an example: official mean improved from
 r369 `0.0237821583` to `0.0237592500`, and the no-32 guard also improved from
 `0.0215056146` to `0.0214763021`. That win is not a cache-32 artifact.
+
+## 2026-05-08 18:35Z -- LANL Methodology Response to Long's Cache-Size Rule
+
+LANL concurs with the split proposed in `BENCHMARK-METHODOLOGY-LLNL.md`: the
+current race remains valid because both teams use the same
+`llgan.cachesim_eval` surface, but the paper should not pretend the fixed
+`32,128,512,2048,8192` ladder is a universal storage-cache model. Cache size
+`32` is a hot-head concentration diagnostic, not a production-realistic cache
+capacity for multi-TB traces.
+
+LANL supports adding a paper/reporting surface with per-corpus powers of two
+from `1` through `2^ceil(log2(N+1))`, where `N` is the distinct-object
+footprint of the real reference trace. That gives every corpus a deterministic
+full HRC span, including the saturation end, and avoids using the same five
+capacities for traces whose footprints differ by an order of magnitude.
+
+Counter-proposal details for convergence:
+
+- Keep the legacy 5-cache x 6-policy surface as the race scoreboard until the
+  current campaign is closed; re-scoring mid-race would create a new contest.
+- For the paper, report both the legacy race score and the footprint-scaled
+  score so readers can see whether a win is robust to the cache ladder.
+- Aggregate the footprint-scaled ladder as a log-cache integral or equivalent
+  normalized Riemann sum, not a plain arithmetic mean over many correlated
+  adjacent capacities.
+- Continue posting a no-32 guard for LANL guarded continuations on the legacy
+  surface, because cache-32-only wins are not a meaningful architectural claim.
+- Correct the protocol parenthetical before publication: current Baleen24
+  race rows, including LLNL R291.BAL2, are on the 5-cache x 6-policy surface.
+  The `32768`/`lfu`/`lirs` extension is the established CloudPhysics surface,
+  not the Baleen24 surface unless both teams explicitly re-score Baleen24.
+
+This is a concurrence with Long's self-scaling ladder, with the guardrail that
+the legacy race metric remains the official scoreboard until both teams agree
+to a new published-methodology benchmark.

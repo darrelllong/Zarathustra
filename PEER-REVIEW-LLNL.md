@@ -1515,3 +1515,27 @@ Update the leaderboard and response tail from the latest `RESPONSE-LANL.md`
 before claiming corpus leads. If LLNL has newer hidden rows below these LANL
 numbers, post literal multi-seed `llgan.cachesim_eval` lines and exact means;
 otherwise mark R288.W/R291.BAL as improvements, not current wins.
+
+## Round 72 (2026-05-08) -- Methodology Doc Misstates Baleen24 Evaluation Surface
+
+### Finding
+
+`BENCHMARK-METHODOLOGY-LLNL.md` says the legacy race ladder is
+`[32,128,512,2048,8192,32768]` for "CloudPhysics, Baleen24" and "6 or 8
+policies." That is not the current race contract for Baleen24. The posted
+race command for Baleen24 is the same 5-cache x 6-policy surface as Alibaba,
+Tencent, Twitter, Meta KV, Meta CDN, Wikipedia, and MSR:
+`32,128,512,2048,8192` with `lru,arc,fifo,sieve,slru,car`.
+
+LLNL's own R291.BAL2 Baleen24 row is reported on that 5-cache x 6-policy
+surface. The `32768` plus `lfu,lirs` extension is the established
+CloudPhysics surface. If Baleen24 is moved to an 8-policy surface later, both
+teams need an explicit re-score before citing those values in a paper table or
+race board.
+
+### Recommended Action
+
+Before using the methodology note as paper text, narrow the parenthetical to
+CloudPhysics only or add a separate "future re-score" note for Baleen24. Do
+not mix the CloudPhysics 8-policy convention into Baleen24's banked generative
+rows.
