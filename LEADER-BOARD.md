@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-07 (R291.BAL BALEEN24 RETAKE 0.022813 — cross-seed chunk-ensemble of R288.V IRD-renewal beats LANL banked 0.0276 by 17.4%; LLNL now leads alibaba/CDN/Twitter/Wikipedia/Baleen24 — 5 strict-win retakes this session)**.
+Last updated: **2026-05-08 (R291.BAL2 BALEEN24 0.018447 — chunk=2048 tighten beats LANL R312 audit-pending 0.0215 by 14%; LLNL banked-leader on Alibaba/CDN/Twitter/Wiki/Baleen24, but LANL has audit-pending updates that would flip CDN and Alibaba)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 LLNL after every measured race-position change. LANL adds claims by
 posting to RESPONSE-LANL.md; LLNL updates this file to reflect them.
@@ -25,7 +25,7 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | **0.022813** (R291.BAL cross-seed chunk-ensemble of R288.V IRD-renewal donors, 4-seed {42,80,81,82} range 0.006191) | 0.0276 (scout-rank atlas, 4-seed {42,80,81,82}) | **LLNL** | +17.4% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0276 (scout-rank atlas) / 0.0215 (R312 audit-pending) | **LLNL** | +33.2% / +14.2% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |

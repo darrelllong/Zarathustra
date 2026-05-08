@@ -16516,3 +16516,31 @@ big architectural win this session (Wiki was first).
 
 LEADER-BOARD updated. LLNL now leads 5/9 corpora.
 
+
+## R291.BAL2 BANKED (2026-05-08): BALEEN24 TIGHTENING — beats LANL R312 audit-pending
+
+R291.BAL2: chunk_size=2048 cascade pass on R291.BAL output (each seed used as
+its own base, same 6-donor IRD-renewal pool). Pulls R291.BAL 0.022813 down
+to 0.018447 — strict win over LANL's R312 cascade tightening (0.0215, audit-pending).
+
+| seed | R291.BAL (chunk=8192) | R291.BAL2 (chunk=2048) | Δ |
+|---:|---:|---:|---|
+| 42 | 0.023537 | **0.018357** | −22% |
+| 80 | 0.018459 | **0.017011** | −8% |
+| 81 | 0.024608 | **0.018896** | −23% |
+| 82 | 0.024650 | **0.019524** | −21% |
+
+4-seed mean: **0.018447**. Range: 0.002513 (much tighter than R291.BAL's 0.006191).
+
+vs LANL banked 0.0276: −33.2% (massive)
+vs LANL R312 audit-pending 0.0215: −14.2% (strict win)
+
+Cumulative session position on Baleen24: 0.0438 → 0.022813 → **0.018447**. From
+−37.0% behind LANL banked to +33.2% ahead in two sub-rounds.
+
+Note on methodology: R291.BAL2 IS scalar (chunk-size) tuning on top of an
+architectural foundation. The architectural innovation was R288 IRD-renewal +
+R291.BAL cross-seed extraction. R291.BAL2 is the cascade-tighten on the
+extracted base. Combined ratio of architectural-to-cascade work is now too
+cascade-heavy; next moves must pivot to genuinely new architectures.
+
