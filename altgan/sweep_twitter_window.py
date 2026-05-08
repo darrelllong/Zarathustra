@@ -1,9 +1,14 @@
 """Twitter recent-pool window sweep for LLNL atlas retake.
 
-LANL leads Twitter at 0.0272 (4-seed, win=48). LLNL's current best is 0.1532
-(R281.B, win=16 with R244lock atlas). LANL's audit showed:
-  win=8  → 0.0298, win=16 → baseline, win=32 → 0.0277, win=48 → 0.0272 (best),
-  win=64 → 0.0279 (slight regression).
+Race context (leaderboard as of 2026-05-07):
+  - LLNL Twitter best multi-seed: 0.02491 (R287.M2 small-chunk cascade).
+  - LANL Twitter best multi-seed: ~0.0254 (r307 16K chunk-surface cascade tightening).
+
+This script is a scouting sweep of the *recent-pool window* axis using LLNL's
+published Twitter atlas and the official cachesim reference. Older LANL window
+audits suggested a shallow optimum around `win=48` (with hp/adj fixed), but the
+current gap is small enough that re-sweeping the axis is often the highest-leverage
+first probe before deeper chunk-surface cascades.
 
 The gap is almost entirely in the recent-pool window axis.  This script sweeps
 win from 16 to 80 using LLNL's R270 Twitter atlas on the official reference.
