@@ -4424,3 +4424,46 @@ six-policy surface.
 
 No-32 guard mean improved from r357 `0.0230990833` to `0.0224830938`, a
 `0.0006159895` (`2.6667%`) lower diagnostic mean.
+
+## Baleen24 64-Row Guarded Continuation (2026-05-08)
+
+Continued Baleen24 from r354 with a guarded 64-row object-ID selector.
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r355_guard64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212567000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r355_guard64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0214786667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r355_guard64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213324667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r355_guard64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211049333 |
+
+Four-seed mean: `0.0212931917` (display `0.0213`), range `0.0003737333`.
+This improves r354 `0.0213008917` by `0.0000077000` (`0.0361%` lower),
+improves r351 `0.0213130917` by `0.0000199000` (`0.0934%` lower), and beats
+LLNL R291.BAL `0.022813` by `0.0015198083` (`6.6620%` lower) on the official
+six-policy surface.
+
+No-32 guard mean improved from r354 `0.0170438646` to `0.0170367188`, a
+`0.0000071458` (`0.0419%`) lower diagnostic mean.
+
+## Meta CDN IRD-Seeded 256-Row Guarded Continuation (2026-05-08)
+
+Continued Meta CDN from r358 with a guarded 256-row object-ID selector.
+Reference: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r359_irdrguard_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0236` | 0.0235611667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r359_irdrguard_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0235` | 0.0234994000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r359_irdrguard_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0248` | 0.0248382000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r359_irdrguard_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0248` | 0.0248070667 |
+
+Four-seed mean: `0.0241764583` (display `0.0242`), range `0.0013388000`.
+This improves r358 `0.0244480250` by `0.0002715667` (`1.1108%` lower),
+improves r357 `0.0248605417` by `0.0006840834` (`2.7517%` lower), improves
+r320 `0.0269202167` by `0.0027437584` (`10.1922%` lower), and beats LLNL
+R287.CDN2 `0.03081` by `0.0066335417` (`21.5305%` lower) on the official
+six-policy surface.
+
+No-32 guard mean improved from r358 `0.0224830938` to `0.0220344896`, a
+`0.0004486042` (`1.9953%`) lower diagnostic mean.
