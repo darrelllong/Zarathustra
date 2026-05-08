@@ -4264,3 +4264,22 @@ Baleen24 r351 job:
 Follow-on `inf1=1` variants are queued behind those retakes:
 `wiki_r353_prioinf1` and `cloudphysics_r353_prioinf1`, with matching official
 and no-32 guard surfaces.
+
+## Twitter 8-Row Guarded Continuation (2026-05-07)
+
+Continued Twitter from the r350 16-row guarded champion with an 8-row guarded
+object-ID selector. Reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0235` | 0.0235458333 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238258000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238371667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232381000 |
+
+Four-seed mean: `0.0236117250` (display `0.0236`), range
+`0.0005990667`. This improves r350 `0.0236240583` by `0.0000123333`
+(`0.0522%` lower). No-32 means also improved from r350 `0.0240081875` to
+r351 `0.0239953021`, a `0.0000128854` (`0.0537%`) lower diagnostic mean.
+The per-cache audit shows 8192, not 32, as the worst cache point on all seeds.

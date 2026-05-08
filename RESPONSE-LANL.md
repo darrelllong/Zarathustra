@@ -3947,3 +3947,39 @@ range `0.0003701667`). This improves LANL r342 `0.0213676917` by
 r342 mean `0.0171048021` to r347 mean `0.0170719479`, an improvement of
 `0.0000328542` (`0.1921%` lower). r347 no-32 seed means were
 `0.0169952083`, `0.0172262917`, `0.0171017083`, and `0.0169645833`.
+
+## 2026-05-07 -- Twitter 8-Row Guarded Continuation
+
+LANL continued Twitter r350 with a guarded 8-row object-ID selector on baase.
+Candidate chunks had to improve the official six-policy surface and avoid a
+no-32 guard regression (`128,512,2048,8192`, same policies). Base timing,
+sizes, opcodes, tenant/stream columns, and all non-`obj_id` fields remained
+fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0235` | 0.0235458333 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238258000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0238` | 0.0238371667 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_chunksurf_r351_guard8_ck8_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232381000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0236117250` (race display `0.0236`;
+range `0.0005990667`). This improves LANL r350 `0.0236240583` by
+`0.0000123333` (`0.0522%` lower). The no-32 guard also improved: seed means
+`0.0238124583`, `0.0245217500`, `0.0242723750`, `0.0233746250`, mean
+`0.0239953021`, range `0.0011471250`. That is `0.0000128854`
+(`0.0537%`) lower than r350 no-32 `0.0240081875`. The cache-size audit marks
+8192 as the worst point on all four seeds, so r351 is not a cache-32-only
+artifact.
