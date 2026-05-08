@@ -227,6 +227,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Per chunk, accept the first improving donor or scan all donors and accept the best.",
     )
     p.add_argument(
+        "--max-candidates-per-chunk",
+        type=int,
+        default=0,
+        help=(
+            "Forwarded to optimize_tencent_chunk_surface. With accept-mode=best, "
+            "cap donor/shift evaluations per chunk so fixed eval budgets cover more chunks."
+        ),
+    )
+    p.add_argument(
         "--swap-columns",
         default="obj_id",
         help="Comma-separated donor columns to splice in each chunk; default obj_id.",
@@ -378,6 +387,8 @@ def main(argv: list[str] | None = None) -> int:
                 str(args.min_improvement),
                 "--accept-mode",
                 args.accept_mode,
+                "--max-candidates-per-chunk",
+                str(args.max_candidates_per_chunk),
                 "--swap-columns",
                 args.swap_columns,
                 f"--donor-shifts={args.donor_shifts}",

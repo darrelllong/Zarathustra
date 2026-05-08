@@ -69,6 +69,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--min-improvement", type=float, default=1e-6)
     p.add_argument("--accept-mode", choices=["first", "best"], default="first",
                    help="Accept the first improving donor per chunk, or scan all donors and accept the best.")
+    p.add_argument("--max-candidates-per-chunk", type=int, default=0,
+                   help=(
+                       "For accept-mode=best, evaluate at most this many donor/shift candidates per chunk. "
+                       "Default 0 scans all donors/shifts. A positive cap makes large donor pools search "
+                       "many more trace regions under a fixed --max-evals budget."
+                   ))
     p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
                    help="Comma-separated donor columns to splice; default obj_id.")
     p.add_argument("--donor-shifts", type=_parse_ints, default=[0],
@@ -276,7 +282,7 @@ def main() -> int:
         chunk_order = list(rng.permutation(len(chunks)))
         print(
             f"[chunk_surface] start grid chunk={chunk_size} stride={start_stride} "
-            f"candidates={len(chunks)}",
+            f"candidates={len(chunks)} max_candidates_per_chunk={args.max_candidates_per_chunk}",
             flush=True,
         )
         for pass_ix in range(args.max_passes):
@@ -294,8 +300,15 @@ def main() -> int:
                 best_chunk_donor = None
                 best_chunk_source_start = None
                 best_chunk_donor_shift = None
-                for donor_name, donor_swap in donor_frames:
-                    for donor_shift in donor_shifts:
+                candidate_pairs = [
+                    (donor_name, donor_swap, donor_shift)
+                    for donor_name, donor_swap in donor_frames
+                    for donor_shift in donor_shifts
+                ]
+                if args.max_candidates_per_chunk > 0 and args.max_candidates_per_chunk < len(candidate_pairs):
+                    take = rng.permutation(len(candidate_pairs))[: args.max_candidates_per_chunk]
+                    candidate_pairs = [candidate_pairs[int(ix)] for ix in take]
+                for donor_name, donor_swap, donor_shift in candidate_pairs:
                         if args.max_evals and eval_count >= args.max_evals:
                             stop_search = True
                             break
@@ -391,8 +404,8 @@ def main() -> int:
                                 flush=True,
                             )
                             break
-                    if stop_search or (args.accept_mode == "first" and pass_accepts > 0):
-                        break
+                if stop_search:
+                    break
                 if (
                     args.accept_mode == "best"
                     and best_chunk_swap is not None
@@ -483,6 +496,7 @@ def main() -> int:
         "guard_eval_label": args.guard_eval_label if guard_sizes else "",
         "guard_max_regression": args.guard_max_regression if guard_sizes else None,
         "accept_mode": args.accept_mode,
+        "max_candidates_per_chunk": args.max_candidates_per_chunk,
         "donor_shifts": donor_shifts,
         "max_evals": args.max_evals,
         "accepted": accepted,
