@@ -2265,15 +2265,36 @@ python3 -m altgan.launch_trace_bootstrap_shuffle_pack \
 ### TraceBootstrap shuffle panels (auto-generated)
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (defaults: `twitter,metakv,metacdn`), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
+| seed | fake | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 4.9466666666675434e-05 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0001` | 6.0933333333335056e-05 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0001` | 6.953333333335292e-05 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0001` | 7.850000000001096e-05 |
+
+Four-seed mean: `0.0000646083`, range `0.0000290333`.
 <!-- END TRACEBOOTSTRAP_SHUFFLE_TWITTER -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METAKV -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (defaults: `twitter,metakv,metacdn`), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
+| seed | fake | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0008` | 0.0007696999999999917 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0006` | 0.0006142999999999861 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0007` | 0.0006895666666666634 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0007` | 0.0006826666666666686 |
+
+Four-seed mean: `0.0006890583`, range `0.0001554000`.
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METAKV -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_METACDN -->
-_(pending: run `python3 -m altgan.ssh_tracebootstrap_shuffle_pack --host baase --sync bundle --ssh-option StrictHostKeyChecking=accept-new --commit --push --tmux-session tb_shuffle_pack` (defaults: `twitter,metakv,metacdn`), or run `python3 -m altgan.launch_trace_bootstrap_shuffle_pack --update-lanl-docs --commit --push` on a `/tiamat` host)_
+| seed | fake | literal `llgan.cachesim_eval` mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_shuffle65536_nort_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 4.133333333315263e-06 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_shuffle65536_nort_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 2.5333333333136623e-06 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_shuffle65536_nort_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 1.4999999999876223e-06 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_lanl_boot_shuffle65536_nort_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0000` | 4.099999999992072e-06 |
+
+Four-seed mean: `0.0000030667`, range `0.0000026333`.
 <!-- END TRACEBOOTSTRAP_SHUFFLE_METACDN -->
 
 <!-- BEGIN TRACEBOOTSTRAP_SHUFFLE_WIKI -->
