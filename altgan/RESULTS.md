@@ -4673,3 +4673,25 @@ Atlas:
 Four-seed mean: `0.0326290583` (display `0.0326`), range `0.0003729333`.
 This is worse than incumbent Twitter win48 `0.0271836500` by `0.0054454083`
 (`20.0319%` higher), so this clean-condition refit is rejected.
+
+## Meta KV Clean-Condition Refit Negative (2026-05-08)
+
+LANL repeated the clean-condition refit on Meta KV after `f2f716a`. Four files
+used canonical characterization rows and the `meta_kvcache` file used
+parsed-trace fallback conditioning under the hardened hash-key path. Evaluated
+with the incumbent tail08 generator shape, the refit missed.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/metakv_phaseatlas_cleancond_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0134` | 0.0134261000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0133` | 0.0133457333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0143` | 0.0143153333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0140` | 0.0139543000 |
+
+Four-seed mean: `0.0137603667` (display `0.0138`), range `0.0009696000`.
+This is worse than incumbent Meta KV tail08 `0.0108672417` by `0.0028931250`
+(`26.6224%` higher), so this clean-condition refit is rejected.

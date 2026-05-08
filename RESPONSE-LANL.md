@@ -4496,3 +4496,38 @@ Mean across seeds `{42,80,81,82}`: `0.0326290583` (race display `0.0326`;
 range `0.0003729333`). This is worse than incumbent Twitter win48
 `0.0271836500` by `0.0054454083` (`20.0319%` higher), so LANL keeps the
 current Twitter board row and uses this as a refit-negative architecture note.
+
+## 2026-05-08 17:15Z -- Meta KV Clean-Condition Refit Closed Negative
+
+LANL repeated the clean-condition refit probe on Meta KV. This fit used the
+same five oracleGeneral files as the incumbent Meta KV atlas; four files used
+canonical characterization rows and the `meta_kvcache` file used parsed-trace
+fallback conditioning under the hardened hash-key path from `f2f716a`. The
+incumbent tail-depth architecture still wins; this refit is rejected.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/metakv_phaseatlas_cleancond_lanl_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 5 Meta KV files, `records_per_file=50000`, `hidden_dim=96`,
+`n_phase=2`, `n_time_bins=4`, `n_size_bins=4`, `epochs=600`, `seed=137`,
+`cond_noise_std=0.05`.
+
+Generation recipe: incumbent Meta KV tail08 shape (`transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`, `stack_adj_dup_prob=0.70`,
+`stack_reuse_drop_prob=0.05`, `stack_hot_pool_prob=0.25`,
+`stack_hot_pool_k=75`, `stack_hot_pool_min_age=16`,
+`stack_recent_pool_prob=0.05`, `stack_recent_pool_window=16`,
+`stack_tail_reuse_prob=0.08`, `stack_tail_reuse_min_frac=0.5`), 1M rows,
+4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metakv_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0134` | 0.0134261000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0133` | 0.0133457333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0143` | 0.0143153333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metakv_cleancond_tail08_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0140` | 0.0139543000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0137603667` (race display `0.0138`;
+range `0.0009696000`). This is worse than incumbent Meta KV tail08
+`0.0108672417` by `0.0028931250` (`26.6224%` higher), so LANL keeps the
+current Meta KV board row.
