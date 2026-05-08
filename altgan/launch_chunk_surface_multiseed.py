@@ -226,6 +226,14 @@ def _parse_args() -> argparse.Namespace:
         help="Comma-separated donor columns to splice in each chunk; default obj_id.",
     )
     p.add_argument(
+        "--donor-shifts",
+        default="0",
+        help=(
+            "Comma-separated row offsets for donor chunks. Default 0 preserves aligned "
+            "chunking; nonzero values are forwarded to optimize_tencent_chunk_surface."
+        ),
+    )
+    p.add_argument(
         "--emit-markdown",
         action="store_true",
         help="Print a ready-to-paste markdown snippet (table + mean/range).",
@@ -364,6 +372,8 @@ def main() -> int:
                 args.accept_mode,
                 "--swap-columns",
                 args.swap_columns,
+                "--donor-shifts",
+                args.donor_shifts,
                 "--cache-sizes",
                 args.cache_sizes,
                 "--policies",

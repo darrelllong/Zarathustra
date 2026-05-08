@@ -69,6 +69,11 @@ def _parse_args() -> argparse.Namespace:
                    help="Accept the first improving donor per chunk, or scan all donors and accept the best.")
     p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
                    help="Comma-separated donor columns to splice; default obj_id.")
+    p.add_argument("--donor-shifts", type=_parse_ints, default=[0],
+                   help=(
+                       "Comma-separated row offsets for donor chunks. Default 0 preserves "
+                       "the aligned-chunk contract; nonzero shifts test donor[start+shift:end+shift]."
+                   ))
     p.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     p.add_argument("--policies", default=DEFAULT_POLICIES)
     p.add_argument("--guard-cache-sizes", default="",
@@ -158,8 +163,12 @@ def _segments_equal(
     donor: dict[str, np.ndarray],
     start: int,
     end: int,
+    source_start: int | None = None,
 ) -> bool:
-    return all(np.array_equal(current[column][start:end], donor[column][start:end]) for column in current)
+    if source_start is None:
+        source_start = start
+    source_end = source_start + (end - start)
+    return all(np.array_equal(current[column][start:end], donor[column][source_start:source_end]) for column in current)
 
 
 def _fmt(value: int) -> str:
@@ -214,6 +223,10 @@ def main() -> int:
         if donor_len != base_len:
             raise ValueError(f"donor length mismatch for {donor_path}: {donor_len} vs {base_len}")
         donor_frames.append((Path(donor_path).stem, donor_swap))
+    donor_shifts = list(dict.fromkeys(int(shift) for shift in args.donor_shifts))
+    if not donor_shifts:
+        donor_shifts = [0]
+    print(f"[chunk_surface] donor shifts: {','.join(str(shift) for shift in donor_shifts)}", flush=True)
 
     binary = _find_cachesim()
     print(f"[chunk_surface] scoring real surface once {args.real}", flush=True)
@@ -271,92 +284,106 @@ def main() -> int:
                 best_chunk_mean = best_mean
                 best_chunk_guard_mean = best_guard_mean
                 best_chunk_donor = None
+                best_chunk_source_start = None
+                best_chunk_donor_shift = None
                 for donor_name, donor_swap in donor_frames:
-                    if args.max_evals and eval_count >= args.max_evals:
-                        stop_search = True
-                        break
-                    if _segments_equal(current_swap, donor_swap, start, end):
-                        continue
-                    trial_swap = _copy_swap_values(current_swap)
-                    for column in swap_columns:
-                        trial_swap[column][start:end] = donor_swap[column][start:end]
-                    _write_candidate(base, trial_swap, candidate_path)
-                    eval_count += 1
-                    try:
-                        report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
-                    except RuntimeError as exc:
-                        first_line = str(exc).splitlines()[0] if str(exc) else "unknown error"
-                        print(
-                            f"[chunk_surface] SKIP invalid candidate eval={eval_count} "
-                            f"chunk={chunk_size} start={start} donor={donor_name} "
-                            f"reason={first_line}",
-                            flush=True,
-                        )
-                        continue
-                    mean = float(report["mean_hrc_mae"])
-                    delta = best_mean - mean
-                    print(
-                        f"[chunk_surface] eval={eval_count} chunk={chunk_size} "
-                        f"pass={pass_ix + 1} start={start} donor={donor_name} "
-                        f"mean={mean:.10f} delta={delta:+.10f}",
-                        flush=True,
-                    )
-                    if mean + args.min_improvement < best_mean:
-                        guard_report = None
-                        guard_mean = None
-                        if guard_sizes and guard_real_by is not None and best_guard_mean is not None:
-                            guard_report = _evaluate_fake(
-                                binary,
-                                candidate_path,
-                                guard_real_by,
-                                guard_sizes,
-                                guard_policies,
-                            )
-                            guard_mean = float(guard_report["mean_hrc_mae"])
-                            if not _guard_allows(
-                                guard_mean=guard_mean,
-                                best_guard_mean=best_guard_mean,
-                                max_regression=args.guard_max_regression,
-                            ):
-                                print(
-                                    f"[chunk_surface] REJECT guard start={start} "
-                                    f"donor={donor_name} guard={guard_mean:.10f} "
-                                    f"best_guard={best_guard_mean:.10f}",
-                                    flush=True,
-                                )
-                                continue
-                        if args.accept_mode == "best":
-                            if mean + args.min_improvement < best_chunk_mean:
-                                best_chunk_swap = trial_swap
-                                best_chunk_report = report
-                                best_chunk_guard_report = guard_report
-                                best_chunk_mean = mean
-                                best_chunk_guard_mean = guard_mean
-                                best_chunk_donor = donor_name
+                    for donor_shift in donor_shifts:
+                        if args.max_evals and eval_count >= args.max_evals:
+                            stop_search = True
+                            break
+                        source_start = start + donor_shift
+                        source_end = source_start + (end - start)
+                        if source_start < 0 or source_end > n:
                             continue
-                        current_swap = trial_swap
-                        best_report = report
-                        best_mean = mean
-                        if guard_report is not None:
-                            best_guard_report = guard_report
-                            best_guard_mean = guard_mean
-                        pass_accepts += 1
-                        move = {
-                            "chunk_size": chunk_size,
-                            "pass": pass_ix + 1,
-                            "start": start,
-                            "end": end,
-                            "donor": donor_name,
-                            "mean": mean,
-                        }
-                        if guard_mean is not None:
-                            move["guard_mean"] = guard_mean
-                        accepted.append(move)
+                        if _segments_equal(current_swap, donor_swap, start, end, source_start):
+                            continue
+                        trial_swap = _copy_swap_values(current_swap)
+                        for column in swap_columns:
+                            trial_swap[column][start:end] = donor_swap[column][source_start:source_end]
+                        _write_candidate(base, trial_swap, candidate_path)
+                        eval_count += 1
+                        try:
+                            report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
+                        except RuntimeError as exc:
+                            first_line = str(exc).splitlines()[0] if str(exc) else "unknown error"
+                            print(
+                                f"[chunk_surface] SKIP invalid candidate eval={eval_count} "
+                                f"chunk={chunk_size} start={start} donor={donor_name} "
+                                f"shift={donor_shift} reason={first_line}",
+                                flush=True,
+                            )
+                            continue
+                        mean = float(report["mean_hrc_mae"])
+                        delta = best_mean - mean
                         print(
-                            f"[chunk_surface] ACCEPT start={start} end={end} "
-                            f"donor={donor_name} best={best_mean:.10f}",
+                            f"[chunk_surface] eval={eval_count} chunk={chunk_size} "
+                            f"pass={pass_ix + 1} start={start} donor={donor_name} "
+                            f"shift={donor_shift} mean={mean:.10f} delta={delta:+.10f}",
                             flush=True,
                         )
+                        if mean + args.min_improvement < best_mean:
+                            guard_report = None
+                            guard_mean = None
+                            if guard_sizes and guard_real_by is not None and best_guard_mean is not None:
+                                guard_report = _evaluate_fake(
+                                    binary,
+                                    candidate_path,
+                                    guard_real_by,
+                                    guard_sizes,
+                                    guard_policies,
+                                )
+                                guard_mean = float(guard_report["mean_hrc_mae"])
+                                if not _guard_allows(
+                                    guard_mean=guard_mean,
+                                    best_guard_mean=best_guard_mean,
+                                    max_regression=args.guard_max_regression,
+                                ):
+                                    print(
+                                        f"[chunk_surface] REJECT guard start={start} "
+                                        f"donor={donor_name} shift={donor_shift} "
+                                        f"guard={guard_mean:.10f} best_guard={best_guard_mean:.10f}",
+                                        flush=True,
+                                    )
+                                    continue
+                            if args.accept_mode == "best":
+                                if mean + args.min_improvement < best_chunk_mean:
+                                    best_chunk_swap = trial_swap
+                                    best_chunk_report = report
+                                    best_chunk_guard_report = guard_report
+                                    best_chunk_mean = mean
+                                    best_chunk_guard_mean = guard_mean
+                                    best_chunk_donor = donor_name
+                                    best_chunk_source_start = source_start
+                                    best_chunk_donor_shift = donor_shift
+                                continue
+                            current_swap = trial_swap
+                            best_report = report
+                            best_mean = mean
+                            if guard_report is not None:
+                                best_guard_report = guard_report
+                                best_guard_mean = guard_mean
+                            pass_accepts += 1
+                            move = {
+                                "chunk_size": chunk_size,
+                                "pass": pass_ix + 1,
+                                "start": start,
+                                "end": end,
+                                "source_start": source_start,
+                                "source_end": source_end,
+                                "donor_shift": donor_shift,
+                                "donor": donor_name,
+                                "mean": mean,
+                            }
+                            if guard_mean is not None:
+                                move["guard_mean"] = guard_mean
+                            accepted.append(move)
+                            print(
+                                f"[chunk_surface] ACCEPT start={start} end={end} "
+                                f"donor={donor_name} shift={donor_shift} best={best_mean:.10f}",
+                                flush=True,
+                            )
+                            break
+                    if stop_search or (args.accept_mode == "first" and pass_accepts > 0):
                         break
                 if (
                     args.accept_mode == "best"
@@ -376,6 +403,13 @@ def main() -> int:
                         "pass": pass_ix + 1,
                         "start": start,
                         "end": end,
+                        "source_start": best_chunk_source_start,
+                        "source_end": (
+                            best_chunk_source_start + (end - start)
+                            if best_chunk_source_start is not None
+                            else None
+                        ),
+                        "donor_shift": best_chunk_donor_shift,
                         "donor": best_chunk_donor,
                         "mean": best_mean,
                     }
@@ -384,7 +418,8 @@ def main() -> int:
                     accepted.append(move)
                     print(
                         f"[chunk_surface] ACCEPT start={start} end={end} "
-                        f"donor={best_chunk_donor} best={best_mean:.10f}",
+                        f"donor={best_chunk_donor} shift={best_chunk_donor_shift} "
+                        f"best={best_mean:.10f}",
                         flush=True,
                     )
                 if stop_search:
@@ -439,6 +474,7 @@ def main() -> int:
         "guard_eval_label": args.guard_eval_label if guard_sizes else "",
         "guard_max_regression": args.guard_max_regression if guard_sizes else None,
         "accept_mode": args.accept_mode,
+        "donor_shifts": donor_shifts,
         "max_evals": args.max_evals,
         "accepted": accepted,
         "eval_count": eval_count,
