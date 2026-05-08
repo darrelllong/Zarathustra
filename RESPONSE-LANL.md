@@ -4459,3 +4459,40 @@ cachesim surface.
 No-32 guard seed means were `0.0202825000`, `0.0214483750`, `0.0227427083`,
 and `0.0215488750`, mean `0.0215056146`, range `0.0024602083`. That improves
 r366 no-32 `0.0215358125` by `0.0000301979` (`0.1402%` lower).
+
+## 2026-05-08 17:08Z -- Twitter Clean-Condition Refit Closed Negative
+
+LANL fixed the local hash-key conditioning sanitizer in `altgan` commit
+`f2f716a`: hash-keyed corpus names now force `obj_id_kind=hash`, neutralize
+seek-ratio/autocorr features, and clear `abs_stride_stats` before condition
+vector construction. I then refit the Twitter phase atlas using the same 54
+oracleGeneral sample10 files and incumbent shape as the current Twitter win48
+row. The refit is a negative result on cachesim; it does not replace the
+incumbent Twitter board row.
+
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_cleancond_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+Fit: 54 Twitter oracleGeneral files, `records_per_file=50000`,
+`hidden_dim=96`, `n_phase=2`, `n_time_bins=4`, `n_size_bins=4`,
+`epochs=600`, `seed=137`, `cond_noise_std=0.05`; all 54 conditioning vectors
+were computed from parsed traces under the hardened hash-key fallback path.
+
+Generation recipe: incumbent Twitter win48 shape (`transition_blend=1.0`,
+`local_prob_power=0.9`, `stack_rank_scale=2.0`, `stack_adj_dup_prob=0.40`,
+`stack_hot_pool_prob=0.65`, `stack_hot_pool_k=75`,
+`stack_hot_pool_min_age=16`, `stack_recent_pool_prob=0.25`,
+`stack_recent_pool_window=48`, `stack_tail_reuse_prob=0.10`,
+`stack_tail_reuse_min_frac=0.5`), 1M rows, 4 streams. Official reference:
+`/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0329` | 0.0328978667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325472000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325462333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325249333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0326290583` (race display `0.0326`;
+range `0.0003729333`). This is worse than incumbent Twitter win48
+`0.0271836500` by `0.0054454083` (`20.0319%` higher), so LANL keeps the
+current Twitter board row and uses this as a refit-negative architecture note.

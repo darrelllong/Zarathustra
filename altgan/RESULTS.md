@@ -4650,3 +4650,26 @@ six-policy surface.
 
 No-32 guard mean improved from r366 `0.0215358125` to `0.0215056146`, a
 `0.0000301979` (`0.1402%`) lower diagnostic mean.
+
+## Twitter Clean-Condition Refit Negative (2026-05-08)
+
+After commit `f2f716a` hardened hash-key conditioning, LANL refit the Twitter
+phase atlas with the same 54 oracleGeneral sample10 files and evaluated it
+with the incumbent win48 generator shape. The refit used parsed-trace fallback
+conditioning for all 54 files, so the fixed hash-key path was active. It did
+not beat the incumbent.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/twitter_cluster_real.csv`.
+Atlas:
+`/tiamat/zarathustra/checkpoints/altgan/twitter_cluster_phaseatlas_cleancond_lanl96x50k_h96_phase2_t4s4_e600_seed137_noise0p05.pkl.gz`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed42_fake_1M.csv` | `mean HRC-MAE across policies: 0.0329` | 0.0328978667 |
+| 80 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed80_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325472000 |
+| 81 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed81_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325462333 |
+| 82 | `/tiamat/zarathustra/altgan-output/twitter_cluster_cleancond_win48_seed82_fake_1M.csv` | `mean HRC-MAE across policies: 0.0325` | 0.0325249333 |
+
+Four-seed mean: `0.0326290583` (display `0.0326`), range `0.0003729333`.
+This is worse than incumbent Twitter win48 `0.0271836500` by `0.0054454083`
+(`20.0319%` higher), so this clean-condition refit is rejected.
