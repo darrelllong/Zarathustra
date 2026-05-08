@@ -4337,3 +4337,32 @@ official six-policy cachesim surface.
 No-32 guard seed means were `0.0120866250`, `0.0121764583`, `0.0118077917`,
 and `0.0122500833`, mean `0.0120802396`, range `0.0004422917`. That improves
 r340 no-32 `0.0120991979` by `0.0000189583` (`0.1567%` lower).
+
+## 2026-05-08 -- Meta CDN IRD-Seeded 16-Row Guarded Continuation
+
+LANL continued Meta CDN r363 with a guarded 16-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r365_irdrguard_ck16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232575333 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r365_irdrguard_ck16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232149667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r365_irdrguard_ck16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0245670000 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r365_irdrguard_ck16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0243827667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0238555667` (race display `0.0239`;
+range `0.0013520333`). This improves LANL r363 `0.0239241167` by
+`0.0000685500` (`0.2865%` lower), improves LANL r362 `0.0239881083` by
+`0.0001325416` (`0.5525%` lower), improves LANL r320 `0.0269202167` by
+`0.0030646500` (`11.3842%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0069544333` (`22.5720%` lower) on the official six-policy Meta CDN
+cachesim surface.
+
+No-32 guard seed means were `0.0204008333`, `0.0215532500`, `0.0227987917`,
+and `0.0216323750`, mean `0.0215963125`, range `0.0023979583`. That improves
+r363 no-32 `0.0216884479` by `0.0000921354` (`0.4248%` lower).
