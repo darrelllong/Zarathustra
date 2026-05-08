@@ -4233,3 +4233,19 @@ Four-seed mean: `0.0213297667` (display `0.0213`), range `0.0003701667`.
 This improves r342 `0.0213676917` by `0.0000379250` (`0.1775%` lower).
 No-32 means also improved from r342 `0.0171048021` to r347 `0.0170719479`,
 a `0.0000328542` (`0.1921%`) lower diagnostic mean.
+
+## Priority IRD Renewal Fix (2026-05-07)
+
+Patched `altgan.ird_renewal` priority heap mode so independent/fallback
+emissions refresh the object's renewal timer and invalidate stale heap entries.
+Before this fix, only dependent pops rescheduled in `heap=priority`, so mixed
+independent arrivals could leave obsolete due events in the heap. The older
+r295 priority-heap negatives should be treated as bug-polluted, not a clean
+architecture rejection.
+
+A guarded four-seed Wikipedia retake is queued on baase behind the live Twitter
+r351 job:
+`wiki_r352_priofix`, spec
+`priofix_s28_rb16:ird_s=28,ip=0.10,rb=16,heap=priority`, official
+`32,128,512,2048,8192` six-policy surface plus no-32 guard
+`128,512,2048,8192`.
