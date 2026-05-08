@@ -77,6 +77,10 @@ class SeedResult:
     cachesim_line: str | None
     mean: float | None
     mean_token: str | None
+    guard_json: Path | None = None
+    guard_line: str | None = None
+    guard_mean: float | None = None
+    guard_mean_token: str | None = None
 
 
 @dataclass(frozen=True)
@@ -166,6 +170,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--corpus", required=True, help="Corpus tag used in output filenames.")
     p.add_argument("--cache-sizes", default="32,128,512,2048,8192")
     p.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car")
+    p.add_argument("--guard-cache-sizes", default="",
+                   help="Optional diagnostic cache sizes, e.g. 128,512,2048,8192.")
+    p.add_argument("--guard-policies", default="",
+                   help="Policies for --guard-cache-sizes; defaults to --policies.")
+    p.add_argument("--guard-label", default="guard",
+                   help="Suffix used for optional guard cachesim JSONs.")
     p.add_argument("--seeds", default="42,80,81,82", help="Comma-separated generation seeds.")
     p.add_argument("--n-records", type=int, default=1_000_000)
     p.add_argument("--spec", action="append", type=_parse_spec, required=True,
@@ -338,6 +348,33 @@ def _format_markdown(
             rng = max(means) - min(means) if means else Decimal(0)
             lines.append(f"| `{spec}` | `{float(m):.10f}` | `{float(rng):.10f}` |")
 
+    guard_rows = [r for r in results if r.guard_mean_token is not None]
+    if guard_rows:
+        lines.append("")
+        lines.append("| spec | seed | guard JSON | guard literal mean line | guard mean |")
+        lines.append("|---|---:|---|---|---:|")
+        for r in guard_rows:
+            guard_cell = f"`{r.guard_line}`" if r.guard_line else ""
+            json_cell = f"`{r.guard_json}`" if r.guard_json is not None else ""
+            lines.append(
+                f"| `{r.spec}` | {r.seed} | {json_cell} | {guard_cell} | {r.guard_mean_token} |"
+            )
+
+        by_guard_spec: dict[str, list[Decimal]] = {}
+        for r in guard_rows:
+            try:
+                by_guard_spec.setdefault(r.spec, []).append(Decimal(r.guard_mean_token or "nan"))
+            except Exception:
+                continue
+        if by_guard_spec:
+            lines.append("")
+            lines.append("| spec | guard mean across seeds | guard range |")
+            lines.append("|---|---:|---:|")
+            for spec, means in sorted(by_guard_spec.items(), key=lambda kv: sum(kv[1]) / max(1, len(kv[1]))):
+                m = sum(means) / max(1, len(means))
+                rng = max(means) - min(means) if means else Decimal(0)
+                lines.append(f"| `{spec}` | `{float(m):.10f}` | `{float(rng):.10f}` |")
+
     lines.append("")
     return "\n".join(lines)
 
@@ -362,7 +399,13 @@ def main() -> int:
             fake = root / f"{tag}_fake_{args.n_records // 1_000}k.csv"
             cs_json = root / "cachesim_lanl" / f"{tag}_official.json"
             cs_json.parent.mkdir(parents=True, exist_ok=True)
+            guard_json = (
+                root / "cachesim_lanl" / f"{tag}_{args.guard_label}.json"
+                if args.guard_cache_sizes
+                else None
+            )
             cachesim_line: str | None = None
+            guard_line: str | None = None
 
             if args.skip_existing and cs_json.exists():
                 print(f"[irdr_sweep] skip existing {cs_json.name}", flush=True)
@@ -374,6 +417,28 @@ def main() -> int:
                 cachesim_line = _extract_cachesim_mean_line(output)
 
             mean_token, mean = _mean_token_from_json_text(cs_json)
+            guard_mean_token = None
+            guard_mean = None
+            if guard_json is not None:
+                guard_policies = args.guard_policies or args.policies
+                if args.skip_existing and guard_json.exists():
+                    print(f"[irdr_sweep] skip existing {guard_json.name}", flush=True)
+                else:
+                    print(f"[irdr_sweep] guard eval {guard_json.name}", flush=True)
+                    output = _run_capture(
+                        [
+                            sys.executable, "-u", "-m", "llgan.cachesim_eval",
+                            "--fake", str(fake),
+                            "--real", args.real,
+                            "--cache-sizes", args.guard_cache_sizes,
+                            "--policies", guard_policies,
+                            "--out", str(guard_json),
+                        ],
+                        env,
+                        args.dry_run,
+                    )
+                    guard_line = _extract_cachesim_mean_line(output)
+                guard_mean_token, guard_mean = _mean_token_from_json_text(guard_json)
             if mean is not None:
                 seed_means.append(mean)
             if mean is not None and mean_token is not None:
@@ -382,6 +447,8 @@ def main() -> int:
                 print(f"[irdr_sweep] {tag}: {mean:.10f}", flush=True)
             else:
                 print(f"[irdr_sweep] {tag}: pending", flush=True)
+            if guard_mean is not None and guard_mean_token is not None:
+                print(f"[irdr_sweep] {tag} {args.guard_label}: {guard_mean_token}", flush=True)
             all_seed_results.append(
                 SeedResult(
                     spec=spec.name,
@@ -391,6 +458,10 @@ def main() -> int:
                     cachesim_line=cachesim_line,
                     mean=mean,
                     mean_token=mean_token,
+                    guard_json=guard_json,
+                    guard_line=guard_line,
+                    guard_mean=guard_mean,
+                    guard_mean_token=guard_mean_token,
                 )
             )
 
