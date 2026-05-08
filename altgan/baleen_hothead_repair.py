@@ -27,6 +27,12 @@ def _parse_args() -> argparse.Namespace:
         help="Target fraction of rows whose cache key equals the previous row.",
     )
     parser.add_argument(
+        "--break-mode",
+        choices=("unique", "hothead"),
+        default="unique",
+        help="Rewrite adjacent-repeat breaks as fresh one-shots or into the synthetic hot head.",
+    )
+    parser.add_argument(
         "--hothead-frac",
         type=float,
         default=0.08,
@@ -126,7 +132,11 @@ def main() -> int:
     if break_count > 0 and len(break_candidates) > 0:
         chosen = rng.choice(break_candidates, size=min(break_count, len(break_candidates)), replace=False)
         for ix, pos in enumerate(chosen):
-            obj_ids[int(pos)] = int(args.synthetic_base_id + 100_000_000 + args.seed * 10_000_000 + ix)
+            if args.break_mode == "hothead":
+                stream_part = 0 if args.stream_mode == "zero" else int(streams[int(pos)])
+                obj_ids[int(pos)] = int(args.synthetic_base_id + stream_part * 1_000_000 + ix % max(1, args.hothead_ids))
+            else:
+                obj_ids[int(pos)] = int(args.synthetic_base_id + 100_000_000 + args.seed * 10_000_000 + ix)
         print(f"[hothead] broke_adjacent={len(chosen)} target_adjacent_rows={target_adj}", flush=True)
     else:
         chosen = np.empty(0, dtype=np.int64)
