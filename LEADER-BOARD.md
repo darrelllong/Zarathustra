@@ -28,13 +28,13 @@ The race has two metric classes:
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
 | Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0209385833 (r377 guarded ID+size 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002931667; no-32 guard mean 0.0167670937) | **LLNL** | +13.5% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
-| Twitter | **0.02491** (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | 0.02547 (R288 chunk-ensemble) | **LLNL** | +2.2% |
+| Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | 0.03081 (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | **0.0237592500** (r370 guarded 2-row continuation, 4-seed {42,80,81,82}, range 0.0013576000; no-32 guard mean 0.0214763021) | **LANL** | -22.9% |
 | Wikipedia | **0.008895** (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | 0.01146 (IRD-renewal ird_s=32 ip=0.10) | **LLNL** | +22.4% |
 
-**Generative score**: LANL leads 5 (Tencent, CloudPhysics, MSR Exchange,
-Meta KV, Meta CDN); LLNL leads 4 (Alibaba, Twitter, Wikipedia, Baleen24).
+**Generative score**: LANL leads 6 (Tencent, CloudPhysics, MSR Exchange,
+Twitter, Meta KV, Meta CDN); LLNL leads 3 (Alibaba, Wikipedia, Baleen24).
 Alibaba remains an LLNL lead under the current banked rows: LLNL R287.A2
 `0.009999` vs LANL r368 `0.0106785333`. LANL r368 improves LANL r364 by
 `0.0000034750` (`0.0325%` lower) but still trails LLNL by `0.0006795333`
@@ -84,10 +84,10 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - 4-seed multi-seed mean: **0.03017** (range 0.000213)
 - Improvement over R283.H (0.0311): 3.0%; gap to LANL 0.0267 closed to 13.0%
 
-### LLNL R287.M Twitter (current banked — chunk-ensemble guard pass on R281.K base)
+### LLNL R287.M Twitter (superseded by LANL r351)
 - Method: `llgan.chunk_ensemble` cascade; synthetic donors only
 - 4-seed multi-seed mean: **0.02881** (range 0.000176)
-- Gap to LANL 0.02547 still 13.1%
+- LANL r351 now leads LLNL R287.M2 `0.02491` by `0.0012982750` (`5.2119%` lower).
 
 ### LLNL R280.I Wikipedia (PRIOR — superseded by R287.W)
 - Same atlas/recipe as R280.M; only `--stack-rank-scale 4.5` instead of 5.0
@@ -210,14 +210,14 @@ metric-class advantage 2DIO does not contest.
    tightened to 0.01076 in `RESPONSE-LANL.md`, putting the means within
    seed-noise. Pre-empt with finer-cascade chunk-ensemble (chunk_size in
    {2K, 4K, 8K}) or fit-time work on the R270 atlas.
-5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r374
-   `0.0212568500` -> LLNL leads by 15.2%. LANL's r374 tightened its row and
+5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r377
+   `0.0209385833` -> LLNL leads by 13.5%. LANL's r377 tightened its row and
    reduced variance, but closing the remaining gap likely needs a new
    architecture, not smaller object-ID chunks.
-6. **Twitter / Meta KV / Meta CDN**: LLNL leads Twitter by 2.2%; LANL leads
-   Meta KV by 77.3% and Meta CDN by 22.9% after r370. LLNL's R281 claims
-   were vanilla atlas with poor reuse; R287.M closed most of the Twitter gap.
-   LANL's specific knobs: Twitter win=48,
+6. **Twitter / Meta KV / Meta CDN**: LANL leads Twitter by 5.2% after r351,
+   Meta KV by 77.3%, and Meta CDN by 22.9% after r370. LLNL's R281 claims
+   were vanilla atlas with poor reuse; R287.M closed much of the Twitter gap,
+   but LANL's guarded cascade retook the row. LANL's specific knobs: Twitter win=48,
    Meta KV tail=0.08/adj=0.70/drop=0.05/hp=0.25. LLNL should port those
    knobs to LLNL's atlases for these corpora and/or wrap with chunk-
    ensemble guard pass.
