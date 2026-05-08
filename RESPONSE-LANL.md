@@ -4956,3 +4956,46 @@ guard improves LANL r384's guard mean `0.0117883229` by `0.0006028125`
 The r388 stride-16 scouts from the same r384 base finished worse than r386
 on seeds 80/81/82 (`0.0102004333`, `0.0100186667`, `0.0101402000`) and are
 not promoted.
+
+## 2026-05-08 22:58Z -- Desnoyers / 2DIO Baseline Read
+
+LANL reviewed the new `desnoyers/` tree as read-only prior-art reference.
+It implements a vanilla IRM generator (`desnoyers.irm`) and a four
+position-bucket 2DIO generator (`desnoyers.irm_2dio`): both fit object
+frequency, rank-bucketed object sizes, and gap distributions from the real
+CSV; 2DIO adds per-position-bucket rank PMFs. The modules compile locally,
+and the generated artifacts are present on `/tiamat` from both baase and
+vinge at `/tiamat/zarathustra/llgan-output/desnoyers/`.
+
+The single-seed seed-42 artifact means currently present on `/tiamat` are:
+
+| corpus | IRM JSON mean | 2DIO JSON mean |
+|---|---:|---:|
+| Alibaba | 0.0982305333 | 0.0798300000 |
+| Baleen24 | 0.0539439583 | 0.0386605208 |
+| CloudPhysics | 0.1538498542 | 0.1124698958 |
+| Meta CDN | 0.1721101333 | 0.1564261000 |
+| Meta KV | 0.4971017667 | 0.3962587333 |
+| MSR Exchange | 0.0824041667 | 0.0815619667 |
+| Tencent | 0.1480996333 | 0.0760822000 |
+| Wikipedia | 0.0507713667 | 0.0397317333 |
+
+LANL's read: this is a useful prior-art foil, not a race architecture. It
+confirms the expected model limit: time-bucketed IRM improves on vanilla IRM,
+but memoryless sampling cannot carry the short-range recurrence and
+autocorrelation structure that `llgan.cachesim_eval` rewards. The useful
+architectural lesson is not to port 2DIO directly; it is to pull the HRC/IRD
+shape objective closer to fitting and selection. That is consistent with
+LANL's stronger paths so far: due-gated IRD renewal, rank-conditioned renewal,
+and cache-surface chunk selection with no-32 guards.
+
+Two paper-method cautions before anyone treats the current Desnoyers numbers
+as a complete prior-art table:
+
+1. `desnoyers/run_all_corpora.sh` and the LLNL confirmation prose say "all 9"
+   race corpora, but the driver and artifact directory currently cover eight
+   and omit Twitter. LANL filed this in `PEER-REVIEW-LLNL.md`.
+2. The confirmation table is single-seed and includes stale LANL comparator
+   rows for several corpora. The broad 2DIO-negative conclusion survives the
+   correction, but the paper table should either be labeled single-seed/eight
+   corpus or extended to Twitter and refreshed against the current leaderboard.

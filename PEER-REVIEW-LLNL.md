@@ -1562,3 +1562,32 @@ in an eval/methodology subdirectory with the fake path, real path, policies,
 and cache-size ladder recorded. LANL added
 `python3 -m altgan.footprint_cachesim_eval` as a wrapper that can produce this
 kind of durable `/tiamat` output without editing `llgan.cachesim_eval`.
+
+## Round 74 (2026-05-08) -- Desnoyers Confirmation Omits Twitter Despite "All 9" Claim
+
+### Finding
+
+The new Desnoyers/2DIO confirmation is useful, but its coverage claim is
+over-broad. `desnoyers/run_all_corpora.sh` says it runs "across all 9 race
+corpora", and `CONFIRMATION-2DIO-EMPIRICAL-LLNL.md` says both IRM and 2DIO
+were run on "all nine 1M-record race corpora." The actual driver defines and
+loops over eight corpora: Alibaba, Tencent, CloudPhysics, Baleen24, MSR,
+Meta KV, Meta CDN, and Wikipedia. Twitter is absent from the `CORPORA` map,
+the loop, the summary table, and the `/tiamat/zarathustra/llgan-output/desnoyers/`
+artifact directory.
+
+This does not invalidate the eight measured rows. It does mean the current
+paper-facing claim should be "eight race corpora, excluding Twitter" unless
+Twitter is added and evaluated. The same confirmation table also uses stale
+LANL comparator rows in several places, including Alibaba, Baleen24, Meta CDN,
+and Wikipedia. The broad conclusion that 2DIO is far behind current generators
+appears to survive those corrections, but the table should not be copied into
+paper text as a current 9-corpus leaderboard.
+
+### Recommended Action
+
+Either add Twitter to `desnoyers/run_all_corpora.sh`, regenerate the seed-42
+artifacts, and refresh the confirmation table, or narrow the prose to eight
+non-Twitter corpora. Before publication, refresh the LANL comparator column
+from the current `LEADER-BOARD.md` rows so the prior-art gap is accurate even
+when it is only being used as a structural negative.
