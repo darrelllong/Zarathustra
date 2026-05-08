@@ -4243,6 +4243,10 @@ independent arrivals could leave obsolete due events in the heap. The older
 r295 priority-heap negatives should be treated as bug-polluted, not a clean
 architecture rejection.
 
+Added an optional 2DIO-style singleton branch as well: priority specs can use
+`inf1=1` (and optional `sp=<prob>`) to keep count-1 objects out of the finite
+IRD heap and emit them from a shuffled `IRD=infinity` singleton pool.
+
 A guarded four-seed Wikipedia retake is queued on baase behind the live Twitter
 r351 job:
 `wiki_r352_priofix`, spec
