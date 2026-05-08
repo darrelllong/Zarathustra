@@ -148,6 +148,49 @@ Per-corpus ladders under this rule (from observed footprints):
    duplicate of its neighbor. (Equivalent to a Riemann sum on log scale, which
    is the natural measure for power-of-two ladders.)
 
+## Empirical demonstration: Wikipedia seed 42, three claims
+
+We ran the proposed full power-of-2 ladder (1, 2, 4, ..., 524288; 20 sizes;
+6 policies lru/arc/fifo/sieve/slru/car) on three Wikipedia seed-42 traces
+and compared per-policy mean HRC-MAE under the old 5-size surface vs the
+new 20-size ladder:
+
+| Trace | Old 5-size surface | New 20-size ladder | Ratio |
+|---|---:|---:|---:|
+| LLNL R288.W (banked, IRD-renewal s32) | 0.008925 | 0.0232 | 2.6× |
+| LANL irdr s3200 (banked-class IRD-renewal) | 0.011229 | 0.0282 | 2.5× |
+| LANL r328 chunksurf (audit-pending) | **0.005117** | 0.0234 | **4.6×** |
+
+**Three findings:**
+
+1. **The 43% gap between LANL r328 and LLNL R288.W on the old surface
+   collapses to <1% (statistical tie) on the new ladder.** LANL r328's
+   chunksurf cascade was over-fitting the small-cache regime that the old
+   surface measures.
+
+2. **At cache=524288 (saturation, equal to footprint+1 sample),** every
+   generator has |Δ| ∈ [0.13, 0.18] HRC against real. The real Wikipedia
+   trace at saturation hits 63% (47% miss); fakes hit only 49% (51% miss).
+   This 14-point gap is the actual prediction failure mode, and it is
+   **completely invisible to the current surface** which terminates at
+   cache=8192.
+
+3. **At cache=1, 2, 4, 8, the per-policy errors are 0.0001–0.005 across all
+   three traces.** These sizes contribute almost no information because
+   even adjacent-duplicate rate is matched well; including them in the
+   ladder is for completeness, not discriminative power.
+
+**Net implication for the paper**: claims like "LLNL beats LANL by 22%" or
+"LANL beats LLNL by 43%" on Wikipedia depend critically on the cache-size
+ladder choice. Under a footprint-spanning ladder, the three generators
+tested are within ~20% of each other. The "race" is then less about which
+team wins on the small-cache regime and more about which team's generator
+captures real-trace structure at production-realistic cache scales — where
+**all of us currently fail by similar amounts**.
+
+Synthetic CSVs and per-trace cachesim JSON for this comparison are at
+`/tmp/protoladder_*.json` on baase (full per-policy per-cache breakdowns).
+
 ## Why this matters for the paper
 
 The race results as posted in `LEADER-BOARD.md` are **internally fair** under
