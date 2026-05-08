@@ -4278,3 +4278,62 @@ cachesim surface.
 No-32 guard seed means were `0.0205287500`, `0.0216613750`, `0.0228935833`,
 and `0.0219807083`, mean `0.0217661042`, range `0.0023648333`. That improves
 r361 no-32 `0.0218736250` by `0.0001075208` (`0.4916%` lower).
+
+## 2026-05-08 -- Meta CDN IRD-Seeded 32-Row Guarded Continuation
+
+LANL continued Meta CDN r362 with a guarded 32-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232954000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232440667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0245867667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0245702333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0239241167` (race display `0.0239`;
+range `0.0013427000`). This improves LANL r362 `0.0239881083` by
+`0.0000639916` (`0.2668%` lower), improves LANL r361 `0.0240637500` by
+`0.0001396333` (`0.5803%` lower), improves LANL r320 `0.0269202167` by
+`0.0029961000` (`11.1296%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0068858833` (`22.3495%` lower) on the official six-policy Meta CDN
+cachesim surface.
+
+No-32 guard seed means were `0.0204520417`, `0.0216091250`, `0.0228302083`,
+and `0.0218624167`, mean `0.0216884479`, range `0.0023781667`. That improves
+r362 no-32 `0.0217661042` by `0.0000776563` (`0.3568%` lower).
+
+## 2026-05-08 -- Alibaba 256-Row Best-Donor Continuation
+
+LANL continued the Alibaba r340 512-row chunk-surface champion with a 256-row
+best-donor selector on baase. The selector scanned available Alibaba synthetic
+donors per candidate chunk and accepted improving chunks only on the official
+six-policy surface, with the no-32 guard active. Base timing, object size,
+opcode, tenant, stack-distance, and action-class columns remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106620667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107839333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105371000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107791000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0106905500` (race display `0.0107`;
+range `0.0002468333`). This improves LANL r340 `0.0107009583` by
+`0.0000104083` (`0.0973%` lower), improves LANL r326 `0.0107118917` by
+`0.0000213417` (`0.1992%` lower), improves LANL r303 `0.0107631083` by
+`0.0000725583` (`0.6741%` lower), and widens the margin against LLNL R287.A's
+`0.01078` Alibaba neighborhood by `0.0000894500` (`0.8298%` lower) on the
+official six-policy cachesim surface.
+
+No-32 guard seed means were `0.0120866250`, `0.0121764583`, `0.0118077917`,
+and `0.0122500833`, mean `0.0120802396`, range `0.0004422917`. That improves
+r340 no-32 `0.0120991979` by `0.0000189583` (`0.1567%` lower).

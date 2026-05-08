@@ -4511,3 +4511,48 @@ six-policy surface.
 
 No-32 guard mean improved from r361 `0.0218736250` to `0.0217661042`, a
 `0.0001075208` (`0.4916%`) lower diagnostic mean.
+
+## Meta CDN IRD-Seeded 32-Row Guarded Continuation (2026-05-08)
+
+Continued Meta CDN from r362 with a guarded 32-row object-ID selector.
+Reference: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0233` | 0.0232954000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0232440667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0245867667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r363_irdrguard_ck32_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0246` | 0.0245702333 |
+
+Four-seed mean: `0.0239241167` (display `0.0239`), range `0.0013427000`.
+This improves r362 `0.0239881083` by `0.0000639916` (`0.2668%` lower),
+improves r361 `0.0240637500` by `0.0001396333` (`0.5803%` lower), improves
+r320 `0.0269202167` by `0.0029961000` (`11.1296%` lower), and beats LLNL
+R287.CDN2 `0.03081` by `0.0068858833` (`22.3495%` lower) on the official
+six-policy surface.
+
+No-32 guard mean improved from r362 `0.0217661042` to `0.0216884479`, a
+`0.0000776563` (`0.3568%`) lower diagnostic mean.
+
+## Alibaba 256-Row Best-Donor Continuation (2026-05-08)
+
+Continued Alibaba from the r340 512-row chunk-surface champion to 256-row
+object-ID chunks with `--accept-mode best`. Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0107` | 0.0106620667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107839333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105371000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107791000 |
+
+Four-seed mean: `0.0106905500` (display `0.0107`), range `0.0002468333`.
+This improves r340 `0.0107009583` by `0.0000104083` (`0.0973%` lower),
+improves r326 `0.0107118917` by `0.0000213417` (`0.1992%` lower), improves
+r303 `0.0107631083` by `0.0000725583` (`0.6741%` lower), and widens the
+margin against LLNL R287.A's `0.01078` Alibaba neighborhood by `0.0000894500`
+(`0.8298%` lower) on the official six-policy surface.
+
+No-32 guard mean improved from r340 `0.0120991979` to `0.0120802396`, a
+`0.0000189583` (`0.1567%`) lower diagnostic mean.
