@@ -3805,7 +3805,9 @@ Four-seed mean: `0.0107118917` (display `0.0107`), range `0.0002502333`.
 This improves r323 `0.0107265167` by `0.0000146250`, improves r303
 `0.0107631083` by `0.0000512166` (`0.48%` lower), and widens the margin
 against LLNL R287.A's `0.01078` Alibaba neighborhood by about `0.0000681084`
-on the official six-policy cachesim surface.
+on the official six-policy cachesim surface. `LEADER-BOARD.md` (last updated
+2026-05-08) lists LLNL's banked Alibaba at `0.009999` (R287.A2), so r326 still
+trails by `0.0007128917` (`7.13%` higher).
 
 ## Alibaba 512-Row Best-Donor Continuation (2026-05-07)
 
@@ -3827,8 +3829,10 @@ Four-seed mean: `0.0107009583` (display `0.0107`), range `0.0002461000`.
 This improves r326 `0.0107118917` by `0.0000109334`, improves r303
 `0.0107631083` by `0.0000621500`, and widens the margin against LLNL R287.A's
 `0.01078` Alibaba neighborhood by about `0.0000790417` on the official
-six-policy cachesim surface. Diagnostic no-32 sensitivity also improved: r326
-no-32 mean `0.0121092396` to r340 no-32 mean `0.0120991979`, a
+six-policy cachesim surface. `LEADER-BOARD.md` (last updated 2026-05-08) lists
+LLNL's banked Alibaba at `0.009999` (R287.A2), so r340 still trails by
+`0.0007019583` (`7.02%` higher). Diagnostic no-32 sensitivity also improved:
+r326 no-32 mean `0.0121092396` to r340 no-32 mean `0.0120991979`, a
 `0.0000100417` (`0.08%`) lower diagnostic mean excluding cache size `32`.
 
 ## Wikipedia 32K Chunk-Surface Retake (2026-05-07)
@@ -4552,7 +4556,9 @@ This improves r340 `0.0107009583` by `0.0000104083` (`0.0973%` lower),
 improves r326 `0.0107118917` by `0.0000213417` (`0.1992%` lower), improves
 r303 `0.0107631083` by `0.0000725583` (`0.6741%` lower), and widens the
 margin against LLNL R287.A's `0.01078` Alibaba neighborhood by `0.0000894500`
-(`0.8298%` lower) on the official six-policy surface.
+(`0.8298%` lower) on the official six-policy surface. `LEADER-BOARD.md` (last
+updated 2026-05-08) lists LLNL's banked Alibaba at `0.009999` (R287.A2), so
+r360 still trails by `0.0006915500` (`6.92%` higher).
 
 No-32 guard mean improved from r340 `0.0120991979` to `0.0120802396`, a
 `0.0000189583` (`0.1567%`) lower diagnostic mean.
@@ -4620,7 +4626,9 @@ improves r340 `0.0107009583` by `0.0000189500` (`0.1771%` lower), improves
 r326 `0.0107118917` by `0.0000298834` (`0.2790%` lower), improves r303
 `0.0107631083` by `0.0000811000` (`0.7535%` lower), and widens the margin
 against LLNL R287.A's `0.01078` Alibaba neighborhood by `0.0000979917`
-(`0.9090%` lower) on the official six-policy surface.
+(`0.9090%` lower) on the official six-policy surface. `LEADER-BOARD.md` (last
+updated 2026-05-08) lists LLNL's banked Alibaba at `0.009999` (R287.A2), so
+r364 still trails by `0.0006830083` (`6.83%` higher).
 
 No-32 guard mean improved from r360 `0.0120802396` to `0.0120711250`, a
 `0.0000091146` (`0.0755%`) lower diagnostic mean.

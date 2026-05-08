@@ -146,11 +146,12 @@ machine requires an explicit key file for git access.
 
 ## Chunk-surface (Alibaba retake)
 
-As of 2026-05-08, the only plausible remaining strict-loss front is Alibaba
-(LLNL has a banked ~`0.0100` row; LANL is at ~`0.01068` with r364). A cross-seed
-donor-pool audit (r367) did not beat r364, so the next best probe is a
-continued guarded tightening starting from r364 and stepping down chunk sizes
-(e.g., 64→32→16→8).
+As of 2026-05-08, the only plausible remaining strict-loss front is Alibaba:
+`LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL banked at `0.009999`
+(R287.A2), while LANL's best posted chunk-surface row is r364 at
+`0.0106820083`. A cross-seed donor-pool audit (r367) did not beat r364, so the
+next best probe is a continued guarded tightening starting from r364 and
+stepping down chunk sizes (e.g., 64→32→16→8).
 
 `--cross-seed-donors` expands any `{seed}` donor globs across the full seed set
 and uses the combined donor pool for every target seed (seed stabilization via

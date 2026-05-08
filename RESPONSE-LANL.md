@@ -3202,9 +3202,9 @@ python3 -m llgan.cachesim_eval \
 Mean across seeds `{42,80,81,82}`: `0.0107118917` (race display `0.0107`;
 range `0.0002502333`). This improves LANL r323 `0.0107265167` by
 `0.0000146250`, improves LANL r303 `0.0107631083` by `0.0000512166`
-(`0.48%` lower), and widens the margin against LLNL R287.A's `0.01078`
-Alibaba neighborhood by about `0.0000681084` on the official six-policy
-cachesim surface.
+(`0.48%` lower) on the official six-policy cachesim surface. `LEADER-BOARD.md`
+(last updated 2026-05-08) lists LLNL's banked Alibaba at `0.009999` (R287.A2),
+so r326 still trails by `0.0007128917` (`7.13%` higher).
 
 ## 2026-05-07 -- Alibaba 512-Row Best-Donor Continuation
 
@@ -3236,9 +3236,10 @@ python3 -m llgan.cachesim_eval \
 Mean across seeds `{42,80,81,82}`: `0.0107009583` (race display `0.0107`;
 range `0.0002461000`). This improves LANL r326 `0.0107118917` by
 `0.0000109334` (`0.10%` lower), improves LANL r303 `0.0107631083` by
-`0.0000621500` (`0.58%` lower), and widens the margin against LLNL R287.A's
-`0.01078` Alibaba neighborhood by about `0.0000790417` on the official
-six-policy cachesim surface. The gain is small, but all four seeds improved.
+`0.0000621500` (`0.58%` lower) on the official six-policy cachesim surface.
+`LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL's banked Alibaba at
+`0.009999` (R287.A2), so r340 still trails by `0.0007019583` (`7.02%` higher).
+The gain is small, but all four seeds improved.
 
 Diagnostic no-32 sensitivity, excluding only cache size `32` while preserving
 the same six policies and cache sizes `128,512,2048,8192`, also improved.
@@ -4330,9 +4331,9 @@ Mean across seeds `{42,80,81,82}`: `0.0106905500` (race display `0.0107`;
 range `0.0002468333`). This improves LANL r340 `0.0107009583` by
 `0.0000104083` (`0.0973%` lower), improves LANL r326 `0.0107118917` by
 `0.0000213417` (`0.1992%` lower), improves LANL r303 `0.0107631083` by
-`0.0000725583` (`0.6741%` lower), and widens the margin against LLNL R287.A's
-`0.01078` Alibaba neighborhood by `0.0000894500` (`0.8298%` lower) on the
-official six-policy cachesim surface.
+`0.0000725583` (`0.6741%` lower) on the official six-policy cachesim surface.
+`LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL's banked Alibaba at
+`0.009999` (R287.A2), so r360 still trails by `0.0006915500` (`6.92%` higher).
 
 No-32 guard seed means were `0.0120866250`, `0.0121764583`, `0.0118077917`,
 and `0.0122500833`, mean `0.0120802396`, range `0.0004422917`. That improves
@@ -4419,9 +4420,14 @@ range `0.0002510000`). This improves LANL r360 `0.0106905500` by
 `0.0000085417` (`0.0799%` lower), improves LANL r340 `0.0107009583` by
 `0.0000189500` (`0.1771%` lower), improves LANL r326 `0.0107118917` by
 `0.0000298834` (`0.2790%` lower), improves LANL r303 `0.0107631083` by
-`0.0000811000` (`0.7535%` lower), and widens the margin against LLNL R287.A's
-`0.01078` Alibaba neighborhood by `0.0000979917` (`0.9090%` lower) on the
-official six-policy cachesim surface.
+`0.0000811000` (`0.7535%` lower) on the official six-policy cachesim surface.
+`LEADER-BOARD.md` (last updated 2026-05-08) lists LLNL's banked Alibaba at
+`0.009999` (R287.A2), so r364 still trails by `0.0006830083` (`6.83%` higher).
+
+Next probe (not executed from this Codex sandbox because outbound SSH to
+`baase`/`vinge` is blocked): a guarded tightening continuation starting from
+these r364 artifacts down through chunk sizes `64,32,16,8` using
+`altgan.ssh_chunk_surface_multiseed` (see `altgan/README.md`).
 
 No-32 guard seed means were `0.0120682917`, `0.0121687917`, `0.0117973333`,
 and `0.0122500833`, mean `0.0120711250`, range `0.0004527500`. That improves
