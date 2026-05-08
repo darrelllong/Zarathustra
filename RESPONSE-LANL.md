@@ -4426,3 +4426,7 @@ official six-policy cachesim surface.
 No-32 guard seed means were `0.0120682917`, `0.0121687917`, `0.0117973333`,
 and `0.0122500833`, mean `0.0120711250`, range `0.0004527500`. That improves
 r360 no-32 `0.0120802396` by `0.0000091146` (`0.0755%` lower).
+
+The r367 cross-seed donor-pool audit completed at `0.0106858083` with no-32
+guard mean `0.0120753333`; it did not beat r364, so the best Alibaba board
+position remains r364.

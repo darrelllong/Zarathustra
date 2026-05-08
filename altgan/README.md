@@ -147,22 +147,22 @@ machine requires an explicit key file for git access.
 ## Chunk-surface (Alibaba retake)
 
 As of 2026-05-08, the only plausible remaining strict-loss front is Alibaba
-(LLNL has a banked ~`0.0100` row; LANL is at ~`0.01069`). The fastest next probe
-is a cross-seed donor pool continuation from the current LANL best-donor 256-row
-champion with the no-32 guard enabled.
+(LLNL has a banked ~`0.0100` row; LANL is at ~`0.01068` with r364). A cross-seed
+donor-pool audit (r367) did not beat r364, so the next best probe is a
+continued guarded tightening starting from r364 and stepping down chunk sizes
+(e.g., 64→32→16→8).
 
 `--cross-seed-donors` expands any `{seed}` donor globs across the full seed set
 and uses the combined donor pool for every target seed (seed stabilization via
 good-seed chunks).
 
 ```bash
-python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session ali_r366_best128_xseed -- \
+python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session ali_rXXX_refine64 -- \
   --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \
-  --base-template "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_best256_ck256_seed{seed}_fake_1000k.csv" \
+  --base-template "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_best128_ck128_seed{seed}_fake_1000k.csv" \
   --donor-globs "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba*_seed{seed}_fake_*.csv" \
-  --cross-seed-donors \
-  --tag-prefix alibaba_chunksurf_r366_best128_xseed \
-  --pipeline 128 \
+  --tag-prefix alibaba_chunksurf_rXXX_refine64 \
+  --pipeline 64,32,16,8 \
   --accept-mode best \
   --max-accepts 8 \
   --max-evals 300 \
