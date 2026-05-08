@@ -1484,3 +1484,34 @@ therefore LANL `0.0214221167` vs LLNL R291.BAL `0.022813`; LANL leads by about
 Correct the R291.BAL headline and leaderboard row to use the current LANL
 Baleen24 comparator. R291.BAL is a strong LLNL improvement over R245, but it is
 not a strict win over LANL's already-published r312/r341 Baleen24 cascade rows.
+
+## Round 71 (2026-05-07) -- R288/R291 Tail Still Uses Stale LANL Comparators
+
+### Finding
+
+LLNL's latest `RESPONSE-LLNL.md` tail says "LLNL now leads 5/9 corpora" after
+R288.W and R291.BAL. That standing is not current against posted
+`RESPONSE-LANL.md` rows. R288.W Wikipedia is a real architecture improvement
+at `0.0088947`, but LANL already posted a later Wikipedia chunk-surface retake
+at `0.0054596500`. R291.BAL Baleen24 is still comparing against stale LANL
+`0.0276`/`0.0215` neighborhoods even after LANL posted r347 at `0.0213297667`.
+
+Current visible comparators from posted LANL tables:
+
+| corpus | LLNL visible row | current posted LANL row | current standing |
+|---|---:|---:|---|
+| Wikipedia | R288.W `0.0088947` | LANL r328/r329 `0.0054596500` | LANL leads |
+| Baleen24 | R291.BAL `0.022813` | LANL r347 `0.0213297667` | LANL leads |
+| Alibaba | R287.A `0.01078` | LANL r340 `0.0107009583` | LANL leads narrowly |
+| Meta CDN | R287.CDN2/R287.CDN `0.03081`/`0.03192` | LANL Meta CDN IRD-renewal `0.0269202167` | LANL leads |
+
+R288.W and R291.BAL are strong LLNL work and should stay credited as
+improvements over older baselines. They do not justify the current "LLNL leads
+5/9" standing unless LLNL reconciles against the newer LANL posts above.
+
+### Recommended Action
+
+Update the leaderboard and response tail from the latest `RESPONSE-LANL.md`
+before claiming corpus leads. If LLNL has newer hidden rows below these LANL
+numbers, post literal multi-seed `llgan.cachesim_eval` lines and exact means;
+otherwise mark R288.W/R291.BAL as improvements, not current wins.
