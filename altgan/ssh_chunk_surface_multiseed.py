@@ -61,6 +61,20 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         help="Python interpreter on the remote host.",
     )
     p.add_argument(
+        "--remote-git-ssh-key",
+        default="",
+        help=(
+            "Remote key path for git fetch/push on the remote host (optional). "
+            "Leave empty to rely on whatever SSH identity/agent is already available on the remote host."
+        ),
+    )
+    p.add_argument(
+        "--remote-git-ssh-option",
+        action="append",
+        default=[],
+        help="Extra ssh -o option for remote git operations (repeatable).",
+    )
+    p.add_argument(
         "--sync",
         choices=["pull", "bundle", "none"],
         default="bundle",
@@ -125,6 +139,24 @@ def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
     return ssh_argv
 
 
+def _git_ssh_command_export(*, args: argparse.Namespace) -> str:
+    """Return a remote-shell line exporting GIT_SSH_COMMAND for git operations.
+
+    The remote host may rely on agent forwarding or its own on-disk key; this just
+    forces BatchMode and (optionally) a specific remote key path.
+    """
+    cmd: list[str] = ["ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes"]
+    if args.remote_git_ssh_key.strip():
+        cmd.extend(["-i", args.remote_git_ssh_key.strip()])
+    for opt in args.remote_git_ssh_option:
+        opt = opt.strip()
+        if opt:
+            cmd.extend(["-o", opt])
+    cmd_str = " ".join(shlex.quote(part) for part in cmd)
+    # Quote the whole command string so spaces are preserved in the env var.
+    return f"export GIT_SSH_COMMAND={shlex.quote(cmd_str)}"
+
+
 def _create_local_bundle_bytes(*, ref: str) -> bytes:
     repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
     proc = subprocess.run(
@@ -143,10 +175,12 @@ def _create_local_bundle_bytes(*, ref: str) -> bytes:
 def _build_remote_bundle_sync_script(*, args: argparse.Namespace, ref: str) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     remote_ref = f"refs/remotes/codex_sync/{ref}"
+    git_ssh_export = _git_ssh_command_export(args=args)
     return "\n".join(
         [
             "set -euo pipefail",
             f"cd {repo_dir_expr}",
+            git_ssh_export,
             "bundle_path=$(mktemp)",
             "cat > \"$bundle_path\"",
             f"git fetch \"$bundle_path\" {shlex.quote(ref)}:{shlex.quote(remote_ref)}",
@@ -160,10 +194,12 @@ def _build_remote_bundle_sync_script(*, args: argparse.Namespace, ref: str) -> s
 
 def _build_remote_pull_sync_script(*, args: argparse.Namespace, ref: str) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    git_ssh_export = _git_ssh_command_export(args=args)
     return "\n".join(
         [
             "set -euo pipefail",
             f"cd {repo_dir_expr}",
+            git_ssh_export,
             f"git checkout -B {shlex.quote(ref)} origin/{shlex.quote(ref)} || git checkout {shlex.quote(ref)}",
             "git pull --rebase origin main",
             "git clean -fdx",
@@ -178,9 +214,10 @@ def _build_remote_run_script(
     launch_args: list[str],
 ) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
+    git_ssh_export = _git_ssh_command_export(args=args)
     cmd = [args.remote_python, "-u", "-m", "altgan.launch_chunk_surface_multiseed"] + launch_args
     cmd_str = " ".join(_q(part) for part in cmd)
-    lines = ["set -euo pipefail", f"cd {repo_dir_expr}"]
+    lines = ["set -euo pipefail", f"cd {repo_dir_expr}", git_ssh_export]
     if args.tmux_session:
         session = _q(args.tmux_session)
         # We always run tmux jobs detached so they are explicitly managed.

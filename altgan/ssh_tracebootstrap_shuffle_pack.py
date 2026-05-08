@@ -57,6 +57,25 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--repo-dir", default="~/LANL/Zarathustra", help="Repo path on remote host.")
     p.add_argument(
+        "--remote-python",
+        default="/tiamat/zarathustra/altgan-venv/bin/python",
+        help="Python interpreter on the remote host (default: /tiamat/zarathustra/altgan-venv/bin/python).",
+    )
+    p.add_argument(
+        "--remote-git-ssh-key",
+        default="",
+        help=(
+            "Remote key path for git pull/push on the remote host (optional). "
+            "Leave empty to rely on agent forwarding / remote ssh config."
+        ),
+    )
+    p.add_argument(
+        "--remote-git-ssh-option",
+        action="append",
+        default=[],
+        help="Extra ssh -o option for remote git operations (repeatable).",
+    )
+    p.add_argument(
         "--zarathustra-root",
         default="/tiamat/zarathustra",
         help="Remote root containing traces/ and llgan-output/ (default: /tiamat/zarathustra).",
@@ -200,6 +219,19 @@ def _ssh_argv(*, args: argparse.Namespace) -> list[str]:
     return ssh_argv
 
 
+def _git_ssh_command_export(*, args: argparse.Namespace) -> str:
+    """Return a remote-shell line exporting GIT_SSH_COMMAND for git operations."""
+    cmd: list[str] = ["ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes"]
+    if args.remote_git_ssh_key.strip():
+        cmd.extend(["-i", args.remote_git_ssh_key.strip()])
+    for opt in args.remote_git_ssh_option:
+        opt = opt.strip()
+        if opt:
+            cmd.extend(["-o", opt])
+    cmd_str = " ".join(shlex.quote(part) for part in cmd)
+    return f"export GIT_SSH_COMMAND={shlex.quote(cmd_str)}"
+
+
 def _create_local_bundle_bytes(*, ref: str) -> bytes:
     repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
     # `git bundle create - <ref>` writes the bundle to stdout.
@@ -219,9 +251,11 @@ def _create_local_bundle_bytes(*, ref: str) -> bytes:
 def _build_remote_sync_script(*, args: argparse.Namespace, ref: str) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     remote_ref = f"refs/remotes/codex_sync/{ref}"
+    git_ssh_export = _git_ssh_command_export(args=args)
     script_lines = [
         "set -euo pipefail",
         f"cd {repo_dir_expr}",
+        git_ssh_export,
         "bundle_path=$(mktemp)",
         "cat > \"$bundle_path\"",
         f"git fetch \"$bundle_path\" {shlex.quote(ref)}:{shlex.quote(remote_ref)}",
@@ -240,8 +274,10 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     repo_dir_expr = _remote_repo_dir_expr(args.repo_dir)
     corpora = _normalize_csv_list(args.corpora)
     seeds = _normalize_csv_list(args.seeds)
+    git_ssh_export = _git_ssh_command_export(args=args)
     cmd = [
-        "python3",
+        args.remote_python,
+        "-u",
         "-m",
         "altgan.launch_trace_bootstrap_shuffle_pack",
         "--corpora",
@@ -287,8 +323,9 @@ def _build_remote_script(*, args: argparse.Namespace) -> str:
     script_lines = [
         "set -euo pipefail",
         f"cd {repo_dir_expr}",
+        git_ssh_export,
         *(["git pull --rebase origin main"] if args.sync == "pull" else []),
-        "python3 -V",
+        f"{_q(args.remote_python)} -V",
         "echo '[ssh_tracebootstrap] Running TraceBootstrap shuffle pack...'",
         " ".join(_q(part) for part in cmd),
     ]
