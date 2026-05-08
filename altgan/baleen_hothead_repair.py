@@ -77,27 +77,16 @@ def _spaced_positions(candidates: np.ndarray, target: int, min_gap: int, rng: np
             return candidates
         return np.sort(rng.choice(candidates, size=target, replace=False))
 
+    block_ids = (candidates - int(candidates[0])) // min_gap
+    blocks = np.unique(block_ids)
+    rng.shuffle(blocks)
     selected: list[int] = []
-    # Shuffled block starts keep the hot-head writes spread without making the
-    # pattern perfectly periodic.
-    offset = int(rng.integers(0, min_gap))
-    for start in range(offset, int(candidates[-1]) + 1, min_gap):
-        end = start + min_gap
-        lo = np.searchsorted(candidates, start, side="left")
-        hi = np.searchsorted(candidates, end, side="left")
+    for block in blocks[:target]:
+        lo = int(np.searchsorted(block_ids, block, side="left"))
+        hi = int(np.searchsorted(block_ids, block, side="right"))
         if hi <= lo:
             continue
         selected.append(int(candidates[int(rng.integers(lo, hi))]))
-        if len(selected) >= target:
-            break
-    if len(selected) < target:
-        remaining = np.setdiff1d(candidates, np.asarray(selected, dtype=np.int64), assume_unique=False)
-        rng.shuffle(remaining)
-        for pos in remaining:
-            if all(abs(int(pos) - old) >= min_gap for old in selected):
-                selected.append(int(pos))
-                if len(selected) >= target:
-                    break
     return np.asarray(sorted(selected), dtype=np.int64)
 
 
