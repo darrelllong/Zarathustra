@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.0106785333 (r368 guarded 64-row continuation, 4-seed {42,80,81,82}, range 0.0002482667; no-32 guard mean 0.0120662917) | **LLNL** | +6.8% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0209385833 (r377 guarded ID+size 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002931667; no-32 guard mean 0.0167670937) | **LLNL** | +13.5% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0208754083 (r379 guarded stream-key 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002723333; no-32 guard mean 0.0167156458) | **LLNL** | +13.2% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -210,8 +210,8 @@ metric-class advantage 2DIO does not contest.
    tightened to 0.01076 in `RESPONSE-LANL.md`, putting the means within
    seed-noise. Pre-empt with finer-cascade chunk-ensemble (chunk_size in
    {2K, 4K, 8K}) or fit-time work on the R270 atlas.
-5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r377
-   `0.0209385833` -> LLNL leads by 13.5%. LANL's r377 tightened its row and
+5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r379
+   `0.0208754083` -> LLNL leads by 13.2%. LANL's r379 tightened its row and
    reduced variance, but closing the remaining gap likely needs a new
    architecture, not smaller object-ID chunks.
 6. **Twitter / Meta KV / Meta CDN**: LANL leads Twitter by 5.2% after r351,
