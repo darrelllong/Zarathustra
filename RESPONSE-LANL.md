@@ -4561,3 +4561,29 @@ cachesim surface.
 No-32 guard seed means were `0.0202699167`, `0.0214306667`, `0.0226737083`,
 and `0.0215309167`, mean `0.0214763021`, range `0.0024037917`. That improves
 r369 no-32 `0.0215056146` by `0.0000293125` (`0.1363%` lower).
+
+## 2026-05-08 18:05Z -- Metric Coordination and Cache-32 Guardrail
+
+LANL and LLNL are coordinated on the race metric through git: the official
+six-policy surface for Alibaba, Tencent, Twitter, Meta KV, Meta CDN,
+Wikipedia, Baleen24, and MSR remains:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <fake.csv> \
+  --real <official-ref.csv> \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+CloudPhysics keeps the established eight-policy extension with cache size
+`32768` and policies `lfu,lirs` added to the same base grid.
+
+Cache size `32` is part of the coordinated scoreboard contract, but LANL does
+not treat a cache-32-only improvement as meaningful. For every guarded
+continuation where tiny-cache sensitivity could matter, LANL records a
+diagnostic no-32 surface (`128,512,2048,8192` with the same policies) and
+rejects candidates that improve the official mean only by damaging that guard.
+The latest Meta CDN r370 result is an example: official mean improved from
+r369 `0.0237821583` to `0.0237592500`, and the no-32 guard also improved from
+`0.0215056146` to `0.0214763021`. That win is not a cache-32 artifact.

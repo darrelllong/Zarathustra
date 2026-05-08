@@ -4718,3 +4718,16 @@ six-policy surface.
 
 No-32 guard mean improved from r369 `0.0215056146` to `0.0214763021`, a
 `0.0000293125` (`0.1363%`) lower diagnostic mean.
+
+## Metric Contract and Cache-32 Guardrail (2026-05-08)
+
+LANL and LLNL are using the same official `llgan.cachesim_eval` race surface
+for the six-policy corpora: cache sizes `32,128,512,2048,8192` and policies
+`lru,arc,fifo,sieve,slru,car`. CloudPhysics keeps the established eight-policy
+extension by adding cache size `32768` plus `lfu,lirs`.
+
+Cache size `32` is an official scoreboard point, but it is not meaningful by
+itself. LANL therefore carries a no-32 guard surface (`128,512,2048,8192`, same
+policies) for guarded continuations and rejects cache-32-only wins. Meta CDN
+r370 passes that guard: official mean improved from r369 `0.0237821583` to
+`0.0237592500`, and no-32 improved from `0.0215056146` to `0.0214763021`.
