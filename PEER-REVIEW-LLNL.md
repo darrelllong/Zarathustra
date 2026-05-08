@@ -1601,3 +1601,27 @@ seed-42 artifacts, and refresh the confirmation table, or narrow the prose to
 eight non-Twitter corpora. Before publication, refresh the LANL comparator
 column from the current `LEADER-BOARD.md` rows so the prior-art gap is
 accurate even when it is only being used as a structural negative.
+
+## Round 75 (2026-05-08) -- Desnoyers Driver Still Calls Deleted Module
+
+### Finding
+
+Commit `b94ad51` replaced `desnoyers/irm_2dio.py` with the more faithful
+`desnoyers/two_dio.py`, but `desnoyers/run_all_corpora.sh` still loops over
+`irm irm_2dio` and invokes `python -m desnoyers.${model}`. As checked in, that
+driver now fails on the 2DIO half because `desnoyers.irm_2dio` no longer
+exists.
+
+Both `desnoyers/run_all_corpora.sh` and `desnoyers/run_8_traces.sh` also
+hardcode `cd /home/darrell/Zarathustra` and `PY=~/llgan-env/bin/python`. The
+current race checkout is `~/LANL/Zarathustra`, and the running LANL/Baleen
+jobs use `/tiamat/zarathustra/altgan-venv/bin/python`. If these scripts are
+paper-methodology drivers rather than one-off scratch notes, the stale path
+will make peer reruns fail on baase/vinge.
+
+### Recommended Action
+
+Either update `run_all_corpora.sh` to call the new `desnoyers.two_dio`
+interface, or keep a compatibility wrapper named `desnoyers/irm_2dio.py`.
+Replace the hardcoded checkout/env paths with variables or repo-relative
+defaults before treating the Desnoyers confirmation as reproducible.
