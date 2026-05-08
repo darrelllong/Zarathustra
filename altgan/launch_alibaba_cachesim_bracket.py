@@ -1,9 +1,13 @@
-"""Launch forced-phase Alibaba NeuralAtlas cache-sim brackets.
+"""Launch Alibaba NeuralAtlas brackets and score the official cachesim surface.
 
-This wrapper exists to make the current race recipe repeatable. It builds the
-long ``evaluate_neural_atlas`` command, pins math-library threads, writes the
-same fake/real/cachesim artifact names as the manual runs, and keeps
-``--force-phase-schedule`` on by default.
+This wrapper exists to make the current Alibaba race recipe repeatable and
+safe:
+
+- Generates a fake trace via ``altgan.evaluate_neural_atlas``.
+- Scores the literal race surface via ``python -m llgan.cachesim_eval`` against
+  the official Alibaba reference CSV.
+- Pins math-library threads to avoid oversubscription.
+- Keeps ``--force-phase-schedule`` on by default (disable only for ablations).
 """
 
 from __future__ import annotations
@@ -15,6 +19,10 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, NamedTuple
+
+
+OFFICIAL_CACHE_SIZES = "32,128,512,2048,8192"
+OFFICIAL_POLICIES = "lru,arc,fifo,sieve,slru,car"
 
 
 class Spec(NamedTuple):
@@ -106,7 +114,7 @@ def _command(args: argparse.Namespace, spec: Spec, base: str) -> list[str]:
         "13",
         "--condition-from-real-manifest",
         "--real-manifest",
-        str(outroot / "alibaba_real_manifest_seed42_1M_manifest.json"),
+        args.real_manifest,
         "--transition-blend",
         "0.2",
         "--local-prob-power",
@@ -136,9 +144,9 @@ def _command(args: argparse.Namespace, spec: Spec, base: str) -> list[str]:
         "--stack-hot-pool-min-age",
         str(args.hot_pool_min_age),
         "--n-records",
-        "1000000",
+        str(args.n_records),
         "--n-streams",
-        "4",
+        str(args.n_streams),
         "--seed",
         spec.seed,
         "--output",
@@ -147,18 +155,44 @@ def _command(args: argparse.Namespace, spec: Spec, base: str) -> list[str]:
         str(outroot / f"{base}_fake_1M.csv"),
         "--real-output",
         str(outroot / "alibaba_real_manifest_seed42_1M_eval_real.csv"),
-        "--cachesim-bin",
-        args.cachesim_bin,
-        "--cachesim-output",
-        str(outroot / "cachesim_lanl" / f"{base}_eight_policy_caps.json"),
-        "--cachesim-policies",
-        args.cachesim_policies,
         "--progress-interval",
         str(args.progress_interval),
     ]
+    if args.internal_cachesim_bin:
+        cmd.extend(
+            [
+                "--cachesim-bin",
+                args.internal_cachesim_bin,
+                "--cachesim-output",
+                str(outroot / "cachesim_lanl" / f"{base}_internal.json"),
+                "--cachesim-cache-sizes",
+                args.internal_cache_sizes,
+                "--cachesim-policies",
+                args.internal_policies,
+            ]
+        )
     if args.force_phase:
         cmd.insert(cmd.index("--stack-rank-scale"), "--force-phase-schedule")
     return cmd
+
+
+def _cachesim_cmd(args: argparse.Namespace, fake: Path, out_json: Path) -> list[str]:
+    return [
+        sys.executable,
+        "-u",
+        "-m",
+        "llgan.cachesim_eval",
+        "--fake",
+        str(fake),
+        "--real",
+        args.official_ref,
+        "--cache-sizes",
+        args.cache_sizes,
+        "--policies",
+        args.policies,
+        "--out",
+        str(out_json),
+    ]
 
 
 def _env() -> dict[str, str]:
@@ -176,6 +210,11 @@ def _env() -> dict[str, str]:
 
 def _quote(cmd: Iterable[str]) -> str:
     return " ".join(shlex.quote(part) for part in cmd)
+
+
+def _run(cmd: list[str], env: dict[str, str]) -> None:
+    print("+ " + _quote(cmd), flush=True)
+    subprocess.run(cmd, check=True, env=env)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,11 +237,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--output-root", default="/tiamat/zarathustra/altgan-output")
     parser.add_argument(
-        "--cachesim-bin", default="tools/cachesim/target/release/cachesim"
+        "--real-manifest",
+        default="/tiamat/zarathustra/altgan-output/alibaba_real_manifest_seed42_1M_manifest.json",
+        help=(
+            "Real manifest JSON used for conditional generation. This should match the "
+            "1M Alibaba stack-atlas manifest used for scoring."
+        ),
     )
     parser.add_argument(
-        "--cachesim-policies", default="lru,arc,fifo,sieve,slru,car,lfu,lirs"
+        "--official-ref",
+        default="/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv",
+        help="Official reference CSV for llgan.cachesim_eval.",
     )
+    parser.add_argument("--n-records", type=int, default=1_000_000)
+    parser.add_argument("--n-streams", type=int, default=4)
+    parser.add_argument("--cache-sizes", default=OFFICIAL_CACHE_SIZES)
+    parser.add_argument("--policies", default=OFFICIAL_POLICIES)
+    parser.add_argument(
+        "--internal-cachesim-bin",
+        default="",
+        help=(
+            "Optional tools/cachesim binary passed to altgan.evaluate_neural_atlas for "
+            "extra diagnostics. Official scoring always uses llgan.cachesim_eval."
+        ),
+    )
+    parser.add_argument("--internal-cache-sizes", default=OFFICIAL_CACHE_SIZES)
+    parser.add_argument("--internal-policies", default=OFFICIAL_POLICIES)
     parser.add_argument(
         "--hot-pool-weight-power",
         type=float,
@@ -225,11 +285,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print commands instead of launching them.",
+        help="Print commands instead of running them.",
+    )
+    parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument(
+        "--allow-nonofficial-surface",
+        action="store_true",
+        help=(
+            "Allow non-official cache sizes/policies. Without this, the wrapper "
+            "refuses to run if --cache-sizes or --policies differ from the official "
+            "race surface."
+        ),
     )
     args = parser.parse_args(argv)
+    if (
+        (args.cache_sizes != OFFICIAL_CACHE_SIZES or args.policies != OFFICIAL_POLICIES)
+        and not args.allow_nonofficial_surface
+    ):
+        raise SystemExit(
+            "Refusing to run a non-official cachesim surface. Either keep "
+            f"--cache-sizes {OFFICIAL_CACHE_SIZES!r} and --policies {OFFICIAL_POLICIES!r} "
+            "or pass --allow-nonofficial-surface for ablations."
+        )
+
+    outroot = Path(args.output_root)
+    cachesim_root = outroot / "cachesim_lanl"
     if not args.dry_run:
-        Path(args.output_root, "cachesim_lanl").mkdir(parents=True, exist_ok=True)
+        cachesim_root.mkdir(parents=True, exist_ok=True)
     env = _env()
     for spec in args.spec:
         base = _artifact_base(
@@ -238,19 +320,19 @@ def main(argv: list[str] | None = None) -> int:
             hot_pool_min_age=args.hot_pool_min_age,
         )
         cmd = _command(args, spec, base)
-        log_path = Path(args.output_root) / f"{base}.log"
-        if args.dry_run:
-            print(f"{_quote(cmd)} > {shlex.quote(str(log_path))} 2>&1")
+        fake = outroot / f"{base}_fake_1M.csv"
+        cachesim_json = cachesim_root / f"{base}_official6.json"
+        if args.skip_existing and cachesim_json.exists():
+            print(f"[altgan.launch_alibaba_cachesim_bracket] skip existing {cachesim_json}")
             continue
-        with log_path.open("ab") as log_file:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                env=env,
-                start_new_session=True,
-            )
-        print(f"{proc.pid} {base}")
+        if args.dry_run:
+            print(_quote(cmd))
+            print(_quote(_cachesim_cmd(args, fake, cachesim_json)))
+            continue
+        print(f"[altgan.launch_alibaba_cachesim_bracket] running {base}", flush=True)
+        _run(cmd, env)
+        _run(_cachesim_cmd(args, fake, cachesim_json), env)
+        print(f"[altgan.launch_alibaba_cachesim_bracket] wrote {cachesim_json}", flush=True)
     return 0
 
 

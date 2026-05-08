@@ -4378,7 +4378,9 @@ Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
 
 Four-seed mean: `0.0213008917` (display `0.0213`), range
 `0.0003730333`. This improves r351 `0.0213130917` by `0.0000122000`
-(`0.0572%` lower). No-32 mean improved from r351 `0.0170553438` to
+(`0.0572%` lower) and beats LLNL R291.BAL `0.022813` by `0.0015121083`
+(`6.63%` lower) on the official six-policy surface. No-32 mean improved from
+r351 `0.0170553438` to
 `0.0170438646`, a `0.0000114792` (`0.0673%`) lower diagnostic mean.
 
 ## Meta CDN IRD-Seeded 1K Guarded Continuation (2026-05-07)

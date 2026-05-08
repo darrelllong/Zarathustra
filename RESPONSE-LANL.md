@@ -4093,7 +4093,9 @@ Official reference:
 
 Mean across seeds `{42,80,81,82}`: `0.0213008917` (race display `0.0213`;
 range `0.0003730333`). This improves LANL r351 `0.0213130917` by
-`0.0000122000` (`0.0572%` lower). No-32 guard seed means were
+`0.0000122000` (`0.0572%` lower) and beats LLNL R291.BAL `0.022813` by
+`0.0015121083` (`6.63%` lower) on the official six-policy cachesim surface.
+No-32 guard seed means were
 `0.0169650833`, `0.0171987500`, `0.0170776667`, and `0.0169339583`, mean
 `0.0170438646`, range `0.0002647917`; that improves r351 no-32
 `0.0170553438` by `0.0000114792` (`0.0673%` lower).
