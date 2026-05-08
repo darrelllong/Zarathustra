@@ -4750,3 +4750,22 @@ sizes from `1` through `2^ceil(log2(N+1))`.
 This does not replace the current race scoreboard. It gives LANL a reproducible
 way to audit whether a claimed win survives a footprint-spanning cache ladder,
 with JSON outputs written to `/tiamat` rather than ephemeral `/tmp` paths.
+
+## Meta CDN r370 Footprint-Ladder Scout (2026-05-08)
+
+Single-seed methodology audit, not a race claim. Using
+`python3 -m altgan.footprint_cachesim_eval`, Meta CDN r370 seed42 was evaluated
+against real footprint `417390` with cache sizes
+`1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288`
+and policies `lru,arc,fifo,sieve,slru,car`.
+
+Fake:
+`/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed42_fake_1000k.csv`.
+JSON:
+`/tiamat/zarathustra/altgan-output/evals/metacdn_r370_seed42_footprint_ladder.json`.
+Literal line: `mean HRC-MAE across policies: 0.0370`. Exact JSON mean:
+`0.0369840667`.
+
+The same seed is `0.0231519667` on the official legacy ladder. The
+footprint-scaled ladder exposes large-cache hotness error; at cache `524288`,
+most policies have fake miss ratio `0.4325` against real `0.5224`.

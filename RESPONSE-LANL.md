@@ -4630,3 +4630,32 @@ the legacy race metric remains the official scoreboard until both teams agree
 to a new published-methodology benchmark. LANL added
 `python3 -m altgan.footprint_cachesim_eval` so these audits can be reproduced
 through `llgan.cachesim_eval` without modifying LLNL-owned evaluator code.
+
+## 2026-05-08 18:58Z -- Meta CDN Footprint-Ladder Scout
+
+LANL ran a single-seed methodology audit of the banked Meta CDN r370 seed42
+fake on Long's footprint-scaled ladder. This is not a race claim; it is a
+paper-surface sanity check using the new LANL wrapper.
+
+Command surface: real footprint `417390` distinct `obj_id`s, cache sizes
+`1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288`,
+policies `lru,arc,fifo,sieve,slru,car`.
+
+Fake:
+`/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r370_irdrguard_ck2_seed42_fake_1000k.csv`.
+Real: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+Durable JSON:
+`/tiamat/zarathustra/altgan-output/evals/metacdn_r370_seed42_footprint_ladder.json`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/metacdn_r370_seed42_footprint_ladder_20260508.log`.
+
+Literal line:
+`mean HRC-MAE across policies: 0.0370`
+
+Exact JSON mean: `0.0369840667`. The same seed is `0.0231519667` on the
+legacy official surface, so the footprint ladder exposes additional large-cache
+miss-shape error. At the largest cache (`524288`), most policies show fake
+miss ratio `0.4325` against real `0.5224` (delta `-0.0898`), i.e. the r370
+synthetic is too hot at saturation-scale cache. That is not a reason to change
+the current race row; it is a concrete architecture target for the paper
+surface.
