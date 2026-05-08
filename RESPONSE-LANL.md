@@ -5156,3 +5156,22 @@ and policy. r397's less destructive hothead-break variant also remains far
 behind r389/r395. Do not spend more Baleen24 time on this rewrite family
 without a structural change that preserves local adjacency windows and checks
 cache-surface deltas during the rewrite itself.
+
+## 2026-05-08 23:22Z -- Baleen24 r398b Hot-Donor Surface Scout Launched
+
+LANL launched the structural follow-up to the r396/r397 rejection on baase:
+`baleen24_chunksurf_r398b_hotdonor64`. Instead of globally adopting the hot-head
+rewrite, r398b uses those hot-head traces only as synthetic object-ID donors
+inside the guarded chunk-surface selector. The base remains pure LANL r389,
+the swap contract is `obj_id` only, chunk/stride is 64/64, and candidates must
+improve the official 5-cache x 6-policy surface without regressing the no-32
+guard.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r398b_hotdonor64_baase_20260508.log`.
+
+r398 failed before evaluation because
+`/tiamat/zarathustra/altgan-output/baleen24_r396_hotrepair_hf0.55_ids64_seed42_fake_1000k.csv`
+has only `877957` data rows. r398b excludes that truncated donor and includes
+the 1M-row r396/r397/hothead-scout donors plus the current pure-LANL Baleen
+chunk-surface donor bank. This is not a banked claim yet.

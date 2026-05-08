@@ -5045,3 +5045,18 @@ r396's first variant moved seed42 from footprint `192522`, adjacent fraction
 above real everywhere. r397 reduced the damage but still missed badly. Next
 Baleen hot-head work must be cache-surface-aware during construction; global
 object-ID rewrites are too blunt.
+
+## Baleen24 r398b Hot-Donor Surface Scout Launch (2026-05-08)
+
+Launched `baleen24_chunksurf_r398b_hotdonor64` on baase as the structural
+follow-up to the r396/r397 rejects. It starts from the pure-LANL r389 base,
+uses the hot-head repair traces only as synthetic `obj_id` donors, and lets the
+guarded chunk-surface selector admit only 64-row chunks that improve the
+official 5-cache x 6-policy surface while preserving the no-32 guard.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r398b_hotdonor64_baase_20260508.log`.
+
+The first r398 launch failed before evaluation because one donor artifact,
+`baleen24_r396_hotrepair_hf0.55_ids64_seed42_fake_1000k.csv`, has `877957`
+data rows instead of 1M. r398b excludes that truncated donor.
