@@ -3784,3 +3784,19 @@ range `0.0003573333`). This improves LANL r335 `0.0297950833` by
 `0.0001242500` (`0.42%` lower), and beats LLNL R206's `0.0305` by
 `0.0007430833` on the official six-policy Tencent cachesim surface. Seed 81
 remains the exposed weak seed, but it also improved again.
+
+## 2026-05-07 -- Cache-32 Sanity Rule
+
+LANL treats cache size `32` as part of the official race surface because the
+agreed evaluator includes `--cache-sizes 32,128,512,2048,8192`. That does not
+make `32` a strong standalone scientific lens for large-object corpora: with a
+huge working set, it can be dominated by near-total misses and immediate
+reuse/burst artifacts. Optimizing only that point would be metric gaming.
+
+Current LANL claims therefore keep the official literal five-size cachesim line
+for race eligibility and add a no-32 diagnostic when practical:
+`--cache-sizes 128,512,2048,8192` with the same policy set. A continuation is
+more credible when both the official mean and the no-32 mean drop. The recent
+CloudPhysics r339, Baleen24 r342, and Twitter r346 posts all moved in the right
+direction under the no-32 diagnostic, so those gains are not just cap-32
+artifacts.

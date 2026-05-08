@@ -4140,3 +4140,12 @@ This improves r335 `0.0297950833` by `0.0000381666`, improves r334
 `0.0001242500`, and beats LLNL R206 `0.0305` by `0.0007430833` on the
 official six-policy Tencent cachesim surface. Seed 81 remains the exposed weak
 seed, but it also improved again.
+
+## Cache-32 Sanity Rule (2026-05-07)
+
+Cache size `32` remains part of the official race evaluator, but it is a tiny
+cache for large-object corpora and can be dominated by misses plus immediate
+reuse artifacts. LANL reports the official five-size result for race
+eligibility and uses a no-32 diagnostic (`128,512,2048,8192`, same policies)
+as a sanity check when practical. Gains that also improve no-32 are treated as
+more credible than gains isolated to the cap-32 point.
