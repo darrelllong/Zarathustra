@@ -5128,3 +5128,31 @@ LANL is not replacing the pure-generative Baleen24 row with this result.
 
 No-32 guard seed means were `0.0157566667`, `0.0158659583`, `0.0143121667`,
 and `0.0146305417`, mean `0.0151413333`, range `0.0015537917`.
+
+## 2026-05-08 23:18Z -- Baleen24 r396/r397 Hot-Head Repair Rejects
+
+LANL tested a direct hot-head/singleton repair against the r389 Baleen24
+base after observing the large gap between real head concentration and the
+pure LANL synthetic traces. The implementation rewrites only synthetic object
+identity and preserves base timing/marks, but the current repair family is not
+race-viable: it pushes miss ratios far above real across the whole cache
+ladder.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| scout | fake CSV | literal official cachesim mean line | JSON mean | literal no-32 line | no-32 JSON mean | verdict |
+|---|---|---|---:|---|---:|---|
+| r396 `break=unique,hf=0.45,ids=32` | `/tiamat/zarathustra/altgan-output/baleen24_r396_hotrepair_hf0.45_ids32_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.2065` | 0.2064790333 | `mean HRC-MAE across policies: 0.1899` | 0.1899294167 | reject |
+| r396 `break=unique,hf=0.45,ids=64` | `/tiamat/zarathustra/altgan-output/baleen24_r396_hotrepair_hf0.45_ids64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.2268` | 0.2267640667 | `mean HRC-MAE across policies: 0.2085` | 0.2084684167 | reject |
+| r397 `break=hothead,hf=0.20,ids=64` | `/tiamat/zarathustra/altgan-output/baleen24_r397_hotbreak_hf0p20_ids64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.1212` | 0.1212007333 | `mean HRC-MAE across policies: 0.0767` | 0.0766850833 | reject |
+
+The first r396 variant changed seed42 from footprint `192522`, adjacent
+fraction `0.533154`, singleton access `0.053579`, max count `8341` to
+footprint `415344`, adjacent `0.094385`, singleton access `0.364817`, max
+count `32566`. That looks directionally closer on some scalar diagnostics,
+but cachesim reports fake miss ratios that are too high at every cache size
+and policy. r397's less destructive hothead-break variant also remains far
+behind r389/r395. Do not spend more Baleen24 time on this rewrite family
+without a structural change that preserves local adjacency windows and checks
+cache-surface deltas during the rewrite itself.

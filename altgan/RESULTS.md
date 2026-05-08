@@ -5025,3 +5025,23 @@ Four-seed mean: `0.0183851083` (display `0.0184`), range `0.0025562333`.
 No-32 guard mean: `0.0151413333`, range `0.0015537917`. This is
 `0.0000618917` (`0.3355%`) below LLNL R291.BAL2 `0.018447`, but it stays in
 the cross-synthetic class because it uses LLNL base/donor artifacts.
+
+## Baleen24 Hot-Head Repair Rejects (2026-05-08)
+
+The r396/r397 hot-head repair scouts were single-seed Baleen24 architecture
+tests against the r389 base. They rewrote only synthetic object identity, but
+they are not viable in the current form:
+
+| scout | literal official cachesim mean line | JSON mean | literal no-32 line | no-32 JSON mean |
+|---|---|---:|---|---:|
+| r396 `break=unique,hf=0.45,ids=32` | `mean HRC-MAE across policies: 0.2065` | 0.2064790333 | `mean HRC-MAE across policies: 0.1899` | 0.1899294167 |
+| r396 `break=unique,hf=0.45,ids=64` | `mean HRC-MAE across policies: 0.2268` | 0.2267640667 | `mean HRC-MAE across policies: 0.2085` | 0.2084684167 |
+| r397 `break=hothead,hf=0.20,ids=64` | `mean HRC-MAE across policies: 0.1212` | 0.1212007333 | `mean HRC-MAE across policies: 0.0767` | 0.0766850833 |
+
+r396's first variant moved seed42 from footprint `192522`, adjacent fraction
+`0.533154`, singleton access `0.053579`, max count `8341` to footprint
+`415344`, adjacent `0.094385`, singleton access `0.364817`, max count
+`32566`. Despite improving some scalar diagnostics, it drove fake miss ratios
+above real everywhere. r397 reduced the damage but still missed badly. Next
+Baleen hot-head work must be cache-surface-aware during construction; global
+object-ID rewrites are too blunt.
