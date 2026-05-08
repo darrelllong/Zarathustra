@@ -171,6 +171,10 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--cache-sizes", default="32,128,512,2048,8192")
     p.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car")
+    p.add_argument("--guard-cache-sizes", default="")
+    p.add_argument("--guard-policies", default="")
+    p.add_argument("--guard-max-regression", type=float, default=0.0)
+    p.add_argument("--guard-eval-label", default="guard")
     p.add_argument("--max-passes", type=int, default=1)
     p.add_argument("--max-accepts", type=int, default=128)
     p.add_argument("--max-evals", type=int, default=0)
@@ -314,6 +318,17 @@ def main() -> int:
                 "--policies",
                 args.policies,
             ]
+            if args.guard_cache_sizes:
+                cmd += [
+                    "--guard-cache-sizes",
+                    args.guard_cache_sizes,
+                    "--guard-policies",
+                    args.guard_policies or args.policies,
+                    "--guard-max-regression",
+                    str(args.guard_max_regression),
+                    "--guard-eval-label",
+                    args.guard_eval_label,
+                ]
             stage_literal_line = _run(cmd, env=env, dry_run=args.dry_run)
 
             # `optimize_tencent_chunk_surface` builds:

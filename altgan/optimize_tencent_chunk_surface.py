@@ -62,6 +62,14 @@ def _parse_args() -> argparse.Namespace:
                    help="Accept the first improving donor per chunk, or scan all donors and accept the best.")
     p.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     p.add_argument("--policies", default=DEFAULT_POLICIES)
+    p.add_argument("--guard-cache-sizes", default="",
+                   help="Optional secondary cache-size surface candidates must not regress.")
+    p.add_argument("--guard-policies", default="",
+                   help="Policies for --guard-cache-sizes; defaults to --policies.")
+    p.add_argument("--guard-max-regression", type=float, default=0.0,
+                   help="Allowed guard mean regression for an otherwise improving candidate.")
+    p.add_argument("--guard-eval-label", default="guard",
+                   help="Suffix for the final guard eval JSON when --guard-cache-sizes is set.")
     p.add_argument("--keep-candidates", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
@@ -133,6 +141,15 @@ def _fmt(value: int) -> str:
     return str(value).replace("-", "m")
 
 
+def _guard_allows(
+    *,
+    guard_mean: float,
+    best_guard_mean: float,
+    max_regression: float,
+) -> bool:
+    return guard_mean <= best_guard_mean + max_regression
+
+
 def main() -> int:
     args = _parse_args()
     root = Path(args.output_root)
@@ -168,6 +185,16 @@ def main() -> int:
     binary = _find_cachesim()
     print(f"[chunk_surface] scoring real surface once {args.real}", flush=True)
     real_by = _group_runs(_run_cachesim(binary, args.real, args.cache_sizes, args.policies))
+    guard_sizes = args.guard_cache_sizes.strip()
+    guard_policies = (args.guard_policies or args.policies).strip()
+    guard_real_by = None
+    if guard_sizes:
+        print(
+            f"[chunk_surface] scoring guard real surface once {args.real} "
+            f"cache_sizes={guard_sizes} policies={guard_policies}",
+            flush=True,
+        )
+        guard_real_by = _group_runs(_run_cachesim(binary, args.real, guard_sizes, guard_policies))
 
     n = len(base)
     tmp_parent = Path(args.tmp_dir) if args.tmp_dir else Path(tempfile.mkdtemp(prefix="lanl_chunk_surface_"))
@@ -183,6 +210,12 @@ def main() -> int:
     best_report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
     best_mean = float(best_report["mean_hrc_mae"])
     print(f"[chunk_surface] base mean {best_mean:.10f}", flush=True)
+    best_guard_report = None
+    best_guard_mean = None
+    if guard_sizes and guard_real_by is not None:
+        best_guard_report = _evaluate_fake(binary, candidate_path, guard_real_by, guard_sizes, guard_policies)
+        best_guard_mean = float(best_guard_report["mean_hrc_mae"])
+        print(f"[chunk_surface] base guard mean {best_guard_mean:.10f}", flush=True)
 
     accepted: list[dict] = []
     eval_count = 1
@@ -201,7 +234,9 @@ def main() -> int:
                 end = min(n, start + chunk_size)
                 best_chunk_obj = None
                 best_chunk_report = None
+                best_chunk_guard_report = None
                 best_chunk_mean = best_mean
+                best_chunk_guard_mean = best_guard_mean
                 best_chunk_donor = None
                 for donor_name, donor_obj in donor_frames:
                     if args.max_evals and eval_count >= args.max_evals:
@@ -233,25 +268,56 @@ def main() -> int:
                         flush=True,
                     )
                     if mean + args.min_improvement < best_mean:
+                        guard_report = None
+                        guard_mean = None
+                        if guard_sizes and guard_real_by is not None and best_guard_mean is not None:
+                            guard_report = _evaluate_fake(
+                                binary,
+                                candidate_path,
+                                guard_real_by,
+                                guard_sizes,
+                                guard_policies,
+                            )
+                            guard_mean = float(guard_report["mean_hrc_mae"])
+                            if not _guard_allows(
+                                guard_mean=guard_mean,
+                                best_guard_mean=best_guard_mean,
+                                max_regression=args.guard_max_regression,
+                            ):
+                                print(
+                                    f"[chunk_surface] REJECT guard start={start} "
+                                    f"donor={donor_name} guard={guard_mean:.10f} "
+                                    f"best_guard={best_guard_mean:.10f}",
+                                    flush=True,
+                                )
+                                continue
                         if args.accept_mode == "best":
                             if mean + args.min_improvement < best_chunk_mean:
                                 best_chunk_obj = trial_obj
                                 best_chunk_report = report
+                                best_chunk_guard_report = guard_report
                                 best_chunk_mean = mean
+                                best_chunk_guard_mean = guard_mean
                                 best_chunk_donor = donor_name
                             continue
                         current_obj = trial_obj
                         best_report = report
                         best_mean = mean
+                        if guard_report is not None:
+                            best_guard_report = guard_report
+                            best_guard_mean = guard_mean
                         pass_accepts += 1
-                        accepted.append({
+                        move = {
                             "chunk_size": chunk_size,
                             "pass": pass_ix + 1,
                             "start": start,
                             "end": end,
                             "donor": donor_name,
                             "mean": mean,
-                        })
+                        }
+                        if guard_mean is not None:
+                            move["guard_mean"] = guard_mean
+                        accepted.append(move)
                         print(
                             f"[chunk_surface] ACCEPT start={start} end={end} "
                             f"donor={donor_name} best={best_mean:.10f}",
@@ -267,15 +333,21 @@ def main() -> int:
                     current_obj = best_chunk_obj
                     best_report = best_chunk_report
                     best_mean = best_chunk_mean
+                    if best_chunk_guard_report is not None:
+                        best_guard_report = best_chunk_guard_report
+                        best_guard_mean = best_chunk_guard_mean
                     pass_accepts += 1
-                    accepted.append({
+                    move = {
                         "chunk_size": chunk_size,
                         "pass": pass_ix + 1,
                         "start": start,
                         "end": end,
                         "donor": best_chunk_donor,
                         "mean": best_mean,
-                    })
+                    }
+                    if best_chunk_guard_mean is not None:
+                        move["guard_mean"] = best_chunk_guard_mean
+                    accepted.append(move)
                     print(
                         f"[chunk_surface] ACCEPT start={start} end={end} "
                         f"donor={best_chunk_donor} best={best_mean:.10f}",
@@ -304,10 +376,15 @@ def main() -> int:
     eval_label = args.eval_label or f"official{policy_count}"
     final_fake = root / f"{tag}_fake_{n // 1000}k.csv"
     final_json = eval_root / f"{tag}_{eval_label}.json"
+    final_guard_json = eval_root / f"{tag}_{args.guard_eval_label}.json" if guard_sizes else None
     moves_json = eval_root / f"{tag}_moves.json"
     _write_candidate(base, current_obj, final_fake)
     final_report = _evaluate_fake(binary, final_fake, real_by, args.cache_sizes, args.policies)
     final_json.write_text(json.dumps(final_report, indent=2))
+    final_guard_report = None
+    if guard_sizes and guard_real_by is not None and final_guard_json is not None:
+        final_guard_report = _evaluate_fake(binary, final_fake, guard_real_by, guard_sizes, guard_policies)
+        final_guard_json.write_text(json.dumps(final_guard_report, indent=2))
     moves_json.write_text(json.dumps({
         "swap_contract": {
             "swapped_columns": ["obj_id"],
@@ -323,11 +400,18 @@ def main() -> int:
         "cache_sizes": args.cache_sizes,
         "policies": args.policies,
         "eval_label": eval_label,
+        "guard_cache_sizes": guard_sizes,
+        "guard_policies": guard_policies if guard_sizes else "",
+        "guard_eval_label": args.guard_eval_label if guard_sizes else "",
+        "guard_max_regression": args.guard_max_regression if guard_sizes else None,
         "accept_mode": args.accept_mode,
         "max_evals": args.max_evals,
         "accepted": accepted,
         "eval_count": eval_count,
         "mean_hrc_mae": final_report["mean_hrc_mae"],
+        "guard_mean_hrc_mae": (
+            final_guard_report["mean_hrc_mae"] if final_guard_report is not None else None
+        ),
     }, indent=2))
 
     print(f"[chunk_surface] wrote {final_fake}", flush=True)
@@ -341,6 +425,12 @@ def main() -> int:
     ]), flush=True)
     print_report(final_report)
     print(f"\nReport JSON: {final_json}", flush=True)
+    if final_guard_json is not None and final_guard_report is not None:
+        print(
+            f"[chunk_surface] guard mean {float(final_guard_report['mean_hrc_mae']):.10f}",
+            flush=True,
+        )
+        print(f"[chunk_surface] guard JSON: {final_guard_json}", flush=True)
     print(f"[chunk_surface] moves JSON: {moves_json}", flush=True)
     print(f"[chunk_surface] accepted={len(accepted)} eval_count={eval_count}", flush=True)
     print(f"[chunk_surface] final mean {float(final_report['mean_hrc_mae']):.10f}", flush=True)
