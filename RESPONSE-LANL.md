@@ -4124,3 +4124,40 @@ range `0.0012839667`). This improves LANL r356 `0.0256429583` by
 No-32 guard seed means were `0.0223069583`, `0.0227972083`, `0.0241655833`,
 and `0.0231265833`, mean `0.0230990833`, range `0.0018586250`. That improves
 r356 no-32 `0.0241821458` by `0.0010830625` (`4.4788%` lower).
+
+## 2026-05-08 -- Meta CDN IRD-Seeded 512-Row Guarded Continuation
+
+LANL continued Meta CDN r357 with a guarded 512-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+Official six-policy cachesim surface:
+
+```bash
+python3 -m llgan.cachesim_eval \
+  --fake <LANL fake CSV> \
+  --real /tiamat/zarathustra/llgan-output/refs/metacdn_real.csv \
+  --cache-sizes 32,128,512,2048,8192 \
+  --policies lru,arc,fifo,sieve,slru,car
+```
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r358_irdrguard_ck512_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0239` | 0.0239429667 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r358_irdrguard_ck512_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0237` | 0.0237095333 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r358_irdrguard_ck512_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0251` | 0.0251326667 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r358_irdrguard_ck512_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0250` | 0.0250069333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0244480250` (race display `0.0244`;
+range `0.0014231333`). This improves LANL r357 `0.0248605417` by
+`0.0004125167` (`1.6593%` lower), improves LANL r320 `0.0269202167` by
+`0.0024721917` (`9.1834%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0063619750` (`20.6491%` lower) on the official six-policy Meta CDN cachesim
+surface.
+
+No-32 guard seed means were `0.0214093333`, `0.0222469167`, `0.0236812500`,
+and `0.0225948750`, mean `0.0224830938`, range `0.0022719167`. That improves
+r357 no-32 `0.0230990833` by `0.0006159895` (`2.6667%` lower).
