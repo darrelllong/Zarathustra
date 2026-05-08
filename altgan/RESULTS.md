@@ -5006,3 +5006,22 @@ r394 is now running on vinge from the r389 base with 128-row
 `--max-candidates-per-chunk 8`, and `--max-evals 800`. Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r394_broad128_vinge_20260508.log`.
 No banked result until all four literal cachesim lines land.
+
+## Baleen24 r392 Cross-Synthetic Selector Complete (2026-05-08)
+
+Completed the r391 cross-synthetic scout as a four-seed run. Base was LLNL
+R291.BAL2 per seed; donors were LLNL R291.BAL/R291.BAL2 plus LANL r382. This
+is a disclosed selector result, not a pure LANL generative leaderboard row.
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0182` | 0.0181972000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0170` | 0.0169577000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0189` | 0.0188716000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195139333 |
+
+Four-seed mean: `0.0183851083` (display `0.0184`), range `0.0025562333`.
+No-32 guard mean: `0.0151413333`, range `0.0015537917`. This is
+`0.0000618917` (`0.3355%`) below LLNL R291.BAL2 `0.018447`, but it stays in
+the cross-synthetic class because it uses LLNL base/donor artifacts.

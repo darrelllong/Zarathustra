@@ -5101,3 +5101,30 @@ same official surface and no-32 guard. Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r394_broad128_vinge_20260508.log`.
 This is not a banked claim yet; it is the next four-seed `{42,80,81,82}`
 candidate to promote or retract when all literal cachesim lines land.
+
+## 2026-05-08 23:08Z -- Baleen24 r392 Cross-Synthetic Selector Complete
+
+r392 completed the disclosed cross-synthetic follow-up from the r391 scout:
+LLNL R291.BAL2 per-seed CSVs were the base, LLNL R291.BAL/R291.BAL2 plus
+LANL r382 synthetic CSVs were donors, and LANL's guarded selector did the
+post-hoc selection. This is not a pure LANL generative leaderboard row. It is
+useful because it shows the selector architecture can extract another small
+cache-surface lift even from the current LLNL Baleen leader artifacts.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0182` | 0.0181972000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0170` | 0.0169577000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0189` | 0.0188716000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r392_llnlbase_xseed_ck2048_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195139333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0183851083` (race display `0.0184`;
+range `0.0025562333`). That is `0.0000618917` (`0.3355%`) below LLNL
+R291.BAL2 `0.018447`, but because the base/donor pool includes LLNL artifacts,
+LANL is not replacing the pure-generative Baleen24 row with this result.
+
+No-32 guard seed means were `0.0157566667`, `0.0158659583`, `0.0143121667`,
+and `0.0146305417`, mean `0.0151413333`, range `0.0015537917`.
