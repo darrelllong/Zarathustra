@@ -268,28 +268,52 @@ def main(argv: list[str] | None = None) -> int:
     if args.push and not args.commit:
         raise SystemExit("--push requires --commit")
 
-    ssh_argv = _ssh_argv(args=args)
+    def _run(ns: argparse.Namespace) -> int:
+        ssh_argv = _ssh_argv(args=ns)
 
-    scripts: list[tuple[str, bytes | None]] = []
-    if args.sync == "bundle":
-        bundle = _create_local_bundle_bytes(ref=args.ref)
-        scripts.append((_build_remote_bundle_sync_script(args=args, ref=args.ref), bundle))
-    elif args.sync == "pull":
-        scripts.append((_build_remote_pull_sync_script(args=args, ref=args.ref), None))
+        scripts: list[tuple[str, bytes | None]] = []
+        if ns.sync == "bundle":
+            bundle = _create_local_bundle_bytes(ref=ns.ref)
+            scripts.append((_build_remote_bundle_sync_script(args=ns, ref=ns.ref), bundle))
+        elif ns.sync == "pull":
+            scripts.append((_build_remote_pull_sync_script(args=ns, ref=ns.ref), None))
 
-    scripts.append((_build_remote_run_script(args=args, launch_args=launch_args), None))
+        scripts.append((_build_remote_run_script(args=ns, launch_args=launch_args), None))
 
-    # Execute each stage as a separate SSH invocation so bundle bytes can be piped cleanly.
-    for script, stdin_bytes in scripts:
-        full = ssh_argv + ["bash", "-lc", script]
-        print("+ " + " ".join(_q(part) for part in full), flush=True)
-        if args.dry_run:
-            if stdin_bytes is not None:
-                print(f"[ssh_chunk_surface] dry-run: would stream {len(stdin_bytes)} bundle bytes", flush=True)
-            continue
-        subprocess.run(full, input=stdin_bytes, check=True)
+        # Execute each stage as a separate SSH invocation so bundle bytes can be piped cleanly.
+        for script, stdin_bytes in scripts:
+            full = ssh_argv + ["bash", "-lc", script]
+            print("+ " + " ".join(_q(part) for part in full), flush=True)
+            if ns.dry_run:
+                if stdin_bytes is not None:
+                    print(
+                        f"[ssh_chunk_surface] dry-run: would stream {len(stdin_bytes)} bundle bytes",
+                        flush=True,
+                    )
+                continue
+            subprocess.run(full, input=stdin_bytes, check=True)
 
-    return 0
+        return 0
+
+    try:
+        return _run(args)
+    except subprocess.CalledProcessError as exc:
+        if args.dry_run or args.no_proxyjump:
+            raise
+        if exc.returncode != 255:
+            # Non-SSH failure (remote command exited non-zero). Don't retry
+            # automatically; that can be expensive and may duplicate work.
+            raise
+        # Common failure mode: ssh-config forces ProxyJump through a host that
+        # is not resolvable from the current network. Retry once without
+        # ProxyJump to reduce operator friction.
+        sys.stderr.write(
+            "[ssh_chunk_surface] NOTE: command failed; retrying with --no-proxyjump (ProxyJump=none).\n"
+        )
+        sys.stderr.flush()
+        retry_args = argparse.Namespace(**vars(args))
+        retry_args.no_proxyjump = True
+        return _run(retry_args)
 
 
 if __name__ == "__main__":

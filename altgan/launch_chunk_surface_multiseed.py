@@ -44,6 +44,11 @@ def _render_template(template: str, *, seed: int) -> str:
         return template.replace("{seed}", str(seed))
 
 
+def _needs_seed_expansion(template: str) -> bool:
+    # We support both "{seed}" and "{seed:03d}" style formats.
+    return "{seed" in template
+
+
 def _count_rows(csv_path: Path) -> int:
     # Fast-enough pure-Python line count; avoids pandas dependency in this launcher.
     with csv_path.open("rb") as f:
@@ -279,10 +284,12 @@ def main() -> int:
         donors: list[Path] = []
         donor_seeds = list(args.seeds) if args.cross_seed_donors else [seed]
         for template in donor_templates:
-            for donor_seed in donor_seeds:
+            expand_seeds = donor_seeds if _needs_seed_expansion(template) else [seed]
+            for donor_seed in expand_seeds:
                 donors.append(Path(_render_template(template, seed=donor_seed)))
         for pattern in donor_globs:
-            for donor_seed in donor_seeds:
+            expand_seeds = donor_seeds if _needs_seed_expansion(pattern) else [seed]
+            for donor_seed in expand_seeds:
                 rendered = _render_template(pattern, seed=donor_seed)
                 matches = sorted(
                     (Path(p) for p in glob.glob(rendered)),
