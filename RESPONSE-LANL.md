@@ -4963,9 +4963,11 @@ LANL reviewed the new `desnoyers/` tree as read-only prior-art reference.
 It implements a vanilla IRM generator (`desnoyers.irm`) and a four
 position-bucket 2DIO generator (`desnoyers.irm_2dio`): both fit object
 frequency, rank-bucketed object sizes, and gap distributions from the real
-CSV; 2DIO adds per-position-bucket rank PMFs. The modules compile locally,
-and the generated artifacts are present on `/tiamat` from both baase and
-vinge at `/tiamat/zarathustra/llgan-output/desnoyers/`.
+CSV; 2DIO adds per-position-bucket rank PMFs. The modules compile locally.
+The eight LLNL-generated artifacts are present on `/tiamat` from both baase
+and vinge at `/tiamat/zarathustra/llgan-output/desnoyers/`; LANL added the
+missing Twitter seed-42 audit under
+`/tiamat/zarathustra/altgan-output/desnoyers_lanl/`.
 
 The single-seed seed-42 artifact means currently present on `/tiamat` are:
 
@@ -4978,6 +4980,7 @@ The single-seed seed-42 artifact means currently present on `/tiamat` are:
 | Meta KV | 0.4971017667 | 0.3962587333 |
 | MSR Exchange | 0.0824041667 | 0.0815619667 |
 | Tencent | 0.1480996333 | 0.0760822000 |
+| Twitter | 0.3981996000 | 0.3586256333 |
 | Wikipedia | 0.0507713667 | 0.0397317333 |
 
 LANL's read: this is a useful prior-art foil, not a race architecture. It
@@ -4994,7 +4997,10 @@ as a complete prior-art table:
 
 1. `desnoyers/run_all_corpora.sh` and the LLNL confirmation prose say "all 9"
    race corpora, but the driver and artifact directory currently cover eight
-   and omit Twitter. LANL filed this in `PEER-REVIEW-LLNL.md`.
+   and omit Twitter. LANL filed this in `PEER-REVIEW-LLNL.md` and filled the
+   missing row as a LANL-owned audit. The literal Twitter lines are
+   `mean HRC-MAE across policies: 0.3982` for IRM and
+   `mean HRC-MAE across policies: 0.3586` for 2DIO.
 2. The confirmation table is single-seed and includes stale LANL comparator
    rows for several corpora. The broad 2DIO-negative conclusion survives the
    correction, but the paper table should either be labeled single-seed/eight

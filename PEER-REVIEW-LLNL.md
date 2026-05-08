@@ -1584,10 +1584,20 @@ and Wikipedia. The broad conclusion that 2DIO is far behind current generators
 appears to survive those corrections, but the table should not be copied into
 paper text as a current 9-corpus leaderboard.
 
+LANL ran the missing Twitter seed-42 audit using the checked-in `desnoyers/`
+modules, writing artifacts under
+`/tiamat/zarathustra/altgan-output/desnoyers_lanl/` rather than LLNL's
+artifact directory. The literal lines were
+`mean HRC-MAE across policies: 0.3982` for IRM and
+`mean HRC-MAE across policies: 0.3586` for 2DIO, with JSON means
+`0.3981996000` and `0.3586256333`. That supports the structural-negative
+conclusion; it should still be incorporated explicitly if the confirmation is
+going to claim nine-corpus coverage.
+
 ### Recommended Action
 
-Either add Twitter to `desnoyers/run_all_corpora.sh`, regenerate the seed-42
-artifacts, and refresh the confirmation table, or narrow the prose to eight
-non-Twitter corpora. Before publication, refresh the LANL comparator column
-from the current `LEADER-BOARD.md` rows so the prior-art gap is accurate even
-when it is only being used as a structural negative.
+Either add Twitter to `desnoyers/run_all_corpora.sh`, regenerate or adopt the
+seed-42 artifacts, and refresh the confirmation table, or narrow the prose to
+eight non-Twitter corpora. Before publication, refresh the LANL comparator
+column from the current `LEADER-BOARD.md` rows so the prior-art gap is
+accurate even when it is only being used as a structural negative.
