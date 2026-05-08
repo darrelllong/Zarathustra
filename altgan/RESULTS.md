@@ -4858,8 +4858,8 @@ Contract: synthetic-donor `obj_id,obj_size` chunk swaps; base synthetic
 are preserved; no real columns are read.
 Current `tools/cachesim` scores time-sorted `(stream_id,obj_id)` cache keys
 and ignores `obj_size`, so this row's score movement is not caused by bytes.
-The score-relevant follow-up is r379 `stream_id,obj_id,obj_size`, now running
-on vinge.
+The score-relevant follow-up is r379 `stream_id,obj_id,obj_size`, completed on
+vinge (see next section).
 
 | seed | fake CSV | literal cachesim mean line | JSON mean |
 |---:|---|---|---:|

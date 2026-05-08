@@ -4760,8 +4760,8 @@ are spliced together, while `stream_id`, `ts`, `opcode`, `tenant`,
 columns are read. Scoring caveat remains unchanged: current `tools/cachesim`
 scores time-sorted `(stream_id,obj_id)` cache keys and ignores `obj_size`, so
 the score movement is object-ID chunk geometry under fixed base stream
-assignment. The score-relevant follow-up, r379, is now running with
-`stream_id,obj_id,obj_size` swaps on vinge.
+assignment. The score-relevant follow-up, r379, completed on vinge with
+`stream_id,obj_id,obj_size` swaps (see next section).
 
 Official reference:
 `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
