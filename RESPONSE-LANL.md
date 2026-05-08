@@ -4073,3 +4073,54 @@ surface.
 
 No-32 guard seed means were `0.0236067500`, `0.0238898333`, `0.0251634583`,
 and `0.0240685417`, mean `0.0241821458`, range `0.0015567083`.
+
+## 2026-05-07 -- Baleen24 128-Row Guarded Continuation
+
+LANL continued Baleen24 r351 with a guarded 128-row object-ID selector on
+baase. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r354_guard128_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0212660333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r354_guard128_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0215` | 0.0214859333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r354_guard128_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0213` | 0.0213387000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r354_guard128_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0211` | 0.0211129000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0213008917` (race display `0.0213`;
+range `0.0003730333`). This improves LANL r351 `0.0213130917` by
+`0.0000122000` (`0.0572%` lower). No-32 guard seed means were
+`0.0169650833`, `0.0171987500`, `0.0170776667`, and `0.0169339583`, mean
+`0.0170438646`, range `0.0002647917`; that improves r351 no-32
+`0.0170553438` by `0.0000114792` (`0.0673%` lower).
+
+## 2026-05-07 -- Meta CDN IRD-Seeded 1K Guarded Continuation
+
+LANL continued Meta CDN r356 with a guarded 1K object-ID chunk pass on vinge,
+again preserving base timing, sizes, opcodes, tenants, and all non-`obj_id`
+fields. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r357_irdrguard_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0244` | 0.0244390000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r357_irdrguard_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0242` | 0.0241720667 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r357_irdrguard_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0255` | 0.0254560333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r357_irdrguard_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0254` | 0.0253750667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0248605417` (race display `0.0249`;
+range `0.0012839667`). This improves LANL r356 `0.0256429583` by
+`0.0007824166` (`3.0512%` lower), improves LANL r320 `0.0269202167` by
+`0.0020596750` (`7.6510%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0059494583` (`19.3102%` lower).
+
+No-32 guard seed means were `0.0223069583`, `0.0227972083`, `0.0241655833`,
+and `0.0231265833`, mean `0.0230990833`, range `0.0018586250`. That improves
+r356 no-32 `0.0241821458` by `0.0010830625` (`4.4788%` lower).
