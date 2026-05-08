@@ -221,6 +221,11 @@ def _parse_args() -> argparse.Namespace:
         help="Per chunk, accept the first improving donor or scan all donors and accept the best.",
     )
     p.add_argument(
+        "--swap-columns",
+        default="obj_id",
+        help="Comma-separated donor columns to splice in each chunk; default obj_id.",
+    )
+    p.add_argument(
         "--emit-markdown",
         action="store_true",
         help="Print a ready-to-paste markdown snippet (table + mean/range).",
@@ -357,6 +362,8 @@ def main() -> int:
                 str(args.min_improvement),
                 "--accept-mode",
                 args.accept_mode,
+                "--swap-columns",
+                args.swap_columns,
                 "--cache-sizes",
                 args.cache_sizes,
                 "--policies",

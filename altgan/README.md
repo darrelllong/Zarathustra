@@ -175,6 +175,12 @@ stepping down chunk sizes (e.g., 64→32→16→8).
 and uses the combined donor pool for every target seed (seed stabilization via
 good-seed chunks).
 
+`--swap-columns` controls the disclosed synthetic donor contract. The default
+is LANL's object-ID-only selector (`obj_id`). For an architecture scout that
+matches LLNL's broader synthetic-donor contract, use
+`--swap-columns obj_id,obj_size` and include that contract in the tag name and
+posted result.
+
 ```bash
 python3 -m altgan.ssh_chunk_surface_multiseed --host baase --tmux-session ali_rXXX_refine64 -- \
   --real /tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv \

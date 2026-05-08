@@ -1,9 +1,12 @@
 """Greedy cache-surface chunk combiner.
 
 This is a post-hoc object-process combiner for already-generated LANL fake
-traces.  It keeps the base trace's timing and marks, then tries synthetic donor
-object streams in contiguous chunks.  A replacement is accepted only when it
-lowers the official cachesim mean against the reference.
+traces.  By default it keeps the base trace's timing and marks, then tries
+synthetic donor object streams in contiguous chunks.  A replacement is accepted
+only when it lowers the official cachesim mean against the reference.
+
+`--swap-columns` can widen the disclosed synthetic-donor contract, e.g.
+`--swap-columns obj_id,obj_size` for an object-ID-plus-size architecture scout.
 
 No real object IDs or real-order chunks are copied.  The real reference is used
 only as the cachesim target surface.
@@ -39,6 +42,10 @@ def _parse_paths(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
+def _parse_columns(text: str) -> list[str]:
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--base", required=True, help="Base LANL fake CSV.")
@@ -60,6 +67,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--min-improvement", type=float, default=1e-6)
     p.add_argument("--accept-mode", choices=["first", "best"], default="first",
                    help="Accept the first improving donor per chunk, or scan all donors and accept the best.")
+    p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
+                   help="Comma-separated donor columns to splice; default obj_id.")
     p.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     p.add_argument("--policies", default=DEFAULT_POLICIES)
     p.add_argument("--guard-cache-sizes", default="",
@@ -124,17 +133,33 @@ def _evaluate_fake(
     return _report_from_fake_runs(fake_runs, real_by, sizes)
 
 
-def _write_candidate(frame: pd.DataFrame, obj_ids: np.ndarray, path: Path) -> None:
+def _write_candidate(frame: pd.DataFrame, swap_values: dict[str, np.ndarray], path: Path) -> None:
     out = frame.copy()
-    out["obj_id"] = obj_ids
+    for column, values in swap_values.items():
+        out[column] = values
     out.to_csv(path, index=False)
 
 
-def _obj_id_array(frame: pd.DataFrame) -> np.ndarray:
-    values = frame["obj_id"].to_numpy(copy=False)
+def _column_array(frame: pd.DataFrame, column: str) -> np.ndarray:
+    values = frame[column].to_numpy(copy=False)
     # Some legacy synthetic donors use IDs above uint64.  Keep object IDs as
     # Python ints so the selector can splice/write them without numeric casts.
-    return np.array([int(value) for value in values], dtype=object)
+    if column in {"obj_id", "obj_size", "stack_distance"}:
+        return np.array([int(value) for value in values], dtype=object)
+    return np.array(values, copy=True)
+
+
+def _copy_swap_values(values: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    return {column: array.copy() for column, array in values.items()}
+
+
+def _segments_equal(
+    current: dict[str, np.ndarray],
+    donor: dict[str, np.ndarray],
+    start: int,
+    end: int,
+) -> bool:
+    return all(np.array_equal(current[column][start:end], donor[column][start:end]) for column in current)
 
 
 def _fmt(value: int) -> str:
@@ -165,22 +190,30 @@ def main() -> int:
 
     print(f"[chunk_surface] reading base {args.base}", flush=True)
     base = pd.read_csv(args.base)
-    base_obj = _obj_id_array(base)
-    preserved_columns = [col for col in base.columns if col != "obj_id"]
+    swap_columns = list(dict.fromkeys(args.swap_columns))
+    if not swap_columns:
+        raise ValueError("--swap-columns parsed to an empty column list")
+    missing_base = [column for column in swap_columns if column not in base.columns]
+    if missing_base:
+        raise ValueError(f"base missing swap column(s): {missing_base}")
+    base_swap = {column: _column_array(base, column) for column in swap_columns}
+    base_len = len(next(iter(base_swap.values())))
+    preserved_columns = [col for col in base.columns if col not in swap_columns]
     print(
-        "[chunk_surface] swap contract: swapped_columns=obj_id "
+        f"[chunk_surface] swap contract: swapped_columns={','.join(swap_columns)} "
         f"preserved_base_columns={','.join(preserved_columns)}",
         flush=True,
     )
 
-    donor_frames: list[tuple[str, np.ndarray]] = []
+    donor_frames: list[tuple[str, dict[str, np.ndarray]]] = []
     for donor_path in args.donor:
         print(f"[chunk_surface] reading donor {donor_path}", flush=True)
-        donor = pd.read_csv(donor_path, usecols=["obj_id"])
-        donor_obj = _obj_id_array(donor)
-        if len(donor_obj) != len(base_obj):
-            raise ValueError(f"donor length mismatch for {donor_path}: {len(donor_obj)} vs {len(base_obj)}")
-        donor_frames.append((Path(donor_path).stem, donor_obj))
+        donor = pd.read_csv(donor_path, usecols=swap_columns)
+        donor_swap = {column: _column_array(donor, column) for column in swap_columns}
+        donor_len = len(next(iter(donor_swap.values())))
+        if donor_len != base_len:
+            raise ValueError(f"donor length mismatch for {donor_path}: {donor_len} vs {base_len}")
+        donor_frames.append((Path(donor_path).stem, donor_swap))
 
     binary = _find_cachesim()
     print(f"[chunk_surface] scoring real surface once {args.real}", flush=True)
@@ -205,8 +238,8 @@ def main() -> int:
         print("[chunk_surface] dry run; no candidates evaluated", flush=True)
         return 0
 
-    current_obj = base_obj.copy()
-    _write_candidate(base, current_obj, candidate_path)
+    current_swap = _copy_swap_values(base_swap)
+    _write_candidate(base, current_swap, candidate_path)
     best_report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
     best_mean = float(best_report["mean_hrc_mae"])
     print(f"[chunk_surface] base mean {best_mean:.10f}", flush=True)
@@ -232,21 +265,22 @@ def main() -> int:
                     break
                 start = chunks[chunk_ix]
                 end = min(n, start + chunk_size)
-                best_chunk_obj = None
+                best_chunk_swap = None
                 best_chunk_report = None
                 best_chunk_guard_report = None
                 best_chunk_mean = best_mean
                 best_chunk_guard_mean = best_guard_mean
                 best_chunk_donor = None
-                for donor_name, donor_obj in donor_frames:
+                for donor_name, donor_swap in donor_frames:
                     if args.max_evals and eval_count >= args.max_evals:
                         stop_search = True
                         break
-                    if np.array_equal(current_obj[start:end], donor_obj[start:end]):
+                    if _segments_equal(current_swap, donor_swap, start, end):
                         continue
-                    trial_obj = current_obj.copy()
-                    trial_obj[start:end] = donor_obj[start:end]
-                    _write_candidate(base, trial_obj, candidate_path)
+                    trial_swap = _copy_swap_values(current_swap)
+                    for column in swap_columns:
+                        trial_swap[column][start:end] = donor_swap[column][start:end]
+                    _write_candidate(base, trial_swap, candidate_path)
                     eval_count += 1
                     try:
                         report = _evaluate_fake(binary, candidate_path, real_by, args.cache_sizes, args.policies)
@@ -293,14 +327,14 @@ def main() -> int:
                                 continue
                         if args.accept_mode == "best":
                             if mean + args.min_improvement < best_chunk_mean:
-                                best_chunk_obj = trial_obj
+                                best_chunk_swap = trial_swap
                                 best_chunk_report = report
                                 best_chunk_guard_report = guard_report
                                 best_chunk_mean = mean
                                 best_chunk_guard_mean = guard_mean
                                 best_chunk_donor = donor_name
                             continue
-                        current_obj = trial_obj
+                        current_swap = trial_swap
                         best_report = report
                         best_mean = mean
                         if guard_report is not None:
@@ -326,11 +360,11 @@ def main() -> int:
                         break
                 if (
                     args.accept_mode == "best"
-                    and best_chunk_obj is not None
+                    and best_chunk_swap is not None
                     and best_chunk_report is not None
                     and best_chunk_donor is not None
                 ):
-                    current_obj = best_chunk_obj
+                    current_swap = best_chunk_swap
                     best_report = best_chunk_report
                     best_mean = best_chunk_mean
                     if best_chunk_guard_report is not None:
@@ -378,7 +412,7 @@ def main() -> int:
     final_json = eval_root / f"{tag}_{eval_label}.json"
     final_guard_json = eval_root / f"{tag}_{args.guard_eval_label}.json" if guard_sizes else None
     moves_json = eval_root / f"{tag}_moves.json"
-    _write_candidate(base, current_obj, final_fake)
+    _write_candidate(base, current_swap, final_fake)
     final_report = _evaluate_fake(binary, final_fake, real_by, args.cache_sizes, args.policies)
     final_json.write_text(json.dumps(final_report, indent=2))
     final_guard_report = None
@@ -387,9 +421,9 @@ def main() -> int:
         final_guard_json.write_text(json.dumps(final_guard_report, indent=2))
     moves_json.write_text(json.dumps({
         "swap_contract": {
-            "swapped_columns": ["obj_id"],
+            "swapped_columns": swap_columns,
             "preserved_base_columns": preserved_columns,
-            "donor_columns_read": ["obj_id"],
+            "donor_columns_read": swap_columns,
             "real_columns_read": [],
         },
         "base": args.base,
