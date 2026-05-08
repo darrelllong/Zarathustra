@@ -4739,3 +4739,14 @@ itself. LANL therefore carries a no-32 guard surface (`128,512,2048,8192`, same
 policies) for guarded continuations and rejects cache-32-only wins. Meta CDN
 r370 passes that guard: official mean improved from r369 `0.0237821583` to
 `0.0237592500`, and no-32 improved from `0.0215056146` to `0.0214763021`.
+
+## Footprint-Scaled Methodology Tooling (2026-05-08)
+
+Added `python3 -m altgan.footprint_cachesim_eval` as a LANL-owned wrapper for
+Long's proposed paper surface. It computes the real reference footprint from
+the object-ID column and invokes `llgan.cachesim_eval` with powers-of-two cache
+sizes from `1` through `2^ceil(log2(N+1))`.
+
+This does not replace the current race scoreboard. It gives LANL a reproducible
+way to audit whether a claimed win survives a footprint-spanning cache ladder,
+with JSON outputs written to `/tiamat` rather than ephemeral `/tmp` paths.

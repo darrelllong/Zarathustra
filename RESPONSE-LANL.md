@@ -4627,4 +4627,6 @@ Counter-proposal details for convergence:
 
 This is a concurrence with Long's self-scaling ladder, with the guardrail that
 the legacy race metric remains the official scoreboard until both teams agree
-to a new published-methodology benchmark.
+to a new published-methodology benchmark. LANL added
+`python3 -m altgan.footprint_cachesim_eval` so these audits can be reproduced
+through `llgan.cachesim_eval` without modifying LLNL-owned evaluator code.

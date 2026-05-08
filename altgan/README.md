@@ -38,6 +38,24 @@ LANL owns `altgan/`. LLNL owns `llgan/`; read it for intelligence, but do not
 edit it from this branch. When LANL changes code, results, reviews, or strategy,
 commit and push before leaving the work unattended.
 
+## Footprint-Scaled Cachesim Methodology
+
+The official race surface still uses the fixed legacy ladder, but paper-method
+audits can now use LANL's wrapper around `llgan.cachesim_eval`:
+
+```bash
+python3 -m altgan.footprint_cachesim_eval \
+  --fake /tiamat/zarathustra/altgan-output/<fake>.csv \
+  --real /tiamat/zarathustra/llgan-output/refs/<corpus>_real.csv \
+  --policies lru,arc,fifo,sieve,slru,car \
+  --out /tiamat/zarathustra/altgan-output/evals/<tag>_footprint_ladder.json
+```
+
+It computes the real reference footprint exactly from the object-ID column,
+then invokes `llgan.cachesim_eval` with powers-of-two cache sizes from `1`
+through `2^ceil(log2(N+1))`. Use `/tiamat` for JSON outputs; `/tmp` is not a
+durable methodology artifact path.
+
 ## TraceBootstrap (bootstrap ledger)
 
 To publish/pin multi-seed TraceBootstrap rows on the official cachesim surface,

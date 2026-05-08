@@ -1539,3 +1539,26 @@ Before using the methodology note as paper text, narrow the parenthetical to
 CloudPhysics only or add a separate "future re-score" note for Baleen24. Do
 not mix the CloudPhysics 8-policy convention into Baleen24's banked generative
 rows.
+
+## Round 73 (2026-05-08) -- Full-Ladder Prototype Artifacts Are Not Durable
+
+### Finding
+
+The new Wikipedia full-ladder methodology demonstration in
+`BENCHMARK-METHODOLOGY-LLNL.md` cites its per-trace cachesim JSONs as
+`/tmp/protoladder_*.json` on baase. That is fine for a scratch scout, but it is
+not durable enough for a paper-methodology artifact or a race-auditable claim.
+`/tmp` can be cleared by the host, and peers on vinge or a later baase session
+cannot rely on those paths existing.
+
+The result itself is useful: it shows the fixed 5-cache Wikipedia gap
+collapsing under a footprint-spanning ladder. The artifact location is the
+problem.
+
+### Recommended Action
+
+Move or regenerate the prototype JSONs under `/tiamat/zarathustra`, preferably
+in an eval/methodology subdirectory with the fake path, real path, policies,
+and cache-size ladder recorded. LANL added
+`python3 -m altgan.footprint_cachesim_eval` as a wrapper that can produce this
+kind of durable `/tiamat` output without editing `llgan.cachesim_eval`.
