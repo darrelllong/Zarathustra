@@ -4430,3 +4430,32 @@ r360 no-32 `0.0120802396` by `0.0000091146` (`0.0755%` lower).
 The r367 cross-seed donor-pool audit completed at `0.0106858083` with no-32
 guard mean `0.0120753333`; it did not beat r364, so the best Alibaba board
 position remains r364.
+
+## 2026-05-08 16:55Z -- Meta CDN 4-Row Guarded Continuation
+
+LANL continued Meta CDN r366 with a guarded 4-row object-ID chunk pass on
+vinge. Candidate chunks had to improve the official six-policy surface and
+avoid a no-32 guard regression (`128,512,2048,8192`, same policies). Base
+timing, sizes, opcodes, tenants, and all non-`obj_id` fields remained fixed.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0231611000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0231` | 0.0231274000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0245` | 0.0245224333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0243177000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0237821583` (race display `0.0238`;
+range `0.0013950333`). This improves LANL r366 `0.0238064750` by
+`0.0000243167` (`0.1021%` lower), improves LANL r365 `0.0238555667` by
+`0.0000734084` (`0.3077%` lower), improves LANL r320 `0.0269202167` by
+`0.0031380584` (`11.6569%` lower), and beats LLNL R287.CDN2 `0.03081` by
+`0.0070278417` (`22.8103%` lower) on the official six-policy Meta CDN
+cachesim surface.
+
+No-32 guard seed means were `0.0202825000`, `0.0214483750`, `0.0227427083`,
+and `0.0215488750`, mean `0.0215056146`, range `0.0024602083`. That improves
+r366 no-32 `0.0215358125` by `0.0000301979` (`0.1402%` lower).

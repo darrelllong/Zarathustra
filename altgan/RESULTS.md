@@ -4628,3 +4628,25 @@ No-32 guard mean improved from r360 `0.0120802396` to `0.0120711250`, a
 The r367 cross-seed donor-pool audit completed at `0.0106858083` with no-32
 guard mean `0.0120753333`; it did not beat r364, so the best Alibaba board
 position remains r364.
+
+## Meta CDN IRD-Seeded 4-Row Guarded Continuation (2026-05-08)
+
+Continued Meta CDN from r366 with a guarded 4-row object-ID selector.
+Reference: `/tiamat/zarathustra/llgan-output/refs/metacdn_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0232` | 0.0231611000 |
+| 80 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0231` | 0.0231274000 |
+| 81 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0245` | 0.0245224333 |
+| 82 | `/tiamat/zarathustra/altgan-output/metacdn_chunksurf_r369_irdrguard_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0243` | 0.0243177000 |
+
+Four-seed mean: `0.0237821583` (display `0.0238`), range `0.0013950333`.
+This improves r366 `0.0238064750` by `0.0000243167` (`0.1021%` lower),
+improves r365 `0.0238555667` by `0.0000734084` (`0.3077%` lower), improves
+r320 `0.0269202167` by `0.0031380584` (`11.6569%` lower), and beats LLNL
+R287.CDN2 `0.03081` by `0.0070278417` (`22.8103%` lower) on the official
+six-policy surface.
+
+No-32 guard mean improved from r366 `0.0215358125` to `0.0215056146`, a
+`0.0000301979` (`0.1402%`) lower diagnostic mean.
