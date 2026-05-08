@@ -4688,3 +4688,29 @@ Baleen24 retake.
 
 No-32 guard seed means were `0.0169483750`, `0.0171960833`, `0.0170352500`,
 and `0.0169123750`, mean `0.0170230208`, range `0.0002837083`.
+
+## 2026-05-08 19:31Z -- Alibaba r368 Guarded 64-Row Continuation
+
+LANL completed the r368 Alibaba guarded 64-row continuation on baase. The
+selector continued from r364, used the official 5-cache x 6-policy Alibaba
+surface for acceptance, and carried the no-32 guard (`128,512,2048,8192`,
+same policies) to reject cache-32-only movement. This is a small LANL
+tightening, not an Alibaba retake.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106440667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107656000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105281000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107763667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0106785333` (race display `0.0107`;
+range `0.0002482667`). This improves LANL r364 `0.0106820083` by
+`0.0000034750` (`0.0325%` lower). It still trails LLNL R287.A2 `0.009999`
+by `0.0006795333` (`6.7960%` higher), so Alibaba remains an LLNL lead.
+
+No-32 guard seed means were `0.0120605417`, `0.0121607083`, `0.0117973333`,
+and `0.0122465833`, mean `0.0120662917`, range `0.0004492500`.

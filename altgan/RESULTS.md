@@ -4788,3 +4788,22 @@ This improves r347 `0.0213297667` by `0.0000729167`, improves r341
 (`15.2320%` higher), so it is banked as a LANL tightening, not a retake.
 
 No-32 guard mean: `0.0170230208`, range `0.0002837083`.
+
+## Alibaba r368 Guarded 64-Row Continuation (2026-05-08)
+
+Continued Alibaba from r364 with a guarded 64-row object-ID selector.
+Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0106` | 0.0106440667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107656000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0105` | 0.0105281000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_best64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0108` | 0.0107763667 |
+
+Four-seed mean: `0.0106785333` (display `0.0107`), range `0.0002482667`.
+This improves r364 `0.0106820083` by `0.0000034750` (`0.0325%` lower), but
+still trails LLNL R287.A2 `0.009999` by `0.0006795333` (`6.7960%` higher).
+
+No-32 guard mean: `0.0120662917`, range `0.0004492500`.

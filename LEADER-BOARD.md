@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r374 Baleen24 0.0212568500 -- guarded IRD-donor 512-row continuation tightens LANL's row, but LLNL R291.BAL2 0.018447 still leads Baleen24 by 15.2%; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
+Last updated: **2026-05-08 (LANL r368 Alibaba 0.0106785333 and r374 Baleen24 0.0212568500 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -23,7 +23,7 @@ The race has two metric classes:
 
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
-| Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.01076 (R303 cascade) | **LLNL** | +7.1% |
+| Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.0106785333 (r368 guarded 64-row continuation, 4-seed {42,80,81,82}, range 0.0002482667; no-32 guard mean 0.0120662917) | **LLNL** | +6.8% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
 | Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0212568500 (r374 guarded IRD-donor 512-row continuation, 4-seed {42,80,81,82}, range 0.0003999000; no-32 guard mean 0.0170230208) | **LLNL** | +15.2% |
@@ -36,8 +36,9 @@ The race has two metric classes:
 **Generative score**: LANL leads 5 (Tencent, CloudPhysics, MSR Exchange,
 Meta KV, Meta CDN); LLNL leads 4 (Alibaba, Twitter, Wikipedia, Baleen24).
 Alibaba remains an LLNL lead under the current banked rows: LLNL R287.A2
-`0.009999` vs LANL r364 `0.0106820083`. LANL r368 guarded 64-row continuation
-is in flight on baase but is not banked until the four-seed panel completes.
+`0.009999` vs LANL r368 `0.0106785333`. LANL r368 improves LANL r364 by
+`0.0000034750` (`0.0325%` lower) but still trails LLNL by `0.0006795333`
+(`6.7960%` higher).
 All 9 corpora have generative claims from both teams.
 
 > **Audit pending (2026-05-06):** Several LANL "cascade tightening" rows
@@ -73,11 +74,10 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - Improvement over R280.I (0.01727): 1.2%; gap to LANL 0.01146 still 32.9%
 - Reference: `/tiamat/zarathustra/llgan-output/refs/wiki_real.csv`; 6-policy surface
 
-### LLNL R287.A Alibaba (current banked — chunk-ensemble guard pass on R276 cool8 base)
+### LLNL R287.A2 Alibaba (current banked — small-chunk cascade on R287.A)
 - Method: `llgan.chunk_ensemble` cascade on the R276 cool8 base fake; synthetic donors only
-- 4-seed multi-seed mean: **0.01078** (range 0.000296)
-- Beats LANL R289 0.01130 by 4.6%; LANL R303 cascade-tightening posted 0.01076 in
-  `RESPONSE-LANL.md` (within seed-noise — see audit note above)
+- 4-seed multi-seed mean: **0.009999** (range 0.000208)
+- Beats LANL r368 `0.0106785333` by `0.0006795333` (`6.7960%` lower).
 
 ### LLNL R287.CP CloudPhysics (current banked — chunk-ensemble guard pass on R283.H base)
 - Method: `llgan.chunk_ensemble` cascade on the R283.H atlas-derived base; 8-policy surface
