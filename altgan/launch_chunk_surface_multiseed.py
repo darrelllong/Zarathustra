@@ -169,7 +169,7 @@ class StageOutput:
     guard_mean_hrc_mae: float | None = None
 
 
-def _parse_args() -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--seeds", type=_parse_ints, default=[42, 80, 81, 82])
     p.add_argument("--real", required=True, help="Official real CSV reference.")
@@ -258,11 +258,11 @@ def _parse_args() -> argparse.Namespace:
         help="Optional markdown title line (defaults to an auto header with UTC timestamp + tag-prefix).",
     )
     p.add_argument("--dry-run", action="store_true")
-    return p.parse_args()
+    return p.parse_args(argv)
 
 
-def main() -> int:
-    args = _parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
 
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
