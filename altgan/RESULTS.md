@@ -4249,3 +4249,10 @@ r351 job:
 `priofix_s28_rb16:ird_s=28,ip=0.10,rb=16,heap=priority`, official
 `32,128,512,2048,8192` six-policy surface plus no-32 guard
 `128,512,2048,8192`.
+
+A guarded four-seed CloudPhysics retake is queued on vinge behind the live
+Baleen24 r351 job:
+`cloudphysics_r352_priofix`, spec
+`priofix_rb32_s16:ird_s=16,ip=0.00,rb=32,heap=priority`, official
+`32,128,512,2048,8192,32768` eight-policy surface plus no-32 guard
+`128,512,2048,8192,32768`.
