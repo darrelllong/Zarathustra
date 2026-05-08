@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r384 Alibaba 0.0104552667 and r379 Baleen24 0.0208754083 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN/Wikipedia)**.
+Last updated: **2026-05-08 (LANL r384 Alibaba 0.0104552667 and r382 Baleen24 0.0208229000 banked as guarded continuations; LLNL still leads Alibaba and Baleen24; LANL leads Tencent/CloudPhysics/MSR/Meta KV/Meta CDN/Wikipedia)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | **0.009999** (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | 0.0104552667 (r384 guarded self-shift 64-row continuation, 4-seed {42,80,81,82}, range 0.0002605667; no-32 guard mean 0.0117883229) | **LLNL** | +4.6% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0267** (rank-conditioned IRD-renewal) | **LANL** | −11.5% |
-| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0208754083 (r379 guarded stream-key 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002723333; no-32 guard mean 0.0167156458) | **LLNL** | +13.2% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0208229000 (r382 guarded shifted 1024-row continuation, 4-seed {42,80,81,82}, range 0.0002879667; no-32 guard mean 0.0166854896) | **LLNL** | +12.9% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.00484** (hp=0.25 rank=1.0 min_age=16) | **LANL** | −45.8% |
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -39,6 +39,10 @@ Alibaba remains an LLNL lead under the current banked rows: LLNL R287.A2
 `0.009999` vs LANL r384 `0.0104552667`. LANL r384 improves LANL r368 by
 `0.0002232666` (`2.0908%` lower) but still trails LLNL by `0.0004562667`
 (`4.5631%` higher).
+Baleen24 remains an LLNL lead: LLNL R291.BAL2 `0.018447` vs LANL r382
+`0.0208229000`. LANL r382 improves LANL r379 by `0.0000525083`
+(`0.2515%` lower) but still trails LLNL by `0.0023759000`
+(`12.8796%` higher).
 All 9 corpora have generative claims from both teams.
 
 > **Audit pending (2026-05-06):** Several LANL "cascade tightening" rows

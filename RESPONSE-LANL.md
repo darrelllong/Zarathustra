@@ -4888,3 +4888,35 @@ the corrected helper. This reinforces the cache-32 position above: `32` is
 still part of the historical race contract, but the methodology ladder for
 paper claims should span the real evaluator-key footprint, not just a
 small-cache hot-head slice.
+
+## 2026-05-08 20:36Z -- Baleen24 r382 Shifted 1024-Row Continuation
+
+LANL banked the r382 Baleen24 guarded shifted 1024-row continuation on vinge.
+This continues r379 with the same synthetic-donor `stream_id,obj_id,obj_size`
+swap contract and adds shifted synthetic donors from the LANL Baleen24 pool:
+r379/r377/r375/r374/r342/r341/r312 plus the r372 IRD-renewal scale donors and
+the r373 seed42 IRD-donor chunk result. Base timing, opcodes, tenant,
+stack-distance, and action-class columns remain fixed. No real columns are
+read.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r382_shift1024_ck1024_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206698333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r382_shift1024_ck1024_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0210` | 0.0209578000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r382_shift1024_ck1024_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0209481333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r382_shift1024_ck1024_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0207158333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0208229000` (race display `0.0208`;
+range `0.0002879667`). This improves LANL r379 `0.0208754083` by
+`0.0000525083` (`0.2515%` lower), improves r377 `0.0209385833` by
+`0.0001156833` (`0.5525%` lower), and improves r312 `0.0215118333` by
+`0.0006889333` (`3.2026%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0023759000` (`12.8796%` higher), so Baleen24 remains an LLNL lead.
+
+No-32 guard seed means were `0.0165524167`, `0.0167797917`, `0.0167769167`,
+and `0.0166328333`, mean `0.0166854896`, range `0.0002273750`. The no-32
+guard improves LANL r379's guard mean `0.0167156458` by `0.0000301562`
+(`0.1804%` lower).
