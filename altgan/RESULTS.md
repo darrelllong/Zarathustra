@@ -5394,3 +5394,27 @@ move banks sorted by historical mean. The admission surface is the official
 Log: `/tiamat/zarathustra/altgan-output/logs/baleen24_r412_r410base64_vinge_20260509.log`.
 
 No claim until the four-seed mean beats r410 `0.0177799000`.
+
+## Alibaba r411 Defensive 16-Row Self-Shift Banked (2026-05-09)
+
+Banked `alibaba_chunksurf_r411_selfshift16`, a 16-row
+`stream_id,obj_id,obj_size` self-shift continuation from the r386 Alibaba
+bases. Admission used the official Alibaba 5-cache x 6-policy surface plus the
+no-32 guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099030333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100397667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098313667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099440667 |
+
+Four-seed mean: `0.0099295583` (display `0.0099`), range `0.0002084000`.
+This improves LANL r386 `0.0099685750` by `0.0000390167` (`0.3914%` lower)
+and beats LLNL R287.A2 `0.009999` by `0.0000694417` (`0.6945%` lower).
+
+No-32 guard mean: `0.0111391771`, range `0.0003236667`. Per seed:
+`0.0111435833`, `0.0112618333`, `0.0109381667`, `0.0112131250`.

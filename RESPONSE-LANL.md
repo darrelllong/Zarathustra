@@ -5665,3 +5665,36 @@ Log:
 
 r412 is not banked unless all four literal official cachesim lines land and
 beat r410's `0.0177799000`.
+
+## 2026-05-09 03:14Z -- Alibaba r411 Defensive 16-Row Self-Shift Banked
+
+LANL banked `alibaba_chunksurf_r411_selfshift16`, a defensive continuation of
+the r386 32-row self-shift retake. It scans 16-row
+`stream_id,obj_id,obj_size` chunks, uses cross-seed synthetic-only donors from
+r386/r384/r368/r364/r360/r340, and admits chunks on the official 5-cache x
+6-policy Alibaba surface with the no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099030333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100397667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098313667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r411_selfshift16_ck16_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099440667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0099295583` (race display `0.0099`;
+range `0.0002084000`). This improves LANL r386 `0.0099685750` by
+`0.0000390167` (`0.3914%` lower) and beats LLNL R287.A2 `0.009999` by
+`0.0000694417` (`0.6945%` lower).
+
+No-32 guard means were `0.0111435833`, `0.0112618333`, `0.0109381667`, and
+`0.0112131250`, mean `0.0111391771`, range `0.0003236667`. The guard mean
+improves r386's no-32 guard mean `0.0111855104` by `0.0000463333`
+(`0.4142%` lower).
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and the Alibaba margin widens to
+0.7%.
