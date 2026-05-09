@@ -5265,3 +5265,33 @@ r404 had the right count histogram but the wrong temporal birth geometry; r407
 anchors the priority heap to fitted first-arrival positions, cutting both the
 official surface and the no-32 diagnostic while preserving the direct-generator
 claim class.
+
+## Baleen24 r409 r407-Base Reinforcement Launched (2026-05-09)
+
+`baleen24_chunksurf_r409_r407base256` is a reinforcement scout launched from the
+newly banked r407 per-seed bases, using synthetic-only cross-seed donors and the
+official-surface guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log: `/tiamat/zarathustra/altgan-output/logs/baleen24_r409_r407base256_vinge_20260509.log`.
+
+Follow-up command (run on a `/tiamat` host, or from a laptop via SSH; no new score claim):
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host vinge \
+  --tmux-session bal_r409_r407base256 \
+  --remote-module altgan.launch_baleen24_r407_chunk_surface_multiseed \
+  -- \
+  --tag-prefix baleen24_chunksurf_r409_r407base256 \
+  --pipeline 256 \
+  --cross-seed-donors \
+  --priority-move-sort mean \
+  --max-accepts 8 \
+  --max-evals 350 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --guard-regression-per-official-gain 0.25 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```

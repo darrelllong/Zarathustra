@@ -5499,3 +5499,24 @@ Log:
 
 r409 is not banked unless all four literal official cachesim lines land and
 beat r407's `0.0183702583`.
+
+Preset wrapper for re-running or extending the r409 scout (no new score claim):
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host vinge \
+  --tmux-session bal_r409_r407base256 \
+  --remote-module altgan.launch_baleen24_r407_chunk_surface_multiseed \
+  -- \
+  --tag-prefix baleen24_chunksurf_r409_r407base256 \
+  --pipeline 256 \
+  --cross-seed-donors \
+  --priority-move-sort mean \
+  --max-accepts 8 \
+  --max-evals 350 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --guard-regression-per-official-gain 0.25 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
