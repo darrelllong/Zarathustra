@@ -5587,3 +5587,17 @@ Four-seed mean: `0.0663185000`, range `0.0190366667`. The failure shape is
 now clear enough to drive the next learned-code edit: controlling births and
 working-set occupancy alone does not recover the 32/128-cache locality surface;
 the Mattson decoder needs an explicit short-depth/recent-reuse pressure term.
+
+r423b short-reuse-pressure scout, not banked:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0597` | 0.0596890000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0755` | 0.0755086667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0638` | 0.0638423333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0600` | 0.0600426667 |
+
+Four-seed mean: `0.0647706667`, range `0.0158196667`. The decode-side
+short-depth pressure improved every r422 seed, but it is still only a patch on
+the learned distribution. The next architecture path is to train this pressure
+into the model, not only apply it during sampling.

@@ -5940,3 +5940,23 @@ birth count.
 
 Mean across seeds `{42,80,81,82}`: `0.0663185000` (race display `0.0663`;
 range `0.0190366667`). This should not replace the Tencent leaderboard row.
+
+r423b tests the decoder-side form of the same idea. The new source knob
+`--short-reuse-pressure` applies Denning pressure to the learned Mattson-depth
+probabilities whenever the live synthetic 32/128-window working sets are larger
+than the real targets. This is still the r420 learned checkpoint; no refit was
+done. The pressure term improved all four r422 seeds, but it remains a Tencent
+ML scout rather than a banked leaderboard claim.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0597` | 0.0596890000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0755` | 0.0755086667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0638` | 0.0638423333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r423b_shortreuse_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0600` | 0.0600426667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0647706667` (race display `0.0648`;
+range `0.0158196667`). This is a 2.33% improvement over r422, but still more
+than 2x worse than Tencent r336. The next learned move should be a refit that
+teaches the network the short-depth pressure directly, rather than injecting it
+only at decode time.
