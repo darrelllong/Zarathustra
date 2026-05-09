@@ -16772,3 +16772,27 @@ sampling preserves the first factor exactly. Uniform within-bin was
 throwing away P(rank | bin) — the long-tailed Zipf/Pareto density inside
 the wide log-spaced bins.
 
+
+### R298e 1M seed=42 measured (2026-05-09 06:13)
+
+1M Wiki seed=42 generate (3050s wall) + 6×5 cachesim:
+
+| policy | R298b 1M | R298e 1M | Δ |
+|---|---:|---:|---|
+| lru   | 0.0388 | 0.0315 | -19% |
+| arc   | 0.0246 | 0.0198 | -19% |
+| fifo  | 0.0463 | 0.0391 | -16% |
+| sieve | 0.0422 | 0.0410 | -3%  |
+| slru  | 0.0370 | 0.0381 | +3%  |
+| car   | 0.0223 | 0.0186 | -17% |
+| **mean** | **0.0352** | **0.0313** | **-11.1%** |
+
+**R298e beats R298b on 5 of 6 policies and -11.1% on mean at 1M
+apples-to-apples.** Action distribution at 1M: FRESH 43.4%, RECYCLE 13.4%,
+IN_STACK 43.2% (real Wiki at 1M ≈ FRESH 49%). The model emits slightly
+fewer FRESH than real, replacing them with deeper IN_STACK reuses, but the
+empirical-bin sampler keeps the cachesim surface correctly calibrated.
+
+R298e seeds {80, 81, 82} 100k smoke launched for stability check; 1M for
+remaining seeds queued behind that. ATB claim pending 4-seed mean.
+
