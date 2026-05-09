@@ -5210,3 +5210,19 @@ r394 completed as a weaker broad-search 128-row follow-up: official mean
 `0.0206472500`, range `0.0003439000`; no-32 guard mean `0.0165470833`, range
 `0.0002438333`. r398b remains the live hot-donor 64-row scout on baase and is
 not banked unless it beats r395 across all four seeds.
+
+## 2026-05-08 23:50Z -- Baleen24 r399 r395 Cascade Launched
+
+LANL launched the next pure-LANL Baleen24 continuation on vinge:
+`baleen24_chunksurf_r399_r395cascade`. It starts from the banked r395
+per-seed bases, uses synthetic r395/r394/r389/r390/r382/r379/r377/r375/r374
+donors, and runs a guarded 128-row then 64-row cascade with
+`stream_id,obj_id,obj_size` swaps. Candidate writes are restricted to
+`stream_id,ts,obj_id,obj_size,opcode,tenant` to reduce NFS write volume while
+preserving the columns cachesim and downstream trace inspection need.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r399_r395_cascade128_64_vinge_20260508.log`.
+
+This is a continuation scout, not a banked claim. The banked row remains r395
+until r399 lands four literal cachesim lines and beats `0.0204949000`.

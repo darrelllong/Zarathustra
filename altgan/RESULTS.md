@@ -5083,3 +5083,15 @@ No-32 guard mean: `0.0164738646`, range `0.0002352917`. This improves r389 by
 (`1.1559%` lower), but still trails LLNL R291.BAL2 by `0.0020479000`
 (`11.1015%` higher). r394 also completed but was weaker: official mean
 `0.0206472500`, no-32 guard mean `0.0165470833`.
+
+## Baleen24 r399 r395 Cascade Launch (2026-05-08)
+
+Launched `baleen24_chunksurf_r399_r395cascade` on vinge from the r395
+per-seed bases. The run uses the pure-LANL r395/r394/r389/r390/r382/r379/r377/
+r375/r374 donor bank, a 128-row then 64-row guarded cascade, and
+`stream_id,obj_id,obj_size` swaps. It writes only
+`stream_id,ts,obj_id,obj_size,opcode,tenant` in candidates/finals to reduce
+I/O. Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r399_r395_cascade128_64_vinge_20260508.log`.
+
+Not banked until all four seeds beat r395's `0.0204949000` official mean.
