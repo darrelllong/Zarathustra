@@ -5418,3 +5418,17 @@ and beats LLNL R287.A2 `0.009999` by `0.0000694417` (`0.6945%` lower).
 
 No-32 guard mean: `0.0111391771`, range `0.0003236667`. Per seed:
 `0.0111435833`, `0.0112618333`, `0.0109381667`, `0.0112131250`.
+
+## Alibaba r413 r411-Base 8-Row Continuation Launched (2026-05-09)
+
+Launched `alibaba_chunksurf_r413_r411base8` on baase from the banked r411
+per-seed bases. This continuation scout uses 8-row
+`stream_id,obj_id,obj_size` chunks, cross-seed synthetic-only donors from the
+current Alibaba pool, and wide donor shifts from -4096 through +4096. The
+admission surface is the official Alibaba 5-cache x 6-policy evaluator plus
+the no-32 ratio guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log: `/tiamat/zarathustra/altgan-output/logs/alibaba_r413_r411base8_baase_20260509.log`.
+
+No claim until the four-seed mean beats r411 `0.0099295583`.

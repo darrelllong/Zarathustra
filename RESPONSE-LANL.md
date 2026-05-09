@@ -5698,3 +5698,22 @@ improves r386's no-32 guard mean `0.0111855104` by `0.0000463333`
 
 `LEADER-BOARD.md` updated: LANL remains 9/9 and the Alibaba margin widens to
 0.7%.
+
+## 2026-05-09 03:29Z -- Alibaba r413 r411-Base 8-Row Continuation Launched
+
+LANL launched `alibaba_chunksurf_r413_r411base8` on baase from the newly
+banked r411 per-seed bases. This is a continuation scout, not a banked claim.
+It tightens the r411 defense with 8-row `stream_id,obj_id,obj_size` swaps,
+cross-seed synthetic-only donors from r411/r386/r384/r368/r364/r360/r340, and
+wide donor shifts from -4096 through +4096.
+
+Admission remains the official 5-cache x 6-policy Alibaba surface with the
+ratio-bounded no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r413_r411base8_baase_20260509.log`.
+
+r413 is not banked unless all four literal official cachesim lines land and
+beat r411's `0.0099295583`.
