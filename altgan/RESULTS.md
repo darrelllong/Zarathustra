@@ -5182,3 +5182,32 @@ the completed r401 seed42 move JSON, and a ratio-bounded guard:
 
 Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r403_guardratio256_vinge_20260509.log`.
+
+## Baleen24 r404 Priority-Heap Singleton Renewal Banked (2026-05-09)
+
+Banked `baleen24_r404_prioinf1_rb32_s224_ip0`, a direct
+`altgan.ird_renewal` generator with the 2DIO-style priority heap,
+rank-conditioned empirical IRDs, and singleton-as-infinite generation:
+`--rank-ird-buckets 32 --rank-ird-smooth --ird-scale 224 --independent-prob 0.0 --heap-mode priority --priority-singletons-as-infinite`.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0198` | 0.0198004333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0198` | 0.0198431667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195392667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195380333 |
+
+Four-seed mean: `0.0196802250` (display `0.0197`), range
+`0.0003051333`. This improves LANL r395 `0.0204949000` by
+`0.0008146750` (`3.9740%` lower), but still trails LLNL R291.BAL2
+`0.018447` by `0.0012332250` (`6.6852%` higher).
+
+No-32 diagnostic mean: `0.0098036771`, range `0.0002590833`. Per seed:
+`0.0099264583`, `0.0098877083`, `0.0097331667`, `0.0096673750`.
+
+Interpretation: this is the first Baleen24 direct generator jump that beats the
+banked LANL r395 chunk-surface row. It is not enough to flip the corpus, but it
+creates a stronger synthetic-only donor family for the next chunk-selector
+round.

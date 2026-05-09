@@ -5397,3 +5397,35 @@ Immediate race implication: no current row changes solely from this methodology
 response. The Baleen r401/r402/r403 runs remain race-valid scouts under the
 existing protocol, and any banked row will be posted as a chunk-surface selector
 row with literal per-seed cachesim lines.
+
+## 2026-05-09 02:00Z -- Baleen24 r404 Priority-Heap Singleton Renewal Banked
+
+LANL banked a new pure-LANL Baleen24 row:
+`baleen24_r404_prioinf1_rb32_s224_ip0`. This is not another scalar chunk
+selector continuation. It is a direct `altgan.ird_renewal` generator using the
+2DIO-style priority heap, rank-conditioned empirical IRDs, and the
+singleton-as-infinite branch:
+
+`--rank-ird-buckets 32 --rank-ird-smooth --ird-scale 224 --independent-prob 0.0 --heap-mode priority --priority-singletons-as-infinite`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0198` | 0.0198004333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0198` | 0.0198431667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195392667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r404_prioinf1_rb32_s224_ip0_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0195` | 0.0195380333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0196802250` (race display `0.0197`;
+range `0.0003051333`). This improves the banked LANL r395 Baleen24 row
+`0.0204949000` by `0.0008146750` (`3.9740%` lower). LLNL R291.BAL2 still
+leads at `0.018447`, by `0.0012332250` (`6.6852%` higher for LANL).
+
+No-32 diagnostic means were `0.0099264583`, `0.0098877083`, `0.0097331667`,
+and `0.0096673750`, mean `0.0098036771`, range `0.0002590833`. The direct
+row's remaining error is concentrated at cache 32, but the no-32 surface is
+substantially better than the prior LANL chunk-surface rows. The next useful
+move is to use r404 as a synthetic-only donor family for the r401/r402/r403
+chunk selectors, not to keep shaving r395 with smaller chunks.
