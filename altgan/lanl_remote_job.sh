@@ -29,7 +29,7 @@ pull_repo() {
 status_job() {
   local pattern="${1:?pattern required}"
   local log_path="${2:-}"
-  pgrep -af "$pattern" || true
+  pgrep -af "$pattern" | awk '$0 !~ /lanl_remote_job\.sh status/ {print}' || true
   if [[ -n "$log_path" && -f "$log_path" ]]; then
     tail -160 "$log_path"
   fi
@@ -37,9 +37,16 @@ status_job() {
 
 kill_job() {
   local pattern="${1:?pattern required}"
-  pkill -f "$pattern" || true
+  local -a pids=()
+  while read -r pid _rest; do
+    [[ -z "$pid" ]] && continue
+    pids+=("$pid")
+  done < <(pgrep -af "$pattern" | awk '$0 !~ /lanl_remote_job\.sh kill/ {print}')
+  if (( ${#pids[@]} > 0 )); then
+    kill "${pids[@]}" || true
+  fi
   sleep 1
-  pgrep -af "$pattern" || true
+  pgrep -af "$pattern" | awk '$0 !~ /lanl_remote_job\.sh kill/ {print}' || true
 }
 
 launch_mdlstm_tencent() {
