@@ -6432,3 +6432,26 @@ harder, especially seed 80.
 
 Mean across seeds `{42,80,81,82}`: `0.0691027500` (race display `0.0691`;
 range `0.0199113333`). Retracted; r434 remains the best learned Tencent scout.
+
+## 2026-05-09 10:30Z -- Tencent r437 Learned-WS Controller Added
+
+Added a new learned generation mode in `altgan/mattson_denning_lstm.py`:
+`--birth-control-mode learned-ws`. The LSTM was already trained with auxiliary
+Denning working-set heads, but rollout ignored those logits and used either a
+fixed real working-set trajectory or footprint targets. The new mode converts
+the model's predicted next-working-set distribution into raw target counts and
+feeds that learned target back into the birth/reuse controller and short-reuse
+pressure path.
+
+This is the direct response to the r436 failure: exact Mattson-rank tokens
+alone preserved rank labels but did not repair generation-time working-set
+geometry. r437 will return to the r434 tokenization (no exact cutoff, no
+RECYCLE split, empirical rank sampler) and replace the external WS target with
+the learned Denning head.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+Planned launch:
+`tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3`

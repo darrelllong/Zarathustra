@@ -5954,3 +5954,15 @@ r431 is promoted and replaces r426 on Alibaba. Official mean improves to
 
 Four-seed mean: `0.0098792833`, range `0.0002137333`; guard mean
 `0.0110781875`, guard range `0.0003305417`.
+
+## 2026-05-09 10:30Z -- Tencent r437 Learned-WS Controller Added
+
+Added `--birth-control-mode learned-ws` to the Mattson-Denning LSTM generator.
+Rollout can now use the LSTM's learned Denning working-set head as the
+generation-time target for birth/reuse pressure. This is an architecture change
+from r434/r436: the model now feeds back its own learned WS prediction instead
+of copying a fixed real WS trajectory.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`

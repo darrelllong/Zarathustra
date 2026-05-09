@@ -708,6 +708,18 @@ def _ws_targets_from_real(state: dict, n_records: int, windows: list[int]) -> np
     return targets
 
 
+def _ws_target_from_logits(ws_logits, ws_edges: np.ndarray) -> np.ndarray:
+    """Convert learned next-working-set logits into raw target counts."""
+    torch, _nn = _try_torch()
+    mids = 0.5 * (ws_edges[:-1].astype(np.float64) + ws_edges[1:].astype(np.float64) - 1.0)
+    mids = np.maximum(mids, 0.0)
+    targets: list[float] = []
+    for head_logits in ws_logits:
+        probs = torch.softmax(head_logits[0, -1], dim=-1).detach().cpu().numpy()
+        targets.append(float(np.dot(probs, mids[: len(probs)])))
+    return np.asarray(targets, dtype=np.float64)
+
+
 def _force_emitted_reuse(
     stack: list[int],
     emitted_seen: set[int],
@@ -899,6 +911,7 @@ def generate_ids(
         birth_control_mode = "none"
     birth_targets = _birth_targets_from_real(state, n_records) if birth_control_mode == "footprint" else None
     ws_targets = _ws_targets_from_real(state, n_records, windows) if birth_control_mode == "ws" else None
+    use_learned_ws = birth_control_mode == "learned-ws"
     window_scale = np.asarray(windows, dtype=np.float64)
     emitted_seen: set[int] = set()
     emitted_order: list[int] = []
@@ -915,7 +928,7 @@ def generate_ids(
     with torch.inference_mode():
         init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
         init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
-        logits, birth_logits, _ws_logits, h = model(init_tok, init_ws)
+        logits, birth_logits, ws_logits, h = model(init_tok, init_ws)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
@@ -926,9 +939,13 @@ def generate_ids(
             reuse_eligible: set[int] | None = None
             current_ws: np.ndarray | None = None
             target_ws: np.ndarray | None = None
-            if ws_targets is not None:
+            if ws_targets is not None or use_learned_ws:
                 current_ws = np.asarray([len(counter) for _queue, counter in ws_counts], dtype=np.float64)
-                target_ws = ws_targets[i].astype(np.float64)
+                target_ws = (
+                    _ws_target_from_logits(ws_logits, ws_edges)
+                    if use_learned_ws
+                    else ws_targets[i].astype(np.float64)
+                )
                 pressure_by_window = (target_ws - current_ws) / np.maximum(window_scale, 1.0)
                 pressure = float(np.dot(pressure_by_window, np.asarray([0.35, 0.25, 0.20, 0.12, 0.08])))
                 birth_logit += 5.0 * max(-0.75, min(0.75, pressure))
@@ -1043,7 +1060,7 @@ def generate_ids(
                         del counter[old]
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
             step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
-            logits, birth_logits, _ws_logits, h = model(step_tok, step_ws, h)
+            logits, birth_logits, ws_logits, h = model(step_tok, step_ws, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
@@ -1207,7 +1224,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--seed", type=int, default=42)
     gen_p.add_argument("--temperature", type=float, default=1.0)
     gen_p.add_argument("--no-birth-control", action="store_true")
-    gen_p.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
+    gen_p.add_argument("--birth-control-mode", choices=["footprint", "ws", "learned-ws"], default="footprint")
     gen_p.add_argument("--short-reuse-pressure", type=float, default=0.0)
     gen_p.set_defaults(fn=generate)
 
@@ -1223,7 +1240,7 @@ def build_parser() -> argparse.ArgumentParser:
     multi.add_argument("--policies", default=DEFAULT_POLICIES)
     multi.add_argument("--fit", action="store_true")
     multi.add_argument("--no-birth-control", action="store_true")
-    multi.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
+    multi.add_argument("--birth-control-mode", choices=["footprint", "ws", "learned-ws"], default="footprint")
     multi.add_argument("--short-reuse-pressure", type=float, default=0.0)
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")

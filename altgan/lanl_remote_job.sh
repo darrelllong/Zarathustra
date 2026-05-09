@@ -14,7 +14,7 @@ usage:
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
   altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
