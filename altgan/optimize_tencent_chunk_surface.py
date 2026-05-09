@@ -82,6 +82,12 @@ def _parse_args() -> argparse.Namespace:
                        "Accepted donor/start/shift moves from these files are evaluated first for "
                        "matching chunk starts before the random candidate cap is filled."
                    ))
+    p.add_argument("--priority-move-sort", choices=["input", "mean"], default="input",
+                   help=(
+                       "Ordering for multiple priority moves targeting the same chunk. "
+                       "Default input preserves existing behavior. `mean` tries moves from "
+                       "lower historical post-accept cachesim means first."
+                   ))
     p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
                    help="Comma-separated donor columns to splice; default obj_id.")
     p.add_argument(
@@ -194,8 +200,9 @@ def _copy_swap_values(values: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
 def _load_priority_moves(
     patterns: list[str],
     donor_by_name: dict[str, dict[str, np.ndarray]],
+    sort_mode: str,
 ) -> dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int]]]:
-    by_chunk_start: dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int]]] = {}
+    by_chunk_start: dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int, float]]] = {}
     loaded_files = 0
     loaded_moves = 0
     skipped_moves = 0
@@ -219,29 +226,35 @@ def _load_priority_moves(
                     chunk_size = int(move["chunk_size"])
                     start = int(move["start"])
                     donor_shift = int(move.get("donor_shift", int(move["source_start"]) - start))
+                    move_mean = float(move.get("mean", float("inf")))
                 except (KeyError, TypeError, ValueError):
                     skipped_moves += 1
                     continue
-                by_chunk_start.setdefault((chunk_size, start), []).append((donor_name, donor_swap, donor_shift))
+                by_chunk_start.setdefault((chunk_size, start), []).append(
+                    (donor_name, donor_swap, donor_shift, move_mean)
+                )
                 loaded_moves += 1
+    out: dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int]]] = {}
     for key, rows in list(by_chunk_start.items()):
         seen: set[tuple[str, int]] = set()
-        deduped: list[tuple[str, dict[str, np.ndarray], int]] = []
-        for donor_name, donor_swap, donor_shift in rows:
+        deduped: list[tuple[str, dict[str, np.ndarray], int, float]] = []
+        for donor_name, donor_swap, donor_shift, move_mean in rows:
             pair = (donor_name, donor_shift)
             if pair in seen:
                 continue
             seen.add(pair)
-            deduped.append((donor_name, donor_swap, donor_shift))
-        by_chunk_start[key] = deduped
+            deduped.append((donor_name, donor_swap, donor_shift, move_mean))
+        if sort_mode == "mean":
+            deduped.sort(key=lambda row: row[3])
+        out[key] = [(donor_name, donor_swap, donor_shift) for donor_name, donor_swap, donor_shift, _ in deduped]
     if patterns:
         print(
             f"[chunk_surface] priority moves: files={loaded_files} "
             f"usable={loaded_moves} skipped={skipped_moves} "
-            f"target_chunks={len(by_chunk_start)}",
+            f"target_chunks={len(out)} sort={sort_mode}",
             flush=True,
         )
-    return by_chunk_start
+    return out
 
 
 def _segments_equal(
@@ -341,7 +354,7 @@ def main() -> int:
     donor_by_name: dict[str, dict[str, np.ndarray]] = {}
     for donor_name, donor_swap in donor_frames:
         donor_by_name.setdefault(donor_name, donor_swap)
-    priority_moves = _load_priority_moves(args.priority_moves, donor_by_name)
+    priority_moves = _load_priority_moves(args.priority_moves, donor_by_name, args.priority_move_sort)
 
     binary = _find_cachesim()
     print(f"[chunk_surface] scoring real surface once {args.real}", flush=True)
@@ -646,6 +659,7 @@ def main() -> int:
         "accept_mode": args.accept_mode,
         "max_candidates_per_chunk": args.max_candidates_per_chunk,
         "priority_moves": args.priority_moves,
+        "priority_move_sort": args.priority_move_sort,
         "donor_shifts": donor_shifts,
         "max_evals": args.max_evals,
         "accepted": accepted,

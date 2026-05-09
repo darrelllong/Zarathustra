@@ -245,6 +245,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--priority-move-sort",
+        choices=["input", "mean"],
+        default="input",
+        help=(
+            "Forwarded to optimize_tencent_chunk_surface. Default preserves input order; "
+            "`mean` tries lower historical post-accept cachesim means first per chunk."
+        ),
+    )
+    p.add_argument(
         "--swap-columns",
         default="obj_id",
         help="Comma-separated donor columns to splice in each chunk; default obj_id.",
@@ -408,6 +417,8 @@ def main(argv: list[str] | None = None) -> int:
                 str(args.max_candidates_per_chunk),
                 "--priority-moves",
                 args.priority_moves,
+                "--priority-move-sort",
+                args.priority_move_sort,
                 "--swap-columns",
                 args.swap_columns,
                 "--write-columns",
