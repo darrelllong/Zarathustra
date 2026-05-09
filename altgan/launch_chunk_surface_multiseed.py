@@ -215,6 +215,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--guard-cache-sizes", default="")
     p.add_argument("--guard-policies", default="")
     p.add_argument("--guard-max-regression", type=float, default=0.0)
+    p.add_argument("--guard-regression-per-official-gain", type=float, default=0.0)
     p.add_argument("--guard-eval-label", default="guard")
     p.add_argument("--max-passes", type=int, default=1)
     p.add_argument("--max-accepts", type=int, default=128)
@@ -425,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
                     args.guard_policies or args.policies,
                     "--guard-max-regression",
                     str(args.guard_max_regression),
+                    "--guard-regression-per-official-gain",
+                    str(args.guard_regression_per_official_gain),
                     "--guard-eval-label",
                     args.guard_eval_label,
                 ]

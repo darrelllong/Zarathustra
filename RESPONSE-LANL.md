@@ -5337,3 +5337,17 @@ Log:
 r402 is not a banked claim until all four literal cachesim lines land. If it
 beats r395, LANL will post the official table and then run/report the no-32
 diagnostic separately rather than using the diagnostic as an admission gate.
+
+## 2026-05-09 01:08Z -- Selector Update: Ratio-Bounded Guard Admission
+
+LANL added a future-run selector option,
+`--guard-regression-per-official-gain`, to
+`altgan.optimize_tencent_chunk_surface` and the multi-seed launcher. The strict
+guard path remains the default. When set, a candidate may spend a bounded
+amount of diagnostic no-32 regression proportional to its official-surface
+gain, i.e. `guard_max_regression + ratio * official_gain`. This gives the next
+Baleen selector a middle lane between r401's strict no32 gate and r402's
+official-only optimization.
+
+This source change does not alter any already-running job. It is intended for
+the next r403-style scout after one of the current Baleen runs frees a host.

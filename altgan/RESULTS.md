@@ -5159,3 +5159,13 @@ Log:
 This is not banked until all four literal cachesim lines beat r395. If it
 lands, report a separate no-32 diagnostic audit rather than treating the
 diagnostic guard as the official admission rule.
+
+## Chunk-Surface Selector Guard-Ratio Option (2026-05-09)
+
+Added `--guard-regression-per-official-gain` to the generic chunk-surface
+selector and multi-seed launcher. Default behavior is unchanged. When the flag
+is positive and a guard surface is configured, a candidate may spend
+`guard_max_regression + ratio * official_gain` of guard regression. This is for
+the next Baleen move-bank scout: r401 is strict no32-guarded, r402 is
+official-only, and the new option gives a disclosed middle lane for candidates
+whose official race-surface gain outweighs tiny diagnostic drift.

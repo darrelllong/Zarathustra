@@ -109,6 +109,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Policies for --guard-cache-sizes; defaults to --policies.")
     p.add_argument("--guard-max-regression", type=float, default=0.0,
                    help="Allowed guard mean regression for an otherwise improving candidate.")
+    p.add_argument("--guard-regression-per-official-gain", type=float, default=0.0,
+                   help=(
+                       "Allow additional guard regression proportional to the official-surface "
+                       "gain. For example 0.25 admits a guard increase of up to one quarter "
+                       "of the candidate's official mean improvement, plus --guard-max-regression."
+                   ))
     p.add_argument("--guard-eval-label", default="guard",
                    help="Suffix for the final guard eval JSON when --guard-cache-sizes is set.")
     p.add_argument("--keep-candidates", action="store_true")
@@ -260,8 +266,11 @@ def _guard_allows(
     guard_mean: float,
     best_guard_mean: float,
     max_regression: float,
+    official_gain: float,
+    regression_per_official_gain: float,
 ) -> bool:
-    return guard_mean <= best_guard_mean + max_regression
+    allowed = max_regression + max(0.0, official_gain) * max(0.0, regression_per_official_gain)
+    return guard_mean <= best_guard_mean + allowed
 
 
 def main() -> int:
@@ -485,11 +494,19 @@ def main() -> int:
                                     guard_mean=guard_mean,
                                     best_guard_mean=best_guard_mean,
                                     max_regression=args.guard_max_regression,
+                                    official_gain=delta,
+                                    regression_per_official_gain=args.guard_regression_per_official_gain,
                                 ):
+                                    allowed_guard = (
+                                        args.guard_max_regression
+                                        + max(0.0, delta)
+                                        * max(0.0, args.guard_regression_per_official_gain)
+                                    )
                                     print(
                                         f"[chunk_surface] REJECT guard start={start} "
                                         f"donor={donor_name} shift={donor_shift} "
-                                        f"guard={guard_mean:.10f} best_guard={best_guard_mean:.10f}",
+                                        f"guard={guard_mean:.10f} best_guard={best_guard_mean:.10f} "
+                                        f"allowed_regression={allowed_guard:.10f}",
                                         flush=True,
                                     )
                                     continue
@@ -623,6 +640,9 @@ def main() -> int:
         "guard_policies": guard_policies if guard_sizes else "",
         "guard_eval_label": args.guard_eval_label if guard_sizes else "",
         "guard_max_regression": args.guard_max_regression if guard_sizes else None,
+        "guard_regression_per_official_gain": (
+            args.guard_regression_per_official_gain if guard_sizes else None
+        ),
         "accept_mode": args.accept_mode,
         "max_candidates_per_chunk": args.max_candidates_per_chunk,
         "priority_moves": args.priority_moves,
