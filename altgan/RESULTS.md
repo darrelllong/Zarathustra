@@ -5847,6 +5847,22 @@ Validation:
 - `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
 - `bash -n altgan/lanl_remote_job.sh`
 
+## 2026-05-09 10:49Z -- Tencent r437 Learned-WS Controller Result
+
+r437 completed and is retracted. Raw expected learned-WS targets caused a
+fresh-emission collapse; next fix is to clamp learned targets to each actual
+Denning window before feeding them back into birth/reuse control.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.4321` | 0.4320970000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.3240` | 0.3239510000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.2008` | 0.2008000000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.3888` | 0.3888416667 |
+
+Four-seed mean: `0.3364224167`, range `0.2312970000`. Retracted versus r434
+`0.0601647500`.
+
 ## 2026-05-09 10:38Z -- Tencent r437 Learned-WS Controller Launched
 
 Launched `tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3` on vinge.

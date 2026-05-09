@@ -6495,3 +6495,26 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 10:49Z -- Tencent r437 Learned-WS Controller Completed, Retracted
+
+r437 completed and is a clean negative result. Feeding the raw expected value
+of the learned Denning working-set logits back into the birth/reuse controller
+caused a fresh-emission collapse: the generated traces over-miss every policy,
+with output unique counts as high as seed42 `99,452` of `100,000`.
+
+The failure mode is architectural, not a scalar-pressure miss. The WS logits
+are binned on the global footprint scale, so softmax expectation leaks mass
+into high-count bins and produces impossible per-window targets. Next patch:
+clamp learned WS targets to each actual window before using them for birth
+control.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.4321` | 0.4320970000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.3240` | 0.3239510000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.2008` | 0.2008000000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.3888` | 0.3888416667 |
+
+Mean across seeds `{42,80,81,82}`: `0.3364224167` (race display `0.3364`;
+range `0.2312970000`). Retracted; r434 remains the best learned Tencent scout.

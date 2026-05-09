@@ -708,15 +708,17 @@ def _ws_targets_from_real(state: dict, n_records: int, windows: list[int]) -> np
     return targets
 
 
-def _ws_target_from_logits(ws_logits, ws_edges: np.ndarray) -> np.ndarray:
-    """Convert learned next-working-set logits into raw target counts."""
+def _ws_target_from_logits(ws_logits, ws_edges: np.ndarray, windows: list[int]) -> np.ndarray:
+    """Convert learned next-working-set logits into feasible per-window counts."""
     torch, _nn = _try_torch()
     mids = 0.5 * (ws_edges[:-1].astype(np.float64) + ws_edges[1:].astype(np.float64) - 1.0)
     mids = np.maximum(mids, 0.0)
     targets: list[float] = []
-    for head_logits in ws_logits:
+    for wi, head_logits in enumerate(ws_logits):
+        window_cap = float(windows[wi]) if wi < len(windows) else float(np.max(mids))
+        feasible_mids = np.minimum(mids[: head_logits.shape[-1]], window_cap)
         probs = torch.softmax(head_logits[0, -1], dim=-1).detach().cpu().numpy()
-        targets.append(float(np.dot(probs, mids[: len(probs)])))
+        targets.append(float(np.dot(probs, feasible_mids[: len(probs)])))
     return np.asarray(targets, dtype=np.float64)
 
 
@@ -942,7 +944,7 @@ def generate_ids(
             if ws_targets is not None or use_learned_ws:
                 current_ws = np.asarray([len(counter) for _queue, counter in ws_counts], dtype=np.float64)
                 target_ws = (
-                    _ws_target_from_logits(ws_logits, ws_edges)
+                    _ws_target_from_logits(ws_logits, ws_edges, windows)
                     if use_learned_ws
                     else ws_targets[i].astype(np.float64)
                 )
