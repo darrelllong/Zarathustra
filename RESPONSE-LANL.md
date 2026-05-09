@@ -6072,3 +6072,24 @@ not a promotion.
 Mean across seeds `{42,80,81,82}`: `0.0099017667` (race display `0.0099`;
 range `0.0002089333`). r426 remains live with cap-limited candidate sampling;
 use r426, not r425b, for any further Alibaba promotion candidate.
+
+## 2026-05-09 08:09Z -- Tencent r428 FRESH/RECYCLE Cap-512 Learned Scout Completed
+
+r428 completed the first true FRESH/RECYCLE Mattson-Denning LSTM scout. It is
+not promoted: cap 512 preserves global footprint reasonably well, but the
+generated traces still under-hit badly at the 32/128 LRU/FIFO/SLRU surface.
+That says the architecture split fixed one conflation bug without yet learning
+enough immediate-reuse pressure.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0604` | 0.0603596667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0787` | 0.0786873333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0659` | 0.0659160000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0646` | 0.0646360000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0673997500` (race display `0.0674`;
+range `0.0183276667`). Retracted versus r423b (`0.0647706667`) and far behind
+banked Tencent r336 (`0.0297569167`). Next learned probe should shrink the
+RECYCLE cap and/or strengthen short-rank pressure; the failure is local reuse,
+not footprint count.

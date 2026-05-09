@@ -5696,3 +5696,20 @@ r413 official panel, so this is not promoted.
 
 Mean across seeds `{42,80,81,82}`: `0.0099017667` (race display `0.0099`;
 range `0.0002089333`).
+
+## 2026-05-09 08:09Z -- Tencent r428 Cap-512 FRESH/RECYCLE Result
+
+r428 is a completed learned-generator scout, not a promotion. The split
+FRESH/RECYCLE vocabulary trained cleanly, but cap 512 still under-expresses
+short-cache locality.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0604` | 0.0603596667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0787` | 0.0786873333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0659` | 0.0659160000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r428_recyclecap512_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0646` | 0.0646360000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0673997500` (race display `0.0674`;
+range `0.0183276667`). This loses to r423b and stays far behind r336; next
+probe should concentrate more probability into ranks below 128.
