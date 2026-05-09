@@ -53,22 +53,26 @@ import numpy as np
 
 # ----- Tokenization: real trace → action sequence -------------------------
 
-ACTION_NEW = -1
+ACTION_FRESH = -1   # true one-shot: never seen before
+ACTION_RECYCLE = -2  # deep reuse: stack distance > K (was seen but evicted)
 
 
 def trace_to_actions(real_csv: str, max_rows: int, K: int):
     """Read real trace, compute cache-action sequence + stack snapshots.
 
-    For each access at position t with obj_id o:
-      - LRU stack distance d = number of distinct obj_ids accessed since o's
-        previous access (or -1 if first access).
-      - Action: ACTION_NEW (-1) if d < 0 OR d >= K (out-of-window deep reuse);
-        otherwise k = d (the stack position to take).
-      - Stack snapshot: list of top-K most-recent distinct obj_ids before t.
+    Action vocabulary (R299b — fixes the conflation bug):
+      - ACTION_FRESH (-1)   if d < 0 (first access — true one-shot)
+      - ACTION_RECYCLE (-2) if d >= K (deep reuse beyond modeled stack)
+      - REUSE@k (0..K-1)    otherwise (in-stack reuse at position k = d)
+
+    Splitting the previous "NEW" class into FRESH vs RECYCLE preserves the
+    distinction between (a) genuine first accesses and (b) reuses too deep
+    for the K-position attention. At decode, RECYCLE samples from the stale
+    pool of recently-evicted obj_ids; FRESH allocates a new address.
 
     Returns:
       obj_ids: np.ndarray of shape [N] (uint64) — the trace itself
-      actions: np.ndarray of shape [N] (int64) — -1 (NEW) or 0..K-1 (REUSE@k)
+      actions: np.ndarray of shape [N] (int64) — -1, -2, or 0..K-1
       footprint: int — distinct obj_ids in trace
     """
     print(f"[trace_transformer] reading {real_csv} K={K}", flush=True)
@@ -90,22 +94,25 @@ def trace_to_actions(real_csv: str, max_rows: int, K: int):
     last_pos = {}
     pos_sorted: list = []
     actions = np.empty(n, dtype=np.int64)
-    actions.fill(ACTION_NEW)
+    actions.fill(ACTION_FRESH)
     for i, oid in enumerate(obj_list):
         prev = last_pos.get(oid, -1)
         if prev >= 0:
             idx = bisect.bisect_right(pos_sorted, prev)
             d = len(pos_sorted) - idx
-            actions[i] = d if d < K else ACTION_NEW
+            actions[i] = d if d < K else ACTION_RECYCLE
             del pos_sorted[bisect.bisect_left(pos_sorted, prev)]
         bisect.insort(pos_sorted, i)
         last_pos[oid] = i
     footprint = len(last_pos)
 
-    n_new = int((actions == ACTION_NEW).sum())
-    n_reuse = n - n_new
+    n_fresh = int((actions == ACTION_FRESH).sum())
+    n_recycle = int((actions == ACTION_RECYCLE).sum())
+    n_in_stack = n - n_fresh - n_recycle
     print(f"[trace_transformer] n={n:,} footprint={footprint:,} "
-          f"new={n_new:,} ({n_new/n:.3f}) reuse_in_K={n_reuse:,} ({n_reuse/n:.3f})",
+          f"fresh={n_fresh:,} ({n_fresh/n:.3f}) "
+          f"recycle={n_recycle:,} ({n_recycle/n:.3f}) "
+          f"in_stack={n_in_stack:,} ({n_in_stack/n:.3f})",
           flush=True)
     return obj_arr, actions, footprint
 
@@ -134,6 +141,8 @@ def obj_id_to_hashes(obj_ids: np.ndarray, n_hashes: int = 16,
 
 def _build_model(K: int, n_hashes: int, bucket_size: int,
                  emb_dim: int, n_heads: int, n_layers: int, history: int):
+    """Build TraceTransformer with K+2 output classes:
+    {REUSE@0, ..., REUSE@K-1, RECYCLE, FRESH}."""
     import torch
     import torch.nn as nn
 
@@ -147,8 +156,9 @@ def _build_model(K: int, n_hashes: int, bucket_size: int,
             self.bucket_size = bucket_size
             # Hash-factored obj_id embedding.
             self.hash_embed = nn.Embedding(n_hashes * bucket_size, emb_dim)
-            # Special "NEW" token embedding (shared role for NEW outcome).
-            self.new_token = nn.Parameter(torch.randn(emb_dim))
+            # Special tokens: RECYCLE (deep reuse), FRESH (one-shot).
+            self.recycle_token = nn.Parameter(torch.randn(emb_dim))
+            self.fresh_token = nn.Parameter(torch.randn(emb_dim))
             # Position encodings for history and stack.
             self.history_pos = nn.Embedding(history, emb_dim)
             self.stack_pos = nn.Embedding(K, emb_dim)
@@ -159,45 +169,36 @@ def _build_model(K: int, n_hashes: int, bucket_size: int,
                 norm_first=True, activation="gelu",
             )
             self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
-            # Decision: cross-attention from current state to (stack + NEW).
             self.query_proj = nn.Linear(emb_dim, emb_dim)
             self.key_proj = nn.Linear(emb_dim, emb_dim)
 
         def embed_objs(self, hash_codes: "torch.Tensor") -> "torch.Tensor":
-            """hash_codes: [B, T, n_hashes] (long). Returns [B, T, emb_dim]."""
-            # Add per-hash offset so embeddings live in their own ranges.
             offsets = (torch.arange(self.n_hashes,
                                     device=hash_codes.device) * self.bucket_size)
-            offset_codes = hash_codes + offsets  # [B, T, n_hashes]
-            emb = self.hash_embed(offset_codes)  # [B, T, n_hashes, emb_dim]
-            return emb.sum(dim=-2)  # sum across hashes
+            offset_codes = hash_codes + offsets
+            emb = self.hash_embed(offset_codes)
+            return emb.sum(dim=-2)
 
         def forward(self, hist_hash: "torch.Tensor", stack_hash: "torch.Tensor"):
-            """hist_hash: [B, M, H] history (last M obj_ids' hash codes).
-            stack_hash: [B, K, H] current LRU stack (top-K).
-            Returns: logits [B, K+1] over (stack[0], ..., stack[K-1], NEW).
-            """
+            """Returns: logits [B, K+2] over (REUSE@0..K-1, RECYCLE, FRESH)."""
             B = hist_hash.shape[0]
             M = hist_hash.shape[1]
             K = stack_hash.shape[1]
-            # Embed.
-            hist_emb = self.embed_objs(hist_hash)  # [B, M, D]
-            stack_emb = self.embed_objs(stack_hash)  # [B, K, D]
-            # Add positional embeddings.
+            hist_emb = self.embed_objs(hist_hash)
+            stack_emb = self.embed_objs(stack_hash)
             hist_pos = self.history_pos(torch.arange(M, device=hist_hash.device))
             stack_pos = self.stack_pos(torch.arange(K, device=hist_hash.device))
             hist_emb = hist_emb + hist_pos.unsqueeze(0)
             stack_emb = stack_emb + stack_pos.unsqueeze(0)
-            # Concat and run through transformer encoder.
-            seq = torch.cat([hist_emb, stack_emb], dim=1)  # [B, M+K, D]
+            seq = torch.cat([hist_emb, stack_emb], dim=1)
             enc = self.encoder(seq)
-            # Query = mean of history encoding (current state summary).
-            query = self.query_proj(enc[:, :M].mean(dim=1, keepdim=True))  # [B,1,D]
-            # Keys = stack encoding + NEW token.
-            new_key = self.new_token.unsqueeze(0).unsqueeze(0).expand(B, 1, -1)
-            keys = self.key_proj(torch.cat([enc[:, M:], new_key], dim=1))  # [B, K+1, D]
-            # Logits = query · keys.
-            logits = (query * keys).sum(dim=-1) / (self.emb_dim ** 0.5)  # [B, K+1]
+            query = self.query_proj(enc[:, :M].mean(dim=1, keepdim=True))
+            recycle_key = self.recycle_token.unsqueeze(0).unsqueeze(0).expand(B, 1, -1)
+            fresh_key = self.fresh_token.unsqueeze(0).unsqueeze(0).expand(B, 1, -1)
+            keys = self.key_proj(
+                torch.cat([enc[:, M:], recycle_key, fresh_key], dim=1)
+            )  # [B, K+2, D]
+            logits = (query * keys).sum(dim=-1) / (self.emb_dim ** 0.5)  # [B, K+2]
             return logits
 
     return TraceTransformer()
@@ -281,12 +282,11 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
 
     hashes_t = torch.from_numpy(hashes_full).long()
     actions_t = torch.from_numpy(actions).long()
-    actions_t = actions_t.clamp(min=ACTION_NEW)  # already
 
-    # Map ACTION_NEW (-1) → K (the NEW class index in the K+1 logits).
-    target_class = torch.where(actions_t == ACTION_NEW,
-                                torch.full_like(actions_t, K),
-                                actions_t)
+    # Output classes: {REUSE@0..K-1, RECYCLE = K, FRESH = K+1}.
+    target_class = actions_t.clone()
+    target_class[actions_t == ACTION_RECYCLE] = K
+    target_class[actions_t == ACTION_FRESH] = K + 1
 
     # Precompute stack hash sequence as needed during training.
     stack_idx_t = torch.from_numpy(stack_idx_seq).long()
@@ -342,21 +342,27 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
 # ----- Generation ---------------------------------------------------------
 
 def generate(model, K: int, history: int, n_hashes: int, bucket_size: int,
-             n_records: int, seed: int) -> np.ndarray:
+             n_records: int, seed: int, stale_pool_size: int = 100_000) -> np.ndarray:
+    """R299b generation with split FRESH / RECYCLE classes.
+
+    When model predicts FRESH (class K+1): allocate brand-new obj_id.
+    When model predicts RECYCLE (class K): sample uniformly from stale pool
+      (recently-evicted obj_ids — items that fell off the bottom of the K-stack).
+    Else REUSE@k: take stack[k].
+    """
     import torch
+    from collections import deque
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
     device = next(model.parameters()).device
     model.eval()
 
-    # Maintain LRU stack and history.
-    stack: list = []  # list of obj_ids (uint64)
-    obj_to_stack_pos = {}
+    stack: list = []
     next_new = 0
-    history_buf: list = [0] * history  # padding ids
+    history_buf: list = [0] * history
+    stale_pool: deque = deque(maxlen=stale_pool_size)  # FIFO of evicted obj_ids
     out = np.empty(n_records, dtype=np.uint64)
 
-    # Precompute hash function on the fly per id.
     primes = np.array([
         2654435761, 40503, 2246822519, 3266489917, 374761393, 1376312589,
         2073600871, 2150448427, 2807114953, 3132291347, 691013249,
@@ -369,41 +375,49 @@ def generate(model, K: int, history: int, n_hashes: int, bucket_size: int,
 
     with torch.no_grad():
         for j in range(n_records):
-            # Build hist hash.
-            hist_h = np.stack([hash_one(o) for o in history_buf])  # [M, H]
-            # Build stack hash (K slots).
+            hist_h = np.stack([hash_one(o) for o in history_buf])
             sk = np.zeros((K, n_hashes), dtype=np.int64)
             for k in range(min(len(stack), K)):
                 sk[k] = hash_one(stack[k])
             hist_t = torch.from_numpy(hist_h).long().unsqueeze(0).to(device)
             stack_t = torch.from_numpy(sk).long().unsqueeze(0).to(device)
-            logits = model(hist_t, stack_t)[0].cpu().numpy()  # [K+1]
+            logits = model(hist_t, stack_t)[0].cpu().numpy()  # [K+2]
 
-            # Mask actions for empty stack slots → impossible
+            # Mask in-stack positions that are empty.
             if len(stack) < K:
                 logits[len(stack):K] = -1e9
+            # Mask RECYCLE if stale pool is empty (rare warm-up case).
+            if not stale_pool:
+                logits[K] = -1e9
 
-            # Softmax + sample.
             logits -= logits.max()
             p = np.exp(logits)
             p /= p.sum()
-            action = int(rng.choice(K + 1, p=p))
+            action = int(rng.choice(K + 2, p=p))
 
-            if action == K or action >= len(stack):
-                # NEW
+            if action == K + 1 or (action == K and not stale_pool):
+                # FRESH
                 addr = next_new
                 next_new += 1
-                stack.insert(0, addr)
+            elif action == K:
+                # RECYCLE from stale pool (sample uniformly).
+                addr = int(stale_pool[rng.integers(0, len(stale_pool))])
             else:
-                # REUSE @ position k = action
+                # REUSE @ position k
                 addr = stack.pop(action)
-                stack.insert(0, addr)
+
+            # Update stack: push to top; if stack overflows K, evict bottom to stale pool.
+            stack.insert(0, addr)
+            if len(stack) > K:
+                evicted = stack.pop()
+                stale_pool.append(evicted)
             out[j] = addr
             history_buf.pop(0)
             history_buf.append(int(addr))
 
     print(f"[trace_transformer generate] emitted {n_records:,} records, "
-          f"unique={next_new:,}, max_stack={len(stack):,}", flush=True)
+          f"unique={next_new:,}, max_stack={len(stack):,}, "
+          f"stale_pool={len(stale_pool):,}", flush=True)
     return out
 
 
