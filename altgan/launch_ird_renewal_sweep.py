@@ -100,6 +100,9 @@ class Spec:
     heap_mode: str = "due"
     priority_singletons_as_infinite: bool = False
     priority_singleton_prob: float = -1.0
+    priority_initial_key: str = "sample"
+    priority_singleton_order: str = "shuffle"
+    priority_singleton_gate: bool = False
 
 
 def _parse_spec(text: str) -> Spec:
@@ -124,6 +127,9 @@ def _parse_spec(text: str) -> Spec:
         "inf1": "priority_singletons_as_infinite",
         "singleton_prob": "priority_singleton_prob",
         "sp": "priority_singleton_prob",
+        "init": "priority_initial_key",
+        "singletons": "priority_singleton_order",
+        "sgate": "priority_singleton_gate",
     }
     fields = {f.name: f for f in Spec.__dataclass_fields__.values()}  # type: ignore[attr-defined]
     kwargs: dict[str, object] = {"name": name}
@@ -169,6 +175,12 @@ def _auto_name(spec: Spec) -> str:
         parts.append("inf1")
     if spec.priority_singleton_prob >= 0:
         parts.append(f"sp{spec.priority_singleton_prob:g}")
+    if spec.priority_initial_key != "sample":
+        parts.append(f"init{spec.priority_initial_key}")
+    if spec.priority_singleton_order != "shuffle":
+        parts.append(f"singletons{spec.priority_singleton_order}")
+    if spec.priority_singleton_gate:
+        parts.append("sgate")
     return "_".join(parts)
 
 
@@ -222,6 +234,12 @@ def _renewal_cmd(
         cmd.append("--priority-singletons-as-infinite")
     if spec.priority_singleton_prob >= 0:
         cmd += ["--priority-singleton-prob", str(spec.priority_singleton_prob)]
+    if spec.priority_initial_key != "sample":
+        cmd += ["--priority-initial-key", spec.priority_initial_key]
+    if spec.priority_singleton_order != "shuffle":
+        cmd += ["--priority-singleton-order", spec.priority_singleton_order]
+    if spec.priority_singleton_gate:
+        cmd.append("--priority-singleton-gate")
     if spec.rank_ird_buckets > 0:
         cmd += ["--rank-ird-buckets", str(spec.rank_ird_buckets)]
     if spec.per_stream:

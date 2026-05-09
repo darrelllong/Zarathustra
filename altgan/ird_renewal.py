@@ -23,6 +23,7 @@ import pandas as pd
 class RenewalProfile:
     source_rows: int
     counts_by_rank: np.ndarray
+    first_pos_by_rank: np.ndarray
     new_order: np.ndarray
     irds: np.ndarray
     ird_ranks: np.ndarray
@@ -91,6 +92,14 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--priority-singleton-prob", type=float, default=-1.0,
                    help="Overall probability of drawing from the priority singleton pool; negative "
                         "uses the empirical singleton access fraction.")
+    p.add_argument("--priority-initial-key", choices=("sample", "first"), default="sample",
+                   help="Priority heap initialization. sample preserves the original 2DIO-style "
+                        "sampled first sleep; first uses the fitted first-arrival position by rank.")
+    p.add_argument("--priority-singleton-order", choices=("shuffle", "first"), default="shuffle",
+                   help="Ordering for the IRD=infinity singleton pool in priority heap mode.")
+    p.add_argument("--priority-singleton-gate", action="store_true",
+                   help="With --priority-singleton-order first, only emit singleton ranks whose "
+                        "fitted first-arrival position has reached the current output position.")
     p.add_argument("--mark-mode", choices=("sequence", "sample"), default="sequence")
     p.add_argument("--preserve-streams", action="store_true",
                    help="Use fitted stream IDs. Default stream_id=0 keeps synthetic IDs global.")
@@ -123,9 +132,12 @@ def fit_profile_from_df(df: pd.DataFrame, ird_quantile_max: float = 1.0) -> Rene
     new_order = code_to_rank[np.arange(len(counts_by_code), dtype=np.int64)]
 
     last = np.full(len(counts_by_code), -1, dtype=np.int64)
+    first = np.full(len(counts_by_code), -1, dtype=np.int64)
     gaps: list[int] = []
     gap_ranks: list[int] = []
     for pos, code in enumerate(codes):
+        if first[code] < 0:
+            first[code] = pos
         prev = int(last[code])
         if prev >= 0:
             gaps.append(pos - prev)
@@ -143,6 +155,7 @@ def fit_profile_from_df(df: pd.DataFrame, ird_quantile_max: float = 1.0) -> Rene
     return RenewalProfile(
         source_rows=int(len(df)),
         counts_by_rank=counts_by_rank,
+        first_pos_by_rank=first[rank_to_code].astype(np.int64, copy=False),
         new_order=new_order.astype(np.int64, copy=False),
         irds=np.maximum(irds, 1),
         ird_ranks=ird_ranks,
@@ -161,6 +174,13 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     seen = np.zeros(footprint, dtype=np.bool_)
     versions = np.zeros(footprint, dtype=np.int64)
     new_order = _scaled_new_order(profile.new_order, footprint, rng)
+    first_positions = _scaled_first_positions(
+        profile.first_pos_by_rank,
+        footprint,
+        int(args.n_records),
+        int(profile.source_rows),
+        rng,
+    )
     new_cursor = 0
     seen_list: list[int] = []
     due_heap: list[tuple[int, int, int]] = []
@@ -180,7 +200,10 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
     )
     singleton_order = np.flatnonzero(counts == 1).astype(np.int64, copy=False)
     if priority_singletons_as_infinite and len(singleton_order) > 0:
-        rng.shuffle(singleton_order)
+        if getattr(args, "priority_singleton_order", "shuffle") == "first":
+            singleton_order = singleton_order[np.argsort(first_positions[singleton_order], kind="stable")]
+        else:
+            rng.shuffle(singleton_order)
     singleton_cursor = 0
     singleton_prob = float(getattr(args, "priority_singleton_prob", -1.0))
     if singleton_prob < 0:
@@ -282,10 +305,16 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             return None
         return int(candidates[int(rng.integers(0, len(candidates)))])
 
-    def next_singleton_rank() -> int | None:
+    def next_singleton_rank(pos: int | None = None) -> int | None:
         nonlocal singleton_cursor
         while singleton_cursor < len(singleton_order):
             rank = int(singleton_order[singleton_cursor])
+            if (
+                pos is not None
+                and getattr(args, "priority_singleton_gate", False)
+                and first_positions[rank] > pos
+            ):
+                return None
             singleton_cursor += 1
             if remaining[rank] > 0 and not seen[rank]:
                 return rank
@@ -297,7 +326,11 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
                 continue
             if remaining[rank] > 0:
                 versions[rank] += 1
-                heapq.heappush(due_heap, (sample_ird(rank), int(versions[rank]), int(rank)))
+                if getattr(args, "priority_initial_key", "sample") == "first":
+                    due_key = max(0, int(first_positions[rank]))
+                else:
+                    due_key = sample_ird(rank)
+                heapq.heappush(due_heap, (due_key, int(versions[rank]), int(rank)))
 
     for pos in range(args.n_records):
         if total_remaining <= 0:
@@ -307,7 +340,7 @@ def generate(profile: RenewalProfile, args: argparse.Namespace) -> pd.DataFrame:
             due_key = pos
             from_dependent = False
             if priority_singletons_as_infinite and rng.random() < singleton_prob:
-                rank = next_singleton_rank()
+                rank = next_singleton_rank(pos)
             if rank is None and rng.random() < args.independent_prob:
                 rank = sample_frequency_rank(allow_unseen=True)
             if rank is None:
@@ -518,6 +551,23 @@ def _scaled_new_order(source_order: np.ndarray, footprint: int, rng: np.random.G
     order = np.arange(footprint, dtype=np.int64)
     rng.shuffle(order)
     return order
+
+
+def _scaled_first_positions(
+    source_first_positions: np.ndarray,
+    footprint: int,
+    n_records: int,
+    source_rows: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    scale = n_records / max(float(source_rows), 1.0)
+    if footprint <= len(source_first_positions):
+        pos = np.rint(source_first_positions[:footprint].astype(np.float64, copy=True) * scale)
+        return np.clip(pos, 0, max(0, n_records - 1)).astype(np.int64, copy=False)
+    extra = rng.integers(0, max(1, n_records), size=footprint - len(source_first_positions))
+    base = np.rint(source_first_positions.astype(np.float64, copy=True) * scale)
+    combined = np.concatenate([base, extra.astype(np.float64, copy=False)])
+    return np.clip(combined, 0, max(0, n_records - 1)).astype(np.int64, copy=False)
 
 
 def _rank_bucket(rank: int, footprint: int, bucket_count: int) -> int:

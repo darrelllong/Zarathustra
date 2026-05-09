@@ -65,6 +65,14 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         help="Python interpreter on the remote host.",
     )
     p.add_argument(
+        "--remote-module",
+        default="altgan.launch_chunk_surface_multiseed",
+        help=(
+            "Python module to execute on the remote host (default: altgan.launch_chunk_surface_multiseed). "
+            "Useful for running preset wrappers like altgan.launch_baleen24_chunk_surface_multiseed."
+        ),
+    )
+    p.add_argument(
         "--remote-git-ssh-key",
         default="",
         help=(
@@ -97,7 +105,7 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     p.add_argument(
         "remainder",
         nargs=argparse.REMAINDER,
-        help="Arguments passed to `python3 -m altgan.launch_chunk_surface_multiseed` after `--`.",
+        help="Arguments passed to the remote module after `--`.",
     )
     ns = p.parse_args(argv)
     remainder = list(ns.remainder)
@@ -238,7 +246,7 @@ def _build_remote_run_script(
     launch_args: list[str],
 ) -> str:
     git_ssh_export = _git_ssh_command_export(args=args)
-    cmd = [args.remote_python, "-u", "-m", "altgan.launch_chunk_surface_multiseed"] + launch_args
+    cmd = [args.remote_python, "-u", "-m", args.remote_module] + launch_args
     cmd_str = " ".join(_q(part) for part in cmd)
     lines = ["set -euo pipefail", *_remote_cd_repo_snippet(args=args), git_ssh_export]
     if args.tmux_session:
