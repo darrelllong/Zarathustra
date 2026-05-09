@@ -6055,3 +6055,20 @@ Model:
 
 No leaderboard change yet; this is a live learned multi-seed scout until the
 literal `llgan.cachesim_eval` panel completes.
+
+## 2026-05-09 07:44Z -- Alibaba r425b Completed Flat, Not Promoted
+
+r425b completed the r413-base 4-row continuation. It found no accepted moves
+on any seed, so the result is exactly the existing r413 banked panel and is
+not a promotion.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098741333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100102000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098012667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099214667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0099017667` (race display `0.0099`;
+range `0.0002089333`). r426 remains live with cap-limited candidate sampling;
+use r426, not r425b, for any further Alibaba promotion candidate.

@@ -5681,3 +5681,18 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r428_recyclecap512_ws_p3_vinge_20260509.log`.
 
 Awaiting literal cachesim lines before any promotion.
+
+## 2026-05-09 07:44Z -- Alibaba r425b Completed Flat
+
+r425b did not improve on the banked r413 bases; all four seeds reproduce the
+r413 official panel, so this is not promoted.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098741333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100102000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098012667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r425b_r413base4_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099214667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0099017667` (race display `0.0099`;
+range `0.0002089333`).
