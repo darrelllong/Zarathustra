@@ -6378,3 +6378,57 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r436_exact128_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 10:17Z -- Alibaba r431 r426-Base Priority Continuation Banked
+
+r431 completed on baase and replaces r426 as the banked Alibaba row. It is a
+small defensive gain, but it clears the promotion rule: official 5-cache x
+6-policy mean improves from r426 `0.0098906833` to `0.0098792833`, and the
+no-32 guard also improves from `0.0110912604` to `0.0110781875`.
+
+Reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098477667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099868667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0097731333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099093667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0098792833` (race display `0.0099`;
+range `0.0002137333`). Alibaba remains LANL-led over LLNL R287.A2 `0.009999`.
+
+Guard surface `guard`:
+
+| seed | guard JSON | guard mean |
+|---:|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed42_guard.json` | 0.0110800000 |
+| 80 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed80_guard.json` | 0.0111975833 |
+| 81 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed81_guard.json` | 0.0108670417 |
+| 82 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed82_guard.json` | 0.0111681250 |
+
+Guard mean across seeds `{42,80,81,82}`: `0.0110781875` (range
+`0.0003305417`).
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and Alibaba tightens to
+`0.0098792833`.
+
+## 2026-05-09 10:19Z -- Tencent r436 Exact-Short-Rank LSTM Completed, Retracted
+
+r436 completed the exact-short-rank tokenization scout. It is a clean negative
+result: exact rank tokens below 128 increased the learned branch mean to
+`0.0691027500`, worse than r434 `0.0601647500`. The diagnosis is useful:
+preserving exact short Mattson ranks without also fixing the generation-time
+birth/footprint geometry makes the model under-hit LRU/FIFO/SLRU at 32/128 even
+harder, especially seed 80.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0603` | 0.0602706667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0802` | 0.0801820000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0707` | 0.0707330000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0652` | 0.0652253333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0691027500` (race display `0.0691`;
+range `0.0199113333`). Retracted; r434 remains the best learned Tencent scout.

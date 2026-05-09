@@ -5924,3 +5924,33 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
 Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r436_exact128_empiricalrank_norecycle.pt`.
+
+## 2026-05-09 10:19Z -- Tencent r436 Exact-Short-Rank LSTM Result
+
+r436 completed and is retracted. Exact one-token Mattson ranks below 128 made
+the learned Tencent branch worse than r434 instead of fixing the 32/128 miss.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0603` | 0.0602706667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0802` | 0.0801820000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0707` | 0.0707330000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0652` | 0.0652253333 |
+
+Four-seed mean: `0.0691027500`, range `0.0199113333`. Retracted versus r434
+`0.0601647500`.
+
+## 2026-05-09 10:17Z -- Alibaba r431 r426-Base Priority Continuation Result
+
+r431 is promoted and replaces r426 on Alibaba. Official mean improves to
+`0.0098792833`; no-32 guard mean improves to `0.0110781875`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098477667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099868667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0097731333 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r431_r426base4_cap16_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099093667 |
+
+Four-seed mean: `0.0098792833`, range `0.0002137333`; guard mean
+`0.0110781875`, guard range `0.0003305417`.
