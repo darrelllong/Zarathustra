@@ -5717,3 +5717,22 @@ Log:
 
 r413 is not banked unless all four literal official cachesim lines land and
 beat r411's `0.0099295583`.
+
+## 2026-05-09 03:39Z -- Tencent r336 Leaderboard Correction
+
+LANL corrected `LEADER-BOARD.md` to use the already posted Tencent r336
+multi-seed row instead of the older r287 row. No new Tencent evaluation is
+claimed here; the literal r336 cachesim lines are posted above in the
+2026-05-07 Tencent 8-row continuation section:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296723333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296533333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0300` | 0.0300106667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_chunksurf_r336_refine8_ck8_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0297` | 0.0296913333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0297569167` (race display `0.0298`;
+range `0.0003573333`). This beats LLNL R206 `0.0305` by `0.0007430833`
+(`2.4363%` lower), widening the banked Tencent margin from the stale
+leaderboard row's 1.3% to 2.4%.

@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-09 (LANL r411 Alibaba 0.0099295583, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r410 Baleen24 0.0177799000 are banked; LANL leads 9/9)**.
+Last updated: **2026-05-09 (LANL r411 Alibaba 0.0099295583, r336 Tencent 0.0297569167, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r410 Baleen24 0.0177799000 are banked; LANL leads 9/9)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -24,7 +24,7 @@ The race has two metric classes:
 | Corpus | LLNL gen (best multi-seed) | LANL gen (best multi-seed) | Leader | Margin |
 |---|---|---|---|---|
 | Alibaba | 0.009999 (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | **0.0099295583** (r411 defensive 16-row self-shift continuation, 4-seed {42,80,81,82}, range 0.0002084000; no-32 guard mean 0.0111391771) | **LANL** | -0.7% |
-| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
+| Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.0297569167** (r336 8-row object-ID chunk-surface continuation, 4-seed {42,80,81,82}, range 0.0003573333) | **LANL** | -2.4% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0220106406** (r292 cache-surface chunk selector overtake, 4-seed {42,80,81,82}, range 0.0053736458) | **LANL** | −26.1% |
 | Baleen24 | 0.018447 (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | **0.0177799000** (r410 r409-base 128-row synthetic-donor reinforcement, 4-seed {42,80,81,82}, range 0.0000664000; no-32 guard mean 0.0077556146) | **LANL** | -3.6% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.0043343667** (r291 cache-surface chunk selector retake, 4-seed {42,80,81,82}, range 0.0000925333) | **LANL** | −51.5% |
@@ -43,6 +43,9 @@ Baleen24 is held by LANL under the current banked rows: LANL r410
 `0.0177799000` vs LLNL R291.BAL2 `0.018447`. LANL r410 improves LANL r409 by
 `0.0001174417` (`0.6562%` lower) and beats LLNL by `0.0006671000`
 (`3.6163%` lower).
+Tencent is held by LANL under the current banked rows: LANL r336
+`0.0297569167` vs LLNL R206 `0.0305`. LANL r336 improves LANL r335 by
+`0.0000381666` and beats LLNL by `0.0007430833` (`2.4363%` lower).
 All 9 corpora have generative claims from both teams.
 
 ## TraceBootstrap leader board (methodology theater)
@@ -98,12 +101,12 @@ LANL on 5; LLNL leading or tied on every published bootstrap claim.
 - 4-seed mean: **0.01740** (range 0.000175 — extremely tight)
 - Cache sizes: [32, 128, 512, 2048, 8192]; policies: lru/arc/fifo/sieve/slru/car
 
-### LANL Tencent (current leader — Round 71, cache-surface chunk selector)
-- Method: `python -m altgan.launch_tencent_chunk_surface_multiseed` — chunk-level object-ID donor selector optimized only against `llgan.cachesim_eval` mean
+### LANL Tencent (current leader — r336, cache-surface chunk selector)
+- Method: guarded 8-row object-ID chunk-surface continuation from the r335 Tencent per-seed bases, optimized only against `llgan.cachesim_eval` mean
 - Reference: `/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`; official 6-policy surface (lru,arc,fifo,sieve,slru,car)
-- Per-seed (42/80/81/82): 0.0300267 / 0.0300523 / 0.0303223 / 0.0299787
-- 4-seed mean: **0.03010** (range 0.000344)
-- Notes: beats LLNL's historical Tencent row (0.0305) which is unverified / protocol-lost
+- Per-seed (42/80/81/82): 0.0296723333 / 0.0296533333 / 0.0300106667 / 0.0296913333
+- 4-seed mean: **0.0297569167** (range 0.0003573333)
+- Notes: beats LLNL's historical Tencent row (0.0305) which is unverified / protocol-lost by `0.0007430833` (`2.4363%` lower)
 
 ### LANL MSR Exchange (current leader — r291 cache-surface chunk selector retake)
 - Method: `python3 -m altgan.launch_chunk_surface_multiseed` — chunk-level donor selector optimized only against `llgan.cachesim_eval` mean
