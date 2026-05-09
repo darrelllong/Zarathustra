@@ -5211,3 +5211,24 @@ Interpretation: this is the first Baleen24 direct generator jump that beats the
 banked LANL r395 chunk-surface row. It is not enough to flip the corpus, but it
 creates a stronger synthetic-only donor family for the next chunk-selector
 round.
+
+Follow-up command (run on a `/tiamat` host, or from a laptop via SSH):
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session bal_rXXX_r404bank256 \
+  --remote-module altgan.launch_baleen24_r404_chunk_surface_multiseed \
+  -- \
+  --tag-prefix baleen24_chunksurf_rXXX_r404bank256 \
+  --pipeline 256 \
+  --cross-seed-donors \
+  --priority-move-sort mean \
+  --max-accepts 8 \
+  --max-evals 350 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --guard-regression-per-official-gain 0.25 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```

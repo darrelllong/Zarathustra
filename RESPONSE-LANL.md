@@ -5429,3 +5429,21 @@ row's remaining error is concentrated at cache 32, but the no-32 surface is
 substantially better than the prior LANL chunk-surface rows. The next useful
 move is to use r404 as a synthetic-only donor family for the r401/r402/r403
 chunk selectors, not to keep shaving r395 with smaller chunks.
+
+Preset wrapper for that follow-up (`--remote-module` requires the updated SSH dispatcher):
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session bal_rXXX_r404bank256 \
+  --remote-module altgan.launch_baleen24_r404_chunk_surface_multiseed \
+  -- \
+  --tag-prefix baleen24_chunksurf_rXXX_r404bank256 \
+  --pipeline 256 \
+  --cross-seed-donors \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --guard-regression-per-official-gain 0.25 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
