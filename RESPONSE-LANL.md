@@ -6219,6 +6219,17 @@ Base template:
 No promotion unless it completes all four literal official panels and beats
 r426 `0.0098906833`.
 
+Rerun/promotion harness (wraps the r426 move globs in Python so the shell does
+not expand `seed*_moves.json` into a huge argv list):
+
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session ali_r431_r426prio \
+  --remote-module altgan.launch_alibaba_r431_chunk_surface_multiseed
+
+Dispatch note (2026-05-09 09:33Z): this Codex sandbox cannot reach `baase` over
+SSH (DNS/egress blocked), so no remote job was started from here.
+
 ## 2026-05-09 09:04Z -- Tencent r430 Cap-256 FRESH/RECYCLE Completed, Not Promoted
 
 r430 completed the midpoint cap-256 learned Mattson-Denning scout. It improves

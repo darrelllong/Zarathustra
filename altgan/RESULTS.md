@@ -5806,6 +5806,17 @@ Log:
 Base template:
 `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed{seed}_fake_1000k.csv`.
 
+Rerun/promotion harness (avoids shell-expanding `seed*_moves.json` into an
+argv explosion by passing globs from Python):
+
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session ali_r431_r426prio \
+  --remote-module altgan.launch_alibaba_r431_chunk_surface_multiseed
+
+Dispatch note (2026-05-09 09:33Z): this Codex sandbox cannot reach `baase` over
+SSH (DNS/egress blocked), so no remote job was started from here.
+
 ## 2026-05-09 09:04Z -- Tencent r430 Cap-256 FRESH/RECYCLE Result
 
 r430 is a completed learned-generator scout, not a promotion. It improves on

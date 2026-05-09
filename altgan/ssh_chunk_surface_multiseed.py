@@ -272,7 +272,7 @@ def _build_remote_run_script(
 
 def main(argv: list[str] | None = None) -> int:
     args, launch_args = _parse_args(sys.argv[1:] if argv is None else argv)
-    if not launch_args:
+    if not launch_args and args.remote_module == "altgan.launch_chunk_surface_multiseed":
         raise SystemExit("missing launch args: pass `-- --real ... --base-template ...`")
     if args.push and not args.commit:
         raise SystemExit("--push requires --commit")
@@ -338,7 +338,26 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.flush()
         retry_args = argparse.Namespace(**vars(args))
         retry_args.no_proxyjump = True
-        return _run(retry_args)
+        try:
+            return _run(retry_args)
+        except subprocess.CalledProcessError as exc2:
+            if exc2.returncode != 255:
+                sys.stderr.write(
+                    f"[ssh_chunk_surface] ERROR: remote command failed with exit code {exc2.returncode}.\n"
+                )
+                sys.stderr.flush()
+                return int(exc2.returncode)
+            sys.stderr.write(
+                "[ssh_chunk_surface] ERROR: ssh failed (exit 255).\n"
+                "[ssh_chunk_surface] Common causes:\n"
+                "  - Outbound SSH blocked by the current environment/sandbox (often shows as "
+                "'Operation not permitted' or 'Connection closed by UNKNOWN port 65535').\n"
+                "  - DNS not available (e.g. 'Could not resolve hostname ...').\n"
+                "[ssh_chunk_surface] Fix: run this command from a machine/network that can reach the "
+                "target host on port 22.\n"
+            )
+            sys.stderr.flush()
+            return 255
 
 
 if __name__ == "__main__":
