@@ -123,7 +123,7 @@ launch_mdlstm_tencent() {
   if [[ -n "${ALTGAN_MARKDOWN_TITLE:-}" ]]; then
     md_title="$ALTGAN_MARKDOWN_TITLE"
   else
-    md_title="## $(date -u +%Y-%m-%d\\ %H:%MZ) -- ${tag} Completed (multi-seed)"
+    md_title="## $(date -u '+%Y-%m-%d %H:%MZ') -- ${tag} Completed (multi-seed)"
   fi
   local -a cmd=(
     "$VENV_PY" -u -m altgan.mattson_denning_lstm multiseed
