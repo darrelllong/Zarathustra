@@ -5903,3 +5903,24 @@ a leaderboard row versus banked Tencent r336.
 
 Four-seed mean: `0.0601647500`, range `0.0192313333`. Best learned scout so
 far; not promoted against banked Tencent r336 `0.0297569167`.
+
+## 2026-05-09 10:12Z -- Tencent r436 Exact-Short-Rank LSTM Launched
+
+r435 was killed after status showed the old in-memory remote wrapper had
+omitted `--exact-rank-cutoff 128`. r436 is the real exact-short-rank run: no
+RECYCLE split, empirical within-bin Mattson-rank sampling, WS birth control,
+pressure 3.0, exact Mattson-rank tokens below 128.
+
+Process line:
+
+`--recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 128 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0`
+
+Tokenization:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=187 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=128 fresh=38,507 recycle=0 reuse=61,493 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4063168`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r436_exact128_empiricalrank_norecycle.pt`.

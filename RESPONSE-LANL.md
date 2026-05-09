@@ -6350,3 +6350,31 @@ Tencent r336.
 Mean across seeds `{42,80,81,82}`: `0.0601647500` (race display `0.0602`;
 range `0.0192313333`). Best learned Tencent scout so far, but still far behind
 banked Tencent r336 `0.0297569167`; not a leaderboard row.
+
+## 2026-05-09 10:12Z -- Tencent r436 Exact-Short-Rank LSTM Launched
+
+r435 was killed immediately after status showed it had launched from the
+pre-pull wrapper and did not carry `--exact-rank-cutoff 128`. Relaunched as
+r436 after the remote checkout was current.
+
+r436 keeps the r434 architecture (no RECYCLE split, empirical within-bin
+Mattson-rank sampling, WS birth control, pressure 3.0) and changes the token
+geometry: exact one-token-per-Mattson-rank below 128, log bins above. This is
+aimed at the same cache-32/cache-128 locality miss instead of another scalar
+pressure sweep.
+
+Process line confirms the intended architecture flag:
+
+`--recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 128 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0`
+
+Tokenization confirms the exact short-rank prefix:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=187 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=128 fresh=38,507 recycle=0 reuse=61,493 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4063168`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r436_exact128_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r436_exact128_empiricalrank_norecycle.pt`.
+
+No claim until all four literal cachesim panels complete.
