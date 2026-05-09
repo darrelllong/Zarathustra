@@ -6245,3 +6245,25 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r442_pos32_wsmax_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 12:24Z -- Tencent r442 Phase-Conditioned Fit Completed, Retracted
+
+r442 completed as a negative learned-architecture result. Adding absolute phase
+conditioning did not repair the mid-cache under-hit; it worsened the mean
+versus r441 `0.0656921667`, r440 `0.0643654167`, and r434 `0.0601647500`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0689` | 0.0689256667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0819` | 0.0818966667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0700` | 0.0699970000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0700` | 0.0700006667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0727050000` (race display `0.0727`;
+range `0.0129710000`). r442 is not promoted.
+
+Inference: coarse absolute phase does not explain the learned MDLSTM failure.
+The repeated pattern across r440-r442 is over-compressed mid-stack reuse. Next
+learned change should represent Mattson depth with more local structure, such
+as exact small ranks or a separate short/mid/deep rank head, before adding more
+context features.
