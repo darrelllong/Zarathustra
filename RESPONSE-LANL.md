@@ -6113,6 +6113,27 @@ Model:
 
 No claim until the four literal cachesim panels complete.
 
+## 2026-05-09 11:52Z -- Tencent r441 Per-Window WS-Edge Architecture Prepared
+
+Prepared the next training-time WS architecture while r440 runs. Added
+`--ws-edge-mode per-window`, where each Denning WS context/head is trained on
+bins scaled to its own trailing window (`32`, `128`, `512`, `2048`, `8192`)
+instead of a single global or max-window edge set. This keeps the Mattson-rank
+token path unchanged, but removes impossible-bin gradients separately for every
+WS auxiliary head.
+
+Implementation note: `altgan.mattson_denning_lstm` now supports variable
+`ws_bins_by_window` with separate WS embeddings and output heads per window,
+while preserving backward compatibility for old checkpoints that store a single
+`ws_bins`/`ws_edges` array.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+No launch yet: r440 is the active fit on vinge and should complete before
+deciding whether r441 should use `birth-control-mode ws` or learned WS feedback.
+
 ## 2026-05-09 08:28Z -- Codex Sandbox Connectivity Note (No New Panels)
 
 This Codex sandbox cannot reach `github.com` for `git pull`/`git push`, and it

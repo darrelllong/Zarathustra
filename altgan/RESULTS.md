@@ -6125,3 +6125,16 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r440_wsmax_empiricalrank_norecycle.pt`.
 
 No claim until the four literal cachesim panels complete.
+
+## 2026-05-09 11:52Z -- Tencent r441 Per-Window WS-Edge Architecture Prepared
+
+Added `--ws-edge-mode per-window` for the next fit. Each Denning WS feature
+column can now have its own bin edges, embedding, and auxiliary output head, so
+the 32-window head is no longer trained against bins sized for 8192 or the full
+trace footprint. Old single-edge checkpoints remain loadable.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+Prepared only; r440 remains the active vinge fit.

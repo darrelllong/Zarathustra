@@ -122,6 +122,32 @@ def make_log_edges(max_value: int, n_bins: int) -> np.ndarray:
     return edges.astype(np.int64)
 
 
+def _coerce_ws_edges(raw):
+    if isinstance(raw, np.ndarray) and raw.ndim == 1:
+        return raw.astype(np.int64)
+    if isinstance(raw, np.ndarray) and raw.dtype != object and raw.ndim == 2:
+        return [raw[i].astype(np.int64) for i in range(raw.shape[0])]
+    return [np.asarray(edge, dtype=np.int64) for edge in list(raw)]
+
+
+def _ws_edges_for_window(edges, wi: int) -> np.ndarray:
+    if isinstance(edges, np.ndarray) and edges.ndim == 1:
+        return edges
+    return np.asarray(edges[wi], dtype=np.int64)
+
+
+def _ws_bins_by_window(edges, n_windows: int) -> list[int]:
+    if isinstance(edges, np.ndarray) and edges.ndim == 1:
+        return [max(1, len(edges) - 1)] * n_windows
+    return [max(1, len(_ws_edges_for_window(edges, wi)) - 1) for wi in range(n_windows)]
+
+
+def _normalize_ws_bins(ws_bins, n_windows: int) -> list[int]:
+    if isinstance(ws_bins, (int, np.integer)):
+        return [int(ws_bins)] * n_windows
+    return [int(v) for v in list(ws_bins)]
+
+
 def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> np.ndarray:
     """Log rank bins with an optional exact-rank prefix for short-cache depths."""
     max_value = max(int(max_value), 1)
@@ -192,18 +218,19 @@ def mattson_depths(trace: RealTrace) -> tuple[np.ndarray, int]:
     return depths, len(last_pos)
 
 
-def denning_working_sets(trace: RealTrace, windows: list[int], edges: np.ndarray) -> np.ndarray:
+def denning_working_sets(trace: RealTrace, windows: list[int], edges) -> np.ndarray:
     """Binned trailing-window working-set sizes before each event."""
     from collections import Counter, deque
 
     keys = list(zip(trace.stream_ids.tolist(), trace.obj_ids.tolist()))
     queues = [deque() for _ in windows]
     counts = [Counter() for _ in windows]
+    edge_by_window = [_ws_edges_for_window(edges, wi) for wi in range(len(windows))]
     features = np.empty((len(keys), len(windows)), dtype=np.int64)
 
     for i, key in enumerate(keys):
         for wi, window in enumerate(windows):
-            features[i, wi] = value_to_bin(len(counts[wi]), edges)
+            features[i, wi] = value_to_bin(len(counts[wi]), edge_by_window[wi])
             queues[wi].append(key)
             counts[wi][key] += 1
             while len(queues[wi]) > window:
@@ -227,8 +254,12 @@ def tokenize(
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     rank_max = min(footprint, max(1, int(recycle_rank_cap))) if recycle_rank_cap > 0 else footprint
     rank_edges = make_rank_edges(rank_max, n_rank_bins, exact_rank_cutoff)
-    ws_edge_max = max(windows, default=footprint) if ws_edge_mode == "max-window" else footprint
-    ws_edges = make_log_edges(ws_edge_max, n_ws_bins)
+    if ws_edge_mode == "per-window":
+        ws_edges = [make_log_edges(window, n_ws_bins) for window in windows]
+        ws_edge_max = max(windows, default=footprint)
+    else:
+        ws_edge_max = max(windows, default=footprint) if ws_edge_mode == "max-window" else footprint
+        ws_edges = make_log_edges(ws_edge_max, n_ws_bins)
     tokens = tokens_from_depths(depths, rank_edges, trace.n, recycle_rank_cap)
     ws_tokens = denning_working_sets(trace, windows, ws_edges)
     fresh = int((tokens == FRESH_TOKEN).sum())
@@ -247,7 +278,7 @@ def tokenize(
         f"reuse_offset={reuse_token_offset} recycle_rank_cap={int(recycle_rank_cap)} "
         f"exact_rank_cutoff={int(exact_rank_cutoff)} "
         f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
-        f"ws_bins={len(ws_edges) - 1} ws_edge_mode={ws_edge_mode} "
+        f"ws_bins={_ws_bins_by_window(ws_edges, len(windows))} ws_edge_mode={ws_edge_mode} "
         f"ws_edge_max={int(ws_edge_max)} windows={windows}",
         flush=True,
     )
@@ -302,14 +333,15 @@ def _try_torch():
         raise RuntimeError("PyTorch is required for mattson_denning_lstm") from exc
 
 
-def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_embed: int, hidden: int):
+def build_model(vocab: int, n_windows: int, ws_bins, token_embed: int, ws_embed: int, hidden: int):
     torch, nn = _try_torch()
+    ws_bins_by_window = _normalize_ws_bins(ws_bins, n_windows)
 
     class MattsonDenningLSTM(nn.Module):
         def __init__(self):
             super().__init__()
             self.token_emb = nn.Embedding(vocab, token_embed)
-            self.ws_emb = nn.ModuleList([nn.Embedding(ws_bins, ws_embed) for _ in range(n_windows)])
+            self.ws_emb = nn.ModuleList([nn.Embedding(n_bins, ws_embed) for n_bins in ws_bins_by_window])
             self.lstm = nn.LSTM(
                 token_embed + n_windows * ws_embed,
                 hidden,
@@ -318,7 +350,7 @@ def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_e
             )
             self.head = nn.Linear(hidden, vocab)
             self.birth_head = nn.Linear(hidden, 1)
-            self.ws_heads = nn.ModuleList([nn.Linear(hidden, ws_bins) for _ in range(n_windows)])
+            self.ws_heads = nn.ModuleList([nn.Linear(hidden, n_bins) for n_bins in ws_bins_by_window])
 
         def forward(self, tok, ws, h=None):
             parts = [self.token_emb(tok)]
@@ -338,7 +370,7 @@ def train_model(
     rank_edges: np.ndarray,
     windows: list[int],
     vocab: int,
-    ws_bins: int,
+    ws_bins,
     hidden: int,
     token_embed: int,
     ws_embed: int,
@@ -357,7 +389,8 @@ def train_model(
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = build_model(vocab, ws_tokens.shape[1], ws_bins, token_embed, ws_embed, hidden).to(device)
+    ws_bins_by_window = _normalize_ws_bins(ws_bins, ws_tokens.shape[1])
+    model = build_model(vocab, ws_tokens.shape[1], ws_bins_by_window, token_embed, ws_embed, hidden).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     reuse_token_offset = max(LEGACY_REUSE_TOKEN_OFFSET, int(vocab) - len(rank_edges) + 1)
     reuse_class_weights = None
@@ -410,7 +443,7 @@ def train_model(
             else:
                 reuse_loss = logits.sum() * 0.0
             ws_loss = torch.stack([
-                F.cross_entropy(ws_logits[wi].reshape(-1, ws_bins), y_ws[:, :, wi].reshape(-1))
+                F.cross_entropy(ws_logits[wi].reshape(-1, ws_bins_by_window[wi]), y_ws[:, :, wi].reshape(-1))
                 for wi in range(ws_tokens.shape[1])
             ]).mean()
             token_loss = birth_loss + reuse_loss
@@ -473,7 +506,7 @@ def load_checkpoint(path: str | Path):
     model = build_model(
         int(state["vocab"]),
         len(state["windows"]),
-        int(state["ws_bins"]),
+        state.get("ws_bins_by_window", int(state["ws_bins"])),
         int(state["token_embed"]),
         int(state["ws_embed"]),
         int(state["hidden"]),
@@ -502,13 +535,14 @@ def fit(args) -> None:
     )
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
+    ws_bins_by_window = _ws_bins_by_window(ws_edges, len(windows))
     model = train_model(
         tokens,
         ws_tokens,
         rank_edges=rank_edges,
         windows=windows,
         vocab=vocab,
-        ws_bins=len(ws_edges) - 1,
+        ws_bins=ws_bins_by_window,
         hidden=args.hidden,
         token_embed=args.token_embed,
         ws_embed=args.ws_embed,
@@ -543,7 +577,8 @@ def fit(args) -> None:
             "recycle_token": RECYCLE_TOKEN if args.recycle_rank_cap > 0 else None,
             "reuse_token_offset": reuse_token_offset,
             "recycle_rank_cap": int(args.recycle_rank_cap),
-            "ws_bins": len(ws_edges) - 1,
+            "ws_bins": max(ws_bins_by_window),
+            "ws_bins_by_window": ws_bins_by_window,
             "hidden": args.hidden,
             "token_embed": args.token_embed,
             "ws_embed": args.ws_embed,
@@ -568,8 +603,11 @@ def _sample_pool(values: np.ndarray, limit: int = 4096) -> list[int]:
     return [int(v) for v in values[idx]]
 
 
-def _ws_feature_from_counts(counts, edges: np.ndarray) -> list[int]:
-    return [value_to_bin(len(counter), edges) for _queue, counter in counts]
+def _ws_feature_from_counts(counts, edges) -> list[int]:
+    return [
+        value_to_bin(len(counter), _ws_edges_for_window(edges, wi))
+        for wi, (_queue, counter) in enumerate(counts)
+    ]
 
 
 def _slice_trace(trace: RealTrace, start: int, end: int) -> RealTrace:
@@ -586,7 +624,7 @@ def _warmstart_context(
     state: dict,
     seed: int,
     rank_edges: np.ndarray,
-    ws_edges: np.ndarray,
+    ws_edges,
     windows: list[int],
     history: int,
 ):
@@ -715,16 +753,17 @@ def _ws_targets_from_real(state: dict, n_records: int, windows: list[int]) -> np
 
 def _ws_target_from_logits(
     ws_logits,
-    ws_edges: np.ndarray,
+    ws_edges,
     windows: list[int],
     mode: str = "clamp",
 ) -> np.ndarray:
     """Convert learned next-working-set logits into feasible per-window counts."""
     torch, _nn = _try_torch()
-    mids = 0.5 * (ws_edges[:-1].astype(np.float64) + ws_edges[1:].astype(np.float64) - 1.0)
-    mids = np.maximum(mids, 0.0)
     targets: list[float] = []
     for wi, head_logits in enumerate(ws_logits):
+        edges = _ws_edges_for_window(ws_edges, wi)
+        mids = 0.5 * (edges[:-1].astype(np.float64) + edges[1:].astype(np.float64) - 1.0)
+        mids = np.maximum(mids, 0.0)
         window_cap = float(windows[wi]) if wi < len(windows) else float(np.max(mids))
         local_mids = mids[: head_logits.shape[-1]]
         probs = torch.softmax(head_logits[0, -1], dim=-1).detach().cpu().numpy()
@@ -912,7 +951,7 @@ def generate_ids(
     model.eval()
 
     rank_edges = np.asarray(state["rank_edges"], dtype=np.int64)
-    ws_edges = np.asarray(state["ws_edges"], dtype=np.int64)
+    ws_edges = _coerce_ws_edges(state["ws_edges"])
     windows = [int(w) for w in state["windows"]]
     history = int(state["seq_len"])
     vocab = int(state["vocab"])
@@ -1210,9 +1249,9 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--ws-windows", default=DEFAULT_WINDOWS)
         q.add_argument(
             "--ws-edge-mode",
-            choices=["footprint", "max-window"],
+            choices=["footprint", "max-window", "per-window"],
             default="footprint",
-            help="bin Denning working-set counts against the full footprint or the largest WS control window",
+            help="bin Denning working-set counts against the full footprint, largest WS control window, or each window independently",
         )
         q.add_argument("--hidden", type=int, default=128)
         q.add_argument("--token-embed", type=int, default=64)
