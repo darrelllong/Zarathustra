@@ -5557,3 +5557,10 @@ Four-seed mean: `0.0730714167`, range `0.0033330000`. r420 replaces the single
 NEW-or-depth classifier with a learned birth/reuse factorization: binary birth
 loss plus reuse-only Mattson depth loss, still conditioned on Denning working
 sets and still carrying the next-working-set auxiliary loss.
+
+r420 launched on vinge:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r420_split_vinge_20260509.log`.
+Checkpoint:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r420_split.pt`.
+This is a fresh fit because the split birth head must be trained, not loaded
+randomly onto the r414 checkpoint.

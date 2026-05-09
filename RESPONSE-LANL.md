@@ -5898,3 +5898,11 @@ range `0.0033330000`). r420 changes the learned architecture itself: binary
 birth cross entropy plus reuse-only Mattson depth cross entropy, with the
 Denning working-set auxiliary head retained. This trains the birth/reuse split
 instead of treating NEW as just another depth token.
+
+r420 launched on vinge as `tencent_mdlstm_r420_split` with a fresh checkpoint
+because older r414 checkpoints do not contain the trained birth head. Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r420_split_vinge_20260509.log`.
+Checkpoint:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r420_split.pt`.
+Early training is decomposed in the log as `birth`, `reuse`, and `ws`; by
+epoch 4 the run had reached roughly `birth=0.33`, `reuse=1.21`, `ws=0.15`.
