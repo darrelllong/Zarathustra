@@ -49,12 +49,25 @@ import sys
 import numpy as np
 
 
-def fgen_pmf(k: int, spike_indices: list[int], eps: float) -> np.ndarray:
-    """Eq. 3 of the paper: PMF over {0,1,...,k-1} (0-indexed for Python).
-    spike_indices ⊂ {0..k-1}; spikes share (1-ε) mass equally; holes share ε.
+_INF_IRD = -1  # Sentinel returned by sample_ird to indicate t=∞.
+
+
+def fgen_pmf(k: int, spike_indices_zero_idx: list[int], eps: float) -> np.ndarray:
+    """Eq. 3 of the paper: PMF over k bins.
+
+    INDEXING CONVENTION: this function takes spike_indices in 0-indexed Python
+    convention (∈ {0..k-1}). The paper uses 1-indexed convention (∈ {1..k}).
+    The CLI parser (parse_fgen_arg) accepts paper-1-indexed input from users
+    matching Table 3, and subtracts 1 internally. Internal code must treat
+    spike_indices as 0-indexed.
+
+    Per Eq. 3: spikes share (1-ε) mass equally; holes share ε equally.
+    Returned PMF sums to 1 over {0..k-1}.
     """
     pmf = np.zeros(k, dtype=np.float64)
-    spike_set = set(int(i) for i in spike_indices)
+    spike_set = set(int(i) for i in spike_indices_zero_idx)
+    if any(i < 0 or i >= k for i in spike_set):
+        raise ValueError(f"spike index out of range for k={k}: {spike_set}")
     n_spikes = len(spike_set)
     n_holes = k - n_spikes
     if n_spikes > 0:
@@ -71,29 +84,49 @@ def fgen_pmf(k: int, spike_indices: list[int], eps: float) -> np.ndarray:
 
 
 def auto_tune_T_max(pmf: np.ndarray, M: int) -> int:
-    """Solve T_max so mean of drawn IRDs = M, given bin midpoints
-    b_i = (2i-1)/2 × T_max/k (Section 4.1)."""
+    """Solve T_max so mean of finite IRDs = M, given bin midpoints
+    b_i = (2(i+1)-1)/2 × T_max/k for 0-indexed i (Section 4.1).
+
+    Note: this is conditional on t < ∞. The ∞-atom does not contribute
+    to T_max calibration since it doesn't sample from the finite support.
+    """
     k = len(pmf)
-    # M = sum_i b_i * f(i) = T_max/(2k) * sum_i (2i-1) * f(i)
-    # T_max = 2*M*k / sum_i (2i-1) * f(i)
-    weight = sum((2 * (i + 1) - 1) * pmf[i] for i in range(k))  # 1-indexed (2i-1)
+    weight = sum((2 * (i + 1) - 1) * pmf[i] for i in range(k))
     if weight <= 0:
         return max(M, 1)
     T_max = int(round(2 * M * k / weight))
     return max(T_max, k)
 
 
-def sample_ird(pmf: np.ndarray, T_max: int, rng: np.random.Generator, n: int) -> np.ndarray:
-    """Sample n integer IRDs from the piecewise PMF over {1..T_max}.
-    Pick bin i with prob pmf[i], then uniform in integer interval [lo, hi]."""
+def sample_ird(pmf: np.ndarray, T_max: int, p_inf: float,
+               rng: np.random.Generator, n: int) -> np.ndarray:
+    """Sample n IRDs from the 2DIO distribution: with probability p_inf
+    return _INF_IRD (sentinel for t=∞); else sample from piecewise fgen
+    PMF over integer support {1..T_max}.
+
+    Algorithm 2 (paper p.6) explicitly branches on t=∞ in both initialization
+    and trace-generation loops; this corresponds to one-shot accesses (objects
+    referenced once and never re-accessed). p_inf is the per-draw probability
+    of that branch; 0 reproduces the all-finite default fgen.
+    """
     k = len(pmf)
-    bin_idx = rng.choice(k, size=n, replace=True, p=pmf)
-    bin_width = T_max / k
-    los = (bin_idx * bin_width).astype(np.int64) + 1
-    his = ((bin_idx + 1) * bin_width).astype(np.int64)
-    his = np.maximum(his, los)
-    out = rng.integers(los, his + 1)
-    return out.astype(np.int64)
+    out = np.empty(n, dtype=np.int64)
+    if p_inf > 0:
+        inf_mask = rng.random(n) < p_inf
+        n_finite = int((~inf_mask).sum())
+        out[inf_mask] = _INF_IRD
+    else:
+        inf_mask = np.zeros(n, dtype=bool)
+        n_finite = n
+    if n_finite > 0:
+        bin_idx = rng.choice(k, size=n_finite, replace=True, p=pmf)
+        bin_width = T_max / k
+        los = (bin_idx * bin_width).astype(np.int64) + 1
+        his = ((bin_idx + 1) * bin_width).astype(np.int64)
+        his = np.maximum(his, los)
+        finite_samples = rng.integers(los, his + 1).astype(np.int64)
+        out[~inf_mask] = finite_samples
+    return out
 
 
 def sample_g(g_spec: str, M: int, rng: np.random.Generator, n: int) -> np.ndarray:
@@ -131,11 +164,17 @@ def sample_g(g_spec: str, M: int, rng: np.random.Generator, n: int) -> np.ndarra
 
 
 def gen_from_2d(p_irm: float, g_spec: str, fgen_args: tuple,
-                M: int, N: int, seed: int) -> np.ndarray:
-    """Run Algorithm 2 of the 2DIO paper.
+                p_inf: float, M: int, N: int, seed: int) -> np.ndarray:
+    """Faithful implementation of Algorithm 2 (Gen-from-2D) of the
+    Wang/Khor/Desnoyers EUROSYS 2026 2DIO paper.
 
-    fgen_args: (k, spike_indices, eps) — as in paper Eq. 3
-              OR None to disable IRD channel (set p_irm=1.0 in that case).
+    fgen_args: (k, spike_indices_zero_idx, eps) per Eq. 3.
+               None to disable IRD channel; in that case set p_irm=1.
+    p_inf:     per-draw probability that t=∞ from the IRD channel. The
+               paper's Algorithm 2 has explicit if-t=∞ branches in both
+               heap initialization (skip insert, increment a) and
+               trace-generation loops (emit fresh a, increment a). p_inf
+               controls the one-shot rate of the synthetic.
     """
     rng = np.random.default_rng(seed)
 
@@ -144,46 +183,67 @@ def gen_from_2d(p_irm: float, g_spec: str, fgen_args: tuple,
         k, spike_indices, eps = fgen_args
         pmf = fgen_pmf(k, spike_indices, eps)
         T_max = auto_tune_T_max(pmf, M)
-        print(f"[2dio] fgen k={k} spikes={spike_indices} eps={eps} → T_max={T_max:,}", flush=True)
+        print(f"[2dio] fgen k={k} spikes(0-idx)={spike_indices} eps={eps} "
+              f"p_inf={p_inf} → T_max={T_max:,}", flush=True)
     else:
         pmf, T_max = None, None
 
-    # Heap initialization: M items each with sleep time t ~ f.
+    # Heap initialization: paper Algorithm 2 lines 4-7. While Heap.size < M:
+    #   t ~ f; if t ≠ ∞: Heap.insert(<t, a>); a ← a + 1   (always increment)
+    # We may need more than M draws if some are ∞.
     heap: list = []
     a = 0
     if pmf is not None:
-        ts_init = sample_ird(pmf, T_max, rng, M)
-        for t in ts_init:
-            heapq.heappush(heap, (int(t), a))
+        # Pre-sample with a buffer; reserve more if ∞ rate is high.
+        # Expected draws needed = M / (1 - p_inf). Use 2× safety margin.
+        margin = 2.0 if p_inf > 0 else 1.0
+        n_buffer = int(M * margin / max(1 - p_inf, 1e-9)) + M
+        ts_init = sample_ird(pmf, T_max, p_inf, rng, n_buffer)
+        idx = 0
+        while len(heap) < M:
+            if idx >= len(ts_init):
+                # Top up if buffer ran out (rare; only if p_inf is very high).
+                ts_init = np.concatenate([ts_init,
+                                          sample_ird(pmf, T_max, p_inf, rng, M)])
+            t = int(ts_init[idx])
+            idx += 1
+            if t != _INF_IRD:
+                heapq.heappush(heap, (t, a))
             a += 1
     else:
-        # No IRD channel: still create M items (trivial, never popped except via IRM)
-        for _ in range(M):
-            a += 1
+        # No IRD channel: still create M items (only consumed by IRM channel).
+        a = M
 
-    # Trace generation.
+    # Trace generation: paper Algorithm 2 lines 9-19.
     π_s = np.empty(N, dtype=np.uint64)
     if pmf is not None:
-        ts_trace = sample_ird(pmf, T_max, rng, N)
+        ts_trace = sample_ird(pmf, T_max, p_inf, rng, N)
     randoms = rng.random(N)
     g_addrs = sample_g(g_spec, M, rng, N) if p_irm > 0 else None
 
-    cur_pos = 0
     for j in range(N):
         if randoms[j] < p_irm and g_addrs is not None:
+            # IRM-arrival channel: addr ~ g; π_s.append(addr)
             π_s[j] = int(g_addrs[j])
-        else:
-            if pmf is None:
-                # Fallback to IRM if no f.
-                π_s[j] = int(g_addrs[j]) if g_addrs is not None else 0
-                continue
-            t = int(ts_trace[j])
-            # Pop minimum next-due item.
+            continue
+        if pmf is None:
+            # No IRD channel configured; fall back to IRM if present.
+            π_s[j] = int(g_addrs[j]) if g_addrs is not None else 0
+            continue
+        t = int(ts_trace[j])
+        if t == _INF_IRD:
+            # Paper line 14-15: t = ∞ → emit fresh a, a ← a + 1.
+            π_s[j] = a
+            a += 1
+        elif heap:
+            # Paper line 17-19: pop min-due item, emit, push back with t0+t.
             t0, a0 = heapq.heappop(heap)
             π_s[j] = a0
             heapq.heappush(heap, (t0 + t, a0))
-        cur_pos += 1
-
+        else:
+            # Heap empty (only if every init draw was ∞); emit fresh.
+            π_s[j] = a
+            a += 1
     return π_s
 
 
@@ -199,18 +259,36 @@ def write_csv(path: str, π_s: np.ndarray, n_streams: int = 1):
 
 
 def parse_fgen_arg(s: str) -> tuple:
-    """Parse fgen argument: 'k:I:eps' where I is comma-separated 0-indexed bin indices.
-    Example: '30:9,13,17,19:5e-3'  → fgen(k=30, I={9,13,17,19}, ε=5e-3)
-             'none' or '' → None
+    """Parse fgen argument: 'k:I:eps' where I is comma-separated bin indices.
+
+    INDEXING CONVENTION: I-values match the PAPER's TABLE 3 convention, which
+    is 0-indexed despite the formal §3.3.1 definition stating support
+    "i ∈ {1,2,...,k}". The Table 3 entries v766 fgen(40,[0,5],5.7e-3) and
+    v827 fgen(40,[0,13],5e-3) contain 0, which is invalid under 1-indexed
+    {1..k}. Hence Table 3 is 0-indexed (probably aligned with the C++
+    trace-gen tool at github.com/Effygal/trace-gen). We follow Table 3.
+
+    Pass the I-values verbatim from Table 3 — no offset.
+
+    Examples (all from paper Table 3):
+        '100:2:2e-3'           → v521  spike at bin 2  (0-indexed)
+        '40:0,5:5.7e-3'        → v766  spikes at bins 0 and 5
+        '60:0,13:5e-3'         → v827
+        '30:9,13,17,19:5e-3'   → w24   spikes at bins 9,13,17,19
+        'none' or ''           → None (disable IRD channel; set p_irm=1)
     """
     if not s or s.lower() == "none":
         return None
     parts = s.split(":")
     if len(parts) != 3:
-        raise argparse.ArgumentTypeError("fgen format is k:i1,i2,...:eps")
+        raise argparse.ArgumentTypeError("fgen format is k:i1,i2,...:eps "
+                                         "(I in TABLE-3 0-INDEXED convention)")
     k = int(parts[0])
     I = [int(x) for x in parts[1].split(",")] if parts[1] else []
     eps = float(parts[2])
+    if any(i < 0 or i >= k for i in I):
+        raise argparse.ArgumentTypeError(
+            f"Table-3 0-indexed I values must be in {{0..{k-1}}}: got {I}")
     return (k, I, eps)
 
 
@@ -221,7 +299,12 @@ def main():
     p.add_argument("--g", default="none",
                    help="Item-freq distribution: zipf:1.2 | pareto:2.5,1 | normal:M/2,M/6 | uniform | none")
     p.add_argument("--f", required=True,
-                   help="IRD distribution: 'k:I:eps' fgen-spec, or 'none' to disable IRD channel")
+                   help="IRD distribution: 'k:I:eps' fgen-spec (paper-1-indexed I), "
+                        "or 'none' to disable IRD channel")
+    p.add_argument("--p-inf", type=float, default=0.0,
+                   help="Per-draw probability t=∞ from IRD channel (one-shot rate). "
+                        "Algorithm 2 has explicit ∞ branches; the paper's fgen has "
+                        "finite support so the t=∞ mass enters via this parameter.")
     p.add_argument("-m", "--M", type=int, required=True, help="trace footprint")
     p.add_argument("-n", "--N", type=int, required=True, help="trace length")
     p.add_argument("--seed", type=int, default=42)
@@ -229,9 +312,10 @@ def main():
     args = p.parse_args()
 
     fgen_args = parse_fgen_arg(args.f)
-    print(f"[2dio] generating M={args.M:,} N={args.N:,} P_IRM={args.p_irm} g={args.g} f={args.f}",
-          flush=True)
-    π_s = gen_from_2d(args.p_irm, args.g, fgen_args, args.M, args.N, args.seed)
+    print(f"[2dio] generating M={args.M:,} N={args.N:,} P_IRM={args.p_irm} "
+          f"g={args.g} f={args.f} p_inf={args.p_inf}", flush=True)
+    π_s = gen_from_2d(args.p_irm, args.g, fgen_args, args.p_inf,
+                      args.M, args.N, args.seed)
     write_csv(args.output, π_s)
     print(f"[2dio] wrote {len(π_s):,} records → {args.output}", flush=True)
 

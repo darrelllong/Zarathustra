@@ -39,23 +39,29 @@ M=10000
 N=1000000
 
 run_profile() {
-  local name=$1 p_irm=$2 g=$3 f=$4
+  local name=$1 p_irm=$2 g=$3 f=$4 p_inf=$5
   local seed=42
   local fake=$OUT/${name}_seed${seed}.csv
-  echo "=== $name (P_IRM=$p_irm, g=$g, f=$f) ==="
-  $PY -m desnoyers.two_dio --p-irm $p_irm --g "$g" --f "$f" \
+  echo "=== $name (P_IRM=$p_irm, g=$g, f=$f, p_inf=$p_inf) ==="
+  $PY -m desnoyers.two_dio --p-irm $p_irm --g "$g" --f "$f" --p-inf $p_inf \
       -m $M -n $N --seed $seed --output $fake 2>&1 | tail -3
   ls -la $fake | awk '{print "  size: "$5" bytes"}'
 }
 
-run_profile w11  1.0  zipf:1.3   none
-run_profile w24  0.45 zipf:1.2   "30:9,13,17,19:5e-3"
-run_profile w44  0.0  none       "30:9,13,17,19:2.5e-2"
-run_profile w82  0.2  zipf:1.2   "100:12,13,19:1e-3"
-run_profile v521 0.0  none       "100:2:2e-3"
-run_profile v538 0.1  zipf:1.2   "40:3,4:5e-3"
-run_profile v766 0.0  none       "40:0,5:5.7e-3"
-run_profile v827 0.2  zipf:1.2   "60:0,13:5e-3"
+# Table 3 I-values are PAPER-1-INDEXED. Per-trace one-shot ratio = footprint/length
+# (paper Table 1) — used as a starting estimate of p_inf for the explicit ∞-mass.
+# Values below scale fallback to 1 - M_paper/N_paper (one-shot ratio in real traces);
+# the paper itself does not list p_inf as a fitted parameter, so this is our
+# best reconstruction of the missing parameter required by Algorithm 2's t=∞ branch.
+#                              # paper-Table-1: M / N → est p_inf
+run_profile w11  1.0  zipf:1.3   none                        0.0
+run_profile w24  0.45 zipf:1.2   "30:9,13,17,19:5e-3"        0.20  # 16.5M/82M
+run_profile w44  0.0  none       "30:9,13,17,19:2.5e-2"      0.15  # 3.7M/25M
+run_profile w82  0.2  zipf:1.2   "100:12,13,19:1e-3"         0.013 # 0.19M/14M
+run_profile v521 0.0  none       "100:2:2e-3"                0.026 # 0.16M/6M
+run_profile v538 0.1  zipf:1.2   "40:3,4:5e-3"               0.027 # 33M/1204M
+run_profile v766 0.0  none       "40:0,5:5.7e-3"             0.037 # 0.12M/3.3M  (Table 3 verbatim)
+run_profile v827 0.2  zipf:1.2   "60:0,13:5e-3"              0.27  # 0.85M/3.2M  (Table 3 verbatim)
 
 echo
 echo "=== LRU HRC at log-spaced cache sizes (M=$M; cache as fraction of M) ==="
