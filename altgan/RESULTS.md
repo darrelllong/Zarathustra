@@ -2252,6 +2252,8 @@ alias (if you have one), e.g. `--host vinge` or `--host baase`.
 
 If your ssh config routes through a jump host (ProxyJump) and that host doesn't resolve, add `--no-proxyjump` (or `--ssh-option ProxyJump=none`).
 
+If SSH fails immediately with `Operation not permitted`, you're in a sandboxed environment that blocks outbound TCP sockets; re-run from an unsandboxed host (or from the `/tiamat` host itself).
+
 ```bash
 python3 -m altgan.launch_trace_bootstrap_shuffle_pack \
   --update-lanl-docs \
@@ -5614,3 +5616,12 @@ r424 short-reuse-loss refit, not banked and not promoted:
 Four-seed mean: `0.0732929167`, range `0.0137426667`. This refit is worse
 than r423b; static short-depth weighting at `1.5` overcorrects the learned
 reuse distribution.
+
+## 2026-05-09 06:30Z -- Alibaba r425 r413-Base 4-Row Continuation Launch Blocked
+
+Attempted to launch an official multi-seed Alibaba continuation from the
+banked r413 bases using `altgan.ssh_chunk_surface_multiseed`, but this local
+environment blocks outbound SSH (`Operation not permitted`). No remote jobs
+were launched from this sandbox.
+
+Next launch should use `--remote-module altgan.launch_alibaba_r413_chunk_surface_multiseed`.

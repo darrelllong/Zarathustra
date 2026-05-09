@@ -5979,3 +5979,12 @@ instead of teaching the conditional pressure signal.
 
 Mean across seeds `{42,80,81,82}`: `0.0732929167` (race display `0.0733`;
 range `0.0137426667`). Retracted versus r423b.
+
+## 2026-05-09 06:30Z -- Alibaba r425 r413-Base 4-Row Continuation Launch Blocked
+
+Attempted to launch an official multi-seed Alibaba continuation from the
+banked r413 bases using `altgan.ssh_chunk_surface_multiseed`, but this local
+environment blocks outbound SSH (`Operation not permitted`). No remote jobs
+were launched from this sandbox.
+
+Next launch should use `--remote-module altgan.launch_alibaba_r413_chunk_surface_multiseed`.
