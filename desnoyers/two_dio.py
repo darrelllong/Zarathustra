@@ -131,8 +131,17 @@ def sample_ird(pmf: np.ndarray, T_max: int, p_inf: float,
 
 def sample_g(g_spec: str, M: int, rng: np.random.Generator, n: int) -> np.ndarray:
     """Sample n addresses from item-frequency distribution g over {0..M-1}.
+
+    Implementation uses analytical / rejection sampling rather than
+    explicit PMF construction so memory cost is O(n) rather than O(M).
+    Critical for paper-scale M (e.g. v538 has M=33M which would
+    otherwise allocate ~250 MB just for the PMF).
+
     g_spec format: 'zipf:alpha' | 'pareto:alpha,xm' | 'normal:mu,sigma'
-                   | 'uniform' | 'none'."""
+                   | 'uniform' | 'none'.
+
+    Returns 0-indexed addresses in {0..M-1}.
+    """
     if g_spec.lower() in ("none", ""):
         return np.zeros(n, dtype=np.int64)
     parts = g_spec.split(":")
@@ -140,24 +149,49 @@ def sample_g(g_spec: str, M: int, rng: np.random.Generator, n: int) -> np.ndarra
     args = parts[1] if len(parts) > 1 else ""
     if name == "zipf":
         alpha = float(args) if args else 1.2
-        # Zipfian PMF: g(i) = (1/i)^α / Z over i=1..M
-        ranks = np.arange(1, M + 1, dtype=np.float64)
-        pmf = ranks ** (-alpha)
-        pmf /= pmf.sum()
-        return rng.choice(M, size=n, replace=True, p=pmf)
+        # numpy's np.random.zipf samples k ∈ {1, 2, ...} with PMF ∝ k^(-α)
+        # using the standard rejection method (Devroye 1986, ch.10). We
+        # clip into {1..M} via simple resampling; expected reject rate is
+        # 1 - F(M) ≈ M^(1-α) / ζ(α). For α ≥ 1.2, M ≥ 100, reject rate
+        # is < 1 % so single-pass resampling converges quickly.
+        out = np.empty(n, dtype=np.int64)
+        idx = 0
+        while idx < n:
+            block = rng.zipf(alpha, size=max(n - idx, 1024))
+            keep = block[block <= M]
+            take = min(len(keep), n - idx)
+            out[idx:idx + take] = keep[:take] - 1  # 1-indexed → 0-indexed
+            idx += take
+        return out
     if name == "pareto":
         a, xm = (float(x) for x in args.split(","))
-        # Pareto over discrete support {1..M}; PMF ∝ x_m^α / i^(α+1)
-        ranks = np.arange(1, M + 1, dtype=np.float64)
-        pmf = (xm ** a) / (ranks ** (a + 1))
-        pmf /= pmf.sum()
-        return rng.choice(M, size=n, replace=True, p=pmf)
+        # Discrete Pareto Type I: PMF ∝ x_m^α / k^(α+1) over k=1..M.
+        # Inverse-CDF sampling: U ~ Uniform(0,1), k = floor(x_m / U^(1/α)).
+        # For unbounded tail, clip to M. Reject-resample if > M to keep
+        # the within-support PMF exactly (single-pass sufficient at α ≥ 1).
+        out = np.empty(n, dtype=np.int64)
+        idx = 0
+        while idx < n:
+            u = rng.random(max(n - idx, 1024))
+            k = np.floor(xm / np.power(u, 1.0 / a)).astype(np.int64)
+            keep = k[(k >= 1) & (k <= M)]
+            take = min(len(keep), n - idx)
+            out[idx:idx + take] = keep[:take] - 1
+            idx += take
+        return out
     if name == "normal":
         mu, sigma = (float(x) for x in args.split(","))
-        ranks = np.arange(M, dtype=np.float64)
-        pmf = np.exp(-((ranks - mu) ** 2) / (2 * sigma ** 2))
-        pmf /= pmf.sum()
-        return rng.choice(M, size=n, replace=True, p=pmf)
+        # Continuous-normal sample, floor to integer, reject outside {0..M-1}.
+        out = np.empty(n, dtype=np.int64)
+        idx = 0
+        while idx < n:
+            x = rng.normal(mu, sigma, size=max(n - idx, 1024))
+            k = np.floor(x).astype(np.int64)
+            keep = k[(k >= 0) & (k < M)]
+            take = min(len(keep), n - idx)
+            out[idx:idx + take] = keep[:take]
+            idx += take
+        return out
     if name == "uniform":
         return rng.integers(0, M, size=n, dtype=np.int64)
     raise ValueError(f"unknown g spec: {g_spec}")

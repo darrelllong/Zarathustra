@@ -48,20 +48,35 @@ run_profile() {
   ls -la $fake | awk '{print "  size: "$5" bytes"}'
 }
 
-# Table 3 I-values are PAPER-1-INDEXED. Per-trace one-shot ratio = footprint/length
-# (paper Table 1) — used as a starting estimate of p_inf for the explicit ∞-mass.
-# Values below scale fallback to 1 - M_paper/N_paper (one-shot ratio in real traces);
-# the paper itself does not list p_inf as a fitted parameter, so this is our
-# best reconstruction of the missing parameter required by Algorithm 2's t=∞ branch.
-#                              # paper-Table-1: M / N → est p_inf
-run_profile w11  1.0  zipf:1.3   none                        0.0
-run_profile w24  0.45 zipf:1.2   "30:9,13,17,19:5e-3"        0.20  # 16.5M/82M
-run_profile w44  0.0  none       "30:9,13,17,19:2.5e-2"      0.15  # 3.7M/25M
-run_profile w82  0.2  zipf:1.2   "100:12,13,19:1e-3"         0.013 # 0.19M/14M
-run_profile v521 0.0  none       "100:2:2e-3"                0.026 # 0.16M/6M
-run_profile v538 0.1  zipf:1.2   "40:3,4:5e-3"               0.027 # 33M/1204M
-run_profile v766 0.0  none       "40:0,5:5.7e-3"             0.037 # 0.12M/3.3M  (Table 3 verbatim)
-run_profile v827 0.2  zipf:1.2   "60:0,13:5e-3"              0.27  # 0.85M/3.2M  (Table 3 verbatim)
+# p_inf NOTE: the paper does not specify p_inf as a fitted parameter. Algorithm
+# 2 has an explicit t=∞ branch but fgen has finite support, so p_inf must be
+# supplied separately. Values below come from `compute_oneshot.py` measured
+# against our reference trace where we have a proxy of the paper-trace
+# corpus (CloudPhysics for w-class, AliCloud-via-alibaba for v521-class) at
+# 1M-record scale; for paper-traces we don't have a direct proxy, we leave
+# p_inf=0 and rely on the IRM channel for one-shots (where applicable),
+# noting the limitation explicitly. These measured values are at our
+# small-scale (1M) sample, not the paper's full-trace scale; if the paper-
+# trace one-shot rate differs at full N, our replication will too.
+#
+# Measured one-shot rates from /tiamat/zarathustra/llgan-output/refs/*.csv:
+#   alibaba_stackatlas_1M (v521-class proxy):  0.6136
+#   cloudphysics (w-class proxy):               0.3653
+#   metacdn (no direct paper-trace match):      0.2664
+#   wiki (no direct match):                     0.3010
+#
+# Table 3 I-values are pasted verbatim (Table 3 is 0-indexed, validated via
+# v766 [0,5] and v827 [0,13] entries that are invalid under 1-indexed).
+#
+# Profile          P_IRM  g            f-spec                     p_inf  Source of p_inf
+run_profile w11  1.0  zipf:1.3   none                        0.0    # P_IRM=1 → IRD channel unused; p_inf irrelevant
+run_profile w24  0.45 zipf:1.2   "30:9,13,17,19:5e-3"        0.37   # measured CP one-shot proxy
+run_profile w44  0.0  none       "30:9,13,17,19:2.5e-2"      0.37   # measured CP one-shot proxy
+run_profile w82  0.2  zipf:1.2   "100:12,13,19:1e-3"         0.37   # measured CP one-shot proxy
+run_profile v521 0.0  none       "100:2:2e-3"                0.61   # measured alibaba one-shot proxy
+run_profile v538 0.1  zipf:1.2   "40:3,4:5e-3"               0.0    # no proxy; IRM channel covers
+run_profile v766 0.0  none       "40:0,5:5.7e-3"             0.0    # no proxy; documented limitation
+run_profile v827 0.2  zipf:1.2   "60:0,13:5e-3"              0.0    # no proxy; documented limitation
 
 echo
 echo "=== LRU HRC at log-spaced cache sizes (M=$M; cache as fraction of M) ==="
