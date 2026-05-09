@@ -5887,3 +5887,19 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
 Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r434_empiricalrank_norecycle.pt`.
+
+## 2026-05-09 09:55Z -- Tencent r434 Empirical Rank No-RECYCLE Result
+
+r434 is the new best learned Tencent scout: empirical within-bin Mattson-rank
+sampling works better without the RECYCLE split on this corpus. It is still not
+a leaderboard row versus banked Tencent r336.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0530` | 0.0529990000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0722` | 0.0722303333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0578` | 0.0578286667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0576` | 0.0576010000 |
+
+Four-seed mean: `0.0601647500`, range `0.0192313333`. Best learned scout so
+far; not promoted against banked Tencent r336 `0.0297569167`.

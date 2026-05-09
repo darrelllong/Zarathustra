@@ -6332,3 +6332,21 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r434_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 09:55Z -- Tencent r434 Empirical Rank No-RECYCLE Completed, New Best Learned Scout
+
+r434 completed the no-RECYCLE control for empirical Mattson-rank sampling. It
+improves over r433 and r423b, so the empirical sampler is stronger without the
+RECYCLE split on Tencent. It is still not a leaderboard row versus banked
+Tencent r336.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0530` | 0.0529990000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0722` | 0.0722303333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0578` | 0.0578286667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0576` | 0.0576010000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0601647500` (race display `0.0602`;
+range `0.0192313333`). Best learned Tencent scout so far, but still far behind
+banked Tencent r336 `0.0297569167`; not a leaderboard row.
