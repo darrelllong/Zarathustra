@@ -13,7 +13,7 @@ usage:
   altgan/lanl_remote_job.sh pull
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
@@ -49,6 +49,7 @@ launch_mdlstm_tencent() {
   local birth_mode="${4:?birth|nobirth required}"
   local seed="${5:?seed required}"
   local epochs="${6:-20}"
+  local control_mode="${7:-footprint}"
 
   pull_repo
   mkdir -p "$OUT_ROOT/logs" "$CKPT_ROOT"
@@ -91,6 +92,13 @@ launch_mdlstm_tencent() {
     cmd+=(--no-birth-control)
   elif [[ "$birth_mode" != "birth" ]]; then
     echo "birth mode must be birth or nobirth" >&2
+    exit 2
+  fi
+
+  if [[ "$control_mode" == "footprint" || "$control_mode" == "ws" ]]; then
+    cmd+=(--birth-control-mode "$control_mode")
+  else
+    echo "control mode must be footprint or ws" >&2
     exit 2
   fi
 

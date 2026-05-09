@@ -542,6 +542,36 @@ def _birth_targets_from_real(state: dict, n_records: int) -> np.ndarray | None:
     return targets
 
 
+def _ws_targets_from_real(state: dict, n_records: int, windows: list[int]) -> np.ndarray | None:
+    real_path = state.get("real")
+    if not real_path:
+        return None
+    try:
+        trace = read_real_csv(real_path, n_records)
+    except OSError:
+        return None
+    from collections import Counter, deque
+
+    keys = list(zip(trace.stream_ids.tolist(), trace.obj_ids.tolist()))
+    queues = [deque() for _ in windows]
+    counts = [Counter() for _ in windows]
+    targets = np.empty((n_records, len(windows)), dtype=np.int64)
+    last = np.zeros(len(windows), dtype=np.int64)
+    for i in range(n_records):
+        if i < len(keys):
+            for wi, window in enumerate(windows):
+                last[wi] = len(counts[wi])
+                queues[wi].append(keys[i])
+                counts[wi][keys[i]] += 1
+                while len(queues[wi]) > window:
+                    old = queues[wi].popleft()
+                    counts[wi][old] -= 1
+                    if counts[wi][old] <= 0:
+                        del counts[wi][old]
+        targets[i] = last
+    return targets
+
+
 def _force_emitted_reuse(
     stack: list[int],
     emitted_seen: set[int],
@@ -549,6 +579,7 @@ def _force_emitted_reuse(
     rank_edges: np.ndarray,
     probs: np.ndarray,
     rng: np.random.Generator,
+    eligible: set[int] | None = None,
 ) -> tuple[int, int] | None:
     if not stack or not emitted_order:
         return None
@@ -571,11 +602,15 @@ def _force_emitted_reuse(
                 oid = int(stack[rank])
                 if oid not in emitted_seen:
                     continue
+                if eligible is not None and oid not in eligible:
+                    continue
                 stack.pop(rank)
                 stack.insert(0, oid)
                 return oid, rank_to_token(rank, rank_edges)
     for _ in range(8):
         oid = int(emitted_order[int(rng.integers(0, len(emitted_order)))])
+        if eligible is not None and oid not in eligible:
+            continue
         try:
             rank = stack.index(oid)
         except ValueError:
@@ -585,6 +620,8 @@ def _force_emitted_reuse(
         return oid, rank_to_token(rank, rank_edges)
     for rank, oid in enumerate(stack):
         if oid in emitted_seen:
+            if eligible is not None and oid not in eligible:
+                continue
             stack.pop(rank)
             stack.insert(0, oid)
             return int(oid), rank_to_token(rank, rank_edges)
@@ -598,6 +635,7 @@ def generate_ids(
     seed: int,
     temperature: float,
     birth_control: bool = True,
+    birth_control_mode: str = "footprint",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
 
@@ -621,7 +659,11 @@ def generate_ids(
         history,
     )
     ws_counts = list(zip(queues, counters))
-    birth_targets = _birth_targets_from_real(state, n_records) if birth_control else None
+    if not birth_control:
+        birth_control_mode = "none"
+    birth_targets = _birth_targets_from_real(state, n_records) if birth_control_mode == "footprint" else None
+    ws_targets = _ws_targets_from_real(state, n_records, windows) if birth_control_mode == "ws" else None
+    window_scale = np.asarray(windows, dtype=np.float64)
     emitted_seen: set[int] = set()
     emitted_order: list[int] = []
     out = np.empty(n_records, dtype=np.int64)
@@ -644,7 +686,21 @@ def generate_ids(
             birth_target = int(birth_targets[i]) if birth_targets is not None else 0
             force_new = birth_targets is not None and len(emitted_seen) < birth_target
             force_reuse = birth_targets is not None and len(emitted_seen) >= birth_target
-            birth_prob = float(torch.sigmoid(birth_logits[0, -1]).detach().cpu())
+            birth_logit = float(birth_logits[0, -1].detach().cpu())
+            reuse_eligible: set[int] | None = None
+            if ws_targets is not None:
+                current_ws = np.asarray([len(counter) for _queue, counter in ws_counts], dtype=np.float64)
+                target_ws = ws_targets[i].astype(np.float64)
+                pressure_by_window = (target_ws - current_ws) / np.maximum(window_scale, 1.0)
+                pressure = float(np.dot(pressure_by_window, np.asarray([0.35, 0.25, 0.20, 0.12, 0.08])))
+                birth_logit += 5.0 * max(-0.75, min(0.75, pressure))
+                if float(np.max(pressure_by_window)) > 0.20:
+                    force_new = True
+                if float(np.min(pressure_by_window)) < -0.20:
+                    force_reuse = True
+                    force_new = False
+                    reuse_eligible = {int(oid) for _sid, oid in ws_counts[0][1].keys()}
+            birth_prob = float(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, birth_logit)))))
             z = logits[0, -1, 1:] / max(float(temperature), 1e-6)
             reuse_probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             probs = np.zeros(vocab, dtype=np.float64)
@@ -681,13 +737,26 @@ def generate_ids(
                 else:
                     oid = stack.pop(rank)
                     stack.insert(0, oid)
-            if (
+            should_force_reuse = (
                 birth_targets is not None
                 and not force_new
                 and oid not in emitted_seen
                 and len(emitted_seen) >= birth_target
-            ):
-                forced = _force_emitted_reuse(stack, emitted_seen, emitted_order, rank_edges, probs, rng)
+            ) or (
+                ws_targets is not None
+                and force_reuse
+                and oid not in emitted_seen
+            )
+            if should_force_reuse:
+                forced = _force_emitted_reuse(
+                    stack,
+                    emitted_seen,
+                    emitted_order,
+                    rank_edges,
+                    probs,
+                    rng,
+                    eligible=reuse_eligible,
+                )
                 if forced is not None:
                     oid, token = forced
             out[i] = oid
@@ -744,6 +813,7 @@ def generate(args) -> None:
         args.seed,
         args.temperature,
         not args.no_birth_control,
+        args.birth_control_mode,
     )
     write_csv(args.output, obj_ids, sizes, opcodes, tenants)
 
@@ -775,6 +845,7 @@ def multiseed(args) -> None:
             seed,
             args.temperature,
             not args.no_birth_control,
+            args.birth_control_mode,
         )
         write_csv(fake, obj_ids, sizes, opcodes, tenants)
         report = evaluate(str(fake), args.real, args.cache_sizes, args.policies)
@@ -849,6 +920,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--seed", type=int, default=42)
     gen_p.add_argument("--temperature", type=float, default=1.0)
     gen_p.add_argument("--no-birth-control", action="store_true")
+    gen_p.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
     gen_p.set_defaults(fn=generate)
 
     multi = sub.add_parser("multiseed")
@@ -863,6 +935,7 @@ def build_parser() -> argparse.ArgumentParser:
     multi.add_argument("--policies", default=DEFAULT_POLICIES)
     multi.add_argument("--fit", action="store_true")
     multi.add_argument("--no-birth-control", action="store_true")
+    multi.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")
     multi.set_defaults(fn=multiseed)

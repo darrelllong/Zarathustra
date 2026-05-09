@@ -5568,3 +5568,8 @@ randomly onto the r414 checkpoint.
 Added `altgan/lanl_remote_job.sh` as the remote launcher/status wrapper. It
 keeps local SSH calls simple and moves pull/nohup/redirection/backgrounding into
 the remote checkout, reducing repeated local sandbox permission prompts.
+
+r421 learned-birth free rollout failed on seed 42:
+`mean HRC-MAE across policies: 0.4316`, with `output_unique=99,144` by 100k
+rows. r422 adds a Denning working-set controller over windows
+`32,128,512,2048,8192` rather than exact global footprint matching.
