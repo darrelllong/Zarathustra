@@ -151,10 +151,10 @@ launch_mdlstm_tencent() {
     exit 2
   fi
 
-  if [[ "$control_mode" == "footprint" || "$control_mode" == "ws" ]]; then
+  if [[ "$control_mode" == "footprint" || "$control_mode" == "ws" || "$control_mode" == "learned-ws" ]]; then
     cmd+=(--birth-control-mode "$control_mode")
   else
-    echo "control mode must be footprint or ws" >&2
+    echo "control mode must be footprint, ws, or learned-ws" >&2
     exit 2
   fi
 
