@@ -5481,3 +5481,21 @@ No-32 diagnostic means were `0.007925583333333338`,
 `0.007933958333333343`, mean `0.0079704792`, range `0.0001082500`.
 
 `LEADER-BOARD.md` updated: LANL now leads 9/9 generative corpora.
+
+## 2026-05-09 02:45Z -- Baleen24 r409 r407-Base Reinforcement Launched
+
+LANL stopped the obsolete vinge r399/r403 Baleen scouts and launched
+`baleen24_chunksurf_r409_r407base256` from the newly banked r407 per-seed
+bases. This is a reinforcement scout, not a new claim yet. It uses
+synthetic-only cross-seed donors from r407, r408 scale scouts, r404, partial
+r405 outputs, and older LANL Baleen chunk rows, with 256-row
+`stream_id,obj_id,obj_size` swaps, official-surface optimization, and the
+no-32 ratio guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r409_r407base256_vinge_20260509.log`.
+
+r409 is not banked unless all four literal official cachesim lines land and
+beat r407's `0.0183702583`.
