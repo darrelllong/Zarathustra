@@ -5843,3 +5843,11 @@ those invalid reuses into brand-new objects. Seed 42 emitted `unique=98,654`
 for 100k rows and produced the literal official line
 `mean HRC-MAE across policies: 0.4269`. The follow-up source now masks invalid
 depth-token support and samples reuse ranks only inside the live stack.
+
+r415 support masking alone was not enough: the old all-NEW generation prefix
+still drove a new-object storm (`unique=48,587` by 50k generated rows), and it
+also fed the post-event working-set state where training used pre-event
+working-set tokens. r416 fixes both sequence-model issues: generation now
+warm-starts from a remapped real prefix long enough to cover the Denning
+windows, and each autoregressive step feeds `(token_t, working_set_before_t)`
+to match the training interface.

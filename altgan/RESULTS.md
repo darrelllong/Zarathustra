@@ -5511,3 +5511,10 @@ r414 seed 42 failure, kept as evidence: the unconstrained decoder emitted
 `mean HRC-MAE across policies: 0.4269`. The next revision masks impossible
 Mattson depth-token support during decoding instead of converting invalid
 reuse-depth samples into new objects.
+
+r415 support-mask scout was killed early after `unique=48,587` by 50k rows.
+That showed the second sequence bug: generation was warm-starting from an
+all-NEW context and feeding post-event working-set tokens, while training
+predicts from pre-event working-set tokens. r416 warm-starts from a remapped
+real prefix and feeds `(token_t, working_set_before_t)` during streaming
+generation.

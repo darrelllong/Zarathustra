@@ -188,9 +188,7 @@ def tokenize(trace: RealTrace, n_rank_bins: int, n_ws_bins: int, windows: list[i
     depths, footprint = mattson_depths(trace)
     rank_edges = make_log_edges(footprint, n_rank_bins)
     ws_edges = make_log_edges(footprint, n_ws_bins)
-    tokens = np.empty(trace.n, dtype=np.int64)
-    for i, depth in enumerate(depths):
-        tokens[i] = NEW_TOKEN if depth < 0 else rank_to_token(int(depth), rank_edges)
+    tokens = tokens_from_depths(depths, rank_edges, trace.n)
     ws_tokens = denning_working_sets(trace, windows, ws_edges)
     print(
         "[mattson_denning tokenize] "
@@ -199,6 +197,13 @@ def tokenize(trace: RealTrace, n_rank_bins: int, n_ws_bins: int, windows: list[i
         flush=True,
     )
     return tokens, ws_tokens, rank_edges, ws_edges, footprint
+
+
+def tokens_from_depths(depths: np.ndarray, rank_edges: np.ndarray, n: int) -> np.ndarray:
+    tokens = np.empty(n, dtype=np.int64)
+    for i, depth in enumerate(depths):
+        tokens[i] = NEW_TOKEN if depth < 0 else rank_to_token(int(depth), rank_edges)
+    return tokens
 
 
 def _try_torch():
@@ -415,9 +420,96 @@ def _ws_feature_from_counts(counts, edges: np.ndarray) -> list[int]:
     return [value_to_bin(len(counter), edges) for _queue, counter in counts]
 
 
+def _slice_trace(trace: RealTrace, start: int, end: int) -> RealTrace:
+    return RealTrace(
+        stream_ids=trace.stream_ids[start:end],
+        obj_ids=trace.obj_ids[start:end],
+        obj_sizes=trace.obj_sizes[start:end],
+        opcodes=trace.opcodes[start:end],
+        tenants=trace.tenants[start:end],
+    )
+
+
+def _warmstart_context(
+    state: dict,
+    seed: int,
+    rank_edges: np.ndarray,
+    ws_edges: np.ndarray,
+    windows: list[int],
+    history: int,
+):
+    from collections import Counter, deque
+
+    queues = [deque() for _ in windows]
+    counters = [Counter() for _ in windows]
+    stack: list[int] = []
+    next_new = 0
+    default_tokens = [NEW_TOKEN] * history
+    default_ws = [[0] * len(windows) for _ in range(history)]
+
+    real_path = state.get("real")
+    if not real_path:
+        return default_tokens, default_ws, queues, counters, stack, next_new
+
+    try:
+        trace = read_real_csv(real_path, int(state.get("max_rows") or 0))
+    except OSError:
+        return default_tokens, default_ws, queues, counters, stack, next_new
+
+    warm_rows = min(trace.n, max(history, max(windows, default=history)))
+    if warm_rows <= 0:
+        return default_tokens, default_ws, queues, counters, stack, next_new
+
+    rng = np.random.default_rng(seed + 7919)
+    start_hi = max(0, trace.n - warm_rows - 1)
+    start = int(rng.integers(0, start_hi + 1)) if start_hi else 0
+    warm = _slice_trace(trace, start, start + warm_rows)
+    depths, _footprint = mattson_depths(warm)
+    warm_tokens = tokens_from_depths(depths, rank_edges, warm.n).tolist()
+    warm_ws = denning_working_sets(warm, windows, ws_edges).tolist()
+
+    id_map: dict[tuple[int, int], int] = {}
+    for sid, oid in zip(warm.stream_ids.tolist(), warm.obj_ids.tolist()):
+        real_key = (int(sid), int(oid))
+        mapped = id_map.get(real_key)
+        if mapped is None:
+            mapped = next_new
+            id_map[real_key] = mapped
+            next_new += 1
+        else:
+            try:
+                stack.remove(mapped)
+            except ValueError:
+                pass
+        stack.insert(0, mapped)
+        key = (0, mapped)
+        for wi, (queue, counter) in enumerate(zip(queues, counters)):
+            queue.append(key)
+            counter[key] += 1
+            while len(queue) > windows[wi]:
+                old = queue.popleft()
+                counter[old] -= 1
+                if counter[old] <= 0:
+                    del counter[old]
+
+    if len(warm_tokens) < history:
+        pad = history - len(warm_tokens)
+        warm_tokens = [NEW_TOKEN] * pad + warm_tokens
+        warm_ws = [[0] * len(windows) for _ in range(pad)] + warm_ws
+    else:
+        warm_tokens = warm_tokens[-history:]
+        warm_ws = warm_ws[-history:]
+
+    print(
+        "[mattson_denning generate] "
+        f"warmstart_rows={warm.n:,} start={start:,} unique={next_new:,} stack={len(stack):,}",
+        flush=True,
+    )
+    return warm_tokens, warm_ws, queues, counters, stack, next_new
+
+
 def generate_ids(state: dict, model, n_records: int, seed: int, temperature: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
-    from collections import Counter, deque
 
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
@@ -430,11 +522,15 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
     windows = [int(w) for w in state["windows"]]
     history = int(state["seq_len"])
     vocab = int(state["vocab"])
-    queues = [deque() for _ in windows]
-    counters = [Counter() for _ in windows]
+    init_tokens, init_ws_tokens, queues, counters, stack, next_new = _warmstart_context(
+        state,
+        seed,
+        rank_edges,
+        ws_edges,
+        windows,
+        history,
+    )
     ws_counts = list(zip(queues, counters))
-    stack: list[int] = []
-    next_new = 0
     out = np.empty(n_records, dtype=np.int64)
 
     mark_sample = state.get("mark_sample", {})
@@ -446,11 +542,12 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
     tenants = np.empty(n_records, dtype=np.int64)
 
     with torch.inference_mode():
-        init_tok = torch.full((1, history), NEW_TOKEN, dtype=torch.long, device=device)
-        init_ws = torch.zeros((1, history, len(windows)), dtype=torch.long, device=device)
+        init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
+        init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
         logits, _ws_logits, h = model(init_tok, init_ws)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
+            ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
             z = logits[0, -1] / max(float(temperature), 1e-6)
             probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             if stack:
@@ -495,9 +592,8 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
                     counter[old] -= 1
                     if counter[old] <= 0:
                         del counter[old]
-            ws_now = _ws_feature_from_counts(ws_counts, ws_edges)
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
-            step_ws = torch.tensor([[ws_now]], dtype=torch.long, device=device)
+            step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
             logits, _ws_logits, h = model(step_tok, step_ws, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
