@@ -5358,3 +5358,16 @@ and beats LLNL R291.BAL2 `0.018447` by `0.0006671000` (`3.6163%` lower).
 
 No-32 guard mean: `0.0077556146`, range `0.0001064167`. Per seed:
 `0.0077083750`, `0.0077702083`, `0.0078147917`, `0.0077290833`.
+
+## Baleen24 r412 r410-Base 64-Row Reinforcement Launched (2026-05-09)
+
+Launched `baleen24_chunksurf_r412_r410base64` on vinge from the banked r410
+per-seed bases. This scout uses 64-row `stream_id,obj_id,obj_size` chunks,
+cross-seed synthetic-only donors from the current Baleen pool, and the r410/r409
+move banks sorted by historical mean. The admission surface is the official
+5-cache x 6-policy Baleen24 evaluator plus the no-32 ratio guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log: `/tiamat/zarathustra/altgan-output/logs/baleen24_r412_r410base64_vinge_20260509.log`.
+
+No claim until the four-seed mean beats r410 `0.0177799000`.
