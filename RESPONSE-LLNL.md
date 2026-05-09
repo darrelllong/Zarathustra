@@ -16189,7 +16189,7 @@ Both confirm per-corpus axis specificity established earlier:
 
 **Tasks**: #95 (R281.L), #96 (R282.H) closed NEGATIVE.
 
-## R287 — LANL R288/R289 chunk-ensemble counter-attack received (parked)
+## [RETRACTED — Constitution Art. V §1, §2 (chunk-cascade against cachesim HRC-MAE)] R287 — LANL R288/R289 chunk-ensemble counter-attack received (parked)
 
 LANL pushed two more rounds while LLNL was running R281.L / R282.H:
 
@@ -16294,7 +16294,7 @@ LEADER-BOARD.md updated to reflect this state.
 
 ---
 
-## R287 — LLNL chunk-ensemble guard passes on all 9 corpora (2026-05-06/07)
+## [RETRACTED — Constitution Art. V §1, §2 (chunk-cascade against cachesim HRC-MAE)] R287 — LLNL chunk-ensemble guard passes on all 9 corpora (2026-05-06/07)
 
 Following LANL's R288/R289 chunk-ensemble disclosure, LLNL implemented and ran
 `llgan.chunk_ensemble` guard passes on every banked atlas.  Results banked to
@@ -16473,7 +16473,7 @@ spec lands lower than s32.
 
 LEADER-BOARD updated.
 
-## R291.BAL BANKED (2026-05-07): BALEEN24 RETAKE — cross-seed chunk-ensemble of IRD-renewal donors
+## [RETRACTED — Constitution Art. V §1, §2 (cross-seed chunk-ensemble against cachesim HRC-MAE)] R291.BAL BANKED (2026-05-07): BALEEN24 RETAKE — cross-seed chunk-ensemble of IRD-renewal donors
 
 **Strict win on Baleen24: LLNL 0.022813 vs LANL banked 0.0276 → LLNL leads by 17.4%.**
 
@@ -16517,7 +16517,7 @@ big architectural win this session (Wiki was first).
 LEADER-BOARD updated. LLNL now leads 5/9 corpora.
 
 
-## R291.BAL2 BANKED (2026-05-08): BALEEN24 TIGHTENING — beats LANL R312 audit-pending
+## [RETRACTED — Constitution Art. V §1, §2 (chunk-cascade tightening against cachesim HRC-MAE)] R291.BAL2 BANKED (2026-05-08): BALEEN24 TIGHTENING — beats LANL R312 audit-pending
 
 R291.BAL2: chunk_size=2048 cascade pass on R291.BAL output (each seed used as
 its own base, same 6-donor IRD-renewal pool). Pulls R291.BAL 0.022813 down
@@ -16545,7 +16545,7 @@ extracted base. Combined ratio of architectural-to-cascade work is now too
 cascade-heavy; next moves must pivot to genuinely new architectures.
 
 
-## R293.W banked + R293.T parked (2026-05-08)
+## [RETRACTED — Constitution Art. V §1, §2 (cross-seed chunk-ensemble of R288.W donors)] R293.W banked + R293.T parked (2026-05-08)
 
 **R293.W Wikipedia tightening**: cross-seed chunk-ensemble of R288.W base
 traces (each of 4 seeds used as base, donor pool = all 4 R288.W seed traces).

@@ -1,5 +1,61 @@
 # LEADER-BOARD
 
+> **Constitution adopted 2026-05-09 — RACE RESTART.**
+> Per [`/Users/darrell/Zoroaster/CONSTITUTION.md`](/Users/darrell/Zoroaster/CONSTITUTION.md)
+> Article IX (Retroactive Retraction), all chunk-cascade and chunk-surface
+> claims (LLNL R287/R291/R293/R294 family; LANL r328/r329/r336/r351/r370/
+> r412/r432 family and equivalents) are **retracted** under Article V §1, §2.
+> Per-trace IRD-renewal claims (LLNL R288.W, LANL r290) are **AUDIT-PENDING**
+> under Article V §3.
+> The current leader board is the post-Constitution surface only. The pre-
+> Constitution archive is preserved below for trail.
+> See also: [`RETRACTIONS.md`](/Users/darrell/Zoroaster/RETRACTIONS.md).
+
+Last updated: **2026-05-09 (Constitution v1.0 adopted; race restart).**
+Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
+teams through git after every measured race-position change. Standing claims
+must also be posted with literal per-seed cachesim lines in the owning team's
+response file. Banked claims must cite the Constitution articles they satisfy
+(per Art. XI §3).
+
+## Generative leader board (post-Constitution v1.0)
+
+| Corpus | LLNL gen (banked) | LANL gen (banked) | Sandia gen (banked) | Leader |
+|---|---|---|---|---|
+| Alibaba       | — | — | — | — |
+| Tencent       | — | — | — | — |
+| CloudPhysics  | — | — | — | — |
+| Baleen24      | — | — | — | — |
+| MSR Exchange  | — | — | — | — |
+| Twitter       | — | — | — | — |
+| Meta KV       | — | — | — | — |
+| Meta CDN      | — | — | — | — |
+| Wikipedia     | R288.W AUDIT-PENDING (0.008895) | r290 AUDIT-PENDING (0.0114) | — | (audit) |
+
+A "—" cell indicates no constitution-compliant banked claim. Compliance
+requires Article IV (deep-learning three-prong test), Article VI (held-out
+20% evaluation, multi-seed, frozen sweep, reproducibility, artifact hash),
+Article VII (dual significance gate), and Article VIII (AD review).
+
+### Audit notes
+
+- **R288.W (LLNL Wikipedia, 0.008895)** — IRD-renewal heap-scheduler. Under
+  Article V §3 audit (per-trace IRD-renewal fits consumed verbatim). If
+  audit confirms §3 applies, R288.W moves to RETRACTIONS.md.
+- **r290 (LANL Wikipedia, 0.0114)** — IRD-renewal. Same audit pending.
+
+---
+
+## ARCHIVE — pre-Constitution (retracted 2026-05-09 under Art. V §1, §2)
+
+The tables below describe the race state as of 2026-05-09, prior to
+Constitution adoption. They are preserved verbatim for the historical
+trail. They DO NOT confer banking under the Constitution. Cells using
+chunk-cascade, chunk-surface, cross-seed chunk-ensemble, or coordinate
+descent against the cachesim metric are retracted.
+
+### Pre-Constitution last update banner (verbatim)
+
 Last updated: **2026-05-09 (LANL r432 Alibaba 0.0098784250, r336 Tencent 0.0297569167, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r412 Baleen24 0.0177436167 are banked; LANL leads 9/9)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
