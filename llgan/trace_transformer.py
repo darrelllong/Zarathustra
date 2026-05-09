@@ -253,7 +253,8 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
                        n_hashes: int = 16, bucket_size: int = 4096,
                        emb_dim: int = 96, n_heads: int = 4, n_layers: int = 3,
                        batch: int = 128, epochs: int = 10, lr: float = 1e-3,
-                       seed: int = 42, max_rows: int = 0):
+                       seed: int = 42, max_rows: int = 0,
+                       class_balance: bool = False):
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
@@ -297,6 +298,24 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
     valid_t = np.array(valid_t)
     print(f"[trace_transformer train] training positions: {len(valid_t):,}", flush=True)
 
+    # Class-balanced weights: inverse-sqrt of class frequency, normalized to mean 1.
+    # Counters class imbalance (49% FRESH dominates). Square-root softens the
+    # extreme weighting that pure inverse-frequency would impose on rare in-stack
+    # classes (which can have <0.1% frequency individually).
+    weights = None
+    if class_balance:
+        cls_count = np.bincount(target_class.numpy(), minlength=K + 2)
+        cls_freq = cls_count / max(cls_count.sum(), 1)
+        # inverse-sqrt with smoothing
+        w = 1.0 / np.sqrt(cls_freq + 1e-6)
+        # Normalize so mean weight = 1.
+        w = w * (cls_freq * w).sum()
+        w[cls_freq == 0] = 0.0
+        weights = torch.from_numpy(w.astype(np.float32)).to(device)
+        print(f"[trace_transformer train] class-balanced weights: "
+              f"FRESH={w[K+1]:.2f} RECYCLE={w[K]:.2f} "
+              f"IN_STACK[0]={w[0]:.2f} IN_STACK[127]={w[127]:.2f}", flush=True)
+
     for ep in range(epochs):
         model.train()
         rng.shuffle(valid_t)
@@ -324,7 +343,7 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
             tgt = tgt.to(device)
 
             logits = model(hist_h, stack_h)
-            loss = F.cross_entropy(logits, tgt)
+            loss = F.cross_entropy(logits, tgt, weight=weights)
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -444,6 +463,7 @@ def cmd_fit(args):
         bucket_size=args.bucket_size, emb_dim=args.emb_dim, n_heads=args.n_heads,
         n_layers=args.n_layers, batch=args.batch, epochs=args.epochs,
         lr=args.lr, seed=args.seed, max_rows=args.max_rows,
+        class_balance=args.class_balance,
     )
     state = {
         "K": K, "history": history, "n_hashes": n_hashes,
@@ -491,6 +511,9 @@ def main():
     pf.add_argument("--lr", type=float, default=1e-3)
     pf.add_argument("--seed", type=int, default=42)
     pf.add_argument("--max-rows", type=int, default=0)
+    pf.add_argument("--class-balance", action="store_true",
+                    help="Use inverse-sqrt-frequency class weights in the cross-entropy "
+                         "loss to counter FRESH-class dominance.")
     pf.set_defaults(fn=cmd_fit)
     pg = sub.add_parser("generate")
     pg.add_argument("--model", required=True)
