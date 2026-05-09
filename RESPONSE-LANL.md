@@ -6824,3 +6824,29 @@ Guard surface `guard`:
 | 82 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed82_guard.json` | 0.0111681250 |
 
 Guard mean across seeds `{42,80,81,82}`: `0.0110770104` (range `0.0003352500`).
+
+## 2026-05-09 16:57Z -- Tencent r443 Exact-Short-Rank Fit Launched
+
+Launched `tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3` on
+vinge as the next learned Tencent architectural test. r440-r442 all pointed at
+over-compressed Mattson depth, so this fit keeps the Denning WS birth-control
+path but preserves exact short reuse ranks through 128 before falling back to
+the empirical binned sampler.
+
+Process line:
+
+`--ws-edge-mode max-window --pos-bins 0 --pos-embed 8 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 128 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --fit --birth-control-mode ws`
+
+Tokenization/training confirms the intended architecture:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=187 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=128 fresh=38,507 recycle=0 reuse=61,493 ws_bins=[30, 30, 30, 30, 30] ws_edge_mode=max-window ws_edge_max=8192 windows=[32, 128, 512, 2048, 8192]`
+
+`[mattson_denning train] device=cuda params=330,354 seq=256 batch=256 epochs=20 n_batches=389 reuse_offset=1 pos_bins=0 pos_embed=8 short_reuse_loss_weight=0.0`
+
+PID: `4104017`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3_vinge_20260509T165728Z.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r443_exact128_wsmax_empiricalrank_norecycle.pt`.
+
+No claim until the four literal cachesim panels complete.
