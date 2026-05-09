@@ -6745,3 +6745,28 @@ Validation:
 
 Next fit target: r442 with `--ws-edge-mode max-window`, `--pos-bins 32`, and
 `--pos-embed 8`.
+
+## 2026-05-09 12:14Z -- Tencent r442 Phase-Conditioned Fit Launched
+
+Launched `tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3` on
+vinge as a real fit. This uses the r440 max-window Denning geometry, empirical
+within-bin rank sampling, no recycle cap, and the new learned phase embedding
+path.
+
+Process line:
+
+`--ws-edge-mode max-window --pos-bins 32 --pos-embed 8 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 0 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --fit --birth-control-mode ws`
+
+Tokenization/training confirms the intended architecture:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=59 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=0 fresh=38,507 recycle=0 reuse=61,493 ws_bins=[30, 30, 30, 30, 30] ws_edge_mode=max-window ws_edge_max=8192 windows=[32, 128, 512, 2048, 8192]`
+
+`[mattson_denning train] device=cuda params=310,002 seq=256 batch=256 epochs=20 n_batches=389 reuse_offset=1 pos_bins=32 pos_embed=8 short_reuse_loss_weight=0.0`
+
+PID: `4085369`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r442_pos32_wsmax_empiricalrank_norecycle_ws_p3_vinge_20260509T121421Z.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r442_pos32_wsmax_empiricalrank_norecycle.pt`.
+
+No claim until all four literal cachesim panels complete.
