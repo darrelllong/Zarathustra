@@ -6427,7 +6427,9 @@ Remote launch (official surface only):
 python3 -m altgan.ssh_chunk_surface_multiseed \
   --host baase \
   --tmux-session ali_r432_r431def \
-  --remote-module altgan.launch_alibaba_r432_chunk_surface_multiseed
+  --remote-module altgan.launch_alibaba_r432_chunk_surface_multiseed \
+  --commit --push \
+  --commit-message "LANL: Alibaba r432 defensive continuation"
 
 Dispatch note: this Codex sandbox cannot reach `/tiamat` hosts over SSH (DNS /
 egress blocked), so no remote job was started from here.

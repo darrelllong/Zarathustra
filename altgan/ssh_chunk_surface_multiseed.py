@@ -73,6 +73,14 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         ),
     )
     p.add_argument(
+        "--remote-log-dir",
+        default="/tiamat/zarathustra/altgan-output/logs",
+        help=(
+            "Remote directory for stdout/stderr logs (default: /tiamat/zarathustra/altgan-output/logs). "
+            "When set, the remote run redirects output to a timestamped log and prints LOG:<path>."
+        ),
+    )
+    p.add_argument(
         "--remote-git-ssh-key",
         default="",
         help=(
@@ -248,26 +256,53 @@ def _build_remote_run_script(
     git_ssh_export = _git_ssh_command_export(args=args)
     cmd = [args.remote_python, "-u", "-m", args.remote_module] + launch_args
     cmd_str = " ".join(_q(part) for part in cmd)
-    lines = ["set -euo pipefail", *_remote_cd_repo_snippet(args=args), git_ssh_export]
-    if args.tmux_session:
-        session = _q(args.tmux_session)
-        # We always run tmux jobs detached so they are explicitly managed.
-        lines += [
-            f"tmux new-session -d -s {session} {shlex.quote(cmd_str)}",
-            f"echo '[ssh_chunk_surface] tmux session started: {args.tmux_session}'",
-        ]
-        return "\n".join(lines)
-    lines.append(cmd_str)
-    if args.commit:
-        lines += [
-            "echo '[ssh_chunk_surface] committing updated docs...'",
+
+    def _commit_block() -> list[str]:
+        if not args.commit:
+            return []
+        lines2 = [
+            "echo '[ssh_chunk_surface] Committing doc updates...'",
             "git status --porcelain",
-            "git add -A",
-            f"git commit -m {_q(args.commit_message)}",
+            "git add altgan/RESULTS.md RESPONSE-LANL.md",
+            # Only commit if there is something staged/changed.
+            "if git diff --cached --quiet && git diff --quiet; then",
+            "  echo '[ssh_chunk_surface] No doc changes detected; skipping commit.'",
+            "else",
+            f"  git commit -m {_q(args.commit_message)} || true",
+            "fi",
         ]
         if args.push:
-            lines.append("git push origin HEAD:main")
-    return "\n".join(lines)
+            lines2.append("git push origin HEAD:main")
+        else:
+            lines2.append("echo '[ssh_chunk_surface] NOTE: --push not set; leaving commit unpushed.'")
+        return lines2
+
+    def _log_wrapped_cmd() -> list[str]:
+        log_dir = (args.remote_log_dir or "").strip()
+        if not log_dir:
+            return [cmd_str]
+        safe_tag = (args.remote_module or "chunk_surface").replace("/", "_").replace(".", "_")
+        return [
+            f"log_dir={_q(log_dir)}",
+            "mkdir -p \"$log_dir\"",
+            "ts=$(date -u +%Y%m%dT%H%M%SZ)",
+            f"log_path=\"$log_dir/{safe_tag}_$ts.log\"",
+            f"echo \"LOG:$log_path\"",
+            f"{cmd_str} > \"$log_path\" 2>&1",
+        ]
+
+    base_lines = ["set -euo pipefail", *_remote_cd_repo_snippet(args=args), git_ssh_export]
+    run_lines = _log_wrapped_cmd() + _commit_block()
+
+    if args.tmux_session:
+        # For detached runs, embed the full run script (including commit/push)
+        # inside the tmux session so completion triggers the git operations.
+        remote_script = "\n".join(base_lines + run_lines + ["echo '[ssh_chunk_surface] Done.'"])
+        session = _q(args.tmux_session)
+        inner = f"tmux new-session -d -s {session} bash -lc {shlex.quote(remote_script)}"
+        return "\n".join(base_lines + [inner, f"echo '[ssh_chunk_surface] tmux session started: {args.tmux_session}'"])
+
+    return "\n".join(base_lines + run_lines + ["echo '[ssh_chunk_surface] Done.'"])
 
 
 def main(argv: list[str] | None = None) -> int:
