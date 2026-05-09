@@ -6178,3 +6178,25 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r441_wsperwin_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 12:09Z -- Tencent r441 Per-Window WS-Edge Completed, Retracted
+
+r441 completed as another learned-architecture negative result. Per-window
+Denning WS bins trained cleanly and avoided impossible-bin support, but the
+rollouts still under-hit the 128/512/2048 cache points. It is worse than r440
+`0.0643654167` and r434 `0.0601647500`, so it is not promoted.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r441_wsperwin_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0574` | 0.0573516667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r441_wsperwin_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0801` | 0.0800846667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r441_wsperwin_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0648` | 0.0648460000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r441_wsperwin_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0605` | 0.0604863333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0656921667` (race display `0.0657`;
+range `0.0227330000`). r441 is not promoted.
+
+Next architectural inference: better WS bin geometry improves the training
+surface but not the reuse-rank decoder. The next learned scout should change
+how rank/reuse events are parameterized or conditioned, not keep squeezing the
+WS target alone.
