@@ -5172,6 +5172,8 @@ Log:
 
 r398 failed before evaluation because
 `/tiamat/zarathustra/altgan-output/baleen24_r396_hotrepair_hf0.55_ids64_seed42_fake_1000k.csv`
-has only `877957` data rows. r398b excludes that truncated donor and includes
-the 1M-row r396/r397/hothead-scout donors plus the current pure-LANL Baleen
-chunk-surface donor bank. This is not a banked claim yet.
+has only `877957` data rows. The chunk-surface combiner now skips
+mismatched-length donors (truncated writes) instead of failing; r398b also
+excludes that truncated donor explicitly and includes the 1M-row
+r396/r397/hothead-scout donors plus the current pure-LANL Baleen chunk-surface
+donor bank. This is not a banked claim yet.

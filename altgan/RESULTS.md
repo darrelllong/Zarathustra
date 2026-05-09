@@ -5059,4 +5059,6 @@ Log:
 
 The first r398 launch failed before evaluation because one donor artifact,
 `baleen24_r396_hotrepair_hf0.55_ids64_seed42_fake_1000k.csv`, has `877957`
-data rows instead of 1M. r398b excludes that truncated donor.
+data rows instead of 1M. The chunk-surface combiner now skips mismatched-length
+donors (truncated writes) instead of failing; r398b also excludes that
+truncated donor explicitly.

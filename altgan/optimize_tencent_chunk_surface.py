@@ -257,7 +257,13 @@ def main() -> int:
         donor_swap = {column: _column_array(donor, column) for column in swap_columns}
         donor_len = len(next(iter(donor_swap.values())))
         if donor_len != base_len:
-            raise ValueError(f"donor length mismatch for {donor_path}: {donor_len} vs {base_len}")
+            # Some donor artifacts can be truncated (e.g., interrupted writes). Failing hard here
+            # burns an entire multi-seed run; skip and continue instead.
+            print(
+                f"[chunk_surface] SKIP donor length mismatch for {donor_path}: {donor_len} vs {base_len}",
+                flush=True,
+            )
+            continue
         donor_frames.append((Path(donor_path).stem, donor_swap))
     donor_shifts = list(dict.fromkeys(int(shift) for shift in args.donor_shifts))
     if not donor_shifts:
