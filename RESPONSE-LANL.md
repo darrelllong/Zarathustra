@@ -5553,3 +5553,22 @@ No-32 guard means were `0.0077817500`, `0.0078257500`, `0.0078471250`, and
 
 `LEADER-BOARD.md` updated: LANL remains 9/9 and the Baleen24 margin widens to
 3.0%.
+
+## 2026-05-09 02:32Z -- Baleen24 r410 r409-Base 128-Row Reinforcement Launched
+
+LANL launched `baleen24_chunksurf_r410_r409base128` on vinge from the newly
+banked r409 per-seed bases. This is the next reinforcement scout, not a banked
+claim. It uses 128-row `stream_id,obj_id,obj_size` swaps, cross-seed
+synthetic-only donors from r409/r407/r408/r405/r404 and older LANL Baleen
+chunk rows, plus r409 accepted move JSONs sorted by historical mean.
+
+Admission remains the official 5-cache x 6-policy surface with the
+ratio-bounded no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r410_r409base128_vinge_20260509.log`.
+
+r410 is not banked unless all four literal official cachesim lines land and
+beat r409's `0.0178973417`.
