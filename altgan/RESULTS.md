@@ -5334,3 +5334,27 @@ surface with the no-32 ratio guard:
 Log: `/tiamat/zarathustra/altgan-output/logs/alibaba_r411_selfshift16_baase_20260509.log`.
 
 No claim until the four-seed mean beats r386 `0.0099685750`.
+
+## Baleen24 r410 r409-Base 128-Row Reinforcement Banked (2026-05-09)
+
+Banked `baleen24_chunksurf_r410_r409base128`, a synthetic-only 128-row
+`stream_id,obj_id,obj_size` chunk-surface reinforcement from the r409 bases.
+Admission used the official 5-cache x 6-policy Baleen24 surface plus the
+no-32 ratio guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177849000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177774333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0178118333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0177` | 0.0177454333 |
+
+Four-seed mean: `0.0177799000` (display `0.0178`), range `0.0000664000`.
+This improves LANL r409 `0.0178973417` by `0.0001174417` (`0.6562%` lower)
+and beats LLNL R291.BAL2 `0.018447` by `0.0006671000` (`3.6163%` lower).
+
+No-32 guard mean: `0.0077556146`, range `0.0001064167`. Per seed:
+`0.0077083750`, `0.0077702083`, `0.0078147917`, `0.0077290833`.

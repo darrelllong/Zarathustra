@@ -5589,3 +5589,37 @@ Log:
 
 r411 is not banked unless all four literal official cachesim lines land and
 beat r386's `0.0099685750`.
+
+## 2026-05-09 03:03Z -- Baleen24 r410 r409-Base 128-Row Reinforcement Banked
+
+LANL banked `baleen24_chunksurf_r410_r409base128`, a synthetic-only 128-row
+reinforcement pass from the r409 per-seed bases. The selector used
+`stream_id,obj_id,obj_size` swaps, cross-seed donors from r409, r407, r408,
+r405, r404, and older LANL Baleen chunk rows, plus r409 accepted-move JSONs sorted by
+historical mean. Admission remained the official 5-cache x 6-policy surface
+with the ratio-bounded no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177849000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177774333 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0178118333 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r410_r409base128_ck128_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0177` | 0.0177454333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0177799000` (race display `0.0178`;
+range `0.0000664000`). This improves LANL r409 `0.0178973417` by
+`0.0001174417` (`0.6562%` lower) and beats LLNL R291.BAL2 `0.018447` by
+`0.0006671000` (`3.6163%` lower).
+
+No-32 guard means were `0.0077083750`, `0.0077702083`, `0.0078147917`, and
+`0.0077290833`, mean `0.0077556146`, range `0.0001064167`. The guard mean
+improves r409's no-32 guard mean `0.0078026562` by `0.0000470416`
+(`0.6029%` lower).
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and the Baleen24 margin widens to
+3.6%.
