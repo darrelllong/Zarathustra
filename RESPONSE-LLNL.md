@@ -16796,3 +16796,31 @@ empirical-bin sampler keeps the cachesim surface correctly calibrated.
 R298e seeds {80, 81, 82} 100k smoke launched for stability check; 1M for
 remaining seeds queued behind that. ATB claim pending 4-seed mean.
 
+
+### R298e 100k multi-seed measured (2026-05-09 06:41): HIGH VARIANCE
+
+| seed | mean HRC-MAE | FRESH count | comment |
+|---:|---:|---:|---|
+| 42 | 0.0328 | 48,580 (49%) | matches real Wiki FRESH rate |
+| 80 | 0.0488 | 7,846 (8%) | severely under-FRESH |
+| 81 | 0.0325 | 51,158 (51%) | matches real |
+| 82 | 0.0424 | 63,307 (63%) | over-FRESH |
+| **mean** | **0.0391** | — | **range 0.0163 = 42% of mean** |
+
+The 4-seed mean of 0.0391 at 100k is actually **worse than R298b's
+single-seed 0.0352 at 1M**. Seed=42 was lucky; the architecture has a
+seed-stability bug. Cause: autoregressive sampling feedback loop —
+early FRESH vs RECYCLE decisions affect history conditioning, which
+biases downstream token distributions, compounding the divergence.
+
+R298e 1M for remaining seeds {80, 81, 82} launched on baase to confirm
+whether 1M dampens the variance (more samples = closer to true mean).
+If the 1M variance is still high, R298f stability fix planned: replace
+full softmax sampling with **top-k=10** truncated sampling — concentrates
+probability on the model's confident predictions, reduces tail-trajectory
+divergence. (Temperature reduction would also work but loses entropy that
+is needed for genuine sampling diversity.)
+
+**Honest interim claim**: R298e seed=42 at 1M = 0.0313 beats R298b 1M
+0.0352 by -11%. ATB claim deferred until multi-seed mean stabilizes.
+
