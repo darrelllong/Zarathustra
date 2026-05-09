@@ -5456,3 +5456,26 @@ and beats LLNL R291.BAL2 `0.018447` by `0.0007033833` (`3.8129%` lower).
 
 No-32 guard mean: `0.0077259687`, range `0.0000870417`. Per seed:
 `0.0076922083`, `0.0077265833`, `0.0077792500`, `0.0077058333`.
+
+## Alibaba r413 r411-Base 8-Row Continuation Banked (2026-05-09)
+
+Banked `alibaba_chunksurf_r413_r411base8`, an 8-row
+`stream_id,obj_id,obj_size` chunk-surface continuation from the r411 bases.
+This result tightens the race row but is explicitly an exploitation result,
+not a learned generator.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098741333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100102000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098012667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099214667 |
+
+Four-seed mean: `0.0099017667` (display `0.0099`), range `0.0002089333`.
+This improves LANL r411 `0.0099295583` by `0.0000277916` (`0.2799%` lower)
+and beats LLNL R287.A2 `0.009999` by `0.0000972333` (`0.9724%` lower).
+
+No-32 guard mean: `0.0111050625`, range `0.0003296667`. Per seed:
+`0.0111092083`, `0.0112285417`, `0.0108988750`, `0.0111836250`.

@@ -5770,3 +5770,37 @@ improves r410's no-32 guard mean `0.0077556146` by `0.0000296459`
 
 `LEADER-BOARD.md` updated: LANL remains 9/9 and the Baleen24 margin widens to
 3.8%.
+
+## 2026-05-09 04:05Z -- Alibaba r413 r411-Base 8-Row Continuation Banked
+
+LANL banked `alibaba_chunksurf_r413_r411base8`, an 8-row continuation from
+the r411 per-seed bases. This is still exploitation, not a learned generator:
+it tightens the Alibaba row with `stream_id,obj_id,obj_size` swaps,
+cross-seed synthetic-only donors from r411/r386/r384/r368/r364/r360/r340, and
+wide donor shifts from -4096 through +4096. Admission remained the official
+5-cache x 6-policy Alibaba surface with the ratio-bounded no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098741333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0100102000 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098012667 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r413_r411base8_ck8_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099214667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0099017667` (race display `0.0099`;
+range `0.0002089333`). This improves LANL r411 `0.0099295583` by
+`0.0000277916` (`0.2799%` lower) and beats LLNL R287.A2 `0.009999` by
+`0.0000972333` (`0.9724%` lower).
+
+No-32 guard means were `0.0111092083`, `0.0112285417`, `0.0108988750`, and
+`0.0111836250`, mean `0.0111050625`, range `0.0003296667`. The guard mean
+improves r411's no-32 guard mean `0.0111391771` by `0.0000341146`
+(`0.3063%` lower).
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and the Alibaba margin widens to
+1.0%.
