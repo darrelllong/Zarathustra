@@ -6067,3 +6067,20 @@ mass to the window cap. Also fixed learned-WS generation so
 Validation:
 - `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
 - `bash -n altgan/lanl_remote_job.sh`
+
+## 2026-05-09 11:24Z -- Tencent r439 Masked Learned-WS No-Fit Launch
+
+Launched `tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3` on
+vinge as a no-fit rollout from the r437 checkpoint.
+
+Process line:
+
+`--model /tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt --tag tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 0 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --birth-control-mode learned-ws-masked`
+
+PID: `4074953`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_vinge_20260509T112407Z.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
+
+No claim until all four literal cachesim panels complete.
