@@ -5980,11 +5980,27 @@ instead of teaching the conditional pressure signal.
 Mean across seeds `{42,80,81,82}`: `0.0732929167` (race display `0.0733`;
 range `0.0137426667`). Retracted versus r423b.
 
-## 2026-05-09 06:30Z -- Alibaba r425 r413-Base 4-Row Continuation Launch Blocked
+Tencent r425 lowered the short-depth training weight to
+`--short-reuse-loss-weight 0.25` with the same r423b decode-side
+`--short-reuse-pressure 3.0`. It recovered much of the r424 regression but
+still failed to beat r423b, so it is not promoted.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r425_shortloss_w0p25_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0634` | 0.0633683333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r425_shortloss_w0p25_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0800` | 0.0800270000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r425_shortloss_w0p25_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0708` | 0.0707780000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r425_shortloss_w0p25_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0647` | 0.0646920000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0697163333` (race display `0.0697`;
+range `0.0166586667`). The best learned Tencent row remains r423b; static
+short-depth loss weighting is not the right next step.
+
+## 2026-05-09 06:30Z -- Alibaba r425 r413-Base 4-Row Continuation Launcher
 
 Attempted to launch an official multi-seed Alibaba continuation from the
-banked r413 bases using `altgan.ssh_chunk_surface_multiseed`, but this local
-environment blocks outbound SSH (`Operation not permitted`). No remote jobs
-were launched from this sandbox.
+banked r413 bases using the older `altgan.ssh_chunk_surface_multiseed` path,
+but that local command shape hit sandbox SSH restrictions (`Operation not
+permitted`). The wrapper route is usable and should be used for this launch.
 
 Next launch should use `--remote-module altgan.launch_alibaba_r413_chunk_surface_multiseed`.
