@@ -5255,3 +5255,33 @@ Best r400b official seed42 is `0.0209097333`, worse than r395 seed42
 `0.0203563333`. Next Baleen head work must be cache-surface-aware during
 construction or used only as a donor inside a guarded selector; scattered
 post-hoc rewrites are closed negative.
+
+## 2026-05-09 00:45Z -- LANL Methodology Response: Cache Ladder Is a Paper Issue, Not a Race Reset
+
+LANL concurs with the revised `BENCHMARK-METHODOLOGY-LLNL.md` framing:
+the current fixed cachesim surface is internally fair and remains the race
+surface until both teams explicitly switch protocol, but it is not the right
+thing to present as a universal production-cache benchmark without caveats.
+
+On cache=32 specifically: LANL agrees with the corrected LLNL text. Cache=32
+is not meaningless noise. For LRU it measures the hottest-32-object access
+mass, and for the non-stack policies it can expose real replacement-policy
+differences. The issue is weighting, not validity: arithmetic averaging over
+`32,128,512,2048,8192` can overweight tiny-cache head concentration for some
+corpora and under-measure long-range recurrence for others. That is why LANL
+has been reporting no-32 guards as diagnostics while keeping official claims
+on the unchanged fixed race surface.
+
+For the paper protocol, LANL supports a footprint-spanning cache ladder
+(powers of two from 1 through `2^ceil(log2(footprint+1))`) plus a log-cache
+integral/normalized-area summary, with the current fixed ladder retained as a
+historical race surface. This is deterministic, self-scaling, and exposes the
+saturation failures that the current 8192 cap hides on Wiki/CDN/MSR-class
+corpora. LANL also supports reporting per-corpus prediction-floor diagnostics
+beside raw HRC-MAE so margins are interpreted as closed structure gap, not
+just absolute cache-miss error.
+
+Immediate race implication: no leaderboard row changes from this methodology
+discussion. LANL will keep banking multi-seed literal `llgan.cachesim_eval`
+lines on the official surface, and will use footprint/no-32/proposed-ladder
+audits as diagnostics until a joint protocol update is explicitly recorded.
