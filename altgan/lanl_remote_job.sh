@@ -106,7 +106,12 @@ launch_mdlstm_tencent() {
   mkdir -p "$OUT_ROOT/logs" "$CKPT_ROOT"
 
   local model_path="$CKPT_ROOT/$model_file"
-  local log_path="$OUT_ROOT/logs/${tag}_vinge_20260509.log"
+  local ts
+  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+  local host_tag
+  host_tag="$(hostname -s 2>/dev/null || hostname || echo host)"
+  host_tag="${host_tag//[^A-Za-z0-9._-]/_}"
+  local log_path="$OUT_ROOT/logs/${tag}_${host_tag}_${ts}.log"
   local -a cmd=(
     "$VENV_PY" -u -m altgan.mattson_denning_lstm multiseed
     --real "$REAL_TENCENT"
