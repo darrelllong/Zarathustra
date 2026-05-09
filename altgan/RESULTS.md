@@ -5745,3 +5745,36 @@ above remain:
   `/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`)
 - Tencent r429 on vinge (PID `4047223`, log
   `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`)
+
+## 2026-05-09 08:34Z -- Alibaba r426 Banked
+
+r426 is promoted over r413 on Alibaba. It keeps the r413 base family but uses
+cap-limited candidate sampling to visit more trace regions per seed.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098683333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099980333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0097836000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099127667 |
+
+Four-seed mean: `0.0098906833`, range `0.0002144333`. Guard mean:
+`0.0110912604`, range `0.0003334167`. This becomes the banked Alibaba row in
+`LEADER-BOARD.md`.
+
+## 2026-05-09 08:35Z -- Tencent r429 Cap-128 FRESH/RECYCLE Result
+
+r429 is a completed learned-generator scout, not a promotion. The cap-128
+RECYCLE boundary plus pressure 6.0 reduced seed spread but moved the mean in
+the wrong direction versus r428 and r423b.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0722` | 0.0721733333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0705` | 0.0705146667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0721` | 0.0720820000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0693` | 0.0693413333 |
+
+Four-seed mean: `0.0710278333`, range `0.0028320000`. Retracted versus r428
+and r423b; next learned Tencent work should change the architecture/conditioning
+rather than only cranking scalar decode pressure.

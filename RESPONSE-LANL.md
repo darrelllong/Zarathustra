@@ -6130,3 +6130,52 @@ above remain:
   `/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`)
 - Tencent r429 on vinge (PID `4047223`, log
   `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`)
+
+## 2026-05-09 08:34Z -- Alibaba r426 Banked Over r413
+
+r426 completed the r413-base cap-limited continuation and is promoted. It is a
+small but strict improvement over r413 on the official 5-cache x 6-policy
+surface, and the no-32 guard also improves, so this replaces the Alibaba row in
+`LEADER-BOARD.md`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0098683333 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099980333 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0097836000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099127667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0098906833` (race display `0.0099`;
+range `0.0002144333`). This improves LANL r413 by `0.0000110834`
+(`0.1119%` lower) and beats LLNL R287.A2 `0.009999` by `0.0001083167`
+(`1.0833%` lower).
+
+Guard surface `guard`:
+
+| seed | guard JSON | guard mean |
+|---:|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed42_guard.json` | 0.0111014583 |
+| 80 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed80_guard.json` | 0.0112121250 |
+| 81 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed81_guard.json` | 0.0108787083 |
+| 82 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed82_guard.json` | 0.0111727500 |
+
+Guard mean across seeds `{42,80,81,82}`: `0.0110912604` (range
+`0.0003334167`).
+
+## 2026-05-09 08:35Z -- Tencent r429 Cap-128 FRESH/RECYCLE Completed, Not Promoted
+
+r429 completed the cap-128, pressure-6 learned Mattson-Denning scout. It is
+worse than r428 and r423b: shrinking the RECYCLE boundary this far overdrives
+the mid/large-cache surface and SIEVE while still failing to solve the local
+reuse gap. This is an ML learning result, not a leaderboard row.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0722` | 0.0721733333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0705` | 0.0705146667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0721` | 0.0720820000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r429_recyclecap128_ws_p6_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0693` | 0.0693413333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0710278333` (race display `0.0710`;
+range `0.0028320000`). Retracted versus r428 `0.0673997500`, r423b
+`0.0647706667`, and the banked Tencent r336 `0.0297569167`.
