@@ -6873,3 +6873,28 @@ range `0.0153326667`). r443 is not promoted.
 Next learned move is r444: add the new window-band Mattson-depth auxiliary head
 from `altgan/mattson_denning_lstm.py` and use its generation-time band bias to
 stabilize the exact-rank model across seeds.
+
+## 2026-05-09 17:09Z -- Tencent r444 Rank-Band Exact-Rank Fit Launched
+
+Launched `tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075`
+on vinge. This is the first fit using the new learned window-band Mattson-depth
+auxiliary head, keyed to the race cache ladder, on top of r443's exact short
+rank tokenization.
+
+Process line:
+
+`--ws-edge-mode max-window --pos-bins 0 --pos-embed 8 --rank-band-mode window --rank-band-loss-weight 0.25 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 128 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --rank-band-bias 0.75 --fit --birth-control-mode ws`
+
+Tokenization/training confirms the intended architecture:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=187 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=128 fresh=38,507 recycle=0 reuse=61,493 ws_bins=[30, 30, 30, 30, 30] ws_edge_mode=max-window ws_edge_max=8192 windows=[32, 128, 512, 2048, 8192]`
+
+`[mattson_denning train] device=cuda params=331,128 seq=256 batch=256 epochs=20 n_batches=389 reuse_offset=1 pos_bins=0 pos_embed=8 short_reuse_loss_weight=0.0 rank_band_mode=window rank_band_loss_weight=0.25`
+
+PID: `4108472`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075_vinge_20260509T170906Z.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle.pt`.
+
+No claim until the four literal cachesim panels complete.
