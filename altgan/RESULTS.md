@@ -6393,3 +6393,20 @@ range `0.0063310000`). r444 is not promoted.
 
 Immediate follow-up: reuse the r444 checkpoint with `--rank-band-bias 0.0` to
 separate auxiliary representation learning from biased decode.
+
+## Tencent r445 Rank-Band Aux-Only Decode Launched (2026-05-09)
+
+Launched `tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000`
+on vinge using the already-trained r444 checkpoint with no refit and
+`--rank-band-bias 0.0`. This isolates whether the window-band auxiliary task
+helped the LSTM representation without allowing the band head to steer sampling.
+
+Process line:
+
+`--model /tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle.pt --ws-edge-mode max-window --rank-band-mode window --rank-band-loss-weight 0.25 --rank-sampler empirical --exact-rank-cutoff 128 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --rank-band-bias 0.0 --birth-control-mode ws`
+
+PID: `4111023`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_vinge_20260509T172119Z.log`.
+
+No claim until the four literal cachesim panels complete.
