@@ -307,12 +307,23 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _run(args)
     except subprocess.CalledProcessError as exc:
-        if args.dry_run or args.no_proxyjump:
+        if args.dry_run:
             raise
         if exc.returncode != 255:
             # Non-SSH failure (remote command exited non-zero). Don't retry
             # automatically; that can be expensive and may duplicate work.
-            raise
+            sys.stderr.write(
+                f"[ssh_chunk_surface] ERROR: remote command failed with exit code {exc.returncode}.\n"
+            )
+            sys.stderr.flush()
+            return int(exc.returncode)
+        if args.no_proxyjump:
+            sys.stderr.write(
+                "[ssh_chunk_surface] ERROR: ssh failed (exit 255). "
+                "If you see 'Operation not permitted', this environment is blocking outbound SSH.\n"
+            )
+            sys.stderr.flush()
+            return 255
         # Common failure mode: ssh-config forces ProxyJump through a host that
         # is not resolvable from the current network. Retry once without
         # ProxyJump to reduce operator friction.
