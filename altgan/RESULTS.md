@@ -5792,3 +5792,16 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r430_recyclecap256_ws_p3_vinge_20260509.log`.
 Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r430_recyclecap256.pt`.
+
+## 2026-05-09 08:41Z -- Alibaba r431 r426-Base Priority Continuation
+
+Launched `alibaba_chunksurf_r431_r426base4_cap16` on baase from the banked r426
+per-seed bases. The run prioritizes the r426 accepted move JSONs, keeps
+`--max-candidates-per-chunk 16`, uses `--max-evals 700`, and retains the no-32
+guard.
+
+PID: `1970307`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r431_r426base4_cap16_20260509T084034Z.log`.
+Base template:
+`/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed{seed}_fake_1000k.csv`.

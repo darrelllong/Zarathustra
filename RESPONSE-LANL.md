@@ -6198,3 +6198,23 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r430_recyclecap256.pt`.
 
 No claim until all four literal `llgan.cachesim_eval` panels complete.
+
+## 2026-05-09 08:41Z -- Alibaba r431 r426-Base Priority Continuation Launched
+
+Launched an Alibaba continuation on baase from the newly banked r426 bases:
+`alibaba_chunksurf_r431_r426base4_cap16`. This uses r426's accepted move files
+as priority candidates, keeps `--max-candidates-per-chunk 16`, raises the
+budget to `--max-evals 700`, and continues to guard the no-32 surface.
+
+The first wildcard-form launch rejected the expanded `seed*_moves.json` list
+before doing optimizer work; the active run uses an explicit comma-separated
+priority list.
+
+PID: `1970307`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r431_r426base4_cap16_20260509T084034Z.log`.
+Base template:
+`/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed{seed}_fake_1000k.csv`.
+
+No promotion unless it completes all four literal official panels and beats
+r426 `0.0098906833`.
