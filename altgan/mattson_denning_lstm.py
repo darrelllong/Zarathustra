@@ -22,6 +22,10 @@ from pathlib import Path
 import numpy as np
 
 NEW_TOKEN = 0
+FRESH_TOKEN = 0
+RECYCLE_TOKEN = 1
+LEGACY_REUSE_TOKEN_OFFSET = 1
+SPLIT_REUSE_TOKEN_OFFSET = 2
 DEFAULT_WINDOWS = "32,128,512,2048,8192"
 DEFAULT_SIZES = "32,128,512,2048,8192"
 DEFAULT_POLICIES = "lru,arc,fifo,sieve,slru,car"
@@ -123,8 +127,12 @@ def value_to_bin(value: int, edges: np.ndarray) -> int:
     return max(0, min(ix, len(edges) - 2))
 
 
-def rank_to_token(rank: int, edges: np.ndarray) -> int:
-    return value_to_bin(rank, edges) + 1
+def rank_to_token(
+    rank: int,
+    edges: np.ndarray,
+    reuse_token_offset: int = LEGACY_REUSE_TOKEN_OFFSET,
+) -> int:
+    return value_to_bin(rank, edges) + int(reuse_token_offset)
 
 
 def token_to_rank(
@@ -132,10 +140,11 @@ def token_to_rank(
     edges: np.ndarray,
     rng: np.random.Generator,
     max_rank: int | None = None,
+    reuse_token_offset: int = LEGACY_REUSE_TOKEN_OFFSET,
 ) -> int:
-    if token == NEW_TOKEN:
+    if token < reuse_token_offset:
         return -1
-    ix = token - 1
+    ix = token - int(reuse_token_offset)
     lo = int(edges[ix])
     hi = int(edges[min(ix + 1, len(edges) - 1)])
     if max_rank is not None:
@@ -184,25 +193,49 @@ def denning_working_sets(trace: RealTrace, windows: list[int], edges: np.ndarray
     return features
 
 
-def tokenize(trace: RealTrace, n_rank_bins: int, n_ws_bins: int, windows: list[int]):
+def tokenize(
+    trace: RealTrace,
+    n_rank_bins: int,
+    n_ws_bins: int,
+    windows: list[int],
+    recycle_rank_cap: int = 0,
+):
     depths, footprint = mattson_depths(trace)
-    rank_edges = make_log_edges(footprint, n_rank_bins)
+    reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
+    rank_max = min(footprint, max(1, int(recycle_rank_cap))) if recycle_rank_cap > 0 else footprint
+    rank_edges = make_log_edges(rank_max, n_rank_bins)
     ws_edges = make_log_edges(footprint, n_ws_bins)
-    tokens = tokens_from_depths(depths, rank_edges, trace.n)
+    tokens = tokens_from_depths(depths, rank_edges, trace.n, recycle_rank_cap)
     ws_tokens = denning_working_sets(trace, windows, ws_edges)
+    fresh = int((tokens == FRESH_TOKEN).sum())
+    recycle = int((tokens == RECYCLE_TOKEN).sum()) if recycle_rank_cap > 0 else 0
+    reuse = trace.n - fresh - recycle
     print(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
+        f"reuse_offset={reuse_token_offset} recycle_rank_cap={int(recycle_rank_cap)} "
+        f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
         f"ws_bins={len(ws_edges) - 1} windows={windows}",
         flush=True,
     )
     return tokens, ws_tokens, rank_edges, ws_edges, footprint
 
 
-def tokens_from_depths(depths: np.ndarray, rank_edges: np.ndarray, n: int) -> np.ndarray:
+def tokens_from_depths(
+    depths: np.ndarray,
+    rank_edges: np.ndarray,
+    n: int,
+    recycle_rank_cap: int = 0,
+) -> np.ndarray:
     tokens = np.empty(n, dtype=np.int64)
+    reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     for i, depth in enumerate(depths):
-        tokens[i] = NEW_TOKEN if depth < 0 else rank_to_token(int(depth), rank_edges)
+        if depth < 0:
+            tokens[i] = FRESH_TOKEN
+        elif recycle_rank_cap > 0 and int(depth) >= int(recycle_rank_cap):
+            tokens[i] = RECYCLE_TOKEN
+        else:
+            tokens[i] = rank_to_token(int(depth), rank_edges, reuse_token_offset)
     return tokens
 
 
@@ -273,11 +306,13 @@ def train_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model(vocab, ws_tokens.shape[1], ws_bins, token_embed, ws_embed, hidden).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    reuse_token_offset = max(LEGACY_REUSE_TOKEN_OFFSET, int(vocab) - len(rank_edges) + 1)
     reuse_class_weights = None
     if short_reuse_loss_weight > 0.0:
-        reuse_class_weights = torch.from_numpy(
-            _short_reuse_class_weights(rank_edges, windows, short_reuse_loss_weight)
-        ).to(device)
+        weights = _short_reuse_class_weights(rank_edges, windows, short_reuse_loss_weight)
+        if reuse_token_offset == SPLIT_REUSE_TOKEN_OFFSET:
+            weights = np.concatenate((np.ones(1, dtype=np.float32), weights))
+        reuse_class_weights = torch.from_numpy(weights).to(device)
 
     tok_t = torch.from_numpy(tokens.astype(np.int64))
     ws_t = torch.from_numpy(ws_tokens.astype(np.int64))
@@ -290,7 +325,7 @@ def train_model(
         "[mattson_denning train] "
         f"device={device} params={sum(p.numel() for p in model.parameters()):,} "
         f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches} "
-        f"short_reuse_loss_weight={short_reuse_loss_weight}",
+        f"reuse_offset={reuse_token_offset} short_reuse_loss_weight={short_reuse_loss_weight}",
         flush=True,
     )
 
@@ -307,12 +342,12 @@ def train_model(
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             logits, birth_logits, ws_logits, _ = model(x_tok, x_ws)
-            y_birth = (y == NEW_TOKEN).float()
+            y_birth = (y == FRESH_TOKEN).float()
             birth_loss = F.binary_cross_entropy_with_logits(
                 birth_logits.reshape(-1),
                 y_birth.reshape(-1),
             )
-            reuse_mask = y != NEW_TOKEN
+            reuse_mask = y != FRESH_TOKEN
             if bool(reuse_mask.any()):
                 reuse_loss = F.cross_entropy(
                     logits[:, :, 1:][reuse_mask],
@@ -408,13 +443,16 @@ def fit(args) -> None:
         args.rank_bins,
         args.ws_bins,
         windows,
+        args.recycle_rank_cap,
     )
+    reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
+    vocab = len(rank_edges) + (reuse_token_offset - 1)
     model = train_model(
         tokens,
         ws_tokens,
         rank_edges=rank_edges,
         windows=windows,
-        vocab=len(rank_edges),
+        vocab=vocab,
         ws_bins=len(ws_edges) - 1,
         hidden=args.hidden,
         token_embed=args.token_embed,
@@ -436,7 +474,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 3,
+            "version": 4,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -444,7 +482,11 @@ def fit(args) -> None:
             "rank_edges": rank_edges,
             "ws_edges": ws_edges,
             "windows": windows,
-            "vocab": len(rank_edges),
+            "vocab": vocab,
+            "fresh_token": FRESH_TOKEN,
+            "recycle_token": RECYCLE_TOKEN if args.recycle_rank_cap > 0 else None,
+            "reuse_token_offset": reuse_token_offset,
+            "recycle_rank_cap": int(args.recycle_rank_cap),
             "ws_bins": len(ws_edges) - 1,
             "hidden": args.hidden,
             "token_embed": args.token_embed,
@@ -454,7 +496,7 @@ def fit(args) -> None:
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
             "short_reuse_loss_weight": args.short_reuse_loss_weight,
-            "training_loss": "binary birth cross entropy plus reuse-only Mattson depth cross entropy plus auxiliary next-Denning-working-set cross entropy",
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy",
         },
     )
 
@@ -495,27 +537,29 @@ def _warmstart_context(
     counters = [Counter() for _ in windows]
     stack: list[int] = []
     next_new = 0
+    recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
+    stale_pool = deque(maxlen=max(10_000, recycle_rank_cap * 16 if recycle_rank_cap > 0 else 10_000))
     default_tokens = [NEW_TOKEN] * history
     default_ws = [[0] * len(windows) for _ in range(history)]
 
     real_path = state.get("real")
     if not real_path:
-        return default_tokens, default_ws, queues, counters, stack, next_new
+        return default_tokens, default_ws, queues, counters, stack, next_new, stale_pool
 
     try:
         trace = read_real_csv(real_path, int(state.get("max_rows") or 0))
     except OSError:
-        return default_tokens, default_ws, queues, counters, stack, next_new
+        return default_tokens, default_ws, queues, counters, stack, next_new, stale_pool
 
     min_warm = min(trace.n, max(history, max(windows, default=history)))
     if min_warm <= 0:
-        return default_tokens, default_ws, queues, counters, stack, next_new
+        return default_tokens, default_ws, queues, counters, stack, next_new, stale_pool
 
     rng = np.random.default_rng(seed + 7919)
     end = int(rng.integers(min_warm, trace.n + 1)) if trace.n > min_warm else trace.n
     warm = _slice_trace(trace, 0, end)
     depths, _footprint = mattson_depths(warm)
-    warm_tokens = tokens_from_depths(depths, rank_edges, warm.n).tolist()
+    warm_tokens = tokens_from_depths(depths, rank_edges, warm.n, recycle_rank_cap).tolist()
     warm_ws = denning_working_sets(warm, windows, ws_edges).tolist()
 
     id_map: dict[tuple[int, int], int] = {}
@@ -532,6 +576,8 @@ def _warmstart_context(
             except ValueError:
                 pass
         stack.insert(0, mapped)
+        if recycle_rank_cap > 0 and len(stack) > recycle_rank_cap:
+            stale_pool.append(int(stack.pop()))
         key = (0, mapped)
         for wi, (queue, counter) in enumerate(zip(queues, counters)):
             queue.append(key)
@@ -552,10 +598,11 @@ def _warmstart_context(
 
     print(
         "[mattson_denning generate] "
-        f"warmstart_rows={warm.n:,} prefix_end={end:,} unique={next_new:,} stack={len(stack):,}",
+        f"warmstart_rows={warm.n:,} prefix_end={end:,} unique={next_new:,} "
+        f"stack={len(stack):,} stale_pool={len(stale_pool):,}",
         flush=True,
     )
-    return warm_tokens, warm_ws, queues, counters, stack, next_new
+    return warm_tokens, warm_ws, queues, counters, stack, next_new, stale_pool
 
 
 def _birth_targets_from_real(state: dict, n_records: int) -> np.ndarray | None:
@@ -615,21 +662,22 @@ def _force_emitted_reuse(
     probs: np.ndarray,
     rng: np.random.Generator,
     eligible: set[int] | None = None,
+    reuse_token_offset: int = LEGACY_REUSE_TOKEN_OFFSET,
 ) -> tuple[int, int] | None:
     if not stack or not emitted_order:
         return None
     reuse_probs = probs.copy()
-    reuse_probs[NEW_TOKEN] = 0.0
-    for tok in range(1, len(reuse_probs)):
-        if int(rank_edges[tok - 1]) >= len(stack):
+    reuse_probs[:reuse_token_offset] = 0.0
+    for tok in range(reuse_token_offset, len(reuse_probs)):
+        if int(rank_edges[tok - reuse_token_offset]) >= len(stack):
             reuse_probs[tok] = 0.0
     total = float(reuse_probs.sum())
     if total > 0.0:
         reuse_probs /= total
         for _ in range(16):
             token = int(rng.choice(len(reuse_probs), p=reuse_probs))
-            lo = int(rank_edges[token - 1])
-            hi = min(int(rank_edges[min(token, len(rank_edges) - 1)]), len(stack))
+            lo = int(rank_edges[token - reuse_token_offset])
+            hi = min(int(rank_edges[min(token - reuse_token_offset + 1, len(rank_edges) - 1)]), len(stack))
             if hi <= lo:
                 continue
             for _attempt in range(4):
@@ -641,7 +689,7 @@ def _force_emitted_reuse(
                     continue
                 stack.pop(rank)
                 stack.insert(0, oid)
-                return oid, rank_to_token(rank, rank_edges)
+                return oid, rank_to_token(rank, rank_edges, reuse_token_offset)
     for _ in range(8):
         oid = int(emitted_order[int(rng.integers(0, len(emitted_order)))])
         if eligible is not None and oid not in eligible:
@@ -652,14 +700,14 @@ def _force_emitted_reuse(
             continue
         stack.pop(rank)
         stack.insert(0, oid)
-        return oid, rank_to_token(rank, rank_edges)
+        return oid, rank_to_token(rank, rank_edges, reuse_token_offset)
     for rank, oid in enumerate(stack):
         if oid in emitted_seen:
             if eligible is not None and oid not in eligible:
                 continue
             stack.pop(rank)
             stack.insert(0, oid)
-            return int(oid), rank_to_token(rank, rank_edges)
+            return int(oid), rank_to_token(rank, rank_edges, reuse_token_offset)
     return None
 
 
@@ -671,6 +719,7 @@ def _apply_short_reuse_pressure(
     current_ws: np.ndarray,
     target_ws: np.ndarray,
     gain: float,
+    reuse_token_offset: int = LEGACY_REUSE_TOKEN_OFFSET,
 ) -> np.ndarray:
     if gain <= 0.0 or stack_len <= 0 or len(windows) == 0:
         return probs
@@ -688,11 +737,12 @@ def _apply_short_reuse_pressure(
     primary = max(int(windows[0]), 1)
     cutoff = max(int(windows[min(1, len(windows) - 1)]), primary)
     biased = probs.copy()
-    for tok in range(1, len(biased)):
+    for tok in range(reuse_token_offset, len(biased)):
         if biased[tok] <= 0.0:
             continue
-        lo = int(rank_edges[tok - 1])
-        hi = min(int(rank_edges[min(tok, len(rank_edges) - 1)]), stack_len)
+        ix = tok - reuse_token_offset
+        lo = int(rank_edges[ix])
+        hi = min(int(rank_edges[min(ix + 1, len(rank_edges) - 1)]), stack_len)
         if hi <= lo:
             biased[tok] = 0.0
             continue
@@ -710,6 +760,19 @@ def _apply_short_reuse_pressure(
         biased /= total
         return biased
     return probs
+
+
+def _sample_stale_recycle(stale_pool, stack: list[int], rng: np.random.Generator) -> int | None:
+    if not stale_pool:
+        return None
+    for _ in range(32):
+        oid = int(stale_pool[int(rng.integers(0, len(stale_pool)))])
+        try:
+            stack.remove(oid)
+        except ValueError:
+            pass
+        return oid
+    return None
 
 
 def generate_ids(
@@ -735,7 +798,11 @@ def generate_ids(
     windows = [int(w) for w in state["windows"]]
     history = int(state["seq_len"])
     vocab = int(state["vocab"])
-    init_tokens, init_ws_tokens, queues, counters, stack, next_new = _warmstart_context(
+    reuse_token_offset = int(state.get("reuse_token_offset") or LEGACY_REUSE_TOKEN_OFFSET)
+    recycle_token_raw = state.get("recycle_token")
+    recycle_token = int(recycle_token_raw) if recycle_token_raw is not None else -1
+    recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
+    init_tokens, init_ws_tokens, queues, counters, stack, next_new, stale_pool = _warmstart_context(
         state,
         seed,
         rank_edges,
@@ -792,16 +859,15 @@ def generate_ids(
             reuse_probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             probs = np.zeros(vocab, dtype=np.float64)
             probs[1:] = reuse_probs
-            if stack:
-                probs = probs.copy()
-                for tok in range(1, vocab):
-                    if int(rank_edges[tok - 1]) >= len(stack):
-                        probs[tok] = 0.0
-                total = float(probs.sum())
-                if total > 0.0:
-                    probs /= total
-                else:
-                    probs[:] = 0.0
+            probs = probs.copy()
+            if recycle_token >= 0 and not stale_pool:
+                probs[recycle_token] = 0.0
+            for tok in range(reuse_token_offset, vocab):
+                if int(rank_edges[tok - reuse_token_offset]) >= len(stack):
+                    probs[tok] = 0.0
+            total = float(probs.sum())
+            if total > 0.0:
+                probs /= total
             else:
                 probs = np.zeros(vocab, dtype=np.float64)
             if ws_targets is not None and current_ws is not None and target_ws is not None:
@@ -813,27 +879,44 @@ def generate_ids(
                     current_ws,
                     target_ws,
                     float(short_reuse_pressure),
+                    reuse_token_offset,
                 )
             if force_new or (not force_reuse and (not stack or rng.random() < birth_prob)):
-                token = NEW_TOKEN
+                token = FRESH_TOKEN
             elif float(probs.sum()) > 0.0:
                 token = int(rng.choice(vocab, p=probs))
             else:
-                token = NEW_TOKEN
-            if token == NEW_TOKEN or not stack:
+                token = FRESH_TOKEN
+            if token == FRESH_TOKEN:
                 oid = next_new
                 next_new += 1
                 stack.insert(0, oid)
+            elif token == recycle_token:
+                oid = _sample_stale_recycle(stale_pool, stack, rng)
+                if oid is None:
+                    oid = next_new
+                    next_new += 1
+                    token = FRESH_TOKEN
+                stack.insert(0, int(oid))
             else:
-                rank = token_to_rank(token, rank_edges, rng, max_rank=len(stack) - 1)
+                rank = token_to_rank(
+                    token,
+                    rank_edges,
+                    rng,
+                    max_rank=len(stack) - 1,
+                    reuse_token_offset=reuse_token_offset,
+                )
                 if rank < 0 or rank >= len(stack):
                     oid = next_new
                     next_new += 1
                     stack.insert(0, oid)
-                    token = NEW_TOKEN
+                    token = FRESH_TOKEN
                 else:
                     oid = stack.pop(rank)
                     stack.insert(0, oid)
+            if recycle_rank_cap > 0:
+                while len(stack) > recycle_rank_cap:
+                    stale_pool.append(int(stack.pop()))
             should_force_reuse = (
                 birth_targets is not None
                 and not force_new
@@ -853,6 +936,7 @@ def generate_ids(
                     probs,
                     rng,
                     eligible=reuse_eligible,
+                    reuse_token_offset=reuse_token_offset,
                 )
                 if forced is not None:
                     oid, token = forced
@@ -879,13 +963,13 @@ def generate_ids(
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
                     f"internal_unique={next_new:,} output_unique={len(emitted_seen):,} "
-                    f"stack={len(stack):,}",
+                    f"stack={len(stack):,} stale_pool={len(stale_pool):,}",
                     flush=True,
                 )
     print(
         f"[mattson_denning generate] emitted={n_records:,} "
         f"internal_unique={next_new:,} output_unique={len(emitted_seen):,} "
-        f"stack={len(stack):,}",
+        f"stack={len(stack):,} stale_pool={len(stale_pool):,}",
         flush=True,
     )
     return out, sizes, opcodes, tenants
@@ -1007,6 +1091,12 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--seed", type=int, default=42)
         q.add_argument("--aux-ws-loss-weight", type=float, default=0.15)
         q.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
+        q.add_argument(
+            "--recycle-rank-cap",
+            type=int,
+            default=0,
+            help="if >0, label Mattson depths at or beyond this cap as RECYCLE instead of ordinary rank-bin reuse",
+        )
 
     fit_p = sub.add_parser("fit")
     add_train_flags(fit_p)
