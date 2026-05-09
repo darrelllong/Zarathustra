@@ -6935,3 +6935,24 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_vinge_20260509T172119Z.log`.
 
 No claim until the four literal cachesim panels complete.
+
+## 2026-05-09 17:25Z -- Tencent r445 Rank-Band Aux-Only Decode Completed, Not Promoted
+
+r445 completed as the no-bias ablation of the r444 checkpoint. Removing
+generation-time band bias recovered much of the r444 damage, but the auxiliary
+head still did not beat r443 or r434. The learned band task alone does not fix
+the seed-80 instability.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0621` | 0.0620723333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0720` | 0.0719723333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0677` | 0.0676783333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r445_rankband_auxonly_exact128_wsmax_empiricalrank_norecycle_ws_p3_b000_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0635` | 0.0635260000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0663122500` (race display `0.0663`;
+range `0.0099000000`). r445 is not promoted.
+
+Branch conclusion: exact short ranks help more than the band auxiliary. The
+next ML change should alter how identity/reuse state enters the recurrent
+model, not add another post-logit rank-band steering term.
