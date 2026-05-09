@@ -5646,3 +5646,14 @@ PID: `1882071`.
 Log:
 `/tiamat/zarathustra/altgan-output/logs/alibaba_r425b_r413base4_20260509T065340Z.log`.
 Tag prefix: `alibaba_chunksurf_r425b_r413base4`.
+
+Follow-up r426 launched on baase because r425b was spending most of its capped
+budget enumerating many donor/shift choices for the same tiny chunk starts.
+r426 keeps the same r413 base family but adds `--max-candidates-per-chunk 16`
+and raises the cap to `--max-evals 600` so the scout visits more trace regions
+per seed.
+
+PID: `1900591`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`.
+Tag prefix: `alibaba_chunksurf_r426_r413base4_cap16`.
