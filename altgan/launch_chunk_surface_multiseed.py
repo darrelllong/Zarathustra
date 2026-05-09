@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
+from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -57,14 +58,27 @@ def _count_rows(csv_path: Path) -> int:
     return max(lines - 1, 0)
 
 
-def _mean_from_json(path: Path) -> float:
+def _mean_from_json(path: Path) -> tuple[float, str]:
+    """Return (mean_as_float, mean_as_string) from a cachesim JSON report.
+
+    The string form is intended to preserve the JSON-reported value for
+    copy/paste into response docs (avoids rounding to a fixed number of digits).
+    """
     with path.open() as f:
-        data = json.load(f)
+        data = json.load(f, parse_float=Decimal)
     if "mean_hrc_mae" in data:
-        return float(data["mean_hrc_mae"])
-    if "mean" in data:
-        return float(data["mean"])
-    raise KeyError(f"{path} missing mean_hrc_mae/mean")
+        raw = data["mean_hrc_mae"]
+    elif "mean" in data:
+        raw = data["mean"]
+    else:
+        raise KeyError(f"{path} missing mean_hrc_mae/mean")
+    if isinstance(raw, Decimal):
+        raw_str = format(raw, "f")
+        raw_float = float(raw)
+    else:
+        raw_str = str(raw)
+        raw_float = float(raw)
+    return raw_float, raw_str
 
 
 def _literal_cachesim_mean_line(mean_hrc_mae: float) -> str:
@@ -107,8 +121,8 @@ def _markdown_snippet(
     *,
     title: str,
     seeds: list[int],
-    final_means: list[tuple[int, float, Path, Path, str]],
-    guard_means: list[tuple[int, float, Path]] | None,
+    final_means: list[tuple[int, float, str, Path, Path, str]],
+    guard_means: list[tuple[int, float, str, Path]] | None,
     guard_label: str,
     overall_mean: float,
     overall_range: float,
@@ -120,9 +134,9 @@ def _markdown_snippet(
         "| seed | fake CSV | literal cachesim mean line | JSON mean |",
         "|---:|---|---|---:|",
     ]
-    for seed, mean, fake_csv, _report_json, literal_mean_line in final_means:
+    for seed, _mean, mean_raw, fake_csv, _report_json, literal_mean_line in final_means:
         lines.append(
-            f"| {seed} | `{fake_csv}` | `{literal_mean_line}` | {mean:.10f} |"
+            f"| {seed} | `{fake_csv}` | `{literal_mean_line}` | {mean_raw} |"
         )
     lines += [
         "",
@@ -130,7 +144,7 @@ def _markdown_snippet(
         "",
     ]
     if guard_means:
-        guard_values = [mean for _seed, mean, _json_path in guard_means]
+        guard_values = [mean for _seed, mean, _mean_raw, _json_path in guard_means]
         guard_mean = sum(guard_values) / len(guard_values)
         guard_range = max(guard_values) - min(guard_values) if guard_values else 0.0
         label = guard_label or "guard"
@@ -140,8 +154,8 @@ def _markdown_snippet(
             "| seed | guard JSON | guard mean |",
             "|---:|---|---:|",
         ]
-        for seed, mean, json_path in guard_means:
-            lines.append(f"| {seed} | `{json_path}` | {mean:.10f} |")
+        for seed, _mean, mean_raw, json_path in guard_means:
+            lines.append(f"| {seed} | `{json_path}` | {mean_raw} |")
         lines += [
             "",
             f"Guard mean across seeds `{seeds_text}`: `{guard_mean:.10f}` (range `{guard_range:.10f}`).",
@@ -187,9 +201,11 @@ class StageOutput:
     fake_csv: Path
     report_json: Path
     mean_hrc_mae: float
+    mean_hrc_mae_raw: str
     literal_mean_line: str
     guard_json: Path | None = None
     guard_mean_hrc_mae: float | None = None
+    guard_mean_hrc_mae_raw: str | None = None
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -348,8 +364,8 @@ def main(argv: list[str] | None = None) -> int:
     policy_count = _policy_count(args.policies)
     eval_label = f"official{policy_count}"
 
-    final_means: list[tuple[int, float, Path, Path, str]] = []
-    final_guards: list[tuple[int, float, Path]] = []
+    final_means: list[tuple[int, float, str, Path, Path, str]] = []
+    final_guards: list[tuple[int, float, str, Path]] = []
 
     for seed in args.seeds:
         base = Path(_render_template(args.base_template, seed=seed))
@@ -485,21 +501,25 @@ def main(argv: list[str] | None = None) -> int:
                 current_base = out_fake
                 continue
 
-            mean = _mean_from_json(out_json)
-            guard_mean = (
+            mean, mean_raw = _mean_from_json(out_json)
+            guard = (
                 _mean_from_json(guard_json)
                 if guard_json is not None and guard_json.exists()
                 else None
             )
+            guard_mean = guard[0] if guard is not None else None
+            guard_mean_raw = guard[1] if guard is not None else None
             last_out = StageOutput(
                 seed=seed,
                 chunk_size=chunk_size,
                 fake_csv=out_fake,
                 report_json=out_json,
                 mean_hrc_mae=mean,
+                mean_hrc_mae_raw=mean_raw,
                 literal_mean_line=stage_literal_line or _literal_cachesim_mean_line(mean),
                 guard_json=guard_json if guard_mean is not None else None,
                 guard_mean_hrc_mae=guard_mean,
+                guard_mean_hrc_mae_raw=guard_mean_raw if guard_mean is not None else None,
             )
             current_base = out_fake
 
@@ -508,35 +528,48 @@ def main(argv: list[str] | None = None) -> int:
         if last_out is None:
             raise RuntimeError("pipeline produced no stages")
         final_means.append(
-            (seed, last_out.mean_hrc_mae, last_out.fake_csv, last_out.report_json, last_out.literal_mean_line)
+            (
+                seed,
+                last_out.mean_hrc_mae,
+                last_out.mean_hrc_mae_raw,
+                last_out.fake_csv,
+                last_out.report_json,
+                last_out.literal_mean_line,
+            )
         )
-        if last_out.guard_mean_hrc_mae is not None and last_out.guard_json is not None:
-            final_guards.append((seed, last_out.guard_mean_hrc_mae, last_out.guard_json))
+        if (
+            last_out.guard_mean_hrc_mae is not None
+            and last_out.guard_mean_hrc_mae_raw is not None
+            and last_out.guard_json is not None
+        ):
+            final_guards.append(
+                (seed, last_out.guard_mean_hrc_mae, last_out.guard_mean_hrc_mae_raw, last_out.guard_json)
+            )
 
     if args.dry_run:
         print("\n[dry-run] No stages executed; exiting.", flush=True)
         return 0
 
     print("\n=== CHUNK-SURFACE MULTI-SEED SUMMARY ===", flush=True)
-    for seed, mean, fake_csv, report_json, literal_mean_line in final_means:
+    for seed, _mean, mean_raw, fake_csv, report_json, literal_mean_line in final_means:
         print(f"\nseed {seed}", flush=True)
         print(f"fake CSV: {fake_csv}", flush=True)
         print(literal_mean_line, flush=True)
-        print(f"JSON mean: {mean:.10f}", flush=True)
+        print(f"JSON mean: {mean_raw}", flush=True)
         print(f"Report JSON: {report_json}", flush=True)
         guard_row = next((row for row in final_guards if row[0] == seed), None)
         if guard_row is not None:
-            _guard_seed, guard_mean, guard_json = guard_row
-            print(f"Guard mean ({args.guard_eval_label}): {guard_mean:.10f}", flush=True)
+            _guard_seed, _guard_mean, guard_mean_raw, guard_json = guard_row
+            print(f"Guard mean ({args.guard_eval_label}): {guard_mean_raw}", flush=True)
             print(f"Guard JSON: {guard_json}", flush=True)
 
-    means = [mean for _, mean, _, _, _ in final_means]
+    means = [mean for _, mean, _mean_raw, _fake_csv, _report_json, _literal in final_means]
     overall_mean = sum(means) / len(means)
     overall_range = max(means) - min(means) if means else 0.0
     print(f"\nMean across seeds {args.seeds}: {overall_mean:.10f}", flush=True)
     print(f"Range: {overall_range:.10f}", flush=True)
     if final_guards:
-        guard_values = [mean for _seed, mean, _json_path in final_guards]
+        guard_values = [mean for _seed, mean, _mean_raw, _json_path in final_guards]
         guard_mean = sum(guard_values) / len(guard_values)
         guard_range = max(guard_values) - min(guard_values) if guard_values else 0.0
         print(
