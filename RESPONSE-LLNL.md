@@ -16544,3 +16544,29 @@ R291.BAL cross-seed extraction. R291.BAL2 is the cascade-tighten on the
 extracted base. Combined ratio of architectural-to-cascade work is now too
 cascade-heavy; next moves must pivot to genuinely new architectures.
 
+
+## R293.W banked + R293.T parked (2026-05-08)
+
+**R293.W Wikipedia tightening**: cross-seed chunk-ensemble of R288.W base
+traces (each of 4 seeds used as base, donor pool = all 4 R288.W seed traces).
+Same R291.BAL pattern.
+
+| seed | R288.W baseline | R293.W ensemble | Δ |
+|---:|---:|---:|---|
+| 42 | 0.008925 | 0.008804 | -1.4% |
+| 80 | 0.009209 | 0.008383 | -9.0% |
+| 81 | 0.008528 | 0.008346 | -2.1% |
+| 82 | 0.008917 | 0.008271 | -7.2% |
+
+4-seed mean: **0.008451** (range 0.000533). Improves R288.W banked 0.008895
+by 5% but still loses to LANL r328 banked 0.005460 by 35.4%. Banked as
+the new LLNL Wikipedia row; defensive tightening, does not retake the lead.
+
+**R293.T Tencent: parked.** R288 IRD-renewal at scales s∈{1,2,4,8,16}
+(single seed) lands at 0.40, 0.25, 0.23, 0.23, 0.20 respectively. LANL
+banked = 0.030. The IRD-renewal architecture does not fit Tencent's
+strong-locality / KV-distribution structure (per the working-set
+characterization in BENCHMARK-METHODOLOGY-LLNL.md, Tencent has T_25=27k
+and m(T_25)=0.07 — very different from the bimodal/one-shot regime where
+IRD-renewal works). Tencent needs a different architecture.
+

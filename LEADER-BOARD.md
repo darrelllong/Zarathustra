@@ -31,7 +31,7 @@ The race has two metric classes:
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
 | Meta CDN | 0.03081 (R287.CDN2 small-chunk cascade on R287.CDN, 4-seed range 0.000172) | **0.0237592500** (r370 guarded 2-row continuation, 4-seed {42,80,81,82}, range 0.0013576000; no-32 guard mean 0.0214763021) | **LANL** | -22.9% |
-| Wikipedia | 0.008895 (R288.W IRD-renewal s32 ip=0.10, 4-seed {42,80,81,82} range 0.000681) | **0.0054596500** (r328/r329 32K object-ID chunk-surface retake, 4-seed {42,80,81,82}, range 0.0008116333) | **LANL** | -38.6% |
+| Wikipedia | 0.008451 (R293.W cross-seed chunk-ensemble of R288.W, 4-seed {42,80,81,82} range 0.000533) | **0.0054596500** (r328/r329 32K object-ID chunk-surface retake, 4-seed {42,80,81,82}, range 0.0008116333) | **LANL** | -35.4% |
 
 **Generative score**: LANL leads 9 (Alibaba, Tencent, CloudPhysics,
 Baleen24, MSR Exchange, Twitter, Meta KV, Meta CDN, Wikipedia); LLNL leads 0.
