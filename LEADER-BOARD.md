@@ -57,13 +57,13 @@ All 9 corpora have generative claims from both teams.
 | CloudPhysics | 0.0000 (R259g, 8-pol) | 0.0000266927 | tied |
 | Baleen24 | 0.0000 (R259g) | published 2026-05-03 | tied |
 | MSR Exchange | 0.0000 (R259g) | published 2026-05-03 | tied |
-| **Twitter** | **0.0000** (R277.A) | not published | **LLNL alone** |
-| **Meta KV** | **0.0006** (R278) | not published | **LLNL alone** |
-| **Meta CDN** | **0.0000** (R279) | not published | **LLNL alone** |
-| **Wikipedia** | **~0.00004** (R280) | not published | **LLNL alone** |
+| Twitter | 0.0000 (R277.A) | published (shuffle mean `0.0000646083`) | tied |
+| Meta KV | 0.0006 (R278) | published (shuffle mean `0.0006890583`) | tied |
+| Meta CDN | 0.0000 (R279) | published (shuffle mean `0.0000030667`) | tied |
+| Wikipedia | ~0.00004 (R280) | published (shuffle mean `0.0000385000`) | tied |
 
-**Bootstrap score**: LLNL on 9 corpora (5 tied with LANL + 4 alone);
-LANL on 5; LLNL leading or tied on every published bootstrap claim.
+**Bootstrap score**: LLNL on 9 corpora (all 9 now published by LANL);
+LANL on 9. LLNL leading or tied on every published bootstrap claim.
 
 ## Standing reproducibility info
 
