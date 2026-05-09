@@ -5846,3 +5846,19 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_vinge_20260509.log`.
 Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r433_recyclecap256_empiricalrank.pt`.
+
+## 2026-05-09 09:30Z -- Tencent r433 Empirical Mattson-Rank Result
+
+r433 is a completed learned-generator scout and the best learned Tencent row so
+far. It improves r430 by replacing uniform within-bin Mattson rank sampling
+with empirical rank samples fit from exact real depths, and it also beats r423b.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0574` | 0.0574476667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0691` | 0.0690886667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0623` | 0.0623213333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0625` | 0.0625200000 |
+
+Four-seed mean: `0.0628444167`, range `0.0116410000`. Best learned scout, but
+not a leaderboard row versus banked Tencent r336 `0.0297569167`.

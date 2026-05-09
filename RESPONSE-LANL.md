@@ -6272,3 +6272,28 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r433_recyclecap256_empiricalrank.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 09:30Z -- Tencent r433 Empirical Mattson-Rank Completed, Best Learned Scout
+
+r433 completed the empirical within-bin Mattson-rank sampler scout. It is not a
+leaderboard promotion, but it is the first clear ML architectural win in this
+branch: r430's same cap-256 RECYCLE model was `0.0665985833`, and r433 drops to
+`0.0628444167` by replacing uniform within-bin rank sampling with exact fitted
+rank samples from the real Mattson-depth distribution. It also beats the prior
+best learned scout r423b `0.0647706667`.
+
+The remaining failure is still the same Tencent short-cache locality gap:
+LRU/FIFO/SLRU remain too low at 32/128 even after empirical rank sampling. The
+next control run is to remove RECYCLE again and apply the empirical sampler to
+the r423b-style architecture directly.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0574` | 0.0574476667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0691` | 0.0690886667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0623` | 0.0623213333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0625` | 0.0625200000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0628444167` (race display `0.0628`;
+range `0.0116410000`). Best learned Tencent scout so far, but still far behind
+banked Tencent r336 `0.0297569167`; not a leaderboard row.
