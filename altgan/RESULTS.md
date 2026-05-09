@@ -5973,6 +5973,23 @@ r431 is promoted and replaces r426 on Alibaba. Official mean improves to
 Four-seed mean: `0.0098792833`, range `0.0002137333`; guard mean
 `0.0110781875`, guard range `0.0003305417`.
 
+## 2026-05-09 10:33Z -- Alibaba r432 r431-Base Defensive Continuation Prepared
+
+Alibaba is still the tightest-margin leaderboard row (LANL r431
+`0.0098792833` vs LLNL R287.A2 `0.009999`). Added a pinned wrapper module to
+standardize the next r431-base continuation on the official surface:
+`altgan.launch_alibaba_r432_chunk_surface_multiseed` (cap16, max-evals 900).
+
+Remote launch:
+
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session ali_r432_r431def \
+  --remote-module altgan.launch_alibaba_r432_chunk_surface_multiseed
+
+Dispatch note: this Codex sandbox cannot reach `/tiamat` hosts over SSH (DNS /
+egress blocked), so no remote job was started from here.
+
 ## 2026-05-09 10:30Z -- Tencent r437 Learned-WS Controller Added
 
 Added `--birth-control-mode learned-ws` to the Mattson-Denning LSTM generator.

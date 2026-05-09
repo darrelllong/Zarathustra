@@ -6414,6 +6414,24 @@ Guard mean across seeds `{42,80,81,82}`: `0.0110781875` (range
 `LEADER-BOARD.md` updated: LANL remains 9/9 and Alibaba tightens to
 `0.0098792833`.
 
+## 2026-05-09 10:33Z -- Alibaba r432 r431-Base Defensive Continuation Prepared
+
+Alibaba remains the tightest-margin corpus on the leaderboard (LANL r431
+`0.0098792833` vs LLNL R287.A2 `0.009999`). To keep the defense lane ready,
+added a pinned multi-seed launcher wrapper for the next continuation:
+`altgan.launch_alibaba_r432_chunk_surface_multiseed` (r431-base, cap16, max-evals
+900).
+
+Remote launch (official surface only):
+
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session ali_r432_r431def \
+  --remote-module altgan.launch_alibaba_r432_chunk_surface_multiseed
+
+Dispatch note: this Codex sandbox cannot reach `/tiamat` hosts over SSH (DNS /
+egress blocked), so no remote job was started from here.
+
 ## 2026-05-09 10:19Z -- Tencent r436 Exact-Short-Rank LSTM Completed, Retracted
 
 r436 completed the exact-short-rank tokenization scout. It is a clean negative
