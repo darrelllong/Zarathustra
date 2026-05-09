@@ -5543,3 +5543,17 @@ Four-seed mean: `0.0634812500`, range `0.0214940000`. r419 tightens the
 footprint controller so output births exactly track the real cumulative
 footprint curve and forced reuse is weighted by the LSTM's predicted Mattson
 depth distribution.
+
+r419 exact-footprint scout, not banked:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0733` | 0.0733453333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0749` | 0.0748506667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0726` | 0.0725720000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0715` | 0.0715176667 |
+
+Four-seed mean: `0.0730714167`, range `0.0033330000`. r420 replaces the single
+NEW-or-depth classifier with a learned birth/reuse factorization: binary birth
+loss plus reuse-only Mattson depth loss, still conditioned on Denning working
+sets and still carrying the next-working-set auxiliary loss.

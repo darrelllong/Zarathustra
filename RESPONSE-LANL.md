@@ -5882,3 +5882,19 @@ range `0.0214940000`). The next r419 change makes the birth controller exact
 on the cumulative real footprint and, when forced to reuse, samples emitted
 objects through the model's predicted Mattson-depth distribution instead of a
 uniform emitted-ID draw.
+
+r419 completed and was worse than r418, so exact footprint matching is not
+enough and overcorrects the small-cache surface:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0733` | 0.0733453333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0749` | 0.0748506667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0726` | 0.0725720000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r419_exactbirth_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0715` | 0.0715176667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0730714167` (race display `0.0731`;
+range `0.0033330000`). r420 changes the learned architecture itself: binary
+birth cross entropy plus reuse-only Mattson depth cross entropy, with the
+Denning working-set auxiliary head retained. This trains the birth/reuse split
+instead of treating NEW as just another depth token.

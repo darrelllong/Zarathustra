@@ -231,6 +231,7 @@ def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_e
                 batch_first=True,
             )
             self.head = nn.Linear(hidden, vocab)
+            self.birth_head = nn.Linear(hidden, 1)
             self.ws_heads = nn.ModuleList([nn.Linear(hidden, ws_bins) for _ in range(n_windows)])
 
         def forward(self, tok, ws, h=None):
@@ -239,7 +240,7 @@ def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_e
                 parts.append(emb(ws[:, :, i]))
             x = torch.cat(parts, dim=-1)
             out, h = self.lstm(x, h)
-            return self.head(out), [head(out) for head in self.ws_heads], h
+            return self.head(out), self.birth_head(out).squeeze(-1), [head(out) for head in self.ws_heads], h
 
     return MattsonDenningLSTM()
 
@@ -296,12 +297,25 @@ def train_model(
             x_ws = torch.stack([ws_t[i:i + seq_len] for i in idx]).to(device)
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
-            logits, ws_logits, _ = model(x_tok, x_ws)
-            token_loss = F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1))
+            logits, birth_logits, ws_logits, _ = model(x_tok, x_ws)
+            y_birth = (y == NEW_TOKEN).float()
+            birth_loss = F.binary_cross_entropy_with_logits(
+                birth_logits.reshape(-1),
+                y_birth.reshape(-1),
+            )
+            reuse_mask = y != NEW_TOKEN
+            if bool(reuse_mask.any()):
+                reuse_loss = F.cross_entropy(
+                    logits[:, :, 1:][reuse_mask],
+                    y[reuse_mask] - 1,
+                )
+            else:
+                reuse_loss = logits.sum() * 0.0
             ws_loss = torch.stack([
                 F.cross_entropy(ws_logits[wi].reshape(-1, ws_bins), y_ws[:, :, wi].reshape(-1))
                 for wi in range(ws_tokens.shape[1])
             ]).mean()
+            token_loss = birth_loss + reuse_loss
             loss = token_loss + float(aux_ws_loss_weight) * ws_loss
             opt.zero_grad(set_to_none=True)
             loss.backward()
@@ -313,6 +327,8 @@ def train_model(
                     f"[mattson_denning train] ep={ep + 1}/{epochs} "
                     f"batch={bi + 1}/{n_batches} loss={float(loss.detach().cpu()):.5f} "
                     f"tok={float(token_loss.detach().cpu()):.5f} "
+                    f"birth={float(birth_loss.detach().cpu()):.5f} "
+                    f"reuse={float(reuse_loss.detach().cpu()):.5f} "
                     f"ws={float(ws_loss.detach().cpu()):.5f}",
                     flush=True,
                 )
@@ -386,7 +402,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 2,
+            "version": 3,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -403,7 +419,7 @@ def fit(args) -> None:
             "rank_bins": args.rank_bins,
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
-            "training_loss": "next-token cross entropy on Mattson depth tokens plus auxiliary next-Denning-working-set cross entropy",
+            "training_loss": "binary birth cross entropy plus reuse-only Mattson depth cross entropy plus auxiliary next-Denning-working-set cross entropy",
         },
     )
 
@@ -621,14 +637,18 @@ def generate_ids(
     with torch.inference_mode():
         init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
         init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
-        logits, _ws_logits, h = model(init_tok, init_ws)
+        logits, birth_logits, _ws_logits, h = model(init_tok, init_ws)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
             birth_target = int(birth_targets[i]) if birth_targets is not None else 0
             force_new = birth_targets is not None and len(emitted_seen) < birth_target
-            z = logits[0, -1] / max(float(temperature), 1e-6)
-            probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
+            force_reuse = birth_targets is not None and len(emitted_seen) >= birth_target
+            birth_prob = float(torch.sigmoid(birth_logits[0, -1]).detach().cpu())
+            z = logits[0, -1, 1:] / max(float(temperature), 1e-6)
+            reuse_probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
+            probs = np.zeros(vocab, dtype=np.float64)
+            probs[1:] = reuse_probs
             if stack:
                 probs = probs.copy()
                 for tok in range(1, vocab):
@@ -639,12 +659,13 @@ def generate_ids(
                     probs /= total
                 else:
                     probs[:] = 0.0
-                    probs[NEW_TOKEN] = 1.0
             else:
                 probs = np.zeros(vocab, dtype=np.float64)
-                probs[NEW_TOKEN] = 1.0
-            token = int(rng.choice(vocab, p=probs))
-            if force_new:
+            if force_new or (not force_reuse and (not stack or rng.random() < birth_prob)):
+                token = NEW_TOKEN
+            elif float(probs.sum()) > 0.0:
+                token = int(rng.choice(vocab, p=probs))
+            else:
                 token = NEW_TOKEN
             if token == NEW_TOKEN or not stack:
                 oid = next_new
@@ -687,7 +708,7 @@ def generate_ids(
                         del counter[old]
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
             step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
-            logits, _ws_logits, h = model(step_tok, step_ws, h)
+            logits, birth_logits, _ws_logits, h = model(step_tok, step_ws, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
