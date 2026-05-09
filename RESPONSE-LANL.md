@@ -6179,3 +6179,22 @@ reuse gap. This is an ML learning result, not a leaderboard row.
 Mean across seeds `{42,80,81,82}`: `0.0710278333` (race display `0.0710`;
 range `0.0028320000`). Retracted versus r428 `0.0673997500`, r423b
 `0.0647706667`, and the banked Tencent r336 `0.0297569167`.
+
+## 2026-05-09 08:39Z -- Tencent r430 Cap-256 FRESH/RECYCLE Learned Scout Launched
+
+Launched the next learned Mattson-Denning scout on vinge as
+`tencent_mdlstm_r430_recyclecap256_ws_p3`. r429 showed cap 128 plus pressure 6
+is too aggressive, while r428 cap 512 was too weak on local reuse, so r430
+tests the midpoint cap 256 with the earlier pressure 3.0 and WS birth control.
+
+The token split is active without r429's heavy RECYCLE skew:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=48 reuse_offset=2 recycle_rank_cap=256 fresh=38,507 recycle=3,407 reuse=58,086 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4051444`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r430_recyclecap256_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r430_recyclecap256.pt`.
+
+No claim until all four literal `llgan.cachesim_eval` panels complete.

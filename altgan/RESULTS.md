@@ -5778,3 +5778,17 @@ the wrong direction versus r428 and r423b.
 Four-seed mean: `0.0710278333`, range `0.0028320000`. Retracted versus r428
 and r423b; next learned Tencent work should change the architecture/conditioning
 rather than only cranking scalar decode pressure.
+
+## 2026-05-09 08:39Z -- Tencent r430 Cap-256 FRESH/RECYCLE Scout
+
+Launched `tencent_mdlstm_r430_recyclecap256_ws_p3` on vinge. This keeps the
+r428/r429 FRESH/RECYCLE architecture but tests the midpoint RECYCLE boundary
+after cap 512 under-acted and cap 128 over-acted.
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=48 reuse_offset=2 recycle_rank_cap=256 fresh=38,507 recycle=3,407 reuse=58,086 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4051444`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r430_recyclecap256_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r430_recyclecap256.pt`.
