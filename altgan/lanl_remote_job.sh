@@ -14,7 +14,7 @@ usage:
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
   altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws|learned-ws-masked] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
@@ -156,10 +156,10 @@ launch_mdlstm_tencent() {
     exit 2
   fi
 
-  if [[ "$control_mode" == "footprint" || "$control_mode" == "ws" || "$control_mode" == "learned-ws" ]]; then
+  if [[ "$control_mode" == "footprint" || "$control_mode" == "ws" || "$control_mode" == "learned-ws" || "$control_mode" == "learned-ws-masked" ]]; then
     cmd+=(--birth-control-mode "$control_mode")
   else
-    echo "control mode must be footprint, ws, or learned-ws" >&2
+    echo "control mode must be footprint, ws, learned-ws, or learned-ws-masked" >&2
     exit 2
   fi
 

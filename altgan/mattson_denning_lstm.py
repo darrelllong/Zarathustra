@@ -708,7 +708,12 @@ def _ws_targets_from_real(state: dict, n_records: int, windows: list[int]) -> np
     return targets
 
 
-def _ws_target_from_logits(ws_logits, ws_edges: np.ndarray, windows: list[int]) -> np.ndarray:
+def _ws_target_from_logits(
+    ws_logits,
+    ws_edges: np.ndarray,
+    windows: list[int],
+    mode: str = "clamp",
+) -> np.ndarray:
     """Convert learned next-working-set logits into feasible per-window counts."""
     torch, _nn = _try_torch()
     mids = 0.5 * (ws_edges[:-1].astype(np.float64) + ws_edges[1:].astype(np.float64) - 1.0)
@@ -716,8 +721,19 @@ def _ws_target_from_logits(ws_logits, ws_edges: np.ndarray, windows: list[int]) 
     targets: list[float] = []
     for wi, head_logits in enumerate(ws_logits):
         window_cap = float(windows[wi]) if wi < len(windows) else float(np.max(mids))
-        feasible_mids = np.minimum(mids[: head_logits.shape[-1]], window_cap)
+        local_mids = mids[: head_logits.shape[-1]]
         probs = torch.softmax(head_logits[0, -1], dim=-1).detach().cpu().numpy()
+        if mode == "masked":
+            feasible = local_mids <= window_cap
+            if np.any(feasible):
+                local_probs = probs.copy()
+                local_probs[~feasible[: len(local_probs)]] = 0.0
+                total = float(local_probs.sum())
+                if total > 0.0:
+                    local_probs /= total
+                    targets.append(float(np.dot(local_probs, local_mids[: len(local_probs)])))
+                    continue
+        feasible_mids = np.minimum(local_mids, window_cap)
         targets.append(float(np.dot(probs, feasible_mids[: len(probs)])))
     return np.asarray(targets, dtype=np.float64)
 
@@ -913,7 +929,8 @@ def generate_ids(
         birth_control_mode = "none"
     birth_targets = _birth_targets_from_real(state, n_records) if birth_control_mode == "footprint" else None
     ws_targets = _ws_targets_from_real(state, n_records, windows) if birth_control_mode == "ws" else None
-    use_learned_ws = birth_control_mode == "learned-ws"
+    use_learned_ws = birth_control_mode in {"learned-ws", "learned-ws-masked"}
+    learned_ws_decode = "masked" if birth_control_mode == "learned-ws-masked" else "clamp"
     window_scale = np.asarray(windows, dtype=np.float64)
     emitted_seen: set[int] = set()
     emitted_order: list[int] = []
@@ -944,12 +961,13 @@ def generate_ids(
             if ws_targets is not None or use_learned_ws:
                 current_ws = np.asarray([len(counter) for _queue, counter in ws_counts], dtype=np.float64)
                 target_ws = (
-                    _ws_target_from_logits(ws_logits, ws_edges, windows)
+                    _ws_target_from_logits(ws_logits, ws_edges, windows, learned_ws_decode)
                     if use_learned_ws
                     else ws_targets[i].astype(np.float64)
                 )
                 pressure_by_window = (target_ws - current_ws) / np.maximum(window_scale, 1.0)
-                pressure = float(np.dot(pressure_by_window, np.asarray([0.35, 0.25, 0.20, 0.12, 0.08])))
+                pressure_weights = np.asarray([0.35, 0.25, 0.20, 0.12, 0.08])[: len(pressure_by_window)]
+                pressure = float(np.dot(pressure_by_window[: len(pressure_weights)], pressure_weights))
                 birth_logit += 5.0 * max(-0.75, min(0.75, pressure))
                 if float(np.max(pressure_by_window)) > 0.20:
                     force_new = True
@@ -973,7 +991,7 @@ def generate_ids(
                 probs /= total
             else:
                 probs = np.zeros(vocab, dtype=np.float64)
-            if ws_targets is not None and current_ws is not None and target_ws is not None:
+            if current_ws is not None and target_ws is not None:
                 probs = _apply_short_reuse_pressure(
                     probs,
                     rank_edges,
@@ -1226,7 +1244,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--seed", type=int, default=42)
     gen_p.add_argument("--temperature", type=float, default=1.0)
     gen_p.add_argument("--no-birth-control", action="store_true")
-    gen_p.add_argument("--birth-control-mode", choices=["footprint", "ws", "learned-ws"], default="footprint")
+    gen_p.add_argument(
+        "--birth-control-mode",
+        choices=["footprint", "ws", "learned-ws", "learned-ws-masked"],
+        default="footprint",
+    )
     gen_p.add_argument("--short-reuse-pressure", type=float, default=0.0)
     gen_p.set_defaults(fn=generate)
 
@@ -1242,7 +1264,11 @@ def build_parser() -> argparse.ArgumentParser:
     multi.add_argument("--policies", default=DEFAULT_POLICIES)
     multi.add_argument("--fit", action="store_true")
     multi.add_argument("--no-birth-control", action="store_true")
-    multi.add_argument("--birth-control-mode", choices=["footprint", "ws", "learned-ws"], default="footprint")
+    multi.add_argument(
+        "--birth-control-mode",
+        choices=["footprint", "ws", "learned-ws", "learned-ws-masked"],
+        default="footprint",
+    )
     multi.add_argument("--short-reuse-pressure", type=float, default=0.0)
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")

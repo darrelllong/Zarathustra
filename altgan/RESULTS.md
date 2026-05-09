@@ -6041,3 +6041,29 @@ of copying a fixed real WS trajectory.
 Validation:
 - `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
 - `bash -n altgan/lanl_remote_job.sh`
+
+## 2026-05-09 11:18Z -- Tencent r438 Completed, Masked Learned-WS Decoder Prepared
+
+r438 completed as a clean negative result. Clipping learned Denning
+working-set targets to each actual window fixed r437's all-fresh collapse, but
+the clipped expectation still converts impossible high-bin probability mass
+into cap-sized fresh pressure. Retracted versus r434 `0.0601647500`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0733` | 0.0733193333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0750` | 0.0749740000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0539` | 0.0539303333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.1168` | 0.1167636667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0797468333` (race display `0.0797`;
+range `0.0628333333`). r438 is not promoted.
+
+Added `--birth-control-mode learned-ws-masked`, which renormalizes learned WS
+logits over feasible bins per Denning window instead of clipping impossible
+mass to the window cap. Also fixed learned-WS generation so
+`--short-reuse-pressure` applies to learned targets.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`

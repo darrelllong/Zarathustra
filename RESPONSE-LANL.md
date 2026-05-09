@@ -6554,3 +6554,32 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 11:18Z -- Tencent r438 Completed, Masked Learned-WS Decoder Prepared
+
+r438 completed as a clean negative result. Clipping the learned Denning
+working-set expectation to each actual window fixed the r437 all-fresh collapse,
+but it still lets probability mass from impossible high-count bins land at the
+window cap. That keeps the birth controller too noisy and leaves a bad seed82
+tail. Retracted versus r434 `0.0601647500`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0733` | 0.0733193333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0750` | 0.0749740000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0539` | 0.0539303333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.1168` | 0.1167636667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0797468333` (race display `0.0797`;
+range `0.0628333333`). r438 is not promoted.
+
+Next architectural patch is in source: `--birth-control-mode learned-ws-masked`
+renormalizes learned WS logits over bins whose midpoints are feasible for the
+current Denning window instead of clipping impossible mass to the cap. The same
+patch also applies `--short-reuse-pressure` to learned WS targets; r437/r438
+were using the learned birth controller but not the learned-target reuse
+reshaping path.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
