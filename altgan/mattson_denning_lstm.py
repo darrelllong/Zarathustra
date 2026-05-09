@@ -188,6 +188,46 @@ def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> 
     return edges.astype(np.int64)
 
 
+def _rank_band_bounds(windows: list[int]) -> np.ndarray:
+    bounds = sorted({int(w) for w in windows if int(w) > 0})
+    return np.asarray(bounds, dtype=np.int64)
+
+
+def _rank_band_count(mode: str, windows: list[int]) -> int:
+    if mode != "window":
+        return 0
+    return int(len(_rank_band_bounds(windows)) + 1)
+
+
+def _rank_band_for_span(lo: int, hi: int, bounds: np.ndarray) -> int:
+    if len(bounds) == 0:
+        return 0
+    hi = max(int(hi), int(lo) + 1)
+    mid = 0.5 * (int(lo) + hi - 1)
+    return int(np.searchsorted(bounds, mid, side="right"))
+
+
+def _rank_token_band_map(
+    rank_edges: np.ndarray,
+    windows: list[int],
+    vocab: int,
+    reuse_token_offset: int,
+    mode: str,
+) -> np.ndarray:
+    mapping = np.full(int(vocab), -100, dtype=np.int64)
+    if mode != "window":
+        return mapping
+    bounds = _rank_band_bounds(windows)
+    for tok in range(int(reuse_token_offset), int(vocab)):
+        ix = tok - int(reuse_token_offset)
+        if ix < 0 or ix >= len(rank_edges) - 1:
+            continue
+        lo = int(rank_edges[ix])
+        hi = int(rank_edges[min(ix + 1, len(rank_edges) - 1)])
+        mapping[tok] = _rank_band_for_span(lo, hi, bounds)
+    return mapping
+
+
 def value_to_bin(value: int, edges: np.ndarray) -> int:
     ix = int(np.searchsorted(edges, int(value), side="right") - 1)
     return max(0, min(ix, len(edges) - 2))
@@ -361,10 +401,12 @@ def build_model(
     hidden: int,
     pos_bins: int = 0,
     pos_embed: int = 0,
+    rank_bands: int = 0,
 ):
     torch, nn = _try_torch()
     ws_bins_by_window = _normalize_ws_bins(ws_bins, n_windows)
     use_pos = int(pos_bins) > 0 and int(pos_embed) > 0
+    rank_bands = max(0, int(rank_bands))
 
     class MattsonDenningLSTM(nn.Module):
         def __init__(self):
@@ -382,6 +424,7 @@ def build_model(
             self.head = nn.Linear(hidden, vocab)
             self.birth_head = nn.Linear(hidden, 1)
             self.ws_heads = nn.ModuleList([nn.Linear(hidden, n_bins) for n_bins in ws_bins_by_window])
+            self.rank_band_head = nn.Linear(hidden, rank_bands) if rank_bands > 0 else None
 
         def forward(self, tok, ws, pos=None, h=None):
             parts = [self.token_emb(tok)]
@@ -393,7 +436,14 @@ def build_model(
                 parts.append(self.pos_emb(pos))
             x = torch.cat(parts, dim=-1)
             out, h = self.lstm(x, h)
-            return self.head(out), self.birth_head(out).squeeze(-1), [head(out) for head in self.ws_heads], h
+            rank_band_logits = self.rank_band_head(out) if self.rank_band_head is not None else None
+            return (
+                self.head(out),
+                self.birth_head(out).squeeze(-1),
+                [head(out) for head in self.ws_heads],
+                rank_band_logits,
+                h,
+            )
 
     return MattsonDenningLSTM()
 
@@ -411,6 +461,8 @@ def train_model(
     ws_embed: int,
     pos_bins: int,
     pos_embed: int,
+    rank_band_mode: str,
+    rank_band_loss_weight: float,
     seq_len: int,
     batch: int,
     epochs: int,
@@ -436,6 +488,7 @@ def train_model(
         hidden,
         pos_bins,
         pos_embed,
+        _rank_band_count(rank_band_mode, windows),
     ).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     reuse_token_offset = max(LEGACY_REUSE_TOKEN_OFFSET, int(vocab) - len(rank_edges) + 1)
@@ -445,6 +498,9 @@ def train_model(
         if reuse_token_offset == SPLIT_REUSE_TOKEN_OFFSET:
             weights = np.concatenate((np.ones(1, dtype=np.float32), weights))
         reuse_class_weights = torch.from_numpy(weights).to(device)
+    rank_band_map = torch.from_numpy(
+        _rank_token_band_map(rank_edges, windows, vocab, reuse_token_offset, rank_band_mode)
+    ).to(device)
 
     tok_t = torch.from_numpy(tokens.astype(np.int64))
     ws_t = torch.from_numpy(ws_tokens.astype(np.int64))
@@ -459,7 +515,8 @@ def train_model(
         f"device={device} params={sum(p.numel() for p in model.parameters()):,} "
         f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches} "
         f"reuse_offset={reuse_token_offset} pos_bins={int(pos_bins)} pos_embed={int(pos_embed)} "
-        f"short_reuse_loss_weight={short_reuse_loss_weight}",
+        f"short_reuse_loss_weight={short_reuse_loss_weight} "
+        f"rank_band_mode={rank_band_mode} rank_band_loss_weight={rank_band_loss_weight}",
         flush=True,
     )
 
@@ -476,7 +533,7 @@ def train_model(
             x_pos = torch.stack([pos_t[i:i + seq_len] for i in idx]).to(device)
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
-            logits, birth_logits, ws_logits, _ = model(x_tok, x_ws, x_pos)
+            logits, birth_logits, ws_logits, rank_band_logits, _ = model(x_tok, x_ws, x_pos)
             y_birth = (y == FRESH_TOKEN).float()
             birth_loss = F.binary_cross_entropy_with_logits(
                 birth_logits.reshape(-1),
@@ -495,8 +552,28 @@ def train_model(
                 F.cross_entropy(ws_logits[wi].reshape(-1, ws_bins_by_window[wi]), y_ws[:, :, wi].reshape(-1))
                 for wi in range(ws_tokens.shape[1])
             ]).mean()
+            if (
+                rank_band_logits is not None
+                and float(rank_band_loss_weight) > 0.0
+                and int(rank_band_map.max().detach().cpu()) >= 0
+            ):
+                y_rank_band = rank_band_map[y]
+                rank_band_mask = y_rank_band >= 0
+                if bool(rank_band_mask.any()):
+                    rank_band_loss = F.cross_entropy(
+                        rank_band_logits[rank_band_mask],
+                        y_rank_band[rank_band_mask],
+                    )
+                else:
+                    rank_band_loss = logits.sum() * 0.0
+            else:
+                rank_band_loss = logits.sum() * 0.0
             token_loss = birth_loss + reuse_loss
-            loss = token_loss + float(aux_ws_loss_weight) * ws_loss
+            loss = (
+                token_loss
+                + float(aux_ws_loss_weight) * ws_loss
+                + float(rank_band_loss_weight) * rank_band_loss
+            )
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -509,7 +586,8 @@ def train_model(
                     f"tok={float(token_loss.detach().cpu()):.5f} "
                     f"birth={float(birth_loss.detach().cpu()):.5f} "
                     f"reuse={float(reuse_loss.detach().cpu()):.5f} "
-                    f"ws={float(ws_loss.detach().cpu()):.5f}",
+                    f"ws={float(ws_loss.detach().cpu()):.5f} "
+                    f"rank_band={float(rank_band_loss.detach().cpu()):.5f}",
                     flush=True,
                 )
         print(
@@ -561,6 +639,7 @@ def load_checkpoint(path: str | Path):
         int(state["hidden"]),
         int(state.get("pos_bins") or 0),
         int(state.get("pos_embed") or 0),
+        int(state.get("rank_bands") or 0),
     )
     incompatible = model.load_state_dict(state["model_state"], strict=False)
     if incompatible.missing_keys or incompatible.unexpected_keys:
@@ -587,6 +666,7 @@ def fit(args) -> None:
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
     ws_bins_by_window = _ws_bins_by_window(ws_edges, len(windows))
+    rank_bands = _rank_band_count(args.rank_band_mode, windows)
     model = train_model(
         tokens,
         ws_tokens,
@@ -599,6 +679,8 @@ def fit(args) -> None:
         ws_embed=args.ws_embed,
         pos_bins=args.pos_bins,
         pos_embed=args.pos_embed,
+        rank_band_mode=args.rank_band_mode,
+        rank_band_loss_weight=args.rank_band_loss_weight,
         seq_len=args.seq_len,
         batch=args.batch,
         epochs=args.epochs,
@@ -637,15 +719,19 @@ def fit(args) -> None:
             "ws_embed": args.ws_embed,
             "pos_bins": int(args.pos_bins),
             "pos_embed": int(args.pos_embed),
+            "rank_band_mode": args.rank_band_mode,
+            "rank_band_bounds": _rank_band_bounds(windows).tolist(),
+            "rank_bands": rank_bands,
             "seq_len": args.seq_len,
             "rank_bins": args.rank_bins,
             "exact_rank_cutoff": int(args.exact_rank_cutoff),
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
             "short_reuse_loss_weight": args.short_reuse_loss_weight,
+            "rank_band_loss_weight": args.rank_band_loss_weight,
             "rank_sampler": args.rank_sampler,
             "rank_samples_by_token": rank_samples_by_token if args.rank_sampler == "empirical" else [],
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state",
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands",
         },
     )
 
@@ -945,6 +1031,39 @@ def _apply_short_reuse_pressure(
     return probs
 
 
+def _apply_rank_band_bias(
+    probs: np.ndarray,
+    rank_edges: np.ndarray,
+    windows: list[int],
+    rank_band_probs: np.ndarray | None,
+    gain: float,
+    reuse_token_offset: int,
+) -> np.ndarray:
+    if rank_band_probs is None or gain <= 0.0 or len(rank_band_probs) == 0:
+        return probs
+    biased = probs.copy()
+    bounds = _rank_band_bounds(windows)
+    n_bands = len(rank_band_probs)
+    for tok in range(int(reuse_token_offset), len(biased)):
+        if biased[tok] <= 0.0:
+            continue
+        ix = tok - int(reuse_token_offset)
+        if ix < 0 or ix >= len(rank_edges) - 1:
+            continue
+        lo = int(rank_edges[ix])
+        hi = int(rank_edges[min(ix + 1, len(rank_edges) - 1)])
+        band = _rank_band_for_span(lo, hi, bounds)
+        if band < 0 or band >= n_bands:
+            continue
+        scale = max(1e-9, float(rank_band_probs[band]) * float(n_bands))
+        biased[tok] *= math.exp(max(-8.0, min(8.0, float(gain) * math.log(scale))))
+    total = float(biased.sum())
+    if total > 0.0:
+        biased /= total
+        return biased
+    return probs
+
+
 def _sample_stale_recycle(stale_pool, stack: list[int], rng: np.random.Generator) -> int | None:
     if not stale_pool:
         return None
@@ -996,6 +1115,7 @@ def generate_ids(
     birth_control: bool = True,
     birth_control_mode: str = "footprint",
     short_reuse_pressure: float = 0.0,
+    rank_band_bias: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
 
@@ -1048,7 +1168,7 @@ def generate_ids(
         init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
         init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
         init_pos = torch.zeros_like(init_tok)
-        logits, birth_logits, ws_logits, h = model(init_tok, init_ws, init_pos)
+        logits, birth_logits, ws_logits, rank_band_logits, h = model(init_tok, init_ws, init_pos)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
@@ -1056,6 +1176,11 @@ def generate_ids(
             force_new = birth_targets is not None and len(emitted_seen) < birth_target
             force_reuse = birth_targets is not None and len(emitted_seen) >= birth_target
             birth_logit = float(birth_logits[0, -1].detach().cpu())
+            rank_band_probs = (
+                torch.softmax(rank_band_logits[0, -1], dim=-1).detach().cpu().numpy()
+                if rank_band_logits is not None and float(rank_band_bias) > 0.0
+                else None
+            )
             reuse_eligible: set[int] | None = None
             current_ws: np.ndarray | None = None
             target_ws: np.ndarray | None = None
@@ -1103,6 +1228,14 @@ def generate_ids(
                     float(short_reuse_pressure),
                     reuse_token_offset,
                 )
+            probs = _apply_rank_band_bias(
+                probs,
+                rank_edges,
+                windows,
+                rank_band_probs,
+                float(rank_band_bias),
+                reuse_token_offset,
+            )
             if force_new or (not force_reuse and (not stack or rng.random() < birth_prob)):
                 token = FRESH_TOKEN
             elif float(probs.sum()) > 0.0:
@@ -1182,7 +1315,7 @@ def generate_ids(
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
             step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
             step_pos = torch.tensor([[position_token_at(i, n_records, pos_bins)]], dtype=torch.long, device=device)
-            logits, birth_logits, ws_logits, h = model(step_tok, step_ws, step_pos, h)
+            logits, birth_logits, ws_logits, rank_band_logits, h = model(step_tok, step_ws, step_pos, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
@@ -1220,6 +1353,7 @@ def generate(args) -> None:
         not args.no_birth_control,
         args.birth_control_mode,
         args.short_reuse_pressure,
+        args.rank_band_bias,
     )
     write_csv(args.output, obj_ids, sizes, opcodes, tenants)
 
@@ -1253,6 +1387,7 @@ def multiseed(args) -> None:
             not args.no_birth_control,
             args.birth_control_mode,
             args.short_reuse_pressure,
+            args.rank_band_bias,
         )
         write_csv(fake, obj_ids, sizes, opcodes, tenants)
         report = evaluate(str(fake), args.real, args.cache_sizes, args.policies)
@@ -1346,6 +1481,13 @@ def build_parser() -> argparse.ArgumentParser:
             default=0,
             help="if >0, label Mattson depths at or beyond this cap as RECYCLE instead of ordinary rank-bin reuse",
         )
+        q.add_argument(
+            "--rank-band-mode",
+            choices=["none", "window"],
+            default="none",
+            help="add an auxiliary Mattson-depth band head keyed to the cache-window ladder",
+        )
+        q.add_argument("--rank-band-loss-weight", type=float, default=0.0)
 
     fit_p = sub.add_parser("fit")
     add_train_flags(fit_p)
@@ -1365,6 +1507,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="footprint",
     )
     gen_p.add_argument("--short-reuse-pressure", type=float, default=0.0)
+    gen_p.add_argument("--rank-band-bias", type=float, default=0.0)
     gen_p.set_defaults(fn=generate)
 
     multi = sub.add_parser("multiseed")
@@ -1385,6 +1528,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="footprint",
     )
     multi.add_argument("--short-reuse-pressure", type=float, default=0.0)
+    multi.add_argument("--rank-band-bias", type=float, default=0.0)
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")
     multi.set_defaults(fn=multiseed)

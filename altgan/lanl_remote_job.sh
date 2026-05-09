@@ -15,7 +15,7 @@ usage:
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
   altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws|learned-ws-masked] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff] [footprint|max-window|per-window] [pos_bins] [pos_embed]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws|learned-ws-masked] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff] [footprint|max-window|per-window] [pos_bins] [pos_embed] [none|window] [rank_band_loss_weight] [rank_band_bias]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
@@ -108,6 +108,9 @@ launch_mdlstm_tencent() {
   local ws_edge_mode="${13:-footprint}"
   local pos_bins="${14:-0}"
   local pos_embed="${15:-8}"
+  local rank_band_mode="${16:-none}"
+  local rank_band_loss_weight="${17:-0}"
+  local rank_band_bias="${18:-0}"
 
   pull_repo
   mkdir -p "$OUT_ROOT/logs" "$CKPT_ROOT"
@@ -142,6 +145,8 @@ launch_mdlstm_tencent() {
     --ws-embed 16
     --pos-bins "$pos_bins"
     --pos-embed "$pos_embed"
+    --rank-band-mode "$rank_band_mode"
+    --rank-band-loss-weight "$rank_band_loss_weight"
     --seq-len 256
     --batch 256
     --epochs "$epochs"
@@ -154,6 +159,7 @@ launch_mdlstm_tencent() {
     --seeds 42,80,81,82
     --temperature 1.0
     --short-reuse-pressure "$short_reuse_pressure"
+    --rank-band-bias "$rank_band_bias"
     --cache-sizes 32,128,512,2048,8192
     --policies lru,arc,fifo,sieve,slru,car
   )
