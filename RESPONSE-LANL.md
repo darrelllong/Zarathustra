@@ -5447,3 +5447,37 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
   --emit-markdown \
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
+
+## 2026-05-09 02:35Z -- Baleen24 r407 Priority First-Arrival Renewal Retake Banked
+
+LANL banked `baleen24_r407_initfirst_irdr_initfirst`, a direct
+`altgan.ird_renewal` row that flips Baleen24 back to LANL on the official
+surface. The architectural change is first-arrival priority initialization:
+r404 already matched the real count histogram, but it initialized priority
+heap sleeps from sampled IRDs, which gave the wrong temporal birth geometry.
+r407 initializes each finite-IRD object with its fitted first-arrival position
+by rank while keeping the r404 priority heap, rank-conditioned empirical IRDs,
+and singleton-as-infinite branch:
+
+`--rank-ird-buckets 32 --rank-ird-smooth --ird-scale 224 --independent-prob 0.0 --heap-mode priority --priority-singletons-as-infinite --priority-initial-key first`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0183` | 0.01832803333333333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0185` | 0.018479333333333323 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0184` | 0.018384933333333315 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0183` | 0.018288733333333338 |
+
+Mean across seeds `{42,80,81,82}`: `0.0183702583` (race display `0.0184`;
+range `0.0001906000`). This improves LANL r404 `0.0196802250` by
+`0.0013099667` (`6.6563%` lower) and beats LLNL R291.BAL2 `0.018447` by
+`0.0000767417` (`0.4160%` lower).
+
+No-32 diagnostic means were `0.007925583333333338`,
+`0.008033833333333329`, `0.007988541666666654`, and
+`0.007933958333333343`, mean `0.0079704792`, range `0.0001082500`.
+
+`LEADER-BOARD.md` updated: LANL now leads 9/9 generative corpora.

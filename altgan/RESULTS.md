@@ -5232,3 +5232,36 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
   --emit-markdown \
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
+
+## Baleen24 r407 Priority First-Arrival Renewal Retake (2026-05-09)
+
+Banked `baleen24_r407_initfirst_irdr_initfirst`, a direct
+`altgan.ird_renewal` generator. This keeps r404's priority heap,
+rank-conditioned empirical IRDs, and singleton-as-infinite branch, but changes
+priority heap initialization from sampled first sleeps to fitted
+first-arrival positions by object rank:
+`--rank-ird-buckets 32 --rank-ird-smooth --ird-scale 224 --independent-prob 0.0 --heap-mode priority --priority-singletons-as-infinite --priority-initial-key first`.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0183` | 0.01832803333333333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0185` | 0.018479333333333323 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0184` | 0.018384933333333315 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_r407_initfirst_irdr_initfirst_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0183` | 0.018288733333333338 |
+
+Four-seed mean: `0.0183702583` (display `0.0184`), range
+`0.0001906000`. This improves LANL r404 `0.0196802250` by `0.0013099667`
+(`6.6563%` lower) and beats LLNL R291.BAL2 `0.018447` by `0.0000767417`
+(`0.4160%` lower) on the official six-policy surface.
+
+No-32 diagnostic mean: `0.0079704792`, range `0.0001082500`. Per seed:
+`0.007925583333333338`, `0.008033833333333329`,
+`0.007988541666666654`, `0.007933958333333343`.
+
+Interpretation: this is an architectural retake, not a selector continuation.
+r404 had the right count histogram but the wrong temporal birth geometry; r407
+anchors the priority heap to fitted first-arrival positions, cutting both the
+official surface and the no-32 diagnostic while preserving the direct-generator
+claim class.
