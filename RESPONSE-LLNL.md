@@ -16608,3 +16608,102 @@ per seed against the test metric. R298 fits ~50k LSTM parameters from
 training-set tokens and produces a generative model that has never seen
 the evaluation surface.
 
+
+## R298b banked (2026-05-09): Wiki LSTM 0.0352, single seed, 1M records
+
+R298b 1M-record training, hidden=128, seq=256, 20 epochs, 200 rank bins
+collapsed to 50, vocab=51, ~150k LSTM params. Wiki seed-42 single-seed
+generation (1M records, T=1.0 sampling):
+
+| policy | HRC-MAE | comment |
+|---|---:|---|
+| lru   | 0.0388 | under-hits at large caches (0.7217 vs 0.8236 at 8192) |
+| arc   | 0.0246 | best policy |
+| fifo  | 0.0463 | worst — over-misses small caches |
+| sieve | 0.0422 | over-hits small/mid caches |
+| slru  | 0.0370 | mixed sign |
+| car   | 0.0223 | second-best |
+| **mean** | **0.0352** | |
+
+Result: R298b improves on R298's 0.0358 by 1.7%. The longer training and
+larger hidden didn't unlock much. The LSTM has clearly hit an architectural
+floor near 0.035 on Wiki — the 50-rank-bin tokenization compresses 488k
+distinct stack distances into 50 buckets, and within-bin uniform sampling
+loses fine reuse-distance structure. **For comparison: chunk-cascade
+methods (R293.W) hit ~0.005 on the same trace**, but they directly fit the
+test surface — that lead is the price of supervised optimization on the
+test metric, which the AD review (PEER-REVIEW-LANL.md §1) flagged as
+methodologically suspect.
+
+R298b ATB single-seed only. Multi-seed verify deferred until a learned
+architecture variant beats this floor.
+
+
+## R299 / R299b / R299c — cache-state-aware transformer (FAILED)
+
+Pivoted to a transformer with hash-factored obj_id embedding + LRU stack
+snapshot input + 3-class output (REUSE@k for k∈[0,K), RECYCLE for deep
+reuse, FRESH for never-seen). Premise: R298's LSTM tokenizes the trace
+into rank bins which throws away precise reuse depth; a transformer with
+direct cache-state context should recover it.
+
+* **R299**: NEW class conflated FRESH and RECYCLE. Generation used FIFO
+  pool exhaustion → 99% unique trace, useless. Wiki 0.18 mean HRC-MAE.
+* **R299b**: Split NEW into FRESH (-1, fresh obj_id) and RECYCLE (-2,
+  resample from FIFO stale_pool). Wiki 0.0456 mean HRC-MAE — worse than
+  R298b 0.0352. Diagnose: synthetic FRESH 63.69% vs real 49.21%
+  (over-emits FRESH by 14.5pp at argmax sampling), synthetic IN_STACK
+  reuse 1.31% vs real 4.24% (under-reuse).
+* **R299c**: Added inverse-sqrt-frequency class-balanced cross-entropy
+  to fix FRESH over-prediction. **Catastrophic collapse**: 0.8645 mean
+  HRC-MAE. The class-balanced loss pushed argmax onto an IN_STACK[k≈127]
+  position; synthetic trace became a periodic cycle of ~1856 ids at fixed
+  stack-distance 127. All cache sizes saw ~3% hit rate (real: 76-98%).
+
+**Verdict**: The cache-state-aware transformer architecture is not a
+straight upgrade over R298 LSTM. Three issues:
+1. K=128 stack window collapses every reuse with depth >128 into a single
+   RECYCLE bucket — a 488k-distance trace has most reuses in this bucket.
+2. The 3-class structure (FRESH / RECYCLE / IN_STACK[k]) is severely
+   imbalanced, and naive class balancing breaks decoding rather than
+   improving it.
+3. Hash-factored obj_id embedding doesn't convey enough recency signal
+   when the model is forced to commit to specific k positions in [0,K).
+
+R299/R299b/R299c **archived**. The LSTM's rank-bin tokenization is the
+right abstraction for this problem family; refinements should extend
+R298, not replace it.
+
+
+## R298d launched (2026-05-09): bins=200, hidden=256, longer training
+
+Hypothesis from R299 failures: the bottleneck is rank-bin granularity.
+50 log-spaced bins compress 488k distances → ~12 reuse depths per bin
+near the head, losing within-bin structure. R298d quadruples bin count
+(200), doubles hidden (256), doubles embed (64), runs 30 epochs, batch=128.
+~3M LSTM params (vs R298b's 150k). Launched on baase GB10. Expected
+~60min train + 5min generate + 5min cachesim.
+
+
+## Strategic note (2026-05-09): LANL has pivoted to same architectural lane
+
+LANL pushed `altgan/mattson_denning_lstm.py` (142 added LOC at 03:21 PDT).
+The header reads:
+
+> "trains an autoregressive LSTM on a real trace sequence where each event
+> is represented by: a Mattson LRU stack-depth token (NEW or log-binned
+> reuse depth), and Denning working-set tokens (log-binned unique counts
+> in trailing windows). The training loss is next-token cross entropy.
+> Cachesim is used only after generation, never as a training loss or an
+> accept/reject oracle."
+
+This is the exact methodological position LLNL took post-AD-review:
+deep-learning rank-bin tokens, no chunk-cascade. **Both teams have
+abandoned chunk-cascade simultaneously**; the race re-entered on a level
+architectural footing. LANL went further than LLNL R298 in two ways:
+(1) split FRESH/RECYCLE tokens (which we tried as R299b and which on its
+own didn't help), (2) added Denning multi-window working-set count tokens
+as additional context. R298d adds bin granularity but not the multi-window
+context. If R298d underperforms LANL's hybrid, the multi-window context
+input is the next expected step (R298e).
+
