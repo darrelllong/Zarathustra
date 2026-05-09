@@ -319,8 +319,13 @@ def main(argv: list[str] | None = None) -> int:
             return int(exc.returncode)
         if args.no_proxyjump:
             sys.stderr.write(
-                "[ssh_chunk_surface] ERROR: ssh failed (exit 255). "
-                "If you see 'Operation not permitted', this environment is blocking outbound SSH.\n"
+                "[ssh_chunk_surface] ERROR: ssh failed (exit 255).\n"
+                "[ssh_chunk_surface] Common causes:\n"
+                "  - Outbound SSH blocked by the current environment/sandbox (often shows as "
+                "'Operation not permitted' or 'Connection closed by UNKNOWN port 65535').\n"
+                "  - DNS not available (e.g. 'Could not resolve hostname ...').\n"
+                "[ssh_chunk_surface] Fix: run this command from a machine/network that can reach the "
+                "target host on port 22.\n"
             )
             sys.stderr.flush()
             return 255

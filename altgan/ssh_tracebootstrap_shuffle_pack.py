@@ -435,6 +435,17 @@ def main() -> int:
             retry_args = argparse.Namespace(**vars(args))
             retry_args.no_proxyjump = True
             return _sync_and_run(retry_args)
+        if code != 0 and args.no_proxyjump:
+            print(
+                "[ssh_tracebootstrap] ERROR: SSH bundle sync failed.\n"
+                "[ssh_tracebootstrap] Common causes:\n"
+                "  - Outbound SSH blocked by the current environment/sandbox (often shows as "
+                "'Operation not permitted' or 'Connection closed by UNKNOWN port 65535').\n"
+                "  - DNS not available (e.g. 'Could not resolve hostname ...').\n"
+                "[ssh_tracebootstrap] Fix: run from a machine/network that can reach the target host on port 22.",
+                file=sys.stderr,
+                flush=True,
+            )
         return code
 
     return subprocess.run(remote_cmd, shell=True).returncode

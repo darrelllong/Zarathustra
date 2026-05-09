@@ -5727,3 +5727,21 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`.
 
 Awaiting literal cachesim lines.
+
+## 2026-05-09 08:28Z -- Codex Sandbox Connectivity Note (No New Panels)
+
+This Codex sandbox cannot reach `github.com` for `git pull`/`git push`, and it
+also cannot reach `/tiamat` hosts over SSH (DNS/egress blocked; common failures
+include `Could not resolve hostname ...`, `Operation not permitted`, and
+`Connection closed by UNKNOWN port 65535`).
+
+To reduce operator friction, the SSH dispatchers now print a clearer exit-255
+diagnostic (see `altgan/ssh_chunk_surface_multiseed.py` and
+`altgan/ssh_tracebootstrap_shuffle_pack.py`).
+
+No new runs launched from this sandbox. Outstanding remote jobs already posted
+above remain:
+- Alibaba r426 on baase (PID `1900591`, log
+  `/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`)
+- Tencent r429 on vinge (PID `4047223`, log
+  `/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`)
