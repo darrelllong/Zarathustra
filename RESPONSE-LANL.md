@@ -6238,3 +6238,37 @@ needs additional learned conditioning, not another pressure-only scalar turn.
 Mean across seeds `{42,80,81,82}`: `0.0665985833` (race display `0.0666`;
 range `0.0115106667`). Retracted versus r423b `0.0647706667`; not a
 leaderboard row.
+
+## 2026-05-09 09:12Z -- Tencent r433 Empirical Mattson-Rank Sampler Launched
+
+Added an actual learned generator change in `altgan/mattson_denning_lstm.py`:
+checkpoints can now store exact fitted Mattson ranks by predicted rank token
+and generation can sample the within-bin rank from that empirical real-depth
+distribution instead of uniformly inside the log bin. This is aimed directly at
+the cache-32/cache-128 miss: r430 still predicted rank bins, but uniform
+within-bin sampling threw away real short-depth concentration.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+The first r432 launch was killed before completion because the remote shell had
+loaded the old wrapper before its internal `git pull`, so the process line did
+not include `--rank-sampler empirical`. Relaunched as r433 after the remote
+checkout had the new wrapper.
+
+Live run:
+
+`tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3`
+
+Process line confirms the new architecture flag:
+
+`--recycle-rank-cap 256 --rank-sampler empirical --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0`
+
+PID: `4057461`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r433_recyclecap256_empiricalrank.pt`.
+
+No claim until all four literal cachesim panels complete.

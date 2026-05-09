@@ -5822,3 +5822,27 @@ short-cache locality surface.
 
 Four-seed mean: `0.0665985833`, range `0.0115106667`. Retracted versus r423b
 `0.0647706667`.
+
+## 2026-05-09 09:12Z -- Tencent r433 Empirical Mattson-Rank Sampler
+
+Added `--rank-sampler empirical` to the Mattson-Denning LSTM path. At fit time
+the checkpoint stores exact real Mattson ranks per predicted rank token; at
+generation time a predicted rank bin samples from that empirical within-bin
+distribution instead of a uniform interval. This keeps the model trained on
+Mattson/Denning structure while preserving short-depth concentration that
+matters at cache sizes 32 and 128.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+r432 was killed early because it launched from the old in-memory wrapper and
+did not include the new flag. Active run:
+
+`tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3`
+
+PID: `4057461`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r433_recyclecap256_empiricalrank_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r433_recyclecap256_empiricalrank.pt`.
