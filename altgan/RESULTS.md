@@ -6325,3 +6325,26 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r443_exact128_wsmax_empiricalrank_norecycle.pt`.
 
 No claim until the four literal cachesim panels complete.
+
+## Tencent r443 Exact-Short-Rank Fit Completed, Not Promoted (2026-05-09)
+
+r443 completed as an informative learned-architecture negative. Exact short
+Mattson ranks through 128 improved the r440-r442 family, but the seed-80
+failure remains large and the mean is still worse than the r434 Tencent bank
+(`0.0601647500`). This supports the diagnosis that the flat reuse-token head
+still needs explicit cache-ladder depth structure, not just more short-rank
+resolution.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0584` | 0.0583936667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0737` | 0.0737263333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0610` | 0.0609530000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r443_exact128_wsmax_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0586` | 0.0585773333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0629125833` (race display `0.0629`;
+range `0.0153326667`). r443 is not promoted.
+
+Next learned move is r444: add the new window-band Mattson-depth auxiliary head
+from `altgan/mattson_denning_lstm.py` and use its generation-time band bias to
+stabilize the exact-rank model across seeds.
