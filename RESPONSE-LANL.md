@@ -5857,3 +5857,11 @@ random segment with segment-local Mattson depths, while the model was trained
 on global-from-start stack state. r417 changes warm-start again: it replays the
 real prefix from row 0 to the sampled point, remaps object IDs into synthetic
 IDs, and seeds the LRU stack and Denning queues from that global prefix.
+
+r417 confirmed the failure is exposure-bias in the token head, not just stack
+initialization (`unique=79,070` by 50k rows). r418 adds a Denning/footprint
+birth controller: the LSTM still proposes locality depth, but output
+distinct-count growth is constrained to the real cumulative footprint curve,
+with forced reuse of already-emitted IDs when the synthetic output is ahead of
+that birth curve. This is an architectural birth/reuse factorization, not a
+scalar post-hoc cache knob.

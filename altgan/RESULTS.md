@@ -5523,3 +5523,9 @@ r416 still failed because the warm prefix was segment-local. r417 uses a
 global prefix replay from row 0 to the sampled point before generation, so the
 Mattson stack, Denning queues, and LSTM hidden state are all seeded in the same
 coordinate system used during training.
+
+r417 still collapsed (`unique=79,070` by 50k rows), identifying free-running
+birth exposure-bias. r418 adds output footprint control: the LSTM remains the
+reuse-depth model, while a Denning/footprint birth controller follows the real
+cumulative distinct-count curve and forces already-emitted reuse when the
+synthetic output is ahead of that curve.

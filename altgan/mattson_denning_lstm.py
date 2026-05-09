@@ -507,7 +507,59 @@ def _warmstart_context(
     return warm_tokens, warm_ws, queues, counters, stack, next_new
 
 
-def generate_ids(state: dict, model, n_records: int, seed: int, temperature: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _birth_targets_from_real(state: dict, n_records: int) -> np.ndarray | None:
+    real_path = state.get("real")
+    if not real_path:
+        return None
+    try:
+        trace = read_real_csv(real_path, n_records)
+    except OSError:
+        return None
+    seen: set[tuple[int, int]] = set()
+    targets = np.empty(n_records, dtype=np.int64)
+    last = 0
+    for i in range(n_records):
+        if i < trace.n:
+            seen.add((int(trace.stream_ids[i]), int(trace.obj_ids[i])))
+            last = len(seen)
+        targets[i] = last
+    return targets
+
+
+def _force_emitted_reuse(
+    stack: list[int],
+    emitted_seen: set[int],
+    emitted_order: list[int],
+    rank_edges: np.ndarray,
+    rng: np.random.Generator,
+) -> tuple[int, int] | None:
+    if not stack or not emitted_order:
+        return None
+    for _ in range(8):
+        oid = int(emitted_order[int(rng.integers(0, len(emitted_order)))])
+        try:
+            rank = stack.index(oid)
+        except ValueError:
+            continue
+        stack.pop(rank)
+        stack.insert(0, oid)
+        return oid, rank_to_token(rank, rank_edges)
+    for rank, oid in enumerate(stack):
+        if oid in emitted_seen:
+            stack.pop(rank)
+            stack.insert(0, oid)
+            return int(oid), rank_to_token(rank, rank_edges)
+    return None
+
+
+def generate_ids(
+    state: dict,
+    model,
+    n_records: int,
+    seed: int,
+    temperature: float,
+    birth_control: bool = True,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
 
     rng = np.random.default_rng(seed)
@@ -530,6 +582,9 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
         history,
     )
     ws_counts = list(zip(queues, counters))
+    birth_targets = _birth_targets_from_real(state, n_records) if birth_control else None
+    emitted_seen: set[int] = set()
+    emitted_order: list[int] = []
     out = np.empty(n_records, dtype=np.int64)
 
     mark_sample = state.get("mark_sample", {})
@@ -578,7 +633,18 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
                 else:
                     oid = stack.pop(rank)
                     stack.insert(0, oid)
+            if (
+                birth_targets is not None
+                and oid not in emitted_seen
+                and len(emitted_seen) >= int(birth_targets[i])
+            ):
+                forced = _force_emitted_reuse(stack, emitted_seen, emitted_order, rank_edges, rng)
+                if forced is not None:
+                    oid, token = forced
             out[i] = oid
+            if oid not in emitted_seen:
+                emitted_seen.add(int(oid))
+                emitted_order.append(int(oid))
             sizes[i] = int(size_pool[rng.integers(0, len(size_pool))])
             opcodes[i] = int(opcode_pool[rng.integers(0, len(opcode_pool))])
             tenants[i] = int(tenant_pool[rng.integers(0, len(tenant_pool))])
@@ -596,11 +662,15 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
             logits, _ws_logits, h = model(step_tok, step_ws, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
-                    f"[mattson_denning generate] emitted={i + 1:,} unique={next_new:,} stack={len(stack):,}",
+                    f"[mattson_denning generate] emitted={i + 1:,} "
+                    f"internal_unique={next_new:,} output_unique={len(emitted_seen):,} "
+                    f"stack={len(stack):,}",
                     flush=True,
                 )
     print(
-        f"[mattson_denning generate] emitted={n_records:,} unique={next_new:,} stack={len(stack):,}",
+        f"[mattson_denning generate] emitted={n_records:,} "
+        f"internal_unique={next_new:,} output_unique={len(emitted_seen):,} "
+        f"stack={len(stack):,}",
         flush=True,
     )
     return out, sizes, opcodes, tenants
@@ -624,6 +694,7 @@ def generate(args) -> None:
         args.n_records,
         args.seed,
         args.temperature,
+        not args.no_birth_control,
     )
     write_csv(args.output, obj_ids, sizes, opcodes, tenants)
 
@@ -648,7 +719,14 @@ def multiseed(args) -> None:
     rows = []
     for seed in _parse_ints(args.seeds):
         fake = out_root / f"{args.tag}_seed{seed}_fake_{args.n_records // 1000}k.csv"
-        obj_ids, sizes, opcodes, tenants = generate_ids(state, model, args.n_records, seed, args.temperature)
+        obj_ids, sizes, opcodes, tenants = generate_ids(
+            state,
+            model,
+            args.n_records,
+            seed,
+            args.temperature,
+            not args.no_birth_control,
+        )
         write_csv(fake, obj_ids, sizes, opcodes, tenants)
         report = evaluate(str(fake), args.real, args.cache_sizes, args.policies)
         print_report(report)
@@ -721,6 +799,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--n-records", type=int, default=100_000)
     gen_p.add_argument("--seed", type=int, default=42)
     gen_p.add_argument("--temperature", type=float, default=1.0)
+    gen_p.add_argument("--no-birth-control", action="store_true")
     gen_p.set_defaults(fn=generate)
 
     multi = sub.add_parser("multiseed")
@@ -734,6 +813,7 @@ def build_parser() -> argparse.ArgumentParser:
     multi.add_argument("--cache-sizes", default=DEFAULT_SIZES)
     multi.add_argument("--policies", default=DEFAULT_POLICIES)
     multi.add_argument("--fit", action="store_true")
+    multi.add_argument("--no-birth-control", action="store_true")
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")
     multi.set_defaults(fn=multiseed)
