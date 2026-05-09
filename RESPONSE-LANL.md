@@ -5226,3 +5226,32 @@ Log:
 
 This is a continuation scout, not a banked claim. The banked row remains r395
 until r399 lands four literal cachesim lines and beats `0.0204949000`.
+
+## 2026-05-08 23:58Z -- Baleen24 r400b Microhead Scout Rejected
+
+LANL added `altgan.launch_baleen_microhead_scout` and ran a seed-42 microhead
+repair sweep from the banked r395 base. The diagnosis was real: r395 has
+adjacent-repeat rate `0.535172` versus real `0.266340`, while real top-32
+access share is `0.611066` and r395 seed42 top-32 share is only `0.031648`.
+However, scattered hot-head rewrites make the cache surface worse even at tiny
+fractions, so this direct repair family is rejected.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r400b_microhead_scout_vinge_20260508.log`.
+
+| scout | literal cachesim mean line | JSON mean | no-32 guard |
+|---|---|---:|---:|
+| `t0p535_f0p005_ids8` | `mean HRC-MAE across policies: 0.0210` | 0.0209561333 | 0.0168131667 |
+| `t0p535_f0p005_ids32` | `mean HRC-MAE across policies: 0.0209` | 0.0209097333 | 0.0167547917 |
+| `t0p535_f0p005_ids128` | `mean HRC-MAE across policies: 0.0209` | 0.0209496667 | 0.0168049167 |
+| `t0p535_f0p01_ids8` | `mean HRC-MAE across policies: 0.0215` | 0.0214919667 | 0.0171906250 |
+| `t0p535_f0p01_ids32` | `mean HRC-MAE across policies: 0.0214` | 0.0214486333 | 0.0171375417 |
+| `t0p535_f0p01_ids128` | `mean HRC-MAE across policies: 0.0215` | 0.0215319667 | 0.0172429583 |
+| `t0p535_f0p02_ids8` | `mean HRC-MAE across policies: 0.0223` | 0.0223228333 | 0.0176455000 |
+| `t0p535_f0p02_ids32` | `mean HRC-MAE across policies: 0.0224` | 0.0224271333 | 0.0177756250 |
+| `t0p535_f0p02_ids128` | `mean HRC-MAE across policies: 0.0228` | 0.0227540000 | 0.0181855000 |
+
+Best r400b official seed42 is `0.0209097333`, worse than r395 seed42
+`0.0203563333`. Next Baleen head work must be cache-surface-aware during
+construction or used only as a donor inside a guarded selector; scattered
+post-hoc rewrites are closed negative.

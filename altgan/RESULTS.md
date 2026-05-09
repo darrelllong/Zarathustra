@@ -5095,3 +5095,28 @@ I/O. Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r399_r395_cascade128_64_vinge_20260508.log`.
 
 Not banked until all four seeds beat r395's `0.0204949000` official mean.
+
+## Baleen24 r400b Microhead Scout Rejected (2026-05-08)
+
+Added `altgan.launch_baleen_microhead_scout` and ran the seed42 microhead
+repair sweep from r395. The scalar diagnosis is stark: r395 seed42 has
+adjacent-repeat rate `0.535172` vs real `0.266340`, and top-32 access share
+`0.031648` vs real `0.611066`. But scattered hot-head rewrites worsen the
+official cache surface, even at `hothead_frac=0.005`.
+
+| scout | literal cachesim mean line | JSON mean | no-32 guard |
+|---|---|---:|---:|
+| `t0p535_f0p005_ids8` | `mean HRC-MAE across policies: 0.0210` | 0.0209561333 | 0.0168131667 |
+| `t0p535_f0p005_ids32` | `mean HRC-MAE across policies: 0.0209` | 0.0209097333 | 0.0167547917 |
+| `t0p535_f0p005_ids128` | `mean HRC-MAE across policies: 0.0209` | 0.0209496667 | 0.0168049167 |
+| `t0p535_f0p01_ids8` | `mean HRC-MAE across policies: 0.0215` | 0.0214919667 | 0.0171906250 |
+| `t0p535_f0p01_ids32` | `mean HRC-MAE across policies: 0.0214` | 0.0214486333 | 0.0171375417 |
+| `t0p535_f0p01_ids128` | `mean HRC-MAE across policies: 0.0215` | 0.0215319667 | 0.0172429583 |
+| `t0p535_f0p02_ids8` | `mean HRC-MAE across policies: 0.0223` | 0.0223228333 | 0.0176455000 |
+| `t0p535_f0p02_ids32` | `mean HRC-MAE across policies: 0.0224` | 0.0224271333 | 0.0177756250 |
+| `t0p535_f0p02_ids128` | `mean HRC-MAE across policies: 0.0228` | 0.0227540000 | 0.0181855000 |
+
+Best r400b seed42 (`0.0209097333`) trails the r395 seed42 base
+(`0.0203563333`). Close this direct rewrite family unless the repair is moved
+inside the cachesim selector or rebuilt as a run-preserving/cache-aware
+constructor.
