@@ -342,7 +342,8 @@ def train_transformer(real_csv: str, K: int = 128, history: int = 64,
 # ----- Generation ---------------------------------------------------------
 
 def generate(model, K: int, history: int, n_hashes: int, bucket_size: int,
-             n_records: int, seed: int, stale_pool_size: int = 100_000) -> np.ndarray:
+             n_records: int, seed: int, stale_pool_size: int = 100_000,
+             temperature: float = 1.0) -> np.ndarray:
     """R299b generation with split FRESH / RECYCLE classes.
 
     When model predicts FRESH (class K+1): allocate brand-new obj_id.
@@ -390,10 +391,15 @@ def generate(model, K: int, history: int, n_hashes: int, bucket_size: int,
             if not stale_pool:
                 logits[K] = -1e9
 
-            logits -= logits.max()
-            p = np.exp(logits)
-            p /= p.sum()
-            action = int(rng.choice(K + 2, p=p))
+            if temperature <= 0:
+                # Greedy / argmax decoding.
+                action = int(np.argmax(logits))
+            else:
+                scaled = logits / max(temperature, 1e-6)
+                scaled -= scaled.max()
+                p = np.exp(scaled)
+                p /= p.sum()
+                action = int(rng.choice(K + 2, p=p))
 
             if action == K + 1 or (action == K and not stale_pool):
                 # FRESH
@@ -461,7 +467,7 @@ def cmd_generate(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     out = generate(model, K, history, state["n_hashes"], state["bucket_size"],
-                   args.n, args.seed)
+                   args.n, args.seed, temperature=args.temperature)
     write_csv(args.output, out)
     print(f"[trace_transformer generate] wrote {args.n:,} records → {args.output}",
           flush=True)
@@ -491,6 +497,11 @@ def main():
     pg.add_argument("--output", required=True)
     pg.add_argument("--n", type=int, default=1_000_000)
     pg.add_argument("--seed", type=int, default=42)
+    pg.add_argument("--temperature", type=float, default=1.0,
+                    help="Softmax temperature for sampling. 1.0 = raw model dist; "
+                         "<1.0 sharpens toward argmax; 0 = greedy. Lower T may "
+                         "fix under-emit of dominant action class when softmax mass "
+                         "is spread thin across K+2 outcomes.")
     pg.set_defaults(fn=cmd_generate)
     args = p.parse_args()
     args.fn(args)
