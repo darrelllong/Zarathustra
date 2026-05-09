@@ -6,6 +6,7 @@ OUT_ROOT="${ALTGAN_OUT_ROOT:-/tiamat/zarathustra/altgan-output}"
 CKPT_ROOT="${ALTGAN_CKPT_ROOT:-/tiamat/zarathustra/checkpoints/altgan}"
 VENV_PY="${ALTGAN_PY:-/tiamat/zarathustra/altgan-venv/bin/python}"
 REAL_TENCENT="${TENCENT_REAL:-/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv}"
+APPEND_MD="${ALTGAN_APPEND_MARKDOWN:-RESPONSE-LANL.md,altgan/RESULTS.md}"
 
 usage() {
   cat <<'EOF'
@@ -19,6 +20,9 @@ usage:
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
 redirection, nohup, and backgrounding happens on the remote host.
+
+Defaults:
+  ALTGAN_APPEND_MARKDOWN="$APPEND_MD"
 EOF
 }
 
@@ -113,6 +117,12 @@ launch_mdlstm_tencent() {
   host_tag="$(hostname -s 2>/dev/null || hostname || echo host)"
   host_tag="${host_tag//[^A-Za-z0-9._-]/_}"
   local log_path="$OUT_ROOT/logs/${tag}_${host_tag}_${ts}.log"
+  local md_title=""
+  if [[ -n "${ALTGAN_MARKDOWN_TITLE:-}" ]]; then
+    md_title="$ALTGAN_MARKDOWN_TITLE"
+  else
+    md_title="## $(date -u +%Y-%m-%d\\ %H:%MZ) -- ${tag} Completed (multi-seed)"
+  fi
   local -a cmd=(
     "$VENV_PY" -u -m altgan.mattson_denning_lstm multiseed
     --real "$REAL_TENCENT"
@@ -143,6 +153,10 @@ launch_mdlstm_tencent() {
     --cache-sizes 32,128,512,2048,8192
     --policies lru,arc,fifo,sieve,slru,car
   )
+
+  if [[ -n "${APPEND_MD:-}" ]]; then
+    cmd+=(--append-markdown "$APPEND_MD" --markdown-title "$md_title")
+  fi
 
   if [[ "$fit_mode" == "fit" ]]; then
     cmd+=(--fit)
