@@ -5529,3 +5529,17 @@ birth exposure-bias. r418 adds output footprint control: the LSTM remains the
 reuse-depth model, while a Denning/footprint birth controller follows the real
 cumulative distinct-count curve and forces already-emitted reuse when the
 synthetic output is ahead of that curve.
+
+r418 completed as a non-banked learned-generator scout:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0667` | 0.0666636667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0506` | 0.0505556667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0647` | 0.0646560000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0720` | 0.0720496667 |
+
+Four-seed mean: `0.0634812500`, range `0.0214940000`. r419 tightens the
+footprint controller so output births exactly track the real cumulative
+footprint curve and forced reuse is weighted by the LSTM's predicted Mattson
+depth distribution.

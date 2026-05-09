@@ -531,10 +531,33 @@ def _force_emitted_reuse(
     emitted_seen: set[int],
     emitted_order: list[int],
     rank_edges: np.ndarray,
+    probs: np.ndarray,
     rng: np.random.Generator,
 ) -> tuple[int, int] | None:
     if not stack or not emitted_order:
         return None
+    reuse_probs = probs.copy()
+    reuse_probs[NEW_TOKEN] = 0.0
+    for tok in range(1, len(reuse_probs)):
+        if int(rank_edges[tok - 1]) >= len(stack):
+            reuse_probs[tok] = 0.0
+    total = float(reuse_probs.sum())
+    if total > 0.0:
+        reuse_probs /= total
+        for _ in range(16):
+            token = int(rng.choice(len(reuse_probs), p=reuse_probs))
+            lo = int(rank_edges[token - 1])
+            hi = min(int(rank_edges[min(token, len(rank_edges) - 1)]), len(stack))
+            if hi <= lo:
+                continue
+            for _attempt in range(4):
+                rank = int(rng.integers(lo, hi))
+                oid = int(stack[rank])
+                if oid not in emitted_seen:
+                    continue
+                stack.pop(rank)
+                stack.insert(0, oid)
+                return oid, rank_to_token(rank, rank_edges)
     for _ in range(8):
         oid = int(emitted_order[int(rng.integers(0, len(emitted_order)))])
         try:
@@ -602,6 +625,8 @@ def generate_ids(
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
+            birth_target = int(birth_targets[i]) if birth_targets is not None else 0
+            force_new = birth_targets is not None and len(emitted_seen) < birth_target
             z = logits[0, -1] / max(float(temperature), 1e-6)
             probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             if stack:
@@ -619,6 +644,8 @@ def generate_ids(
                 probs = np.zeros(vocab, dtype=np.float64)
                 probs[NEW_TOKEN] = 1.0
             token = int(rng.choice(vocab, p=probs))
+            if force_new:
+                token = NEW_TOKEN
             if token == NEW_TOKEN or not stack:
                 oid = next_new
                 next_new += 1
@@ -635,10 +662,11 @@ def generate_ids(
                     stack.insert(0, oid)
             if (
                 birth_targets is not None
+                and not force_new
                 and oid not in emitted_seen
-                and len(emitted_seen) >= int(birth_targets[i])
+                and len(emitted_seen) >= birth_target
             ):
-                forced = _force_emitted_reuse(stack, emitted_seen, emitted_order, rank_edges, rng)
+                forced = _force_emitted_reuse(stack, emitted_seen, emitted_order, rank_edges, probs, rng)
                 if forced is not None:
                     oid, token = forced
             out[i] = oid

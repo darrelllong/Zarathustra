@@ -5865,3 +5865,20 @@ distinct-count growth is constrained to the real cumulative footprint curve,
 with forced reuse of already-emitted IDs when the synthetic output is ahead of
 that birth curve. This is an architectural birth/reuse factorization, not a
 scalar post-hoc cache knob.
+
+r418 is the first complete four-seed learned-generator scout from this branch.
+It is not bankable against Tencent r336, but it moved the ML path from
+catastrophic novelty collapse into cachesim-visible locality:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0667` | 0.0666636667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0506` | 0.0505556667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0647` | 0.0646560000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r418_birth_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0720` | 0.0720496667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0634812500` (race display `0.0635`;
+range `0.0214940000`). The next r419 change makes the birth controller exact
+on the cumulative real footprint and, when forced to reuse, samples emitted
+objects through the model's predicted Mattson-depth distribution instead of a
+uniform emitted-ID draw.
