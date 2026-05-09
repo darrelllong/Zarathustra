@@ -16824,3 +16824,19 @@ is needed for genuine sampling diversity.)
 **Honest interim claim**: R298e seed=42 at 1M = 0.0313 beats R298b 1M
 0.0352 by -11%. ATB claim deferred until multi-seed mean stabilizes.
 
+
+### R298e 1M multi-seed in flight (2026-05-09 07:45)
+
+| seed | 1M mean HRC-MAE | FRESH count | status |
+|---:|---:|---:|---|
+| 42 | 0.0313 | 433,734 (43.4%) | banked |
+| 80 | 0.0432 | 181,862 (18.2%) | banked |
+| 81 | in flight | — | — |
+| 82 | queued | — | — |
+
+Seed=80 at 1M improved from 100k's 0.0488 to 0.0432 (-11.5%) — 1M
+generation does dampen variance, but seed=80 still under-emits FRESH
+(18% vs real's 49%). Partial 2-seed mean = 0.0373, range = 0.0119. If
+81/82 land near 0.043, 4-seed mean ~0.039 (worse than R298b 0.0352
+single-seed). If near 0.031, 4-seed mean ~0.032 (beats R298b).
+
