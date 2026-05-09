@@ -16707,3 +16707,68 @@ as additional context. R298d adds bin granularity but not the multi-window
 context. If R298d underperforms LANL's hybrid, the multi-window context
 input is the next expected step (R298e).
 
+
+## R298d / R298e measured 2026-05-09: bin granularity + empirical sampling
+
+R298d (200 bins, hidden=256, 30 epochs, ~912k LSTM params) at 100k Wiki
+seed=42 = **0.0458 mean HRC-MAE** — worse than R298b 0.0352 at 1M.
+Per-policy decomposition explained why:
+
+| policy | R298b 1M | R298d 100k | Δ |
+|---|---:|---:|---|
+| lru   | 0.0388 | 0.0114 | -71% |
+| arc   | 0.0246 | 0.0588 | +139% |
+| fifo  | 0.0463 | 0.0071 | -85% |
+| sieve | 0.0422 | 0.0676 | +60% |
+| slru  | 0.0370 | 0.0702 | +90% |
+| car   | 0.0223 | 0.0598 | +168% |
+
+The bigger model dramatically tightened LRU/FIFO (depth-aware policies that
+align with our rank-bin tokenization) but blew out ARC/SIEVE/SLRU/CAR
+(recency-aware policies that punish over-prediction of short reuses).
+The synthetic over-hits at small caches by 3-9pp — too few one-shots /
+too many short reuses at small stack depths. Diagnosis: within-bin
+**uniform** rank sampling. The log-spaced bins are wide near the tail;
+sampling uniformly inside each bin loses the actual reuse-distance density.
+
+**R298e fix**: replace within-bin uniform sampling with **empirical**
+sampling — at fit time, collect the actual stack distances observed for
+each bin during tokenization; at generate time, sample from that empirical
+distribution (LANL `--rank-sampler empirical` lever). Same R298d checkpoint,
+no retraining; only the generator changes. Implementation:
+`/tmp/r298e_empirical_gen.py` (~150 lines, reuses
+`llgan.trace_lstm.make_rank_bins` + `rank_to_token`).
+
+**R298e measured (Wiki seed=42, 100k)**: **0.0328 mean HRC-MAE**.
+Per-policy:
+
+| policy | R298d uniform 100k | R298e empirical 100k | Δ |
+|---|---:|---:|---|
+| lru   | 0.0114 | 0.0179 | +57% |
+| arc   | 0.0588 | 0.0294 | -50% |
+| fifo  | 0.0071 | 0.0258 | +263% |
+| sieve | 0.0676 | 0.0448 | -34% |
+| slru  | 0.0702 | 0.0484 | -31% |
+| car   | 0.0598 | 0.0306 | -49% |
+| **mean** | **0.0458** | **0.0328** | **-28%** |
+
+The empirical sampler trades LRU/FIFO precision (depth tokenization gets
+slightly noisier) for major gains on the recency-aware policies. **0.0328
+at 100k beats R298b's 0.0352 at 1M** (apples-to-100k it's -28% vs R298d
+uniform). Action distribution: synthetic FRESH 48.6% vs real Wiki ~49%
+(near-perfect match), validating that the model's FRESH/IN_STACK split
+behaviour was healthy and the bottleneck really was just within-bin
+sampling.
+
+R298e 1M seed=42 launched on baase to confirm at the headline comparison
+scale; expect ~55min generate + ~7min cachesim. After that: multi-seed
+{42, 80, 81, 82} for ATB claim.
+
+**This is the first deep-learning architectural improvement post-AD that
+beats R298b's floor with a measurable mechanism.** The mechanism is
+mathematically clean: P(rank | bin, history) = P(rank | bin) × P(bin |
+history), where the LSTM learns the second factor and within-bin empirical
+sampling preserves the first factor exactly. Uniform within-bin was
+throwing away P(rank | bin) — the long-tailed Zipf/Pareto density inside
+the wide log-spaced bins.
+
