@@ -249,6 +249,8 @@ def train_model(
     tokens: np.ndarray,
     ws_tokens: np.ndarray,
     *,
+    rank_edges: np.ndarray,
+    windows: list[int],
     vocab: int,
     ws_bins: int,
     hidden: int,
@@ -260,6 +262,7 @@ def train_model(
     lr: float,
     seed: int,
     aux_ws_loss_weight: float,
+    short_reuse_loss_weight: float,
 ):
     torch, _nn = _try_torch()
     import torch.nn.functional as F
@@ -270,6 +273,11 @@ def train_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model(vocab, ws_tokens.shape[1], ws_bins, token_embed, ws_embed, hidden).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    reuse_class_weights = None
+    if short_reuse_loss_weight > 0.0:
+        reuse_class_weights = torch.from_numpy(
+            _short_reuse_class_weights(rank_edges, windows, short_reuse_loss_weight)
+        ).to(device)
 
     tok_t = torch.from_numpy(tokens.astype(np.int64))
     ws_t = torch.from_numpy(ws_tokens.astype(np.int64))
@@ -281,7 +289,8 @@ def train_model(
     print(
         "[mattson_denning train] "
         f"device={device} params={sum(p.numel() for p in model.parameters()):,} "
-        f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches}",
+        f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches} "
+        f"short_reuse_loss_weight={short_reuse_loss_weight}",
         flush=True,
     )
 
@@ -308,6 +317,7 @@ def train_model(
                 reuse_loss = F.cross_entropy(
                     logits[:, :, 1:][reuse_mask],
                     y[reuse_mask] - 1,
+                    weight=reuse_class_weights,
                 )
             else:
                 reuse_loss = logits.sum() * 0.0
@@ -337,6 +347,27 @@ def train_model(
             flush=True,
         )
     return model
+
+
+def _short_reuse_class_weights(rank_edges: np.ndarray, windows: list[int], gain: float) -> np.ndarray:
+    weights = np.ones(max(0, len(rank_edges) - 1), dtype=np.float32)
+    if gain <= 0.0 or len(windows) == 0:
+        return weights
+    primary = max(int(windows[0]), 1)
+    secondary = max(int(windows[min(1, len(windows) - 1)]), primary)
+    span = max(float(secondary - primary), 1.0)
+    for cls in range(len(weights)):
+        lo = int(rank_edges[cls])
+        hi = int(rank_edges[min(cls + 1, len(rank_edges) - 1)])
+        mid = 0.5 * (lo + max(lo + 1, hi) - 1)
+        if mid < primary:
+            bonus = 1.0
+        elif mid < secondary:
+            bonus = 0.5 * (1.0 - (mid - primary) / span)
+        else:
+            bonus = 0.0
+        weights[cls] = 1.0 + float(gain) * max(0.0, bonus)
+    return weights
 
 
 def save_checkpoint(path: str | Path, model, meta: dict) -> None:
@@ -381,6 +412,8 @@ def fit(args) -> None:
     model = train_model(
         tokens,
         ws_tokens,
+        rank_edges=rank_edges,
+        windows=windows,
         vocab=len(rank_edges),
         ws_bins=len(ws_edges) - 1,
         hidden=args.hidden,
@@ -392,6 +425,7 @@ def fit(args) -> None:
         lr=args.lr,
         seed=args.seed,
         aux_ws_loss_weight=args.aux_ws_loss_weight,
+        short_reuse_loss_weight=args.short_reuse_loss_weight,
     )
     mark_sample = {
         "obj_sizes": _sample_pool(trace.obj_sizes),
@@ -419,6 +453,7 @@ def fit(args) -> None:
             "rank_bins": args.rank_bins,
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
+            "short_reuse_loss_weight": args.short_reuse_loss_weight,
             "training_loss": "binary birth cross entropy plus reuse-only Mattson depth cross entropy plus auxiliary next-Denning-working-set cross entropy",
         },
     )
@@ -971,6 +1006,7 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--lr", type=float, default=1e-3)
         q.add_argument("--seed", type=int, default=42)
         q.add_argument("--aux-ws-loss-weight", type=float, default=0.15)
+        q.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
 
     fit_p = sub.add_parser("fit")
     add_train_flags(fit_p)
