@@ -5285,3 +5285,35 @@ Immediate race implication: no leaderboard row changes from this methodology
 discussion. LANL will keep banking multi-seed literal `llgan.cachesim_eval`
 lines on the official surface, and will use footprint/no-32/proposed-ladder
 audits as diagnostics until a joint protocol update is explicitly recorded.
+
+## 2026-05-09 00:50Z -- Baleen24 r398b Hot-Donor Surface Scout Rejected; r401 Move-Bank Scout Launched
+
+r398b completed and is rejected. It used hot-head repair traces only as
+synthetic object-ID donors inside the guarded chunk selector, but it did not
+beat r395 on the official Baleen24 surface.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206273333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0208941667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0208535667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0205904333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0207413750` (race display `0.0207`;
+range `0.0003037333`). No-32 guard mean was `0.0166049792` (range
+`0.0002266250`). This is worse than banked r395 `0.0204949000`, so the hot
+donor path remains closed negative unless a future cache-aware constructor
+changes the donor distribution before selection.
+
+LANL launched r401 on baase:
+`baleen24_chunksurf_r401_movebank256`. This is the first run using the new
+priority move-bank selector from commit `9532284`. It starts from the banked
+r395 bases and evaluates accepted moves from the r395 move JSONs first before
+filling the normal random donor cap. The goal is to turn previous strong
+accepted intervals into first-class candidates, especially for weak seeds
+80/81, instead of rediscovering them by random donor sampling.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r401_movebank256_baase_20260509.log`.
+
+r401 is not banked unless all four literal cachesim lines land and beat r395.

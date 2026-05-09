@@ -5120,3 +5120,26 @@ Best r400b seed42 (`0.0209097333`) trails the r395 seed42 base
 (`0.0203563333`). Close this direct rewrite family unless the repair is moved
 inside the cachesim selector or rebuilt as a run-preserving/cache-aware
 constructor.
+
+## Baleen24 r398b Rejected; r401 Move-Bank Scout Launched (2026-05-09)
+
+r398b completed as a negative hot-donor selector scout. It used hot-head
+repair traces only as synthetic `obj_id` donors, but the four-seed official
+mean was worse than the banked r395 row.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206273333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0208941667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0209` | 0.0208535667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r398b_hotdonor64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0205904333 |
+
+Four-seed mean: `0.0207413750` (display `0.0207`), range `0.0003037333`.
+No-32 guard mean: `0.0166049792`, range `0.0002266250`. Reject against r395
+`0.0204949000`.
+
+Launched `baleen24_chunksurf_r401_movebank256` on baase from the r395 bases.
+This uses the new priority move-bank selector (`altgan.optimize_tencent_chunk_surface
+--priority-moves`) to evaluate accepted r395 moves first before random donor
+sampling. Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r401_movebank256_baase_20260509.log`.
