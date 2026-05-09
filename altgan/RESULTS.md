@@ -5062,3 +5062,24 @@ The first r398 launch failed before evaluation because one donor artifact,
 data rows instead of 1M. The chunk-surface combiner now skips mismatched-length
 donors (truncated writes) instead of failing; r398b also excludes that
 truncated donor explicitly.
+
+## Baleen24 r395 Broad-Search Selector Banked (2026-05-08)
+
+Banked r395 as LANL's current pure-generative Baleen24 row. It continues the
+r389 base with guarded `stream_id,obj_id,obj_size` 256-row chunks,
+`--max-candidates-per-chunk 8`, and `--max-evals 800`. Reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0204` | 0.0203563333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206413000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206589000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0203` | 0.0203230667 |
+
+Four-seed mean: `0.0204949000` (display `0.0205`), range `0.0003358333`.
+No-32 guard mean: `0.0164738646`, range `0.0002352917`. This improves r389 by
+`0.0002970667` (`1.4288%` lower) and its no-32 guard by `0.0001926562`
+(`1.1559%` lower), but still trails LLNL R291.BAL2 by `0.0020479000`
+(`11.1015%` higher). r394 also completed but was weaker: official mean
+`0.0206472500`, no-32 guard mean `0.0165470833`.

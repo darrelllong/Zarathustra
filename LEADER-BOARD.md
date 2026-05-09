@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-08 (LANL r386 Alibaba 0.0099685750, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r389 Baleen24 0.0207919667 are banked as guarded continuations; LANL leads 8/9, LLNL still leads Baleen24)**.
+Last updated: **2026-05-08 (LANL r386 Alibaba 0.0099685750, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r395 Baleen24 0.0204949000 are banked as guarded continuations; LANL leads 8/9, LLNL still leads Baleen24)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | 0.009999 (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | **0.0099685750** (r386 guarded self-shift 32-row continuation, 4-seed {42,80,81,82}, range 0.0001902667; no-32 guard mean 0.0111855104) | **LANL** | -0.3% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0220106406** (r292 cache-surface chunk selector overtake, 4-seed {42,80,81,82}, range 0.0053736458) | **LANL** | −26.1% |
-| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0207919667 (r389 guarded shifted 512-row continuation, 4-seed {42,80,81,82}, range 0.0002855667; no-32 guard mean 0.0166665208) | **LLNL** | +12.7% |
+| Baleen24 | **0.018447** (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | 0.0204949000 (r395 guarded broad 256-row continuation, 4-seed {42,80,81,82}, range 0.0003358333; no-32 guard mean 0.0164738646) | **LLNL** | +11.1% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.0043343667** (r291 cache-surface chunk selector retake, 4-seed {42,80,81,82}, range 0.0000925333) | **LANL** | −51.5% |
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -40,10 +40,10 @@ Alibaba flips back to LANL under the current banked rows: LANL r386
 `0.0099685750` vs LLNL R287.A2 `0.009999`. LANL r386 improves LANL r384 by
 `0.0004866917` (`4.6550%` lower) and beats LLNL by `0.0000304250`
 (`0.3043%` lower).
-Baleen24 remains an LLNL lead: LLNL R291.BAL2 `0.018447` vs LANL r389
-`0.0207919667`. LANL r389 improves LANL r382 by `0.0000309333`
-(`0.1486%` lower) but still trails LLNL by `0.0023449667`
-(`12.7119%` higher).
+Baleen24 remains an LLNL lead: LLNL R291.BAL2 `0.018447` vs LANL r395
+`0.0204949000`. LANL r395 improves LANL r389 by `0.0002970667`
+(`1.4288%` lower) but still trails LLNL by `0.0020479000`
+(`11.1015%` higher).
 All 9 corpora have generative claims from both teams.
 
 ## TraceBootstrap leader board (methodology theater)
@@ -202,8 +202,8 @@ metric-class advantage 2DIO does not contest.
 4. **Alibaba defence** (LANL just retook with r386 0.0099685750): LLNL is now
    behind by 0.3% on the banked row convention. Pre-empt with a finer chunk
    cascade (chunk_size in {2K, 4K, 8K}) or fit-time work on the R270 atlas.
-5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r389
-   `0.0207919667` -> LLNL leads by 12.7%. LANL's r389 tightened the mean,
+5. **Baleen24 defence**: LLNL R291.BAL2 `0.018447` vs LANL r395
+   `0.0204949000` -> LLNL leads by 11.1%. LANL's r395 tightened the mean,
    but closing the remaining gap likely needs a new
    architecture, not smaller object-ID chunks.
 6. **Twitter / Meta KV / Meta CDN**: LANL leads Twitter by 5.2% after r351,

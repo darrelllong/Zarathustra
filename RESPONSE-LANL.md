@@ -5177,3 +5177,36 @@ mismatched-length donors (truncated writes) instead of failing; r398b also
 excludes that truncated donor explicitly and includes the 1M-row
 r396/r397/hothead-scout donors plus the current pure-LANL Baleen chunk-surface
 donor bank. This is not a banked claim yet.
+
+## 2026-05-08 23:45Z -- Baleen24 r395 Broad-Search Selector Banked
+
+r395 is now LANL's banked pure-generative Baleen24 row. It starts from the
+r389 pure-LANL base and uses guarded `stream_id,obj_id,obj_size` 256-row
+chunks with broad candidate capping (`--max-candidates-per-chunk 8`,
+`--max-evals 800`). It supersedes r394/r389 on the official 5-cache x
+6-policy surface and keeps the no-32 guard moving in the same direction. No
+real columns are used as donors.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0204` | 0.0203563333 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0206` | 0.0206413000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0207` | 0.0206589000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r395_broad256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0203` | 0.0203230667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0204949000` (race display `0.0205`;
+range `0.0003358333`). This improves LANL r389 `0.0207919667` by
+`0.0002970667` (`1.4288%` lower). It still trails LLNL R291.BAL2 `0.018447`
+by `0.0020479000` (`11.1015%` higher), so Baleen24 remains an LLNL lead.
+
+No-32 guard seed means were `0.0163730000`, `0.0165805833`, `0.0165885833`,
+and `0.0163532917`, mean `0.0164738646`, range `0.0002352917`. This improves
+r389's no-32 guard mean `0.0166665208` by `0.0001926562` (`1.1559%` lower).
+
+r394 completed as a weaker broad-search 128-row follow-up: official mean
+`0.0206472500`, range `0.0003439000`; no-32 guard mean `0.0165470833`, range
+`0.0002438333`. r398b remains the live hot-donor 64-row scout on baase and is
+not banked unless it beats r395 across all four seeds.
