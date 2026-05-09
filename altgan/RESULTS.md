@@ -6269,3 +6269,33 @@ The repeated pattern across r440-r442 is over-compressed mid-stack reuse. Next
 learned change should represent Mattson depth with more local structure, such
 as exact small ranks or a separate short/mid/deep rank head, before adding more
 context features.
+
+## Alibaba r432 r431-Base Defensive Continuation Banked (2026-05-09)
+
+r432 is promoted over r431 on Alibaba. Official mean improves from r431
+`0.0098792833` to `0.0098784250`; no-32 guard mean improves from
+`0.0110781875` to `0.0110770104`. The gain is tiny, but it is a complete
+four-seed official-surface improvement with literal panels.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/alibaba_stackatlas_1M_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0098477667 |
+| 80 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0100` | 0.0099868667 |
+| 81 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0098` | 0.0097697000 |
+| 82 | `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0099` | 0.0099093667 |
+
+Four-seed mean: `0.0098784250` (display `0.0099`), range `0.0002171667`.
+r432 replaces r431 on the Alibaba row.
+
+Guard surface `guard`:
+
+| seed | guard JSON | guard mean |
+|---:|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed42_guard.json` | 0.0110800000 |
+| 80 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed80_guard.json` | 0.0111975833 |
+| 81 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed81_guard.json` | 0.0108623333 |
+| 82 | `/tiamat/zarathustra/altgan-output/cachesim_lanl/alibaba_chunksurf_r432_r431base4_cap16_ck4_seed82_guard.json` | 0.0111681250 |
+
+Guard mean across seeds `{42,80,81,82}`: `0.0110770104` (range `0.0003352500`).
