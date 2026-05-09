@@ -14,7 +14,7 @@ usage:
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
   altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
@@ -99,6 +99,7 @@ launch_mdlstm_tencent() {
   local short_reuse_pressure="${8:-0}"
   local short_reuse_loss_weight="${9:-0}"
   local recycle_rank_cap="${10:-0}"
+  local rank_sampler="${11:-uniform}"
 
   pull_repo
   mkdir -p "$OUT_ROOT/logs" "$CKPT_ROOT"
@@ -126,6 +127,7 @@ launch_mdlstm_tencent() {
     --seed "$seed"
     --short-reuse-loss-weight "$short_reuse_loss_weight"
     --recycle-rank-cap "$recycle_rank_cap"
+    --rank-sampler "$rank_sampler"
     --seeds 42,80,81,82
     --temperature 1.0
     --short-reuse-pressure "$short_reuse_pressure"

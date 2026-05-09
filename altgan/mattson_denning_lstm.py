@@ -210,6 +210,13 @@ def tokenize(
     fresh = int((tokens == FRESH_TOKEN).sum())
     recycle = int((tokens == RECYCLE_TOKEN).sum()) if recycle_rank_cap > 0 else 0
     reuse = trace.n - fresh - recycle
+    rank_samples_by_token = rank_samples_from_depths(
+        depths,
+        tokens,
+        len(rank_edges) + (reuse_token_offset - 1),
+        reuse_token_offset,
+        recycle_rank_cap,
+    )
     print(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
@@ -218,7 +225,7 @@ def tokenize(
         f"ws_bins={len(ws_edges) - 1} windows={windows}",
         flush=True,
     )
-    return tokens, ws_tokens, rank_edges, ws_edges, footprint
+    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token
 
 
 def tokens_from_depths(
@@ -237,6 +244,26 @@ def tokens_from_depths(
         else:
             tokens[i] = rank_to_token(int(depth), rank_edges, reuse_token_offset)
     return tokens
+
+
+def rank_samples_from_depths(
+    depths: np.ndarray,
+    tokens: np.ndarray,
+    vocab: int,
+    reuse_token_offset: int,
+    recycle_rank_cap: int = 0,
+) -> list[list[int]]:
+    samples: list[list[int]] = [[] for _ in range(vocab)]
+    for depth, token in zip(depths.tolist(), tokens.tolist()):
+        depth_i = int(depth)
+        token_i = int(token)
+        if token_i < reuse_token_offset or depth_i < 0:
+            continue
+        if recycle_rank_cap > 0 and depth_i >= recycle_rank_cap:
+            continue
+        if 0 <= token_i < vocab:
+            samples[token_i].append(depth_i)
+    return samples
 
 
 def _try_torch():
@@ -438,7 +465,7 @@ def load_checkpoint(path: str | Path):
 def fit(args) -> None:
     windows = _parse_ints(args.ws_windows)
     trace = read_real_csv(args.real, args.max_rows)
-    tokens, ws_tokens, rank_edges, ws_edges, footprint = tokenize(
+    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token = tokenize(
         trace,
         args.rank_bins,
         args.ws_bins,
@@ -474,7 +501,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 4,
+            "version": 5,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -496,7 +523,9 @@ def fit(args) -> None:
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
             "short_reuse_loss_weight": args.short_reuse_loss_weight,
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy",
+            "rank_sampler": args.rank_sampler,
+            "rank_samples_by_token": rank_samples_by_token if args.rank_sampler == "empirical" else [],
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths",
         },
     )
 
@@ -775,6 +804,35 @@ def _sample_stale_recycle(stale_pool, stack: list[int], rng: np.random.Generator
     return None
 
 
+def _sample_rank_for_token(
+    token: int,
+    rank_edges: np.ndarray,
+    stack_len: int,
+    rng: np.random.Generator,
+    reuse_token_offset: int,
+    rank_samples_by_token,
+) -> int:
+    if stack_len <= 0:
+        return -1
+    if rank_samples_by_token and 0 <= token < len(rank_samples_by_token):
+        samples = rank_samples_by_token[token]
+        if samples:
+            for _ in range(16):
+                rank = int(samples[int(rng.integers(0, len(samples)))])
+                if 0 <= rank < stack_len:
+                    return rank
+            eligible = [int(rank) for rank in samples if 0 <= int(rank) < stack_len]
+            if eligible:
+                return int(eligible[int(rng.integers(0, len(eligible)))])
+    return token_to_rank(
+        token,
+        rank_edges,
+        rng,
+        max_rank=stack_len - 1,
+        reuse_token_offset=reuse_token_offset,
+    )
+
+
 def generate_ids(
     state: dict,
     model,
@@ -802,6 +860,7 @@ def generate_ids(
     recycle_token_raw = state.get("recycle_token")
     recycle_token = int(recycle_token_raw) if recycle_token_raw is not None else -1
     recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
+    rank_samples_by_token = state.get("rank_samples_by_token") or []
     init_tokens, init_ws_tokens, queues, counters, stack, next_new, stale_pool = _warmstart_context(
         state,
         seed,
@@ -899,12 +958,13 @@ def generate_ids(
                     token = FRESH_TOKEN
                 stack.insert(0, int(oid))
             else:
-                rank = token_to_rank(
+                rank = _sample_rank_for_token(
                     token,
                     rank_edges,
+                    len(stack),
                     rng,
-                    max_rank=len(stack) - 1,
-                    reuse_token_offset=reuse_token_offset,
+                    reuse_token_offset,
+                    rank_samples_by_token,
                 )
                 if rank < 0 or rank >= len(stack):
                     oid = next_new
@@ -1091,6 +1151,12 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--seed", type=int, default=42)
         q.add_argument("--aux-ws-loss-weight", type=float, default=0.15)
         q.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
+        q.add_argument(
+            "--rank-sampler",
+            choices=["uniform", "empirical"],
+            default="uniform",
+            help="within predicted Mattson-depth bin, sample uniformly or from exact fitted real ranks",
+        )
         q.add_argument(
             "--recycle-rank-cap",
             type=int,
