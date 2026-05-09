@@ -5805,3 +5805,20 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/alibaba_r431_r426base4_cap16_20260509T084034Z.log`.
 Base template:
 `/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r426_r413base4_cap16_ck4_seed{seed}_fake_1000k.csv`.
+
+## 2026-05-09 09:04Z -- Tencent r430 Cap-256 FRESH/RECYCLE Result
+
+r430 is a completed learned-generator scout, not a promotion. It improves on
+r429 and r428 but loses to r423b; the cap-256 split is a better RECYCLE
+boundary than 128 or 512 for this branch, but still does not restore the
+short-cache locality surface.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0611` | 0.0611290000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0726` | 0.0726396667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0667` | 0.0667436667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0659` | 0.0658820000 |
+
+Four-seed mean: `0.0665985833`, range `0.0115106667`. Retracted versus r423b
+`0.0647706667`.

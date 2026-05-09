@@ -6218,3 +6218,23 @@ Base template:
 
 No promotion unless it completes all four literal official panels and beats
 r426 `0.0098906833`.
+
+## 2026-05-09 09:04Z -- Tencent r430 Cap-256 FRESH/RECYCLE Completed, Not Promoted
+
+r430 completed the midpoint cap-256 learned Mattson-Denning scout. It improves
+over r429 and slightly over r428, but still loses to r423b and remains far
+behind the banked Tencent r336. The architectural read is useful: cap 128 made
+RECYCLE too dominant, cap 512 was too weak, and cap 256 is in between but still
+does not repair the 32/128 LRU/FIFO/SLRU under-hit. The next Tencent ML move
+needs additional learned conditioning, not another pressure-only scalar turn.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0611` | 0.0611290000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0726` | 0.0726396667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0667` | 0.0667436667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r430_recyclecap256_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0659` | 0.0658820000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0665985833` (race display `0.0666`;
+range `0.0115106667`). Retracted versus r423b `0.0647706667`; not a
+leaderboard row.
