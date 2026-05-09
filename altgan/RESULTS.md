@@ -5321,3 +5321,16 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
   --emit-markdown \
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
+
+## Alibaba r411 Defensive 16-Row Self-Shift Scout Launched (2026-05-09)
+
+Launched `alibaba_chunksurf_r411_selfshift16` on baase from the banked r386
+32-row self-shift bases. This defensive scout uses 16-row
+`stream_id,obj_id,obj_size` chunks, cross-seed synthetic-only donors from
+r386/r384/r368/r364/r360/r340, and the official Alibaba 5-cache x 6-policy
+surface with the no-32 ratio guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log: `/tiamat/zarathustra/altgan-output/logs/alibaba_r411_selfshift16_baase_20260509.log`.
+
+No claim until the four-seed mean beats r386 `0.0099685750`.
