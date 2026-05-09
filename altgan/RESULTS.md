@@ -5863,6 +5863,20 @@ Denning window before feeding them back into birth/reuse control.
 Four-seed mean: `0.3364224167`, range `0.2312970000`. Retracted versus r434
 `0.0601647500`.
 
+## 2026-05-09 10:54Z -- Tencent r438 Clamped Learned-WS Controller Launched
+
+Patched learned-WS rollout target decoding to clip expected bin midpoints to
+each actual Denning window. Launched r438 as no-fit generation from the r437
+checkpoint, so the comparison isolates the rollout-control fix.
+
+Process line:
+
+`--model /tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt --tag tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 0 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --birth-control-mode learned-ws`
+
+PID: `4070932`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_vinge_20260509.log`.
+
 ## 2026-05-09 10:38Z -- Tencent r437 Learned-WS Controller Launched
 
 Launched `tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3` on vinge.

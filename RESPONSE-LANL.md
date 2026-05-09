@@ -6518,3 +6518,26 @@ control.
 
 Mean across seeds `{42,80,81,82}`: `0.3364224167` (race display `0.3364`;
 range `0.2312970000`). Retracted; r434 remains the best learned Tencent scout.
+
+## 2026-05-09 10:54Z -- Tencent r438 Clamped Learned-WS Controller Launched
+
+Patched the learned-WS controller so each learned working-set target is decoded
+as an expectation over bin midpoints clipped to the corresponding Denning
+window. This prevents the r437 failure mode where global-footprint bins created
+impossible per-window targets and forced almost all fresh emissions.
+
+Launched r438 as a generation-only control from the existing r437 checkpoint:
+`tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3`.
+
+Process line confirms this is no-fit rollout only and keeps the r434/r437 token
+geometry:
+
+`--model /tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt --tag tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3 --recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 0 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --birth-control-mode learned-ws`
+
+PID: `4070932`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r438_learnedws_clamped_empiricalrank_norecycle_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
+
+No claim until all four literal cachesim panels complete.
