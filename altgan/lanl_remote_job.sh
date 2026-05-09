@@ -15,7 +15,7 @@ usage:
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
   altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
-  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws|learned-ws-masked] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff] [footprint|max-window|per-window]
+  altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws|learned-ws|learned-ws-masked] [short_reuse_pressure] [short_reuse_loss_weight] [recycle_rank_cap] [uniform|empirical] [exact_rank_cutoff] [footprint|max-window|per-window] [pos_bins] [pos_embed]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
 only `ssh -i ... host /path/to/altgan/lanl_remote_job.sh ...`; all chaining,
@@ -106,6 +106,8 @@ launch_mdlstm_tencent() {
   local rank_sampler="${11:-uniform}"
   local exact_rank_cutoff="${12:-0}"
   local ws_edge_mode="${13:-footprint}"
+  local pos_bins="${14:-0}"
+  local pos_embed="${15:-8}"
 
   pull_repo
   mkdir -p "$OUT_ROOT/logs" "$CKPT_ROOT"
@@ -138,6 +140,8 @@ launch_mdlstm_tencent() {
     --hidden 128
     --token-embed 64
     --ws-embed 16
+    --pos-bins "$pos_bins"
+    --pos-embed "$pos_embed"
     --seq-len 256
     --batch 256
     --epochs "$epochs"

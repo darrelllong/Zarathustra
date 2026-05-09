@@ -6200,3 +6200,23 @@ Next architectural inference: better WS bin geometry improves the training
 surface but not the reuse-rank decoder. The next learned scout should change
 how rank/reuse events are parameterized or conditioned, not keep squeezing the
 WS target alone.
+
+## 2026-05-09 12:15Z -- Tencent r442 Phase-Conditioned Mattson-Denning Prepared
+
+Added optional learned absolute phase embeddings to
+`altgan.mattson_denning_lstm`. The model can now condition the Mattson-depth
+and Denning-WS recurrent state on a coarse trace-position token via
+`--pos-bins`/`--pos-embed`, while old checkpoints remain loadable with
+`pos_bins=0`.
+
+Why this is architectural: r440/r441 trained WS targets cleanly, but still
+generated too much mid-cache reuse. The current model sees rank and WS state
+but not which trace regime it is in; phase conditioning tests whether the rank
+decoder needs time-varying behavior rather than another scalar pressure knob.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+Next fit target: r442 with `--ws-edge-mode max-window`, `--pos-bins 32`, and
+`--pos-embed 8`.

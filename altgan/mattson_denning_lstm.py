@@ -148,6 +148,25 @@ def _normalize_ws_bins(ws_bins, n_windows: int) -> list[int]:
     return [int(v) for v in list(ws_bins)]
 
 
+def position_tokens(n: int, pos_bins: int) -> np.ndarray:
+    """Coarse absolute trace phase tokens, disabled when pos_bins <= 0."""
+    n = int(n)
+    pos_bins = int(pos_bins)
+    if n <= 0:
+        return np.zeros(0, dtype=np.int64)
+    if pos_bins <= 0:
+        return np.zeros(n, dtype=np.int64)
+    scaled = (np.arange(n, dtype=np.int64) * pos_bins) // max(n, 1)
+    return np.clip(scaled, 0, pos_bins - 1).astype(np.int64)
+
+
+def position_token_at(i: int, n: int, pos_bins: int) -> int:
+    pos_bins = int(pos_bins)
+    if pos_bins <= 0:
+        return 0
+    return int(min(pos_bins - 1, max(0, (int(i) * pos_bins) // max(int(n), 1))))
+
+
 def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> np.ndarray:
     """Log rank bins with an optional exact-rank prefix for short-cache depths."""
     max_value = max(int(max_value), 1)
@@ -333,17 +352,29 @@ def _try_torch():
         raise RuntimeError("PyTorch is required for mattson_denning_lstm") from exc
 
 
-def build_model(vocab: int, n_windows: int, ws_bins, token_embed: int, ws_embed: int, hidden: int):
+def build_model(
+    vocab: int,
+    n_windows: int,
+    ws_bins,
+    token_embed: int,
+    ws_embed: int,
+    hidden: int,
+    pos_bins: int = 0,
+    pos_embed: int = 0,
+):
     torch, nn = _try_torch()
     ws_bins_by_window = _normalize_ws_bins(ws_bins, n_windows)
+    use_pos = int(pos_bins) > 0 and int(pos_embed) > 0
 
     class MattsonDenningLSTM(nn.Module):
         def __init__(self):
             super().__init__()
             self.token_emb = nn.Embedding(vocab, token_embed)
             self.ws_emb = nn.ModuleList([nn.Embedding(n_bins, ws_embed) for n_bins in ws_bins_by_window])
+            self.pos_emb = nn.Embedding(int(pos_bins), int(pos_embed)) if use_pos else None
+            input_dim = token_embed + n_windows * ws_embed + (int(pos_embed) if use_pos else 0)
             self.lstm = nn.LSTM(
-                token_embed + n_windows * ws_embed,
+                input_dim,
                 hidden,
                 num_layers=2,
                 batch_first=True,
@@ -352,10 +383,14 @@ def build_model(vocab: int, n_windows: int, ws_bins, token_embed: int, ws_embed:
             self.birth_head = nn.Linear(hidden, 1)
             self.ws_heads = nn.ModuleList([nn.Linear(hidden, n_bins) for n_bins in ws_bins_by_window])
 
-        def forward(self, tok, ws, h=None):
+        def forward(self, tok, ws, pos=None, h=None):
             parts = [self.token_emb(tok)]
             for i, emb in enumerate(self.ws_emb):
                 parts.append(emb(ws[:, :, i]))
+            if self.pos_emb is not None:
+                if pos is None:
+                    pos = tok.new_zeros(tok.shape)
+                parts.append(self.pos_emb(pos))
             x = torch.cat(parts, dim=-1)
             out, h = self.lstm(x, h)
             return self.head(out), self.birth_head(out).squeeze(-1), [head(out) for head in self.ws_heads], h
@@ -374,6 +409,8 @@ def train_model(
     hidden: int,
     token_embed: int,
     ws_embed: int,
+    pos_bins: int,
+    pos_embed: int,
     seq_len: int,
     batch: int,
     epochs: int,
@@ -390,7 +427,16 @@ def train_model(
         torch.cuda.manual_seed_all(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ws_bins_by_window = _normalize_ws_bins(ws_bins, ws_tokens.shape[1])
-    model = build_model(vocab, ws_tokens.shape[1], ws_bins_by_window, token_embed, ws_embed, hidden).to(device)
+    model = build_model(
+        vocab,
+        ws_tokens.shape[1],
+        ws_bins_by_window,
+        token_embed,
+        ws_embed,
+        hidden,
+        pos_bins,
+        pos_embed,
+    ).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     reuse_token_offset = max(LEGACY_REUSE_TOKEN_OFFSET, int(vocab) - len(rank_edges) + 1)
     reuse_class_weights = None
@@ -402,6 +448,7 @@ def train_model(
 
     tok_t = torch.from_numpy(tokens.astype(np.int64))
     ws_t = torch.from_numpy(ws_tokens.astype(np.int64))
+    pos_t = torch.from_numpy(position_tokens(len(tokens), pos_bins))
     n_train = len(tokens) - seq_len - 1
     if n_train <= 0:
         raise ValueError("not enough tokens for requested sequence length")
@@ -411,7 +458,8 @@ def train_model(
         "[mattson_denning train] "
         f"device={device} params={sum(p.numel() for p in model.parameters()):,} "
         f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches} "
-        f"reuse_offset={reuse_token_offset} short_reuse_loss_weight={short_reuse_loss_weight}",
+        f"reuse_offset={reuse_token_offset} pos_bins={int(pos_bins)} pos_embed={int(pos_embed)} "
+        f"short_reuse_loss_weight={short_reuse_loss_weight}",
         flush=True,
     )
 
@@ -425,9 +473,10 @@ def train_model(
                 continue
             x_tok = torch.stack([tok_t[i:i + seq_len] for i in idx]).to(device)
             x_ws = torch.stack([ws_t[i:i + seq_len] for i in idx]).to(device)
+            x_pos = torch.stack([pos_t[i:i + seq_len] for i in idx]).to(device)
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
-            logits, birth_logits, ws_logits, _ = model(x_tok, x_ws)
+            logits, birth_logits, ws_logits, _ = model(x_tok, x_ws, x_pos)
             y_birth = (y == FRESH_TOKEN).float()
             birth_loss = F.binary_cross_entropy_with_logits(
                 birth_logits.reshape(-1),
@@ -510,6 +559,8 @@ def load_checkpoint(path: str | Path):
         int(state["token_embed"]),
         int(state["ws_embed"]),
         int(state["hidden"]),
+        int(state.get("pos_bins") or 0),
+        int(state.get("pos_embed") or 0),
     )
     incompatible = model.load_state_dict(state["model_state"], strict=False)
     if incompatible.missing_keys or incompatible.unexpected_keys:
@@ -546,6 +597,8 @@ def fit(args) -> None:
         hidden=args.hidden,
         token_embed=args.token_embed,
         ws_embed=args.ws_embed,
+        pos_bins=args.pos_bins,
+        pos_embed=args.pos_embed,
         seq_len=args.seq_len,
         batch=args.batch,
         epochs=args.epochs,
@@ -582,6 +635,8 @@ def fit(args) -> None:
             "hidden": args.hidden,
             "token_embed": args.token_embed,
             "ws_embed": args.ws_embed,
+            "pos_bins": int(args.pos_bins),
+            "pos_embed": int(args.pos_embed),
             "seq_len": args.seq_len,
             "rank_bins": args.rank_bins,
             "exact_rank_cutoff": int(args.exact_rank_cutoff),
@@ -590,7 +645,7 @@ def fit(args) -> None:
             "short_reuse_loss_weight": args.short_reuse_loss_weight,
             "rank_sampler": args.rank_sampler,
             "rank_samples_by_token": rank_samples_by_token if args.rank_sampler == "empirical" else [],
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths",
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state",
         },
     )
 
@@ -960,6 +1015,7 @@ def generate_ids(
     recycle_token = int(recycle_token_raw) if recycle_token_raw is not None else -1
     recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
     rank_samples_by_token = state.get("rank_samples_by_token") or []
+    pos_bins = int(state.get("pos_bins") or 0)
     init_tokens, init_ws_tokens, queues, counters, stack, next_new, stale_pool = _warmstart_context(
         state,
         seed,
@@ -991,7 +1047,8 @@ def generate_ids(
     with torch.inference_mode():
         init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
         init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
-        logits, birth_logits, ws_logits, h = model(init_tok, init_ws)
+        init_pos = torch.zeros_like(init_tok)
+        logits, birth_logits, ws_logits, h = model(init_tok, init_ws, init_pos)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
@@ -1124,7 +1181,8 @@ def generate_ids(
                         del counter[old]
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
             step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
-            logits, birth_logits, ws_logits, h = model(step_tok, step_ws, h)
+            step_pos = torch.tensor([[position_token_at(i, n_records, pos_bins)]], dtype=torch.long, device=device)
+            logits, birth_logits, ws_logits, h = model(step_tok, step_ws, step_pos, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
@@ -1256,6 +1314,13 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--hidden", type=int, default=128)
         q.add_argument("--token-embed", type=int, default=64)
         q.add_argument("--ws-embed", type=int, default=16)
+        q.add_argument(
+            "--pos-bins",
+            type=int,
+            default=0,
+            help="if >0, add learned absolute trace-phase embeddings with this many bins",
+        )
+        q.add_argument("--pos-embed", type=int, default=8)
         q.add_argument("--seq-len", type=int, default=256)
         q.add_argument("--batch", type=int, default=256)
         q.add_argument("--epochs", type=int, default=10)
