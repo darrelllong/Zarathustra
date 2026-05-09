@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-09 (LANL r386 Alibaba 0.0099685750, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r407 Baleen24 0.0183702583 are banked; LANL leads 9/9)**.
+Last updated: **2026-05-09 (LANL r386 Alibaba 0.0099685750, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r409 Baleen24 0.0178973417 are banked; LANL leads 9/9)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | 0.009999 (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | **0.0099685750** (r386 guarded self-shift 32-row continuation, 4-seed {42,80,81,82}, range 0.0001902667; no-32 guard mean 0.0111855104) | **LANL** | -0.3% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.03010** (R287 chunk-surface selector refine, 4-seed {42,80,81,82}, range 0.000344) | **LANL** | −1.3% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0220106406** (r292 cache-surface chunk selector overtake, 4-seed {42,80,81,82}, range 0.0053736458) | **LANL** | −26.1% |
-| Baleen24 | 0.018447 (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | **0.0183702583** (r407 priority first-arrival IRD-renewal direct generator, 4-seed {42,80,81,82}, range 0.0001906000; no-32 diagnostic mean 0.0079704792) | **LANL** | -0.4% |
+| Baleen24 | 0.018447 (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | **0.0178973417** (r409 r407-base 256-row synthetic-donor reinforcement, 4-seed {42,80,81,82}, range 0.0001294333; no-32 guard mean 0.0078026562) | **LANL** | -3.0% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.0043343667** (r291 cache-surface chunk selector retake, 4-seed {42,80,81,82}, range 0.0000925333) | **LANL** | −51.5% |
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -39,10 +39,10 @@ Alibaba flips back to LANL under the current banked rows: LANL r386
 `0.0099685750` vs LLNL R287.A2 `0.009999`. LANL r386 improves LANL r384 by
 `0.0004866917` (`4.6550%` lower) and beats LLNL by `0.0000304250`
 (`0.3043%` lower).
-Baleen24 flips to LANL under the current banked rows: LANL r407
-`0.0183702583` vs LLNL R291.BAL2 `0.018447`. LANL r407 improves LANL r404 by
-`0.0013099667` (`6.6563%` lower) and beats LLNL by `0.0000767417`
-(`0.4160%` lower).
+Baleen24 is held by LANL under the current banked rows: LANL r409
+`0.0178973417` vs LLNL R291.BAL2 `0.018447`. LANL r409 improves LANL r407 by
+`0.0004729166` (`2.5744%` lower) and beats LLNL by `0.0005496583`
+(`2.9797%` lower).
 All 9 corpora have generative claims from both teams.
 
 ## TraceBootstrap leader board (methodology theater)
@@ -201,11 +201,12 @@ metric-class advantage 2DIO does not contest.
 4. **Alibaba defence** (LANL just retook with r386 0.0099685750): LLNL is now
    behind by 0.3% on the banked row convention. Pre-empt with a finer chunk
    cascade (chunk_size in {2K, 4K, 8K}) or fit-time work on the R270 atlas.
-5. **Baleen24 retake pressure**: LANL r407 `0.0183702583` vs LLNL R291.BAL2
-   `0.018447` -> LANL leads by 0.4%. The winning change is priority
-   first-arrival initialization on top of r404's priority-heap
-   singleton-infinity renewal. LLNL's next pressure point is likely temporal
-   birth geometry, not another scalar chunk-size cascade.
+5. **Baleen24 retake pressure**: LANL r409 `0.0178973417` vs LLNL R291.BAL2
+   `0.018447` -> LANL leads by 3.0%. The architectural change was r407's
+   priority first-arrival initialization on top of r404's priority-heap
+   singleton-infinity renewal; r409 then reinforced it with synthetic-only
+   256-row donor chunks. LLNL's next pressure point is likely temporal birth
+   geometry, not another scalar chunk-size cascade.
 6. **Twitter / Meta KV / Meta CDN**: LANL leads Twitter by 5.2% after r351,
    Meta KV by 77.3%, and Meta CDN by 22.9% after r370. LLNL's R281 claims
    were vanilla atlas with poor reuse; R287.M closed much of the Twitter gap,

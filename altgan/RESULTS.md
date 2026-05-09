@@ -5266,6 +5266,32 @@ anchors the priority heap to fitted first-arrival positions, cutting both the
 official surface and the no-32 diagnostic while preserving the direct-generator
 claim class.
 
+## Baleen24 r409 r407-Base 256-Row Reinforcement Banked (2026-05-09)
+
+Banked `baleen24_chunksurf_r409_r407base256`, a synthetic-only 256-row
+chunk-surface selector reinforcement from the r407 first-arrival
+priority-renewal bases. Donors included r407, r408 scale scouts, r404, partial
+r405 outputs, and older LANL Baleen chunk rows. Admission used the official
+5-cache x 6-policy surface plus the ratio-bounded no-32 guard:
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Reference: `/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0179` | 0.0178906000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0179` | 0.0179204000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0180` | 0.0179539000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0178244667 |
+
+Four-seed mean: `0.0178973417` (display `0.0179`), range
+`0.0001294333`. This improves LANL r407 `0.0183702583` by `0.0004729166`
+(`2.5744%` lower) and beats LLNL R291.BAL2 `0.018447` by `0.0005496583`
+(`2.9797%` lower) on the official six-policy surface.
+
+No-32 guard mean: `0.0078026562`, range `0.0000911250`. Per seed:
+`0.0077817500`, `0.0078257500`, `0.0078471250`, `0.0077560000`.
+
 ## Baleen24 r409 r407-Base Reinforcement Launched (2026-05-09)
 
 `baleen24_chunksurf_r409_r407base256` is a reinforcement scout launched from the

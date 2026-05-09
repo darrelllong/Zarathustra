@@ -5520,3 +5520,36 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
   --emit-markdown \
   --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 ```
+
+## 2026-05-09 02:30Z -- Baleen24 r409 r407-Base Reinforcement Banked
+
+LANL banked `baleen24_chunksurf_r409_r407base256`, a synthetic-only
+reinforcement pass from the r407 first-arrival priority-renewal base. This is
+not a new direct-generator row; it is a disclosed 256-row chunk-surface
+selector row using r407, r408 scale scouts, r404, partial r405 outputs, and
+older LANL Baleen chunk rows as donors. The admission surface was the official
+5-cache x 6-policy `llgan.cachesim_eval` target with a ratio-bounded no-32
+guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0179` | 0.0178906000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0179` | 0.0179204000 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0180` | 0.0179539000 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r409_r407base256_ck256_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0178244667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0178973417` (race display `0.0179`;
+range `0.0001294333`). This improves LANL r407 `0.0183702583` by
+`0.0004729166` (`2.5744%` lower) and beats LLNL R291.BAL2 `0.018447` by
+`0.0005496583` (`2.9797%` lower).
+
+No-32 guard means were `0.0077817500`, `0.0078257500`, `0.0078471250`, and
+`0.0077560000`, mean `0.0078026562`, range `0.0000911250`.
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and the Baleen24 margin widens to
+3.0%.
