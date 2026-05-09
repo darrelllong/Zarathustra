@@ -5601,3 +5601,16 @@ Four-seed mean: `0.0647706667`, range `0.0158196667`. The decode-side
 short-depth pressure improved every r422 seed, but it is still only a patch on
 the learned distribution. The next architecture path is to train this pressure
 into the model, not only apply it during sampling.
+
+r424 short-reuse-loss refit, not banked and not promoted:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0671` | 0.0670906667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0808` | 0.0808333333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0756` | 0.0756330000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0696` | 0.0696146667 |
+
+Four-seed mean: `0.0732929167`, range `0.0137426667`. This refit is worse
+than r423b; static short-depth weighting at `1.5` overcorrects the learned
+reuse distribution.

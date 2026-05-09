@@ -13,6 +13,7 @@ usage:
   altgan/lanl_remote_job.sh pull
   altgan/lanl_remote_job.sh status <pattern> [log_path]
   altgan/lanl_remote_job.sh kill <pattern>
+  altgan/lanl_remote_job.sh launch-chunksurf <log_tag> <module> [--tmux <session>] -- <args...>
   altgan/lanl_remote_job.sh launch-mdlstm-tencent <tag> <model_file> <fit|nofit> <birth|nobirth> <seed> [epochs] [footprint|ws] [short_reuse_pressure] [short_reuse_loss_weight]
 
 Remote LANL runner. Keep local SSH invocations simple so the local sandbox sees
@@ -24,6 +25,44 @@ EOF
 pull_repo() {
   cd "$ROOT"
   git pull --ff-only
+}
+
+launch_chunksurf() {
+  local log_tag="${1:?log_tag required}"
+  local module="${2:?module required}"
+  shift 2
+
+  local tmux_session=""
+  if [[ "${1:-}" == "--tmux" ]]; then
+    tmux_session="${2:-}"
+    shift 2
+  fi
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+
+  pull_repo
+  mkdir -p "$OUT_ROOT/logs"
+
+  local ts
+  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+  local log_path="$OUT_ROOT/logs/${log_tag}_${ts}.log"
+  local -a cmd=("$VENV_PY" -u -m "$module" "$@")
+
+  cd "$ROOT"
+  if [[ -n "$tmux_session" ]]; then
+    local cmd_str=""
+    printf -v cmd_str '%q ' "${cmd[@]}"
+    tmux new-session -d -s "$tmux_session" bash -lc "cd \"$ROOT\" && $cmd_str > \"$log_path\" 2>&1"
+    echo "TMUX:$tmux_session"
+    echo "LOG:$log_path"
+    return 0
+  fi
+
+  nohup "${cmd[@]}" > "$log_path" 2>&1 < /dev/null &
+  local pid=$!
+  echo "PID:$pid"
+  echo "LOG:$log_path"
 }
 
 status_job() {
@@ -128,6 +167,7 @@ main() {
     pull) pull_repo ;;
     status) status_job "$@" ;;
     kill) kill_job "$@" ;;
+    launch-chunksurf) launch_chunksurf "$@" ;;
     launch-mdlstm-tencent) launch_mdlstm_tencent "$@" ;;
     -h|--help|help|"") usage ;;
     *)

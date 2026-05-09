@@ -1080,6 +1080,8 @@ alias (if you have one), e.g. `--host vinge` or `--host baase`.
 
 If your ssh config routes through a jump host (ProxyJump) and that host doesn't resolve, add `--no-proxyjump` (or `--ssh-option ProxyJump=none`).
 
+If SSH fails immediately with `Operation not permitted`, you're in a sandboxed environment that blocks outbound TCP sockets; re-run from an unsandboxed host (or from the `/tiamat` host itself).
+
 ```bash
 python3 -m altgan.launch_trace_bootstrap_shuffle_pack \
   --corpora twitter,metakv,metacdn,wiki \
@@ -5960,3 +5962,20 @@ range `0.0158196667`). This is a 2.33% improvement over r422, but still more
 than 2x worse than Tencent r336. The next learned move should be a refit that
 teaches the network the short-depth pressure directly, rather than injecting it
 only at decode time.
+
+r424 tested that refit path with `--short-reuse-loss-weight 1.5` plus the r423b
+decode-side `--short-reuse-pressure 3.0`. It trained cleanly but got worse,
+so this is explicitly not promoted. The loss-weighted model under-produces the
+real 32/128 surface even more strongly on LRU/FIFO/SLRU; the lesson is that a
+large static short-depth class weight distorts the learned reuse distribution
+instead of teaching the conditional pressure signal.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0671` | 0.0670906667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0808` | 0.0808333333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0756` | 0.0756330000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r424_shortloss_w1p5_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0696` | 0.0696146667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0732929167` (race display `0.0733`;
+range `0.0137426667`). Retracted versus r423b.
