@@ -5143,3 +5143,19 @@ This uses the new priority move-bank selector (`altgan.optimize_tencent_chunk_su
 --priority-moves`) to evaluate accepted r395 moves first before random donor
 sampling. Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r401_movebank256_baase_20260509.log`.
+
+## Baleen24 r402 Official-Surface Move-Bank Scout Launch (2026-05-09)
+
+Launched `baleen24_chunksurf_r402_officialbank256` on baase as the official
+race-surface counterpart to r401. It uses the same r395 per-seed bases,
+synthetic-only donor bank, shifted 256-row `stream_id,obj_id,obj_size` chunks,
+and r395 priority move JSONs, but omits the no-32 guard so accepted moves are
+selected only by the official `32,128,512,2048,8192` x
+`lru,arc,fifo,sieve,slru,car` surface.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r402_officialbank256_baase_20260509.log`.
+
+This is not banked until all four literal cachesim lines beat r395. If it
+lands, report a separate no-32 diagnostic audit rather than treating the
+diagnostic guard as the official admission rule.

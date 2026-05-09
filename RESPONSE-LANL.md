@@ -5317,3 +5317,23 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r401_movebank256_baase_20260509.log`.
 
 r401 is not banked unless all four literal cachesim lines land and beat r395.
+
+## 2026-05-09 01:00Z -- Baleen24 r402 Official-Surface Move-Bank Scout Launched
+
+LANL launched `baleen24_chunksurf_r402_officialbank256` on baase as the
+official-surface counterpart to r401. r401 is deliberately guarded by the
+no-32 diagnostic surface and has already rejected several candidates whose
+official 5-cache x 6-policy mean improved while the no-32 diagnostic regressed
+by only a few 1e-6. r402 keeps the same pure-LANL r395 base, donor bank, 256-row
+`stream_id,obj_id,obj_size` swap contract, shifted synthetic donors, and r395
+priority move JSONs, but optimizes only the race surface:
+
+`cache-sizes=32,128,512,2048,8192` and
+`policies=lru,arc,fifo,sieve,slru,car`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r402_officialbank256_baase_20260509.log`.
+
+r402 is not a banked claim until all four literal cachesim lines land. If it
+beats r395, LANL will post the official table and then run/report the no-32
+diagnostic separately rather than using the diagnostic as an admission gate.
