@@ -69,28 +69,28 @@ def fit_stack_distances(real_csv: str, max_rows: int = 0) -> dict:
     n = len(obj_ids)
 
     # Compute LRU stack distance for each reference.
-    # Sliding LRU stack with O(log n) per-access via SortedList.
-    from sortedcontainers import SortedList
+    # Sliding LRU stack via bisect on a sorted-position list. Average-case
+    # complexity is O(log n) for bisect_right + O(n) worst-case for the
+    # list deletion — acceptable for 1M-record traces in seconds.
+    import bisect
     last_pos = {}                    # obj_id -> position of last access
-    pos_sorted = SortedList()        # positions of last accesses, in order
+    pos_sorted: list = []            # positions of last accesses, sorted ascending
     counts: Counter = Counter()
     n_reuses = 0
     max_d = 0
     for i, oid in enumerate(obj_ids):
         prev = last_pos.get(oid, -1)
         if prev >= 0:
-            # Distance = number of distinct objects accessed since prev,
-            # which equals the number of last-access positions strictly
-            # between prev (exclusive) and i (exclusive). That is the
-            # number of entries in pos_sorted greater than prev.
-            idx = pos_sorted.bisect_right(prev)
+            # Distance = number of last-access positions in pos_sorted that are
+            # strictly greater than prev (the older positions are < prev).
+            idx = bisect.bisect_right(pos_sorted, prev)
             d = len(pos_sorted) - idx
             counts[d] += 1
             n_reuses += 1
             if d > max_d:
                 max_d = d
-            pos_sorted.remove(prev)
-        pos_sorted.add(i)
+            del pos_sorted[bisect.bisect_left(pos_sorted, prev)]
+        bisect.insort(pos_sorted, i)
         last_pos[oid] = i
 
     n_oneshot = n - n_reuses
