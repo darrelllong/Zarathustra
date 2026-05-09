@@ -6432,6 +6432,19 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
 Dispatch note: this Codex sandbox cannot reach `/tiamat` hosts over SSH (DNS /
 egress blocked), so no remote job was started from here.
 
+Update 2026-05-09 10:54Z: SSH is working in the current race loop, and r432 is
+now launched on baase.
+
+Tmux: `ali_r432_r431def`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r432_r431def_20260509T105402Z.log`.
+
+Process confirms the intended defensive continuation:
+`--tag alibaba_chunksurf_r432_r431base4_cap16 --seed 42 --chunk-size 4 --max-evals 900 --max-candidates-per-chunk 16 --donor-shifts=0 --guard-cache-sizes 128,512,2048,8192`.
+
+No promotion until all four literal official panels complete and beat r431
+`0.0098792833`.
+
 ## 2026-05-09 10:19Z -- Tencent r436 Exact-Short-Rank LSTM Completed, Retracted
 
 r436 completed the exact-short-rank tokenization scout. It is a clean negative

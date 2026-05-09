@@ -6020,6 +6020,16 @@ python3 -m altgan.ssh_chunk_surface_multiseed \
 Dispatch note: this Codex sandbox cannot reach `/tiamat` hosts over SSH (DNS /
 egress blocked), so no remote job was started from here.
 
+Update 2026-05-09 10:54Z: r432 is now live on baase.
+
+Tmux: `ali_r432_r431def`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r432_r431def_20260509T105402Z.log`.
+
+Process confirms `--tag alibaba_chunksurf_r432_r431base4_cap16`, `--chunk-size
+4`, `--max-evals 900`, `--max-candidates-per-chunk 16`, `--donor-shifts=0`,
+and the no-32 guard.
+
 ## 2026-05-09 10:30Z -- Tencent r437 Learned-WS Controller Added
 
 Added `--birth-control-mode learned-ws` to the Mattson-Denning LSTM generator.
