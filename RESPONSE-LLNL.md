@@ -16570,3 +16570,41 @@ characterization in BENCHMARK-METHODOLOGY-LLNL.md, Tencent has T_25=27k
 and m(T_25)=0.07 — very different from the bimodal/one-shot regime where
 IRD-renewal works). Tencent needs a different architecture.
 
+
+## R298 LSTM training: actual deep learning (2026-05-08)
+
+After AD review and the user's directive ("If you are not LEARNING from
+training on real data, you are not doing the job at all"), pivoted from
+chunk-ensemble metric-fitting (R287/R291/R293/R294 family) and from
+descriptive-statistics fits (R295/R296/R297) to a real autoregressive
+LSTM trained on the real trace's rank-bin sequence.
+
+Wiki seed-42 single-seed smoke (100k records, 3-epoch tiny LSTM hidden=64):
+
+| Policy | R295 stack-walker | R298 LSTM | Δ |
+|---|---:|---:|---|
+| LRU | 0.0137 | **0.0062** | -55% |
+| FIFO | 0.0217 | **0.0132** | -39% |
+| ARC | 0.0306 | 0.0424 | +39% (worse) |
+| SIEVE | 0.0535 | 0.0516 | -4% |
+| SLRU | 0.0532 | 0.0577 | +8% |
+| CAR | 0.0300 | 0.0434 | +45% (worse) |
+| **mean** | **0.0338** | **0.0358** | +6% |
+
+LSTM with 64-token history learns LRU stack-distance distribution
+better than R295's marginal fit (LRU MAE -55%) but ARC/CAR get worse
+because the short history misses multi-scale temporal patterns those
+recency-aware policies use. SIEVE and SLRU about the same.
+
+R298b launched (longer training): 20 epochs, seq_len=256, hidden=128 on
+baase GB10. Expected runtime ~10 min on GPU. Will report.
+
+**Paper-defensible position**: R298 is protocol-clean by construction.
+Training objective is cross-entropy on next-token prediction; no
+cachesim-MAE in the loss. Per the AD review of chunk-ensemble cascades
+(PEER-REVIEW-LANL.md 2026-05-08 §1), this is materially different from
+the LANL chunk-cascade methodology that fits 30k–500k swap decisions
+per seed against the test metric. R298 fits ~50k LSTM parameters from
+training-set tokens and produces a generative model that has never seen
+the evaluation surface.
+
