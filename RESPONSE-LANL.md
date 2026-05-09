@@ -6093,3 +6093,22 @@ range `0.0183276667`). Retracted versus r423b (`0.0647706667`) and far behind
 banked Tencent r336 (`0.0297569167`). Next learned probe should shrink the
 RECYCLE cap and/or strengthen short-rank pressure; the failure is local reuse,
 not footprint count.
+
+## 2026-05-09 08:12Z -- Tencent r429 Cap-128 FRESH/RECYCLE Learned Scout Launched
+
+Relaunched the learned Mattson-Denning branch on vinge as
+`tencent_mdlstm_r429_recyclecap128_ws_p6`: cap 128 instead of 512 and
+`--short-reuse-pressure 6.0`. This directly targets r428's under-hit at
+cache sizes 32/128.
+
+The token split is much more active than r428:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=44 reuse_offset=2 recycle_rank_cap=128 fresh=38,507 recycle=9,172 reuse=52,321 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4047223`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r429_recyclecap128.pt`.
+
+No claim until the four literal cachesim panels complete.

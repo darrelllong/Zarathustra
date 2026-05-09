@@ -5713,3 +5713,17 @@ short-cache locality.
 Mean across seeds `{42,80,81,82}`: `0.0673997500` (race display `0.0674`;
 range `0.0183276667`). This loses to r423b and stays far behind r336; next
 probe should concentrate more probability into ranks below 128.
+
+## 2026-05-09 08:12Z -- Tencent r429 Cap-128 FRESH/RECYCLE Scout
+
+Launched `tencent_mdlstm_r429_recyclecap128_ws_p6` on vinge. Compared with
+r428, this lowers the RECYCLE boundary from 512 to 128 and doubles decode-side
+short-reuse pressure to 6.0.
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=44 reuse_offset=2 recycle_rank_cap=128 fresh=38,507 recycle=9,172 reuse=52,321 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4047223`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r429_recyclecap128_ws_p6_vinge_20260509.log`.
+
+Awaiting literal cachesim lines.
