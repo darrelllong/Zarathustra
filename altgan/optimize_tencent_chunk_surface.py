@@ -15,6 +15,7 @@ only as the cachesim target surface.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import shlex
@@ -74,6 +75,12 @@ def _parse_args() -> argparse.Namespace:
                        "For accept-mode=best, evaluate at most this many donor/shift candidates per chunk. "
                        "Default 0 scans all donors/shifts. A positive cap makes large donor pools search "
                        "many more trace regions under a fixed --max-evals budget."
+                   ))
+    p.add_argument("--priority-moves", type=_parse_paths, default=[],
+                   help=(
+                       "Comma-separated move JSON files or globs from previous chunk-surface runs. "
+                       "Accepted donor/start/shift moves from these files are evaluated first for "
+                       "matching chunk starts before the random candidate cap is filled."
                    ))
     p.add_argument("--swap-columns", type=_parse_columns, default=["obj_id"],
                    help="Comma-separated donor columns to splice; default obj_id.")
@@ -178,6 +185,59 @@ def _copy_swap_values(values: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {column: array.copy() for column, array in values.items()}
 
 
+def _load_priority_moves(
+    patterns: list[str],
+    donor_by_name: dict[str, dict[str, np.ndarray]],
+) -> dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int]]]:
+    by_chunk_start: dict[tuple[int, int], list[tuple[str, dict[str, np.ndarray], int]]] = {}
+    loaded_files = 0
+    loaded_moves = 0
+    skipped_moves = 0
+    for pattern in patterns:
+        paths = sorted(glob.glob(pattern)) or [pattern]
+        for raw_path in paths:
+            path = Path(raw_path)
+            if not path.exists():
+                print(f"[chunk_surface] SKIP priority moves missing {path}", flush=True)
+                continue
+            loaded_files += 1
+            with path.open() as f:
+                data = json.load(f)
+            for move in data.get("accepted", []):
+                donor_name = str(move.get("donor", ""))
+                donor_swap = donor_by_name.get(donor_name)
+                if donor_swap is None:
+                    skipped_moves += 1
+                    continue
+                try:
+                    chunk_size = int(move["chunk_size"])
+                    start = int(move["start"])
+                    donor_shift = int(move.get("donor_shift", int(move["source_start"]) - start))
+                except (KeyError, TypeError, ValueError):
+                    skipped_moves += 1
+                    continue
+                by_chunk_start.setdefault((chunk_size, start), []).append((donor_name, donor_swap, donor_shift))
+                loaded_moves += 1
+    for key, rows in list(by_chunk_start.items()):
+        seen: set[tuple[str, int]] = set()
+        deduped: list[tuple[str, dict[str, np.ndarray], int]] = []
+        for donor_name, donor_swap, donor_shift in rows:
+            pair = (donor_name, donor_shift)
+            if pair in seen:
+                continue
+            seen.add(pair)
+            deduped.append((donor_name, donor_swap, donor_shift))
+        by_chunk_start[key] = deduped
+    if patterns:
+        print(
+            f"[chunk_surface] priority moves: files={loaded_files} "
+            f"usable={loaded_moves} skipped={skipped_moves} "
+            f"target_chunks={len(by_chunk_start)}",
+            flush=True,
+        )
+    return by_chunk_start
+
+
 def _segments_equal(
     current: dict[str, np.ndarray],
     donor: dict[str, np.ndarray],
@@ -269,6 +329,10 @@ def main() -> int:
     if not donor_shifts:
         donor_shifts = [0]
     print(f"[chunk_surface] donor shifts: {','.join(str(shift) for shift in donor_shifts)}", flush=True)
+    donor_by_name: dict[str, dict[str, np.ndarray]] = {}
+    for donor_name, donor_swap in donor_frames:
+        donor_by_name.setdefault(donor_name, donor_swap)
+    priority_moves = _load_priority_moves(args.priority_moves, donor_by_name)
 
     binary = _find_cachesim()
     print(f"[chunk_surface] scoring real surface once {args.real}", flush=True)
@@ -311,12 +375,20 @@ def main() -> int:
     for chunk_size in args.chunk_size:
         start_stride = args.start_stride if args.start_stride and args.start_stride > 0 else chunk_size
         chunks = list(range(0, n, start_stride))
+        chunk_index_by_start = {start: ix for ix, start in enumerate(chunks)}
         rng = np.random.default_rng(args.seed + chunk_size)
         # Fixed seed order avoids favoring early trace regions while remaining reproducible.
-        chunk_order = list(rng.permutation(len(chunks)))
+        priority_chunk_indices = [
+            chunk_index_by_start[start]
+            for move_chunk_size, start in priority_moves
+            if move_chunk_size == chunk_size and start in chunk_index_by_start
+        ]
+        rest_chunk_indices = [ix for ix in rng.permutation(len(chunks)) if ix not in set(priority_chunk_indices)]
+        chunk_order = list(dict.fromkeys(priority_chunk_indices + rest_chunk_indices))
         print(
             f"[chunk_surface] start grid chunk={chunk_size} stride={start_stride} "
-            f"candidates={len(chunks)} max_candidates_per_chunk={args.max_candidates_per_chunk}",
+            f"candidates={len(chunks)} priority_chunks={len(priority_chunk_indices)} "
+            f"max_candidates_per_chunk={args.max_candidates_per_chunk}",
             flush=True,
         )
         for pass_ix in range(args.max_passes):
@@ -334,14 +406,35 @@ def main() -> int:
                 best_chunk_donor = None
                 best_chunk_source_start = None
                 best_chunk_donor_shift = None
-                candidate_pairs = [
+                priority_pairs = priority_moves.get((chunk_size, start), [])
+                all_candidate_pairs = [
                     (donor_name, donor_swap, donor_shift)
                     for donor_name, donor_swap in donor_frames
                     for donor_shift in donor_shifts
                 ]
-                if args.max_candidates_per_chunk > 0 and args.max_candidates_per_chunk < len(candidate_pairs):
-                    take = rng.permutation(len(candidate_pairs))[: args.max_candidates_per_chunk]
-                    candidate_pairs = [candidate_pairs[int(ix)] for ix in take]
+                if args.max_candidates_per_chunk > 0:
+                    cap = args.max_candidates_per_chunk
+                    if len(priority_pairs) >= cap:
+                        candidate_pairs = list(priority_pairs[:cap])
+                    else:
+                        priority_seen = {(name, shift) for name, _swap, shift in priority_pairs}
+                        remaining = [
+                            pair for pair in all_candidate_pairs
+                            if (pair[0], pair[2]) not in priority_seen
+                        ]
+                        take_n = min(cap - len(priority_pairs), len(remaining))
+                        if take_n:
+                            take = rng.permutation(len(remaining))[:take_n]
+                            sampled = [remaining[int(ix)] for ix in take]
+                        else:
+                            sampled = []
+                        candidate_pairs = list(priority_pairs) + sampled
+                else:
+                    priority_seen = {(name, shift) for name, _swap, shift in priority_pairs}
+                    candidate_pairs = list(priority_pairs) + [
+                        pair for pair in all_candidate_pairs
+                        if (pair[0], pair[2]) not in priority_seen
+                    ]
                 for donor_name, donor_swap, donor_shift in candidate_pairs:
                         if args.max_evals and eval_count >= args.max_evals:
                             stop_search = True
@@ -532,6 +625,7 @@ def main() -> int:
         "guard_max_regression": args.guard_max_regression if guard_sizes else None,
         "accept_mode": args.accept_mode,
         "max_candidates_per_chunk": args.max_candidates_per_chunk,
+        "priority_moves": args.priority_moves,
         "donor_shifts": donor_shifts,
         "max_evals": args.max_evals,
         "accepted": accepted,

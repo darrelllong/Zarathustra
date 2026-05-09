@@ -236,6 +236,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--priority-moves",
+        default="",
+        help=(
+            "Comma-separated move JSON paths or globs forwarded to optimize_tencent_chunk_surface. "
+            "Accepted moves from prior runs are evaluated before the random donor cap."
+        ),
+    )
+    p.add_argument(
         "--swap-columns",
         default="obj_id",
         help="Comma-separated donor columns to splice in each chunk; default obj_id.",
@@ -397,6 +405,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.accept_mode,
                 "--max-candidates-per-chunk",
                 str(args.max_candidates_per_chunk),
+                "--priority-moves",
+                args.priority_moves,
                 "--swap-columns",
                 args.swap_columns,
                 "--write-columns",
