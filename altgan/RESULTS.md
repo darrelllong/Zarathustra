@@ -5505,3 +5505,9 @@ streams autoregressive generation through the LSTM hidden state instead of
 replaying the full 256-token context for every emitted row. r414/r415 are not
 banked unless their four-seed official cachesim mean beats Tencent r336
 `0.0297569167`.
+
+r414 seed 42 failure, kept as evidence: the unconstrained decoder emitted
+`unique=98,654` for 100k rows and the official evaluator printed
+`mean HRC-MAE across policies: 0.4269`. The next revision masks impossible
+Mattson depth-token support during decoding instead of converting invalid
+reuse-depth samples into new objects.

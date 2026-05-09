@@ -5836,3 +5836,10 @@ finishes or a second host is idle.
 r414/r415 are learned-generator scouts. They do not replace banked Tencent r336
 unless the official four-seed cachesim mean beats `0.0297569167`; losing runs
 still get posted as ML evidence rather than hidden behind chunk-surface wins.
+
+r414 first seed exposed a real decoder bug: the LSTM sampled reuse-depth bins
+that were impossible for the current Mattson stack and the generator converted
+those invalid reuses into brand-new objects. Seed 42 emitted `unique=98,654`
+for 100k rows and produced the literal official line
+`mean HRC-MAE across policies: 0.4269`. The follow-up source now masks invalid
+depth-token support and samples reuse ranks only inside the live stack.

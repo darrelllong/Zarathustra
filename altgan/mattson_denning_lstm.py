@@ -127,14 +127,21 @@ def rank_to_token(rank: int, edges: np.ndarray) -> int:
     return value_to_bin(rank, edges) + 1
 
 
-def token_to_rank(token: int, edges: np.ndarray, rng: np.random.Generator) -> int:
+def token_to_rank(
+    token: int,
+    edges: np.ndarray,
+    rng: np.random.Generator,
+    max_rank: int | None = None,
+) -> int:
     if token == NEW_TOKEN:
         return -1
     ix = token - 1
     lo = int(edges[ix])
     hi = int(edges[min(ix + 1, len(edges) - 1)])
+    if max_rank is not None:
+        hi = min(hi, int(max_rank) + 1)
     if hi <= lo:
-        return lo
+        return -1
     return int(rng.integers(lo, hi))
 
 
@@ -446,13 +453,27 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
         for i in range(n_records):
             z = logits[0, -1] / max(float(temperature), 1e-6)
             probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
+            if stack:
+                probs = probs.copy()
+                for tok in range(1, vocab):
+                    if int(rank_edges[tok - 1]) >= len(stack):
+                        probs[tok] = 0.0
+                total = float(probs.sum())
+                if total > 0.0:
+                    probs /= total
+                else:
+                    probs[:] = 0.0
+                    probs[NEW_TOKEN] = 1.0
+            else:
+                probs = np.zeros(vocab, dtype=np.float64)
+                probs[NEW_TOKEN] = 1.0
             token = int(rng.choice(vocab, p=probs))
             if token == NEW_TOKEN or not stack:
                 oid = next_new
                 next_new += 1
                 stack.insert(0, oid)
             else:
-                rank = token_to_rank(token, rank_edges, rng)
+                rank = token_to_rank(token, rank_edges, rng, max_rank=len(stack) - 1)
                 if rank < 0 or rank >= len(stack):
                     oid = next_new
                     next_new += 1
