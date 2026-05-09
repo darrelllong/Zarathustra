@@ -6373,3 +6373,23 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle.pt`.
 
 No claim until the four literal cachesim panels complete.
+
+## Tencent r444 Rank-Band Biased Decode Completed, Not Promoted (2026-05-09)
+
+r444 completed as a negative. The window-band auxiliary head trained cleanly,
+but generation-time band bias `0.75` over-corrected the decode: seed 42 fell
+from r443 `0.0583936667` to `0.0679743333`, and all four seeds under-hit the
+small-cache surface. This is not a promotion.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0680` | 0.0679743333 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0743` | 0.0743053333 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0732` | 0.0731503333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r444_rankband_exact128_wsmax_empiricalrank_norecycle_ws_p3_b075_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0742` | 0.0741606667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0723976667` (race display `0.0724`;
+range `0.0063310000`). r444 is not promoted.
+
+Immediate follow-up: reuse the r444 checkpoint with `--rank-band-bias 0.0` to
+separate auxiliary representation learning from biased decode.
