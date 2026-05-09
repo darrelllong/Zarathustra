@@ -5333,6 +5333,29 @@ surface with the no-32 ratio guard:
 
 Log: `/tiamat/zarathustra/altgan-output/logs/alibaba_r411_selfshift16_baase_20260509.log`.
 
+Re-run command (multi-seed; official surface only):
+
+```bash
+python3 -m altgan.ssh_chunk_surface_multiseed \
+  --host baase \
+  --tmux-session ali_r411_selfshift16 \
+  --remote-module altgan.launch_alibaba_r411_chunk_surface_multiseed \
+  -- \
+  --base-template "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_selfshift32_ck32_seed{seed}_fake_1000k.csv" \
+  --donor-globs "/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r386_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r384_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r368_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r364_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r360_*_seed{seed}_fake_1000k.csv,/tiamat/zarathustra/altgan-output/alibaba_chunksurf_r340_*_seed{seed}_fake_1000k.csv" \
+  --cross-seed-donors \
+  --tag-prefix alibaba_chunksurf_r411_selfshift16 \
+  --pipeline 16 \
+  --accept-mode best \
+  --max-accepts 8 \
+  --max-evals 350 \
+  --guard-cache-sizes 128,512,2048,8192 \
+  --guard-max-regression 0.0 \
+  --guard-regression-per-official-gain 0.25 \
+  --emit-markdown \
+  --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
+```
+
 No claim until the four-seed mean beats r386 `0.0099685750`.
 
 ## Baleen24 r410 r409-Base 128-Row Reinforcement Banked (2026-05-09)
