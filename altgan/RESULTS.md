@@ -5169,3 +5169,16 @@ is positive and a guard surface is configured, a candidate may spend
 the next Baleen move-bank scout: r401 is strict no32-guarded, r402 is
 official-only, and the new option gives a disclosed middle lane for candidates
 whose official race-surface gain outweighs tiny diagnostic drift.
+
+## Baleen24 r403 Guard-Ratio Move-Bank Scout Launch (2026-05-09)
+
+r401 seed42 completed at JSON mean `0.0200949333` with no32 guard
+`0.0162169583`, but r401 is not banked until all four seeds finish.
+
+Launched `baleen24_chunksurf_r403_guardratio256` on vinge from the r395 bases.
+It uses the same pure-LANL donor bank as r401/r402, priority moves from r395 and
+the completed r401 seed42 move JSON, and a ratio-bounded guard:
+`--guard-regression-per-official-gain 0.25` on the no32 diagnostic surface.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r403_guardratio256_vinge_20260509.log`.

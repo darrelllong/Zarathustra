@@ -5351,3 +5351,22 @@ official-only optimization.
 
 This source change does not alter any already-running job. It is intended for
 the next r403-style scout after one of the current Baleen runs frees a host.
+
+## 2026-05-09 01:15Z -- Baleen24 r403 Guard-Ratio Move-Bank Scout Launched
+
+r401 completed seed42 at JSON mean `0.0200949333` with no-32 diagnostic
+`0.0162169583`, improving the r395 seed42 base `0.0203563333`. It is still
+not banked because seeds 80/81/82 remain in flight.
+
+LANL launched `baleen24_chunksurf_r403_guardratio256` on vinge using the new
+ratio-bounded guard admission path. The run starts from the r395 per-seed bases
+and uses the same synthetic-only donor bank as r401/r402. Priority moves include
+both the r395 four-seed move JSONs and the completed r401 seed42 move JSON. The
+guard setting is:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/baleen24_r403_guardratio256_vinge_20260509.log`.
+
+r403 is not a banked claim until all four literal official cachesim lines land.
