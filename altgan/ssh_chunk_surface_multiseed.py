@@ -22,7 +22,7 @@ Typical use (from any machine with SSH access):
     --append-markdown RESPONSE-LANL.md,altgan/RESULTS.md
 
 Use `--sync bundle` (default) to stream the *local* `main` branch as a git
-bundle over SSH and hard-reset the remote repo before running.
+bundle over SSH and update the remote LANL checkout before running.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     )
     p.add_argument(
         "--repo-dir",
-        default="/home/darrell/Zarathustra",
+        default="~/LANL/Zarathustra",
         help="Repo path on remote host (will probe common alternates if missing).",
     )
     p.add_argument(
@@ -125,14 +125,15 @@ def _remote_cd_repo_snippet(*, args: argparse.Namespace) -> list[str]:
     return [
         f"repo_dir_user={repo_dir_expr}",
         "repo_dir=''",
-        'for cand in "$repo_dir_user" "$HOME/Zarathustra" "$HOME/LANL/Zarathustra" "/home/darrell/Zarathustra"; do',
+        'for cand in "$repo_dir_user" "$HOME/LANL/Zarathustra" "/home/darrell/LANL/Zarathustra" "$HOME/Zarathustra" "/home/darrell/Zarathustra"; do',
         '  if [ -d "$cand/.git" ]; then repo_dir="$cand"; break; fi',
         "done",
         'if [ -z "$repo_dir" ]; then',
         "  echo '[ssh_chunk_surface] ERROR: could not locate remote repo; tried:' >&2",
         '  echo "  $repo_dir_user" >&2',
-        '  echo "  $HOME/Zarathustra" >&2',
         '  echo "  $HOME/LANL/Zarathustra" >&2',
+        '  echo "  /home/darrell/LANL/Zarathustra" >&2',
+        '  echo "  $HOME/Zarathustra" >&2',
         '  echo "  /home/darrell/Zarathustra" >&2',
         "  exit 2",
         "fi",
