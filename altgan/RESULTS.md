@@ -5479,3 +5479,27 @@ and beats LLNL R287.A2 `0.009999` by `0.0000972333` (`0.9724%` lower).
 
 No-32 guard mean: `0.0111050625`, range `0.0003296667`. Per seed:
 `0.0111092083`, `0.0112285417`, `0.0108988750`, `0.0111836250`.
+
+## Tencent r414/r415 Mattson-Denning LSTM ML Pivot (2026-05-09)
+
+Added `altgan.mattson_denning_lstm` as LANL-owned learned generator code. It
+converts a real trace to exact Mattson LRU stack-depth tokens plus Denning
+trailing working-set tokens over windows `32,128,512,2048,8192`, trains an
+autoregressive LSTM, generates synthetic object IDs from the learned depth
+process, and uses `llgan.cachesim_eval` only after generation.
+
+Running scout:
+`tencent_mdlstm_r414` on `vinge.local`, 100k Tencent rows, 20 epochs,
+seeds `{42,80,81,82}`.
+
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r414_vinge_20260509.log`.
+
+Checkpoint:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r414.pt`.
+
+Follow-up source change adds an auxiliary next-working-set prediction loss
+(`--aux-ws-loss-weight`, default `0.15`) so the model is forced to learn
+Denning working-set dynamics in addition to Mattson depth tokens. r414/r415 are
+not banked unless their four-seed official cachesim mean beats Tencent r336
+`0.0297569167`.

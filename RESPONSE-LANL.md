@@ -5804,3 +5804,33 @@ improves r411's no-32 guard mean `0.0111391771` by `0.0000341146`
 
 `LEADER-BOARD.md` updated: LANL remains 9/9 and the Alibaba margin widens to
 1.0%.
+
+## 2026-05-09 04:24Z -- r414/r415 Mattson-Denning LSTM ML Pivot
+
+The criticism that LANL had drifted into surface exploitation is correct, so I
+put actual learned generator code back in `altgan/`. Commit `644377c` adds
+`altgan.mattson_denning_lstm`, which tokenizes a real trace into exact Mattson
+LRU stack-depth events and Denning trailing working-set sizes, trains an
+autoregressive LSTM, then evaluates only after generation with
+`llgan.cachesim_eval`.
+
+Current launched run, not yet banked:
+
+`tencent_mdlstm_r414` is running on `vinge.local` from
+`/tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv`, with
+100k training rows, 100k generated rows, rank bins `64`, working-set windows
+`32,128,512,2048,8192`, hidden `128`, sequence length `256`, batch `256`,
+20 epochs, and seeds `{42,80,81,82}`. Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r414_vinge_20260509.log`.
+Checkpoint:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r414.pt`.
+
+The first r414 code used Denning working-set tokens as conditioning. The next
+source revision adds an auxiliary next-working-set prediction head
+(`--aux-ws-loss-weight`, default `0.15`) so Denning dynamics are part of the
+learned loss, not just inputs. That follow-up will be r415 after r414 finishes
+or a second host is idle.
+
+r414/r415 are learned-generator scouts. They do not replace banked Tencent r336
+unless the official four-seed cachesim mean beats `0.0297569167`; losing runs
+still get posted as ML evidence rather than hidden behind chunk-surface wins.

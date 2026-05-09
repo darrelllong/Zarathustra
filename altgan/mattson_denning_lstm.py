@@ -219,6 +219,7 @@ def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_e
                 batch_first=True,
             )
             self.head = nn.Linear(hidden, vocab)
+            self.ws_heads = nn.ModuleList([nn.Linear(hidden, ws_bins) for _ in range(n_windows)])
 
         def forward(self, tok, ws, h=None):
             parts = [self.token_emb(tok)]
@@ -226,7 +227,7 @@ def build_model(vocab: int, n_windows: int, ws_bins: int, token_embed: int, ws_e
                 parts.append(emb(ws[:, :, i]))
             x = torch.cat(parts, dim=-1)
             out, h = self.lstm(x, h)
-            return self.head(out), h
+            return self.head(out), [head(out) for head in self.ws_heads], h
 
     return MattsonDenningLSTM()
 
@@ -245,6 +246,7 @@ def train_model(
     epochs: int,
     lr: float,
     seed: int,
+    aux_ws_loss_weight: float,
 ):
     torch, _nn = _try_torch()
     import torch.nn.functional as F
@@ -281,8 +283,14 @@ def train_model(
             x_tok = torch.stack([tok_t[i:i + seq_len] for i in idx]).to(device)
             x_ws = torch.stack([ws_t[i:i + seq_len] for i in idx]).to(device)
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
-            logits, _ = model(x_tok, x_ws)
-            loss = F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1))
+            y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
+            logits, ws_logits, _ = model(x_tok, x_ws)
+            token_loss = F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1))
+            ws_loss = torch.stack([
+                F.cross_entropy(ws_logits[wi].reshape(-1, ws_bins), y_ws[:, :, wi].reshape(-1))
+                for wi in range(ws_tokens.shape[1])
+            ]).mean()
+            loss = token_loss + float(aux_ws_loss_weight) * ws_loss
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -291,7 +299,9 @@ def train_model(
             if bi == 0 or (bi + 1) % max(1, n_batches // 5) == 0:
                 print(
                     f"[mattson_denning train] ep={ep + 1}/{epochs} "
-                    f"batch={bi + 1}/{n_batches} loss={float(loss.detach().cpu()):.5f}",
+                    f"batch={bi + 1}/{n_batches} loss={float(loss.detach().cpu()):.5f} "
+                    f"tok={float(token_loss.detach().cpu()):.5f} "
+                    f"ws={float(ws_loss.detach().cpu()):.5f}",
                     flush=True,
                 )
         print(
@@ -321,7 +331,13 @@ def load_checkpoint(path: str | Path):
         int(state["ws_embed"]),
         int(state["hidden"]),
     )
-    model.load_state_dict(state["model_state"])
+    incompatible = model.load_state_dict(state["model_state"], strict=False)
+    if incompatible.missing_keys or incompatible.unexpected_keys:
+        print(
+            "[mattson_denning load] "
+            f"missing={list(incompatible.missing_keys)} unexpected={list(incompatible.unexpected_keys)}",
+            flush=True,
+        )
     return state, model
 
 
@@ -347,6 +363,7 @@ def fit(args) -> None:
         epochs=args.epochs,
         lr=args.lr,
         seed=args.seed,
+        aux_ws_loss_weight=args.aux_ws_loss_weight,
     )
     mark_sample = {
         "obj_sizes": _sample_pool(trace.obj_sizes),
@@ -357,7 +374,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 1,
+            "version": 2,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -373,7 +390,8 @@ def fit(args) -> None:
             "seq_len": args.seq_len,
             "rank_bins": args.rank_bins,
             "mark_sample": mark_sample,
-            "training_loss": "next-token cross entropy on Mattson depth tokens conditioned on Denning working-set tokens",
+            "aux_ws_loss_weight": args.aux_ws_loss_weight,
+            "training_loss": "next-token cross entropy on Mattson depth tokens plus auxiliary next-Denning-working-set cross entropy",
         },
     )
 
@@ -426,7 +444,7 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
         for i in range(n_records):
             x_tok = torch.tensor([tokens], dtype=torch.long, device=device)
             x_ws = torch.tensor([ws_hist], dtype=torch.long, device=device)
-            logits, _ = model(x_tok, x_ws)
+            logits, _ws_logits, _ = model(x_tok, x_ws)
             z = logits[0, -1] / max(float(temperature), 1e-6)
             probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             token = int(rng.choice(vocab, p=probs))
@@ -576,6 +594,7 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--epochs", type=int, default=10)
         q.add_argument("--lr", type=float, default=1e-3)
         q.add_argument("--seed", type=int, default=42)
+        q.add_argument("--aux-ws-loss-weight", type=float, default=0.15)
 
     fit_p = sub.add_parser("fit")
     add_train_flags(fit_p)
