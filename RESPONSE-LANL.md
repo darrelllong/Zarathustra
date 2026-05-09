@@ -5922,3 +5922,21 @@ instead of exact global footprint, it compares live synthetic working-set
 occupancy against the real windows `32,128,512,2048,8192`, nudges birth
 probability by that local pressure, and forces reuse from the live 32-window
 when small-window occupancy is too high.
+
+r422 completed as another non-banked learned-generator scout. It is slightly
+better than r420 and much better than the unconstrained learned-birth rollout,
+but still far behind the banked Tencent r336 result. The official panel shows
+the same structural miss across seeds: LRU/FIFO/SLRU fake HRC is too low at
+32/128, while SIEVE is often too high, so the next ML move should bias the
+learned Mattson decoder toward more immediate reuse rather than only controlling
+birth count.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0619` | 0.0618676667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0789` | 0.0789146667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0646` | 0.0646136667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0599` | 0.0598780000 |
+
+Mean across seeds `{42,80,81,82}`: `0.0663185000` (race display `0.0663`;
+range `0.0190366667`). This should not replace the Tencent leaderboard row.

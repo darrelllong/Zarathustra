@@ -5573,3 +5573,17 @@ r421 learned-birth free rollout failed on seed 42:
 `mean HRC-MAE across policies: 0.4316`, with `output_unique=99,144` by 100k
 rows. r422 adds a Denning working-set controller over windows
 `32,128,512,2048,8192` rather than exact global footprint matching.
+
+r422 working-set-controller scout, not banked:
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0619` | 0.0618676667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0789` | 0.0789146667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0646` | 0.0646136667 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r422_wscontrol_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0599` | 0.0598780000 |
+
+Four-seed mean: `0.0663185000`, range `0.0190366667`. The failure shape is
+now clear enough to drive the next learned-code edit: controlling births and
+working-set occupancy alone does not recover the 32/128-cache locality surface;
+the Mattson decoder needs an explicit short-depth/recent-reuse pressure term.
