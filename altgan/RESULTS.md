@@ -5862,3 +5862,17 @@ with empirical rank samples fit from exact real depths, and it also beats r423b.
 
 Four-seed mean: `0.0628444167`, range `0.0116410000`. Best learned scout, but
 not a leaderboard row versus banked Tencent r336 `0.0297569167`.
+
+## 2026-05-09 09:35Z -- Tencent r434 Empirical Rank, No-RECYCLE Control
+
+Launched `tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3` on vinge. This
+keeps empirical Mattson-rank sampling but removes the RECYCLE split to compare
+the sampler directly with the r423b-style architecture.
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=59 reuse_offset=1 recycle_rank_cap=0 fresh=38,507 recycle=0 reuse=61,493 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4060141`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r434_empiricalrank_norecycle.pt`.

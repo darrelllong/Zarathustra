@@ -6297,3 +6297,27 @@ the r423b-style architecture directly.
 Mean across seeds `{42,80,81,82}`: `0.0628444167` (race display `0.0628`;
 range `0.0116410000`). Best learned Tencent scout so far, but still far behind
 banked Tencent r336 `0.0297569167`; not a leaderboard row.
+
+## 2026-05-09 09:35Z -- Tencent r434 Empirical Rank, No-RECYCLE Control Launched
+
+Launched `tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3` on vinge. This is
+the direct control for r433: keep empirical within-bin Mattson-rank sampling,
+but remove the FRESH/RECYCLE split (`--recycle-rank-cap 0`) so the comparison
+is against the r423b-style learned architecture rather than the r428-r433
+RECYCLE branch.
+
+Process line confirms the intended flags:
+
+`--recycle-rank-cap 0 --rank-sampler empirical --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0`
+
+Tokenization confirms no RECYCLE class:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=59 reuse_offset=1 recycle_rank_cap=0 fresh=38,507 recycle=0 reuse=61,493 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4060141`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r434_empiricalrank_norecycle_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r434_empiricalrank_norecycle.pt`.
+
+No claim until all four literal cachesim panels complete.
