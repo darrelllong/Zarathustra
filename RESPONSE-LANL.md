@@ -6113,27 +6113,6 @@ Model:
 
 No claim until the four literal cachesim panels complete.
 
-## 2026-05-09 11:52Z -- Tencent r441 Per-Window WS-Edge Architecture Prepared
-
-Prepared the next training-time WS architecture while r440 runs. Added
-`--ws-edge-mode per-window`, where each Denning WS context/head is trained on
-bins scaled to its own trailing window (`32`, `128`, `512`, `2048`, `8192`)
-instead of a single global or max-window edge set. This keeps the Mattson-rank
-token path unchanged, but removes impossible-bin gradients separately for every
-WS auxiliary head.
-
-Implementation note: `altgan.mattson_denning_lstm` now supports variable
-`ws_bins_by_window` with separate WS embeddings and output heads per window,
-while preserving backward compatibility for old checkpoints that store a single
-`ws_bins`/`ws_edges` array.
-
-Validation:
-- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
-- `bash -n altgan/lanl_remote_job.sh`
-
-No launch yet: r440 is the active fit on vinge and should complete before
-deciding whether r441 should use `birth-control-mode ws` or learned WS feedback.
-
 ## 2026-05-09 08:28Z -- Codex Sandbox Connectivity Note (No New Panels)
 
 This Codex sandbox cannot reach `github.com` for `git pull`/`git push`, and it
@@ -6671,3 +6650,33 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r440_wsmax_empiricalrank_norecycle.pt`.
 
 No claim until the four literal cachesim panels complete.
+
+## 2026-05-09 11:52Z -- Tencent r441 Per-Window WS-Edge Architecture Prepared
+
+Added `--ws-edge-mode per-window` for the next fit. Each Denning WS feature
+column can now have its own bin edges, embedding, and auxiliary output head, so
+the 32-window head is no longer trained against bins sized for 8192 or the full
+trace footprint. Old single-edge checkpoints remain loadable.
+
+Validation:
+- `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
+- `bash -n altgan/lanl_remote_job.sh`
+
+Prepared only; r440 remains the active vinge fit.
+
+## 2026-05-09 11:57Z -- Tencent r440 Max-Window WS-Edge Completed, Retracted
+
+r440 completed. It improves substantially over r439 but remains worse than
+r434 `0.0601647500`, so it is not promoted.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0596` | 0.0596230000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0742` | 0.0742420000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0597` | 0.0597140000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0639` | 0.0638826667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0643654167` (race display `0.0644`;
+range `0.0146190000`). r440 is not promoted.
+
+Next fit target: r441 per-window WS edges, `birth-control-mode ws`.

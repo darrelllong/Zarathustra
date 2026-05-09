@@ -6138,3 +6138,20 @@ Validation:
 - `bash -n altgan/lanl_remote_job.sh`
 
 Prepared only; r440 remains the active vinge fit.
+
+## 2026-05-09 11:57Z -- Tencent r440 Max-Window WS-Edge Completed, Retracted
+
+r440 completed. It improves substantially over r439 but remains worse than
+r434 `0.0601647500`, so it is not promoted.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.0596` | 0.0596230000 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.0742` | 0.0742420000 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0597` | 0.0597140000 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r440_wsmax_empiricalrank_norecycle_ws_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.0639` | 0.0638826667 |
+
+Mean across seeds `{42,80,81,82}`: `0.0643654167` (race display `0.0644`;
+range `0.0146190000`). r440 is not promoted.
+
+Next fit target: r441 per-window WS edges, `birth-control-mode ws`.
