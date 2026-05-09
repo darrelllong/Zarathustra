@@ -79,6 +79,29 @@ def _race_display(value: float) -> str:
 def _policy_count(policies: str) -> int:
     return len([part for part in policies.split(",") if part.strip()])
 
+def _rewrite_negative_list_args(argv: list[str]) -> list[str]:
+    """Rewrite space-form negative lists to argparse-safe `--opt=<value>` form.
+
+    argparse treats tokens starting with '-' as option-like even when they are
+    values. For example, `--donor-shifts -4096,-2048,...,4096` fails unless the
+    caller uses `--donor-shifts=-4096,...,4096`. Normalize here so both forms
+    work (especially when launched through remote wrappers).
+    """
+
+    out: list[str] = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--donor-shifts" and i + 1 < len(argv):
+            val = argv[i + 1]
+            if val.startswith("-") and not val.startswith("--"):
+                out.append(f"--donor-shifts={val}")
+                i += 2
+                continue
+        out.append(tok)
+        i += 1
+    return out
+
 
 def _markdown_snippet(
     *,
@@ -170,6 +193,9 @@ class StageOutput:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = _rewrite_negative_list_args(list(argv))
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--seeds", type=_parse_ints, default=[42, 80, 81, 82])
     p.add_argument("--real", required=True, help="Official real CSV reference.")

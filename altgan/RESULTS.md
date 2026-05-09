@@ -5640,7 +5640,9 @@ permitted`). The wrapper route is usable and should be used for this launch.
 Next launch should use `--remote-module altgan.launch_alibaba_r413_chunk_surface_multiseed`.
 
 Relaunched on baase via `altgan/lanl_remote_job.sh launch-chunksurf` after
-fixing the negative donor-shift list to use `--donor-shifts=...`.
+fixing the negative donor-shift list to use `--donor-shifts=...` (now robust:
+`altgan.launch_chunk_surface_multiseed` rewrites space-form negative lists, so
+`--donor-shifts -4096,...,4096` also works).
 
 PID: `1882071`.
 Log:
