@@ -5736,3 +5736,37 @@ Mean across seeds `{42,80,81,82}`: `0.0297569167` (race display `0.0298`;
 range `0.0003573333`). This beats LLNL R206 `0.0305` by `0.0007430833`
 (`2.4363%` lower), widening the banked Tencent margin from the stale
 leaderboard row's 1.3% to 2.4%.
+
+## 2026-05-09 03:56Z -- Baleen24 r412 r410-Base 64-Row Reinforcement Banked
+
+LANL banked `baleen24_chunksurf_r412_r410base64`, a synthetic-only 64-row
+reinforcement pass from the r410 per-seed bases. The selector used
+`stream_id,obj_id,obj_size` swaps, cross-seed donors from r410, r409, r407,
+r408, r405, r404, and older LANL Baleen chunk rows, plus r410/r409 accepted
+move JSONs sorted by historical mean. Admission remained the official
+5-cache x 6-policy surface with the ratio-bounded no-32 guard:
+
+`--guard-cache-sizes 128,512,2048,8192 --guard-regression-per-official-gain 0.25`.
+
+Official reference:
+`/tiamat/zarathustra/llgan-output/refs/baleen24_stackatlas_real.csv`.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r412_r410base64_ck64_seed42_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177678000 |
+| 80 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r412_r410base64_ck64_seed80_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0177` | 0.0177211667 |
+| 81 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r412_r410base64_ck64_seed81_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0178` | 0.0177763667 |
+| 82 | `/tiamat/zarathustra/altgan-output/baleen24_chunksurf_r412_r410base64_ck64_seed82_fake_1000k.csv` | `mean HRC-MAE across policies: 0.0177` | 0.0177091333 |
+
+Mean across seeds `{42,80,81,82}`: `0.0177436167` (race display `0.0177`;
+range `0.0000672333`). This improves LANL r410 `0.0177799000` by
+`0.0000362833` (`0.2041%` lower) and beats LLNL R291.BAL2 `0.018447` by
+`0.0007033833` (`3.8129%` lower).
+
+No-32 guard means were `0.0076922083`, `0.0077265833`, `0.0077792500`, and
+`0.0077058333`, mean `0.0077259687`, range `0.0000870417`. The guard mean
+improves r410's no-32 guard mean `0.0077556146` by `0.0000296459`
+(`0.3822%` lower).
+
+`LEADER-BOARD.md` updated: LANL remains 9/9 and the Baleen24 margin widens to
+3.8%.

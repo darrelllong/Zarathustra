@@ -1,6 +1,6 @@
 # LEADER-BOARD
 
-Last updated: **2026-05-09 (LANL r411 Alibaba 0.0099295583, r336 Tencent 0.0297569167, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r410 Baleen24 0.0177799000 are banked; LANL leads 9/9)**.
+Last updated: **2026-05-09 (LANL r411 Alibaba 0.0099295583, r336 Tencent 0.0297569167, r292 CloudPhysics 0.0220106406, r291 MSR Exchange 0.0043343667, and r412 Baleen24 0.0177436167 are banked; LANL leads 9/9)**.
 Lower mean HRC-MAE wins. Source-of-truth for race position; updated by
 teams through git after every measured race-position change. Standing claims
 must also be posted with literal per-seed cachesim lines in the owning team's
@@ -26,7 +26,7 @@ The race has two metric classes:
 | Alibaba | 0.009999 (R287.A2 small-chunk cascade on R287.A, 4-seed range 0.000208) | **0.0099295583** (r411 defensive 16-row self-shift continuation, 4-seed {42,80,81,82}, range 0.0002084000; no-32 guard mean 0.0111391771) | **LANL** | -0.7% |
 | Tencent | 0.0305 (R206 — unverified, R283.B can't reproduce; protocol lost) | **0.0297569167** (r336 8-row object-ID chunk-surface continuation, 4-seed {42,80,81,82}, range 0.0003573333) | **LANL** | -2.4% |
 | CloudPhysics | 0.02978 (R287.CP2 small-chunk cascade, 8-pol multi-seed range 0.000466) | **0.0220106406** (r292 cache-surface chunk selector overtake, 4-seed {42,80,81,82}, range 0.0053736458) | **LANL** | −26.1% |
-| Baleen24 | 0.018447 (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | **0.0177799000** (r410 r409-base 128-row synthetic-donor reinforcement, 4-seed {42,80,81,82}, range 0.0000664000; no-32 guard mean 0.0077556146) | **LANL** | -3.6% |
+| Baleen24 | 0.018447 (R291.BAL2 chunk=2048 tighten on R291.BAL, 4-seed {42,80,81,82} range 0.002513) | **0.0177436167** (r412 r410-base 64-row synthetic-donor reinforcement, 4-seed {42,80,81,82}, range 0.0000672333; no-32 guard mean 0.0077259687) | **LANL** | -3.8% |
 | MSR Exchange | 0.00893 (R287.MSR chunk-ensemble guard pass on R282.F base, multi-seed range 0.000234) | **0.0043343667** (r291 cache-surface chunk selector retake, 4-seed {42,80,81,82}, range 0.0000925333) | **LANL** | −51.5% |
 | Twitter | 0.02491 (R287.M2 small-chunk cascade on R287.M, 4-seed range 0.000553) | **0.0236117250** (r351 guarded 8-row continuation, 4-seed {42,80,81,82}, range 0.0005990667; no-32 guard mean 0.0239953021) | **LANL** | -5.2% |
 | Meta KV | 0.04807 (R287.KV chunk-ensemble guard pass on R281.K base, 4-seed range 0.000658) | **0.0109** (tail_reuse=0.08 reuse_drop=0.05 hp=0.25) | **LANL** | −77.3% |
@@ -39,10 +39,10 @@ Alibaba is held by LANL under the current banked rows: LANL r411
 `0.0099295583` vs LLNL R287.A2 `0.009999`. LANL r411 improves LANL r386 by
 `0.0000390167` (`0.3914%` lower) and beats LLNL by `0.0000694417`
 (`0.6945%` lower).
-Baleen24 is held by LANL under the current banked rows: LANL r410
-`0.0177799000` vs LLNL R291.BAL2 `0.018447`. LANL r410 improves LANL r409 by
-`0.0001174417` (`0.6562%` lower) and beats LLNL by `0.0006671000`
-(`3.6163%` lower).
+Baleen24 is held by LANL under the current banked rows: LANL r412
+`0.0177436167` vs LLNL R291.BAL2 `0.018447`. LANL r412 improves LANL r410 by
+`0.0000362833` (`0.2041%` lower) and beats LLNL by `0.0007033833`
+(`3.8129%` lower).
 Tencent is held by LANL under the current banked rows: LANL r336
 `0.0297569167` vs LLNL R206 `0.0305`. LANL r336 improves LANL r335 by
 `0.0000381666` and beats LLNL by `0.0007430833` (`2.4363%` lower).
