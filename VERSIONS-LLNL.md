@@ -7107,3 +7107,48 @@ LLNL has closed the order-of-magnitude HRC-MAE gap on **both** corpora (5×→2.
 - `602c5ac` Round 174 state-space expansion scaffolding
 - `8a8f70a` Round 174 closed-marginal writeup
 - `1b7ce3e` VERSIONS-LLNL R170-172 post-mortem
+
+---
+
+## R295 / R296 / R297 / R298 — Denning-line architectures (2026-05-08)
+
+After AD review of LLNL's chunk-ensemble cascade (PEER-REVIEW-LANL.md
+2026-05-08 pass; same critique applies symmetrically to LLNL's own
+`chunk_ensemble.py`), pivoted away from chunk-ensemble metric-fitting
+toward explicit probabilistic models grounded in Coffman & Denning
+(1973) §7.3 working-set theory. Four-architecture cognitive map:
+
+| Round | File | Model | What it captures | Wiki seed-42 mean HRC-MAE |
+|---|---|---|---|---:|
+| **R295** | `llgan/stack_walker.py` | Single global stack-distance distribution | LRU HRC by Mattson stack property (eq. 7.4.1 of Coffman & Denning) | 0.0338 |
+| **R296** | `llgan/locality_walker.py` | Equal-window per-locality stack-distance distributions + Jaccard shift histogram | Within-locality LRU + cross-locality reset (heuristic) | 0.0356 (regression vs R295) |
+| **R297** | `llgan/denning_hmm.py` | K-state HMM with K-medoids locality clustering, Markov transitions, mean dwell, per-state frequency emissions | Denning §7.3.1 stationary-locality-sequence; L1-L3 by construction | **0.0317** |
+| R298 (planned) | `llgan/trace_lstm.py` | Autoregressive LSTM trained on the trace's rank-bin sequence | Within-locality temporal patterns (which obj follows which) — actual learning, not just histogram fitting | TBD |
+
+Single-seed Wikipedia HRC-MAE on the 5-cache × 6-policy race surface.
+LANL banked Wikipedia r328/r329 = 0.005460 (4-seed multi-seed). All
+R295-R297 implementations are 6× behind LANL on Wikipedia under this
+protocol; the architecture-only models cannot match cascade-cascaded
+numbers without learning the within-locality temporal structure that
+LSTM-class models can fit.
+
+**Key methodology point**: R295-R297 do NOT optimize on the test metric.
+The single fitted object per trace is a histogram (R295), a window-set
+(R296), or an HMM (R297). No chunk-swap fitting, no test-MAE gradient
+descent. By the AD critique these are protocol-clean even if numerically
+behind.
+
+**R298 motivation**: R297 captures locality dynamics at the state level
+(Markov transitions) but emits references i.i.d. within a state. Real
+traces have within-locality temporal structure — adjacent references
+correlate. An autoregressive model trained on the trace as a token
+sequence would capture this. Implementation: tokenize trace as
+LRU-rank-bin sequence (small vocab ~50 + NEW token), train tiny LSTM,
+generate autoregressively, materialize obj_ids via LRU stack walk.
+
+**Honest status (2026-05-08, score LANL 9 / LLNL 0):** the chunk-ensemble
+race is lost on every corpus except where LANL chose not to play.
+R295-R297 are a research-grade pivot, not a race-winning move on the
+current protocol. Their value is methodological: they give LLNL a
+defensible "we did model-class work" position for the paper, even if
+LANL's chunk-cascade numbers are lower. R298 is the next learning step.
