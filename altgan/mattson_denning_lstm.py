@@ -221,12 +221,14 @@ def tokenize(
     windows: list[int],
     recycle_rank_cap: int = 0,
     exact_rank_cutoff: int = 0,
+    ws_edge_mode: str = "footprint",
 ):
     depths, footprint = mattson_depths(trace)
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     rank_max = min(footprint, max(1, int(recycle_rank_cap))) if recycle_rank_cap > 0 else footprint
     rank_edges = make_rank_edges(rank_max, n_rank_bins, exact_rank_cutoff)
-    ws_edges = make_log_edges(footprint, n_ws_bins)
+    ws_edge_max = max(windows, default=footprint) if ws_edge_mode == "max-window" else footprint
+    ws_edges = make_log_edges(ws_edge_max, n_ws_bins)
     tokens = tokens_from_depths(depths, rank_edges, trace.n, recycle_rank_cap)
     ws_tokens = denning_working_sets(trace, windows, ws_edges)
     fresh = int((tokens == FRESH_TOKEN).sum())
@@ -245,7 +247,8 @@ def tokenize(
         f"reuse_offset={reuse_token_offset} recycle_rank_cap={int(recycle_rank_cap)} "
         f"exact_rank_cutoff={int(exact_rank_cutoff)} "
         f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
-        f"ws_bins={len(ws_edges) - 1} windows={windows}",
+        f"ws_bins={len(ws_edges) - 1} ws_edge_mode={ws_edge_mode} "
+        f"ws_edge_max={int(ws_edge_max)} windows={windows}",
         flush=True,
     )
     return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token
@@ -495,6 +498,7 @@ def fit(args) -> None:
         windows,
         args.recycle_rank_cap,
         args.exact_rank_cutoff,
+        args.ws_edge_mode,
     )
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
@@ -532,6 +536,7 @@ def fit(args) -> None:
             "footprint": footprint,
             "rank_edges": rank_edges,
             "ws_edges": ws_edges,
+            "ws_edge_mode": args.ws_edge_mode,
             "windows": windows,
             "vocab": vocab,
             "fresh_token": FRESH_TOKEN,
@@ -1203,6 +1208,12 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--rank-bins", type=int, default=64)
         q.add_argument("--ws-bins", type=int, default=32)
         q.add_argument("--ws-windows", default=DEFAULT_WINDOWS)
+        q.add_argument(
+            "--ws-edge-mode",
+            choices=["footprint", "max-window"],
+            default="footprint",
+            help="bin Denning working-set counts against the full footprint or the largest WS control window",
+        )
         q.add_argument("--hidden", type=int, default=128)
         q.add_argument("--token-embed", type=int, default=64)
         q.add_argument("--ws-embed", type=int, default=16)

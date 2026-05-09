@@ -6603,3 +6603,26 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 11:30Z -- Tencent r439 Completed, Retracted
+
+r439 completed as a clean negative result. Masking impossible learned-WS bins
+stopped the cap-clipping leak, but it over-corrected toward reuse: the generated
+traces now under-hit 128/512/2048/8192 across LRU/FIFO/SLRU. This confirms the
+problem belongs in training-time WS target geometry, not another decode-only
+pressure patch.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.1127` | 0.1127376667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.1013` | 0.1012776667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0955` | 0.0955453333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.1131` | 0.1131403333 |
+
+Mean across seeds `{42,80,81,82}`: `0.1056752500` (race display `0.1057`;
+range `0.0175950000`). r439 is not promoted.
+
+Added `--ws-edge-mode max-window` for the next training run. It trains Denning
+WS context/auxiliary heads against bins scaled to the largest configured WS
+window instead of the full trace footprint, reducing the impossible-bin
+gradient that broke learned-WS feedback.

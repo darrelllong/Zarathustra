@@ -6084,3 +6084,23 @@ Model:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
 
 No claim until all four literal cachesim panels complete.
+
+## 2026-05-09 11:30Z -- Tencent r439 Completed, Retracted
+
+r439 completed as a clean negative result. Masked learned-WS decoding
+over-corrected toward reuse and under-hit most non-32 cache points, so the next
+step moves the WS correction upstream into training-time bin geometry.
+
+| seed | fake CSV | literal cachesim mean line | JSON mean |
+|---:|---|---|---:|
+| 42 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed42_fake_100k.csv` | `mean HRC-MAE across policies: 0.1127` | 0.1127376667 |
+| 80 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed80_fake_100k.csv` | `mean HRC-MAE across policies: 0.1013` | 0.1012776667 |
+| 81 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed81_fake_100k.csv` | `mean HRC-MAE across policies: 0.0955` | 0.0955453333 |
+| 82 | `/tiamat/zarathustra/altgan-output/tencent_mdlstm_r439_learnedws_masked_empiricalrank_norecycle_p3_seed82_fake_100k.csv` | `mean HRC-MAE across policies: 0.1131` | 0.1131403333 |
+
+Mean across seeds `{42,80,81,82}`: `0.1056752500` (race display `0.1057`;
+range `0.0175950000`). r439 is not promoted.
+
+Added `--ws-edge-mode max-window` for the next fit: Denning WS context and
+auxiliary heads use bins scaled to the largest configured WS window instead of
+the full trace footprint.
