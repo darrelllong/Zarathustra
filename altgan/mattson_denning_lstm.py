@@ -122,6 +122,27 @@ def make_log_edges(max_value: int, n_bins: int) -> np.ndarray:
     return edges.astype(np.int64)
 
 
+def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> np.ndarray:
+    """Log rank bins with an optional exact-rank prefix for short-cache depths."""
+    max_value = max(int(max_value), 1)
+    cutoff = max(0, min(int(exact_rank_cutoff), max_value + 1))
+    if cutoff <= 1:
+        return make_log_edges(max_value, n_bins)
+    exact_edges = np.arange(0, cutoff + 1, dtype=np.int64)
+    if cutoff > max_value:
+        return np.arange(0, max_value + 2, dtype=np.int64)
+    tail_span = max_value - cutoff + 1
+    raw = np.unique(
+        np.round(np.logspace(0, math.log10(tail_span + 1), n_bins)).astype(np.int64)
+    )
+    tail_edges = cutoff + raw
+    edges = np.unique(np.concatenate((exact_edges, tail_edges)))
+    edges = np.unique(np.clip(edges, 0, max_value + 1))
+    if edges[-1] <= max_value:
+        edges = np.concatenate((edges, [max_value + 1]))
+    return edges.astype(np.int64)
+
+
 def value_to_bin(value: int, edges: np.ndarray) -> int:
     ix = int(np.searchsorted(edges, int(value), side="right") - 1)
     return max(0, min(ix, len(edges) - 2))
@@ -199,11 +220,12 @@ def tokenize(
     n_ws_bins: int,
     windows: list[int],
     recycle_rank_cap: int = 0,
+    exact_rank_cutoff: int = 0,
 ):
     depths, footprint = mattson_depths(trace)
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     rank_max = min(footprint, max(1, int(recycle_rank_cap))) if recycle_rank_cap > 0 else footprint
-    rank_edges = make_log_edges(rank_max, n_rank_bins)
+    rank_edges = make_rank_edges(rank_max, n_rank_bins, exact_rank_cutoff)
     ws_edges = make_log_edges(footprint, n_ws_bins)
     tokens = tokens_from_depths(depths, rank_edges, trace.n, recycle_rank_cap)
     ws_tokens = denning_working_sets(trace, windows, ws_edges)
@@ -221,6 +243,7 @@ def tokenize(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
         f"reuse_offset={reuse_token_offset} recycle_rank_cap={int(recycle_rank_cap)} "
+        f"exact_rank_cutoff={int(exact_rank_cutoff)} "
         f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
         f"ws_bins={len(ws_edges) - 1} windows={windows}",
         flush=True,
@@ -471,6 +494,7 @@ def fit(args) -> None:
         args.ws_bins,
         windows,
         args.recycle_rank_cap,
+        args.exact_rank_cutoff,
     )
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
@@ -520,6 +544,7 @@ def fit(args) -> None:
             "ws_embed": args.ws_embed,
             "seq_len": args.seq_len,
             "rank_bins": args.rank_bins,
+            "exact_rank_cutoff": int(args.exact_rank_cutoff),
             "mark_sample": mark_sample,
             "aux_ws_loss_weight": args.aux_ws_loss_weight,
             "short_reuse_loss_weight": args.short_reuse_loss_weight,
@@ -1156,6 +1181,12 @@ def build_parser() -> argparse.ArgumentParser:
             choices=["uniform", "empirical"],
             default="uniform",
             help="within predicted Mattson-depth bin, sample uniformly or from exact fitted real ranks",
+        )
+        q.add_argument(
+            "--exact-rank-cutoff",
+            type=int,
+            default=0,
+            help="use one token per exact Mattson rank below this cutoff, then log-bin the tail",
         )
         q.add_argument(
             "--recycle-rank-cap",
