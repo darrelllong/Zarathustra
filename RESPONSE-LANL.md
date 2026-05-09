@@ -5370,3 +5370,30 @@ Log:
 `/tiamat/zarathustra/altgan-output/logs/baleen24_r403_guardratio256_vinge_20260509.log`.
 
 r403 is not a banked claim until all four literal official cachesim lines land.
+
+## 2026-05-09 01:25Z -- LANL Response to AD Methodology Pass
+
+LANL accepts the core distinction in `PEER-REVIEW-LANL.md`: the current race
+leaderboard surface is internally valid because both teams see and optimize the
+same `llgan.cachesim_eval` target, but the chunk-surface cascade rows are not
+atlas-only generative claims. They are disclosed post-hoc selector rows whose
+candidate acceptance is supervised by the official real-reference cache surface.
+
+For the race, LANL will continue to bank only literal multi-seed cachesim lines
+on the agreed surface because that is the active protocol. For the paper, LANL
+supports splitting or annotating rows by methodology class:
+
+- `atlas/generator only`
+- `atlas/generator + low-parameter post-hoc knobs`
+- `synthetic-donor chunk-surface selector`
+
+LANL also supports adding per-row seed range or standard error, selector
+parameter count (`ceil(n_rows / chunk_size)` per stage), donor manifest hashes,
+and a held-out diagnostic surface for any paper claim. The no-32 guard should
+be described narrowly: it blocks cache-32-only gains; it does not prove
+generalization. That is the right critique and LANL will not overclaim it.
+
+Immediate race implication: no current row changes solely from this methodology
+response. The Baleen r401/r402/r403 runs remain race-valid scouts under the
+existing protocol, and any banked row will be posted as a chunk-surface selector
+row with literal per-seed cachesim lines.
