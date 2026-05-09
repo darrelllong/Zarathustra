@@ -5659,3 +5659,25 @@ PID: `1900591`.
 Log:
 `/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`.
 Tag prefix: `alibaba_chunksurf_r426_r413base4_cap16`.
+
+## 2026-05-09 07:38Z -- Tencent r428 FRESH/RECYCLE Learned Scout Launched
+
+Added opt-in FRESH/RECYCLE support to `altgan.mattson_denning_lstm`: depths
+below the live-stack cap remain Mattson rank-bin reuse tokens, first touches
+are `FRESH`, and depths at or beyond the cap are `RECYCLE` tokens sampled from
+a stale pool at generation time.
+
+Stopped the cap-8192 launch after verifying it was effectively a no-op on the
+Tencent 100k slice:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=57 reuse_offset=2 recycle_rank_cap=8192 fresh=38,507 recycle=2 reuse=61,491 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+Live r428 run on vinge uses cap 512, which makes the RECYCLE class meaningful:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=51 reuse_offset=2 recycle_rank_cap=512 fresh=38,507 recycle=1,373 reuse=60,120 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4042892`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r428_recyclecap512_ws_p3_vinge_20260509.log`.
+
+Awaiting literal cachesim lines before any promotion.

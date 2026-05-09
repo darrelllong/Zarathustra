@@ -6025,3 +6025,33 @@ PID: `1900591`.
 Log:
 `/tiamat/zarathustra/altgan-output/logs/alibaba_r426_r413base4_cap16_20260509T071641Z.log`.
 Tag prefix: `alibaba_chunksurf_r426_r413base4_cap16`.
+
+## 2026-05-09 07:38Z -- Tencent r428 Learned FRESH/RECYCLE Mattson-Denning Launch
+
+Implemented an opt-in architectural split in `altgan/mattson_denning_lstm.py`:
+true first accesses remain `FRESH`, while Mattson depths at or beyond a
+configured live-stack cap become `RECYCLE` and sample from a stale pool during
+generation. This keeps the learned model on Mattson LRU depth and Denning
+working-set structure rather than treating every out-of-window event as a fresh
+one-shot.
+
+The first launch, `tencent_mdlstm_r427b_recyclecap8192_ws_p3`, verified the new
+path but was stopped immediately because the Tencent 100k training slice had
+only `recycle=2` at cap 8192:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=57 reuse_offset=2 recycle_rank_cap=8192 fresh=38,507 recycle=2 reuse=61,491 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+Relaunched on vinge as `tencent_mdlstm_r428_recyclecap512_ws_p3` with
+`--recycle-rank-cap 512`, WS birth control, and `--short-reuse-pressure 3.0`.
+This exercises the split enough to matter:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=51 reuse_offset=2 recycle_rank_cap=512 fresh=38,507 recycle=1,373 reuse=60,120 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4042892`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r428_recyclecap512_ws_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r428_recyclecap512.pt`.
+
+No leaderboard change yet; this is a live learned multi-seed scout until the
+literal `llgan.cachesim_eval` panel completes.
