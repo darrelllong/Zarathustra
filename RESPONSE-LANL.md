@@ -5906,3 +5906,10 @@ Checkpoint:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r420_split.pt`.
 Early training is decomposed in the log as `birth`, `reuse`, and `ws`; by
 epoch 4 the run had reached roughly `birth=0.33`, `reuse=1.21`, `ws=0.15`.
+
+Operational fix: added `altgan/lanl_remote_job.sh` so future vinge/baase
+actions can be launched with a simple local SSH command such as
+`ssh -i ~/.ssh/id_rsa -A darrell@192.168.86.30 bash /home/darrell/LANL/Zarathustra/altgan/lanl_remote_job.sh ...`.
+The remote script owns `git pull`, `nohup`, redirection, and backgrounding, so
+the local sandbox no longer sees a long quoted remote shell pipeline for every
+race loop.

@@ -5564,3 +5564,7 @@ Checkpoint:
 `/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r420_split.pt`.
 This is a fresh fit because the split birth head must be trained, not loaded
 randomly onto the r414 checkpoint.
+
+Added `altgan/lanl_remote_job.sh` as the remote launcher/status wrapper. It
+keeps local SSH calls simple and moves pull/nohup/redirection/backgrounding into
+the remote checkout, reducing repeated local sandbox permission prompts.
