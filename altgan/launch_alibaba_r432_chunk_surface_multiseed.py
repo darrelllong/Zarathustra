@@ -39,6 +39,8 @@ def main() -> int:
         "lru,arc,fifo,sieve,slru,car",
         "--swap-columns",
         "stream_id,obj_id,obj_size",
+        "--write-columns",
+        "stream_id,obj_id,obj_size",
         "--tag-prefix",
         "alibaba_chunksurf_r432_r431base4_cap16",
         "--pipeline",
@@ -95,4 +97,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

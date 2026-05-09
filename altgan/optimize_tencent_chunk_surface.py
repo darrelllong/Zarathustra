@@ -299,20 +299,13 @@ def main() -> int:
         env[key] = "1"
     os.environ.update(env)
 
-    print(f"[chunk_surface] reading base {args.base}", flush=True)
-    base = pd.read_csv(args.base)
     swap_columns = list(dict.fromkeys(args.swap_columns))
     if not swap_columns:
         raise ValueError("--swap-columns parsed to an empty column list")
-    missing_base = [column for column in swap_columns if column not in base.columns]
-    if missing_base:
-        raise ValueError(f"base missing swap column(s): {missing_base}")
-    base_swap = {column: _column_array(base, column) for column in swap_columns}
-    base_len = len(next(iter(base_swap.values())))
-    preserved_columns = [col for col in base.columns if col not in swap_columns]
     write_columns = list(dict.fromkeys(args.write_columns))
     if write_columns:
-        missing = [col for col in write_columns if col not in base.columns]
+        header = pd.read_csv(args.base, nrows=0)
+        missing = [col for col in write_columns if col not in header.columns]
         if missing:
             raise ValueError(f"--write-columns contains unknown base column(s): {missing}")
         missing_swapped = [col for col in swap_columns if col not in write_columns]
@@ -321,11 +314,21 @@ def main() -> int:
                 "--write-columns must include all --swap-columns; missing: "
                 + ",".join(missing_swapped)
             )
-        base_out = base[write_columns]
+        print(f"[chunk_surface] reading base {args.base} usecols={','.join(write_columns)}", flush=True)
+        base = pd.read_csv(args.base, usecols=write_columns)
         print(f"[chunk_surface] write-columns: {','.join(write_columns)}", flush=True)
     else:
-        base_out = base
+        print(f"[chunk_surface] reading base {args.base}", flush=True)
+        base = pd.read_csv(args.base)
         write_columns = list(base.columns)
+
+    missing_base = [column for column in swap_columns if column not in base.columns]
+    if missing_base:
+        raise ValueError(f"base missing swap column(s): {missing_base}")
+    base_swap = {column: _column_array(base, column) for column in swap_columns}
+    base_len = len(next(iter(base_swap.values())))
+    preserved_columns = [col for col in base.columns if col not in swap_columns]
+    base_out = base[write_columns]
     print(
         f"[chunk_surface] swap contract: swapped_columns={','.join(swap_columns)} "
         f"preserved_base_columns={','.join(preserved_columns)}",
