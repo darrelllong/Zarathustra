@@ -628,6 +628,55 @@ def _force_emitted_reuse(
     return None
 
 
+def _apply_short_reuse_pressure(
+    probs: np.ndarray,
+    rank_edges: np.ndarray,
+    stack_len: int,
+    windows: list[int],
+    current_ws: np.ndarray,
+    target_ws: np.ndarray,
+    gain: float,
+) -> np.ndarray:
+    if gain <= 0.0 or stack_len <= 0 or len(windows) == 0:
+        return probs
+    surplus = 0.0
+    for wi, weight in enumerate((1.0, 0.5)):
+        if wi >= len(windows):
+            break
+        surplus += weight * max(
+            0.0,
+            (float(current_ws[wi]) - float(target_ws[wi])) / max(float(windows[wi]), 1.0),
+        )
+    if surplus <= 0.0:
+        return probs
+
+    primary = max(int(windows[0]), 1)
+    cutoff = max(int(windows[min(1, len(windows) - 1)]), primary)
+    biased = probs.copy()
+    for tok in range(1, len(biased)):
+        if biased[tok] <= 0.0:
+            continue
+        lo = int(rank_edges[tok - 1])
+        hi = min(int(rank_edges[min(tok, len(rank_edges) - 1)]), stack_len)
+        if hi <= lo:
+            biased[tok] = 0.0
+            continue
+        mid = 0.5 * (lo + hi - 1)
+        if mid < primary:
+            log_weight = 1.5 * gain * surplus
+        elif mid < cutoff:
+            log_weight = gain * surplus * (1.0 - mid / max(float(cutoff), 1.0))
+        else:
+            log_weight = -gain * surplus * min(1.0, math.log1p(mid / float(cutoff)))
+        biased[tok] *= math.exp(max(-8.0, min(8.0, log_weight)))
+
+    total = float(biased.sum())
+    if total > 0.0:
+        biased /= total
+        return biased
+    return probs
+
+
 def generate_ids(
     state: dict,
     model,
@@ -636,6 +685,7 @@ def generate_ids(
     temperature: float,
     birth_control: bool = True,
     birth_control_mode: str = "footprint",
+    short_reuse_pressure: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
 
@@ -688,6 +738,8 @@ def generate_ids(
             force_reuse = birth_targets is not None and len(emitted_seen) >= birth_target
             birth_logit = float(birth_logits[0, -1].detach().cpu())
             reuse_eligible: set[int] | None = None
+            current_ws: np.ndarray | None = None
+            target_ws: np.ndarray | None = None
             if ws_targets is not None:
                 current_ws = np.asarray([len(counter) for _queue, counter in ws_counts], dtype=np.float64)
                 target_ws = ws_targets[i].astype(np.float64)
@@ -717,6 +769,16 @@ def generate_ids(
                     probs[:] = 0.0
             else:
                 probs = np.zeros(vocab, dtype=np.float64)
+            if ws_targets is not None and current_ws is not None and target_ws is not None:
+                probs = _apply_short_reuse_pressure(
+                    probs,
+                    rank_edges,
+                    len(stack),
+                    windows,
+                    current_ws,
+                    target_ws,
+                    float(short_reuse_pressure),
+                )
             if force_new or (not force_reuse and (not stack or rng.random() < birth_prob)):
                 token = NEW_TOKEN
             elif float(probs.sum()) > 0.0:
@@ -814,6 +876,7 @@ def generate(args) -> None:
         args.temperature,
         not args.no_birth_control,
         args.birth_control_mode,
+        args.short_reuse_pressure,
     )
     write_csv(args.output, obj_ids, sizes, opcodes, tenants)
 
@@ -846,6 +909,7 @@ def multiseed(args) -> None:
             args.temperature,
             not args.no_birth_control,
             args.birth_control_mode,
+            args.short_reuse_pressure,
         )
         write_csv(fake, obj_ids, sizes, opcodes, tenants)
         report = evaluate(str(fake), args.real, args.cache_sizes, args.policies)
@@ -921,6 +985,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--temperature", type=float, default=1.0)
     gen_p.add_argument("--no-birth-control", action="store_true")
     gen_p.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
+    gen_p.add_argument("--short-reuse-pressure", type=float, default=0.0)
     gen_p.set_defaults(fn=generate)
 
     multi = sub.add_parser("multiseed")
@@ -936,6 +1001,7 @@ def build_parser() -> argparse.ArgumentParser:
     multi.add_argument("--fit", action="store_true")
     multi.add_argument("--no-birth-control", action="store_true")
     multi.add_argument("--birth-control-mode", choices=["footprint", "ws"], default="footprint")
+    multi.add_argument("--short-reuse-pressure", type=float, default=0.0)
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")
     multi.set_defaults(fn=multiseed)
