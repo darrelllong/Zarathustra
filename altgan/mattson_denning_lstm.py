@@ -428,8 +428,6 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
     ws_counts = list(zip(queues, counters))
     stack: list[int] = []
     next_new = 0
-    tokens = [NEW_TOKEN] * history
-    ws_hist = [[0] * len(windows) for _ in range(history)]
     out = np.empty(n_records, dtype=np.int64)
 
     mark_sample = state.get("mark_sample", {})
@@ -441,10 +439,11 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
     tenants = np.empty(n_records, dtype=np.int64)
 
     with torch.inference_mode():
+        init_tok = torch.full((1, history), NEW_TOKEN, dtype=torch.long, device=device)
+        init_ws = torch.zeros((1, history, len(windows)), dtype=torch.long, device=device)
+        logits, _ws_logits, h = model(init_tok, init_ws)
+        progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
-            x_tok = torch.tensor([tokens], dtype=torch.long, device=device)
-            x_ws = torch.tensor([ws_hist], dtype=torch.long, device=device)
-            logits, _ws_logits, _ = model(x_tok, x_ws)
             z = logits[0, -1] / max(float(temperature), 1e-6)
             probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             token = int(rng.choice(vocab, p=probs))
@@ -476,13 +475,12 @@ def generate_ids(state: dict, model, n_records: int, seed: int, temperature: flo
                     if counter[old] <= 0:
                         del counter[old]
             ws_now = _ws_feature_from_counts(ws_counts, ws_edges)
-            tokens.pop(0)
-            tokens.append(token)
-            ws_hist.pop(0)
-            ws_hist.append(ws_now)
-            if i and i % 100_000 == 0:
+            step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
+            step_ws = torch.tensor([[ws_now]], dtype=torch.long, device=device)
+            logits, _ws_logits, h = model(step_tok, step_ws, h)
+            if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
-                    f"[mattson_denning generate] emitted={i:,} unique={next_new:,} stack={len(stack):,}",
+                    f"[mattson_denning generate] emitted={i + 1:,} unique={next_new:,} stack={len(stack):,}",
                     flush=True,
                 )
     print(

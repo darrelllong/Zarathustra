@@ -5500,6 +5500,8 @@ Checkpoint:
 
 Follow-up source change adds an auxiliary next-working-set prediction loss
 (`--aux-ws-loss-weight`, default `0.15`) so the model is forced to learn
-Denning working-set dynamics in addition to Mattson depth tokens. r414/r415 are
-not banked unless their four-seed official cachesim mean beats Tencent r336
+Denning working-set dynamics in addition to Mattson depth tokens. It also
+streams autoregressive generation through the LSTM hidden state instead of
+replaying the full 256-token context for every emitted row. r414/r415 are not
+banked unless their four-seed official cachesim mean beats Tencent r336
 `0.0297569167`.

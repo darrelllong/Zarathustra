@@ -5828,8 +5828,10 @@ Checkpoint:
 The first r414 code used Denning working-set tokens as conditioning. The next
 source revision adds an auxiliary next-working-set prediction head
 (`--aux-ws-loss-weight`, default `0.15`) so Denning dynamics are part of the
-learned loss, not just inputs. That follow-up will be r415 after r414 finishes
-or a second host is idle.
+learned loss, not just inputs. It also changes generation from full-history
+LSTM replay to hidden-state streaming, which keeps learned runs from wasting
+GPU time on avoidable 256-step replays. That follow-up will be r415 after r414
+finishes or a second host is idle.
 
 r414/r415 are learned-generator scouts. They do not replace banked Tencent r336
 unless the official four-seed cachesim mean beats `0.0297569167`; losing runs
