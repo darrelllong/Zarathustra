@@ -5847,6 +5847,24 @@ Validation:
 - `env PYTHONPYCACHEPREFIX=/private/tmp/lanl_pycache python3 -m py_compile altgan/mattson_denning_lstm.py`
 - `bash -n altgan/lanl_remote_job.sh`
 
+## 2026-05-09 10:38Z -- Tencent r437 Learned-WS Controller Launched
+
+Launched `tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3` on vinge.
+
+Process line:
+
+`--recycle-rank-cap 0 --rank-sampler empirical --exact-rank-cutoff 0 --seeds 42,80,81,82 --temperature 1.0 --short-reuse-pressure 3.0 --birth-control-mode learned-ws`
+
+Tokenization:
+
+`[mattson_denning tokenize] n=100,000 footprint=38,507 rank_vocab=59 reuse_offset=1 recycle_rank_cap=0 exact_rank_cutoff=0 fresh=38,507 recycle=0 reuse=61,493 ws_bins=31 windows=[32, 128, 512, 2048, 8192]`
+
+PID: `4068698`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/tencent_mdlstm_r437_learnedws_empiricalrank_norecycle_p3_vinge_20260509.log`.
+Model:
+`/tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r437_learnedws_empiricalrank_norecycle.pt`.
+
 r432 was killed early because it launched from the old in-memory wrapper and
 did not include the new flag. Active run:
 
