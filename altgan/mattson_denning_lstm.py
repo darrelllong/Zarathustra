@@ -456,14 +456,13 @@ def _warmstart_context(
     except OSError:
         return default_tokens, default_ws, queues, counters, stack, next_new
 
-    warm_rows = min(trace.n, max(history, max(windows, default=history)))
-    if warm_rows <= 0:
+    min_warm = min(trace.n, max(history, max(windows, default=history)))
+    if min_warm <= 0:
         return default_tokens, default_ws, queues, counters, stack, next_new
 
     rng = np.random.default_rng(seed + 7919)
-    start_hi = max(0, trace.n - warm_rows - 1)
-    start = int(rng.integers(0, start_hi + 1)) if start_hi else 0
-    warm = _slice_trace(trace, start, start + warm_rows)
+    end = int(rng.integers(min_warm, trace.n + 1)) if trace.n > min_warm else trace.n
+    warm = _slice_trace(trace, 0, end)
     depths, _footprint = mattson_depths(warm)
     warm_tokens = tokens_from_depths(depths, rank_edges, warm.n).tolist()
     warm_ws = denning_working_sets(warm, windows, ws_edges).tolist()
@@ -502,7 +501,7 @@ def _warmstart_context(
 
     print(
         "[mattson_denning generate] "
-        f"warmstart_rows={warm.n:,} start={start:,} unique={next_new:,} stack={len(stack):,}",
+        f"warmstart_rows={warm.n:,} prefix_end={end:,} unique={next_new:,} stack={len(stack):,}",
         flush=True,
     )
     return warm_tokens, warm_ws, queues, counters, stack, next_new

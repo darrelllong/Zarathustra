@@ -5851,3 +5851,9 @@ working-set tokens. r416 fixes both sequence-model issues: generation now
 warm-starts from a remapped real prefix long enough to cover the Denning
 windows, and each autoregressive step feeds `(token_t, working_set_before_t)`
 to match the training interface.
+
+r416 still showed new-object collapse because the first warm-start used a
+random segment with segment-local Mattson depths, while the model was trained
+on global-from-start stack state. r417 changes warm-start again: it replays the
+real prefix from row 0 to the sampled point, remaps object IDs into synthetic
+IDs, and seeds the LRU stack and Denning queues from that global prefix.

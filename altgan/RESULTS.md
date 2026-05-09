@@ -5518,3 +5518,8 @@ all-NEW context and feeding post-event working-set tokens, while training
 predicts from pre-event working-set tokens. r416 warm-starts from a remapped
 real prefix and feeds `(token_t, working_set_before_t)` during streaming
 generation.
+
+r416 still failed because the warm prefix was segment-local. r417 uses a
+global prefix replay from row 0 to the sampled point before generation, so the
+Mattson stack, Denning queues, and LSTM hidden state are all seeded in the same
+coordinate system used during training.
