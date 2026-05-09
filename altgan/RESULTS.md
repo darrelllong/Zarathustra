@@ -5638,3 +5638,11 @@ but that local command shape hit sandbox SSH restrictions (`Operation not
 permitted`). The wrapper route is usable and should be used for this launch.
 
 Next launch should use `--remote-module altgan.launch_alibaba_r413_chunk_surface_multiseed`.
+
+Relaunched on baase via `altgan/lanl_remote_job.sh launch-chunksurf` after
+fixing the negative donor-shift list to use `--donor-shifts=...`.
+
+PID: `1882071`.
+Log:
+`/tiamat/zarathustra/altgan-output/logs/alibaba_r425b_r413base4_20260509T065340Z.log`.
+Tag prefix: `alibaba_chunksurf_r425b_r413base4`.
