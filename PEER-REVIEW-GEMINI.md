@@ -84,3 +84,23 @@ After reviewing the newest structural ideas added since Round 4 (specifically ID
    `_pos_surr = torch.clamp(val / T, 0.0, 1.0)`
 - **Effect:** In PyTorch, `torch.clamp(x, min, max)` produces a gradient of *exactly zero* when `x` is outside the `[min, max]` bounds. If the generator produces a large positive reuse logit (e.g., `val >= 10.0`), `_pos_surr` saturates to 1.0, and its gradient becomes exactly zero. The generator receives absolutely zero penalty signal to push the value back down, making the super-threshold collapse irreversible once it occurs.
 - **Fix:** Remove `torch.clamp` from the positive surrogate computation. The straight-through estimator equation (`_rate = surr + (hard - surr).detach()`) already naturally forces the forward pass to evaluate to exactly `1.0`. By using `_pos_surr = val / T` directly, the backward pass will continuously transmit the intended `1/T` gradient back to the generator for all `val > 0`, correctly pushing the values back toward the target threshold.
+
+## Round 6
+
+### Code-Level Findings: Autoregressive State Drift and Sequence Initialization Bugs
+
+Reviewing the newly introduced autoregressive architectures (`altgan/mattson_denning_lstm.py`, `llgan/trace_lstm.py`, and `llgan/trace_lstm_ws.py`), I've identified several critical train/eval mismatches affecting the sequence modeling logic. These issues systematically decouple the context distributions the models see during training from those they face during generation.
+
+1. `[P1]` **Train/Eval Mismatch: Stateful Generation from Stateless Training**
+**Location:** `altgan/mattson_denning_lstm.py` (Lines ~530-580 vs ~1315-1320)
+**Issue:** During training, `train_model` evaluates independent, randomly sampled sequence chunks of length `seq_len` (e.g., 256). For every chunk, the LSTM hidden state `h` is left as `None` (zero-initialized). However, during generation in `generate_ids`, the model unrolls continuously: `logits, ..., h = model(step_tok, step_ws, step_pos, h)` is called sequentially for $N$ records (e.g., 1,000,000 steps), carrying the state `h` across the entire trace.
+- **Effect:** The LSTM was trained strictly on short horizons (max `seq_len`) starting from a zero state. Unrolling it continuously for millions of steps pushes the hidden state deep into unmapped, out-of-distribution space. The recurrent state drifts far beyond the zero-anchored manifolds learned during training, leading to probability collapse or trajectory divergence.
+- **Fix:** Either switch to stateful BPTT training (passing `h` iteratively across contiguous sequential chunks) or modify `generate_ids` to use a stateless sliding window of length `seq_len` for every step (similar to the sliding window generation loop in `trace_transformer.py`).
+
+2. `[P1]` **Gradient Pollution from Impossible Contexts**
+**Location:** `llgan/trace_lstm.py` (`train_lstm`) and `llgan/trace_lstm_ws.py` (`train_model`)
+**Issue:** When training on randomly extracted trace chunks of length `seq_len`, the model calculates the cross-entropy loss over the *entire* sequence: `loss = F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1))`. Because the model starts with `h=0`, the first few tokens are evaluated with practically zero context (or severely truncated context) as if they were the absolute start of the trace. 
+- **Effect:** During generation, the model is always fed a fully populated context window (`history_buf`), and only the prediction for the *last* token is kept. But during training, the optimizer spends the majority of its capacity trying to solve impossible zero/short-context predictions. The gradients for these early-chunk tokens heavily dilute the signal for the fully contextualized predictions that the generator actually relies on.
+- **Fix:** Compute the loss only on the latter half of the chunk (or the final step) to allow the LSTM time to accumulate a meaningful internal state before being penalized. For example: `loss = F.cross_entropy(logits[:, seq_len//2:].reshape(-1, vocab), y[:, seq_len//2:].reshape(-1))`.
+
+*(Note: The stack-walker decoder issue where deep-reuse predictions generated a fresh object instead of recycling was independently identified and patched in LANL r416; these state-unrolling bugs are orthogonal and currently live in the repository).*
