@@ -188,6 +188,33 @@ def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> 
     return edges.astype(np.int64)
 
 
+def running_footprint_tokens(depths: np.ndarray, fp_edges: np.ndarray) -> np.ndarray:
+    """Bin the running LRU footprint (unique-object count before each event)."""
+    n = len(depths)
+    out = np.empty(n, dtype=np.int64)
+    count = 0
+    for i in range(n):
+        out[i] = value_to_bin(count, fp_edges)
+        if int(depths[i]) < 0:
+            count += 1
+    return out
+
+
+def _running_footprint_from_tokens(
+    tokens: list[int],
+    fp_edges: np.ndarray,
+    start_count: int = 0,
+) -> list[int]:
+    """Bin running footprint from a token sequence (FRESH_TOKEN marks new objects)."""
+    count = start_count
+    out: list[int] = []
+    for t in tokens:
+        out.append(value_to_bin(count, fp_edges))
+        if t == FRESH_TOKEN:
+            count += 1
+    return out
+
+
 def _rank_band_bounds(windows: list[int]) -> np.ndarray:
     bounds = sorted({int(w) for w in windows if int(w) > 0})
     return np.asarray(bounds, dtype=np.int64)
@@ -308,6 +335,7 @@ def tokenize(
     recycle_rank_cap: int = 0,
     exact_rank_cutoff: int = 0,
     ws_edge_mode: str = "footprint",
+    n_stack_depth_bins: int = 0,
 ):
     depths, footprint = mattson_depths(trace)
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
@@ -331,6 +359,13 @@ def tokenize(
         reuse_token_offset,
         recycle_rank_cap,
     )
+    fp_bins = max(0, int(n_stack_depth_bins))
+    if fp_bins > 0:
+        fp_edges = make_log_edges(footprint, fp_bins)
+        fp_tokens = running_footprint_tokens(depths, fp_edges)
+    else:
+        fp_edges = np.asarray([], dtype=np.int64)
+        fp_tokens = np.zeros(trace.n, dtype=np.int64)
     print(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
@@ -338,10 +373,10 @@ def tokenize(
         f"exact_rank_cutoff={int(exact_rank_cutoff)} "
         f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
         f"ws_bins={_ws_bins_by_window(ws_edges, len(windows))} ws_edge_mode={ws_edge_mode} "
-        f"ws_edge_max={int(ws_edge_max)} windows={windows}",
+        f"ws_edge_max={int(ws_edge_max)} windows={windows} fp_bins={fp_bins}",
         flush=True,
     )
-    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token
+    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges
 
 
 def tokens_from_depths(
@@ -386,10 +421,9 @@ def _try_torch():
     try:
         import torch
         import torch.nn as nn
-
         return torch, nn
-    except ImportError as exc:
-        raise RuntimeError("PyTorch is required for mattson_denning_lstm") from exc
+    except ImportError as e:
+        raise ImportError("PyTorch is required for training and generation") from e
 
 
 def build_model(
@@ -402,11 +436,14 @@ def build_model(
     pos_bins: int = 0,
     pos_embed: int = 0,
     rank_bands: int = 0,
+    fp_bins: int = 0,
 ):
     torch, nn = _try_torch()
     ws_bins_by_window = _normalize_ws_bins(ws_bins, n_windows)
     use_pos = int(pos_bins) > 0 and int(pos_embed) > 0
     rank_bands = max(0, int(rank_bands))
+    fp_bins = max(0, int(fp_bins))
+    use_fp = fp_bins > 0
 
     class MattsonDenningLSTM(nn.Module):
         def __init__(self):
@@ -414,7 +451,13 @@ def build_model(
             self.token_emb = nn.Embedding(vocab, token_embed)
             self.ws_emb = nn.ModuleList([nn.Embedding(n_bins, ws_embed) for n_bins in ws_bins_by_window])
             self.pos_emb = nn.Embedding(int(pos_bins), int(pos_embed)) if use_pos else None
-            input_dim = token_embed + n_windows * ws_embed + (int(pos_embed) if use_pos else 0)
+            self.fp_emb = nn.Embedding(fp_bins, ws_embed) if use_fp else None
+            input_dim = (
+                token_embed
+                + n_windows * ws_embed
+                + (int(pos_embed) if use_pos else 0)
+                + (ws_embed if use_fp else 0)
+            )
             self.lstm = nn.LSTM(
                 input_dim,
                 hidden,
@@ -426,7 +469,7 @@ def build_model(
             self.ws_heads = nn.ModuleList([nn.Linear(hidden, n_bins) for n_bins in ws_bins_by_window])
             self.rank_band_head = nn.Linear(hidden, rank_bands) if rank_bands > 0 else None
 
-        def forward(self, tok, ws, pos=None, h=None):
+        def forward(self, tok, ws, pos=None, fp=None, h=None):
             parts = [self.token_emb(tok)]
             for i, emb in enumerate(self.ws_emb):
                 parts.append(emb(ws[:, :, i]))
@@ -434,6 +477,10 @@ def build_model(
                 if pos is None:
                     pos = tok.new_zeros(tok.shape)
                 parts.append(self.pos_emb(pos))
+            if self.fp_emb is not None:
+                if fp is None:
+                    fp = tok.new_zeros(tok.shape)
+                parts.append(self.fp_emb(fp))
             x = torch.cat(parts, dim=-1)
             out, h = self.lstm(x, h)
             rank_band_logits = self.rank_band_head(out) if self.rank_band_head is not None else None
@@ -470,6 +517,8 @@ def train_model(
     seed: int,
     aux_ws_loss_weight: float,
     short_reuse_loss_weight: float,
+    fp_tokens: np.ndarray | None = None,
+    fp_bins: int = 0,
 ):
     torch, _nn = _try_torch()
     import torch.nn.functional as F
@@ -489,6 +538,7 @@ def train_model(
         pos_bins,
         pos_embed,
         _rank_band_count(rank_band_mode, windows),
+        int(fp_bins),
     ).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     reuse_token_offset = max(LEGACY_REUSE_TOKEN_OFFSET, int(vocab) - len(rank_edges) + 1)
@@ -505,6 +555,7 @@ def train_model(
     tok_t = torch.from_numpy(tokens.astype(np.int64))
     ws_t = torch.from_numpy(ws_tokens.astype(np.int64))
     pos_t = torch.from_numpy(position_tokens(len(tokens), pos_bins))
+    fp_t = torch.from_numpy(fp_tokens.astype(np.int64)) if fp_tokens is not None else None
     n_train = len(tokens) - seq_len - 1
     if n_train <= 0:
         raise ValueError("not enough tokens for requested sequence length")
@@ -516,7 +567,8 @@ def train_model(
         f"seq={seq_len} batch={batch} epochs={epochs} n_batches={n_batches} "
         f"reuse_offset={reuse_token_offset} pos_bins={int(pos_bins)} pos_embed={int(pos_embed)} "
         f"short_reuse_loss_weight={short_reuse_loss_weight} "
-        f"rank_band_mode={rank_band_mode} rank_band_loss_weight={rank_band_loss_weight}",
+        f"rank_band_mode={rank_band_mode} rank_band_loss_weight={rank_band_loss_weight} "
+        f"fp_bins={int(fp_bins)}",
         flush=True,
     )
 
@@ -531,9 +583,10 @@ def train_model(
             x_tok = torch.stack([tok_t[i:i + seq_len] for i in idx]).to(device)
             x_ws = torch.stack([ws_t[i:i + seq_len] for i in idx]).to(device)
             x_pos = torch.stack([pos_t[i:i + seq_len] for i in idx]).to(device)
+            x_fp = torch.stack([fp_t[i:i + seq_len] for i in idx]).to(device) if fp_t is not None else None
             y = torch.stack([tok_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + seq_len + 1] for i in idx]).to(device)
-            logits, birth_logits, ws_logits, rank_band_logits, _ = model(x_tok, x_ws, x_pos)
+            logits, birth_logits, ws_logits, rank_band_logits, _ = model(x_tok, x_ws, x_pos, x_fp)
             y_birth = (y == FRESH_TOKEN).float()
             birth_loss = F.binary_cross_entropy_with_logits(
                 birth_logits.reshape(-1),
@@ -640,6 +693,7 @@ def load_checkpoint(path: str | Path):
         int(state.get("pos_bins") or 0),
         int(state.get("pos_embed") or 0),
         int(state.get("rank_bands") or 0),
+        int(state.get("fp_bins") or 0),
     )
     incompatible = model.load_state_dict(state["model_state"], strict=False)
     if incompatible.missing_keys or incompatible.unexpected_keys:
@@ -654,7 +708,8 @@ def load_checkpoint(path: str | Path):
 def fit(args) -> None:
     windows = _parse_ints(args.ws_windows)
     trace = read_real_csv(args.real, args.max_rows)
-    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token = tokenize(
+    stack_depth_bins = int(getattr(args, "stack_depth_bins", 0))
+    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges = tokenize(
         trace,
         args.rank_bins,
         args.ws_bins,
@@ -662,11 +717,13 @@ def fit(args) -> None:
         args.recycle_rank_cap,
         args.exact_rank_cutoff,
         args.ws_edge_mode,
+        stack_depth_bins,
     )
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
     ws_bins_by_window = _ws_bins_by_window(ws_edges, len(windows))
     rank_bands = _rank_band_count(args.rank_band_mode, windows)
+    fp_bins = max(1, len(fp_edges) - 1) if len(fp_edges) > 1 else 0
     model = train_model(
         tokens,
         ws_tokens,
@@ -688,6 +745,8 @@ def fit(args) -> None:
         seed=args.seed,
         aux_ws_loss_weight=args.aux_ws_loss_weight,
         short_reuse_loss_weight=args.short_reuse_loss_weight,
+        fp_tokens=fp_tokens if fp_bins > 0 else None,
+        fp_bins=fp_bins,
     )
     mark_sample = {
         "obj_sizes": _sample_pool(trace.obj_sizes),
@@ -698,7 +757,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 5,
+            "version": 6,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -731,7 +790,9 @@ def fit(args) -> None:
             "rank_band_loss_weight": args.rank_band_loss_weight,
             "rank_sampler": args.rank_sampler,
             "rank_samples_by_token": rank_samples_by_token if args.rank_sampler == "empirical" else [],
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands",
+            "fp_bins": fp_bins,
+            "fp_edges": fp_edges.tolist() if len(fp_edges) > 0 else [],
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory",
         },
     )
 
@@ -944,21 +1005,27 @@ def _force_emitted_reuse(
     if total > 0.0:
         reuse_probs /= total
         for _ in range(16):
-            token = int(rng.choice(len(reuse_probs), p=reuse_probs))
-            lo = int(rank_edges[token - reuse_token_offset])
-            hi = min(int(rank_edges[min(token - reuse_token_offset + 1, len(rank_edges) - 1)]), len(stack))
-            if hi <= lo:
+            tok = int(rng.choice(len(reuse_probs), p=reuse_probs))
+            if tok < reuse_token_offset:
                 continue
-            for _attempt in range(4):
-                rank = int(rng.integers(lo, hi))
-                oid = int(stack[rank])
-                if oid not in emitted_seen:
-                    continue
-                if eligible is not None and oid not in eligible:
-                    continue
-                stack.pop(rank)
-                stack.insert(0, oid)
-                return oid, rank_to_token(rank, rank_edges, reuse_token_offset)
+            rank = _sample_rank_for_token(
+                tok,
+                rank_edges,
+                len(stack),
+                rng,
+                reuse_token_offset,
+                [],
+            )
+            if rank < 0 or rank >= len(stack):
+                continue
+            oid = stack[rank]
+            if oid not in emitted_seen:
+                continue
+            if eligible is not None and oid not in eligible:
+                continue
+            stack.pop(rank)
+            stack.insert(0, oid)
+            return oid, rank_to_token(rank, rank_edges, reuse_token_offset)
     for _ in range(8):
         oid = int(emitted_order[int(rng.integers(0, len(emitted_order)))])
         if eligible is not None and oid not in eligible:
@@ -1136,6 +1203,9 @@ def generate_ids(
     recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
     rank_samples_by_token = state.get("rank_samples_by_token") or []
     pos_bins = int(state.get("pos_bins") or 0)
+    fp_bins = int(state.get("fp_bins") or 0)
+    fp_edges_raw = state.get("fp_edges") or []
+    fp_edges = np.asarray(fp_edges_raw, dtype=np.int64) if fp_bins > 0 and len(fp_edges_raw) > 0 else None
     init_tokens, init_ws_tokens, queues, counters, stack, next_new, stale_pool = _warmstart_context(
         state,
         seed,
@@ -1168,10 +1238,18 @@ def generate_ids(
         init_tok = torch.tensor([init_tokens], dtype=torch.long, device=device)
         init_ws = torch.tensor([init_ws_tokens], dtype=torch.long, device=device)
         init_pos = torch.zeros_like(init_tok)
-        logits, birth_logits, ws_logits, rank_band_logits, h = model(init_tok, init_ws, init_pos)
+        if fp_edges is not None:
+            n_fresh_in_init = sum(1 for t in init_tokens if t == FRESH_TOKEN)
+            init_fp_start = max(0, next_new - n_fresh_in_init)
+            init_fp_list = _running_footprint_from_tokens(init_tokens, fp_edges, start_count=init_fp_start)
+            init_fp = torch.tensor([init_fp_list], dtype=torch.long, device=device)
+        else:
+            init_fp = None
+        logits, birth_logits, ws_logits, rank_band_logits, h = model(init_tok, init_ws, init_pos, init_fp)
         progress_every = max(25_000, min(100_000, max(1, n_records // 4)))
         for i in range(n_records):
             ws_pre = _ws_feature_from_counts(ws_counts, ws_edges)
+            fp_pre = value_to_bin(len(stack), fp_edges) if fp_edges is not None else 0
             birth_target = int(birth_targets[i]) if birth_targets is not None else 0
             force_new = birth_targets is not None and len(emitted_seen) < birth_target
             force_reuse = birth_targets is not None and len(emitted_seen) >= birth_target
@@ -1315,7 +1393,8 @@ def generate_ids(
             step_tok = torch.tensor([[token]], dtype=torch.long, device=device)
             step_ws = torch.tensor([[ws_pre]], dtype=torch.long, device=device)
             step_pos = torch.tensor([[position_token_at(i, n_records, pos_bins)]], dtype=torch.long, device=device)
-            logits, birth_logits, ws_logits, rank_band_logits, h = model(step_tok, step_ws, step_pos, h)
+            step_fp = torch.tensor([[fp_pre]], dtype=torch.long, device=device) if fp_edges is not None else None
+            logits, birth_logits, ws_logits, rank_band_logits, h = model(step_tok, step_ws, step_pos, step_fp, h)
             if i + 1 < n_records and (i + 1) % progress_every == 0:
                 print(
                     f"[mattson_denning generate] emitted={i + 1:,} "
@@ -1488,6 +1567,12 @@ def build_parser() -> argparse.ArgumentParser:
             help="add an auxiliary Mattson-depth band head keyed to the cache-window ladder",
         )
         q.add_argument("--rank-band-loss-weight", type=float, default=0.0)
+        q.add_argument(
+            "--stack-depth-bins",
+            type=int,
+            default=0,
+            help="if >0, add running LRU stack depth (footprint) as a log-binned LSTM input with this many bins",
+        )
 
     fit_p = sub.add_parser("fit")
     add_train_flags(fit_p)
