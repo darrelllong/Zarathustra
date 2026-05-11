@@ -366,6 +366,14 @@ def tokenize(
     else:
         fp_edges = np.asarray([], dtype=np.int64)
         fp_tokens = np.zeros(trace.n, dtype=np.int64)
+    vocab_size = len(rank_edges) + (reuse_token_offset - 1)
+    rank_samples_by_token_fp = (
+        rank_samples_from_depths_fp(
+            depths, tokens, fp_tokens, vocab_size, fp_bins, reuse_token_offset, recycle_rank_cap
+        )
+        if fp_bins > 0
+        else []
+    )
     print(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
@@ -376,7 +384,7 @@ def tokenize(
         f"ws_edge_max={int(ws_edge_max)} windows={windows} fp_bins={fp_bins}",
         flush=True,
     )
-    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges
+    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp
 
 
 def tokens_from_depths(
@@ -414,6 +422,30 @@ def rank_samples_from_depths(
             continue
         if 0 <= token_i < vocab:
             samples[token_i].append(depth_i)
+    return samples
+
+
+def rank_samples_from_depths_fp(
+    depths: np.ndarray,
+    tokens: np.ndarray,
+    fp_tokens: np.ndarray,
+    vocab: int,
+    fp_bins: int,
+    reuse_token_offset: int,
+    recycle_rank_cap: int = 0,
+) -> list[list[list[int]]]:
+    """Footprint-conditioned rank samples: out[token][fp_bin] = [rank, ...]."""
+    samples: list[list[list[int]]] = [[[] for _ in range(fp_bins)] for _ in range(vocab)]
+    for depth, token, fp_tok in zip(depths.tolist(), tokens.tolist(), fp_tokens.tolist()):
+        depth_i = int(depth)
+        token_i = int(token)
+        fp_i = int(fp_tok)
+        if token_i < reuse_token_offset or depth_i < 0:
+            continue
+        if recycle_rank_cap > 0 and depth_i >= recycle_rank_cap:
+            continue
+        if 0 <= token_i < vocab and 0 <= fp_i < fp_bins:
+            samples[token_i][fp_i].append(depth_i)
     return samples
 
 
@@ -709,7 +741,7 @@ def fit(args) -> None:
     windows = _parse_ints(args.ws_windows)
     trace = read_real_csv(args.real, args.max_rows)
     stack_depth_bins = int(getattr(args, "stack_depth_bins", 0))
-    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges = tokenize(
+    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp = tokenize(
         trace,
         args.rank_bins,
         args.ws_bins,
@@ -757,7 +789,7 @@ def fit(args) -> None:
         args.output,
         model,
         {
-            "version": 6,
+            "version": 7,
             "real": str(args.real),
             "max_rows": args.max_rows,
             "n_train_rows": trace.n,
@@ -790,9 +822,10 @@ def fit(args) -> None:
             "rank_band_loss_weight": args.rank_band_loss_weight,
             "rank_sampler": args.rank_sampler,
             "rank_samples_by_token": rank_samples_by_token if args.rank_sampler == "empirical" else [],
+            "rank_samples_by_token_fp": rank_samples_by_token_fp if args.rank_sampler == "empirical" and fp_bins > 0 else [],
             "fp_bins": fp_bins,
             "fp_edges": fp_edges.tolist() if len(fp_edges) > 0 else [],
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory",
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory; optional footprint-conditioned empirical rank sampler conditions within-bin rank draws on the current LRU stack depth bin",
         },
     )
 
@@ -1151,9 +1184,29 @@ def _sample_rank_for_token(
     rng: np.random.Generator,
     reuse_token_offset: int,
     rank_samples_by_token,
+    fp_bin: int = -1,
+    rank_samples_by_token_fp=None,
+    min_fp_bucket: int = 8,
 ) -> int:
     if stack_len <= 0:
         return -1
+    # Footprint-conditioned sampler: prefers the bucket matching current stack depth
+    if (
+        rank_samples_by_token_fp is not None
+        and fp_bin >= 0
+        and 0 <= token < len(rank_samples_by_token_fp)
+        and fp_bin < len(rank_samples_by_token_fp[token])
+    ):
+        fp_samples = rank_samples_by_token_fp[token][fp_bin]
+        if len(fp_samples) >= min_fp_bucket:
+            for _ in range(16):
+                rank = int(fp_samples[int(rng.integers(0, len(fp_samples)))])
+                if 0 <= rank < stack_len:
+                    return rank
+            eligible = [int(r) for r in fp_samples if 0 <= int(r) < stack_len]
+            if eligible:
+                return int(eligible[int(rng.integers(0, len(eligible)))])
+    # Global sampler fallback
     if rank_samples_by_token and 0 <= token < len(rank_samples_by_token):
         samples = rank_samples_by_token[token]
         if samples:
@@ -1202,6 +1255,7 @@ def generate_ids(
     recycle_token = int(recycle_token_raw) if recycle_token_raw is not None else -1
     recycle_rank_cap = int(state.get("recycle_rank_cap") or 0)
     rank_samples_by_token = state.get("rank_samples_by_token") or []
+    rank_samples_by_token_fp = state.get("rank_samples_by_token_fp") or []
     pos_bins = int(state.get("pos_bins") or 0)
     fp_bins = int(state.get("fp_bins") or 0)
     fp_edges_raw = state.get("fp_edges") or []
@@ -1339,6 +1393,8 @@ def generate_ids(
                     rng,
                     reuse_token_offset,
                     rank_samples_by_token,
+                    fp_bin=fp_pre if fp_edges is not None else -1,
+                    rank_samples_by_token_fp=rank_samples_by_token_fp if rank_samples_by_token_fp else None,
                 )
                 if rank < 0 or rank >= len(stack):
                     oid = next_new
