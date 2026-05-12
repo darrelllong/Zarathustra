@@ -168,3 +168,70 @@ python3 -m altgan.mattson_denning_lstm multiseed \
 ```
 
 No claim until the four literal cachesim panels complete.
+
+## 2026-05-12 -- Tencent r448 Cache-Ladder-Aligned Rank Vocabulary (Architectural)
+
+**Diagnosis.** r443 regressed vs r434 (`0.0629` vs `0.0601`) despite adding finer rank
+resolution via `--exact-rank-cutoff 128`. The mechanism: exact-rank-cutoff inflated the
+vocabulary from ~64 to 187 tokens. With 100k training rows and ~61k reuse events, that
+means ~329 events per token on average — but the distribution is Zipf-heavy, so high-rank
+tokens each see only 1–5 training examples. The model cannot reliably learn rare tokens and
+defaults to token-frequency priors, degrading the generation quality.
+
+**Root cause of HRC-MAE floor.** The cachesim metric evaluates hit rates at exactly
+five cache sizes: [32, 128, 512, 2048, 8192]. For a generated trace to hit the correct
+HRC at cache size 32, its rank distribution must have the right fraction of accesses with
+rank < 32. The current log-spaced vocabulary (default n_rank_bins=64) places edges at
+approximately [29, 34] for the rank-32 boundary — neither is exactly 32. When the LSTM
+emits the bin covering [29, 34), the rank sampler draws uniformly from that range; roughly
+half those draws fall on the wrong side of the cache-32 boundary. The same systematic bias
+applies at boundaries 128, 512, 2048, and 8192. This is a structural HRC-MAE floor that
+persists regardless of how well the LSTM learns the sequence.
+
+**Fix: `--cache-ladder` flag.** Adds mandatory rank-edge boundaries at exactly
+[32, 128, 512, 2048, 8192] (configurable via `--ladder-sizes`). These are injected into
+the rank edge array via `np.unique(np.concatenate(base_edges, mandatory))`, raising vocab
+from ~64 to ~69 tokens — a 7% increase, vs r443's 192% increase. No bin straddles a
+cachesim evaluation boundary; the rank sampler draws are always on the correct side.
+
+**Constitution compliance.** The rank boundaries are fixed constants derived from the
+evaluation protocol, not from the real trace. The rank samples saved in the checkpoint are
+fit from training-trace depths (as in r443+). Generation uses `len(stack)` to clamp
+rank draws — a property of the generated sequence, not the real trace.
+
+**r448 vs r447.** r447 is built on r443's exact-rank-cutoff=128 (vocab=187). r448
+returns to no exact-rank-cutoff (vocab≈69) and adds cache-ladder boundaries instead. r448
+also retains `--stack-depth-bins 32` (footprint LSTM conditioning from r446) and the
+footprint-conditioned empirical rank sampler (fp-conditioning from r447, which is implicit
+when `--stack-depth-bins 32` and `--rank-sampler empirical` are both set). The combined
+effect: semantically meaningful vocabulary + footprint-conditioned generation + no
+over-parameterisation.
+
+**Implementation.** `altgan/mattson_denning_lstm.py` (checkpoint version 7, no version bump
+needed since rank_edges are saved):
+- `make_rank_edges(..., mandatory_edges=None)` — new keyword; inserts explicit edge values
+  after computing the base log or exact-cutoff array.
+- `tokenize(..., cache_sizes=None)` — new keyword; passes `cache_sizes` as
+  `mandatory_edges` to `make_rank_edges`.
+- `fit()` — reads `args.cache_ladder` (bool) and `args.ladder_sizes` (str), derives
+  `cache_sizes`, passes to `tokenize()`, saves as `cache_ladder_sizes` in checkpoint.
+- CLI: `--cache-ladder` (flag) and `--ladder-sizes` (str, default `32,128,512,2048,8192`)
+  added to `add_train_flags` (available in both `fit` and `multiseed` subcommands).
+
+**Launch command (vinge) — refit required:**
+
+```
+python3 -m altgan.mattson_denning_lstm multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --max-rows 100000 --ws-edge-mode max-window \
+  --pos-bins 0 --pos-embed 8 --recycle-rank-cap 0 \
+  --rank-sampler empirical --exact-rank-cutoff 0 \
+  --stack-depth-bins 32 --cache-ladder \
+  --seeds 42,80,81,82 --temperature 1.0 \
+  --short-reuse-pressure 3.0 --fit --birth-control-mode ws \
+  --model /tiamat/zarathustra/checkpoints/altgan/tencent_mattson_denning_lstm_r448_sd32_fpcond_cachealign_wsmax_empiricalrank_norecycle.pt \
+  --tag tencent_mdlstm_r448_sd32_fpcond_cachealign_wsmax_empiricalrank_norecycle_ws_p3 \
+  --append-markdown /tiamat/zarathustra/Zarathustra/RESPONSE-LANL.md
+```
+
+No claim until the four literal cachesim panels complete.

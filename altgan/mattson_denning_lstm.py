@@ -167,25 +167,43 @@ def position_token_at(i: int, n: int, pos_bins: int) -> int:
     return int(min(pos_bins - 1, max(0, (int(i) * pos_bins) // max(int(n), 1))))
 
 
-def make_rank_edges(max_value: int, n_bins: int, exact_rank_cutoff: int = 0) -> np.ndarray:
-    """Log rank bins with an optional exact-rank prefix for short-cache depths."""
+def make_rank_edges(
+    max_value: int,
+    n_bins: int,
+    exact_rank_cutoff: int = 0,
+    mandatory_edges: list[int] | None = None,
+) -> np.ndarray:
+    """Log rank bins with optional exact-rank prefix and mandatory boundary points.
+
+    mandatory_edges forces exact bin boundaries at specified values (e.g. cache
+    ladder sizes) so rank samples never straddle a cachesim evaluation boundary.
+    """
     max_value = max(int(max_value), 1)
     cutoff = max(0, min(int(exact_rank_cutoff), max_value + 1))
     if cutoff <= 1:
-        return make_log_edges(max_value, n_bins)
-    exact_edges = np.arange(0, cutoff + 1, dtype=np.int64)
-    if cutoff > max_value:
-        return np.arange(0, max_value + 2, dtype=np.int64)
-    tail_span = max_value - cutoff + 1
-    raw = np.unique(
-        np.round(np.logspace(0, math.log10(tail_span + 1), n_bins)).astype(np.int64)
-    )
-    tail_edges = cutoff + raw
-    edges = np.unique(np.concatenate((exact_edges, tail_edges)))
-    edges = np.unique(np.clip(edges, 0, max_value + 1))
-    if edges[-1] <= max_value:
-        edges = np.concatenate((edges, [max_value + 1]))
-    return edges.astype(np.int64)
+        base = make_log_edges(max_value, n_bins)
+    else:
+        exact_edges = np.arange(0, cutoff + 1, dtype=np.int64)
+        if cutoff > max_value:
+            base = np.arange(0, max_value + 2, dtype=np.int64)
+        else:
+            tail_span = max_value - cutoff + 1
+            raw = np.unique(
+                np.round(np.logspace(0, math.log10(tail_span + 1), n_bins)).astype(np.int64)
+            )
+            tail_edges = cutoff + raw
+            base = np.unique(np.concatenate((exact_edges, tail_edges)))
+            base = np.unique(np.clip(base, 0, max_value + 1))
+            if base[-1] <= max_value:
+                base = np.concatenate((base, [max_value + 1]))
+    if mandatory_edges:
+        extra = np.asarray(
+            [int(e) for e in mandatory_edges if 0 < int(e) <= max_value],
+            dtype=np.int64,
+        )
+        if len(extra):
+            base = np.unique(np.concatenate((base, extra))).astype(np.int64)
+    return base.astype(np.int64)
 
 
 def running_footprint_tokens(depths: np.ndarray, fp_edges: np.ndarray) -> np.ndarray:
@@ -336,11 +354,12 @@ def tokenize(
     exact_rank_cutoff: int = 0,
     ws_edge_mode: str = "footprint",
     n_stack_depth_bins: int = 0,
+    cache_sizes: list[int] | None = None,
 ):
     depths, footprint = mattson_depths(trace)
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     rank_max = min(footprint, max(1, int(recycle_rank_cap))) if recycle_rank_cap > 0 else footprint
-    rank_edges = make_rank_edges(rank_max, n_rank_bins, exact_rank_cutoff)
+    rank_edges = make_rank_edges(rank_max, n_rank_bins, exact_rank_cutoff, mandatory_edges=cache_sizes)
     if ws_edge_mode == "per-window":
         ws_edges = [make_log_edges(window, n_ws_bins) for window in windows]
         ws_edge_max = max(windows, default=footprint)
@@ -374,11 +393,12 @@ def tokenize(
         if fp_bins > 0
         else []
     )
+    cache_ladder_str = ",".join(str(c) for c in sorted(cache_sizes)) if cache_sizes else "none"
     print(
         "[mattson_denning tokenize] "
         f"n={trace.n:,} footprint={footprint:,} rank_vocab={len(rank_edges)} "
         f"reuse_offset={reuse_token_offset} recycle_rank_cap={int(recycle_rank_cap)} "
-        f"exact_rank_cutoff={int(exact_rank_cutoff)} "
+        f"exact_rank_cutoff={int(exact_rank_cutoff)} cache_ladder={cache_ladder_str} "
         f"fresh={fresh:,} recycle={recycle:,} reuse={reuse:,} "
         f"ws_bins={_ws_bins_by_window(ws_edges, len(windows))} ws_edge_mode={ws_edge_mode} "
         f"ws_edge_max={int(ws_edge_max)} windows={windows} fp_bins={fp_bins}",
@@ -741,6 +761,7 @@ def fit(args) -> None:
     windows = _parse_ints(args.ws_windows)
     trace = read_real_csv(args.real, args.max_rows)
     stack_depth_bins = int(getattr(args, "stack_depth_bins", 0))
+    cache_sizes = _parse_ints(args.ladder_sizes) if getattr(args, "cache_ladder", False) else None
     tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp = tokenize(
         trace,
         args.rank_bins,
@@ -750,6 +771,7 @@ def fit(args) -> None:
         args.exact_rank_cutoff,
         args.ws_edge_mode,
         stack_depth_bins,
+        cache_sizes,
     )
     reuse_token_offset = SPLIT_REUSE_TOKEN_OFFSET if args.recycle_rank_cap > 0 else LEGACY_REUSE_TOKEN_OFFSET
     vocab = len(rank_edges) + (reuse_token_offset - 1)
@@ -825,7 +847,8 @@ def fit(args) -> None:
             "rank_samples_by_token_fp": rank_samples_by_token_fp if args.rank_sampler == "empirical" and fp_bins > 0 else [],
             "fp_bins": fp_bins,
             "fp_edges": fp_edges.tolist() if len(fp_edges) > 0 else [],
-            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory; optional footprint-conditioned empirical rank sampler conditions within-bin rank draws on the current LRU stack depth bin",
+            "cache_ladder_sizes": cache_sizes if cache_sizes else [],
+            "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory; optional footprint-conditioned empirical rank sampler conditions within-bin rank draws on the current LRU stack depth bin; optional cache-ladder-aligned rank boundaries ensure rank bins never straddle a cachesim evaluation cache-size boundary",
         },
     )
 
@@ -1628,6 +1651,17 @@ def build_parser() -> argparse.ArgumentParser:
             type=int,
             default=0,
             help="if >0, add running LRU stack depth (footprint) as a log-binned LSTM input with this many bins",
+        )
+        q.add_argument(
+            "--cache-ladder",
+            action="store_true",
+            default=False,
+            help="add exact rank-edge boundaries at each cache-ladder size so no rank bin straddles a cachesim evaluation point",
+        )
+        q.add_argument(
+            "--ladder-sizes",
+            default=DEFAULT_SIZES,
+            help="comma-separated cache-ladder sizes used for --cache-ladder rank boundaries (default: 32,128,512,2048,8192)",
         )
 
     fit_p = sub.add_parser("fit")
