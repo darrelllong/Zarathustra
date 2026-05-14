@@ -944,3 +944,42 @@ Mattson depths in a trace with strong locality phases), correcting this adds 0.0
 HRC-MAE improvement.  Combined with r449-r458, expected total HRC-MAE: 0.020–0.038.
 
 No claim until four-seed cachesim panels complete.
+
+---
+
+## 2026-05-14 -- Tencent r460 2D Birth Rate Calibration (Generation-Time)
+
+**Motivation.** r456 conditions P(fresh) on `ws0_bin` alone (1D calibration).  The 2D
+token blend (r450) showed that `(ws0_bin, ws1_bin)` joint conditioning is more
+discriminative than `ws0_bin` alone — states with equal `ws0` but different `ws1` can have
+materially different access patterns.  The same logic applies to birth rates: when both
+ws0 AND ws1 are high, the trace is likely in a genuine cold-miss phase (fast footprint
+growth); when ws0 is high but ws1 is low, it is a bursty-but-contained phase (more
+transient fresh objects).  These two states can differ in birth rate by 10–20%.
+
+**Fix.** New function `birth_rate_by_ws01(tokens, ws_tokens, ws0_bins, ws1_bins)`:
+```python
+rates[w0, w1] = P(fresh | ws0_bin=w0, ws1_bin=w1)
+```
+Empty `(w0, w1)` pairs fall back to the ws0 marginal (`birth_rate_by_ws0`), which in turn
+falls back to the global rate.  Applied AFTER the 1D blend (r456):
+```python
+birth_prob = (1 - α₁) × lstm_birth + α₁ × birth_rates_1d[w0]      # r456
+birth_prob = (1 - α₂) × birth_prob + α₂ × birth_rates_2d[w0, w1]  # r460
+```
+
+**Constitution compliance.** Generation-time correction only — no refit required for
+generation-only use (the 2D table IS stored in checkpoint).  Refit required to populate
+`empirical_birth_rates_by_ws01`.  Article IV satisfied.  Confidence weighting via
+`--ws-blend-confidence-tau` applies (sparser 2D bins get proportionally lower weight).
+
+**Combined r449–r460 Master Recipe** (all improvements stacked):
+- `--stack-depth-bins 32 --cache-ladder --ws-cache-ladder` (r446/r448/r451)
+- `--dropout 0.1 --lr-schedule cosine --epochs 20 --grad-clip 1.0` (r449/r458)
+- `--ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.10` (r453/r454)
+- `--film-cond --lstm-layers 3 --label-smoothing 0.05` (r455/r457/r458)
+- `--ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50` (r449/r450/r452)
+- `--birth-rate-blend 0.5 --birth-rate-blend-2d 0.25` (r456/r460)
+- `--rank-sampler empirical` with `rank_samples_by_token_ws0` in checkpoint (r459)
+
+No claim until four-seed cachesim panels complete.

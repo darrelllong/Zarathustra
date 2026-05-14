@@ -407,6 +407,7 @@ def tokenize(
     rank_token_freq_table, rank_token_freq_counts = rank_token_freqs_by_ws0(tokens, ws_tokens, vocab_size, reuse_token_offset, ws0_bins)
     rank_token_freq_table_2d, rank_token_freq_counts_2d = rank_token_freqs_by_ws01(tokens, ws_tokens, vocab_size, reuse_token_offset, ws0_bins, ws1_bins)
     empirical_birth_rates, birth_rate_counts = birth_rate_by_ws0(tokens, ws_tokens, ws0_bins)
+    empirical_birth_rates_2d, birth_rate_counts_2d = birth_rate_by_ws01(tokens, ws_tokens, ws0_bins, ws1_bins)
     rank_samples_by_token_ws0 = rank_samples_from_depths_ws0(
         depths, tokens, ws_tokens, vocab_size, ws0_bins, reuse_token_offset, recycle_rank_cap,
     )
@@ -421,7 +422,7 @@ def tokenize(
         f"ws_edge_max={int(ws_edge_max)} windows={windows} fp_bins={fp_bins}",
         flush=True,
     )
-    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp, rank_token_freq_table, rank_token_freq_table_2d, rank_token_freq_counts, rank_token_freq_counts_2d, empirical_birth_rates, birth_rate_counts, rank_samples_by_token_ws0
+    return tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp, rank_token_freq_table, rank_token_freq_table_2d, rank_token_freq_counts, rank_token_freq_counts_2d, empirical_birth_rates, birth_rate_counts, rank_samples_by_token_ws0, empirical_birth_rates_2d, birth_rate_counts_2d
 
 
 def tokens_from_depths(
@@ -484,6 +485,35 @@ def rank_samples_from_depths_fp(
         if 0 <= token_i < vocab and 0 <= fp_i < fp_bins:
             samples[token_i][fp_i].append(depth_i)
     return samples
+
+
+def birth_rate_by_ws01(
+    tokens: np.ndarray,
+    ws_tokens: np.ndarray,
+    ws0_bins: int,
+    ws1_bins: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Empirical fresh-token probability conditioned on (ws0_bin, ws1_bin) jointly.
+
+    Returns (rates, counts) where rates[w0, w1] = P(fresh | ws0_bin=w0, ws1_bin=w1)
+    and counts[w0, w1] = total tokens in that (ws0, ws1) bin pair.  Empty pairs
+    fall back to the ws0 marginal, then to the global rate.
+    """
+    fresh = np.zeros((ws0_bins, ws1_bins), dtype=np.float64)
+    total = np.zeros((ws0_bins, ws1_bins), dtype=np.float64)
+    for tok, ws_row in zip(tokens.tolist(), ws_tokens.tolist()):
+        w0 = min(max(int(ws_row[0]), 0), ws0_bins - 1)
+        w1 = min(max(int(ws_row[1]), 0), ws1_bins - 1) if len(ws_row) > 1 else 0
+        total[w0, w1] += 1.0
+        if int(tok) == FRESH_TOKEN:
+            fresh[w0, w1] += 1.0
+    global_rate = float(fresh.sum()) / max(1.0, float(total.sum()))
+    # Marginal over ws1 for fallback
+    marginal_fresh = fresh.sum(axis=1)
+    marginal_total = total.sum(axis=1)
+    marginal_rates = np.where(marginal_total > 0, marginal_fresh / marginal_total, global_rate)
+    rates = np.where(total > 0, fresh / np.maximum(total, 1.0), marginal_rates[:, np.newaxis])
+    return rates.astype(np.float32), total.astype(np.float32)
 
 
 def rank_samples_from_depths_ws0(
@@ -985,7 +1015,7 @@ def fit(args) -> None:
     stack_depth_bins = int(getattr(args, "stack_depth_bins", 0))
     cache_sizes = _parse_ints(args.ladder_sizes) if getattr(args, "cache_ladder", False) else None
     ws_cache_sizes = _parse_ints(args.ladder_sizes) if getattr(args, "ws_cache_ladder", False) else None
-    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp, rank_token_freq_table, rank_token_freq_table_2d, rank_token_freq_counts, rank_token_freq_counts_2d, empirical_birth_rates, birth_rate_counts, rank_samples_by_token_ws0 = tokenize(
+    tokens, ws_tokens, rank_edges, ws_edges, footprint, rank_samples_by_token, fp_tokens, fp_edges, rank_samples_by_token_fp, rank_token_freq_table, rank_token_freq_table_2d, rank_token_freq_counts, rank_token_freq_counts_2d, empirical_birth_rates, birth_rate_counts, rank_samples_by_token_ws0, empirical_birth_rates_2d, birth_rate_counts_2d = tokenize(
         trace,
         args.rank_bins,
         args.ws_bins,
@@ -1090,6 +1120,8 @@ def fit(args) -> None:
             "rank_token_freq_by_ws01_counts": rank_token_freq_counts_2d.tolist(),
             "empirical_birth_rates_by_ws0": empirical_birth_rates.tolist(),
             "birth_rate_counts_by_ws0": birth_rate_counts.tolist(),
+            "empirical_birth_rates_by_ws01": empirical_birth_rates_2d.tolist(),
+            "birth_rate_counts_by_ws01": birth_rate_counts_2d.tolist(),
             "film_cond": bool(getattr(args, "film_cond", False)),
             "lstm_layers": int(getattr(args, "lstm_layers", 2)),
             "training_loss": "binary fresh-access cross entropy plus non-fresh action cross entropy over optional RECYCLE and Mattson-depth reuse tokens plus auxiliary next-Denning-working-set cross entropy; optional empirical within-bin Mattson-rank sampler is fit from exact real depths; optional absolute phase embeddings condition the recurrent state; optional window-band Mattson-depth auxiliary head learns cache-ladder reuse depth bands; optional running-LRU-stack-depth embedding conditions the LSTM on the current footprint growth trajectory; optional footprint-conditioned empirical rank sampler conditions within-bin rank draws on the current LRU stack depth bin; optional cache-ladder-aligned rank boundaries ensure rank bins never straddle a cachesim evaluation cache-size boundary; optional WS-conditioned empirical rank token blend calibrates the LSTM predicted token distribution against training-time empirical rank-token frequencies conditioned on the primary Denning WS bin",
@@ -1527,6 +1559,7 @@ def generate_ids(
     ws_token_blend_2d: float = 0.0,
     ws_blend_confidence_tau: float = 0.0,
     birth_rate_blend: float = 0.0,
+    birth_rate_blend_2d: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     torch, _nn = _try_torch()
 
@@ -1575,6 +1608,14 @@ def generate_ids(
     birth_rate_counts_raw = state.get("birth_rate_counts_by_ws0") or []
     empirical_birth_rate_counts: np.ndarray | None = (
         np.asarray(birth_rate_counts_raw, dtype=np.float64) if birth_rate_counts_raw else None
+    )
+    birth_rates_2d_raw = state.get("empirical_birth_rates_by_ws01") or []
+    empirical_birth_rates_2d: np.ndarray | None = (
+        np.asarray(birth_rates_2d_raw, dtype=np.float64) if birth_rates_2d_raw else None
+    )
+    birth_rate_counts_2d_raw = state.get("birth_rate_counts_by_ws01") or []
+    empirical_birth_rate_counts_2d: np.ndarray | None = (
+        np.asarray(birth_rate_counts_2d_raw, dtype=np.float64) if birth_rate_counts_2d_raw else None
     )
     init_tokens, init_ws_tokens, queues, counters, stack, next_new, stale_pool = _warmstart_context(
         state,
@@ -1657,6 +1698,14 @@ def generate_ids(
                     cnt_br = float(empirical_birth_rate_counts[w0_br]) if w0_br < len(empirical_birth_rate_counts) else 0.0
                     alpha_br *= min(1.0, math.sqrt(cnt_br / float(ws_blend_confidence_tau)))
                 birth_prob = (1.0 - alpha_br) * birth_prob + alpha_br * float(empirical_birth_rates[w0_br])
+            if birth_rate_blend_2d > 0.0 and empirical_birth_rates_2d is not None and len(ws_pre) > 1:
+                w0_b2 = min(max(int(ws_pre[0]), 0), empirical_birth_rates_2d.shape[0] - 1)
+                w1_b2 = min(max(int(ws_pre[1]), 0), empirical_birth_rates_2d.shape[1] - 1)
+                alpha_b2 = float(birth_rate_blend_2d)
+                if ws_blend_confidence_tau > 0.0 and empirical_birth_rate_counts_2d is not None:
+                    cnt_b2 = float(empirical_birth_rate_counts_2d[w0_b2, w1_b2]) if (w0_b2 < empirical_birth_rate_counts_2d.shape[0] and w1_b2 < empirical_birth_rate_counts_2d.shape[1]) else 0.0
+                    alpha_b2 *= min(1.0, math.sqrt(cnt_b2 / float(ws_blend_confidence_tau)))
+                birth_prob = (1.0 - alpha_b2) * birth_prob + alpha_b2 * float(empirical_birth_rates_2d[w0_b2, w1_b2])
             z = logits[0, -1, 1:] / max(float(temperature), 1e-6)
             reuse_probs = torch.softmax(z, dim=-1).detach().cpu().numpy()
             probs = np.zeros(vocab, dtype=np.float64)
@@ -1859,6 +1908,7 @@ def generate(args) -> None:
         ws_token_blend_2d=float(getattr(args, "ws_token_blend_2d", 0.0)),
         ws_blend_confidence_tau=float(getattr(args, "ws_blend_confidence_tau", 0.0)),
         birth_rate_blend=float(getattr(args, "birth_rate_blend", 0.0)),
+        birth_rate_blend_2d=float(getattr(args, "birth_rate_blend_2d", 0.0)),
     )
     write_csv(args.output, obj_ids, sizes, opcodes, tenants)
 
@@ -1897,6 +1947,7 @@ def multiseed(args) -> None:
             ws_token_blend_2d=float(getattr(args, "ws_token_blend_2d", 0.0)),
             ws_blend_confidence_tau=float(getattr(args, "ws_blend_confidence_tau", 0.0)),
             birth_rate_blend=float(getattr(args, "birth_rate_blend", 0.0)),
+            birth_rate_blend_2d=float(getattr(args, "birth_rate_blend_2d", 0.0)),
         )
         write_csv(fake, obj_ids, sizes, opcodes, tenants)
         report = evaluate(str(fake), args.real, args.cache_sizes, args.policies)
@@ -2112,6 +2163,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="blend LSTM fresh-token probability with WS-conditioned empirical birth rate (0=LSTM only, 1=empirical only)",
     )
+    gen_p.add_argument(
+        "--birth-rate-blend-2d",
+        type=float,
+        default=0.0,
+        help="blend LSTM fresh-token probability with (ws0,ws1)-joint empirical birth rate (0=LSTM only, 1=empirical only)",
+    )
     gen_p.set_defaults(fn=generate)
 
     multi = sub.add_parser("multiseed")
@@ -2156,6 +2213,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="blend LSTM fresh-token probability with WS-conditioned empirical birth rate (0=LSTM only, 1=empirical only)",
+    )
+    multi.add_argument(
+        "--birth-rate-blend-2d",
+        type=float,
+        default=0.0,
+        help="blend LSTM fresh-token probability with (ws0,ws1)-joint empirical birth rate (0=LSTM only, 1=empirical only)",
     )
     multi.add_argument("--append-markdown", default="")
     multi.add_argument("--markdown-title", default="")
