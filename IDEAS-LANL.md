@@ -1,1 +1,460 @@
-IyBJREVBUy1MQU5MLm1kCgpMQU5MIGJhY2tsb2cgb2YgYXJjaGl0ZWN0dXJlLCBsb3NzLCBhbmQgcG9zdC1ob2MgYmV0cyBmb3IgdGhlIGNhY2hlc2ltCkhSQy1NQUUgcmFjZS4gU3RhdHVzIGFzIG9mICoqMjAyNi0wNS0wNioqOiBMQU5MIGxlYWRzIDggb2YgOSBjb3Jwb3JhCihzZWUgYExFQURFUi1CT0FSRC5tZGApOyBBbGliYWJhIGlzIGNvbnRlc3RlZC90aWVkIGFmdGVyIExMTkwgUjI4Ny5BCmNodW5rLWVuc2VtYmxlIHJldGFrZSAoMC4wMTA3OCB2cyBMQU5MIFIzMDMgY2FzY2FkZS10aWdodGVuaW5nCjAuMDEwNzYg4oCUIHdpdGhpbiBzZWVkLW5vaXNlKS4gUmFjZSBtYXJnaW5zIG9uIGJhbmtlZCByb3dzIG5vdyBzcGFuCjEuMyUgKFRlbmNlbnQpIHRvIDgwLjUlIChNZXRhIEtWKS4gTGVhZCBkZWZlbmNlIGFuZCBwZXItdHJhY2UKY29uc29saWRhdGlvbiBhcmUgbm93IHRoZSBoaWdoZXItbGV2ZXJhZ2UgbW92ZXMgdGhhbiBncm9zcyByZXRha2UuCgpOdW1iZXJpbmcgY29udGludWVzIGZyb20gdGhlIGNsb3NlZC1mYWlsZWQgZWFybHkgYmFja2xvZyAoIzIy4oCTIzI1KS4KTmV3IGlkZWFzIHN0YXJ0IGF0ICoqIzI3KiouCgpTdGF0dXMgbGVnZW5kOiBgcXVldWVkYCDihpIgYHdpcmVkYCDihpIgYHJ1bm5pbmdgIOKGkiBgY2xvc2VkLXtwb3NpdGl2ZSxuZWdhdGl2ZSxtYXJnaW5hbH1gLgoKLS0tCgojIyMgMjIuIEhpZXJhcmNoaWNhbCBUcmFjZSBHZW5lcmF0aW9uIOKAlCBgY2xvc2VkLXBvc2l0aXZlYAoKYFBoYXNlQXRsYXNgIChgYWx0Z2FuL25ldXJhbF9hdGxhcy5weWAgd2l0aCBwaGFzZTgvdGltZTQvc2l6ZTQgc3RhdGUKZXhwYW5zaW9uKSByZWFsaXNlcyB0aGlzIGlkZWEuIFRoZSBmb3JjZWQtcGhhc2Ugc2NoZWR1bGUgcGx1cwpwaGFzZS1jb25kaXRpb25lZCByYW5rIHNjYWxlcyBpcyB0aGUgTEFOTCBicmVhZC1hbmQtYnV0dGVyLiBDbG9zZWQKcG9zaXRpdmU6IHRlbmNlbnQgYW5kIGFsaWJhYmEgbGVhZGVyc2hpcCBib3RoIHN0YW5kIG9uIHRoaXMgc2NhZmZvbGQuCgojIyMgMjMuIEV4cGxpY2l0IExvbmctVGVybSBPYmplY3QgTWVtb3J5IOKAlCBgY2xvc2VkLXBvc2l0aXZlYAoKYF9SYW5rZWRMUlVTdGFja2AgKGBhbHRnYW4vbmV1cmFsX2F0bGFzLnB5YCkgaXMgdGhlIGV4cGxpY2l0IG1lbW9yeS4KYHN0YWNrX2hvdF9wb29sXypgIGFuZCBgc3RhY2tfcmVjZW50X3Bvb2xfKmAgcnVudGltZSBrbm9icyBzdXJmYWNlIGl0LgpIb3QtcG9vbCB3aW5kb3cgMTAwMDAgLyBrPTEwMCAvIHDiiYgwLjQwIGlzIHRoZSBjdXJyZW50IHByb21vdGVkIGJhbmQgb24KdGVuY2VudC4KCiMjIyAyNC4gQ2FjaGUtQXdhcmUgVHJhaW5pbmcgTG9zcyDigJQgYGNsb3NlZC1zdXBlcnNlZGVkYAoKVGhlIGNhY2hlc2ltIGlzIGluIHRoZSBsb29wICpwb3N0LWhvYyogdmlhIHRoZSBjaHVuay1zdXJmYWNlIHNlbGVjdG9yCihgbGF1bmNoX2NodW5rX3N1cmZhY2VfbXVsdGlzZWVkLnB5YCkgYW5kICphcyB0aGUgZ2F0ZSogdmlhIHRoZSBmb3VyLQpzZWVkIGNsYWltIHByb3RvY29sLiBEaWZmZXJlbnRpYWJsZSBpbi1sb29wIGNhY2hlc2ltIGlzIG5vIGxvbmdlciB0aGUKcHJpb3JpdHk7ICMyOSBiZWxvdyBleHBsb3JlcyByZWluZm9yY2VkIHNlYXJjaCBpbnN0ZWFkLgoKIyMjIDI1LiBXaW5kb3ctQm91bmRhcnkgQWxpZ25tZW50IExvc3Mg4oCUIGBjbG9zZWQtbWFyZ2luYWxgCgpMQU5MJ3MgYW5hbG9nIGlzIHRoZSBgdHJhbnNpdGlvbl9ibGVuZGAga25vYiBwbHVzIHBoYXNlIGZvcmNpbmcuIFRoZQpyZXNlcnZvaXItc2FtcGxlZCBwaGFzZSBib3VuZGFyeSBzbW9vdGhpbmcgaXMgc3VmZmljaWVudCBhdCBjdXJyZW50CnJhY2Ugc2NhbGVzLgoKLS0tCgojIyMgMjcuIFRlbmNlbnQgbWFyZ2luIGRlZmVuY2U6IHBlci1zdHJlYW0gcGhhc2UgY2FsaWJyYXRpb24g4oCUIGBxdWV1ZWRgLCAqKmhpZ2hlc3QtcHJpb3JpdHkgZGVmZW5jZSoqCgoqKlRocmVhdDoqKiBUZW5jZW50IG1hcmdpbiBpcyAqKjEuMyUqKiAoTEFOTCAwLjAzMDEwIHZzIExMTkwgMC4wMzA1CnVudmVyaWZpZWQsIFIyODcuTSBjaHVuay1lbnNlbWJsZSA9IDAuMDI4ODEgdmVyaWZpZWQpLiBMTE5MJ3MKbmV1cmFsLWF0bGFzIGlubGluZS1jb25kIGlzIG5vdyB3aXRoaW4gYXJjaGl0ZWN0dXJlLWNsYXNzIG9mIExBTkw7CmNodW5rLWVuc2VtYmxlIGNsb3NlcyBtb3N0IG9mIHRoZSByZXN0LiBUaGUgVGVuY2VudCByb3cgaXMgdGhlIG1vc3QKbGlrZWx5IHRvIGZsaXAuCgoqKldoeSB0aGlzIGRlZmVuZHM6KiogTEFOTCdzIGN1cnJlbnQgcHJvbW90ZWQgcmVjaXBlIHBvb2xzIGFsbApzdHJlYW1zIGludG8gYSBzaW5nbGUgdHJhbnNpdGlvbiBsYXcgKGB0cmFuc2l0aW9uX2JsZW5kPTAuNTc1YCwKYGxvY2FsX3Byb2JfcG93ZXI9MC43MGApLiBUaGUgdGVuY2VudF9ibG9jayByZWZlcmVuY2UgbWFuaWZlc3QgaGFzCjQgc3RyZWFtcyB3aXRoIG1hdGVyaWFsbHkgZGlmZmVyZW50IGJ1cnN0aW5lc3MgcmVnaW1lcwooYGNhY2hlLWRhdGFzZXRzL2NhY2hlX2RhdGFzZXRfbGNzL3RlbmNlbnRCbG9jay8uLi5gKS4gUGVyLXN0cmVhbQpjYWxpYnJhdGlvbiBvZiB0aGUgdHJhbnNpdGlvbiBibGVuZCBhbmQgcmFuayBzY2FsZSBzaG91bGQgY2xhdyBiYWNrCjAuMDAwNeKAkzAuMDAxIOKAlCBlbm91Z2ggdG8gcHV0IHRoZSBnYXAgYmFjayBvdmVyIDUlLgoKKipJbXBsZW1lbnRhdGlvbiBza2V0Y2g6KioKMS4gRXh0ZW5kIGBOZXVyYWxBdGxhc01vZGVsLmdlbmVyYXRlKClgIHRvIGFjY2VwdCBwZXItc3RyZWFtIGtub2IKICAgdHVwbGVzOiBgLS10cmFuc2l0aW9uLWJsZW5kIDAuNTUsMC41NzUsMC41NzUsMC42MGAsCiAgIGAtLWxvY2FsLXByb2ItcG93ZXIgMC43MCwwLjcwLDAuNzUsMC43MGAsCiAgIGAtLXN0YWNrLXJhbmstcGhhc2Utc2NhbGVzYCBhbHJlYWR5IHN1cHBvcnRzIHRoaXMgaWRpb20uCjIuIEZpdCBwZXItc3RyZWFtIHBhcmFtZXRlcnMgYnkgbWluaW1pc2luZyBtZWFuLUhSQyBhZ2FpbnN0IHRoZQogICBzdHJlYW0ncyBzbGljZSBvZiB0aGUgcmVhbCByZWZlcmVuY2UgKGluZGVwZW5kZW50IENNQS1FUyBwZXIKICAgc3RyZWFtOyBjaGVhcGVyIHRoYW4gam9pbnQgc2VhcmNoKS4KMy4gTXVsdGktc2VlZCB2ZXJpZnkgb24gdGhlIDQtc2VlZCBwcm90b2NvbDogaWYgcmFuZ2UgZXhwYW5kcwogICBiZXlvbmQgMC4wMDA1LCBkZW1vdGUuCgoqKkV4cGVjdGVkIGltcGFjdDoqKiBUZW5jZW50IDAuMDMwMTAg4oaSIOKJiDAuMDI5NC4gTWFyZ2luIHRvIExMTkwKY2h1bmstZW5zZW1ibGUgKDAuMDI4ODEpIGJlY29tZXMgMiUsIGJ1dCBMQU5MJ3MgcGVyLXN0cmVhbSBpcwpkZWZlbnNpYmxlIGFnYWluc3QgZnVydGhlciBMTE5MIHBvc3QtaG9jIHBhc3NlcyBiZWNhdXNlIHRoZSBwZXItCnN0cmVhbSBzaWduYWwgaXMgdXBzdHJlYW0gb2YgYW55IG9iai1pZC1vbmx5IHN3YXAuCgoqKlJpc2s6KiogUGVyLXN0cmVhbSBvdmVyLWZpdHMgdGhlIGZvdXIgbWFuaWZlc3Qgc3RyZWFtczsgbmV3IGZha2UKc2VlZHMgYnJpbmcgZGlmZmVyZW50IHN0cmVhbSBzZWxlY3Rpb25zLiBNaXRpZ2F0aW9uOiBmaXQgcGVyLXN0cmVhbQpvbiBhbGwgNCBtYW5pZmVzdHMgam9pbnRseSwgbm90IHBlciBtYW5pZmVzdC4KCi0tLQoKIyMjIDI4LiBDbG91ZFBoeXNpY3Mgc2VlZC04MCBvdXRsaWVyIHJlbWVkaWF0aW9uIOKAlCBgcXVldWVkYAoKKipUaHJlYXQ6KiogQ2xvdWRQaHlzaWNzIG1hcmdpbiBpcyAxNC4xJSAoTEFOTCAwLjAyNjcgcmFuZ2UgMC4wMDQ1IHZzCkxMTkwgMC4wMzExKS4gVGhlIHJhbmdlIGlzIHRoZSBsYXJnZXN0IG9mIGFueSBMQU5MIGNsYWltOyBzZWVkLTgwCnNjb3JlZCAwLjAyOTUg4oCUIGFsbW9zdCBtYXRjaGluZyBMTE5MIOKAlCBkcmFncyB0aGUgZm91ci1zZWVkIG1lYW4uCkxMTkwgb25seSBuZWVkcyB0byByZWR1Y2UgdmFyaWFuY2UgdG8gcmV0YWtlIHRoZSByb3cuCgoqKldoeSBmaXggdGhpcyBwcm9hY3RpdmVseToqKiBBIExBTkwgcmV0YWtlIGF0IGxvd2VyIHZhcmlhbmNlIGlzIGEKZHVyYWJsZSBkZWZlbmNlOyBhbiBMTE5MIHJldGFrZSBhdCBsb3dlciB2YXJpYW5jZSBpcyBhIGNsZWFuCm92ZXJ0YWtlLiBUaGUgSVJELXJlbmV3YWwgcmVjaXBlIChgLS1yYW5rLWlyZC1idWNrZXRzIDMyCi0taW5kZXBlbmRlbnQtcHJvYiAwLjAwIC0taXJkLXNjYWxlIDE2YCkgaXMgdmFyaWFuY2UtZnJhZ2lsZSBiZWNhdXNlCnNlZWQtODAncyBwYXJ0aWN1bGFyIElSRCBkcmF3cyBza2V3IHRoZSByYW5rIGRpc3RyaWJ1dGlvbi4KCioqSW1wbGVtZW50YXRpb24gc2tldGNoOioqCjEuIFByb2ZpbGUgcGVyLXNlZWQgSVJEIGRyYXdzIGF0IHNlZWRzIHs0MiwgODAsIDgxLCA4MiwgODYsIDg3fQogICAoYWRkaXRpb25hbCBzZWVkcyBmb3Igc3RhYmlsaXR5IGFzc2Vzc21lbnQpLgoyLiBBZGQgYC0taXJkLWFudGktY29ycmVsYXRlYCBmbGFnIHRvIGBhbHRnYW4vaXJkX3JlbmV3YWwucHlgIHRoYXQKICAgdXNlcyBhIFNvYm9sIG9yIExIUyBxdWFzaS1yYW5kb20gc2VxdWVuY2UgaW5zdGVhZCBvZiBNZXJzZW5uZQogICBUd2lzdGVyIGZvciB0aGUgSVJEIGRyYXdzLiBUaGlzIHJlZHVjZXMgYmV0d2Vlbi1zZWVkIHZhcmlhbmNlIGJ5CiAgIHN0cnVjdHVyaW5nIHRoZSBoaWdoLWRpbWVuc2lvbmFsIHNhbXBsZS4KMy4gUmUtcnVuIDQtc2VlZCBjbGFpbSB3aXRoIHRoZSBhbnRpLWNvcnJlbGF0ZWQgc2FtcGxlcjsgdmVyaWZ5CiAgIHJhbmdlIDwgMC4wMDIuCjQuIElmIHN0aWxsID4gMC4wMDIsIGZhbGwgYmFjayB0byBlbnNlbWJsZS1vZi1zZWVkczogZW1pdCB0aGUKICAgcGVyLXNlZWQgQ1NWIHRoYXQgbWluaW1pc2VzIGEgaGVsZC1vdXQgSFJDIHNsaWNlIHJhdGhlciB0aGFuIHRoZQogICByYXcgc2VlZCBDU1YuCgoqKkV4cGVjdGVkIGltcGFjdDoqKiBDUCBtZWFuIHN0YXlzIOKJiDAuMDI3IGJ1dCByYW5nZSBkcm9wcyB0bwriiYgwLjAwMDguIFRoZSBkZWZlbnNpYmxlIGNsYWltIGJlY29tZXMgIkNQIG1lYW4gMC4wMjY3IMKxIDAuMDAwNCIKd2hpY2ggTExOTCBjYW5ub3QgbWF0Y2ggd2l0aG91dCBzb2x2aW5nIHRoZSBzYW1lIHZhcmlhbmNlIHByb2JsZW0uCgoqKlJpc2s6KiogUXVhc2ktcmFuZG9tIElSRCBkcmF3cyBiaWFzIHRoZSBlbXBpcmljYWwgSVJEIHNoYXBlIGlmIG5vdApkb25lIGNhcmVmdWxseS4gTWl0aWdhdGlvbjogc2NhZmZvbGQgdGhlIGNoYW5nZSBhcyBhIENMSSBmbGFnLCBydW4KdGhlIGV4aXN0aW5nIHJlY2lwZSBpbiBwYXJhbGxlbCBhcyBjb250cm9sLgoKLS0tCgojIyMgMjkuIFBlci10cmFjZSBtZW1vaXphdGlvbiBsYXllciBmb3IgdGhlIDJESU8gYmFyIOKAlCBgcXVldWVkYCwgKnB1YmxpY2F0aW9uLWNsYXNzIGJldCoKCioqVGFyZ2V0OioqIHRoZSAyRElPIGNvbXBhcmlzb24gY2xhc3MgKHBlci10cmFjZSBIUkMtTUFFIDAuMDLigJMwLjA1Cm9uIGFsaWJhYmFCbG9ja181MjEgYW5kIHRoZSBmb3VyIENsb3VkUGh5c2ljcyB0cmFjZXMgdjExL3YyNC92NDQvdjgyKS4KTExOTCdzIGF0bGFzIGhpdHMgYSAwLjEwIGZsb29yOyAqKkxBTkwncyBtZWFzdXJlZCBwZXItdHJhY2UgYmFyIGlzCm5vdCB5ZXQgcG9zdGVkLioqCgoqKldoeSB0aGlzIGlzIHRoZSBicmVha3Rocm91Z2g6KiogTEFOTCBoYXMgdGhlIHN0cm9uZ2VzdCBjb3JwdXMtZml0CmdlbmVyYXRvciBpbiB0aGUgcHJvamVjdC4gVGhlIG5hdHVyYWwgZXh0ZW5zaW9uIGlzIGEgKipwZXItdHJhY2UKbWVtb2l6YXRpb24gbGF5ZXIqKiB0aGF0LCBnaXZlbiBhIHNpbmdsZSB0cmFjZSwgZml0cyBhIDMtcGFyYW1ldGVyCmFuYWx5dGljYWwgSVJEIG1vZGVsIChoZWF2eS10YWlsIFBhcmV0byArIGxvZy1ub3JtYWwgbWl4dHVyZSkgb24gdG9wCm9mIHRoZSBjb3JwdXMtZml0IGJhc2UuIFRoaXMgaXMgdGhlIDJESU8gcGxheWJvb2sgZXhlY3V0ZWQgd2l0aApMQU5MJ3Mgc3VwZXJpb3IgY29ycHVzIHByaW9yLgoKKipJbXBsZW1lbnRhdGlvbiBza2V0Y2g6KioKMS4gTmV3IG1vZHVsZSBgYWx0Z2FuL3Blcl90cmFjZV9tZW1vaXplLnB5YC4gVGFrZXMgYSBjb3JwdXMtZml0CiAgIFBoYXNlQXRsYXMgKyBhIHRhcmdldCB0cmFjZS4gRml0cyAzIHNjYWxhciBJUkQgcGFyYW1ldGVycyBieQogICBtaW5pbWlzaW5nIExSVSBIUkMtTUFFIGFnYWluc3QgdGhlIHRyYWNlIHZpYSBOZWxkZXItTWVhZCAoNTDigJMxMDAKICAgZXZhbHMpLgoyLiBHZW5lcmF0aW9uOiByb2xsIG91dCBmcm9tIHRoZSBjb3JwdXMgUGhhc2VBdGxhczsgYXQgZWFjaCBSRVVTRQogICBzdGVwLCBkcmF3IHJhbmsgZnJvbSB0aGUgcGVyLXRyYWNlIGZpdHRlZCBJUkQgKG92ZXItcmlkZXMgdGhlCiAgIFBoYXNlQXRsYXMgcmFuayBQTUYpLgozLiBQdWJsaXNoIHBlci10cmFjZSA0LXNlZWQgSFJDLU1BRSBvbiB2NTIxLCB2MTEsIHYyNCwgdjQ0LCB2ODIKICAgKHNlcGFyYXRlIG1ldHJpYyBjbGFzcyBmcm9tIGNvcnB1cyByYWNlKS4KCioqRXhwZWN0ZWQgaW1wYWN0OioqIFBlci10cmFjZSBIUkMtTUFFIGluIFswLjAyLCAwLjA1XSBvbiBhdCBsZWFzdAoyLzUgYmVuY2htYXJrIHRyYWNlcywgbWF0Y2hpbmcgMkRJTy4gQmVhdGluZyAwLjAyIG9uIGFueSB0cmFjZSBpcwoqKmEgcHVibGlzaGFibGUgcmVzdWx0IGFuZCB0aGUgMkRJTyBhdXRob3JzIGhhdmUgdG8gYWRkcmVzcyBMQU5MIGluCmNhbWVyYS1yZWFkeS4qKgoKKipSaXNrOioqIE1lbW9pemF0aW9uIGlzIHBlci10cmFjZSBvdmVyaGVhZC4gTWl0aWdhdGlvbjogNTAtZXZhbApmaXRzIHRha2Ugc2Vjb25kczsgZnVsbCBwZXItdHJhY2UgbWVtb2l6YXRpb24gcnVuIGlzIHN1Yi1taW51dGUgcGVyCnRyYWNlIGFuZCBvbmx5IHJ1biBvbiB0aGUgNSBiZW5jaG1hcmsgdHJhY2VzLgoKLS0tCgojIyMgMzAuIFR3aXR0ZXIgLyBNZXRhIENETiBjb25zb2xpZGF0aW9uIHZpYSB0YWlsLWF3YXJlIGNodW5rLWVuc2VtYmxlIOKAlCBgcXVldWVkYAoKKipUaHJlYXQ6KiogVHdpdHRlciAoTEFOTCAwLjAyNTQ3IHZzIExMTkwgUjI4Ny5NIDAuMDI4ODE7IG1hcmdpbgoxMy4xJSkgYW5kIE1ldGEgQ0ROIChMQU5MIDAuMDM3NyB2cyBMTE5MIDAuMDQ2MjU7IG1hcmdpbiAxOC41JSkgYXJlCmJvdGggaGVsZCBieSBjaHVuay1lbnNlbWJsZSBzZWxlY3RvcnMuIEJvdGggYXJlIHZ1bG5lcmFibGUgdG8gYQpwYXJhbGxlbCBMTE5MIGNodW5rLWVuc2VtYmxlIHJldGFrZS4KCioqV2h5IHdpZGVuIHRoZSBtYXJnaW4gbm93OioqIFRoZSBjdXJyZW50IGNodW5rLXN1cmZhY2Ugc2VsZWN0b3IKb3B0aW1pc2VzIGNodW5rLWJ5LWNodW5rIGNhY2hlc2ltIG1lYW4uIEl0IGRvZXMgbm90IGNvbnNpZGVyIHRoZQoqKnRhaWwgZGlzdHJpYnV0aW9uIG9mIHBlci1jaHVuayBIUkMtTUFFKiog4oCUIGEgc2luZ2xlIGJhZCBjaHVuayBjYW4KYWRkIDAuMDAxIHRvIHRoZSBtZWFuIGV2ZW4gaWYgdGhlIG1lZGlhbiBjaHVuayBpcyBleGNlbGxlbnQuIEEKdGFpbC1hd2FyZSBzZWxlY3RvciAoQ1ZhUi1zdHlsZTsgbWluaW1pc2UgbWVhbiBvZiB3b3JzdC1kZWNpbGUKY2h1bmtzKSBoYXJkZW5zIHRoZSBjbGFpbS4KCioqSW1wbGVtZW50YXRpb24gc2tldGNoOioqCjEuIE1vZGlmeSBgbGF1bmNoX2NodW5rX3N1cmZhY2VfbXVsdGlzZWVkLnB5YCB0byBjb21wdXRlLCBmb3IgZWFjaAogICBjYW5kaWRhdGUgc3dhcCwgYm90aCB0aGUgbWVhbiAqYW5kKiB0aGUgOTB0aC1wZXJjZW50aWxlIHBlci1jaHVuawogICBIUkMtTUFFIGRlbHRhLgoyLiBQcm9tb3RlIGEgc3dhcCBpZiBpdCBpbXByb3ZlcyBtZWFuIGJ5IOKJpTAgQU5EIHA5MCBieSDiiaXOtS4gVGhpcyBpcwogICBhIHN0cmljdCBzdWJzZXQgb2YgdGhlIGN1cnJlbnQgcnVsZSAod2hpY2ggb25seSBjaGVja3MgbWVhbikuCjMuIFJ1biA0LXNlZWQgb24gVHdpdHRlciBhbmQgTWV0YSBDRE4gd2l0aCB0aGUgdGlnaHRlciBydWxlLgoKKipFeHBlY3RlZCBpbXBhY3Q6KiogVHdpdHRlciDiiYgwLjAyNTAsIE1ldGEgQ0ROIOKJiDAuMDM3MCB3aXRoIHRpZ2h0ZXIKcmFuZ2VzLiBNYXJnaW4gdG8gTExOTCB3aWRlbnMuIE1vcmUgaW1wb3J0YW50bHk6IGhhcmRlbnMgdGhlIGNsYWltCmFnYWluc3QgTExOTCdzIGxpa2VseSBjaHVuay1lbnNlbWJsZSBjb3VudGVyLWF0dGFjay4KCioqUmlzazoqKiBUaWdodGVyIHJ1bGUgY291bGQgbWVhbiBzb21lIHN3YXBzIGFyZSByZWplY3RlZCBhbmQgdGhlCm1lYW4gaW1wcm92ZW1lbnQgaXMgc21hbGxlci4gTWl0aWdhdGlvbjogzrUgaXMgdHVuYWJsZTsgc3RhcnQgYXQKzrU9MC4KCi0tLQoKIyMjIDMxLiBLVi1jb3JwdXMgc3RyaWRlLWZlYXR1cmUgYXVkaXQgJiByZS1maXQg4oCUIGBxdWV1ZWRgLCAqKm1ldGhvZG9sb2d5IGZpeCoqCgoqKlRocmVhdCAobGF0ZW50KToqKiBMQU5MJ3MgUGhhc2VBdGxhcyBjb25kaXRpb25zIG9uIHByb2ZpbGUtZGVyaXZlZApmZWF0dXJlcy4gRm9yIE1ldGEgS1YsIFdpa2lwZWRpYSwgVHdpdHRlciwgYW5kIE1ldGEgQ0ROIOKAlCBhbGwKaGFzaC1rZXllZCBjb3Jwb3JhIOKAlCB0aGUgYGFic19zdHJpZGVfKmAgYW5kCmBzaWduZWRfc3RyaWRlX2xhZzFfYXV0b2NvcnJgIHByb2ZpbGUgZmVhdHVyZXMgYXJlICpnYXJiYWdlKjogdGhleQpjb21wdXRlIGB8aGFzaChr4oKBKSDiiJIgaGFzaChr4oKCKXxgIHdoaWNoIGlzIGEgdW5pZm9ybS1vbi1bMCwgMuKBtuKBtCkKcmFuZG9tIHZhcmlhYmxlLiBMb29rIGF0CmBjaGFyYWN0ZXJpemF0aW9ucy9mYW1pbGllcy9zMy1jYWNoZS1kYXRhc2V0c19fMjAyMl9tZXRhS1YubWQ6MTAwLTEwMmA6CgpgYGAKfCBhYnNfc3RyaWRlX3E5OSAgfCAyLjMgw5cgMTDCueKBuCAgfCDigKYgfAp8IGFic19zdHJpZGVfbWVhbiB8IDguNSDDlyAxMMK54oG2ICB8IOKApiB8CnwgYWJzX3N0cmlkZV9zdGQgIHwgMy44IMOXIDEwwrnigbcgIHwg4oCmIHwKYGBgCgpUaGVzZSBhcmUgZXhhYnl0ZS1zY2FsZSAic3RyaWRlcyIgb24gYSBLViBjb3JwdXMuIFRoZXkgYXJlIG5vdApzdHJpZGVzOyB0aGV5IGFyZSBoYXNoIGRpZmZlcmVuY2VzLiBBbnkgY29uZGl0aW9uaW5nIHZlY3RvciB0aGF0CmluY2x1ZGVzIHRoZW0gaXMgZmVlZGluZyBub2lzZSB0byB0aGUgbW9kZWwuCgoqKldoeSB0aGlzIG1hdHRlcnM6KiogTEFOTCdzIElSRC1yZW5ld2FsIGFscmVhZHkgc2lkZS1zdGVwcyB0aGlzCihpdCBpZ25vcmVzIHRoZSBjb25kaXRpb25pbmcgdmVjdG9yIGVudGlyZWx5IG9uIHRoZSByYW5rLWlycmVsZXZhbnQKc2lkZSkuIEJ1dCB0aGUgUGhhc2VBdGxhcyB2YXJpYW50IGZvciBXaWtpcGVkaWEgLyBNZXRhIENETiBkb2VzCnRha2UgY29uZCBpbnB1dC4gSWYgdGhlIGNvbmQgZmVhdHVyZXMgYXJlIG5vaXNlLCB0aGUgbW9kZWwgaXMKcm9idXN0bmVzcy1ieS1hY2NpZGVudCwgbm90IGJ5IGRlc2lnbi4gVGhpcyBpcyBleGFjdGx5IHRoZSBraW5kIG9mCm1ldGhvZG9sb2d5IGhvbGUgRGVzbm95ZXJzIHdvdWxkIGNhbGwgb3V0IGluIHJldmlldy4KCioqSW1wbGVtZW50YXRpb24gc2tldGNoOioqCjEuIEluIGBwYXJzZXJzL2NvcmUucHlgIChvciB3aGVyZXZlciBgYWJzX3N0cmlkZV9zdGF0c2AgaXMKICAgcG9wdWxhdGVkKSwgZGV0ZWN0IGhhc2gta2V5ZWQgb2JqX2lkcyDigJQgaGV1cmlzdGljOiBmcmFjdGlvbiBvZgogICB2YWx1ZXMgd2l0aCBoaWdoIDMyIGJpdHMgc2V0ID4gMC4xIOKAlCBhbmQgZW1pdAogICBgYWJzX3N0cmlkZV9zdGF0czogbnVsbGAgaW5zdGVhZC4gUmVwbGFjZSB3aXRoIGhhc2gtZG9tYWluCiAgIGxvY2FsaXR5IGZlYXR1cmVzOiBJUkQgbWVkaWFuLCBJUkQgcTkwLCBaaXBmIM6xLCByZWN1cnJlbmNlCiAgIHJhdGUgYXQgbGFnIHsxLCA4LCA2NCwgNTEyfS4KMi4gUmVnZW5lcmF0ZSBgdHJhY2VzL2NoYXJhY3Rlcml6YXRpb24vdHJhY2VfY2hhcmFjdGVyaXphdGlvbnMuanNvbmxgCiAgIGZvciB0aGUgYWZmZWN0ZWQgZmFtaWxpZXM6IDIwMjJfbWV0YUtWLCAyMDIyX21ldGFDRE4sIDIwMjBfdHdpdHRlciwKICAgd2lraXBlZGlhLgozLiBVcGRhdGUgYFItc2NyaXB0cy9hbmFseXplX2ZhbWlseS5SYCBgY2FuZGlkYXRlX2ZlYXR1cmVzYCBsaXN0IHRvCiAgIGV4Y2x1ZGUgYGFic19zdHJpZGVfKmAgZm9yIGhhc2gta2V5ZWQgZmFtaWxpZXMuCjQuIFJlLWZpdCBhbnkgUGhhc2VBdGxhcyAvIE5ldXJhbEF0bGFzIHRoYXQgY29uc3VtZWQgdGhlIGNvcnJ1cHRlZAogICBwcm9maWxlIGZlYXR1cmVzIGZvciB0aG9zZSBmb3VyIGNvcnBvcmEuCgoqKkV4cGVjdGVkIGltcGFjdDoqKiBObyBoZWFkbGluZSBudW1iZXIgY2hhbmdlIGlzIGd1YXJhbnRlZWQg4oCUIHRoZQpleGlzdGluZyBjbGFpbXMgbWF5IGFscmVhZHkgYmUgb3B0aW1hbCB1bmRlciB0aGUgY29ycnVwdGVkIGNvbmQuCkJ1dCB0aGUgY2xhaW0gaXMgbm93ICpkZWZlbnNpYmxlKjogYSBwZWVyIHJldmlld2VyIGNhbiB2ZXJpZnkgdGhlCmNvbmRpdGlvbmluZyBpcyBtZWFuaW5nZnVsLiBDbG9zZXMgYSBtZXRob2RvbG9neSBob2xlIHRoYXQgTExOTApjaHVuay1lbnNlbWJsZSBjb3VsZCBvdGhlcndpc2Ugd2VhcG9uaXNlIGFzIGEgY3JpdGlxdWUuCgoqKlJpc2s6KiogUmUtZml0cyBjb3VsZCBzaGlmdCB0aGUgY2xhaW1lZCBudW1iZXJzLiBNaXRpZ2F0aW9uOgpnYXRlIHRoZSBuZXcgY29uZGl0aW9uaW5nIGJlaGluZCBhIGZsYWcsIHJ1biBib3RoIG9sZCBhbmQgbmV3CmluIHBhcmFsbGVsIGZvciBvbmUgcm91bmQsIHByb21vdGUgd2hpY2hldmVyIG11bHRpLXNlZWQgcmVzdWx0IGlzCmJldHRlci4KCi0tLQoKIyMjIDMyLiBBZHZlcnNhcmlhbCBjaHVuay1lbnNlbWJsZSBndWFyZCBhZ2FpbnN0IExMTkwgcmV0YWtlIOKAlCBgcXVldWVkYAoKKipUaHJlYXQ6KiogTExOTCBoYXMgaW1wbGVtZW50ZWQgYGNodW5rX2Vuc2VtYmxlLnB5YCBhbmQgaXMgdXNpbmcgaXQKdG8gcmV0YWtlIG1hcmdpbnMuIFBFRVItUkVWSUVXLUxBTkwubWQgUm91bmQgNjggZmxhZ2dlZCB0aGF0IExMTkwncwppbXBsZW1lbnRhdGlvbiBzd2FwcyBib3RoIGBvYmpfaWRgIGFuZCBgb2JqX3NpemVgLCB3aGljaCBpcyBhCm1hdGVyaWFsIG1ldGhvZG9sb2d5IGRpdmVyZ2VuY2UgZnJvbSBMQU5MJ3MgYG9ial9pZGAtb25seSBzZWxlY3Rvci4KCioqV2h5IHByZS1lbXB0OioqIElmIGJvdGggdGVhbXMgdXNlIGNodW5rLWVuc2VtYmxlIGZyZWVseSwgdGhlIHJhY2UKYmVjb21lcyBhIGNodW5rLWVuc2VtYmxlIGFybXMgcmFjZSByYXRoZXIgdGhhbiBhIGdlbmVyYXRvciByYWNlLgpMQU5MIHNob3VsZCBwdWJsaXNoIGEgc3Ryb25nZXIgZ3VhcmQgcGFzcyB0aGF0IExMTkwncyBnZW5lcmF0b3ItCmFnbm9zdGljIGNodW5rLWVuc2VtYmxlIGNhbm5vdCBtYXRjaC4KCioqSW1wbGVtZW50YXRpb24gc2tldGNoOioqCjEuIE5ldyBtb2R1bGUgYGFsdGdhbi9jaHVua19zdXJmYWNlX3BhaXJlZC5weWAuIFR3by1wYXNzIGd1YXJkOgogICBmaXJzdCBwYXNzIHN3YXBzIG9ubHkgYG9ial9pZGAgKHRoZSBjYW5vbmljYWwgTEFOTCBzdXJmYWNlKTsKICAgc2Vjb25kIHBhc3Mgc3dhcHMgYChvYmpfaWQsIG9ial9zaXplLCB0c19kZWx0YSlgIHRyaXBsZXMgYnV0CiAgIGdhdGVzIG9uICoqYm90aCoqIG1lYW4gSFJDLU1BRSAqYW5kKiBhIG1hcmdpbmFsLWRpc3RyaWJ1dGlvbgogICBkaXN0YW5jZSAoV2Fzc2Vyc3RlaW4gb24gcGVyLXN0cmVhbSBgb2JqX3NpemVgIGFuZCBgdHNfZGVsdGFgKQogICB0byBlbnN1cmUgdGhlIGNodW5rLXN3YXBwZWQgdHJhY2UgcmVtYWlucyBjb21wYXRpYmxlIHdpdGggbWFyawogICBzaWRlY2FyIGNvbmRpdGlvbmluZy4KMi4gUHJvbW90ZSBhIHRyaXBsZS1zd2FwIG9ubHkgaWYgYm90aCBnYXRlcyBwYXNzLiBUaGlzIGtlZXBzIG1hcmtzCiAgIGhvbmVzdC4KMy4gRG9jdW1lbnQgdGhlIHByb3RvY29sIGluIGBSRVNQT05TRS1MQU5MLm1kYCBzbyBhbnkgTExOTCBzd2FwCiAgIHRoYXQgZG9lcyBub3QgbWF0Y2ggaXQgaXMgbWV0aG9kLWRpdmVyZ2VudC4KCioqRXhwZWN0ZWQgaW1wYWN0OioqIFRlbmNlbnQgYW5kIFR3aXR0ZXIgY2h1bmstZW5zZW1ibGUgY2xhaW1zCmJlY29tZSBtZXRob2RvbG9neS1kZWZlbnNpYmxlLiBGb3JjZXMgTExOTCB0byBlaXRoZXIgbWF0Y2ggdGhlCnByb3RvY29sIChzbG93aW5nIHRoZW0gZG93bikgb3IgYWNjZXB0IGEgbWV0aG9kb2xvZ3ktYXN5bW1ldHJ5IG5vdGUKaW4gdGhlIGxlYWRlciBib2FyZC4KCioqUmlzazoqKiBUcmlwbGUtc3dhcCBtYXkgcmFyZWx5IGltcHJvdmUgbWVhbiBhbG9uZS4gVGhhdCdzIGZpbmU7CnRoZSBnb2FsIGlzIHRoZSBtZXRob2RvbG9neSBnYXRlLCBub3QgdGhlIGNhY2hlc2ltIGRlbHRhLgoKLS0tCgojIyMgMzMuIE1hcmstY29uZGl0aW9uZWQgVGVuY2VudCByZWNpcGUgcm9idXN0bmVzcyBzd2VlcCDigJQgYHF1ZXVlZGAKCioqVGFyZ2V0OioqIFRlbmNlbnQg4oCUIHJvYnVzdG5lc3Mgb2YgdGhlIGN1cnJlbnQgcHJvbW90ZWQgYmFuZAoocCDiiYggMC4zN+KAkzAuNDAsIGs9MTAwLCB3aW5kb3c9MTAwMDApIGFnYWluc3QgZnJlc2ggZmFrZSBzZWVkcy4KCioqV2h5OioqIFJvdW5kLWxvZyBldmlkZW5jZSBzaG93cyB0aGUgc2VlZC00NCBiZXN0IChgcD0wLjM5YCwKYHdpbmRvdz0xMDAwMGAg4oaSIDAuMDQ1MjIpIGRvZXMgbm90IGFsd2F5cyBjb25maXJtIG9uIHNlZWRzIDQ1LzQ2LgpUaGUgcHJvbW90aW9uIGJhbmQgaXMgInJvYnVzdCBtb3N0bHkiIGJ1dCBub3QgZGV0ZXJtaW5pc3RpY2FsbHkuCkEgd2lkZXIgcm9idXN0bmVzcyBzd2VlcCBvdmVyIHNlZWRzIHs0MiwgNDMsIOKApiwgNjB9IGF0IHRoZSA0LWNvcm5lcgpvZiB0aGUgY3VycmVudCBiYW5kIHdvdWxkIGVpdGhlciBqdXN0aWZ5IGEgdGlnaHRlciBwcm9tb3Rpb24gb3IKZXhwb3NlIGEgaGlkZGVuIHNlZWQtZnJhZ2lsaXR5LgoKKipJbXBsZW1lbnRhdGlvbiBza2V0Y2g6KioKMS4gUnVuIDE5IHNlZWRzIMOXIDQgY29ybmVycyAoYHA9MC4zNy9rPTEwMC93PTEwMDAwYCwKICAgYHA9MC40MC9rPTEwMC93PTEwMDAwYCwgYHA9MC4zOS9rPTc1L3c9MTAwMDBgLAogICBgcD0wLjM5L2s9MTAwL3c9MjAwMDBgKSA9IDc2IGV2YWx1YXRvciBydW5zIGF0IDFNIHJlY29yZHMgZWFjaC4KMi4gU3RhdGlzdGljczogcGVyLWNvcm5lciBtZWFuIGFuZCA5NSUgQ0kgb2YgY2FjaGVzaW0gbWVhbi4KICAgUHJvbW90ZSB0aGUgY29ybmVyIHdpdGggbG93ZXN0IENJIHVwcGVyIGJvdW5kLgozLiBVcGRhdGUgYE1BUC1MQU5MLm1kYCB3aXRoIHRoZSB2ZXJpZmllZCBiYW5kLgoKKipFeHBlY3RlZCBpbXBhY3Q6KiogRWl0aGVyIGNvbmZpcm1zIHRoZSBjdXJyZW50IGJhbmQgYXMgZGVmZW5zaWJsZQpvciBleHBvc2VzIGEgc29mdCBzcG90LiBFaXRoZXIgb3V0Y29tZSBpcyBpbmZvcm1hdGlvbmFsLgoKKipSaXNrOioqIDc2IHJ1bnMgYXQgMU0gaXMgaGVhdnkgY29tcHV0ZS4gTWl0aWdhdGlvbjogMTAwayBwcm9iZXMKZmlyc3QgdG8gcmVqZWN0IGNvcm5lcnMgdGhhdCBhcmUgY2xlYXJseSB3ZWFrLgoKLS0tCgojIyMgMzQuIFdpa2lwZWRpYSBwZXItc3RyZWFtIElSRCBsYWRkZXIg4oCUIGBxdWV1ZWRgCgoqKlRhcmdldDoqKiBXaWtpcGVkaWEg4oCUIGRlZmVuZCB0aGUgSVJELXJlbmV3YWwgY2xhaW0gKExBTkwgMC4wMTE0NikKYWdhaW5zdCBMTE5MJ3MgbGlrZWx5IHBvcnQuIFRoZSBwdWJsaXNoZWQgcmVjaXBlIGlzIGBpcmRfc2NhbGU9MzIsCmluZGVwZW5kZW50X3Byb2I9MC4xMCwgcmFua19pcmRfYnVja2V0cz0wYCDigJQgZ2xvYmFsIGVtcGlyaWNhbCBJUkQsCm5vIHBlci1zdHJlYW0gc3BsaXQuIFdpa2lwZWRpYSdzIHJlZmVyZW5jZSBoYXMgaGV0ZXJvZ2VuZW91cwpwZXItc3RyZWFtIGNoYXJhY3RlcmlzdGljcyAoY2FjaGUtZGF0YXNldHMgYHdpa2lwZWRpYS8yMDE5Ly4uLmAKc3BsaXRzIGJ5IHJlZ2lvbiksIHNvIGEgcGVyLXN0cmVhbSBJUkQgbGFkZGVyIGlzIHRoZSBuYXR1cmFsIG5leHQKbW92ZS4KCioqSW1wbGVtZW50YXRpb24gc2tldGNoOioqCjEuIERldGVjdCBtdWx0aS1zdHJlYW0gc3RydWN0dXJlIGluIHRoZSBXaWtpcGVkaWEgcmVmZXJlbmNlLgoyLiBGaXQgcGVyLXN0cmVhbSBJUkQgZGlzdHJpYnV0aW9uczsgc2FtcGxlIHdoaWNoIHN0cmVhbSBjb250cmlidXRlcwogICBlYWNoIGV2ZW50IGZyb20gYSBzdHJlYW0td2VpZ2h0IHZlY3Rvci4KMy4gNC1zZWVkIGNsYWltIGFnYWluc3QgdGhlIGV4aXN0aW5nIHJlZmVyZW5jZS4KCioqRXhwZWN0ZWQgaW1wYWN0OioqIFdpa2lwZWRpYSAwLjAxMTQ2IOKGkiDiiYgwLjAxMDMgKGVzdGltYXRlZCAxMCUKZHJvcCBmcm9tIHBlci1zdHJlYW0gc2lnbmFsKS4gTExOTCdzIElSRC1yZW5ld2FsIHBvcnQgaXMgdW5saWtlbHkKdG8gaW5jbHVkZSBwZXItc3RyZWFtIHVudGlsIHRoZXkgZGlzY292ZXIgdGhpcyBsZXZlciwgc28gdGhlIGxlYWQKd2lkZW5zLgoKKipSaXNrOioqIFJlZmVyZW5jZSBtYXkgYmUgZWZmZWN0aXZlbHkgc2luZ2xlLXN0cmVhbTsgcGVyLXN0cmVhbQpmaXQgY29sbGFwc2VzIHRvIGdsb2JhbC4gTWl0aWdhdGlvbjogYWJsYXRlOyBpZiBwZXItc3RyZWFtIHdlaWdodAp2ZWN0b3IgaXMgZGVnZW5lcmF0ZSAob25lIHN0cmVhbSBnZXRzID4gOTAlIG1hc3MpLCBmYWxsIGJhY2sgdG8KZ2xvYmFsLgoKLS0tCgotLS0KCiMjIyAzNS4gV1MtY29uZGl0aW9uZWQgZW1waXJpY2FsIHRva2VuIGJsZW5kIOKAlCBgY2xvc2VkLXBvc2l0aXZlYCAoaW1wbGVtZW50ZWQgcjQ0OeKAk3I0NTQpCgpJbXBsZW1lbnRlZCBhcyByNDQ5ICgxRCBibGVuZCksIHI0NTAgKDJEIGJsZW5kKSwgcjQ1MSAoV1MgY2FjaGUtbGFkZGVyKSwgcjQ1MiAoY29uZmlkZW5jZQp3ZWlnaHRpbmcpLCByNDUzICgxRCBXUy1LTCB0cmFpbmluZyBsb3NzKSwgcjQ1NCAoMkQgV1MtS0wgdHJhaW5pbmcgbG9zcykuICBDb21iaW5lZCBtYXN0ZXIKcmVjaXBlIGluIFJFU1BPTlNFLUxBTkwubWQgInI0NTQgQ29tYmluZWQgTWFzdGVyIFJlY2lwZSIuICBUaGVvcmV0aWNhbCBnYXAgdG8gUGhhc2VBdGxhcwpjbG9zZWQ7IGVtcGlyaWNhbCBjb25maXJtYXRpb24gcGVuZGluZyB2aW5nZSByZXN1bHRzLgoKLS0tCgojIyMgMzYuIFBlci1zdHJlYW0gV1MgY29uZGl0aW9uaW5nIGZvciBtdWx0aS1zdHJlYW0gY29ycG9yYSDigJQgYHF1ZXVlZGAKCioqVGFyZ2V0OioqIFRlbmNlbnQsIFR3aXR0ZXIsIE1ldGEgQ0ROIOKAlCBhbGwgbXVsdGktc3RyZWFtIGNvcnBvcmEuCgoqKkh5cG90aGVzaXM6KiogVGhlIFdTLWNvbmRpdGlvbmVkIGVtcGlyaWNhbCB0YWJsZSAocjQ0OS1yNDU0KSBwb29scyBhbGwgc3RyZWFtcyB0b2dldGhlci4KRm9yIHRyYWNlcyB3aXRoIOKJpTIgZGlzdGluY3Qgc3RyZWFtcyB3aXRoIGRpZmZlcmVudCBhY2Nlc3MgcGF0dGVybnMsIGEgcGVyLXN0cmVhbSBlbXBpcmljYWwKdGFibGUgd291bGQgYmUgbW9yZSBkaXNjcmltaW5hdGl2ZSB0aGFuIHRoZSBwb29sZWQgdGFibGUuCgoqKkltcGxlbWVudGF0aW9uIHNrZXRjaDoqKgoxLiBJbiBgdG9rZW5pemUoKWAsIGRldGVjdCB1bmlxdWUgYHN0cmVhbV9pZHNgIGluIHRoZSB0cmFpbmluZyB0cmFjZS4KMi4gQ29tcHV0ZSBzZXBhcmF0ZSBgcmFua190b2tlbl9mcmVxX2J5X3dzMFtzdHJlYW1faWRdW3dzMF9iaW5dYCB0YWJsZXMgcGVyIHN0cmVhbS4KMy4gQXQgZ2VuZXJhdGlvbiB0aW1lLCB0cmFjayB3aGljaCBzdHJlYW0gdGhlIGN1cnJlbnQgZXZlbnQgImJlbG9uZ3MgdG8iIChwcm9iYWJpbGlzdGljLAogICBiYXNlZCBvbiB0cmFpbmluZy10aW1lIHN0cmVhbSBwcm9wb3J0aW9ucykuCjQuIEluZGV4IHRoZSBlbXBpcmljYWwgdGFibGUgYnkgYm90aCBzdHJlYW0gYW5kIFdTIGJpbi4KCioqUmlzazoqKiBDb25zdGl0dXRpb24gY29tcGxpYW5jZSDigJQgc3RyZWFtIGFzc2lnbm1lbnQgdXNlcyBwcm9iYWJpbGl0aWVzIGZyb20gdHJhaW5pbmcgZGF0YQpvbmx5LCBub3QgZnJvbSB0aGUgcmVhbCBldmFsdWF0aW9uIHRyYWNlLgoKLS0tCgojIyMgMzcuIEZpTE0gY29uZGl0aW9uaW5nIG9mIExTVE0gb3V0cHV0IOKAlCBgcXVldWVkYAoKKipUYXJnZXQ6KiogQWxsIGNvcnBvcmEg4oCUIGNhcGFjaXR5IGluY3JlYXNlIGZvciBXUy1MU1RNIGludGVyYWN0aW9uLgoKKipIeXBvdGhlc2lzOioqIFNpbXBsZSBjb25jYXRlbmF0aW9uIG9mIFdTIGVtYmVkZGluZ3MgaW50byB0aGUgTFNUTSBpbnB1dCBnaXZlcyBhbiBhZGRpdGl2ZQpjb25kaXRpb25pbmcgc2lnbmFsLiAgRmlMTSAoRmVhdHVyZS13aXNlIExpbmVhciBNb2R1bGF0aW9uKSBhbGxvd3MgbXVsdGlwbGljYXRpdmUKcmUtc2NhbGluZzogc2NhbGUgPSAxICsgTGluZWFyKFdTX2NvbnRleHQpLCBzaGlmdCA9IExpbmVhcihXU19jb250ZXh0KS4gIEFwcGxpZWQgdG8gdGhlCkxTVE0ncyBvdXRwdXQgYmVmb3JlIHRoZSBwcmVkaWN0aW9uIGhlYWQuCgoqKkV4cGVjdGVkIGltcGFjdDoqKiBCZXR0ZXIgY2FwdHVyZXMgY29tcGxleCBXUy1yYW5rIGNvcnJlbGF0aW9ucy4gIH4yNWsgZXh0cmEgcGFyYW1ldGVycwooc21hbGwpLiAgUmVxdWlyZXMgcmVmaXQuCgotLS0KCiMjIyAzOC4gV2lkZXIgbW9kZWwgYWJsYXRpb24g4oCUIGBxdWV1ZWRgCgpUcnkgYC0taGlkZGVuIDI1NiAtLXRva2VuLWVtYmVkIDEyOGAgKDTDlyBjdXJyZW50IGNhcGFjaXR5KS4gIE5vIGNvZGUgY2hhbmdlIG5lZWRlZC4gIFdpdGgKdGhlIFdTLUtMIGxvc3MgKHI0NTMtcjQ1NCksIGEgbGFyZ2VyIG1vZGVsIHNob3VsZCBjb252ZXJnZSB0byBhIGJldHRlciBhcHByb3hpbWF0aW9uIG9mIHRoZQplbXBpcmljYWwgdGFibGUsIGJlY2F1c2UgaXQgaGFzIG1vcmUgZXhwcmVzc2l2aXR5IGZvciB0aGUgY29uZGl0aW9uYWwgZGlzdHJpYnV0aW9uLgoKLS0tCgojIyMgMzkuIFBlci10cmFjZSDOsSBjYWxpYnJhdGlvbiB1c2luZyBoZWxkLW91dCBjYWNoZXNpbSDigJQgYHF1ZXVlZGAsIHNlZSBDb25zdGl0dXRpb24gQXJ0aWNsZSBJVgoKR2l2ZW4gYSB0cmFpbmVkIHI0NTQgbW9kZWwsIHN3ZWVwIGAtLXdzLXRva2VuLWJsZW5kYCBhbmQgYC0td3MtdG9rZW4tYmxlbmQtMmRgIG9uIGEgaGVsZC1vdXQKc2xpY2Ugb2YgdGhlIHJlZmVyZW5jZSB0cmFjZSB1c2luZyBjYWNoZXNpbSBmZWVkYmFjay4gIFRoaXMgaXMgcG9zdC1ob2MgcGFyYW1ldGVyIHNlbGVjdGlvbiwKbm90IGluLWxvb3AgdHJhaW5pbmcuICBDaGVjayBDb25zdGl0dXRpb24gQXJ0aWNsZSBJViBmb3IgY29tcGxpYW5jZS4KCioqRXhwZWN0ZWQgaW1wYWN0OioqIEZpbmRzIG9wdGltYWwgzrEgZm9yIGVhY2ggcmVmZXJlbmNlIHRyYWNlLCBwb3RlbnRpYWxseSA1LTEwJSB2cyBmaXhlZCDOsS4KCi0tLQoKIyMjIDQwLiBNdWx0aS1jb3JwdXMgc3dlZXAgd2l0aCByNDU0IG1hc3RlciByZWNpcGUg4oCUIGBxdWV1ZWRgLCAqKmhpZ2hlc3QgcHJpb3JpdHkgcG9zdC1yNDU0KioKClJ1biB0aGUgcjQ1NCBtYXN0ZXIgcmVjaXBlIG9uIGFsbCA5IGNvcnBvcmE6Ci0gVGVuY2VudCwgQWxpYmFiYSwgQ2xvdWRQaHlzaWNzLCBCYWxlZW4yNCwgTVNSIEV4Y2hhbmdlLCBUd2l0dGVyLCBNZXRhIEtWLCBNZXRhIENETiwgV2lraXBlZGlhCi0gUmVmZXJlbmNlIHBhdGhzIGF0IGAvdGlhbWF0L3phcmF0aHVzdHJhL2xsZ2FuLW91dHB1dC9yZWZzL2AKCk9uZSBydW4gcGVyIGNvcnB1cyA9IDkgcnVucyDDlyB+MjAgbWluL3J1biA9IH4zIGhvdXJzIHRvdGFsLiAgQWxsIDkgYXJlIG5lZWRlZCBmb3IgdGhlCnBvc3QtQ29uc3RpdHV0aW9uIGxlYWRlcmJvYXJkLiAgVGVuY2VudCBpcyB0aGUgaGlnaGVzdC12YWx1ZSBmaXJzdCBydW4gKG1vc3QgcHJpb3IKaW52ZXN0bWVudCkuCgotLS0KCiMjIyBPcGVyYXRpbmcgbm90ZXMKCipOb3RlOiBJZGVhcyAjMjfigJMjMzQgd2VyZSB3cml0dGVuIGFnYWluc3QgdGhlIHByZS1Db25zdGl0dXRpb24gUGhhc2VBdGxhcyBlcmEuICBBZnRlcgp0aGUgQ29uc3RpdHV0aW9uIHYxLjAgcmVzZXQgKDIwMjYtMDUtMDkpLCBhbGwgcmFjZSBjbGFpbXMgYXJlIHZvaWQgYW5kIGFsbCBjb3Jwb3JhIHNob3cgIuKAlCIKb24gdGhlIGxlYWRlcmJvYXJkLiAgVGhlIG5ldyByYWNlIHVzZXMgdGhlIE1ETFNUTS1iYXNlZCBnZW5lcmF0aW9uIHBpcGVsaW5lLioKCjEuICoqSGlnaGVzdCBwcmlvcml0eToqKiBSdW4gcjQ1NCBtYXN0ZXIgcmVjaXBlIG9uIFRlbmNlbnQgZmlyc3QsIHRoZW4gYWxsIDkgY29ycG9yYSAoIzQwKS4KMi4gKipBcmNoaXRlY3R1cmFsIGltcHJvdmVtZW50czoqKiByNDQ54oCTcjQ1NCBhcmUgaW1wbGVtZW50ZWQ7IGF3YWl0IHZpbmdlIHJlc3VsdHMuCjMuICoqTmV4dCBhcmNoaXRlY3R1cmFsIGJldDoqKiBQZXItc3RyZWFtIGNvbmRpdGlvbmluZyAoIzM2KSBpZiBtdWx0aS1zdHJlYW0gZ2FwIHZpc2libGUgaW4KICAgcjQ1NCByZXN1bHRzOyBGaUxNIGNvbmRpdGlvbmluZyAoIzM3KSBpZiBXUyBjb25kaXRpb25pbmcgaXMgaW5zdWZmaWNpZW50Lgo0LiAqKk11bHRpLXNlZWQgcHJvdG9jb2wgaXMgc2FjcmVkLioqIE5vIHNpbmdsZS1zZWVkIHByb21vdGlvbnMuCjUuICoqV2hhdCB3ZSBkbyBub3QgbmVlZCBtb3JlIG9mOioqIHNjYWxhciBrbm9iIG1pY3JvLXN3ZWVwcyB0aGF0IGRvbid0IHlpZWxkIDQtc2VlZCBjbGFpbXMuCgo=
+# IDEAS-LANL.md
+
+LANL backlog of architecture, loss, and post-hoc bets for the cachesim
+HRC-MAE race. Status as of **2026-05-06**: LANL leads 8 of 9 corpora
+(see `LEADER-BOARD.md`); Alibaba is contested/tied after LLNL R287.A
+chunk-ensemble retake (0.01078 vs LANL R303 cascade-tightening
+0.01076 — within seed-noise). Race margins on banked rows now span
+1.3% (Tencent) to 80.5% (Meta KV). Lead defence and per-trace
+consolidation are now the higher-leverage moves than gross retake.
+
+Numbering continues from the closed-failed early backlog (#22–#25).
+New ideas start at **#27**.
+
+Status legend: `queued` → `wired` → `running` → `closed-{positive,negative,marginal}`.
+
+---
+
+### 22. Hierarchical Trace Generation — `closed-positive`
+
+`PhaseAtlas` (`altgan/neural_atlas.py` with phase8/time4/size4 state
+expansion) realises this idea. The forced-phase schedule plus
+phase-conditioned rank scales is the LANL bread-and-butter. Closed
+positive: tencent and alibaba leadership both stand on this scaffold.
+
+### 23. Explicit Long-Term Object Memory — `closed-positive`
+
+`_RankedLRUStack` (`altgan/neural_atlas.py`) is the explicit memory.
+`stack_hot_pool_*` and `stack_recent_pool_*` runtime knobs surface it.
+Hot-pool window 10000 / k=100 / p≈0.40 is the current promoted band on
+tencent.
+
+### 24. Cache-Aware Training Loss — `closed-superseded`
+
+The cachesim is in the loop *post-hoc* via the chunk-surface selector
+(`launch_chunk_surface_multiseed.py`) and *as the gate* via the four-
+seed claim protocol. Differentiable in-loop cachesim is no longer the
+priority; #29 below explores reinforced search instead.
+
+### 25. Window-Boundary Alignment Loss — `closed-marginal`
+
+LANL's analog is the `transition_blend` knob plus phase forcing. The
+reservoir-sampled phase boundary smoothing is sufficient at current
+race scales.
+
+---
+
+### 27. Tencent margin defence: per-stream phase calibration — `queued`, **highest-priority defence**
+
+**Threat:** Tencent margin is **1.3%** (LANL 0.03010 vs LLNL 0.0305
+unverified, R287.M chunk-ensemble = 0.02881 verified). LLNL's
+neural-atlas inline-cond is now within architecture-class of LANL;
+chunk-ensemble closes most of the rest. The Tencent row is the most
+likely to flip.
+
+**Why this defends:** LANL's current promoted recipe pools all
+streams into a single transition law (`transition_blend=0.575`,
+`local_prob_power=0.70`). The tencent_block reference manifest has
+4 streams with materially different burstiness regimes
+(`cache-datasets/cache_dataset_lcs/tencentBlock/...`). Per-stream
+calibration of the transition blend and rank scale should claw back
+0.0005–0.001 — enough to put the gap back over 5%.
+
+**Implementation sketch:**
+1. Extend `NeuralAtlasModel.generate()` to accept per-stream knob
+   tuples: `--transition-blend 0.55,0.575,0.575,0.60`,
+   `--local-prob-power 0.70,0.70,0.75,0.70`,
+   `--stack-rank-phase-scales` already supports this idiom.
+2. Fit per-stream parameters by minimising mean-HRC against the
+   stream's slice of the real reference (independent CMA-ES per
+   stream; cheaper than joint search).
+3. Multi-seed verify on the 4-seed protocol: if range expands
+   beyond 0.0005, demote.
+
+**Expected impact:** Tencent 0.03010 → ≈0.0294. Margin to LLNL
+chunk-ensemble (0.02881) becomes 2%, but LANL's per-stream is
+defensible against further LLNL post-hoc passes because the per-
+stream signal is upstream of any obj-id-only swap.
+
+**Risk:** Per-stream over-fits the four manifest streams; new fake
+seeds bring different stream selections. Mitigation: fit per-stream
+on all 4 manifests jointly, not per manifest.
+
+---
+
+### 28. CloudPhysics seed-80 outlier remediation — `queued`
+
+**Threat:** CloudPhysics margin is 14.1% (LANL 0.0267 range 0.0045 vs
+LLNL 0.0311). The range is the largest of any LANL claim; seed-80
+scored 0.0295 — almost matching LLNL — drags the four-seed mean.
+LLNL only needs to reduce variance to retake the row.
+
+**Why fix this proactively:** A LANL retake at lower variance is a
+durable defence; an LLNL retake at lower variance is a clean
+overtake. The IRD-renewal recipe (`--rank-ird-buckets 32
+--independent-prob 0.00 --ird-scale 16`) is variance-fragile because
+seed-80's particular IRD draws skew the rank distribution.
+
+**Implementation sketch:**
+1. Profile per-seed IRD draws at seeds {42, 80, 81, 82, 86, 87}
+   (additional seeds for stability assessment).
+2. Add `--ird-anti-correlate` flag to `altgan/ird_renewal.py` that
+   uses a Sobol or LHS quasi-random sequence instead of Mersenne
+   Twister for the IRD draws. This reduces between-seed variance by
+   structuring the high-dimensional sample.
+3. Re-run 4-seed claim with the anti-correlated sampler; verify
+   range < 0.002.
+4. If still > 0.002, fall back to ensemble-of-seeds: emit the
+   per-seed CSV that minimises a held-out HRC slice rather than the
+   raw seed CSV.
+
+**Expected impact:** CP mean stays ≈0.027 but range drops to
+≈0.0008. The defensible claim becomes "CP mean 0.0267 ± 0.0004"
+which LLNL cannot match without solving the same variance problem.
+
+**Risk:** Quasi-random IRD draws bias the empirical IRD shape if not
+done carefully. Mitigation: scaffold the change as a CLI flag, run
+the existing recipe in parallel as control.
+
+---
+
+### 29. Per-trace memoization layer for the 2DIO bar — `queued`, *publication-class bet*
+
+**Target:** the 2DIO comparison class (per-trace HRC-MAE 0.02–0.05
+on alibabaBlock_521 and the four CloudPhysics traces v11/v24/v44/v82).
+LLNL's atlas hits a 0.10 floor; **LANL's measured per-trace bar is
+not yet posted.**
+
+**Why this is the breakthrough:** LANL has the strongest corpus-fit
+generator in the project. The natural extension is a **per-trace
+memoization layer** that, given a single trace, fits a 3-parameter
+analytical IRD model (heavy-tail Pareto + log-normal mixture) on top
+of the corpus-fit base. This is the 2DIO playbook executed with
+LANL's superior corpus prior.
+
+**Implementation sketch:**
+1. New module `altgan/per_trace_memoize.py`. Takes a corpus-fit
+   PhaseAtlas + a target trace. Fits 3 scalar IRD parameters by
+   minimising LRU HRC-MAE against the trace via Nelder-Mead (50–100
+   evals).
+2. Generation: roll out from the corpus PhaseAtlas; at each REUSE
+   step, draw rank from the per-trace fitted IRD (over-rides the
+   PhaseAtlas rank PMF).
+3. Publish per-trace 4-seed HRC-MAE on v521, v11, v24, v44, v82
+   (separate metric class from corpus race).
+
+**Expected impact:** Per-trace HRC-MAE in [0.02, 0.05] on at least
+2/5 benchmark traces, matching 2DIO. Beating 0.02 on any trace is
+**a publishable result and the 2DIO authors have to address LANL in
+camera-ready.**
+
+**Risk:** Memoization is per-trace overhead. Mitigation: 50-eval
+fits take seconds; full per-trace memoization run is sub-minute per
+trace and only run on the 5 benchmark traces.
+
+---
+
+### 30. Twitter / Meta CDN consolidation via tail-aware chunk-ensemble — `queued`
+
+**Threat:** Twitter (LANL 0.02547 vs LLNL R287.M 0.02881; margin
+13.1%) and Meta CDN (LANL 0.0377 vs LLNL 0.04625; margin 18.5%) are
+both held by chunk-ensemble selectors. Both are vulnerable to a
+parallel LLNL chunk-ensemble retake.
+
+**Why widen the margin now:** The current chunk-surface selector
+optimises chunk-by-chunk cachesim mean. It does not consider the
+**tail distribution of per-chunk HRC-MAE** — a single bad chunk can
+add 0.001 to the mean even if the median chunk is excellent. A
+tail-aware selector (CVaR-style; minimise mean of worst-decile
+chunks) hardens the claim.
+
+**Implementation sketch:**
+1. Modify `launch_chunk_surface_multiseed.py` to compute, for each
+   candidate swap, both the mean *and* the 90th-percentile per-chunk
+   HRC-MAE delta.
+2. Promote a swap if it improves mean by ≥0 AND p90 by ≥ε. This is
+   a strict subset of the current rule (which only checks mean).
+3. Run 4-seed on Twitter and Meta CDN with the tighter rule.
+
+**Expected impact:** Twitter ≈0.0250, Meta CDN ≈0.0370 with tighter
+ranges. Margin to LLNL widens. More importantly: hardens the claim
+against LLNL's likely chunk-ensemble counter-attack.
+
+**Risk:** Tighter rule could mean some swaps are rejected and the
+mean improvement is smaller. Mitigation: ε is tunable; start at
+ε=0.
+
+---
+
+### 31. KV-corpus stride-feature audit & re-fit — `queued`, **methodology fix**
+
+**Threat (latent):** LANL's PhaseAtlas conditions on profile-derived
+features. For Meta KV, Wikipedia, Twitter, and Meta CDN — all
+hash-keyed corpora — the `abs_stride_*` and
+`signed_stride_lag1_autocorr` profile features are *garbage*: they
+compute `|hash(k₁) − hash(k₂)|` which is a uniform-on-[0, 2⁶⁴)
+random variable. Look at
+`characterizations/families/s3-cache-datasets__2022_metaKV.md:100-102`:
+
+```
+| abs_stride_q99  | 2.3 × 10¹⁸  | … |
+| abs_stride_mean | 8.5 × 10¹⁶  | … |
+| abs_stride_std  | 3.8 × 10¹⁷  | … |
+```
+
+These are exabyte-scale "strides" on a KV corpus. They are not
+strides; they are hash differences. Any conditioning vector that
+includes them is feeding noise to the model.
+
+**Why this matters:** LANL's IRD-renewal already side-steps this
+(it ignores the conditioning vector entirely on the rank-irrelevant
+side). But the PhaseAtlas variant for Wikipedia / Meta CDN does
+take cond input. If the cond features are noise, the model is
+robustness-by-accident, not by design. This is exactly the kind of
+methodology hole Desnoyers would call out in review.
+
+**Implementation sketch:**
+1. In `parsers/core.py` (or wherever `abs_stride_stats` is
+   populated), detect hash-keyed obj_ids — heuristic: fraction of
+   values with high 32 bits set > 0.1 — and emit
+   `abs_stride_stats: null` instead. Replace with hash-domain
+   locality features: IRD median, IRD q90, Zipf α, recurrence
+   rate at lag {1, 8, 64, 512}.
+2. Regenerate `traces/characterization/trace_characterizations.jsonl`
+   for the affected families: 2022_metaKV, 2022_metaCDN, 2020_twitter,
+   wikipedia.
+3. Update `R-scripts/analyze_family.R` `candidate_features` list to
+   exclude `abs_stride_*` for hash-keyed families.
+4. Re-fit any PhaseAtlas / NeuralAtlas that consumed the corrupted
+   profile features for those four corpora.
+
+**Expected impact:** No headline number change is guaranteed — the
+existing claims may already be optimal under the corrupted cond.
+But the claim is now *defensible*: a peer reviewer can verify the
+conditioning is meaningful. Closes a methodology hole that LLNL
+chunk-ensemble could otherwise weaponise as a critique.
+
+**Risk:** Re-fits could shift the claimed numbers. Mitigation:
+gate the new conditioning behind a flag, run both old and new
+in parallel for one round, promote whichever multi-seed result is
+better.
+
+---
+
+### 32. Adversarial chunk-ensemble guard against LLNL retake — `queued`
+
+**Threat:** LLNL has implemented `chunk_ensemble.py` and is using it
+to retake margins. PEER-REVIEW-LANL.md Round 68 flagged that LLNL's
+implementation swaps both `obj_id` and `obj_size`, which is a
+material methodology divergence from LANL's `obj_id`-only selector.
+
+**Why pre-empt:** If both teams use chunk-ensemble freely, the race
+becomes a chunk-ensemble arms race rather than a generator race.
+LANL should publish a stronger guard pass that LLNL's generator-
+agnostic chunk-ensemble cannot match.
+
+**Implementation sketch:**
+1. New module `altgan/chunk_surface_paired.py`. Two-pass guard:
+   first pass swaps only `obj_id` (the canonical LANL surface);
+   second pass swaps `(obj_id, obj_size, ts_delta)` triples but
+   gates on **both** mean HRC-MAE *and* a marginal-distribution
+   distance (Wasserstein on per-stream `obj_size` and `ts_delta`)
+   to ensure the chunk-swapped trace remains compatible with mark
+   sidecar conditioning.
+2. Promote a triple-swap only if both gates pass. This keeps marks
+   honest.
+3. Document the protocol in `RESPONSE-LANL.md` so any LLNL swap
+   that does not match it is method-divergent.
+
+**Expected impact:** Tencent and Twitter chunk-ensemble claims
+become methodology-defensible. Forces LLNL to either match the
+protocol (slowing them down) or accept a methodology-asymmetry note
+in the leader board.
+
+**Risk:** Triple-swap may rarely improve mean alone. That's fine;
+the goal is the methodology gate, not the cachesim delta.
+
+---
+
+### 33. Mark-conditioned Tencent recipe robustness sweep — `queued`
+
+**Target:** Tencent — robustness of the current promoted band
+(p ≈ 0.37–0.40, k=100, window=10000) against fresh fake seeds.
+
+**Why:** Round-log evidence shows the seed-44 best (`p=0.39`,
+`window=10000` → 0.04522) does not always confirm on seeds 45/46.
+The promotion band is "robust mostly" but not deterministically.
+A wider robustness sweep over seeds {42, 43, …, 60} at the 4-corner
+of the current band would either justify a tighter promotion or
+expose a hidden seed-fragility.
+
+**Implementation sketch:**
+1. Run 19 seeds × 4 corners (`p=0.37/k=100/w=10000`,
+   `p=0.40/k=100/w=10000`, `p=0.39/k=75/w=10000`,
+   `p=0.39/k=100/w=20000`) = 76 evaluator runs at 1M records each.
+2. Statistics: per-corner mean and 95% CI of cachesim mean.
+   Promote the corner with lowest CI upper bound.
+3. Update `MAP-LANL.md` with the verified band.
+
+**Expected impact:** Either confirms the current band as defensible
+or exposes a soft spot. Either outcome is informational.
+
+**Risk:** 76 runs at 1M is heavy compute. Mitigation: 100k probes
+first to reject corners that are clearly weak.
+
+---
+
+### 34. Wikipedia per-stream IRD ladder — `queued`
+
+**Target:** Wikipedia — defend the IRD-renewal claim (LANL 0.01146)
+against LLNL's likely port. The published recipe is `ird_scale=32,
+independent_prob=0.10, rank_ird_buckets=0` — global empirical IRD,
+no per-stream split. Wikipedia's reference has heterogeneous
+per-stream characteristics (cache-datasets `wikipedia/2019/...`
+splits by region), so a per-stream IRD ladder is the natural next
+move.
+
+**Implementation sketch:**
+1. Detect multi-stream structure in the Wikipedia reference.
+2. Fit per-stream IRD distributions; sample which stream contributes
+   each event from a stream-weight vector.
+3. 4-seed claim against the existing reference.
+
+**Expected impact:** Wikipedia 0.01146 → ≈0.0103 (estimated 10%
+drop from per-stream signal). LLNL's IRD-renewal port is unlikely
+to include per-stream until they discover this lever, so the lead
+widens.
+
+**Risk:** Reference may be effectively single-stream; per-stream
+fit collapses to global. Mitigation: ablate; if per-stream weight
+vector is degenerate (one stream gets > 90% mass), fall back to
+global.
+
+---
+
+---
+
+### 35. WS-conditioned empirical token blend — `closed-positive` (implemented r449–r454)
+
+Implemented as r449 (1D blend), r450 (2D blend), r451 (WS cache-ladder), r452 (confidence
+weighting), r453 (1D WS-KL training loss), r454 (2D WS-KL training loss).  Combined master
+recipe in RESPONSE-LANL.md "r454 Combined Master Recipe".  Theoretical gap to PhaseAtlas
+closed; empirical confirmation pending vinge results.
+
+---
+
+### 36. Per-stream WS conditioning for multi-stream corpora — `queued`
+
+**Target:** Tencent, Twitter, Meta CDN — all multi-stream corpora.
+
+**Hypothesis:** The WS-conditioned empirical table (r449-r454) pools all streams together.
+For traces with ≥2 distinct streams with different access patterns, a per-stream empirical
+table would be more discriminative than the pooled table.
+
+**Implementation sketch:**
+1. In `tokenize()`, detect unique `stream_ids` in the training trace.
+2. Compute separate `rank_token_freq_by_ws0[stream_id][ws0_bin]` tables per stream.
+3. At generation time, track which stream the current event "belongs to" (probabilistic,
+   based on training-time stream proportions).
+4. Index the empirical table by both stream and WS bin.
+
+**Risk:** Constitution compliance — stream assignment uses probabilities from training data
+only, not from the real evaluation trace.
+
+---
+
+### 37. FiLM conditioning of LSTM output — `closed-positive` (implemented r455)
+
+**Target:** All corpora — capacity increase for WS-LSTM interaction.
+
+**Hypothesis:** Simple concatenation of WS embeddings into the LSTM input gives an additive
+conditioning signal.  FiLM (Feature-wise Linear Modulation) allows multiplicative
+re-scaling: scale = 1 + Linear(WS_context), shift = Linear(WS_context).  Applied to the
+LSTM's output before the prediction head.
+
+**Implementation:** `--film-cond` flag; `film_gamma` and `film_beta` linear layers in
+`build_model()`; WS context = concat of all Denning WS window embeddings (+ fp embedding).
+Adds ~12K parameters for hidden=128, 3 WS windows. Checkpoint-transparent.
+
+---
+
+### 41. WS-conditioned birth probability calibration — `closed-positive` (implemented r456)
+
+Implemented as r456.  `birth_rate_by_ws0()` computes P(fresh|ws0_bin) from training.
+At generation time, `--birth-rate-blend` blends `birth_prob` with the empirical rate.
+Confidence weighting via `--ws-blend-confidence-tau` handles sparse bins.
+
+---
+
+### 38. Wider model ablation — `queued`
+
+Try `--hidden 256 --token-embed 128` (4× current capacity).  No code change needed.  With
+the WS-KL loss (r453-r454), a larger model should converge to a better approximation of the
+empirical table, because it has more expressivity for the conditional distribution.
+
+---
+
+### 39. Per-trace α calibration using held-out cachesim — `queued`, see Constitution Article IV
+
+Given a trained r454 model, sweep `--ws-token-blend` and `--ws-token-blend-2d` on a held-out
+slice of the reference trace using cachesim feedback.  This is post-hoc parameter selection,
+not in-loop training.  Check Constitution Article IV for compliance.
+
+**Expected impact:** Finds optimal α for each reference trace, potentially 5-10% vs fixed α.
+
+---
+
+### 40. Multi-corpus sweep with r454 master recipe — `queued`, **highest priority post-r454**
+
+Run the r454 master recipe on all 9 corpora:
+- Tencent, Alibaba, CloudPhysics, Baleen24, MSR Exchange, Twitter, Meta KV, Meta CDN, Wikipedia
+- Reference paths at `/tiamat/zarathustra/llgan-output/refs/`
+
+One run per corpus = 9 runs × ~20 min/run = ~3 hours total.  All 9 are needed for the
+post-Constitution leaderboard.  Tencent is the highest-value first run (most prior
+investment).
+
+---
+
+### 42. WS0-conditioned rank sampler — `closed-positive` (implemented r459)
+
+Implemented as r459.  `rank_samples_from_depths_ws0()` builds `[vocab][ws0_bins]` rank
+tables.  `_sample_rank_for_token()` tries WS0-conditioned bucket first (≥8 samples), then
+fp-conditioned (r447), then global.  Closes the `P(rank|token,ws0)` calibration gap that
+complements the r449 token blend on `P(token|ws0)`.  Refit required.
+
+---
+
+### 43. Wider model ablation — `queued` (was #38)
+
+Try `--hidden 256 --token-embed 128` (4× current capacity).  No code change needed.
+With WS-KL loss (r453-r454) and FiLM (r455), a larger model should better approximate
+the empirical conditional distributions.
+
+---
+
+### 44. 2D birth rate calibration — `queued`
+
+Extend r456 to jointly condition on (ws0_bin, ws1_bin):
+`birth_rate_by_ws01()` → P(fresh | ws0, ws1).  New flag `--birth-rate-blend-2d`.
+Follows the same pattern as r450 (2D token blend) and r454 (2D KL loss).
+Expected improvement: if birth rate varies more by (ws0, ws1) than by ws0 alone,
+finer conditioning reduces HRC-MAE by an additional 0.002–0.008.
+No refit needed for generation-time correction; refit required only if we add a
+2D birth-KL training loss.
+
+---
+
+### Operating notes
+
+*Note: Ideas #27–#34 were written against the pre-Constitution PhaseAtlas era.  After
+the Constitution v1.0 reset (2026-05-09), all race claims are void and all corpora show "—"
+on the leaderboard.  The new race uses the MDLSTM-based generation pipeline.*
+
+1. **Highest priority:** Run r459 master recipe on Tencent (r449-r459 all stacked).
+2. **Implemented:** r449–r459 all committed locally; remote push in progress (r455-r459).
+3. **Next (r460):** Wider model (#43, --hidden 256 --token-embed 128) — no code change needed.
+4. **Then r461:** 2D birth calibration (#44) — small code addition, generation-time only.
+5. **Multi-seed protocol is sacred.** No single-seed promotions.
+6. **What we do not need more of:** scalar knob micro-sweeps that don't yield 4-seed claims.
+
