@@ -983,3 +983,79 @@ generation-only use (the 2D table IS stored in checkpoint).  Refit required to p
 - `--rank-sampler empirical` with `rank_samples_by_token_ws0` in checkpoint (r459)
 
 No claim until four-seed cachesim panels complete.
+
+---
+
+## 2026-05-14 -- Tencent r461 Birth-KL Training Loss
+
+**Motivation.** r456 and r460 calibrate birth probability at *generation time* using
+empirical tables.  This is a post-hoc correction — the LSTM's birth logit is trained
+entirely from hard 0/1 labels and has no incentive to produce calibrated per-WS birth
+probabilities.  If the LSTM's native birth head already output `P(fresh | ws0)` close to
+the empirical rate, the generation-time blend would have nothing to correct.  Teaching the
+LSTM to match empirical birth rates *during training* eliminates the need for a large
+blend weight at generation time and should improve generalisation to held-out trace regions
+where the empirical table may have sparse coverage.
+
+**Implementation (r461).** New optional soft-target BCE loss term on the birth head:
+```python
+target_birth_soft = empirical_birth_rates[ws0_bin]   # (B, T) per-position soft target
+birth_kl_loss = F.binary_cross_entropy_with_logits(
+    birth_logits.reshape(-1),
+    target_birth_soft.reshape(-1),
+)
+loss += birth_kl_loss_weight * birth_kl_loss
+```
+When `birth_kl_loss_weight > 0`, `train_model()` loads the 1D empirical birth rate table
+into a GPU tensor and indexes it by `y_ws[:, :, 0]` (WS state before the predicted event).
+The soft target is `P(fresh | ws0_bin)` — the same value that r456 applies at generation
+time.  Hard-label BCE (r456/460 generation blend) and soft-label BCE (r461 training) are
+complementary: training bakes the calibration into model weights; generation blend provides
+a residual correction for distribution shift.
+
+New CLI flag: `--birth-kl-loss-weight` (float, default 0.0).  Recommended sweep: 0.1, 0.25,
+0.5.  Values above 0.5 risk over-regularising the birth head away from the hard labels.
+
+**Constitution compliance.** Training-time loss change — refit required, no generation-only
+path.  No cachesim in training loop (Article IV).  4-seed sweep required for claim
+(Article VI).  Dual significance gate applies (Article VII).
+
+**Sweep plan (r461 master recipe):**
+
+```bash
+python3 -m altgan.mattson_denning_lstm multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --max-rows 100000 --ws-edge-mode max-window \
+  --pos-bins 0 --pos-embed 8 --recycle-rank-cap 0 \
+  --rank-sampler empirical --exact-rank-cutoff 0 \
+  --stack-depth-bins 32 --cache-ladder --ws-cache-ladder \
+  --dropout 0.1 --lr-schedule cosine --epochs 20 --grad-clip 1.0 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.10 \
+  --film-cond --lstm-layers 3 --label-smoothing 0.05 \
+  --birth-kl-loss-weight 0.25 \
+  --seeds 42,80,81,82 --temperature 1.0 \
+  --short-reuse-pressure 3.0 --fit --birth-control-mode ws \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --model /tiamat/zarathustra/checkpoints/altgan/tencent_mdlstm_r461_birth_kl.pt \
+  --tag tencent_mdlstm_r461_birth_kl \
+  --append-markdown /tiamat/zarathustra/Zarathustra/RESPONSE-LANL.md
+```
+
+**Combined r449–r461 Master Recipe** (all improvements stacked):
+- `--stack-depth-bins 32 --cache-ladder --ws-cache-ladder` (r446/r448/r451)
+- `--dropout 0.1 --lr-schedule cosine --epochs 20 --grad-clip 1.0` (r449/r458)
+- `--ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.10` (r453/r454)
+- `--film-cond --lstm-layers 3 --label-smoothing 0.05` (r455/r457/r458)
+- `--birth-kl-loss-weight 0.25` (r461)
+- `--ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50` (r449/r450/r452)
+- `--birth-rate-blend 0.5 --birth-rate-blend-2d 0.25` (r456/r460)
+- `--rank-sampler empirical` with `rank_samples_by_token_ws0` in checkpoint (r459)
+
+**Expected impact.** With soft-label calibration baked into training, the LSTM's native
+birth probability should track `P(fresh | ws0)` more closely, reducing reliance on the
+generation-time blend.  This also improves generalisation: the empirical table is fit on
+100k training rows; the LSTM generalises to unseen subsequences.  Expected HRC-MAE
+improvement over r460: 0.002–0.008, stacking on top of the r449-r460 improvements.
+
+No claim until four-seed cachesim panels complete.

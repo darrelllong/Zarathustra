@@ -772,6 +772,8 @@ def train_model(
     lstm_layers: int = 2,
     label_smoothing: float = 0.0,
     grad_clip: float = 1.0,
+    birth_rate_table: np.ndarray | None = None,
+    birth_kl_loss_weight: float = 0.0,
 ):
     torch, _nn = _try_torch()
     import torch.nn.functional as F
@@ -828,6 +830,11 @@ def train_model(
         ws_freq_t_2d = torch.from_numpy(
             np.asarray(ws_freq_table_2d, dtype=np.float32)
         ).to(device)
+    birth_rate_t: torch.Tensor | None = None
+    if birth_rate_table is not None and float(birth_kl_loss_weight) > 0.0:
+        birth_rate_t = torch.from_numpy(
+            np.asarray(birth_rate_table, dtype=np.float32)
+        ).to(device)
     n_train = len(tokens) - seq_len - 1
     if n_train <= 0:
         raise ValueError("not enough tokens for requested sequence length")
@@ -843,7 +850,8 @@ def train_model(
         f"fp_bins={int(fp_bins)} dropout={float(dropout)} lr_schedule={lr_schedule} "
         f"ws_kl_loss_weight={float(ws_kl_loss_weight)} ws_kl_loss_weight_2d={float(ws_kl_loss_weight_2d)} "
         f"film_cond={bool(film_cond)} lstm_layers={int(lstm_layers)} "
-        f"label_smoothing={float(label_smoothing)} grad_clip={float(grad_clip)}",
+        f"label_smoothing={float(label_smoothing)} grad_clip={float(grad_clip)} "
+        f"birth_kl_loss_weight={float(birth_kl_loss_weight)}",
         flush=True,
     )
 
@@ -867,6 +875,15 @@ def train_model(
                 birth_logits.reshape(-1),
                 y_birth.reshape(-1),
             )
+            birth_kl_loss = logits.sum() * 0.0
+            if birth_rate_t is not None and float(birth_kl_loss_weight) > 0.0:
+                # Soft-target BCE: teach birth head to output P(fresh|ws0) from empirical table
+                ws0_idx_b = y_ws[:, :, 0].clamp(0, birth_rate_t.shape[0] - 1)
+                target_birth_soft = birth_rate_t[ws0_idx_b]  # (B, T)
+                birth_kl_loss = F.binary_cross_entropy_with_logits(
+                    birth_logits.reshape(-1),
+                    target_birth_soft.reshape(-1),
+                )
             reuse_mask = y != FRESH_TOKEN
             if bool(reuse_mask.any()):
                 reuse_loss = F.cross_entropy(
@@ -922,6 +939,7 @@ def train_model(
                 + float(rank_band_loss_weight) * rank_band_loss
                 + float(ws_kl_loss_weight) * ws_kl_loss
                 + float(ws_kl_loss_weight_2d) * ws_kl_loss_2d
+                + float(birth_kl_loss_weight) * birth_kl_loss
             )
             opt.zero_grad(set_to_none=True)
             loss.backward()
@@ -940,7 +958,8 @@ def train_model(
                     f"ws={float(ws_loss.detach().cpu()):.5f} "
                     f"rank_band={float(rank_band_loss.detach().cpu()):.5f} "
                     f"ws_kl={float(ws_kl_loss.detach().cpu()):.5f} "
-                    f"ws_kl_2d={float(ws_kl_loss_2d.detach().cpu()):.5f}",
+                    f"ws_kl_2d={float(ws_kl_loss_2d.detach().cpu()):.5f} "
+                    f"birth_kl={float(birth_kl_loss.detach().cpu()):.5f}",
                     flush=True,
                 )
         print(
@@ -1065,6 +1084,8 @@ def fit(args) -> None:
         lstm_layers=int(getattr(args, "lstm_layers", 2)),
         label_smoothing=float(getattr(args, "label_smoothing", 0.0)),
         grad_clip=float(getattr(args, "grad_clip", 1.0)),
+        birth_rate_table=empirical_birth_rates if float(getattr(args, "birth_kl_loss_weight", 0.0)) > 0.0 else None,
+        birth_kl_loss_weight=float(getattr(args, "birth_kl_loss_weight", 0.0)),
     )
     mark_sample = {
         "obj_sizes": _sample_pool(trace.obj_sizes),
@@ -2118,6 +2139,12 @@ def build_parser() -> argparse.ArgumentParser:
             type=float,
             default=1.0,
             help="gradient norm clip threshold (0.0 = disabled, default 1.0)",
+        )
+        q.add_argument(
+            "--birth-kl-loss-weight",
+            type=float,
+            default=0.0,
+            help="if >0, add soft-target BCE on birth head using empirical P(fresh|ws0) as targets during training",
         )
 
     fit_p = sub.add_parser("fit")

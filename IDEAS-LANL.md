@@ -441,22 +441,29 @@ No refit for generation-only; refit required to populate `empirical_birth_rates_
 
 ---
 
-### 45. 2D birth-KL training loss — `queued`
+### 45. Birth-KL training loss — `closed-positive` (implemented r461)
 
-Add a training-time KL loss on birth probability analogous to r453/r454 token-KL:
-`KL(empirical_birth_rate[ws0, ws1] || sigmoid(birth_logit))`
-
-This would teach the LSTM to PRODUCE calibrated birth probabilities, reducing
-reliance on the generation-time correction (r456/r460).  Unlike the token KL loss
-(which uses categorical KL), birth is binary so the loss is a BCE with a soft target.
+Implemented as soft-target BCE on the birth head: `target = empirical_birth_rates[ws0_bin]`,
+`loss += birth_kl_loss_weight * BCE(birth_logit, target)`.  This teaches the LSTM to
+produce calibrated birth probabilities during training, complementing the generation-time
+blend (r456/r460).  New CLI flag `--birth-kl-loss-weight` (default 0.0, try 0.25).
 
 ---
 
 ### 46. Wider model ablation — `queued` (was #43)
 
 Try `--hidden 256 --token-embed 128` (4× current capacity).  No code change needed.
-First run priority after r460 lands results.  With the full conditioning stack (r449-r460),
+First run priority after r461 lands results.  With the full conditioning stack (r449-r461),
 a larger model should squeeze out the remaining gap to PhaseAtlas 0.0297.
+
+---
+
+### 47. 2D birth-KL training loss — `queued`
+
+Extend r461 from 1D (ws0 only) to 2D (ws0, ws1 joint):
+`target = empirical_birth_rates_2d[ws0_bin, ws1_bin]` with fallback to 1D marginal for
+sparse buckets.  New flag `--birth-kl-loss-weight-2d`.  Expected incremental gain after
+r461: 0.001–0.004.  Run after r461 4-seed results confirm positive signal.
 
 ---
 
@@ -466,10 +473,10 @@ a larger model should squeeze out the remaining gap to PhaseAtlas 0.0297.
 the Constitution v1.0 reset (2026-05-09), all race claims are void and all corpora show "—"
 on the leaderboard.  The new race uses the MDLSTM-based generation pipeline.*
 
-1. **Highest priority:** Run r460 master recipe on Tencent (r449-r460 all stacked).
-2. **Implemented:** r449–r460 all committed locally; push reliable via Bash/curl MCP.
-3. **Next (r461):** Wider model (#46, --hidden 256 --token-embed 128) — no code change needed.
-4. **Then r462:** 2D birth-KL training loss (#45) if birth calibration shows large effect.
+1. **Highest priority:** Run r461 master recipe on Tencent (r449-r461 all stacked, --birth-kl-loss-weight 0.25).
+2. **Implemented:** r449–r461 all committed locally; push reliable via Bash/curl MCP.
+3. **Next (r462):** Wider model (#46, --hidden 256 --token-embed 128) — no code change needed.
+4. **Then r463:** 2D birth-KL training loss (#47, --birth-kl-loss-weight-2d).
 5. **Multi-seed protocol is sacred.** No single-seed promotions.
 6. **What we do not need more of:** scalar knob micro-sweeps that don't yield 4-seed claims.
 
