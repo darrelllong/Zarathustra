@@ -458,12 +458,49 @@ a larger model should squeeze out the remaining gap to PhaseAtlas 0.0297.
 
 ---
 
-### 47. 2D birth-KL training loss — `queued`
+### 47. 2D birth-KL training loss — `closed-positive` (implemented r463)
 
-Extend r461 from 1D (ws0 only) to 2D (ws0, ws1 joint):
-`target = empirical_birth_rates_2d[ws0_bin, ws1_bin]` with fallback to 1D marginal for
-sparse buckets.  New flag `--birth-kl-loss-weight-2d`.  Expected incremental gain after
-r461: 0.001–0.004.  Run after r461 4-seed results confirm positive signal.
+Implemented as r463.  `birth_rate_table_2d` (shape `[ws0_bins × ws1_bins]`) from checkpoint
+`empirical_birth_rates_by_ws01`.  `--birth-kl-loss-weight-2d` (try 0.10–0.25).  Guard:
+requires `y_ws.shape[2] > 1` (single-window traces bypass safely).  Training target:
+`P(fresh | ws0_bin, ws1_bin)` from the 2D table — finer than r461's 1D `P(fresh | ws0_bin)`.
+Expected incremental gain after r461: 0.001–0.005.
+
+---
+
+### 48. Delta-WS conditioned empirical token blend — `queued`
+
+**Hypothesis.** The WS-conditioned empirical token table (r449/r450) conditions on the
+*current* ws0 (and ws1) bin — a snapshot of WS at event t.  But the rank distribution at
+ws0=W depends on whether the WS is rising (many new unique objects just arrived, stack grows)
+or falling (recent objects are being revisited, stack shrinks).  Two states with identical ws0
+can have materially different rank-token distributions depending on WS trajectory.
+
+**Fix: delta-WS conditioning.**  New 3D empirical table
+`rank_token_freq_by_ws0_delta[ws0_bin][delta_sign][rank_token]` where
+`delta_sign = sign(ws0_bin[t] - ws0_bin[t-1])` ∈ {0=falling, 1=stable, 2=rising} (3 values).
+
+At generation time, track `ws0_bin_prev` (the previous step's ws0 bin) and compute
+`delta_sign = 0 if ws0 < ws0_prev else (2 if ws0 > ws0_prev else 1)`.  Use the
+delta-conditioned table in the blend:
+```python
+empirical = ws_token_freq_table_delta[w0_bin, delta_sign]
+```
+Falls back to the 1D table (r449) if the delta bucket is empty (<8 samples).
+
+**Implementation sketch.**  New function `rank_token_freqs_by_ws0_delta(...)` →
+shape `(ws0_bins, 3, vocab)`.  New CLI flags `--ws-token-blend-delta` (float) and
+`--ws-delta-bins` (int, default 3).  Generation needs `ws0_bin_prev` tracked across steps
+(one extra variable in the generation loop).
+
+**Expected impact.**  Rising-WS phases concentrate fresh tokens and deep-rank reuse;
+falling-WS phases concentrate shallow-rank reuse.  Conditioning on direction should reduce
+HRC-MAE by 0.003–0.010 at generation time without refit — or with refit if delta is also
+added as an LSTM conditioning feature.
+
+**Risk.**  100k training rows / (32 bins × 3 delta × 69 vocab) ≈ 15 samples per cell —
+marginal but above the 8-sample fallback threshold on average.  Sparse cells fall back to 1D
+table automatically.
 
 ---
 
@@ -474,9 +511,10 @@ the Constitution v1.0 reset (2026-05-09), all race claims are void and all corpo
 on the leaderboard.  The new race uses the MDLSTM-based generation pipeline.*
 
 1. **Highest priority:** Run r461 master recipe on Tencent (r449-r461 all stacked, --birth-kl-loss-weight 0.25).
-2. **Implemented:** r449–r461 all committed locally; push reliable via Bash/curl MCP.
+2. **Implemented:** r449–r463 all committed; r462 (wider model) needs only a refit launch.
 3. **Next (r462):** Wider model (#46, --hidden 256 --token-embed 128) — no code change needed.
-4. **Then r463:** 2D birth-KL training loss (#47, --birth-kl-loss-weight-2d).
-5. **Multi-seed protocol is sacred.** No single-seed promotions.
-6. **What we do not need more of:** scalar knob micro-sweeps that don't yield 4-seed claims.
+4. **Then (r463):** 2D birth-KL training loss (#47, implemented 2026-05-15).
+5. **Then (r464):** Delta-WS conditioned empirical blend (#48, queued — code needed).
+6. **Multi-seed protocol is sacred.** No single-seed promotions.
+7. **What we do not need more of:** scalar knob micro-sweeps that don't yield 4-seed claims.
 

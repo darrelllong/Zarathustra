@@ -1058,4 +1058,119 @@ generation-time blend.  This also improves generalisation: the empirical table i
 100k training rows; the LSTM generalises to unseen subsequences.  Expected HRC-MAE
 improvement over r460: 0.002–0.008, stacking on top of the r449-r460 improvements.
 
+---
+
+## 2026-05-15 -- Tencent r462 Wider Model Ablation (No Code Change)
+
+**Motivation.** The r461 master recipe has the full conditioning stack: footprint bins,
+cache-ladder rank vocabulary, WS-KL + 2D WS-KL training losses, FiLM conditioning, 3-layer
+LSTM, label smoothing, birth-KL training loss, and generation-time WS/birth calibration
+blends.  The remaining gap to PhaseAtlas 0.0297 may be expressivity-limited: hidden=128 has
+~330K parameters.  Doubling the capacity to hidden=256 / token-embed=128 (≈1.2M parameters,
+4× current) with the full conditioning stack may push the LSTM through its current
+representation bottleneck.
+
+**No code change required.**  `--hidden` and `--token-embed` are already CLI flags.  This is
+a hyperparameter sweep on the r461 master recipe.
+
+**Sweep plan (r462 wider model, refit required):**
+
+```bash
+python3 -m altgan.mattson_denning_lstm multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --max-rows 100000 --ws-edge-mode max-window \
+  --pos-bins 0 --pos-embed 8 --recycle-rank-cap 0 \
+  --rank-sampler empirical --exact-rank-cutoff 0 \
+  --stack-depth-bins 32 --cache-ladder --ws-cache-ladder \
+  --dropout 0.1 --lr-schedule cosine --epochs 20 --grad-clip 1.0 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.10 \
+  --film-cond --lstm-layers 3 --label-smoothing 0.05 \
+  --birth-kl-loss-weight 0.25 \
+  --hidden 256 --token-embed 128 \
+  --seeds 42,80,81,82 --temperature 1.0 \
+  --short-reuse-pressure 3.0 --fit --birth-control-mode ws \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --model /tiamat/zarathustra/checkpoints/altgan/tencent_mdlstm_r462_wide.pt \
+  --tag tencent_mdlstm_r462_wide \
+  --append-markdown /tiamat/zarathustra/Zarathustra/RESPONSE-LANL.md
+```
+
+**Combined r449–r462 Master Recipe** (all improvements stacked + wider model):
+- All r461 flags unchanged
+- `--hidden 256 --token-embed 128` (r462)
+
+No claim until four-seed cachesim panels complete.
+
+---
+
+## 2026-05-15 -- Tencent r463 2D Birth-KL Training Loss (Architectural)
+
+**Motivation.** r461 adds a soft-target BCE loss on the birth head using the 1D empirical
+table `P(fresh | ws0_bin)`.  r460 showed that 2D conditioning `P(fresh | ws0_bin, ws1_bin)`
+is more discriminative than 1D at generation time: states with the same ws0 but different ws1
+can have materially different birth rates.  The same asymmetry applies at training time: the
+1D BCE target averages over ws1 variation within each ws0 bin, providing a coarser calibration
+signal.  Extending r461 to 2D should bake finer-grained birth calibration directly into the
+LSTM weights.
+
+**Fix.** New optional soft-target BCE loss term on the birth head using the 2D joint table:
+```python
+target_birth_soft_2d = empirical_birth_rates_2d[ws0_bin, ws1_bin]  # (B, T)
+birth_kl_loss_2d = F.binary_cross_entropy_with_logits(birth_logits.reshape(-1),
+                                                       target_birth_soft_2d.reshape(-1))
+loss += birth_kl_loss_weight_2d * birth_kl_loss_2d
+```
+
+Empty `(ws0, ws1)` bins fall back to the 1D marginal `birth_rate_by_ws0` at generation time
+(r456); at training time the target is the 2D table value without fallback (sparse bins
+contribute their noisy estimate, same as r461's 1D table for rare ws0 bins).
+
+**Constitution compliance.** Training-time loss change — refit required.  No cachesim in
+training loop (Article IV).  4-seed sweep required for claim (Article VI).
+
+**Implementation.** `altgan/mattson_denning_lstm.py`:
+- `train_model()` → new `birth_rate_table_2d`, `birth_kl_loss_weight_2d` kwargs.
+- Tensor init: `birth_rate_t_2d` from `empirical_birth_rates_by_ws01` checkpoint key.
+- Training loop: `birth_kl_loss_2d` added; requires `y_ws.shape[2] > 1` (guard for
+  single-window traces).
+- Total loss: `+ birth_kl_loss_weight_2d × birth_kl_loss_2d`.
+- Progress logging: `birth_kl_2d=...` added to per-batch print.
+- `fit()` → passes `empirical_birth_rates_2d` and `birth_kl_loss_weight_2d`.
+- `add_train_flags()` → `--birth-kl-loss-weight-2d` (float, default 0.0, try 0.10–0.25).
+- Backward-compatible: λ=0.0 (default) disables entirely.
+
+**Sweep plan (r463 master recipe — refit required):**
+
+```bash
+python3 -m altgan.mattson_denning_lstm multiseed \
+  --real /tiamat/zarathustra/llgan-output/refs/tencent_stackatlas_real.csv \
+  --max-rows 100000 --ws-edge-mode max-window \
+  --pos-bins 0 --pos-embed 8 --recycle-rank-cap 0 \
+  --rank-sampler empirical --exact-rank-cutoff 0 \
+  --stack-depth-bins 32 --cache-ladder --ws-cache-ladder \
+  --dropout 0.1 --lr-schedule cosine --epochs 20 --grad-clip 1.0 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.10 \
+  --film-cond --lstm-layers 3 --label-smoothing 0.05 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --seeds 42,80,81,82 --temperature 1.0 \
+  --short-reuse-pressure 3.0 --fit --birth-control-mode ws \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --model /tiamat/zarathustra/checkpoints/altgan/tencent_mdlstm_r463_birth_kl_2d.pt \
+  --tag tencent_mdlstm_r463_birth_kl_2d \
+  --append-markdown /tiamat/zarathustra/Zarathustra/RESPONSE-LANL.md
+```
+
+**Combined r449–r463 Master Recipe** (all improvements stacked):
+- All r461 flags unchanged
+- `--birth-kl-loss-weight-2d 0.10` (r463)
+
+**Expected impact.** 2D birth-KL provides a finer calibration target for the birth head than
+1D: when both ws0 AND ws1 are high the trace is in a genuine cold-miss phase (birth prob
+high); when ws0 is high but ws1 is low, it is bursty-but-contained (birth prob moderate).
+Expected HRC-MAE improvement over r461: 0.001–0.005.
+
+No claim until four-seed cachesim panels complete.
+
 No claim until four-seed cachesim panels complete.
