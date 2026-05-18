@@ -16840,3 +16840,117 @@ generation does dampen variance, but seed=80 still under-emits FRESH
 81/82 land near 0.043, 4-seed mean ~0.039 (worse than R298b 0.0352
 single-seed). If near 0.031, 4-seed mean ~0.032 (beats R298b).
 
+
+
+## R301 — Birth-rate anchoring + training stability (2026-05-18)
+
+**Motivation.** R298e multi-seed revealed a catastrophic seed-stability
+bug: seed=80 emitted only 18% FRESH at 1M records (real Wiki ≈49%). The
+4-seed mean is likely ~0.039 — worse than R298b's single-seed 0.0352.
+The root cause is a positive feedback loop in autoregressive generation:
+if the LSTM under-emits FRESH early, the working set fills with repeated
+objects, conditioning future steps to emit even fewer FRESH tokens,
+compounding the deficit. No Constitution-compliant claim is possible until
+seed stability is solved.
+
+**Fix 1: Empirical birth-rate blend (generation-time, no retraining).**
+
+At each generation step t, let ws0_bin = current WS0 bin. We maintain
+an empirical table `birth_rate_by_ws0[ws0_bin]` = observed P(NEW | WS0)
+from the training trace, computed during tokenization and stored in the
+checkpoint. At generation:
+
+    p_new = α·birth_rate[ws0_bin] + (1−α)·P_lstm(NEW | history)
+    probs[NEW] = p_new
+    probs[1:] *= (1 − p_new) / (1 − P_lstm(NEW))    # renormalize
+
+α=0 → pure LSTM (R300), α=1 → fully empirical. Recommended α=0.5.
+
+This anchors the FRESH/RECYCLE split to the observed WS-conditional
+distribution at each step, breaking the feedback loop. The key insight:
+when WS0 is high (many recently seen objects), empirical P(NEW | ws0_high)
+is low — so blending suppresses spuriously high LSTM FRESH predictions.
+When WS0 is low (empty window), empirical P(NEW | ws0_low) ≈ 1.0 —
+so blending enforces the correct burst-of-FRESH behavior.
+
+This is a pure generation-time change. **Existing R300 checkpoints do not
+have the birth_rate_by_ws0 table** — retrain with R301 fit to populate it.
+But the mechanism is backward-compatible: if the checkpoint lacks the table,
+generation falls back to α=0 (pure LSTM, same as R300).
+
+**Fix 2: Label smoothing (ε=0.05, training-time).**
+
+`F.cross_entropy(..., label_smoothing=0.05)` redistributes 5% of the
+probability mass uniformly across all tokens. This prevents the LSTM from
+assigning P(NEW)→1.0 on early-trace positions where every access is indeed
+FRESH — which biases the model toward over-emitting FRESH during generation.
+The theoretical motivation: label smoothing calibrates the model's
+confidence, reducing the extreme logit magnitudes that cause seed-dependent
+argmax lock-in.
+
+**Fix 3: Cosine LR schedule + gradient clipping.**
+
+Cosine annealing decays lr from 1e-3 to ~5e-5 over training, enabling
+fine-grained adjustment in later epochs without exploding gradients.
+Gradient clipping (norm=1.0) prevents rare gradient spikes from corrupting
+the trained weights. Both are standard stabilizers; LANL has had both since
+r449.
+
+**Fix 4: Multi-seed generation (`--seeds 42,80,81,82`).**
+
+R301's `generate` subcommand accepts `--seeds 42,80,81,82` and writes one
+CSV per seed (appends `_s{seed}` suffix). Enables 4-seed runs in a single
+invocation without shell wrappers.
+
+**Implementation.** `llgan/trace_lstm_ws.py` updated in-place:
+- `tokenize()`: returns `birth_rate_by_ws0` (shape `[n_ws0_bins]`,
+  `birth_count_by_ws0` for diagnostics).
+- `generate()`: new `birth_rate_by_ws0` and `birth_rate_blend` kwargs;
+  applies blending per-step.
+- `train_model()`: new `label_smoothing`, `grad_clip`, `lr_schedule`,
+  `lstm_layers` kwargs.
+- `build_model()`: `lstm_layers` kwarg (default 2).
+- `cmd_fit()`: stores birth table in checkpoint.
+- `cmd_generate()`: loads birth table; `--seeds`, `--birth-rate-blend`.
+
+**Sweep recipe for Wikipedia (Constitution-compliant):**
+
+```bash
+# Step 1: Fit (on vinge — ~20min for 100k, ~120min for 1M)
+python3 -m llgan.trace_lstm_ws fit \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --max-rows 100000 \
+  --n-bins 200 --ws-bins 32 --ws-windows 32,128,512,2048,8192 \
+  --rank-embed 64 --ws-embed 16 --hidden 256 --lstm-layers 2 \
+  --seq-len 256 --batch 128 --epochs 25 --lr 1e-3 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --seed 42 \
+  --output /tiamat/zarathustra/checkpoints/llnl/wiki_r301_100k.pt
+
+# Step 2: Multi-seed 100k smoke (4 seeds, ~1min each on GPU)
+python3 -m llgan.trace_lstm_ws generate \
+  --model /tiamat/zarathustra/checkpoints/llnl/wiki_r301_100k.pt \
+  --n 100000 --seeds 42,80,81,82 --birth-rate-blend 0.5 \
+  --output /tmp/wiki_r301_100k.csv
+
+# Step 3: Run cachesim on each seed output
+# (standard 5-cache 6-policy surface)
+
+# Step 4: If 100k multi-seed range < 0.005, scale to 1M and run
+# full 4-seed claim
+```
+
+**Expected outcome.** Birth-rate blending should collapse seed-to-seed
+FRESH variance from the observed 40%+ range to <10% range, since the
+WS0-conditional empirical table ensures all seeds follow the same
+FRESH/RECYCLE marginal regardless of early-trajectory luck. The resulting
+4-seed mean should be near R298e seed-42's 0.0313 (rather than the ~0.039
+unanchored mean). If so, this is the first LLNL Constitution-compliant
+claim candidate.
+
+**Constitution compliance.** Training loss = cross-entropy on next-token
+prediction; no cachesim in training loop (Article IV). 4-seed protocol
+required for claim (Article VI). Held-out 20% evaluation = the 200k
+holdout from 1M Wiki records (standard protocol). No new benchmark access.
+
+No claim until 4-seed cachesim mean measured.

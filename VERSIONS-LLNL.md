@@ -7152,3 +7152,23 @@ R295-R297 are a research-grade pivot, not a race-winning move on the
 current protocol. Their value is methodological: they give LLNL a
 defensible "we did model-class work" position for the paper, even if
 LANL's chunk-cascade numbers are lower. R298 is the next learning step.
+
+
+---
+
+## R301 — Birth-rate anchoring + training stability (2026-05-18)
+
+**Status:** Code complete; sweep recipe written; awaiting GPU run on vinge.
+
+**Key changes vs R300:**
+- `tokenize()` computes `birth_rate_by_ws0[ws0_bin]` empirically from training trace
+- `generate()` applies birth-rate blend: `p_new = α·emp(ws0) + (1−α)·lstm`
+- `train_model()` adds label smoothing (ε=0.05), cosine LR, gradient clipping
+- `cmd_generate()` accepts `--seeds 42,80,81,82` for multi-seed in one pass
+- Checkpoint stores birth table for backward-compatible generation
+
+**Target:** Wikipedia 4-seed mean HRC-MAE < 0.035 with range < 0.005.
+**Mechanism:** Breaks the autoregressive FRESH-undershoot feedback loop
+(R298e seed=80 emitted 18% FRESH vs 49% real) by anchoring per-step
+P(FRESH) to the empirical WS0-conditional distribution.
+**Files:** `llgan/trace_lstm_ws.py` (updated in-place from R300).
