@@ -16842,6 +16842,125 @@ single-seed). If near 0.031, 4-seed mean ~0.032 (beats R298b).
 
 
 
+## R302 — Birth-KL training loss + FiLM + 2D birth + WS-rank sampler (2026-05-19)
+
+**Motivation.** R301 ships four generation-time and training-time stabilisers
+(birth-rate blend, label smoothing, cosine LR, multi-seed generation) but the
+LSTM itself is still trained purely on next-token CE.  LANL r455–r463 stacked
+four additional mechanisms on top of a comparable LSTM baseline (FiLM post-LSTM
+conditioning r455, birth-KL training loss r461, 2D birth-KL r463, WS-conditioned
+rank sampler r459).  R302 ports all four to `llgan/trace_lstm_ws.py`, closing
+the architecture gap to LANL's master recipe on the Wikipedia corpus.
+
+**Fix 1: Birth-KL training loss (`--birth-kl-loss-weight`, default 0.0).**
+
+R301's birth-rate blend corrects P(NEW) at *generation time* from outside the
+model.  Birth-KL bakes the same calibration directly into training:
+
+    birth_kl = BCE(logits[NEW_TOKEN], empirical_P(NEW | ws0_bin))
+
+The target `empirical_P(NEW | ws0_bin)` comes from the same `birth_rate_by_ws0`
+table that powers the generation-time blend.  Using `y_ws[:, :, 0]` (the WS0
+state *before* the predicted event) as the conditioning variable aligns the
+training target with generation semantics.
+
+Recommended starting point: `--birth-kl-loss-weight 0.25`.  The loss is added
+on top of the main CE, not replacing it.  Analogue to LANL r461.
+
+**Fix 2: 2D birth-KL (`--birth-kl-loss-weight-2d`, default 0.0).**
+
+Extends the birth-KL target from 1D `P(NEW|ws0)` to the joint table
+`P(NEW|ws0,ws1)`.  When ws0 AND ws1 are both high the trace is in a genuine
+cold-miss phase (birth prob high); when ws0 is high but ws1 is low, it is
+bursty-contained (birth prob moderate).  The 1D table averages over ws1
+variation and provides a coarser calibration signal.
+
+    birth_kl_2d = BCE(logits[NEW_TOKEN], empirical_P(NEW | ws0_bin, ws1_bin))
+
+The 2D table is computed during `tokenize()` and stored in the checkpoint.
+Sparse (ws0, ws1) cells fall back to the 1D marginal.  Recommended:
+`--birth-kl-loss-weight-2d 0.10`.  Analogue to LANL r463.
+
+**Fix 3: FiLM post-LSTM conditioning (`--film-cond`, default off).**
+
+After the LSTM forward pass, WS embeddings modulate the LSTM output via
+Feature-wise Linear Modulation:
+
+    out' = out * (1 + gamma(ws_flat)) + beta(ws_flat)
+
+The WS context is still concatenated to the LSTM input (unchanged from R301);
+FiLM provides an additional multiplicative + additive gate on the hidden state.
+The `(1 + gamma)` residual form initialises to identity (gamma=0, beta=0 ≡ no-op)
+and allows the optimiser to learn the FiLM correction incrementally.
+
+This allows the WS state to *gate* which LSTM activations are relevant rather
+than only biasing the next-step distribution additively through the embedding
+concat.  Analogue to LANL r455.
+
+**Fix 4: WS-conditioned rank sampler (`--rank-sampler empirical`).**
+
+During `tokenize()`, collects per-(token_bin, ws0_bin) arrays of observed LRU
+ranks from the real trace.  At generation time, samples the concrete rank from
+the observed distribution for the current (token_bin, ws0_bin) cell instead of
+the unconditional `bin_ranks_arr`.  Falls back to unconditional sampling for
+cells with fewer than 5 observations.
+
+The key insight: the appropriate stack rank for a given rank-bin token depends
+on the current WS0.  When WS0 is large, the LRU stack is deep and reuse ranks
+tend to be higher; when WS0 is small, they concentrate near the top.  Sampling
+from the right cell preserves this correlation.  Analogue to LANL r459.
+
+**Backward compatibility.** R302 checkpoints load into R301 generate paths:
+`film_cond` defaults to False; `birth_rate_by_ws01` and
+`rank_samples_by_token_ws0` are ignored if absent.  Old R300/R301 checkpoints
+load fine into R302 `generate`.
+
+**Recommended R302 sweep recipe for Wikipedia (Constitution-compliant):**
+
+```bash
+# Step 1: Fit with birth-KL + 2D birth-KL + FiLM + empirical rank sampler
+python3 -m llgan.trace_lstm_ws fit \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --max-rows 100000 \
+  --n-bins 200 --ws-bins 32 --ws-windows 32,128,512,2048,8192 \
+  --rank-embed 64 --ws-embed 16 --hidden 256 --lstm-layers 2 \
+  --seq-len 256 --batch 128 --epochs 25 --lr 1e-3 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --film-cond \
+  --birth-kl-loss-weight 0.25 \
+  --birth-kl-loss-weight-2d 0.10 \
+  --rank-sampler empirical \
+  --seed 42 \
+  --output /tiamat/zarathustra/checkpoints/llnl/wiki_r302_100k.pt
+
+# Step 2: Multi-seed generation (4 seeds, ~1 min each on GPU)
+python3 -m llgan.trace_lstm_ws generate \
+  --model /tiamat/zarathustra/checkpoints/llnl/wiki_r302_100k.pt \
+  --n 100000 --seeds 42,80,81,82 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --output /tmp/wiki_r302_100k.csv
+
+# Step 3: cachesim 4-seed panel, check range vs R301 baseline
+```
+
+**Ablation path.** To isolate each improvement's contribution, first sweep:
+1. R301 recipe + `--birth-kl-loss-weight 0.25` (birth-KL alone)
+2. + `--birth-kl-loss-weight-2d 0.10` (add 2D birth-KL)
+3. + `--film-cond` (add FiLM)
+4. + `--rank-sampler empirical` (add WS-conditioned rank)
+
+**Expected outcome.** Birth-KL should halve the inter-seed FRESH-rate variance
+(the root cause of R298e seed=80 failure), because the LSTM now learns
+calibrated birth probabilities rather than relying entirely on generation-time
+correction.  FiLM conditioning should improve long-range WS tracking.  Combined,
+the 4-seed range should tighten from ~40% relative to <10% relative, enabling
+a Constitution-compliant 4-seed mean close to the R298e seed-42 baseline of
+0.0313.
+
+No claim until 4-seed cachesim panel measured.
+
+---
+
 ## R301 — Birth-rate anchoring + training stability (2026-05-18)
 
 **Motivation.** R298e multi-seed revealed a catastrophic seed-stability

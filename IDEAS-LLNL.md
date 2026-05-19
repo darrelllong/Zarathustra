@@ -1,12 +1,13 @@
 # IDEAS-LLNL.md
 
 LLNL backlog of architecture, loss, and post-hoc bets for the cachesim
-HRC-MAE race. Status as of **2026-05-06**: LANL leads 8 of 9 corpora;
-Alibaba is contested/tied (LLNL R287.A 0.01078 vs LANL R303 cascade-
-tightening 0.01076 — within seed-noise; see `LEADER-BOARD.md` audit
-note). Every idea here is judged by *expected multi-seed mean cachesim
-HRC-MAE delta vs the standing LANL claim*, not by training-time
-diagnostics.
+HRC-MAE race. Status as of **2026-05-19**: post-Constitution restart;
+no banked claims from either team. Wikipedia IRD-renewal claims (LLNL
+R288.W / LANL r290) remain under audit. Active front: R302 Wikipedia LSTM
+with birth-KL + FiLM + 2D birth + WS-rank sampler (wired in
+`llgan/trace_lstm_ws.py`). Every idea here is judged by *expected
+multi-seed mean cachesim HRC-MAE delta vs the standing LANL claim*, not
+by training-time diagnostics.
 
 Numbering continues from the closed-failed GAN-era backlog (#22–#25
 addressed by current implementation, #26 still open). New ideas start
@@ -299,22 +300,91 @@ behind explicit user request; do not autoschedule.
 
 ---
 
-### Operating notes
+### 34. Short-reuse pressure loss — `queued`
 
-1. **Highest near-term ROI:** #27 (port LANL's published recipes to
-   3 corpora; expected to flip 3 rows in one round each). Do this
-   first.
-2. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
+**Target:** all corpora; especially Tencent and Wikipedia where the LSTM
+over-concentrates accesses at rank 0 (the most-recently-used object) compared
+to the real trace.
+
+**Why:** The CE loss treats all ranks equally.  In practice, rank-0 accesses
+in real traces are followed by rank-0 again only ~10-30% of the time (depending
+on corpus); the LSTM, which sees no explicit penalty for adjacent-rank 0
+clustering, tends to over-predict rank 0 at transitions.  A short-reuse pressure
+term penalises predicting the same rank-bin as the previous step more than
+what the empirical transition matrix supports.
+
+**Implementation sketch:**
+1. During `tokenize()`, compute empirical consecutive-rank-0 rate (CRR):
+   `CRR = count(rank_tokens[t]==rank_tokens[t-1]==0) / count(rank_tokens[t-1]==0)`.
+2. During training, add a penalty: when the previous token was rank 0 and the
+   predicted token is rank 0 AND empirical CRR < threshold, add a BCE term that
+   pushes P(rank=0 | prev=rank=0) toward CRR.
+3. CLI flag `--short-reuse-pressure` (float, default 0.0; recommended 1.0–3.0).
+
+**Expected impact:** 1-3% HRC-MAE drop on corpora where adjacent-rank-0
+clustering is the primary deviation.  Analogue to LANL's `--short-reuse-pressure`.
+
+---
+
+### 35. Stack-depth conditioning — `queued`
+
+**Target:** all corpora; especially Meta KV and Tencent where the LRU stack
+depth varies by 3-4 orders of magnitude across the trace.
+
+**Why:** A rank bin of [0, 32] means something different when the LRU stack
+has 50 objects vs 50,000 objects.  Conditioning the LSTM on stack depth lets it
+distinguish the two contexts.
+
+**Implementation sketch:**
+1. During generation, track `len(stack)` as the current footprint.
+2. Bin the footprint with log-spaced edges (e.g. 32 bins over [1, footprint]).
+3. Add a `footprint_emb` embedding in `build_model()` and concatenate to the
+   LSTM input alongside WS embeddings.
+4. During training, pass footprint token computed from the prefix stack depth.
+5. CLI flag `--stack-depth-bins N` (default 0 = disabled).
+
+**Expected impact:** 2-5% drop on large-footprint corpora where the LSTM currently
+conflates early-trace (small stack) and steady-state (large stack) access patterns.
+Analogue to LANL r446.
+
+---
+
+### 36. Wider model (hidden=512 / rank-embed=128) — `queued`
+
+**Target:** all corpora; parameter budget is not the current bottleneck but
+capacity matters once birth-KL and FiLM are in place.
+
+**Why:** R302's recommended recipe is hidden=256 (~1.4M params).  LANL's r462
+sweeps hidden=256 and token-embed=128 (~4× the capacity of their default
+hidden=128 baseline).  Once R302's training signal is calibrated (birth-KL +
+FiLM), the next marginal improvement is expressivity.
+
+**No code change needed.**  `--hidden 512 --rank-embed 128` on the R302 recipe.
+Run only after a R302 4-seed baseline is established; otherwise confounds
+architecture vs capacity attribution.
+
+---
+
+### Operating notes (updated 2026-05-19)
+
+1. **Immediate next run:** R302 on Wikipedia with `--birth-kl-loss-weight 0.25
+   --birth-kl-loss-weight-2d 0.10 --film-cond --rank-sampler empirical`.
+   First check seed stability: if 4-seed FRESH-rate range < 10% relative, scale
+   to 1M and post a Constitution-compliant claim.
+2. **After Wikipedia claim:** port R302 recipe to Tencent and Alibaba using
+   their respective reference CSVs.  The same architecture change should benefit
+   all three storage corpora.
+3. **After storage corpora:** run idea #27 (IRD-renewal port) on Meta KV,
+   CloudPhysics, Wikipedia as a parallel IRD track.  The LSTM and IRD-renewal
+   approaches are not mutually exclusive; post whichever gets the lower 4-seed
+   mean.
+4. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
    Once #27 is banked, this is the structural bet that has the
    highest probability of taking back Twitter/Meta CDN/Baleen24.
-3. **Methodology guard:** every claim still requires four seeds with
+5. **Methodology guard:** every claim still requires four seeds with
    mean and range. Tightness of range is part of the claim — a 0.001
    range with mean 0.027 outranks a 0.005 range with mean 0.026.
-4. **Read [PEER-REVIEW-LANL.md](PEER-REVIEW-LANL.md) Round 68
-   first.** LANL flagged that `chunk_ensemble.py` swaps both obj_id
-   *and size*. Either preserve base size exactly or update the
-   method description before banking the next chunk-ensemble row.
-5. **What we do not need more of:** new GAN-track ideas, new
+6. **What we do not need more of:** new GAN-track ideas, new
    training-time scalar knobs without a structural mechanism, scout
    sweeps that don't produce a 4-seed promotion. The race is
    structural.
