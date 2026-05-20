@@ -17073,3 +17073,147 @@ required for claim (Article VI). Held-out 20% evaluation = the 200k
 holdout from 1M Wiki records (standard protocol). No new benchmark access.
 
 No claim until 4-seed cachesim mean measured.
+
+---
+
+## R303 — WS-KL loss + aux WS head + stateful generation + dropout + short-reuse weights (2026-05-20)
+
+**Motivation.** R302 implemented birth-KL, 2D birth-KL, FiLM, and the WS-conditioned
+rank sampler, matching LANL r461–r463 architecturally.  Four structural gaps remained
+relative to LANL r449+:
+1. O(n·seq_len) history-window generation (vs LANL's O(n) stateful generation).
+2. No WS-conditional rank distribution loss — training signal blind to which rank
+   bins are appropriate for the current WS state.
+3. No auxiliary WS-prediction head — hidden state not directly pressured to track WS.
+4. No short-reuse class weighting — CE loss treats rank-0 (most-recently-used) bins
+   equally with long-reuse bins despite their outsized impact on small-cache HRC-MAE.
+
+**Fix 1: Stateful single-step generation with LSTM warmup (`--warmup-steps`, default=seq_len).**
+
+R302 computed `logits[0, -1]` by re-running the full history window at every step:
+
+    for j in range(n_records):
+        x_rank = torch.tensor([rank_hist])   # shape [1, history]
+        logits, _ = model(x_rank, x_ws)     # O(history) per step; h discarded
+        ll = logits[0, -1]
+
+R303 replaces this with a warmup + stateful loop:
+
+    _, _, h = model(init_tok, ws_zero)      # warmup: init h from warmup_steps tokens
+    for j in range(n_records):
+        logits, _, h = model(step_tok, step_ws, h)   # O(1) per step; h carried
+
+Cost falls from O(n · seq_len) to O(n).  Long-range context is now encoded in h
+rather than an explicit sliding window — the LSTM can leverage temporal dependencies
+beyond the seq_len training window.  Analogue to LANL r446+ stateful generation.
+
+**Fix 2: WS-conditional rank distribution loss (`--ws-kl-loss-weight`, default 0.0).**
+
+During tokenization, LLNL now computes `rank_token_freq_table[ws0_bin, :]` — the
+empirical distribution P(rank_token | ws0_bin) over all vocab tokens.  During training,
+at every (batch, time) position, a KL divergence term penalises the LSTM when its
+predicted rank distribution diverges from the empirical conditional:
+
+    KL( rank_token_freq[ws0_bin] || softmax(logits) )
+
+This is the strongest structural alignment to HRC-MAE: the LRU hit rate at cache size
+s depends directly on P(rank < s), and the WS-conditional empirical distribution
+provides the exact target the LSTM should reproduce.  Analogue to LANL's
+`ws_kl_loss_weight` (with `rank_token_freq_by_ws0` table).  Recommended weight: 0.25.
+
+**Fix 3: Auxiliary WS-prediction head (`--aux-ws-loss-weight`, default 0.0).**
+
+A second linear head `ws_head = nn.Linear(hidden, ws_vocab)` is attached to the LSTM
+output alongside the rank head.  The CE loss on the next WS0 bin forces the LSTM hidden
+state to encode WS dynamics:
+
+    aux_ws_loss = CE(ws_head(lstm_out), next_ws0_bin)
+    loss += aux_ws_loss_weight * aux_ws_loss
+
+This is independent of the rank-prediction loss — it provides a direct gradient signal
+that the LSTM should track working-set size transitions, not just rank statistics.
+Analogous to LANL's `ws_heads` (LANL uses one head per WS window; LLNL uses WS0 only
+as the primary WS driver).  Recommended weight: 0.1–0.3.
+
+**Fix 4: Dropout (`--dropout`, default 0.0).**
+
+Applied in two places: (a) `nn.LSTM(..., dropout=p)` between LSTM layers (active only
+when lstm_layers > 1), and (b) `nn.Dropout(p)` on the LSTM output before the rank head
+and WS head.  Regularises the model on small training sets.  Dropout is set to 0.0
+at inference (cmd_generate always builds with dropout=0.0).  LANL uses p=0.1.
+
+**Fix 5: Short-reuse class weighting (`--short-reuse-loss-weight`, default 0.0).**
+
+A per-token class weight vector is computed over the rank vocab:
+- Rank bins whose midpoint < ws_windows[0] (=32): weight = 1 + gain (full bonus)
+- Rank bins between ws_windows[0] and ws_windows[1] (=128): linearly tapered bonus
+- Rank bins with midpoint >= ws_windows[1]: weight = 1.0 (no change)
+
+This amplifies the CE gradient for short-reuse events that dominate HRC-MAE at the
+small cache sizes (32–512 entries) in the official surface.  Analogue to LANL's
+`short_reuse_loss_weight` / `_short_reuse_class_weights`.  Recommended gain: 1.0–3.0.
+
+**Implementation.** `llgan/trace_lstm_ws.py` rewritten R303:
+- `tokenize()`: new return value `rank_token_freq_table` (shape [n_ws0_bins, vocab]).
+- `_compute_short_reuse_class_weights()`: new helper function.
+- `build_model()`: add `dropout`, `ws_pred_head` params; `forward()` now returns
+  `(logits, ws_logits, h)` — ws_logits is None when ws_pred_head=False.
+- `train_model()`: add `dropout`, `ws_kl_loss_weight`, `aux_ws_loss_weight`,
+  `short_reuse_loss_weight`, `rank_edges`, `windows` params; compute all new losses.
+- `generate()`: stateful single-step loop with warmup (replaces history-window loop);
+  `prev_tok` and `ws_now` carried between steps; h passed through model.
+- `cmd_fit()`: saves `rank_token_freq_table` and `ws_pred_head` flag in checkpoint.
+- `cmd_generate()`: `--warmup-steps N` arg (default 0 = use seq_len from checkpoint).
+
+**Backward compatibility.** R300/R301/R302 checkpoints load into R303 generate:
+`dropout=0.0` at inference; `ws_pred_head` defaults to False if absent; stateful
+generation requires no checkpoint key (warmup_steps falls back to stored `history`).
+
+**Recommended R303 sweep recipe for Wikipedia (Constitution-compliant):**
+
+```bash
+# Step 1: Fit (on vinge — ~25min for 100k rows on GPU)
+python3 -m llgan.trace_lstm_ws fit \
+  --real /tiamat/zarathustra/llgan-output/refs/wiki_real.csv \
+  --max-rows 100000 \
+  --n-bins 200 --ws-bins 32 --ws-windows 32,128,512,2048,8192 \
+  --rank-embed 64 --ws-embed 16 --hidden 256 --lstm-layers 2 \
+  --seq-len 256 --batch 128 --epochs 25 --lr 1e-3 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --film-cond \
+  --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 \
+  --birth-kl-loss-weight-2d 0.10 \
+  --ws-kl-loss-weight 0.25 \
+  --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 \
+  --rank-sampler empirical \
+  --seed 42 \
+  --output /tiamat/zarathustra/checkpoints/llnl/wiki_r303_100k.pt
+
+# Step 2: Multi-seed generation (4 seeds, ~1 min each on GPU)
+python3 -m llgan.trace_lstm_ws generate \
+  --model /tiamat/zarathustra/checkpoints/llnl/wiki_r303_100k.pt \
+  --n 100000 --seeds 42,80,81,82 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --output /tmp/wiki_r303_100k.csv
+
+# Step 3: cachesim 4-seed panel, check FRESH-rate stability across seeds
+```
+
+**Ablation path:**
+1. R302 base (birth-KL + 2D birth-KL + FiLM + WS-rank sampler) — baseline
+2. + stateful generation (`--warmup-steps 256` vs R302's sliding window)
+3. + dropout 0.1
+4. + `--ws-kl-loss-weight 0.25` (WS-KL)
+5. + `--aux-ws-loss-weight 0.1` (aux WS head)
+6. + `--short-reuse-loss-weight 1.0` (short-reuse weights)
+
+**Expected outcome.** The WS-KL loss (fix 2) is the structural driver — it provides
+an empirically-grounded target for the rank distribution at every WS state, directly
+matching what HRC-MAE measures.  Combined with stateful generation (fix 1), the LSTM
+should produce traces with correct WS-conditional rank distributions that reduce
+HRC-MAE below R302's expected 0.030–0.040 range.  Seed stability should improve
+further vs R302 (birth-KL anchors P(NEW); WS-KL anchors P(rank|ws0)).
+
+No claim until 4-seed cachesim panel measured.

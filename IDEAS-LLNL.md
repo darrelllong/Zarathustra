@@ -300,29 +300,23 @@ behind explicit user request; do not autoschedule.
 
 ---
 
-### 34. Short-reuse pressure loss — `queued`
+### 34. Short-reuse class weighting — `closed-positive (R303)`
 
-**Target:** all corpora; especially Tencent and Wikipedia where the LSTM
-over-concentrates accesses at rank 0 (the most-recently-used object) compared
-to the real trace.
+**Target:** all corpora; especially Tencent and Wikipedia.
 
-**Why:** The CE loss treats all ranks equally.  In practice, rank-0 accesses
-in real traces are followed by rank-0 again only ~10-30% of the time (depending
-on corpus); the LSTM, which sees no explicit penalty for adjacent-rank 0
-clustering, tends to over-predict rank 0 at transitions.  A short-reuse pressure
-term penalises predicting the same rank-bin as the previous step more than
-what the empirical transition matrix supports.
+**Why:** The CE loss treats all rank bins equally.  Short-reuse ranks (< ws_windows[0]=32)
+dominate HRC-MAE on small caches (32–512 entries in the official surface).  Amplifying
+the CE gradient for these bins directly pressures the LSTM to get the most cache-relevant
+access patterns right.
 
-**Implementation sketch:**
-1. During `tokenize()`, compute empirical consecutive-rank-0 rate (CRR):
-   `CRR = count(rank_tokens[t]==rank_tokens[t-1]==0) / count(rank_tokens[t-1]==0)`.
-2. During training, add a penalty: when the previous token was rank 0 and the
-   predicted token is rank 0 AND empirical CRR < threshold, add a BCE term that
-   pushes P(rank=0 | prev=rank=0) toward CRR.
-3. CLI flag `--short-reuse-pressure` (float, default 0.0; recommended 1.0–3.0).
+**R303 implementation:** `_compute_short_reuse_class_weights()` assigns weight
+`1 + gain` to rank bins with midpoint < primary window (=32), tapering to 1.0 at
+secondary window (=128), passed via `F.cross_entropy(..., weight=class_weights_t)`.
+CLI: `--short-reuse-loss-weight` (float, default 0.0; recommended 1.0–3.0).
 
-**Expected impact:** 1-3% HRC-MAE drop on corpora where adjacent-rank-0
-clustering is the primary deviation.  Analogue to LANL's `--short-reuse-pressure`.
+**Note:** LANL's generation-time `_apply_short_reuse_pressure` (dynamic WS-feedback
+controller that biases toward short-reuse when current_ws > target_ws) is a complementary
+idea not yet ported.  Tracked as idea #37.
 
 ---
 
@@ -352,33 +346,58 @@ Analogue to LANL r446.
 ### 36. Wider model (hidden=512 / rank-embed=128) — `queued`
 
 **Target:** all corpora; parameter budget is not the current bottleneck but
-capacity matters once birth-KL and FiLM are in place.
+capacity matters once R303's training signal is calibrated.
 
-**Why:** R302's recommended recipe is hidden=256 (~1.4M params).  LANL's r462
-sweeps hidden=256 and token-embed=128 (~4× the capacity of their default
-hidden=128 baseline).  Once R302's training signal is calibrated (birth-KL +
-FiLM), the next marginal improvement is expressivity.
+**Why:** R303's recommended recipe is hidden=256 (~1.5M params with WS head).
+LANL's r462 sweeps hidden=256 token-embed=128.  Once a 4-seed R303 baseline is
+established, the next marginal improvement is expressivity.
 
-**No code change needed.**  `--hidden 512 --rank-embed 128` on the R302 recipe.
-Run only after a R302 4-seed baseline is established; otherwise confounds
-architecture vs capacity attribution.
+**No code change needed.**  `--hidden 512 --rank-embed 128` on the R303 recipe.
+Run only after a R303 4-seed baseline is established.
 
 ---
 
-### Operating notes (updated 2026-05-19)
+### 37. Generation-time WS-feedback pressure (short-reuse pressure) — `queued`
 
-1. **Immediate next run:** R302 on Wikipedia with `--birth-kl-loss-weight 0.25
-   --birth-kl-loss-weight-2d 0.10 --film-cond --rank-sampler empirical`.
-   First check seed stability: if 4-seed FRESH-rate range < 10% relative, scale
-   to 1M and post a Constitution-compliant claim.
-2. **After Wikipedia claim:** port R302 recipe to Tencent and Alibaba using
-   their respective reference CSVs.  The same architecture change should benefit
-   all three storage corpora.
-3. **After storage corpora:** run idea #27 (IRD-renewal port) on Meta KV,
-   CloudPhysics, Wikipedia as a parallel IRD track.  The LSTM and IRD-renewal
-   approaches are not mutually exclusive; post whichever gets the lower 4-seed
-   mean.
-4. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
+**Target:** all corpora.  Complement to idea #34 (training-time class weights).
+
+**Why:** LANL's `_apply_short_reuse_pressure()` is a dynamic WS-feedback controller
+at generation time: when current_ws > target_ws (WS has grown beyond what the empirical
+WS-conditional distribution predicts), bias probabilities toward short-reuse rank bins
+(rank < primary=32) and away from long-reuse bins.  This prevents WS runaway — the
+positive feedback loop where the model generates too many FRESH tokens, inflating the
+WS, causing it to generate even more FRESH tokens.
+
+**Implementation sketch:**
+1. During generation, after computing probs[], track `ws_now[0]` (current WS0) vs
+   `birth_rate_by_ws0[ws0_bin]` (expected birth rate for this WS).
+2. If the current WS is growing faster than expected (surplus > 0), compute a log-weight
+   bonus for short-reuse bins (rank < 32) and penalty for long-reuse bins.
+3. Apply to probs[] before sampling.
+4. CLI flag `--short-reuse-pressure GAIN` (float, default 0.0; try 1.0–3.0).
+
+**Expected impact:** 2-5% HRC-MAE drop on corpora with WS runaway (large seed-to-seed
+variance in FRESH rate).  Directly addresses the root cause of R301's seed=80 failure.
+
+---
+
+### Operating notes (updated 2026-05-20)
+
+1. **Immediate next run:** R303 on Wikipedia with full recipe:
+   `--film-cond --dropout 0.1 --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10
+   --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 --short-reuse-loss-weight 1.0
+   --rank-sampler empirical`.
+   Check 4-seed FRESH-rate range first (want < 10% relative).  If stable, run 1M
+   and post Constitution-compliant claim.
+2. **After Wikipedia claim:** port R303 recipe to Tencent and Alibaba.  WS-KL loss
+   should benefit all corpora with strong WS-conditional rank structure.
+3. **Ablation priority:** WS-KL loss (fix 2) is the structural driver.  If time-
+   constrained, run ablation with ONLY `--ws-kl-loss-weight 0.25` added to R302 to
+   isolate its contribution before running the full R303 stack.
+4. **Next architectural ideas:** #37 (generation-time WS-feedback pressure), #35
+   (stack-depth conditioning), #36 (wider model).  Implement #37 after the first
+   R303 4-seed panel; it costs nothing in training and may sharply reduce seed variance.
+5. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
    Once #27 is banked, this is the structural bet that has the
    highest probability of taking back Twitter/Meta CDN/Baleen24.
 5. **Methodology guard:** every claim still requires four seeds with
