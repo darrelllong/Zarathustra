@@ -551,7 +551,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 fp_tokens: np.ndarray | None = None,
                 n_fp_bins: int = 0,
                 rank_token_freq_table_delta: np.ndarray | None = None,
-                ws_delta_kl_loss_weight: float = 0.0):
+                ws_delta_kl_loss_weight: float = 0.0,
+                birth_rate_by_ws0_delta: np.ndarray | None = None,
+                birth_delta_kl_loss_weight: float = 0.0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -586,6 +588,11 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
     if birth_kl_loss_weight_2d > 0.0 and birth_rate_by_ws01 is not None:
         birth_rate_t_2d = torch.from_numpy(
             np.asarray(birth_rate_by_ws01, dtype=np.float32)).to(device)
+    # Delta-WS birth-KL tensor: P(NEW|ws0,delta_sign), shape [n_ws0_bins, 3] — R310.
+    birth_delta_t: torch.Tensor | None = None
+    if birth_delta_kl_loss_weight > 0.0 and birth_rate_by_ws0_delta is not None:
+        birth_delta_t = torch.from_numpy(
+            np.asarray(birth_rate_by_ws0_delta, dtype=np.float32)).to(device)
 
     # WS-KL tensor: P(rank_token | ws0_bin), shape [n_ws0_bins, vocab].
     ws_kl_freq_t: torch.Tensor | None = None
@@ -612,6 +619,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"epochs={epochs} lr={lr} schedule={lr_schedule} "
           f"label_smooth={label_smoothing} grad_clip={grad_clip} "
           f"birth_kl={birth_kl_loss_weight} birth_kl_2d={birth_kl_loss_weight_2d} "
+          f"birth_delta_kl={birth_delta_kl_loss_weight} "
           f"ws_kl={ws_kl_loss_weight} ws_delta_kl={ws_delta_kl_loss_weight} "
           f"aux_ws={aux_ws_loss_weight} "
           f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
@@ -661,6 +669,25 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                     birth_kl_2d = F.binary_cross_entropy_with_logits(
                         birth_logits_flat, target_soft_2d)
                     loss = loss + birth_kl_loss_weight_2d * birth_kl_2d
+
+            # Delta-WS birth-KL loss: teach birth head P(NEW|ws0,delta) — R310.
+            if birth_delta_t is not None:
+                ws0_next_b = y_ws[:, :, 0]  # [B, T]
+                ws0_cur_b  = x_ws[:, :, 0]
+                delta_b = torch.where(
+                    ws0_next_b < ws0_cur_b,
+                    torch.zeros_like(ws0_next_b),
+                    torch.where(ws0_next_b > ws0_cur_b,
+                                torch.full_like(ws0_next_b, 2),
+                                torch.ones_like(ws0_next_b))
+                )  # [B, T], values 0/1/2
+                ws0_flat_b = ws0_next_b.reshape(-1).clamp(0, birth_delta_t.shape[0] - 1)
+                d_flat_b   = delta_b.reshape(-1).clamp(0, 2)
+                target_birth_delta = birth_delta_t[ws0_flat_b, d_flat_b]
+                birth_logits_flat_b = logits.reshape(-1, vocab)[:, NEW_TOKEN]
+                birth_delta_kl = F.binary_cross_entropy_with_logits(
+                    birth_logits_flat_b, target_birth_delta)
+                loss = loss + birth_delta_kl_loss_weight * birth_delta_kl
 
             # WS-KL loss: align rank distribution to empirical P(rank|ws0).
             if ws_kl_freq_t is not None:
@@ -1031,7 +1058,9 @@ def cmd_fit(args):
                         fp_tokens=fp_tokens,
                         n_fp_bins=n_fp_bins,
                         rank_token_freq_table_delta=rank_token_freq_table_delta,
-                        ws_delta_kl_loss_weight=args.ws_delta_kl_loss_weight)
+                        ws_delta_kl_loss_weight=args.ws_delta_kl_loss_weight,
+                        birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
+                        birth_delta_kl_loss_weight=args.birth_delta_kl_loss_weight)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1398,6 +1427,8 @@ def main():
                     help="CE class-weight gain for short-reuse rank bins (try 1.0–3.0)")
     pf.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0,
                     help="KL loss aligning rank dist to P(rank|ws0,trajectory) (R308; try 0.1–0.25)")
+    pf.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0,
+                    help="BCE loss teaching birth head P(NEW|ws0,trajectory) (R310; try 0.1–0.2)")
     pf.add_argument("--rank-sampler", choices=["uniform", "empirical"],
                     default="uniform",
                     help="rank sampling strategy at generation time")
@@ -1471,6 +1502,7 @@ def main():
     pm.add_argument("--birth-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
     pm.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
     pm.add_argument("--rank-sampler", choices=["uniform", "empirical"], default="uniform")
