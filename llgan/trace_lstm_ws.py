@@ -250,7 +250,9 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
         fp_tokens                    (shape [n] int64 or None),
         fp_edges                     (1-D int64 array or None),
         rank_token_freq_table_delta  (shape [n_ws0_bins, 3, vocab]),
-        rank_token_freq_delta_counts (shape [n_ws0_bins, 3])
+        rank_token_freq_delta_counts (shape [n_ws0_bins, 3]),
+        birth_rate_by_ws0_delta      (shape [n_ws0_bins, 3]),
+        birth_count_by_ws0_delta     (shape [n_ws0_bins, 3])
     """
     obj_ids = []
     with open(real_csv) as f:
@@ -349,6 +351,25 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
                     birth_rate_2d[w0, w1] = birth_rate_by_ws0[w0]
         birth_rate_by_ws01 = birth_rate_2d
 
+    # Delta-WS birth rate P(NEW | ws0_bin, delta_sign) — R307.
+    # Same trajectory encoding as rank delta table: 0=falling, 1=stable, 2=rising.
+    birth_rate_by_ws0_delta = np.zeros((n_ws0_bins, 3), dtype=np.float64)
+    birth_count_by_ws0_delta = np.zeros((n_ws0_bins, 3), dtype=np.int64)
+    _ws0_prev_b = int(ws0_col[0])
+    for t in range(n):
+        w0 = int(ws0_col[t])
+        d_sign = 0 if w0 < _ws0_prev_b else (2 if w0 > _ws0_prev_b else 1)
+        birth_count_by_ws0_delta[w0, d_sign] += 1
+        if rank_tokens[t] == NEW_TOKEN:
+            birth_rate_by_ws0_delta[w0, d_sign] += 1.0
+        _ws0_prev_b = w0
+    for w in range(n_ws0_bins):
+        for d in range(3):
+            if birth_count_by_ws0_delta[w, d] > 0:
+                birth_rate_by_ws0_delta[w, d] /= birth_count_by_ws0_delta[w, d]
+            else:
+                birth_rate_by_ws0_delta[w, d] = birth_rate_by_ws0[w]
+
     # WS-conditioned rank sampler: (bin_idx, ws0_bin) → observed ranks.
     rank_samples_by_token_ws0: dict[tuple[int, int], np.ndarray] = {}
     cell_lists: dict[tuple[int, int], list[int]] = {}
@@ -439,7 +460,8 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
             birth_rate_by_ws01, rank_samples_by_token_ws0, rank_token_freq_table,
             rank_token_freq_table_2d, rank_token_freq_counts,
             fp_tokens, fp_edges,
-            rank_token_freq_table_delta, rank_token_freq_delta_counts)
+            rank_token_freq_table_delta, rank_token_freq_delta_counts,
+            birth_rate_by_ws0_delta, birth_count_by_ws0_delta)
 
 
 def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
@@ -694,7 +716,9 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              fp_edges: np.ndarray | None = None,
              rank_token_freq_table_delta: np.ndarray | None = None,
              ws_token_blend_delta: float = 0.0,
-             rank_token_freq_delta_counts: np.ndarray | None = None):
+             rank_token_freq_delta_counts: np.ndarray | None = None,
+             birth_rate_by_ws0_delta: np.ndarray | None = None,
+             birth_rate_blend_delta: float = 0.0):
     """Stateful single-step autoregressive generation.
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
@@ -767,6 +791,11 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
             ll -= ll.max()
             probs = np.exp(ll); probs /= probs.sum()
 
+            # Delta-sign once per step (shared by rank-delta blend and birth-delta blend).
+            ws0_bin_cur = int(ws_now[0])
+            ws0_delta_sign = (0 if ws0_bin_cur < ws0_bin_prev
+                              else (2 if ws0_bin_cur > ws0_bin_prev else 1))
+
             # --- WS-token blend: anchor rank distribution to P(rank|ws0) ---
             if ws_token_blend > 0.0 and rank_token_freq_table is not None:
                 ws0_bin = min(int(ws_now[0]), rank_token_freq_table.shape[0] - 1)
@@ -795,13 +824,12 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
 
             # --- Delta-WS blend: condition on WS trajectory (rising/stable/falling) ---
             if ws_token_blend_delta > 0.0 and rank_token_freq_table_delta is not None:
-                ws0_bin = min(int(ws_now[0]), rank_token_freq_table_delta.shape[0] - 1)
-                cur_delta = 0 if ws0_bin < ws0_bin_prev else (2 if ws0_bin > ws0_bin_prev else 1)
+                ws0_bin = min(ws0_bin_cur, rank_token_freq_table_delta.shape[0] - 1)
                 alpha_d = ws_token_blend_delta
                 if ws_blend_confidence_tau > 0.0 and rank_token_freq_delta_counts is not None:
-                    cnt_d = float(rank_token_freq_delta_counts[ws0_bin, cur_delta])
+                    cnt_d = float(rank_token_freq_delta_counts[ws0_bin, ws0_delta_sign])
                     alpha_d *= min(1.0, np.sqrt(cnt_d / ws_blend_confidence_tau))
-                emp_d = rank_token_freq_table_delta[ws0_bin, cur_delta]
+                emp_d = rank_token_freq_table_delta[ws0_bin, ws0_delta_sign]
                 probs = (1.0 - alpha_d) * probs + alpha_d * emp_d
                 probs = np.maximum(probs, 0.0)
                 probs /= probs.sum()
@@ -837,6 +865,12 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
                 ws1_bin = min(int(ws_now[1]), birth_rate_by_ws01.shape[1] - 1)
                 emp_2d = float(birth_rate_by_ws01[ws0_bin, ws1_bin])
                 p_blended = birth_rate_blend_2d * emp_2d + (1.0 - birth_rate_blend_2d) * p_blended
+
+            # --- Delta-WS birth-rate blend: P(NEW | ws0, trajectory) — R307 ---
+            if birth_rate_blend_delta > 0.0 and birth_rate_by_ws0_delta is not None:
+                ws0_bin = min(int(ws_now[0]), birth_rate_by_ws0_delta.shape[0] - 1)
+                emp_delta = float(birth_rate_by_ws0_delta[ws0_bin, ws0_delta_sign])
+                p_blended = birth_rate_blend_delta * emp_delta + (1.0 - birth_rate_blend_delta) * p_blended
 
             if p_blended != p_now and p_now < 1.0 - 1e-9:
                 p_blended = max(0.0, min(1.0, p_blended))
@@ -916,7 +950,8 @@ def cmd_fit(args):
      birth_rate_by_ws01, rank_samples_by_token_ws0,
      rank_token_freq_table, rank_token_freq_table_2d,
      rank_token_freq_counts, fp_tokens, fp_edges,
-     rank_token_freq_table_delta, rank_token_freq_delta_counts) = tokenize(
+     rank_token_freq_table_delta, rank_token_freq_delta_counts,
+     birth_rate_by_ws0_delta, _birth_count_by_ws0_delta) = tokenize(
         args.real, args.max_rows, args.n_bins, args.ws_bins,
         windows=tuple(int(x) for x in args.ws_windows.split(",")),
         cache_sizes=cache_sizes,
@@ -972,6 +1007,7 @@ def cmd_fit(args):
         "rank_token_freq_counts": rank_token_freq_counts.tolist(),
         "rank_token_freq_table_delta": rank_token_freq_table_delta.tolist(),
         "rank_token_freq_delta_counts": rank_token_freq_delta_counts.tolist(),
+        "birth_rate_by_ws0_delta": birth_rate_by_ws0_delta.tolist(),
         "fp_edges": fp_edges.tolist() if fp_edges is not None else None,
         "model_state": model.state_dict(),
         "model_config": {
@@ -1045,6 +1081,11 @@ def cmd_generate(args):
     if raw_delta_counts is not None:
         rank_token_freq_delta_counts = np.asarray(raw_delta_counts, dtype=np.float64)
 
+    birth_rate_by_ws0_delta = None
+    raw_birth_delta = state.get("birth_rate_by_ws0_delta")
+    if raw_birth_delta is not None:
+        birth_rate_by_ws0_delta = np.asarray(raw_birth_delta, dtype=np.float64)
+
     fp_edges = None
     raw_fp = state.get("fp_edges")
     if raw_fp is not None:
@@ -1086,7 +1127,9 @@ def cmd_generate(args):
                        fp_edges=fp_edges,
                        rank_token_freq_table_delta=rank_token_freq_table_delta,
                        ws_token_blend_delta=args.ws_token_blend_delta,
-                       rank_token_freq_delta_counts=rank_token_freq_delta_counts)
+                       rank_token_freq_delta_counts=rank_token_freq_delta_counts,
+                       birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
+                       birth_rate_blend_delta=args.birth_rate_blend_delta)
         write_csv(out_path, out)
         print(f"[lstm_ws gen] wrote {args.n:,} → {out_path}", flush=True)
 
@@ -1132,6 +1175,7 @@ def cmd_multiseed(args):
 
     birth_rate_by_ws0        = _arr("birth_rate_by_ws0")
     birth_rate_by_ws01       = _arr("birth_rate_by_ws01")
+    birth_rate_by_ws0_delta  = _arr("birth_rate_by_ws0_delta")
     rank_token_freq_table    = _arr("rank_token_freq_table")
     rank_token_freq_table_2d = _arr("rank_token_freq_table_2d")
     rank_token_freq_counts   = _arr("rank_token_freq_counts")
@@ -1179,7 +1223,9 @@ def cmd_multiseed(args):
                        fp_edges=fp_edges,
                        rank_token_freq_table_delta=rank_token_freq_table_delta,
                        ws_token_blend_delta=args.ws_token_blend_delta,
-                       rank_token_freq_delta_counts=rank_token_freq_delta_counts)
+                       rank_token_freq_delta_counts=rank_token_freq_delta_counts,
+                       birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
+                       birth_rate_blend_delta=args.birth_rate_blend_delta)
         write_csv(out_path, out)
         print(f"[multiseed] wrote {args.n:,} rows → {out_path}", flush=True)
         fake_csvs.append((seed, out_path))
@@ -1319,6 +1365,8 @@ def main():
                     help="comma-separated seeds, e.g. 42,80,81,82")
     pg.add_argument("--birth-rate-blend", type=float, default=0.5)
     pg.add_argument("--birth-rate-blend-2d", type=float, default=0.25)
+    pg.add_argument("--birth-rate-blend-delta", type=float, default=0.0,
+                    help="delta-WS conditioned birth-rate blend; 0=off, try 0.3 (R307)")
     pg.add_argument("--ws-token-blend", type=float, default=0.0,
                     help="blend LSTM rank-dist with empirical P(rank|ws0); 0=LSTM-only, 1=empirical-only (try 0.5)")
     pg.add_argument("--ws-token-blend-2d", type=float, default=0.0,
@@ -1382,6 +1430,7 @@ def main():
                     help="comma-separated generation seeds for multi-seed eval")
     pm.add_argument("--birth-rate-blend", type=float, default=0.5)
     pm.add_argument("--birth-rate-blend-2d", type=float, default=0.25)
+    pm.add_argument("--birth-rate-blend-delta", type=float, default=0.0)
     pm.add_argument("--ws-token-blend", type=float, default=0.0)
     pm.add_argument("--ws-token-blend-2d", type=float, default=0.0)
     pm.add_argument("--ws-blend-confidence-tau", type=float, default=0.0)
