@@ -406,6 +406,27 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 44. Delta-WS birth-KL training loss — `wired (R310)`, *novel vs LANL*
+
+**Target:** all corpora.
+
+**Why:** R307 corrects the birth rate at generation time. R310 teaches the birth head
+to produce trajectory-conditioned P(NEW|ws0,delta_sign) during training. Combined with
+R308 (rank-KL delta training) and R307 (birth-rate blend delta), the full trajectory
+supervision stack is:
+- Train-time rank: R308 `--ws-delta-kl-loss-weight`
+- Train-time birth: R310 `--birth-delta-kl-loss-weight`
+- Gen-time rank: R305 `--ws-token-blend-delta`
+- Gen-time birth: R307 `--birth-rate-blend-delta`
+
+LANL's r449-r464 queue has no analogue for either training-time delta loss.
+
+**R310 implementation:** `--birth-delta-kl-loss-weight α` (default 0.0; try 0.1–0.2).
+BCE loss `birth_delta_kl = BCE(birth_logit, P(NEW|ws0,delta_sign))`. Wired into
+`train_model()`, `cmd_fit()`, and `multiseed` subparser.
+
+---
+
 ### 43. Delta-WS KL training loss — `wired (R308)`, *novel vs LANL*
 
 **Target:** all corpora.
@@ -477,15 +498,16 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R308)
+### Operating notes (updated 2026-05-21, R310)
 
-1. **Immediate next run:** R308 `multiseed` — single command fits + generates + evals:
+1. **Immediate next run:** R310 `multiseed` — single command fits + generates + evals:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
      --fit \
      --film-cond --dropout 0.1 \
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+     --birth-delta-kl-loss-weight 0.15 \
      --ws-kl-loss-weight 0.25 --ws-delta-kl-loss-weight 0.15 \
      --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
@@ -497,10 +519,12 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
-     --tag wiki_r308 --outdir /tmp/r308 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r308/wiki_r308.json
+     --temperature 0.9 \
+     --tag wiki_r310 --outdir /tmp/r310 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r310/wiki_r310.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
+   Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
    `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.
    Use the `multiseed` subcommand with `--model` (no `--fit`) to get a Constitution
