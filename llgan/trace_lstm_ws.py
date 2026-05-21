@@ -549,7 +549,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 windows: list | None = None,
                 short_reuse_loss_weight: float = 0.0,
                 fp_tokens: np.ndarray | None = None,
-                n_fp_bins: int = 0):
+                n_fp_bins: int = 0,
+                rank_token_freq_table_delta: np.ndarray | None = None,
+                ws_delta_kl_loss_weight: float = 0.0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -591,6 +593,12 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
         ws_kl_freq_t = torch.from_numpy(
             np.asarray(rank_token_freq_table, dtype=np.float32)).to(device)
 
+    # Delta-WS KL tensor: P(rank|ws0,delta_sign), shape [n_ws0_bins, 3, vocab] — R308.
+    ws_delta_kl_freq_t: torch.Tensor | None = None
+    if ws_delta_kl_loss_weight > 0.0 and rank_token_freq_table_delta is not None:
+        ws_delta_kl_freq_t = torch.from_numpy(
+            np.asarray(rank_token_freq_table_delta, dtype=np.float32)).to(device)
+
     # Short-reuse class weights for CE loss, shape [vocab].
     class_weights_t: torch.Tensor | None = None
     if short_reuse_loss_weight > 0.0 and rank_edges is not None and windows:
@@ -604,7 +612,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"epochs={epochs} lr={lr} schedule={lr_schedule} "
           f"label_smooth={label_smoothing} grad_clip={grad_clip} "
           f"birth_kl={birth_kl_loss_weight} birth_kl_2d={birth_kl_loss_weight_2d} "
-          f"ws_kl={ws_kl_loss_weight} aux_ws={aux_ws_loss_weight} "
+          f"ws_kl={ws_kl_loss_weight} ws_delta_kl={ws_delta_kl_loss_weight} "
+          f"aux_ws={aux_ws_loss_weight} "
           f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
           flush=True)
     print(f"[lstm_ws train] params={sum(p.numel() for p in model.parameters()):,}",
@@ -661,6 +670,28 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 pred_log = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
                 kl = (target_dist * (torch.log(target_dist + 1e-10) - pred_log)).sum(dim=-1)
                 loss = loss + ws_kl_loss_weight * kl.mean()
+
+            # Delta-WS KL loss: align rank dist to P(rank|ws0, trajectory) — R308.
+            if ws_delta_kl_freq_t is not None:
+                # delta_sign at position t = sign(ws0[t] - ws0[t-1]).
+                # For the first element of each sequence, treat as stable (delta=1).
+                ws0_next = y_ws[:, :, 0]              # [B, T]
+                ws0_cur  = x_ws[:, :, 0]              # [B, T] (ws0 at input step)
+                delta_sign = torch.where(
+                    ws0_next < ws0_cur,
+                    torch.zeros_like(ws0_next),        # falling=0
+                    torch.where(
+                        ws0_next > ws0_cur,
+                        torch.full_like(ws0_next, 2),  # rising=2
+                        torch.ones_like(ws0_next),     # stable=1
+                    )
+                )  # [B, T], dtype long
+                ws0_flat = ws0_next.reshape(-1).clamp(0, ws_delta_kl_freq_t.shape[0] - 1)
+                d_flat   = delta_sign.reshape(-1).clamp(0, 2)
+                target_delta = ws_delta_kl_freq_t[ws0_flat, d_flat]  # [B*T, vocab]
+                pred_log_d = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
+                kl_d = (target_delta * (torch.log(target_delta + 1e-10) - pred_log_d)).sum(dim=-1)
+                loss = loss + ws_delta_kl_loss_weight * kl_d.mean()
 
             # Auxiliary WS-prediction loss: predict next WS0 bin.
             if ws_logits is not None and aux_ws_loss_weight > 0.0:
@@ -983,7 +1014,9 @@ def cmd_fit(args):
                         windows=windows,
                         short_reuse_loss_weight=args.short_reuse_loss_weight,
                         fp_tokens=fp_tokens,
-                        n_fp_bins=n_fp_bins)
+                        n_fp_bins=n_fp_bins,
+                        rank_token_freq_table_delta=rank_token_freq_table_delta,
+                        ws_delta_kl_loss_weight=args.ws_delta_kl_loss_weight)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1344,6 +1377,8 @@ def main():
                     help="CE weight for auxiliary next-WS0 prediction head (try 0.1–0.3)")
     pf.add_argument("--short-reuse-loss-weight", type=float, default=0.0,
                     help="CE class-weight gain for short-reuse rank bins (try 1.0–3.0)")
+    pf.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0,
+                    help="KL loss aligning rank dist to P(rank|ws0,trajectory) (R308; try 0.1–0.25)")
     pf.add_argument("--rank-sampler", choices=["uniform", "empirical"],
                     default="uniform",
                     help="rank sampling strategy at generation time")
@@ -1412,6 +1447,7 @@ def main():
     pm.add_argument("--birth-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--birth-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
     pm.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
     pm.add_argument("--rank-sampler", choices=["uniform", "empirical"], default="uniform")
