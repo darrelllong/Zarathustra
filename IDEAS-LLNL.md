@@ -406,6 +406,20 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 45. 2D WS-KL training loss — `wired (R311)`, *matches LANL r454*
+
+**Target:** all corpora.
+
+**Why:** LANL r454 adds a 2D WS-KL training loss using the full (ws0,ws1) table.
+We had the 1D version (R303) and the 2D table in generation-time blend (R304), but were
+missing the training objective. R311 closes this gap.
+
+**R311 implementation:** `--ws-kl-loss-weight-2d α` (default 0.0; try 0.10–0.15).
+KL loss `KL(LSTM_rank_dist || P(rank|ws0_bin, ws1_bin))` using `rank_token_freq_table_2d`.
+Guard: only applied when `y_ws.shape[2] >= 2` (skips single-window traces safely).
+
+---
+
 ### 44. Delta-WS birth-KL training loss — `wired (R310)`, *novel vs LANL*
 
 **Target:** all corpora.
@@ -498,7 +512,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R310)
+### Operating notes (updated 2026-05-21, R311)
 
 1. **Immediate next run:** R310 `multiseed` — single command fits + generates + evals:
    ```
@@ -508,7 +522,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --film-cond --dropout 0.1 \
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
      --birth-delta-kl-loss-weight 0.15 \
-     --ws-kl-loss-weight 0.25 --ws-delta-kl-loss-weight 0.15 \
+     --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
      --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
@@ -520,8 +534,8 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r310 --outdir /tmp/r310 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r310/wiki_r310.json
+     --tag wiki_r311 --outdir /tmp/r311 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r311/wiki_r311.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
