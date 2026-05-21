@@ -406,6 +406,41 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 43. Delta-WS KL training loss — `wired (R308)`, *novel vs LANL*
+
+**Target:** all corpora.
+
+**Why:** R305 and R307 correct the LSTM's output at generation time via blending. But the
+model itself doesn't learn trajectory-conditional representations during training. Adding a
+KL loss `ws_delta_kl_loss_weight × KL(LSTM || P(rank|ws0,trajectory))` teaches the LSTM
+to produce trajectory-aware distributions internally, making generation-time blending a
+smaller residual correction. LANL's r449-r464 queue has no analogue.
+
+**R308 implementation:** `--ws-delta-kl-loss-weight α` (default 0.0; try 0.1–0.25).
+Delta-sign computed batch-wise in `train_model()` from consecutive ws0 tokens:
+`delta_sign = 0/1/2 = falling/stable/rising`. KL targets `rank_token_freq_table_delta`.
+Wired into `cmd_fit()` and the `multiseed` subparser.
+
+---
+
+### 42. Delta-WS conditioned birth-rate blend — `wired (R307)`, *novel vs LANL*
+
+**Target:** all corpora.
+
+**Why:** At equal ws0 level, a rising WS *must* have elevated P(NEW) — that's how WS grows.
+A falling WS *must* have suppressed P(NEW) — eviction pressure has depleted the hot set.
+The 1D birth-rate table and even the 2D (ws0,ws1) table only partially capture this because
+they bucket on WS level, not on trajectory direction. LANL's r464 queue covers the analogous
+idea for rank tokens; LLNL implements it first for the birth decision.
+
+**R307 implementation:** `birth_rate_by_ws0_delta[ws0_bin][delta_sign]` where
+`delta_sign ∈ {0=falling, 1=stable, 2=rising}`. Computed in `tokenize()`, saved in
+checkpoint, applied at generation time via `--birth-rate-blend-delta α` (default 0.0; try 0.3).
+Falls back to 1D birth rate for empty bins. Shares `ws0_delta_sign` with the R305 rank
+delta-WS blend (computed once per generation step).
+
+---
+
 ### 41. Constitution-compliant multiseed eval pipeline — `wired (R306)`
 
 **Target:** all corpora.
@@ -442,16 +477,17 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R306)
+### Operating notes (updated 2026-05-21, R308)
 
-1. **Immediate next run:** R306 `multiseed` — single command fits + generates + evals:
+1. **Immediate next run:** R308 `multiseed` — single command fits + generates + evals:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
      --fit \
      --film-cond --dropout 0.1 \
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
-     --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 \
+     --ws-kl-loss-weight 0.25 --ws-delta-kl-loss-weight 0.15 \
+     --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
      --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
@@ -459,10 +495,10 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
-     --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+     --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
-     --tag wiki_r306 --outdir /tmp/r306 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r306/wiki_r306.json
+     --tag wiki_r308 --outdir /tmp/r308 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r308/wiki_r308.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
