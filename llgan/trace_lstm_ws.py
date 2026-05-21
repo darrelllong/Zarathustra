@@ -1,4 +1,38 @@
-"""R303 — LSTM + WS context + stateful generation + WS-KL + aux WS head + dropout.
+"""R304 — cache-ladder + WS-token-blend + stack-depth conditioning + gen-time pressure.
+
+Extends R303 (WS-KL, aux WS head, stateful gen, dropout, short-reuse weights) with:
+
+6. Cache-ladder rank vocabulary alignment (--cache-ladder, --ladder-sizes).
+   Injects mandatory rank-edge boundaries at [32,128,512,2048,8192] so no bin
+   straddles a cachesim evaluation boundary.  Eliminates the structural HRC-MAE
+   floor that persists regardless of model quality.  Analogue to LANL r448.
+
+7. WS-cache-ladder WS vocabulary alignment (--ws-cache-ladder).
+   Same mandatory boundaries applied to the WS bin edges so the empirical
+   WS-conditioned tables use cache-aligned conditioning axes.  Analogue to LANL r451.
+
+8. Generation-time WS-conditioned empirical rank blend (--ws-token-blend,
+   --ws-token-blend-2d, --ws-blend-confidence-tau).
+   At each generation step blends the LSTM's predicted rank distribution with the
+   empirical P(rank_token | ws0_bin) stored in the checkpoint.  Zero-refit: works
+   on any R303+ checkpoint.  Analogue to LANL r449/r450/r452.
+   Combined with the WS-KL training loss this closes the calibration gap between
+   MDLSTM and PhaseAtlas.
+
+9. Generation-time WS-feedback short-reuse pressure (--short-reuse-pressure GAIN).
+   Dynamic controller that biases rank-token probabilities toward short-reuse bins
+   (rank < primary=32) whenever the running WS0 exceeds the empirically expected
+   rate, preventing WS runaway.  Zero-refit.  Analogue to LANL's
+   _apply_short_reuse_pressure().  Addresses the root cause of R301's seed-80 failure.
+
+10. Stack-depth conditioning (--stack-depth-bins N).
+    Bins the running LRU footprint (unique-object count so far) on a log-scale array
+    and feeds it as an additional LSTM input embedding.  Lets the model distinguish
+    early-trace (small stack) from steady-state (large stack) contexts.  Requires
+    refit.  Analogue to LANL r446.
+
+All R303 features are preserved and all old checkpoints load fine (new features
+default to off when the checkpoint key is absent).
 
 Extends R302 (birth-KL, 2D birth-KL, FiLM, WS-rank sampler) with five
 structural improvements that close the gap to LANL r449–r463:
@@ -114,7 +148,8 @@ def value_to_bin(value: int, edges: np.ndarray) -> int:
                        len(edges) - 2))
 
 
-def make_rank_bins(footprint: int, n_bins: int) -> np.ndarray:
+def make_rank_bins(footprint: int, n_bins: int,
+                   cache_sizes: list | None = None) -> np.ndarray:
     if footprint <= 1:
         return np.array([0, 2], dtype=np.int64)
     edges = np.unique(np.round(
@@ -122,6 +157,23 @@ def make_rank_bins(footprint: int, n_bins: int) -> np.ndarray:
     ).astype(np.int64))
     if edges[0] > 0:
         edges = np.concatenate([[0], edges])
+    if cache_sizes:
+        mandatory = np.array([s for s in cache_sizes if 0 < s <= footprint],
+                             dtype=np.int64)
+        if len(mandatory):
+            edges = np.unique(np.concatenate([edges, mandatory]))
+    return edges
+
+
+def make_log_edges_with_ladder(max_value: int, n_bins: int,
+                               cache_sizes: list | None = None) -> np.ndarray:
+    """make_log_edges with optional mandatory boundaries for WS-cache-ladder."""
+    edges = make_log_edges(max_value, n_bins)
+    if cache_sizes:
+        mandatory = np.array([s for s in cache_sizes if 0 < s <= max_value],
+                             dtype=np.int64)
+        if len(mandatory):
+            edges = np.unique(np.concatenate([edges, mandatory]))
     return edges
 
 
@@ -163,14 +215,26 @@ def _compute_short_reuse_class_weights(rank_edges: np.ndarray,
 
 
 def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
-             n_ws_bins: int, windows=DEFAULT_WS_WINDOWS):
+             n_ws_bins: int, windows=DEFAULT_WS_WINDOWS,
+             cache_sizes: list | None = None,
+             ws_cache_sizes: list | None = None,
+             stack_depth_bins: int = 0):
     """Tokenize trace into rank_tokens + ws_tokens[t, window].
+
+    cache_sizes: if set, inject mandatory rank-edge boundaries at these values
+                 (cache-ladder alignment, eliminates structural HRC-MAE floor).
+    ws_cache_sizes: same for WS bin edges.
+    stack_depth_bins: if > 0, also compute per-step footprint tokens.
 
     Returns:
         rank_tokens, ws_tokens, rank_edges, ws_edges, footprint,
         bin_ranks_arr, windows, birth_rate_by_ws0, birth_count_by_ws0,
         birth_rate_by_ws01, rank_samples_by_token_ws0,
-        rank_token_freq_table   (shape [n_ws0_bins, vocab])
+        rank_token_freq_table   (shape [n_ws0_bins, vocab]),
+        rank_token_freq_table_2d (shape [n_ws0_bins, n_ws0_bins, vocab] or None),
+        rank_token_freq_counts   (shape [n_ws0_bins]),
+        fp_tokens                (shape [n] int64 or None),
+        fp_edges                 (1-D int64 array or None)
     """
     obj_ids = []
     with open(real_csv) as f:
@@ -197,11 +261,12 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
         bisect.insort(pos_sorted, i)
         last_pos[oid] = i
     footprint = len(last_pos)
-    rank_edges = make_rank_bins(footprint, n_rank_bins)
+    rank_edges = make_rank_bins(footprint, n_rank_bins, cache_sizes=cache_sizes)
 
     # Working-set unique counts per window, BEFORE access at position t.
     ws_max = max(windows)
-    ws_edges = make_log_edges(ws_max, n_ws_bins)
+    ws_edges = make_log_edges_with_ladder(ws_max, n_ws_bins,
+                                          cache_sizes=ws_cache_sizes)
     queues = [deque() for _ in windows]
     counts = [Counter() for _ in windows]
     ws_tokens = np.empty((n, len(windows)), dtype=np.int64)
@@ -283,30 +348,67 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
         rank_samples_by_token_ws0[key] = np.array(lst, dtype=np.int64)
 
     # Empirical rank-token frequency table P(rank_token | ws0_bin).
-    # Shape [n_ws0_bins, vocab].  Used for WS-KL training loss.
-    rank_token_freq_counts = np.zeros((n_ws0_bins, vocab), dtype=np.float64)
+    # Shape [n_ws0_bins, vocab].  Used for WS-KL training loss and gen-time blend.
+    rank_token_freq_raw = np.zeros((n_ws0_bins, vocab), dtype=np.float64)
     for t in range(n):
         w0 = int(ws0_col[t])
         tok = int(rank_tokens[t])
         if 0 <= tok < vocab:
-            rank_token_freq_counts[w0, tok] += 1.0
-    row_sums = rank_token_freq_counts.sum(axis=1, keepdims=True)
-    rank_token_freq_table = rank_token_freq_counts / np.maximum(row_sums, 1.0)
+            rank_token_freq_raw[w0, tok] += 1.0
+    # Per-ws0-bin total count (for confidence weighting).
+    rank_token_freq_counts = rank_token_freq_raw.sum(axis=1)  # shape [n_ws0_bins]
+    row_sums = rank_token_freq_raw.sum(axis=1, keepdims=True)
+    rank_token_freq_table = rank_token_freq_raw / np.maximum(row_sums, 1.0)
+
+    # 2D empirical table P(rank_token | ws0_bin, ws1_bin) for gen-time blend.
+    rank_token_freq_table_2d: np.ndarray | None = None
+    if len(windows) >= 2:
+        ws1_col = ws_tokens[:, 1]
+        n_ws1_bins = n_ws0_bins
+        freq_2d = np.zeros((n_ws0_bins, n_ws1_bins, vocab), dtype=np.float64)
+        for t in range(n):
+            w0 = int(ws0_col[t])
+            w1 = int(ws1_col[t])
+            tok = int(rank_tokens[t])
+            if 0 <= tok < vocab:
+                freq_2d[w0, w1, tok] += 1.0
+        sums_2d = freq_2d.sum(axis=2, keepdims=True)
+        rank_token_freq_table_2d = freq_2d / np.maximum(sums_2d, 1.0)
+        # Fall back to 1D marginal for empty 2D bins.
+        empty_mask = (sums_2d[..., 0] == 0)
+        rank_token_freq_table_2d[empty_mask] = rank_token_freq_table[
+            np.where(empty_mask)[0]]
+
+    # Footprint tokens for stack-depth conditioning (idea #35 / LANL r446).
+    fp_tokens: np.ndarray | None = None
+    fp_edges: np.ndarray | None = None
+    if stack_depth_bins > 0:
+        fp_edges = make_rank_bins(footprint, stack_depth_bins)
+        fp_tok_list = []
+        running_fp = set()
+        for oid in obj_ids:
+            running_fp.add(oid)
+            fp_tok_list.append(value_to_bin(len(running_fp), fp_edges))
+        fp_tokens = np.array(fp_tok_list, dtype=np.int64)
 
     n_ws_bins_eff = len(ws_edges) - 1
     print(f"[lstm_ws tokenize] n={n:,} footprint={footprint:,} "
           f"rank_K={K} vocab={vocab} ws_K={n_ws_bins_eff} windows={list(windows)} "
           f"bin_ranks_filled={len(bin_ranks_arr)} "
           f"global_birth={global_birth_rate:.3f} "
-          f"ws01_cells={len(rank_samples_by_token_ws0):,}", flush=True)
+          f"ws01_cells={len(rank_samples_by_token_ws0):,} "
+          f"fp_bins={stack_depth_bins}", flush=True)
     return (rank_tokens, ws_tokens, rank_edges, ws_edges, footprint,
             bin_ranks_arr, list(windows), birth_rate_by_ws0, birth_count_by_ws0,
-            birth_rate_by_ws01, rank_samples_by_token_ws0, rank_token_freq_table)
+            birth_rate_by_ws01, rank_samples_by_token_ws0, rank_token_freq_table,
+            rank_token_freq_table_2d, rank_token_freq_counts,
+            fp_tokens, fp_edges)
 
 
 def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
                 lstm_layers: int = 2, film_cond: bool = False,
-                dropout: float = 0.0, ws_pred_head: bool = False):
+                dropout: float = 0.0, ws_pred_head: bool = False,
+                n_fp_bins: int = 0):
     import torch
     import torch.nn as nn
 
@@ -315,12 +417,21 @@ def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
             super().__init__()
             self.film_cond = film_cond
             self.ws_pred_head = ws_pred_head
+            self.n_fp_bins = n_fp_bins
             self.rank_emb = nn.Embedding(vocab, rank_embed)
             self.ws_emb = nn.ModuleList(
                 [nn.Embedding(ws_vocab, ws_embed) for _ in range(n_windows)]
             )
             ws_total = n_windows * ws_embed
             input_dim = rank_embed + ws_total
+            # Stack-depth (footprint) conditioning (idea #35 / LANL r446)
+            if n_fp_bins > 0:
+                self.fp_emb = nn.Embedding(n_fp_bins, ws_embed)
+                input_dim += ws_embed
+                self.film_ws_dim = ws_total + ws_embed  # FiLM uses full ctx
+            else:
+                self.fp_emb = None
+                self.film_ws_dim = ws_total
             # inter-layer dropout only applies when lstm_layers > 1
             self.lstm = nn.LSTM(input_dim, hidden, num_layers=lstm_layers,
                                 batch_first=True,
@@ -329,8 +440,8 @@ def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
             self.head = nn.Linear(hidden, vocab)
             # FiLM post-LSTM
             if film_cond:
-                self.film_gamma = nn.Linear(ws_total, hidden, bias=False)
-                self.film_beta = nn.Linear(ws_total, hidden, bias=False)
+                self.film_gamma = nn.Linear(self.film_ws_dim, hidden, bias=False)
+                self.film_beta = nn.Linear(self.film_ws_dim, hidden, bias=False)
             else:
                 self.film_gamma = None
                 self.film_beta = None
@@ -340,14 +451,20 @@ def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
             else:
                 self.ws_head = None
 
-        def forward(self, rank_tok, ws_tok, h=None):
+        def forward(self, rank_tok, ws_tok, h=None, fp_tok=None):
             rank_x = self.rank_emb(rank_tok)
             ws_parts = [emb(ws_tok[:, :, wi]) for wi, emb in enumerate(self.ws_emb)]
             ws_flat = torch.cat(ws_parts, dim=-1)
-            x = torch.cat([rank_x, ws_flat], dim=-1)
+            ctx = ws_flat
+            if self.fp_emb is not None and fp_tok is not None:
+                fp_x = self.fp_emb(fp_tok)
+                ctx = torch.cat([ws_flat, fp_x], dim=-1)
+                x = torch.cat([rank_x, ctx], dim=-1)
+            else:
+                x = torch.cat([rank_x, ws_flat], dim=-1)
             out, h = self.lstm(x, h)
             if self.film_gamma is not None:
-                out = out * (1.0 + self.film_gamma(ws_flat)) + self.film_beta(ws_flat)
+                out = out * (1.0 + self.film_gamma(ctx)) + self.film_beta(ctx)
             out = self.drop(out)
             logits = self.head(out)
             ws_logits = self.ws_head(out) if self.ws_head is not None else None
@@ -371,7 +488,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 aux_ws_loss_weight: float = 0.0,
                 rank_edges: np.ndarray | None = None,
                 windows: list | None = None,
-                short_reuse_loss_weight: float = 0.0):
+                short_reuse_loss_weight: float = 0.0,
+                fp_tokens: np.ndarray | None = None,
+                n_fp_bins: int = 0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -383,10 +502,12 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
     model = build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed,
                         hidden, lstm_layers=lstm_layers,
                         film_cond=film_cond, dropout=dropout,
-                        ws_pred_head=ws_pred).to(device)
+                        ws_pred_head=ws_pred,
+                        n_fp_bins=n_fp_bins).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     rank_t = torch.from_numpy(rank_tokens).long()
     ws_t = torch.from_numpy(ws_tokens).long()
+    fp_t = torch.from_numpy(fp_tokens).long() if fp_tokens is not None and n_fp_bins > 0 else None
     n_total = len(rank_tokens)
     n_train = n_total - seq_len - 1
     total_steps = max(1, (n_train // batch) * epochs)
@@ -420,12 +541,13 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
 
     print(f"[lstm_ws train] V={vocab} ws_V={ws_vocab} E_rank={rank_embed} "
           f"E_ws={ws_embed} H={hidden} layers={lstm_layers} film={film_cond} "
-          f"dropout={dropout} seq={seq_len} batch={batch} epochs={epochs} lr={lr} "
-          f"schedule={lr_schedule} label_smooth={label_smoothing} "
-          f"grad_clip={grad_clip} birth_kl={birth_kl_loss_weight} "
-          f"birth_kl_2d={birth_kl_loss_weight_2d} ws_kl={ws_kl_loss_weight} "
-          f"aux_ws={aux_ws_loss_weight} sr_weight={short_reuse_loss_weight} "
-          f"ws_pred_head={ws_pred} on {device}", flush=True)
+          f"dropout={dropout} fp_bins={n_fp_bins} seq={seq_len} batch={batch} "
+          f"epochs={epochs} lr={lr} schedule={lr_schedule} "
+          f"label_smooth={label_smoothing} grad_clip={grad_clip} "
+          f"birth_kl={birth_kl_loss_weight} birth_kl_2d={birth_kl_loss_weight_2d} "
+          f"ws_kl={ws_kl_loss_weight} aux_ws={aux_ws_loss_weight} "
+          f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
+          flush=True)
     print(f"[lstm_ws train] params={sum(p.numel() for p in model.parameters()):,}",
           flush=True)
 
@@ -441,7 +563,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
             x_ws = torch.stack([ws_t[i:i + seq_len] for i in idx]).to(device)
             y = torch.stack([rank_t[i + 1:i + 1 + seq_len] for i in idx]).to(device)
             y_ws = torch.stack([ws_t[i + 1:i + 1 + seq_len] for i in idx]).to(device)
-            logits, ws_logits, _ = model(x_rank, x_ws)
+            x_fp = (torch.stack([fp_t[i:i + seq_len] for i in idx]).to(device)
+                    if fp_t is not None else None)
+            logits, ws_logits, _ = model(x_rank, x_ws, fp_tok=x_fp)
 
             # Primary CE loss (rank tokens).
             loss = F.cross_entropy(logits.reshape(-1, vocab), y.reshape(-1),
@@ -522,12 +646,27 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              birth_rate_by_ws01: np.ndarray | None = None,
              birth_rate_blend_2d: float = 0.0,
              rank_samples_by_token_ws0: dict | None = None,
-             rank_sampler: str = "uniform"):
+             rank_sampler: str = "uniform",
+             rank_token_freq_table: np.ndarray | None = None,
+             ws_token_blend: float = 0.0,
+             rank_token_freq_table_2d: np.ndarray | None = None,
+             ws_token_blend_2d: float = 0.0,
+             rank_token_freq_counts: np.ndarray | None = None,
+             ws_blend_confidence_tau: float = 0.0,
+             short_reuse_pressure: float = 0.0,
+             fp_edges: np.ndarray | None = None):
     """Stateful single-step autoregressive generation.
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
     zero WS, then drive generation one token at a time, passing h between
     steps.  O(n_records) cost vs O(n_records * seq_len) in R302.
+
+    New in R304:
+    - ws_token_blend: blend LSTM rank-token probs with empirical P(rank|ws0).
+    - ws_token_blend_2d: blend with 2D empirical P(rank|ws0,ws1).
+    - ws_blend_confidence_tau: scale blend by sqrt(bucket_count/tau) for sparse bins.
+    - short_reuse_pressure: dynamic WS-feedback controller biasing toward short-reuse.
+    - fp_edges: footprint bin edges for stack-depth conditioning (LANL r446 analogue).
     """
     import torch
     rng = np.random.default_rng(seed)
@@ -543,13 +682,30 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
     counts = [Counter() for _ in windows]
 
     n_ws0_bins_max = len(ws_edges) - 2  # max valid bin index
+    use_fp = (fp_edges is not None and getattr(model, 'fp_emb', None) is not None)
+    n_fp_max = (len(fp_edges) - 2) if use_fp else 0
+    running_fp_set: set = set()
+
+    # Pre-compute short-reuse bin mask for generation-time pressure.
+    sr_boost_mask: np.ndarray | None = None
+    if short_reuse_pressure > 0.0:
+        primary = int(windows[0]) if windows else 32
+        sr_boost_mask = np.zeros(vocab, dtype=np.float32)
+        for i in range(1, vocab):
+            lo = int(rank_edges[i - 1])
+            hi = int(rank_edges[min(i, len(rank_edges) - 1)])
+            mid = 0.5 * (lo + max(lo + 1, hi) - 1)
+            if mid < primary:
+                sr_boost_mask[i] = 1.0
 
     with torch.no_grad():
         # Warm-up: feed warmup_steps NEW_TOKEN inputs to initialise h.
         ws_zero = torch.zeros(1, warmup_steps, len(windows), dtype=torch.long,
                               device=device)
         init_tok = torch.zeros(1, warmup_steps, dtype=torch.long, device=device)
-        _, _, h = model(init_tok, ws_zero)
+        fp_zero = (torch.zeros(1, warmup_steps, dtype=torch.long, device=device)
+                   if use_fp else None)
+        _, _, h = model(init_tok, ws_zero, fp_tok=fp_zero)
 
         # Current WS state (starts at zero for all windows).
         ws_now = np.zeros(len(windows), dtype=np.int64)
@@ -558,14 +714,59 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
         fresh = recycle = stack_n = 0
 
         for j in range(n_records):
+            fp_bin = value_to_bin(len(running_fp_set), fp_edges) if use_fp else 0
             step_tok = torch.tensor(prev_tok, dtype=torch.long, device=device).reshape(1, 1)
             step_ws = torch.from_numpy(ws_now).to(device=device, dtype=torch.long).reshape(1, 1, -1)
-            logits, _, h = model(step_tok, step_ws, h)
+            step_fp = (torch.tensor(fp_bin, dtype=torch.long, device=device).reshape(1, 1)
+                       if use_fp else None)
+            logits, _, h = model(step_tok, step_ws, h, fp_tok=step_fp)
             ll = logits[0, -1].cpu().numpy()
             ll -= ll.max()
             probs = np.exp(ll); probs /= probs.sum()
 
-            # 1D birth-rate blend: anchor P(NEW) to empirical P(NEW | ws0).
+            # --- WS-token blend: anchor rank distribution to P(rank|ws0) ---
+            if ws_token_blend > 0.0 and rank_token_freq_table is not None:
+                ws0_bin = min(int(ws_now[0]), rank_token_freq_table.shape[0] - 1)
+                alpha = ws_token_blend
+                if ws_blend_confidence_tau > 0.0 and rank_token_freq_counts is not None:
+                    cnt = float(rank_token_freq_counts[ws0_bin])
+                    alpha *= min(1.0, np.sqrt(cnt / ws_blend_confidence_tau))
+                emp1d = rank_token_freq_table[ws0_bin]
+                probs = (1.0 - alpha) * probs + alpha * emp1d
+                probs = np.maximum(probs, 0.0)
+                probs /= probs.sum()
+
+            # --- 2D WS-token blend: further anchor using P(rank|ws0,ws1) ---
+            if (ws_token_blend_2d > 0.0 and rank_token_freq_table_2d is not None
+                    and len(windows) >= 2):
+                ws0_bin = min(int(ws_now[0]), rank_token_freq_table_2d.shape[0] - 1)
+                ws1_bin = min(int(ws_now[1]), rank_token_freq_table_2d.shape[1] - 1)
+                alpha2 = ws_token_blend_2d
+                if ws_blend_confidence_tau > 0.0 and rank_token_freq_counts is not None:
+                    cnt2 = float(rank_token_freq_counts[ws0_bin])
+                    alpha2 *= min(1.0, np.sqrt(cnt2 / ws_blend_confidence_tau))
+                emp2d = rank_token_freq_table_2d[ws0_bin, ws1_bin]
+                probs = (1.0 - alpha2) * probs + alpha2 * emp2d
+                probs = np.maximum(probs, 0.0)
+                probs /= probs.sum()
+
+            # --- Short-reuse pressure: WS-feedback controller ---
+            if short_reuse_pressure > 0.0 and sr_boost_mask is not None:
+                ws0_bin = min(int(ws_now[0]), n_ws0_bins_max)
+                if birth_rate_by_ws0 is not None:
+                    expected_fresh = float(birth_rate_by_ws0[ws0_bin])
+                    actual_fresh_est = float(probs[NEW_TOKEN])
+                    surplus = actual_fresh_est - expected_fresh
+                    if surplus > 0.0:
+                        # Boost short-reuse bins, dampen fresh
+                        log_boost = short_reuse_pressure * surplus * sr_boost_mask
+                        log_probs = np.log(np.maximum(probs, 1e-12))
+                        log_probs += log_boost
+                        log_probs -= log_probs.max()
+                        probs = np.exp(log_probs)
+                        probs /= probs.sum()
+
+            # --- 1D birth-rate blend: anchor P(NEW) to empirical P(NEW | ws0) ---
             p_now = float(probs[NEW_TOKEN])
             p_blended = p_now
             if birth_rate_blend > 0.0 and birth_rate_by_ws0 is not None:
@@ -573,7 +774,7 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
                 emp = float(birth_rate_by_ws0[ws0_bin])
                 p_blended = birth_rate_blend * emp + (1.0 - birth_rate_blend) * p_now
 
-            # 2D birth-rate blend: refine using P(NEW | ws0, ws1).
+            # --- 2D birth-rate blend: refine using P(NEW | ws0, ws1) ---
             if (birth_rate_blend_2d > 0.0 and birth_rate_by_ws01 is not None
                     and len(windows) >= 2):
                 ws0_bin = min(int(ws_now[0]), birth_rate_by_ws01.shape[0] - 1)
@@ -624,6 +825,8 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
                     addr = stack.pop(rank)
                     stack.insert(0, addr); stack_n += 1
             out[j] = addr
+            if use_fp:
+                running_fp_set.add(addr)
 
             ws_now = update_ws_state(queues, counts, addr, windows, ws_edges)
 
@@ -647,14 +850,23 @@ def cmd_fit(args):
     import torch
     if not _try_torch():
         print("ERROR: pytorch missing", file=sys.stderr); sys.exit(1)
+    cache_sizes = ([int(x) for x in args.ladder_sizes.split(",")]
+                   if args.cache_ladder else None)
+    ws_cache_sizes = ([int(x) for x in args.ladder_sizes.split(",")]
+                      if args.ws_cache_ladder else None)
     (rank_tok, ws_tok, rank_edges, ws_edges, footprint,
      bin_ranks, windows, birth_rate_by_ws0, birth_count_by_ws0,
      birth_rate_by_ws01, rank_samples_by_token_ws0,
-     rank_token_freq_table) = tokenize(
+     rank_token_freq_table, rank_token_freq_table_2d,
+     rank_token_freq_counts, fp_tokens, fp_edges) = tokenize(
         args.real, args.max_rows, args.n_bins, args.ws_bins,
-        windows=tuple(int(x) for x in args.ws_windows.split(",")))
+        windows=tuple(int(x) for x in args.ws_windows.split(",")),
+        cache_sizes=cache_sizes,
+        ws_cache_sizes=ws_cache_sizes,
+        stack_depth_bins=args.stack_depth_bins)
     vocab = len(rank_edges)
     ws_vocab = len(ws_edges) - 1
+    n_fp_bins = (len(fp_edges) - 1) if fp_edges is not None else 0
     model = train_model(rank_tok, ws_tok, vocab=vocab, ws_vocab=ws_vocab,
                         n_windows=len(windows),
                         rank_embed=args.rank_embed, ws_embed=args.ws_embed,
@@ -676,7 +888,9 @@ def cmd_fit(args):
                         aux_ws_loss_weight=args.aux_ws_loss_weight,
                         rank_edges=rank_edges,
                         windows=windows,
-                        short_reuse_loss_weight=args.short_reuse_loss_weight)
+                        short_reuse_loss_weight=args.short_reuse_loss_weight,
+                        fp_tokens=fp_tokens,
+                        n_fp_bins=n_fp_bins)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -695,6 +909,10 @@ def cmd_fit(args):
         "rank_samples_by_token_ws0": rswt_serialised,
         "rank_sampler": args.rank_sampler,
         "rank_token_freq_table": rank_token_freq_table.tolist(),
+        "rank_token_freq_table_2d": (rank_token_freq_table_2d.tolist()
+                                     if rank_token_freq_table_2d is not None else None),
+        "rank_token_freq_counts": rank_token_freq_counts.tolist(),
+        "fp_edges": fp_edges.tolist() if fp_edges is not None else None,
         "model_state": model.state_dict(),
         "model_config": {
             "rank_embed": args.rank_embed, "ws_embed": args.ws_embed,
@@ -702,6 +920,7 @@ def cmd_fit(args):
             "n_windows": len(windows), "lstm_layers": args.lstm_layers,
             "film_cond": args.film_cond, "dropout": args.dropout,
             "ws_pred_head": args.aux_ws_loss_weight > 0.0,
+            "n_fp_bins": n_fp_bins,
         },
         "bin_ranks_arr": bin_ranks,
     }
@@ -719,8 +938,9 @@ def cmd_generate(args):
                         lstm_layers=cfg.get("lstm_layers", 2),
                         film_cond=cfg.get("film_cond", False),
                         dropout=0.0,  # no dropout at inference
-                        ws_pred_head=cfg.get("ws_pred_head", False)).to(device)
-    model.load_state_dict(state["model_state"])
+                        ws_pred_head=cfg.get("ws_pred_head", False),
+                        n_fp_bins=cfg.get("n_fp_bins", 0)).to(device)
+    model.load_state_dict(state["model_state"], strict=False)
 
     birth_rate_by_ws0 = None
     raw = state.get("birth_rate_by_ws0")
@@ -740,6 +960,26 @@ def cmd_generate(args):
             for bin_idx, ws0_bin, ranks in rswt_raw
         }
 
+    rank_token_freq_table = None
+    raw_freq = state.get("rank_token_freq_table")
+    if raw_freq is not None:
+        rank_token_freq_table = np.asarray(raw_freq, dtype=np.float64)
+
+    rank_token_freq_table_2d = None
+    raw_freq_2d = state.get("rank_token_freq_table_2d")
+    if raw_freq_2d is not None:
+        rank_token_freq_table_2d = np.asarray(raw_freq_2d, dtype=np.float64)
+
+    rank_token_freq_counts = None
+    raw_counts = state.get("rank_token_freq_counts")
+    if raw_counts is not None:
+        rank_token_freq_counts = np.asarray(raw_counts, dtype=np.float64)
+
+    fp_edges = None
+    raw_fp = state.get("fp_edges")
+    if raw_fp is not None:
+        fp_edges = np.asarray(raw_fp, dtype=np.int64)
+
     rank_sampler = state.get("rank_sampler", "uniform")
     warmup_steps = args.warmup_steps if args.warmup_steps > 0 else int(state.get("history", 64))
 
@@ -750,7 +990,9 @@ def cmd_generate(args):
             out_path = f"{base}_s{seed}{ext}"
         else:
             out_path = args.output
-        print(f"[lstm_ws gen] seed={seed} warmup={warmup_steps} → {out_path}", flush=True)
+        print(f"[lstm_ws gen] seed={seed} warmup={warmup_steps} "
+              f"ws_blend={args.ws_token_blend} ws_blend_2d={args.ws_token_blend_2d} "
+              f"sr_pressure={args.short_reuse_pressure} → {out_path}", flush=True)
         out = generate(model,
                        state["rank_edges"], state["ws_edges"],
                        state["bin_ranks_arr"],
@@ -762,7 +1004,15 @@ def cmd_generate(args):
                        birth_rate_by_ws01=birth_rate_by_ws01,
                        birth_rate_blend_2d=args.birth_rate_blend_2d,
                        rank_samples_by_token_ws0=rank_samples_by_token_ws0,
-                       rank_sampler=rank_sampler)
+                       rank_sampler=rank_sampler,
+                       rank_token_freq_table=rank_token_freq_table,
+                       ws_token_blend=args.ws_token_blend,
+                       rank_token_freq_table_2d=rank_token_freq_table_2d,
+                       ws_token_blend_2d=args.ws_token_blend_2d,
+                       rank_token_freq_counts=rank_token_freq_counts,
+                       ws_blend_confidence_tau=args.ws_blend_confidence_tau,
+                       short_reuse_pressure=args.short_reuse_pressure,
+                       fp_edges=fp_edges)
         write_csv(out_path, out)
         print(f"[lstm_ws gen] wrote {args.n:,} → {out_path}", flush=True)
 
@@ -808,6 +1058,14 @@ def main():
     pf.add_argument("--rank-sampler", choices=["uniform", "empirical"],
                     default="uniform",
                     help="rank sampling strategy at generation time")
+    pf.add_argument("--cache-ladder", action="store_true", default=False,
+                    help="inject mandatory rank-edge boundaries at cache eval sizes (eliminates HRC-MAE floor)")
+    pf.add_argument("--ws-cache-ladder", action="store_true", default=False,
+                    help="inject mandatory WS-edge boundaries at cache eval sizes")
+    pf.add_argument("--ladder-sizes", default="32,128,512,2048,8192",
+                    help="comma-separated mandatory boundary sizes for --cache-ladder/--ws-cache-ladder")
+    pf.add_argument("--stack-depth-bins", type=int, default=0,
+                    help="footprint (LRU stack depth) conditioning bins; 0=disabled (try 32)")
     pf.set_defaults(fn=cmd_fit)
 
     pg = sub.add_parser("generate")
@@ -818,6 +1076,14 @@ def main():
                     help="comma-separated seeds, e.g. 42,80,81,82")
     pg.add_argument("--birth-rate-blend", type=float, default=0.5)
     pg.add_argument("--birth-rate-blend-2d", type=float, default=0.25)
+    pg.add_argument("--ws-token-blend", type=float, default=0.0,
+                    help="blend LSTM rank-dist with empirical P(rank|ws0); 0=LSTM-only, 1=empirical-only (try 0.5)")
+    pg.add_argument("--ws-token-blend-2d", type=float, default=0.0,
+                    help="blend with 2D empirical P(rank|ws0,ws1) (try 0.25)")
+    pg.add_argument("--ws-blend-confidence-tau", type=float, default=0.0,
+                    help="scale blend alpha by sqrt(bucket_count/tau); 0=disabled (try 50)")
+    pg.add_argument("--short-reuse-pressure", type=float, default=0.0,
+                    help="generation-time WS-feedback pressure toward short-reuse bins (try 1.0-3.0)")
     pg.add_argument("--warmup-steps", type=int, default=0,
                     help="LSTM warmup steps before generation (0=use seq_len from checkpoint)")
     pg.set_defaults(fn=cmd_generate)

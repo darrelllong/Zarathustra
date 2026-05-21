@@ -320,7 +320,7 @@ idea not yet ported.  Tracked as idea #37.
 
 ---
 
-### 35. Stack-depth conditioning — `queued`
+### 35. Stack-depth conditioning — `wired (R304)`
 
 **Target:** all corpora; especially Meta KV and Tencent where the LRU stack
 depth varies by 3-4 orders of magnitude across the trace.
@@ -329,17 +329,14 @@ depth varies by 3-4 orders of magnitude across the trace.
 has 50 objects vs 50,000 objects.  Conditioning the LSTM on stack depth lets it
 distinguish the two contexts.
 
-**Implementation sketch:**
-1. During generation, track `len(stack)` as the current footprint.
-2. Bin the footprint with log-spaced edges (e.g. 32 bins over [1, footprint]).
-3. Add a `footprint_emb` embedding in `build_model()` and concatenate to the
-   LSTM input alongside WS embeddings.
-4. During training, pass footprint token computed from the prefix stack depth.
-5. CLI flag `--stack-depth-bins N` (default 0 = disabled).
+**R304 implementation:** `--stack-depth-bins N` (default 0 = disabled; try 32).
+During tokenize, `fp_tokens[t]` = bin of running unique-object count before t.
+`build_model()` adds `fp_emb: Embedding(n_fp_bins, ws_embed)` concatenated to
+LSTM input; FiLM uses the augmented context.  Generation tracks `running_fp_set`
+and bins `len(set)` at each step.  Analogue to LANL r446.
 
 **Expected impact:** 2-5% drop on large-footprint corpora where the LSTM currently
 conflates early-trace (small stack) and steady-state (large stack) access patterns.
-Analogue to LANL r446.
 
 ---
 
@@ -368,38 +365,82 @@ WS-conditional distribution predicts), bias probabilities toward short-reuse ran
 positive feedback loop where the model generates too many FRESH tokens, inflating the
 WS, causing it to generate even more FRESH tokens.
 
-**Implementation sketch:**
-1. During generation, after computing probs[], track `ws_now[0]` (current WS0) vs
-   `birth_rate_by_ws0[ws0_bin]` (expected birth rate for this WS).
-2. If the current WS is growing faster than expected (surplus > 0), compute a log-weight
-   bonus for short-reuse bins (rank < 32) and penalty for long-reuse bins.
-3. Apply to probs[] before sampling.
-4. CLI flag `--short-reuse-pressure GAIN` (float, default 0.0; try 1.0–3.0).
+**R304 implementation:** `--short-reuse-pressure GAIN` (float, default 0.0; try 1.0–3.0).
+After computing probs[], compares `probs[NEW_TOKEN]` to `birth_rate_by_ws0[ws0_bin]`.
+If surplus > 0 (model predicts more fresh than expected), applies log-weight bonus
+to rank bins with midpoint < primary=32.  Applied before birth-rate blend.
+Zero-refit: works on any R303+ checkpoint.  Analogue to LANL's short_reuse_pressure.
 
 **Expected impact:** 2-5% HRC-MAE drop on corpora with WS runaway (large seed-to-seed
 variance in FRESH rate).  Directly addresses the root cause of R301's seed=80 failure.
 
 ---
 
-### Operating notes (updated 2026-05-20)
+### 38. Cache-ladder rank vocabulary alignment — `wired (R304)`
 
-1. **Immediate next run:** R303 on Wikipedia with full recipe:
-   `--film-cond --dropout 0.1 --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10
-   --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 --short-reuse-loss-weight 1.0
-   --rank-sampler empirical`.
-   Check 4-seed FRESH-rate range first (want < 10% relative).  If stable, run 1M
-   and post Constitution-compliant claim.
-2. **After Wikipedia claim:** port R303 recipe to Tencent and Alibaba.  WS-KL loss
-   should benefit all corpora with strong WS-conditional rank structure.
-3. **Ablation priority:** WS-KL loss (fix 2) is the structural driver.  If time-
-   constrained, run ablation with ONLY `--ws-kl-loss-weight 0.25` added to R302 to
-   isolate its contribution before running the full R303 stack.
-4. **Next architectural ideas:** #37 (generation-time WS-feedback pressure), #35
-   (stack-depth conditioning), #36 (wider model).  Implement #37 after the first
-   R303 4-seed panel; it costs nothing in training and may sharply reduce seed variance.
-5. **Biggest architectural win:** #32 (hybrid atlas + IRD-renewal).
-   Once #27 is banked, this is the structural bet that has the
-   highest probability of taking back Twitter/Meta CDN/Baleen24.
+**Target:** all corpora.
+
+**Why:** Log-spaced rank bins may straddle cache evaluation boundaries [32, 128,
+512, 2048, 8192], causing draws to land on the wrong side of the HRC evaluation.
+This is the same structural floor LANL identified in r448.
+
+**R304 implementation:** `--cache-ladder` flag + `--ladder-sizes 32,128,512,2048,8192`.
+Injects mandatory edges via `np.unique(concatenate([log_edges, mandatory]))` in
+`make_rank_bins()`.  Also `--ws-cache-ladder` for WS bin edges.
+
+---
+
+### 39. Generation-time WS-conditioned empirical rank blend — `wired (R304)`
+
+**Target:** all corpora.
+
+**Why:** The LSTM's CE training does not guarantee calibrated P(rank|ws0).
+Blending with the empirical distribution at generation time anchors rank
+predictions without refit.  Zero-refit on any R303+ checkpoint.
+
+**R304 implementation:**
+- `--ws-token-blend α` (default 0.0; try 0.5): blends LSTM probs with
+  `rank_token_freq_table[ws0_bin]` stored in checkpoint.
+- `--ws-token-blend-2d α₂` (default 0.0; try 0.25): further blends with
+  2D table `rank_token_freq_table_2d[ws0_bin, ws1_bin]`.
+- `--ws-blend-confidence-tau τ` (default 0.0; try 50): scales α by
+  `sqrt(bucket_count/τ)` to trust sparse bins less.
+Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
+
+---
+
+### Operating notes (updated 2026-05-21)
+
+1. **Immediate next run:** R304 on Wikipedia — full recipe including new flags:
+   ```
+   python3 -m llgan.trace_lstm_ws fit \
+     --real $WIKI_REF --output wiki_r304.pt \
+     --film-cond --dropout 0.1 \
+     --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+     --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 \
+     --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+     --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+     --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+     --lstm-layers 3 --epochs 25
+   ```
+   Then generate with blend and pressure:
+   ```
+   python3 -m llgan.trace_lstm_ws generate \
+     --model wiki_r304.pt --output wiki_r304 --n 1000000 \
+     --seeds 42,80,81,82 \
+     --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+     --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+     --short-reuse-pressure 2.0
+   ```
+   Check 4-seed FRESH-rate range (want < 10% relative).  If stable, run cachesim
+   and post Constitution-compliant claim if mean < 0.0115 (beats LANL r290).
+2. **Generation-only sweep on any existing R303 checkpoint:** `--ws-token-blend`
+   and `--short-reuse-pressure` work without refit.  Run immediately to probe
+   whether the blend helps the existing model.
+3. **After Wikipedia claim:** port R304 recipe to Tencent and Alibaba.
+4. **Next architectural ideas:** #32 (hybrid atlas + IRD-renewal — highest structural ROI),
+   #36 (wider model hidden=512 after first 4-seed baseline), #29 (black-box cachesim
+   optimization in chunk-ensemble).
 5. **Methodology guard:** every claim still requires four seeds with
    mean and range. Tightness of range is part of the claim — a 0.001
    range with mean 0.027 outranks a 0.005 range with mean 0.026.
