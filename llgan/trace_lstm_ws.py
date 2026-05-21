@@ -544,6 +544,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 birth_kl_loss_weight_2d: float = 0.0,
                 rank_token_freq_table: np.ndarray | None = None,
                 ws_kl_loss_weight: float = 0.0,
+                rank_token_freq_table_2d: np.ndarray | None = None,
+                ws_kl_loss_weight_2d: float = 0.0,
                 aux_ws_loss_weight: float = 0.0,
                 rank_edges: np.ndarray | None = None,
                 windows: list | None = None,
@@ -599,6 +601,11 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
     if ws_kl_loss_weight > 0.0 and rank_token_freq_table is not None:
         ws_kl_freq_t = torch.from_numpy(
             np.asarray(rank_token_freq_table, dtype=np.float32)).to(device)
+    # 2D WS-KL tensor: P(rank|ws0,ws1), shape [ws0_bins, ws0_bins, vocab] — R311/r454.
+    ws_kl_freq_2d_t: torch.Tensor | None = None
+    if ws_kl_loss_weight_2d > 0.0 and rank_token_freq_table_2d is not None:
+        ws_kl_freq_2d_t = torch.from_numpy(
+            np.asarray(rank_token_freq_table_2d, dtype=np.float32)).to(device)
 
     # Delta-WS KL tensor: P(rank|ws0,delta_sign), shape [n_ws0_bins, 3, vocab] — R308.
     ws_delta_kl_freq_t: torch.Tensor | None = None
@@ -620,7 +627,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"label_smooth={label_smoothing} grad_clip={grad_clip} "
           f"birth_kl={birth_kl_loss_weight} birth_kl_2d={birth_kl_loss_weight_2d} "
           f"birth_delta_kl={birth_delta_kl_loss_weight} "
-          f"ws_kl={ws_kl_loss_weight} ws_delta_kl={ws_delta_kl_loss_weight} "
+          f"ws_kl={ws_kl_loss_weight} ws_kl_2d={ws_kl_loss_weight_2d} "
+          f"ws_delta_kl={ws_delta_kl_loss_weight} "
           f"aux_ws={aux_ws_loss_weight} "
           f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
           flush=True)
@@ -697,6 +705,15 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 pred_log = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
                 kl = (target_dist * (torch.log(target_dist + 1e-10) - pred_log)).sum(dim=-1)
                 loss = loss + ws_kl_loss_weight * kl.mean()
+
+            # 2D WS-KL loss: align rank dist to P(rank|ws0,ws1) — R311 / LANL r454.
+            if ws_kl_freq_2d_t is not None and y_ws.shape[2] >= 2:
+                ws0_2d = y_ws[:, :, 0].reshape(-1).clamp(0, ws_kl_freq_2d_t.shape[0] - 1)
+                ws1_2d = y_ws[:, :, 1].reshape(-1).clamp(0, ws_kl_freq_2d_t.shape[1] - 1)
+                target_2d = ws_kl_freq_2d_t[ws0_2d, ws1_2d]  # [B*T, vocab]
+                pred_log_2d = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
+                kl_2d = (target_2d * (torch.log(target_2d + 1e-10) - pred_log_2d)).sum(dim=-1)
+                loss = loss + ws_kl_loss_weight_2d * kl_2d.mean()
 
             # Delta-WS KL loss: align rank dist to P(rank|ws0, trajectory) — R308.
             if ws_delta_kl_freq_t is not None:
@@ -1051,6 +1068,8 @@ def cmd_fit(args):
                         birth_kl_loss_weight_2d=args.birth_kl_loss_weight_2d,
                         rank_token_freq_table=rank_token_freq_table,
                         ws_kl_loss_weight=args.ws_kl_loss_weight,
+                        rank_token_freq_table_2d=rank_token_freq_table_2d,
+                        ws_kl_loss_weight_2d=args.ws_kl_loss_weight_2d,
                         aux_ws_loss_weight=args.aux_ws_loss_weight,
                         rank_edges=rank_edges,
                         windows=windows,
@@ -1421,6 +1440,8 @@ def main():
                     help="2D soft-target BCE weight on birth logit (0=off, try 0.05–0.10)")
     pf.add_argument("--ws-kl-loss-weight", type=float, default=0.0,
                     help="KL weight aligning predicted rank dist to empirical P(rank|ws0) (try 0.25)")
+    pf.add_argument("--ws-kl-loss-weight-2d", type=float, default=0.0,
+                    help="KL weight aligning rank dist to 2D empirical P(rank|ws0,ws1) (R311; try 0.15)")
     pf.add_argument("--aux-ws-loss-weight", type=float, default=0.0,
                     help="CE weight for auxiliary next-WS0 prediction head (try 0.1–0.3)")
     pf.add_argument("--short-reuse-loss-weight", type=float, default=0.0,
@@ -1501,6 +1522,7 @@ def main():
     pm.add_argument("--birth-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--birth-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--ws-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
