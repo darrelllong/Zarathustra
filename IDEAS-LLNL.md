@@ -406,6 +406,22 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 46. HRC-aligned MSE training loss — `wired (R312)`, *novel vs LANL*
+
+**Target:** all corpora.
+
+**Why:** All existing training losses optimize rank token CE or KL to empirical distributions,
+but the race metric is HRC-MAE = mean |fake_hit_rate(S) - real_hit_rate(S)| at 5 cache sizes.
+For LRU, `hit_rate(S) = P(rank < S)` = sum of predicted probs for rank-token bins covering
+rank < S. Adding `hrc_loss_weight × sum_S MSE(pred_rate(S), emp_rate(S))` directly
+trains the LSTM to reproduce the HRC curve at evaluation sizes.
+
+**R312 implementation:** `--hrc-loss-weight w` (default 0.0; try 0.5–2.0). Reuses
+`--ladder-sizes` for the target cache sizes. Pre-computes per-size bin masks at train start.
+Novel — LANL has no metric-aligned loss in their r449-r464 stack.
+
+---
+
 ### 45. 2D WS-KL training loss — `wired (R311)`, *matches LANL r454*
 
 **Target:** all corpora.
@@ -512,7 +528,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R311)
+### Operating notes (updated 2026-05-21, R312)
 
 1. **Immediate next run:** R310 `multiseed` — single command fits + generates + evals:
    ```
@@ -523,6 +539,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
      --birth-delta-kl-loss-weight 0.15 \
      --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+     --hrc-loss-weight 1.0 \
      --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
@@ -534,8 +551,8 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r311 --outdir /tmp/r311 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r311/wiki_r311.json
+     --tag wiki_r312 --outdir /tmp/r312 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r312/wiki_r312.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.

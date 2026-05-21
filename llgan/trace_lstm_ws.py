@@ -824,7 +824,7 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              birth_rate_blend_delta: float = 0.0,
              temperature: float = 1.0,
              top_p: float = 1.0):
-    """Stateful single-step autoregressive generation.
+    """Stateful single-step autoregressive generation (R312).
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
     zero WS, then drive generation one token at a time, passing h between
