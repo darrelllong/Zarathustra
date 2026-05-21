@@ -1,4 +1,18 @@
-"""R304 — cache-ladder + WS-token-blend + stack-depth conditioning + gen-time pressure.
+"""R305 — delta-WS conditioned empirical token blend (ahead of LANL #48).
+
+Extends R304 with:
+
+11. Delta-WS conditioned empirical token blend (--ws-token-blend-delta).
+    Conditions the empirical rank-token blend on WS trajectory (rising / stable /
+    falling) rather than just the current WS level.  Two identical ws0=W states
+    with opposite trajectories have materially different rank distributions: rising
+    WS concentrates fresh tokens and deep reuse; falling WS concentrates shallow
+    reuse.  3D table: rank_token_freq_delta[ws0_bin][delta_sign][rank_token] where
+    delta_sign ∈ {0=falling, 1=stable, 2=rising}.  Zero-refit on any R304+
+    checkpoint; falls back to 1D table for sparse bins (< 8 samples).
+    LLNL implements ahead of LANL idea #48 (queued, code not yet written).
+
+R304 — cache-ladder + WS-token-blend + stack-depth conditioning + gen-time pressure.
 
 Extends R303 (WS-KL, aux WS head, stateful gen, dropout, short-reuse weights) with:
 
@@ -230,11 +244,13 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
         rank_tokens, ws_tokens, rank_edges, ws_edges, footprint,
         bin_ranks_arr, windows, birth_rate_by_ws0, birth_count_by_ws0,
         birth_rate_by_ws01, rank_samples_by_token_ws0,
-        rank_token_freq_table   (shape [n_ws0_bins, vocab]),
-        rank_token_freq_table_2d (shape [n_ws0_bins, n_ws0_bins, vocab] or None),
-        rank_token_freq_counts   (shape [n_ws0_bins]),
-        fp_tokens                (shape [n] int64 or None),
-        fp_edges                 (1-D int64 array or None)
+        rank_token_freq_table        (shape [n_ws0_bins, vocab]),
+        rank_token_freq_table_2d     (shape [n_ws0_bins, n_ws0_bins, vocab] or None),
+        rank_token_freq_counts       (shape [n_ws0_bins]),
+        fp_tokens                    (shape [n] int64 or None),
+        fp_edges                     (1-D int64 array or None),
+        rank_token_freq_table_delta  (shape [n_ws0_bins, 3, vocab]),
+        rank_token_freq_delta_counts (shape [n_ws0_bins, 3])
     """
     obj_ids = []
     with open(real_csv) as f:
@@ -360,6 +376,26 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
     row_sums = rank_token_freq_raw.sum(axis=1, keepdims=True)
     rank_token_freq_table = rank_token_freq_raw / np.maximum(row_sums, 1.0)
 
+    # Delta-WS table P(rank_token | ws0_bin, delta_sign) for gen-time blend.
+    # delta_sign: 0=falling, 1=stable, 2=rising (ws0_bin vs previous step).
+    N_DELTA = 3
+    delta_raw = np.zeros((n_ws0_bins, N_DELTA, vocab), dtype=np.float64)
+    ws0_bin_prev = int(ws0_col[0])
+    for t in range(n):
+        w0 = int(ws0_col[t])
+        tok = int(rank_tokens[t])
+        if 0 <= tok < vocab:
+            d = 0 if w0 < ws0_bin_prev else (2 if w0 > ws0_bin_prev else 1)
+            delta_raw[w0, d, tok] += 1.0
+        ws0_bin_prev = w0
+    delta_sums = delta_raw.sum(axis=2, keepdims=True)
+    rank_token_freq_table_delta = delta_raw / np.maximum(delta_sums, 1.0)
+    # Fall back to 1D marginal for empty delta bins.
+    for d in range(N_DELTA):
+        empty_d = (delta_sums[:, d, 0] == 0)
+        rank_token_freq_table_delta[empty_d, d, :] = rank_token_freq_table[empty_d]
+    rank_token_freq_delta_counts = delta_sums[:, :, 0]  # shape [n_ws0_bins, 3]
+
     # 2D empirical table P(rank_token | ws0_bin, ws1_bin) for gen-time blend.
     rank_token_freq_table_2d: np.ndarray | None = None
     if len(windows) >= 2:
@@ -402,7 +438,8 @@ def tokenize(real_csv: str, max_rows: int, n_rank_bins: int,
             bin_ranks_arr, list(windows), birth_rate_by_ws0, birth_count_by_ws0,
             birth_rate_by_ws01, rank_samples_by_token_ws0, rank_token_freq_table,
             rank_token_freq_table_2d, rank_token_freq_counts,
-            fp_tokens, fp_edges)
+            fp_tokens, fp_edges,
+            rank_token_freq_table_delta, rank_token_freq_delta_counts)
 
 
 def build_model(vocab, n_windows, ws_vocab, rank_embed, ws_embed, hidden,
@@ -654,7 +691,10 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              rank_token_freq_counts: np.ndarray | None = None,
              ws_blend_confidence_tau: float = 0.0,
              short_reuse_pressure: float = 0.0,
-             fp_edges: np.ndarray | None = None):
+             fp_edges: np.ndarray | None = None,
+             rank_token_freq_table_delta: np.ndarray | None = None,
+             ws_token_blend_delta: float = 0.0,
+             rank_token_freq_delta_counts: np.ndarray | None = None):
     """Stateful single-step autoregressive generation.
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
@@ -667,6 +707,8 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
     - ws_blend_confidence_tau: scale blend by sqrt(bucket_count/tau) for sparse bins.
     - short_reuse_pressure: dynamic WS-feedback controller biasing toward short-reuse.
     - fp_edges: footprint bin edges for stack-depth conditioning (LANL r446 analogue).
+    - rank_token_freq_table_delta: P(rank|ws0,delta_sign) shape [ws0,3,vocab] (R305).
+    - ws_token_blend_delta: blend weight for delta-conditioned table (try 0.3).
     """
     import torch
     rng = np.random.default_rng(seed)
@@ -709,6 +751,7 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
 
         # Current WS state (starts at zero for all windows).
         ws_now = np.zeros(len(windows), dtype=np.int64)
+        ws0_bin_prev: int = 0  # for delta-WS conditioning
 
         prev_tok = NEW_TOKEN
         fresh = recycle = stack_n = 0
@@ -747,6 +790,19 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
                     alpha2 *= min(1.0, np.sqrt(cnt2 / ws_blend_confidence_tau))
                 emp2d = rank_token_freq_table_2d[ws0_bin, ws1_bin]
                 probs = (1.0 - alpha2) * probs + alpha2 * emp2d
+                probs = np.maximum(probs, 0.0)
+                probs /= probs.sum()
+
+            # --- Delta-WS blend: condition on WS trajectory (rising/stable/falling) ---
+            if ws_token_blend_delta > 0.0 and rank_token_freq_table_delta is not None:
+                ws0_bin = min(int(ws_now[0]), rank_token_freq_table_delta.shape[0] - 1)
+                cur_delta = 0 if ws0_bin < ws0_bin_prev else (2 if ws0_bin > ws0_bin_prev else 1)
+                alpha_d = ws_token_blend_delta
+                if ws_blend_confidence_tau > 0.0 and rank_token_freq_delta_counts is not None:
+                    cnt_d = float(rank_token_freq_delta_counts[ws0_bin, cur_delta])
+                    alpha_d *= min(1.0, np.sqrt(cnt_d / ws_blend_confidence_tau))
+                emp_d = rank_token_freq_table_delta[ws0_bin, cur_delta]
+                probs = (1.0 - alpha_d) * probs + alpha_d * emp_d
                 probs = np.maximum(probs, 0.0)
                 probs /= probs.sum()
 
@@ -828,6 +884,7 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
             if use_fp:
                 running_fp_set.add(addr)
 
+            ws0_bin_prev = int(ws_now[0])
             ws_now = update_ws_state(queues, counts, addr, windows, ws_edges)
 
             if (j + 1) % 25000 == 0:
@@ -858,7 +915,8 @@ def cmd_fit(args):
      bin_ranks, windows, birth_rate_by_ws0, birth_count_by_ws0,
      birth_rate_by_ws01, rank_samples_by_token_ws0,
      rank_token_freq_table, rank_token_freq_table_2d,
-     rank_token_freq_counts, fp_tokens, fp_edges) = tokenize(
+     rank_token_freq_counts, fp_tokens, fp_edges,
+     rank_token_freq_table_delta, rank_token_freq_delta_counts) = tokenize(
         args.real, args.max_rows, args.n_bins, args.ws_bins,
         windows=tuple(int(x) for x in args.ws_windows.split(",")),
         cache_sizes=cache_sizes,
@@ -912,6 +970,8 @@ def cmd_fit(args):
         "rank_token_freq_table_2d": (rank_token_freq_table_2d.tolist()
                                      if rank_token_freq_table_2d is not None else None),
         "rank_token_freq_counts": rank_token_freq_counts.tolist(),
+        "rank_token_freq_table_delta": rank_token_freq_table_delta.tolist(),
+        "rank_token_freq_delta_counts": rank_token_freq_delta_counts.tolist(),
         "fp_edges": fp_edges.tolist() if fp_edges is not None else None,
         "model_state": model.state_dict(),
         "model_config": {
@@ -975,6 +1035,16 @@ def cmd_generate(args):
     if raw_counts is not None:
         rank_token_freq_counts = np.asarray(raw_counts, dtype=np.float64)
 
+    rank_token_freq_table_delta = None
+    raw_delta = state.get("rank_token_freq_table_delta")
+    if raw_delta is not None:
+        rank_token_freq_table_delta = np.asarray(raw_delta, dtype=np.float64)
+
+    rank_token_freq_delta_counts = None
+    raw_delta_counts = state.get("rank_token_freq_delta_counts")
+    if raw_delta_counts is not None:
+        rank_token_freq_delta_counts = np.asarray(raw_delta_counts, dtype=np.float64)
+
     fp_edges = None
     raw_fp = state.get("fp_edges")
     if raw_fp is not None:
@@ -992,6 +1062,7 @@ def cmd_generate(args):
             out_path = args.output
         print(f"[lstm_ws gen] seed={seed} warmup={warmup_steps} "
               f"ws_blend={args.ws_token_blend} ws_blend_2d={args.ws_token_blend_2d} "
+              f"ws_blend_delta={args.ws_token_blend_delta} "
               f"sr_pressure={args.short_reuse_pressure} → {out_path}", flush=True)
         out = generate(model,
                        state["rank_edges"], state["ws_edges"],
@@ -1012,7 +1083,10 @@ def cmd_generate(args):
                        rank_token_freq_counts=rank_token_freq_counts,
                        ws_blend_confidence_tau=args.ws_blend_confidence_tau,
                        short_reuse_pressure=args.short_reuse_pressure,
-                       fp_edges=fp_edges)
+                       fp_edges=fp_edges,
+                       rank_token_freq_table_delta=rank_token_freq_table_delta,
+                       ws_token_blend_delta=args.ws_token_blend_delta,
+                       rank_token_freq_delta_counts=rank_token_freq_delta_counts)
         write_csv(out_path, out)
         print(f"[lstm_ws gen] wrote {args.n:,} → {out_path}", flush=True)
 
@@ -1082,6 +1156,9 @@ def main():
                     help="blend with 2D empirical P(rank|ws0,ws1) (try 0.25)")
     pg.add_argument("--ws-blend-confidence-tau", type=float, default=0.0,
                     help="scale blend alpha by sqrt(bucket_count/tau); 0=disabled (try 50)")
+    pg.add_argument("--ws-token-blend-delta", type=float, default=0.0,
+                    help="delta-WS conditioned blend weight P(rank|ws0,trajectory); "
+                         "0=off, try 0.3 (R305, ahead of LANL #48)")
     pg.add_argument("--short-reuse-pressure", type=float, default=0.0,
                     help="generation-time WS-feedback pressure toward short-reuse bins (try 1.0-3.0)")
     pg.add_argument("--warmup-steps", type=int, default=0,

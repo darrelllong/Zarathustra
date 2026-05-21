@@ -390,6 +390,22 @@ Injects mandatory edges via `np.unique(concatenate([log_edges, mandatory]))` in
 
 ---
 
+### 40. Delta-WS conditioned empirical token blend — `wired (R305)`, *ahead of LANL #48*
+
+**Target:** all corpora.
+
+**Why:** Two WS states with identical ws0=W but opposite trajectories (rising vs falling)
+have materially different rank distributions.  Rising WS → more fresh tokens and deep reuse.
+Falling WS → concentrated shallow reuse.  LANL identified this as idea #48 but hadn't
+implemented it yet (code needed).  LLNL implements it first.
+
+**R305 implementation:** `--ws-token-blend-delta α` (default 0.0; try 0.3).
+3D table `rank_token_freq_table_delta[ws0_bin][delta_sign][rank_token]` where
+`delta_sign ∈ {0=falling, 1=stable, 2=rising}`.  Applied after 2D blend and before
+short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatically.
+
+---
+
 ### 39. Generation-time WS-conditioned empirical rank blend — `wired (R304)`
 
 **Target:** all corpora.
@@ -409,9 +425,9 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21)
+### Operating notes (updated 2026-05-21, R305)
 
-1. **Immediate next run:** R304 on Wikipedia — full recipe including new flags:
+1. **Immediate next run:** R305 on Wikipedia — full recipe including all new flags:
    ```
    python3 -m llgan.trace_lstm_ws fit \
      --real $WIKI_REF --output wiki_r304.pt \
@@ -429,14 +445,15 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --model wiki_r304.pt --output wiki_r304 --n 1000000 \
      --seeds 42,80,81,82 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+     --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
      --short-reuse-pressure 2.0
    ```
    Check 4-seed FRESH-rate range (want < 10% relative).  If stable, run cachesim
    and post Constitution-compliant claim if mean < 0.0115 (beats LANL r290).
-2. **Generation-only sweep on any existing R303 checkpoint:** `--ws-token-blend`
-   and `--short-reuse-pressure` work without refit.  Run immediately to probe
-   whether the blend helps the existing model.
+2. **Generation-only sweep on any existing R303/R304 checkpoint:** `--ws-token-blend`,
+   `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.
+   Run immediately to probe the blend stack on existing models.
 3. **After Wikipedia claim:** port R304 recipe to Tencent and Alibaba.
 4. **Next architectural ideas:** #32 (hybrid atlas + IRD-renewal — highest structural ROI),
    #36 (wider model hidden=512 after first 4-seed baseline), #29 (black-box cachesim
