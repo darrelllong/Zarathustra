@@ -1091,6 +1091,175 @@ def cmd_generate(args):
         print(f"[lstm_ws gen] wrote {args.n:,} → {out_path}", flush=True)
 
 
+def cmd_multiseed(args):
+    """Fit (optionally) + generate N seeds + cachesim eval → Constitution claim panel."""
+    import json
+    import datetime
+    import torch
+    from llgan import cachesim_eval
+
+    os.makedirs(args.outdir, exist_ok=True)
+
+    # 1. Fit or locate existing model
+    model_path = args.model
+    if args.fit:
+        model_path = os.path.join(args.outdir, f"{args.tag}.pt")
+        args.output = model_path
+        print(f"[multiseed] fitting → {model_path}", flush=True)
+        cmd_fit(args)
+    if not model_path or not os.path.exists(model_path):
+        raise SystemExit(
+            f"multiseed: model not found: {model_path!r}. "
+            "Use --fit to train or --model for an existing checkpoint."
+        )
+
+    # 2. Load model + state
+    state = torch.load(model_path, map_location="cpu", weights_only=False)
+    cfg = state["model_config"]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = build_model(cfg["vocab"], cfg["n_windows"], cfg["ws_vocab"],
+                        cfg["rank_embed"], cfg["ws_embed"], cfg["hidden"],
+                        lstm_layers=cfg.get("lstm_layers", 2),
+                        film_cond=cfg.get("film_cond", False),
+                        dropout=0.0,
+                        ws_pred_head=cfg.get("ws_pred_head", False),
+                        n_fp_bins=cfg.get("n_fp_bins", 0)).to(device)
+    model.load_state_dict(state["model_state"], strict=False)
+
+    def _arr(key, dtype=np.float64):
+        v = state.get(key)
+        return np.asarray(v, dtype=dtype) if v is not None else None
+
+    birth_rate_by_ws0        = _arr("birth_rate_by_ws0")
+    birth_rate_by_ws01       = _arr("birth_rate_by_ws01")
+    rank_token_freq_table    = _arr("rank_token_freq_table")
+    rank_token_freq_table_2d = _arr("rank_token_freq_table_2d")
+    rank_token_freq_counts   = _arr("rank_token_freq_counts")
+    rank_token_freq_table_delta  = _arr("rank_token_freq_table_delta")
+    rank_token_freq_delta_counts = _arr("rank_token_freq_delta_counts")
+    fp_edges = _arr("fp_edges", dtype=np.int64)
+
+    rswt_raw = state.get("rank_samples_by_token_ws0")
+    rank_samples_by_token_ws0 = None
+    if rswt_raw:
+        rank_samples_by_token_ws0 = {
+            (int(bi), int(wb)): np.array(ranks, dtype=np.int64)
+            for bi, wb, ranks in rswt_raw
+        }
+
+    rank_sampler = state.get("rank_sampler", "uniform")
+    warmup_steps = (args.warmup_steps if args.warmup_steps > 0
+                    else int(state.get("history", 64)))
+
+    # 3. Generate one CSV per seed
+    seeds = [int(s) for s in args.seeds.split(",")]
+    fake_csvs: list[tuple[int, str]] = []
+    for seed in seeds:
+        out_path = os.path.join(args.outdir, f"{args.tag}_s{seed}.csv")
+        print(f"[multiseed] generate seed={seed} → {out_path}", flush=True)
+        out = generate(model,
+                       state["rank_edges"], state["ws_edges"],
+                       state["bin_ranks_arr"],
+                       state["windows"], args.n, seed,
+                       cfg["vocab"], cfg["ws_vocab"],
+                       warmup_steps=warmup_steps,
+                       birth_rate_by_ws0=birth_rate_by_ws0,
+                       birth_rate_blend=args.birth_rate_blend,
+                       birth_rate_by_ws01=birth_rate_by_ws01,
+                       birth_rate_blend_2d=args.birth_rate_blend_2d,
+                       rank_samples_by_token_ws0=rank_samples_by_token_ws0,
+                       rank_sampler=rank_sampler,
+                       rank_token_freq_table=rank_token_freq_table,
+                       ws_token_blend=args.ws_token_blend,
+                       rank_token_freq_table_2d=rank_token_freq_table_2d,
+                       ws_token_blend_2d=args.ws_token_blend_2d,
+                       rank_token_freq_counts=rank_token_freq_counts,
+                       ws_blend_confidence_tau=args.ws_blend_confidence_tau,
+                       short_reuse_pressure=args.short_reuse_pressure,
+                       fp_edges=fp_edges,
+                       rank_token_freq_table_delta=rank_token_freq_table_delta,
+                       ws_token_blend_delta=args.ws_token_blend_delta,
+                       rank_token_freq_delta_counts=rank_token_freq_delta_counts)
+        write_csv(out_path, out)
+        print(f"[multiseed] wrote {args.n:,} rows → {out_path}", flush=True)
+        fake_csvs.append((seed, out_path))
+
+    # 4. Cachesim eval each seed
+    per_seed_results: list[dict] = []
+    for seed, fake_csv in fake_csvs:
+        print(f"[multiseed] cachesim eval seed={seed} …", flush=True)
+        report = cachesim_eval.evaluate(
+            fake_csv, args.real, args.cache_sizes, args.policies)
+        cachesim_eval.print_report(report)
+        per_seed_results.append({
+            "seed": seed,
+            "fake_csv": fake_csv,
+            "mean_hrc_mae": report["mean_hrc_mae"],
+            "by_policy": report["by_policy"],
+        })
+
+    # 5. Aggregate: mean + range (Constitution Article VI)
+    per_seed_mae = [r["mean_hrc_mae"] for r in per_seed_results]
+    mean_mae  = sum(per_seed_mae) / len(per_seed_mae)
+    range_mae = max(per_seed_mae) - min(per_seed_mae)
+    seeds_str     = "/".join(str(s) for s in seeds)
+    per_seed_str  = " / ".join(f"{v:.10f}" for v in per_seed_mae)
+
+    print(f"\n{'='*72}", flush=True)
+    print(f"TAG: {args.tag}", flush=True)
+    print(f"Per-seed ({seeds_str}): {per_seed_str}", flush=True)
+    print(f"4-seed mean HRC-MAE : {mean_mae:.10f}  (range {range_mae:.10f})", flush=True)
+    print(f"{'='*72}", flush=True)
+
+    # 6. Constitution-compliant markdown panel
+    today = datetime.date.today().isoformat()
+    md_lines = [
+        f"\n## {today} — {args.tag}\n",
+        f"Per-seed ({seeds_str}): {per_seed_str}  ",
+        f"4-seed mean: **{mean_mae:.10f}** (range {range_mae:.10f})  ",
+        "",
+        "### Per-policy breakdown",
+        "",
+    ]
+    policies = list(per_seed_results[0]["by_policy"].keys())
+    for pol in policies:
+        pol_mae_list = [r["by_policy"][pol]["hrc_mae"] for r in per_seed_results]
+        pol_mean = sum(pol_mae_list) / len(pol_mae_list)
+        pol_str  = " / ".join(f"{v:.6f}" for v in pol_mae_list)
+        md_lines.append(f"- **{pol}**: {pol_str}  →  mean {pol_mean:.6f}")
+    md_lines += [
+        "",
+        f"> cachesim sizes: `{args.cache_sizes}`  policies: `{args.policies}`",
+        f"> model: `{model_path}`",
+        "",
+    ]
+    md_panel = "\n".join(md_lines) + "\n"
+
+    if args.append_markdown:
+        with open(args.append_markdown, "a") as f:
+            f.write(md_panel)
+        print(f"[multiseed] appended claim panel → {args.append_markdown}", flush=True)
+
+    # 7. JSON report
+    json_payload = {
+        "tag": args.tag,
+        "date": today,
+        "model": model_path,
+        "seeds": seeds,
+        "per_seed_mae": per_seed_mae,
+        "mean_hrc_mae": mean_mae,
+        "range_hrc_mae": range_mae,
+        "cache_sizes": args.cache_sizes,
+        "policies": args.policies,
+        "per_seed_results": per_seed_results,
+    }
+    if args.json_out:
+        Path(args.json_out).write_text(json.dumps(json_payload, indent=2))
+        print(f"[multiseed] JSON report → {args.json_out}", flush=True)
+
+    return json_payload
+
+
 def main():
     p = argparse.ArgumentParser(
         description="R303 LSTM + WS-KL + aux WS head + stateful gen + dropout")
@@ -1164,6 +1333,76 @@ def main():
     pg.add_argument("--warmup-steps", type=int, default=0,
                     help="LSTM warmup steps before generation (0=use seq_len from checkpoint)")
     pg.set_defaults(fn=cmd_generate)
+
+    # ------------------------------------------------------------------
+    # multiseed: fit + generate(4 seeds) + cachesim eval → claim panel
+    # Constitution-compliant (Article VI): 4-seed mean + range + per-
+    # seed literal cachesim lines written to markdown / JSON.
+    # ------------------------------------------------------------------
+    pm = sub.add_parser("multiseed",
+                        help="fit + generate 4 seeds + cachesim eval → claim panel")
+    # Fit flags (same as 'fit' subparser)
+    pm.add_argument("--real", required=True, help="reference CSV for tokenize + cachesim eval")
+    pm.add_argument("--max-rows", type=int, default=0)
+    pm.add_argument("--n-bins", type=int, default=200)
+    pm.add_argument("--ws-bins", type=int, default=32)
+    pm.add_argument("--ws-windows", default="32,128,512,2048,8192")
+    pm.add_argument("--rank-embed", type=int, default=64)
+    pm.add_argument("--ws-embed", type=int, default=16)
+    pm.add_argument("--hidden", type=int, default=256)
+    pm.add_argument("--lstm-layers", type=int, default=2)
+    pm.add_argument("--seq-len", type=int, default=256)
+    pm.add_argument("--batch", type=int, default=128)
+    pm.add_argument("--epochs", type=int, default=25)
+    pm.add_argument("--lr", type=float, default=1e-3)
+    pm.add_argument("--label-smoothing", type=float, default=0.05)
+    pm.add_argument("--grad-clip", type=float, default=1.0)
+    pm.add_argument("--lr-schedule", choices=["constant", "cosine"], default="cosine")
+    pm.add_argument("--seed", type=int, default=42, help="training seed")
+    pm.add_argument("--film-cond", action="store_true", default=False)
+    pm.add_argument("--dropout", type=float, default=0.0)
+    pm.add_argument("--birth-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--birth-kl-loss-weight-2d", type=float, default=0.0)
+    pm.add_argument("--ws-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
+    pm.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
+    pm.add_argument("--rank-sampler", choices=["uniform", "empirical"], default="uniform")
+    pm.add_argument("--cache-ladder", action="store_true", default=False)
+    pm.add_argument("--ws-cache-ladder", action="store_true", default=False)
+    pm.add_argument("--ladder-sizes", default="32,128,512,2048,8192")
+    pm.add_argument("--stack-depth-bins", type=int, default=0)
+    # Fit / load
+    pm.add_argument("--fit", action="store_true", default=False,
+                    help="train the model before generating (omit to use --model)")
+    pm.add_argument("--model", default=None,
+                    help="path to existing checkpoint (used if --fit is not set)")
+    # Generation flags
+    pm.add_argument("--n", type=int, default=1_000_000, help="records per generated trace")
+    pm.add_argument("--seeds", default="42,80,81,82",
+                    help="comma-separated generation seeds for multi-seed eval")
+    pm.add_argument("--birth-rate-blend", type=float, default=0.5)
+    pm.add_argument("--birth-rate-blend-2d", type=float, default=0.25)
+    pm.add_argument("--ws-token-blend", type=float, default=0.0)
+    pm.add_argument("--ws-token-blend-2d", type=float, default=0.0)
+    pm.add_argument("--ws-blend-confidence-tau", type=float, default=0.0)
+    pm.add_argument("--ws-token-blend-delta", type=float, default=0.0)
+    pm.add_argument("--short-reuse-pressure", type=float, default=0.0)
+    pm.add_argument("--warmup-steps", type=int, default=0)
+    # Cachesim eval flags
+    pm.add_argument("--cache-sizes", default="32,128,512,2048,8192",
+                    help="cache sizes for cachesim evaluation")
+    pm.add_argument("--policies", default="lru,arc,fifo,sieve,slru,car",
+                    help="policies for cachesim evaluation")
+    # Output flags
+    pm.add_argument("--tag", required=True,
+                    help="tag for this run (used in output filenames and markdown)")
+    pm.add_argument("--outdir", default=".",
+                    help="directory for temporary fake CSVs and JSON report")
+    pm.add_argument("--append-markdown", default=None,
+                    help="markdown file to append claim panel to")
+    pm.add_argument("--json-out", default=None,
+                    help="write full JSON report to this path")
+    pm.set_defaults(fn=cmd_multiseed)
 
     args = p.parse_args()
     args.fn(args)
