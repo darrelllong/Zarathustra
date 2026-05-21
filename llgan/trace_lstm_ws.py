@@ -555,7 +555,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 rank_token_freq_table_delta: np.ndarray | None = None,
                 ws_delta_kl_loss_weight: float = 0.0,
                 birth_rate_by_ws0_delta: np.ndarray | None = None,
-                birth_delta_kl_loss_weight: float = 0.0):
+                birth_delta_kl_loss_weight: float = 0.0,
+                hrc_loss_weight: float = 0.0,
+                hrc_cache_sizes: list | None = None):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -620,6 +622,23 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                                                  short_reuse_loss_weight, vocab)
         class_weights_t = torch.from_numpy(cw).to(device)
 
+    # HRC-aligned loss: for each cache_size S, compute the set of rank token
+    # indices t where rank_edges[t-1] < S (i.e. rank bin is a "hit" at S).
+    # Empirical hit rate = proportion of training tokens in those bins.
+    hrc_masks_t: list[tuple[torch.Tensor, float]] | None = None
+    if hrc_loss_weight > 0.0 and rank_edges is not None:
+        _sizes = hrc_cache_sizes or [32, 128, 512, 2048, 8192]
+        n_total_rank = len(rank_tokens)
+        hrc_masks_t = []
+        for S in _sizes:
+            hit_bins = [t for t in range(1, vocab) if int(rank_edges[t - 1]) < S]
+            if not hit_bins:
+                continue
+            mask = torch.zeros(vocab, dtype=torch.float32, device=device)
+            mask[hit_bins] = 1.0
+            emp_rate = float(np.isin(rank_tokens, hit_bins).sum()) / n_total_rank
+            hrc_masks_t.append((mask, emp_rate))
+
     print(f"[lstm_ws train] V={vocab} ws_V={ws_vocab} E_rank={rank_embed} "
           f"E_ws={ws_embed} H={hidden} layers={lstm_layers} film={film_cond} "
           f"dropout={dropout} fp_bins={n_fp_bins} seq={seq_len} batch={batch} "
@@ -628,7 +647,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"birth_kl={birth_kl_loss_weight} birth_kl_2d={birth_kl_loss_weight_2d} "
           f"birth_delta_kl={birth_delta_kl_loss_weight} "
           f"ws_kl={ws_kl_loss_weight} ws_kl_2d={ws_kl_loss_weight_2d} "
-          f"ws_delta_kl={ws_delta_kl_loss_weight} "
+          f"ws_delta_kl={ws_delta_kl_loss_weight} hrc={hrc_loss_weight} "
           f"aux_ws={aux_ws_loss_weight} "
           f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
           flush=True)
@@ -742,6 +761,15 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 y_ws0 = y_ws[:, :, 0].reshape(-1)
                 ws_loss = F.cross_entropy(ws_logits.reshape(-1, ws_vocab), y_ws0)
                 loss = loss + aux_ws_loss_weight * ws_loss
+
+            # HRC-aligned loss: MSE between predicted and empirical hit rate at each S — R312.
+            if hrc_masks_t:
+                probs_flat = torch.softmax(logits.reshape(-1, vocab), dim=-1)  # [B*T, vocab]
+                hrc_loss_val = torch.tensor(0.0, device=device)
+                for mask, emp_rate in hrc_masks_t:
+                    pred_rate = (probs_flat * mask.unsqueeze(0)).sum(dim=-1).mean()
+                    hrc_loss_val = hrc_loss_val + (pred_rate - emp_rate).pow(2)
+                loss = loss + hrc_loss_weight * hrc_loss_val
 
             opt.zero_grad(); loss.backward()
             if grad_clip > 0.0:
@@ -1079,7 +1107,10 @@ def cmd_fit(args):
                         rank_token_freq_table_delta=rank_token_freq_table_delta,
                         ws_delta_kl_loss_weight=args.ws_delta_kl_loss_weight,
                         birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
-                        birth_delta_kl_loss_weight=args.birth_delta_kl_loss_weight)
+                        birth_delta_kl_loss_weight=args.birth_delta_kl_loss_weight,
+                        hrc_loss_weight=args.hrc_loss_weight,
+                        hrc_cache_sizes=([int(x) for x in args.ladder_sizes.split(",")]
+                                         if args.hrc_loss_weight > 0.0 else None))
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1450,6 +1481,8 @@ def main():
                     help="KL loss aligning rank dist to P(rank|ws0,trajectory) (R308; try 0.1–0.25)")
     pf.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0,
                     help="BCE loss teaching birth head P(NEW|ws0,trajectory) (R310; try 0.1–0.2)")
+    pf.add_argument("--hrc-loss-weight", type=float, default=0.0,
+                    help="HRC-aligned MSE loss at each cachesim eval size (R312; try 0.5–2.0)")
     pf.add_argument("--rank-sampler", choices=["uniform", "empirical"],
                     default="uniform",
                     help="rank sampling strategy at generation time")
@@ -1525,6 +1558,7 @@ def main():
     pm.add_argument("--ws-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0)
+    pm.add_argument("--hrc-loss-weight", type=float, default=0.0)
     pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
     pm.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
     pm.add_argument("--rank-sampler", choices=["uniform", "empirical"], default="uniform")
