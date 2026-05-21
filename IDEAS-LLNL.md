@@ -406,6 +406,23 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 41. Constitution-compliant multiseed eval pipeline — `wired (R306)`
+
+**Target:** all corpora.
+
+**Why:** Article VI requires 4-seed mean + range + literal per-seed cachesim lines before
+any claim lands on the leader-board. Previously this required running fit / generate /
+cachesim as three separate manual steps.  Missing automation was the only thing blocking
+a scored claim after R305 code landed.
+
+**R306 implementation:** `multiseed` subcommand in `llgan/trace_lstm_ws.py`. Accepts all
+fit and generation flags; optionally trains (`--fit`), then generates one CSV per seed,
+runs `llgan.cachesim_eval.evaluate()` against the real reference, aggregates to 4-seed
+mean + range, and appends a formatted markdown panel to `--append-markdown` plus a JSON
+report to `--json-out`.  Single command → complete Constitution-compliant claim evidence.
+
+---
+
 ### 39. Generation-time WS-conditioned empirical rank blend — `wired (R304)`
 
 **Target:** all corpora.
@@ -425,36 +442,34 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R305)
+### Operating notes (updated 2026-05-21, R306)
 
-1. **Immediate next run:** R305 on Wikipedia — full recipe including all new flags:
+1. **Immediate next run:** R306 `multiseed` — single command fits + generates + evals:
    ```
-   python3 -m llgan.trace_lstm_ws fit \
-     --real $WIKI_REF --output wiki_r304.pt \
+   python3 -m llgan.trace_lstm_ws multiseed \
+     --real $WIKI_REF \
+     --fit \
      --film-cond --dropout 0.1 \
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
      --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
      --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
-     --lstm-layers 3 --epochs 25
-   ```
-   Then generate with blend and pressure:
-   ```
-   python3 -m llgan.trace_lstm_ws generate \
-     --model wiki_r304.pt --output wiki_r304 --n 1000000 \
-     --seeds 42,80,81,82 \
+     --lstm-layers 3 --epochs 25 \
+     --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
-     --short-reuse-pressure 2.0
+     --short-reuse-pressure 2.0 \
+     --tag wiki_r306 --outdir /tmp/r306 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r306/wiki_r306.json
    ```
-   Check 4-seed FRESH-rate range (want < 10% relative).  If stable, run cachesim
-   and post Constitution-compliant claim if mean < 0.0115 (beats LANL r290).
-2. **Generation-only sweep on any existing R303/R304 checkpoint:** `--ws-token-blend`,
+   Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
+2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
    `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.
-   Run immediately to probe the blend stack on existing models.
-3. **After Wikipedia claim:** port R304 recipe to Tencent and Alibaba.
+   Use the `multiseed` subcommand with `--model` (no `--fit`) to get a Constitution
+   claim panel without retraining.
+3. **After Wikipedia claim:** port R306 recipe to Tencent and Alibaba.
 4. **Next architectural ideas:** #32 (hybrid atlas + IRD-renewal — highest structural ROI),
    #36 (wider model hidden=512 after first 4-seed baseline), #29 (black-box cachesim
    optimization in chunk-ensemble).

@@ -7172,3 +7172,68 @@ LANL's chunk-cascade numbers are lower. R298 is the next learning step.
 (R298e seed=80 emitted 18% FRESH vs 49% real) by anchoring per-step
 P(FRESH) to the empirical WS0-conditional distribution.
 **Files:** `llgan/trace_lstm_ws.py` (updated in-place from R300).
+
+## R302 — Birth-KL training loss + FiLM + 2D birth + WS-rank sampler (2026-05-19)
+
+**Status:** Code complete.
+
+**Key changes:** Birth-KL soft-target BCE loss (`--birth-kl-loss-weight`), FiLM
+conditioning (`--film-cond`), 2D birth-rate table keyed on (ws0_bin, ws1_bin),
+WS0-conditioned rank sampler (`--rank-sampler empirical`).
+
+## R303 — WS-KL loss + aux WS head + stateful gen + dropout (2026-05-20)
+
+**Status:** Code complete.
+
+**Key changes:** WS-KL training loss aligns LSTM rank dist to empirical P(rank|ws0);
+auxiliary WS-prediction head; stateful generation with LSTM hidden state carry-over;
+dropout regularization; 3-layer LSTM support.
+
+## R304 — Cache-ladder + WS-token-blend + stack-depth conditioning (2026-05-20)
+
+**Status:** Code complete.
+
+**Key changes:** `--cache-ladder` injects mandatory rank-bin edges at cachesim evaluation
+sizes [32,128,512,2048,8192]; `--ws-token-blend` blends LSTM rank dist with empirical
+P(rank|ws0) at generation time; `--ws-token-blend-2d` adds 2D (ws0,ws1) blend;
+`--stack-depth-bins` conditions the LSTM on running LRU footprint; `--short-reuse-pressure`
+feedback controller biasing toward rank < 32.
+
+## R305 — Delta-WS conditioned empirical token blend (2026-05-21)
+
+**Status:** Code complete; ahead of LANL idea #48 (LANL documented but not implemented).
+
+**Key changes:** 3D rank table `[ws0_bin][delta_sign][rank_token]` where delta_sign
+tracks WS trajectory (falling/stable/rising); `--ws-token-blend-delta α` mixes this
+into the generation blend stack after 2D blend and before short-reuse pressure.
+
+## R306 — Constitution-compliant multiseed eval pipeline (2026-05-21)
+
+**Status:** Code complete. Commit `753f936`.
+
+**Key changes:** `multiseed` subcommand in `llgan/trace_lstm_ws.py`. Single command:
+optionally trains (`--fit`), generates one CSV per seed, runs cachesim eval against
+real reference, aggregates 4-seed mean + range, appends Constitution Article VI claim
+panel to `--append-markdown`, writes JSON report. All R305 fit + generation flags
+forwarded. Closes the only remaining gap before filing a scored claim.
+
+**Recipe:**
+```
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF --fit --tag wiki_r306 --outdir /tmp/r306 \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --ws-kl-loss-weight 0.25 --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 25 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 \
+  --short-reuse-pressure 2.0 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r306/wiki_r306.json
+```
+
+**Target:** 4-seed mean HRC-MAE < 0.0115 (beats LANL r290 Wikipedia AUDIT-PENDING).
