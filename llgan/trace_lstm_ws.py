@@ -749,7 +749,9 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              ws_token_blend_delta: float = 0.0,
              rank_token_freq_delta_counts: np.ndarray | None = None,
              birth_rate_by_ws0_delta: np.ndarray | None = None,
-             birth_rate_blend_delta: float = 0.0):
+             birth_rate_blend_delta: float = 0.0,
+             temperature: float = 1.0,
+             top_p: float = 1.0):
     """Stateful single-step autoregressive generation.
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
@@ -819,8 +821,21 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
                        if use_fp else None)
             logits, _, h = model(step_tok, step_ws, h, fp_tok=step_fp)
             ll = logits[0, -1].cpu().numpy()
+            if temperature != 1.0:
+                ll = ll / temperature
             ll -= ll.max()
             probs = np.exp(ll); probs /= probs.sum()
+            # Top-p (nucleus) sampling: zero out tokens beyond cumulative p.
+            if top_p < 1.0:
+                sorted_idx = np.argsort(probs)[::-1]
+                cumsum = np.cumsum(probs[sorted_idx])
+                cutoff = np.searchsorted(cumsum, top_p) + 1
+                mask = np.zeros_like(probs)
+                mask[sorted_idx[:cutoff]] = 1.0
+                probs = probs * mask
+                s = probs.sum()
+                if s > 0:
+                    probs /= s
 
             # Delta-sign once per step (shared by rank-delta blend and birth-delta blend).
             ws0_bin_cur = int(ws_now[0])
@@ -1162,7 +1177,9 @@ def cmd_generate(args):
                        ws_token_blend_delta=args.ws_token_blend_delta,
                        rank_token_freq_delta_counts=rank_token_freq_delta_counts,
                        birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
-                       birth_rate_blend_delta=args.birth_rate_blend_delta)
+                       birth_rate_blend_delta=args.birth_rate_blend_delta,
+                       temperature=args.temperature,
+                       top_p=args.top_p)
         write_csv(out_path, out)
         print(f"[lstm_ws gen] wrote {args.n:,} → {out_path}", flush=True)
 
@@ -1258,7 +1275,9 @@ def cmd_multiseed(args):
                        ws_token_blend_delta=args.ws_token_blend_delta,
                        rank_token_freq_delta_counts=rank_token_freq_delta_counts,
                        birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
-                       birth_rate_blend_delta=args.birth_rate_blend_delta)
+                       birth_rate_blend_delta=args.birth_rate_blend_delta,
+                       temperature=args.temperature,
+                       top_p=args.top_p)
         write_csv(out_path, out)
         print(f"[multiseed] wrote {args.n:,} rows → {out_path}", flush=True)
         fake_csvs.append((seed, out_path))
@@ -1415,6 +1434,10 @@ def main():
                     help="generation-time WS-feedback pressure toward short-reuse bins (try 1.0-3.0)")
     pg.add_argument("--warmup-steps", type=int, default=0,
                     help="LSTM warmup steps before generation (0=use seq_len from checkpoint)")
+    pg.add_argument("--temperature", type=float, default=1.0,
+                    help="softmax temperature at generation; <1=sharper (try 0.8–0.95), >1=flatter")
+    pg.add_argument("--top-p", type=float, default=1.0,
+                    help="nucleus sampling: zero-out tokens beyond cumulative prob p (try 0.95)")
     pg.set_defaults(fn=cmd_generate)
 
     # ------------------------------------------------------------------
@@ -1473,6 +1496,8 @@ def main():
     pm.add_argument("--ws-token-blend-delta", type=float, default=0.0)
     pm.add_argument("--short-reuse-pressure", type=float, default=0.0)
     pm.add_argument("--warmup-steps", type=int, default=0)
+    pm.add_argument("--temperature", type=float, default=1.0)
+    pm.add_argument("--top-p", type=float, default=1.0)
     # Cachesim eval flags
     pm.add_argument("--cache-sizes", default="32,128,512,2048,8192",
                     help="cache sizes for cachesim evaluation")
