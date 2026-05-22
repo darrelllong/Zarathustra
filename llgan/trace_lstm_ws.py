@@ -1,4 +1,12 @@
-"""R305 — delta-WS conditioned empirical token blend (ahead of LANL #48).
+"""R313 — HRC-aligned per-step BCE loss (replaces R312 batch-mean MSE).
+
+R312's HRC loss computed batch_mean(P(hit_at_S)) vs global emp_rate: gradient
+proportional to batch deviation, O(1) signal per step.  R313 replaces this
+with per-step BCE: at each step t, teaches the LSTM to produce P(hit_at_S)
+matching the actual 0/1 outcome.  Proper scoring rule; gradient non-zero at
+every training step regardless of batch mean.  Novel vs LANL (no HRC loss).
+
+R305 — delta-WS conditioned empirical token blend (ahead of LANL #48).
 
 Extends R304 with:
 
@@ -622,13 +630,12 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                                                  short_reuse_loss_weight, vocab)
         class_weights_t = torch.from_numpy(cw).to(device)
 
-    # HRC-aligned loss: for each cache_size S, compute the set of rank token
-    # indices t where rank_edges[t-1] < S (i.e. rank bin is a "hit" at S).
-    # Empirical hit rate = proportion of training tokens in those bins.
-    hrc_masks_t: list[tuple[torch.Tensor, float]] | None = None
+    # HRC-aligned loss (R313): for each cache_size S, pre-compute the hit-bin
+    # indicator mask.  rank_edges[t-1] < S means all ranks in bin t are hits.
+    # With --cache-ladder, no bin straddles a boundary, so this is exact.
+    hrc_masks_t: list[torch.Tensor] | None = None
     if hrc_loss_weight > 0.0 and rank_edges is not None:
         _sizes = hrc_cache_sizes or [32, 128, 512, 2048, 8192]
-        n_total_rank = len(rank_tokens)
         hrc_masks_t = []
         for S in _sizes:
             hit_bins = [t for t in range(1, vocab) if int(rank_edges[t - 1]) < S]
@@ -636,8 +643,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 continue
             mask = torch.zeros(vocab, dtype=torch.float32, device=device)
             mask[hit_bins] = 1.0
-            emp_rate = float(np.isin(rank_tokens, hit_bins).sum()) / n_total_rank
-            hrc_masks_t.append((mask, emp_rate))
+            hrc_masks_t.append(mask)
 
     print(f"[lstm_ws train] V={vocab} ws_V={ws_vocab} E_rank={rank_embed} "
           f"E_ws={ws_embed} H={hidden} layers={lstm_layers} film={film_cond} "
@@ -762,13 +768,20 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 ws_loss = F.cross_entropy(ws_logits.reshape(-1, ws_vocab), y_ws0)
                 loss = loss + aux_ws_loss_weight * ws_loss
 
-            # HRC-aligned loss: MSE between predicted and empirical hit rate at each S — R312.
+            # HRC-aligned loss (R313): per-step BCE on P(hit at S) — stronger
+            # than R312 batch-mean MSE.  At each step t, teaches P(hit_at_S) to
+            # match the actual hit indicator (0 or 1) for that step.  Proper
+            # scoring rule; dense gradient signal vs O(1) per batch in R312.
+            # Novel vs LANL (no HRC loss in r449-r464 stack).
             if hrc_masks_t:
                 probs_flat = torch.softmax(logits.reshape(-1, vocab), dim=-1)  # [B*T, vocab]
+                y_flat_h = y.reshape(-1)  # [B*T] actual next rank tokens
                 hrc_loss_val = torch.tensor(0.0, device=device)
-                for mask, emp_rate in hrc_masks_t:
-                    pred_rate = (probs_flat * mask.unsqueeze(0)).sum(dim=-1).mean()
-                    hrc_loss_val = hrc_loss_val + (pred_rate - emp_rate).pow(2)
+                for mask in hrc_masks_t:
+                    pred_p_hit = (probs_flat * mask.unsqueeze(0)).sum(dim=-1)  # [B*T]
+                    actual_hit = mask[y_flat_h.clamp(0, vocab - 1)]  # [B*T] 0.0 or 1.0
+                    hrc_loss_val = hrc_loss_val + F.binary_cross_entropy(
+                        pred_p_hit.clamp(1e-7, 1 - 1e-7), actual_hit)
                 loss = loss + hrc_loss_weight * hrc_loss_val
 
             opt.zero_grad(); loss.backward()
@@ -1439,7 +1452,7 @@ def cmd_multiseed(args):
 
 def main():
     p = argparse.ArgumentParser(
-        description="R303 LSTM + WS-KL + aux WS head + stateful gen + dropout")
+        description="R313 LSTM + per-step BCE HRC loss + WS-KL + stateful gen")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pf = sub.add_parser("fit")
@@ -1482,7 +1495,7 @@ def main():
     pf.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0,
                     help="BCE loss teaching birth head P(NEW|ws0,trajectory) (R310; try 0.1–0.2)")
     pf.add_argument("--hrc-loss-weight", type=float, default=0.0,
-                    help="HRC-aligned MSE loss at each cachesim eval size (R312; try 0.5–2.0)")
+                    help="HRC-aligned per-step BCE loss at each cachesim eval size (R313; try 0.1–0.5)")
     pf.add_argument("--rank-sampler", choices=["uniform", "empirical"],
                     default="uniform",
                     help="rank sampling strategy at generation time")
@@ -1558,7 +1571,8 @@ def main():
     pm.add_argument("--ws-kl-loss-weight-2d", type=float, default=0.0)
     pm.add_argument("--ws-delta-kl-loss-weight", type=float, default=0.0)
     pm.add_argument("--birth-delta-kl-loss-weight", type=float, default=0.0)
-    pm.add_argument("--hrc-loss-weight", type=float, default=0.0)
+    pm.add_argument("--hrc-loss-weight", type=float, default=0.0,
+                    help="HRC-aligned per-step BCE (R313; try 0.1–0.5)")
     pm.add_argument("--aux-ws-loss-weight", type=float, default=0.0)
     pm.add_argument("--short-reuse-loss-weight", type=float, default=0.0)
     pm.add_argument("--rank-sampler", choices=["uniform", "empirical"], default="uniform")

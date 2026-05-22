@@ -406,19 +406,31 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
-### 46. HRC-aligned MSE training loss — `wired (R312)`, *novel vs LANL*
+### 47. HRC-aligned per-step BCE training loss — `wired (R313)`, *novel vs LANL*
 
 **Target:** all corpora.
 
-**Why:** All existing training losses optimize rank token CE or KL to empirical distributions,
-but the race metric is HRC-MAE = mean |fake_hit_rate(S) - real_hit_rate(S)| at 5 cache sizes.
-For LRU, `hit_rate(S) = P(rank < S)` = sum of predicted probs for rank-token bins covering
-rank < S. Adding `hrc_loss_weight × sum_S MSE(pred_rate(S), emp_rate(S))` directly
-trains the LSTM to reproduce the HRC curve at evaluation sizes.
+**Why:** R312 used batch-mean MSE: compare mean(P(hit_at_S)) over the batch to the global
+empirical hit rate. Gradient proportional to batch deviation — nearly zero once the model
+approximates the marginal rate, and O(1) signal per batch regardless of how many steps are
+miscalibrated. Per-step BCE is strictly stronger: at each position t, teaches
+`P(hit_at_S | LSTM_state_t)` to match the actual 0/1 hit indicator for that step. Proper
+scoring rule (maximized iff predicted probability matches the true conditional hit probability).
+Dense gradient: non-zero at every training step regardless of batch means.
 
-**R312 implementation:** `--hrc-loss-weight w` (default 0.0; try 0.5–2.0). Reuses
-`--ladder-sizes` for the target cache sizes. Pre-computes per-size bin masks at train start.
-Novel — LANL has no metric-aligned loss in their r449-r464 stack.
+**R313 implementation:** Same flag `--hrc-loss-weight w` (default 0.0; **try 0.1–0.5** — lower
+than R312's 0.5–2.0 because BCE has larger raw magnitude than MSE). At each step t, for each
+cache size S: `loss += hrc_loss_weight × mean_t(BCE(P(hit_at_S | t), actual_hit_at_t(S)))`.
+`actual_hit = 1` if next rank token is in a hit bin for S, else 0. Novel — LANL has no
+metric-aligned loss in their r449-r464 stack.
+
+---
+
+### 46. HRC-aligned MSE training loss — `closed-superseded (R312 → R313)`
+
+**Superseded by #47** (per-step BCE). The batch-mean MSE provided weak signal once the model
+approximated the global marginal hit rate. R313 replaces it with per-step BCE for dense
+gradient coverage. No code regression — the same `--hrc-loss-weight` flag now drives BCE.
 
 ---
 
@@ -528,7 +540,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-21, R312)
+### Operating notes (updated 2026-05-22, R313)
 
 1. **Immediate next run:** R310 `multiseed` — single command fits + generates + evals:
    ```
@@ -539,7 +551,7 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
      --birth-delta-kl-loss-weight 0.15 \
      --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
-     --hrc-loss-weight 1.0 \
+     --hrc-loss-weight 0.3 \
      --aux-ws-loss-weight 0.1 \
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
@@ -551,10 +563,12 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r312 --outdir /tmp/r312 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r312/wiki_r312.json
+     --tag wiki_r313 --outdir /tmp/r313 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r313/wiki_r313.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
+   Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE.
+   If loss is dominated by HRC term, reduce to 0.1.
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
    `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.

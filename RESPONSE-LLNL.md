@@ -17217,3 +17217,65 @@ HRC-MAE below R302's expected 0.030–0.040 range.  Seed stability should improv
 further vs R302 (birth-KL anchors P(NEW); WS-KL anchors P(rank|ws0)).
 
 No claim until 4-seed cachesim panel measured.
+
+---
+
+## R313 — HRC-aligned per-step BCE loss (replaces R312 batch-mean MSE) (2026-05-22)
+
+**Motivation.** R312 added the first metric-aligned training loss in the race — novel vs
+LANL's r449-r464 stack.  However, its implementation used batch-mean MSE:
+
+```
+loss += hrc_loss_weight × Σ_S (mean_batch[P(hit_at_S | step)] - emp_hit_rate(S))²
+```
+
+Gradient is proportional to the deviation of the batch mean from the global empirical hit
+rate.  Once the model approximates the correct marginal rate, this gradient collapses to
+near zero — even if individual steps are badly miscalibrated.  Signal is O(1) per batch
+(a single scalar per cache size) regardless of how many steps are wrong.
+
+**Fix: Per-step BCE (R313).**
+
+At each training step t, for each cache size S:
+
+```
+P(hit_at_S | t) = Σ_{k ∈ hit_bins(S)} softmax(LSTM_logits)[k]
+actual_hit_t(S) = 1 if rank_tokens[t+1] is a hit bin for S, else 0
+loss += hrc_loss_weight × mean_t BCE(P(hit_at_S | t), actual_hit_t(S))
+```
+
+Properties:
+1. **Proper scoring rule** — minimized iff `P(hit_at_S | t) = E[actual_hit_t(S)]`, i.e., the
+   LSTM's predicted hit probability matches the true conditional hit probability given its
+   internal state.
+2. **Dense gradient** — non-zero at every training step.  Gradient proportional to
+   `P(hit_at_S | t) - actual_hit_t(S)`, which is large when any step is miscalibrated.
+3. **Novel vs LANL** — LANL has no HRC-aligned loss of any kind.  LLNL now has both the
+   structural advantage (metric-direct training) and the implementation advantage (proper
+   scoring rule).
+
+**Implementation.**  `llgan/trace_lstm_ws.py` updated in-place:
+- `hrc_masks_t` changed from `list[tuple[Tensor, float]]` to `list[Tensor]` (drop `emp_rate`).
+- Training loop: `F.binary_cross_entropy(pred_p_hit.clamp(1e-7, 1-1e-7), actual_hit)` replaces
+  the batch-mean MSE.  `actual_hit = mask[y_flat_h]` is 0.0/1.0 per step.
+- Recommended weight: `--hrc-loss-weight 0.1–0.5` (lower than R312's 0.5–2.0; BCE magnitude
+  is larger than MSE).
+
+**Recipe update.** Operating notes updated to `--hrc-loss-weight 0.3` in the R313 multiseed
+command.  No refit needed to evaluate the per-step BCE effect — but the full R313 recipe
+benefits most from refit with the new loss from epoch 0.
+
+**Advocatus-diaboli check (self-review):**
+- Does the BCE target make sense for NEW_TOKEN steps? YES — `mask[0] = 0.0` for all cache
+  sizes, so `actual_hit = 0` at NEW_TOKEN positions (fresh accesses are never cache hits).
+  The loss correctly penalises the model for assigning high `P(hit_at_S)` at fresh-access
+  steps.
+- Does it interact correctly with `--cache-ladder`? YES — with cache-ladder, no rank bin
+  straddles a cache size boundary, so the hit bin identification (`rank_edges[t-1] < S`) is
+  exact.  Without cache-ladder the condition is approximate; the flag should always be set.
+- Scale check: batch size B=128, seq_len T=256, n_cache_sizes=5.  BCE per step is ~0.5 nats
+  for a calibrated model.  HRC contribution at weight 0.3: `0.3 × 5 × 0.5 = 0.75` nats vs
+  primary CE ~4.25 nats at init → 18% of total loss.  Reasonable; reduce to 0.1 if HRC term
+  dominates training.
+
+No claim until 4-seed cachesim panel measured on vinge.
