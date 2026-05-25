@@ -406,6 +406,21 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 48. Validation-guided checkpoint + per-epoch HRC proxy — `wired (R314)`, *novel vs LANL*
+
+**Target:** all corpora.  Training stability improvement with any R303+ full-loss-stack recipe.
+
+**Why:** With 7+ stacked auxiliary losses, the optimal stopping epoch varies by corpus and weighting.  Always training for exactly 25 epochs is arbitrary.  LANL r449–r464 has no validation split or early stopping.
+
+**R314 implementation:**
+- `--validation-fraction` (float, default 0.0 = R313 behaviour).  Holds out last `frac × n_total` records as temporal validation.  Best-CE-epoch checkpoint is restored after training.
+- `--early-stopping-patience` (int, default 0 = disabled).  Stop if validation CE doesn't improve for N consecutive epochs.
+- In-batch HRC proxy (always when `--hrc-loss-weight > 0`): prints `|mean(P_hat_hit) - actual_hit_rate|` per epoch with zero overhead.
+
+**Recipe update:** `--epochs 50 --validation-fraction 0.15 --early-stopping-patience 7` replaces the fixed `--epochs 25` in the R313 recipe.
+
+---
+
 ### 47. HRC-aligned per-step BCE training loss — `wired (R313)`, *novel vs LANL*
 
 **Target:** all corpora.
@@ -540,9 +555,9 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-22, R313)
+### Operating notes (updated 2026-05-25, R314)
 
-1. **Immediate next run:** R310 `multiseed` — single command fits + generates + evals:
+1. **Immediate next run:** R314 `multiseed` — validation-guided checkpoint, 50 epochs with early stop:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
@@ -556,15 +571,16 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --short-reuse-loss-weight 1.0 --rank-sampler empirical \
      --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
      --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
-     --lstm-layers 3 --epochs 25 \
+     --lstm-layers 3 --epochs 50 \
+     --validation-fraction 0.15 --early-stopping-patience 7 \
      --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r313 --outdir /tmp/r313 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r313/wiki_r313.json
+     --tag wiki_r314 --outdir /tmp/r314 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r314/wiki_r314.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
    Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE.

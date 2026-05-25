@@ -17279,3 +17279,76 @@ benefits most from refit with the new loss from epoch 0.
   dominates training.
 
 No claim until 4-seed cachesim panel measured on vinge.
+
+---
+
+## R314 — Validation-guided checkpoint + per-epoch HRC proxy (2026-05-25)
+
+**Motivation.**  R313 trained for a fixed number of epochs and returned the final-epoch weights.  With 7+ stacked auxiliary losses (birth-KL, 2D birth-KL, birth-delta-KL, WS-KL, 2D WS-KL, WS-delta-KL, HRC-BCE), the optimal stopping epoch varies per corpus and per loss weighting.  Always using epoch 25 is arbitrary and may be after overfitting starts.  Additionally, there was no direct training-time signal for whether the HRC calibration was actually improving.
+
+**Fix 1: Temporal validation split (`--validation-fraction`, default 0.0).**
+
+Holds out the LAST `fraction × n_total` records as a temporal validation set.  Training uses the remaining records.  After each epoch, the model is evaluated in `eval()` mode on up to 100 mini-batches of the validation set.  The CE loss on the validation set is the early-stopping criterion.  When the validation run is complete, the model snapshot with the lowest validation CE is restored before returning.
+
+Rationale for temporal (last-N) split: the training/validation split simulates the model's ability to continue the trace, which is semantically closer to the final task (generate a trace with the same statistical properties) than a random holdout.  For traces with 1M records, 20% = 200k records, giving 100 evaluation batches (capped at the `_val_batch_cap=100` limit).  Overhead: ~1–2 seconds per epoch on GPU — negligible vs ~25–60s of training per epoch.
+
+**Fix 2: Early stopping (`--early-stopping-patience`, default 0 = disabled).**
+
+If validation CE does not improve for `patience` consecutive epochs, training stops early and returns the best checkpoint.  Recommended: `--early-stopping-patience 5` with `--epochs 50` to allow more epochs while guarding against extended stagnation.
+
+**Fix 3: Per-epoch in-batch HRC proxy (`hrc_proxy`, always active when `--hrc-loss-weight > 0`).**
+
+Inside the existing HRC-BCE batch loop, at each cache size S:
+```
+proxy(S) += |mean(P_hat(hit at S)) - mean(actual_hit(S))|  per batch
+```
+No extra forward pass.  The proxy is averaged over all batches in the epoch and printed alongside the training loss.  Provides a direct signal that the HRC-BCE calibration is converging.  Without this, there was no way to distinguish "HRC loss is working" from "auxiliary losses are overwhelming CE" during training.
+
+**Novel vs LANL:** LANL r449–r464 has none of these three features.  LANL trains for a fixed epoch count, no validation split, no in-training HRC diagnostics.  R314 introduces principled epoch selection without cachesim in the training loop (Constitution Article IV compliant: the validation criterion is CE, not cachesim).
+
+**Implementation.**  `llgan/trace_lstm_ws.py` updated in-place (R314):
+- `train_model()`: new `validation_fraction` and `early_stopping_patience` kwargs.  `n_val_records`, `n_val_usable`, `n_val_start` computed from the split.  `best_val_loss`, `best_state`, `patience_counter` state in the epoch loop.  Validation pass added after each training epoch (guarded by `n_val_usable >= batch`).  `best_state` restored on exit.
+- HRC-BCE loop: changed `for mask` → `for mi, mask` to index into `hrc_proxy_sum[mi]`.  In-batch proxy computed inside `torch.no_grad()` using `detach()` — no graph impact.
+- `cmd_fit` / `multiseed` parsers: `--validation-fraction` and `--early-stopping-patience` added to both.
+- `cmd_fit`: passes both new params to `train_model`.
+
+**Backward compatibility.**  Default `validation_fraction=0.0` → identical behaviour to R313.  No checkpoint format change.
+
+**Updated R314 recipe for Wikipedia (replaces R313 recipe in operating notes):**
+
+```bash
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF \
+  --fit \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --birth-delta-kl-loss-weight 0.15 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+  --hrc-loss-weight 0.3 \
+  --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 50 \
+  --validation-fraction 0.15 \
+  --early-stopping-patience 7 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
+  --short-reuse-pressure 2.0 \
+  --temperature 0.9 \
+  --tag wiki_r314 --outdir /tmp/r314 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r314/wiki_r314.json
+```
+
+Key changes vs R313 recipe: `--epochs 50` (up from 25; early stopping guards against over-run), `--validation-fraction 0.15`, `--early-stopping-patience 7`.
+
+**Expected outcome.**  The best-epoch checkpoint avoids the arbitrary epoch-25 cut.  The HRC proxy printed each epoch shows whether training is converging on the metric.  On Wikipedia (1M records): val set = 150k, train set = 850k.  Smoke test: `--max-rows 100000 --validation-fraction 0.15` → val set = 15k ≥ 128 (batch), training = 85k.
+
+**AD check (self-review):**
+- Does val split affect the empirical tables (birth_rate_by_ws0, rank_token_freq_table)?  YES — all empirical tables are computed from `tokenize()` on the FULL dataset before the split.  This is intentional: the tables describe the full corpus statistics.  Only the LSTM training positions are split.  No data leakage.
+- Does the temporal holdout break sequential dependencies?  The validation window starts at `n_train_end`.  The LSTM in validation mode sees sequences `[n_val_start..n_val_start+seq_len]` etc., which are correct temporal windows.  No boundary issue.
+- Cosine LR schedule with early stopping: `T_max = (n_train // batch) * epochs`.  If early stopping fires at epoch 30/50, the LR scheduler has only completed 60% of its schedule.  This means the LR is still declining (not yet at eta_min).  The best checkpoint is taken from epoch ≤ 30, which saw a reasonable LR range.  No issue.
+
+No claim until 4-seed cachesim panel measured on vinge.

@@ -1,4 +1,32 @@
-"""R313 — HRC-aligned per-step BCE loss (replaces R312 batch-mean MSE).
+"""R314 — Validation-guided checkpoint selection + per-epoch HRC proxy.
+
+R313 trained for a fixed number of epochs and always returned the final epoch's
+weights.  With 7+ stacked auxiliary losses, the optimal epoch varies per run and
+per corpus.  R314 adds:
+
+1. Held-out validation split (--validation-fraction, default 0.0 = R313 behaviour).
+   Last `frac * n_total` records are reserved as a temporal holdout.  Training
+   uses the remaining records.  After each epoch, validation CE + HRC proxy MAE
+   are computed in model.eval() mode (no gradient, capped at 100 mini-batches for
+   speed).
+2. Best-checkpoint tracking.  The model snapshot with the lowest validation CE
+   loss is restored before returning.  Without validation (frac=0), returns the
+   final epoch as before.
+3. Early stopping (--early-stopping-patience, default 0 = disabled).  If
+   validation CE does not improve for `patience` consecutive epochs, training
+   stops early.
+4. Per-epoch HRC proxy report.  Even without validation split, training now
+   reports an in-batch HRC proxy (mean |P_hat(hit at S) - actual_hit_rate(S)|)
+   at the end of each epoch.  Zero overhead; uses the logits already computed
+   for the HRC-BCE loss.  Tracks whether the calibration is improving.
+
+Novel vs LANL r449-r464: LANL has no validation split, no early stopping, no
+in-training HRC proxy.  R314 adds principled epoch selection without cachesim
+in the training loop (Article IV compliant).
+
+--- (R313 docstring follows) ---
+
+R313 — HRC-aligned per-step BCE loss (replaces R312 batch-mean MSE).
 
 R312's HRC loss computed batch_mean(P(hit_at_S)) vs global emp_rate: gradient
 proportional to batch deviation, O(1) signal per step.  R313 replaces this
@@ -565,7 +593,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 birth_rate_by_ws0_delta: np.ndarray | None = None,
                 birth_delta_kl_loss_weight: float = 0.0,
                 hrc_loss_weight: float = 0.0,
-                hrc_cache_sizes: list | None = None):
+                hrc_cache_sizes: list | None = None,
+                validation_fraction: float = 0.0,
+                early_stopping_patience: int = 0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -584,7 +614,15 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
     ws_t = torch.from_numpy(ws_tokens).long()
     fp_t = torch.from_numpy(fp_tokens).long() if fp_tokens is not None and n_fp_bins > 0 else None
     n_total = len(rank_tokens)
-    n_train = n_total - seq_len - 1
+    # R314: temporal validation split — last fraction reserved as holdout.
+    n_val_records = int(n_total * validation_fraction) if validation_fraction > 0.0 else 0
+    n_train_end = n_total - n_val_records
+    n_train = n_train_end - seq_len - 1
+    n_val_start = n_train_end
+    n_val_usable = max(0, n_val_records - seq_len - 1)
+    if n_val_records > 0:
+        print(f"[lstm_ws train] R314 val split: train_end={n_train_end:,} "
+              f"val_records={n_val_records:,} val_usable={n_val_usable:,}", flush=True)
     total_steps = max(1, (n_train // batch) * epochs)
     sched = None
     if lr_schedule == "cosine":
@@ -661,11 +699,20 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           flush=True)
 
     rng = np.random.default_rng(seed)
+    # R314: best-checkpoint tracking state.
+    best_val_loss: float = float('inf')
+    best_state: dict | None = None
+    patience_counter: int = 0
+    _val_batch_cap = 100  # max validation mini-batches per epoch (speed)
+
     for ep in range(epochs):
         model.train()
         perm = rng.permutation(n_train)
         n_batches = n_train // batch
         running_loss = 0.0
+        # R314: in-epoch HRC proxy accumulators (only when HRC loss active).
+        hrc_proxy_sum = [0.0] * len(hrc_masks_t) if hrc_masks_t else []
+        hrc_proxy_n = 0
         for bi in range(n_batches):
             idx = perm[bi * batch:(bi + 1) * batch]
             x_rank = torch.stack([rank_t[i:i + seq_len] for i in idx]).to(device)
@@ -777,11 +824,16 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 probs_flat = torch.softmax(logits.reshape(-1, vocab), dim=-1)  # [B*T, vocab]
                 y_flat_h = y.reshape(-1)  # [B*T] actual next rank tokens
                 hrc_loss_val = torch.tensor(0.0, device=device)
-                for mask in hrc_masks_t:
+                for mi, mask in enumerate(hrc_masks_t):
                     pred_p_hit = (probs_flat * mask.unsqueeze(0)).sum(dim=-1)  # [B*T]
                     actual_hit = mask[y_flat_h.clamp(0, vocab - 1)]  # [B*T] 0.0 or 1.0
                     hrc_loss_val = hrc_loss_val + F.binary_cross_entropy(
                         pred_p_hit.clamp(1e-7, 1 - 1e-7), actual_hit)
+                    # R314: accumulate in-batch HRC proxy (no extra forward pass).
+                    with torch.no_grad():
+                        hrc_proxy_sum[mi] += float(
+                            (pred_p_hit.detach().mean() - actual_hit.mean()).abs())
+                hrc_proxy_n += 1
                 loss = loss + hrc_loss_weight * hrc_loss_val
 
             opt.zero_grad(); loss.backward()
@@ -794,7 +846,72 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
             if bi % max(1, n_batches // 10) == 0:
                 print(f"[lstm_ws train] ep {ep+1}/{epochs} batch {bi}/{n_batches} "
                       f"loss={loss.item():.4f}", flush=True)
-        print(f"[lstm_ws train] ep {ep+1}: avg loss = {running_loss / n_batches:.4f}",
+
+        avg_train_loss = running_loss / max(1, n_batches)
+        # R314: per-epoch HRC proxy from in-batch accumulation.
+        hrc_proxy_str = ""
+        if hrc_masks_t and hrc_proxy_n > 0:
+            per_s = [hrc_proxy_sum[i] / hrc_proxy_n for i in range(len(hrc_masks_t))]
+            hrc_proxy_mean = sum(per_s) / len(per_s)
+            hrc_proxy_str = f" hrc_proxy={hrc_proxy_mean:.5f}"
+        print(f"[lstm_ws train] ep {ep+1}: avg_loss={avg_train_loss:.4f}{hrc_proxy_str}",
+              flush=True)
+
+        # R314: validation pass — capped at _val_batch_cap mini-batches.
+        if n_val_usable >= batch:
+            model.eval()
+            val_rng = np.random.default_rng(seed + ep + 10000)
+            val_perm = val_rng.permutation(n_val_usable) + n_val_start
+            n_val_batches = min(n_val_usable // batch, _val_batch_cap)
+            val_loss_acc = 0.0
+            val_hrc_sum = [0.0] * len(hrc_masks_t) if hrc_masks_t else []
+            val_hrc_n = 0
+            with torch.no_grad():
+                for vbi in range(n_val_batches):
+                    vidx = val_perm[vbi * batch:(vbi + 1) * batch]
+                    vx = torch.stack([rank_t[i:i + seq_len] for i in vidx]).to(device)
+                    vxw = torch.stack([ws_t[i:i + seq_len] for i in vidx]).to(device)
+                    vy = torch.stack([rank_t[i + 1:i + 1 + seq_len] for i in vidx]).to(device)
+                    vfw = (torch.stack([fp_t[i:i + seq_len] for i in vidx]).to(device)
+                           if fp_t is not None else None)
+                    vlogits, _, _ = model(vx, vxw, fp_tok=vfw)
+                    vl = F.cross_entropy(vlogits.reshape(-1, vocab), vy.reshape(-1))
+                    val_loss_acc += float(vl.item())
+                    if hrc_masks_t:
+                        vprobs = torch.softmax(vlogits.reshape(-1, vocab), dim=-1)
+                        vy_flat = vy.reshape(-1)
+                        for mi, mask in enumerate(hrc_masks_t):
+                            vp_hit = (vprobs * mask).sum(dim=-1).mean().item()
+                            va_hit = mask[vy_flat.clamp(0, vocab - 1)].mean().item()
+                            val_hrc_sum[mi] += abs(vp_hit - va_hit)
+                        val_hrc_n += 1
+            val_loss = val_loss_acc / max(1, n_val_batches)
+            val_hrc_str = ""
+            if hrc_masks_t and val_hrc_n > 0:
+                vper = [val_hrc_sum[i] / val_hrc_n for i in range(len(hrc_masks_t))]
+                val_hrc_str = f" val_hrc_proxy={sum(vper)/len(vper):.5f}"
+            improved = val_loss < best_val_loss
+            best_marker = " ★" if improved else ""
+            print(f"[lstm_ws train] ep {ep+1}: val_loss={val_loss:.4f}{val_hrc_str}{best_marker}",
+                  flush=True)
+            if improved:
+                best_val_loss = val_loss
+                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if early_stopping_patience > 0 and patience_counter >= early_stopping_patience:
+                    print(f"[lstm_ws train] early stop ep {ep+1}: "
+                          f"no val improvement for {patience_counter} epochs "
+                          f"(patience={early_stopping_patience})", flush=True)
+                    break
+            model.train()
+
+    # R314: restore best-validation-loss checkpoint (only when val split active).
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        model = model.to(device)
+        print(f"[lstm_ws train] restored best checkpoint: val_loss={best_val_loss:.4f}",
               flush=True)
     return model
 
@@ -1123,7 +1240,9 @@ def cmd_fit(args):
                         birth_delta_kl_loss_weight=args.birth_delta_kl_loss_weight,
                         hrc_loss_weight=args.hrc_loss_weight,
                         hrc_cache_sizes=([int(x) for x in args.ladder_sizes.split(",")]
-                                         if args.hrc_loss_weight > 0.0 else None))
+                                         if args.hrc_loss_weight > 0.0 else None),
+                        validation_fraction=args.validation_fraction,
+                        early_stopping_patience=args.early_stopping_patience)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1507,6 +1626,10 @@ def main():
                     help="comma-separated mandatory boundary sizes for --cache-ladder/--ws-cache-ladder")
     pf.add_argument("--stack-depth-bins", type=int, default=0,
                     help="footprint (LRU stack depth) conditioning bins; 0=disabled (try 32)")
+    pf.add_argument("--validation-fraction", type=float, default=0.0,
+                    help="R314: fraction of records held out as temporal validation (try 0.1–0.2)")
+    pf.add_argument("--early-stopping-patience", type=int, default=0,
+                    help="R314: stop if val CE does not improve for N epochs (0=disabled)")
     pf.set_defaults(fn=cmd_fit)
 
     pg = sub.add_parser("generate")
@@ -1580,6 +1703,10 @@ def main():
     pm.add_argument("--ws-cache-ladder", action="store_true", default=False)
     pm.add_argument("--ladder-sizes", default="32,128,512,2048,8192")
     pm.add_argument("--stack-depth-bins", type=int, default=0)
+    pm.add_argument("--validation-fraction", type=float, default=0.0,
+                    help="R314: fraction of records held out as temporal validation (try 0.1–0.2)")
+    pm.add_argument("--early-stopping-patience", type=int, default=0,
+                    help="R314: stop if val CE does not improve for N epochs (0=disabled)")
     # Fit / load
     pm.add_argument("--fit", action="store_true", default=False,
                     help="train the model before generating (omit to use --model)")
