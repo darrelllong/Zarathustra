@@ -7237,3 +7237,15 @@ python3 -m llgan.trace_lstm_ws multiseed \
 ```
 
 **Target:** 4-seed mean HRC-MAE < 0.0115 (beats LANL r290 Wikipedia AUDIT-PENDING).
+
+---
+
+## R315 — HRC-proxy early stopping + auxiliary loss warmup (2026-05-26)
+
+**Status:** Code complete. Two novel improvements over R314.
+
+**Key changes:**
+- `--early-stopping-metric {ce, hrc}`: when `hrc`, the validation HRC proxy MAE replaces CE as the criterion for best-checkpoint selection and early stopping. Directly aligned with the race metric. Falls back to CE if `--hrc-loss-weight 0`.
+- `--loss-warmup-epochs N`: linearly ramp all 7 auxiliary loss weights from 0 → full over N epochs. CE and short-reuse class weights unaffected. Prevents auxiliary losses from overwhelming CE in early training. Recommended: `--loss-warmup-epochs 8` with `--epochs 50`.
+
+**Novel vs LANL r449-r464:** LANL has no validation split, no early stopping, no HRC-aligned loss, no loss scheduling of any kind.

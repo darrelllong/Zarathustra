@@ -406,6 +406,26 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 50. Auxiliary loss warmup (curriculum) — `wired (R315)`, *novel vs LANL*
+
+**Target:** all corpora; especially when full R315 auxiliary loss stack is active.
+
+**Why:** With 7 auxiliary losses active from epoch 0, the combined auxiliary signal (~18% of total loss at init) can overwhelm CE in early epochs, causing the LSTM to memorise empirical calibration tables before learning the basic rank-prediction task. The symptom: fast early auxiliary convergence but slow CE convergence, with final CE higher than single-loss baselines. Fix: linearly ramp auxiliary losses over N epochs.
+
+**R315 implementation:** `--loss-warmup-epochs N` (default 0 = disabled; try 8–15 for 50-epoch runs). `aux_scale = min(1.0, (ep+1)/N)` applied to all 7 auxiliary loss additions. CE + short-reuse class weights unaffected.
+
+---
+
+### 49. HRC-proxy-directed early stopping — `wired (R315)`, *novel vs LANL*
+
+**Target:** all corpora; highest impact when `--hrc-loss-weight > 0`.
+
+**Why:** R314's best-checkpoint criterion (lowest validation CE) is misaligned with the race metric (HRC-MAE). A model with low CE can have miscalibrated P(hit_at_S). Early stopping on HRC proxy MAE selects the epoch where hit-probability calibration is best on the held-out temporal window, not just next-token accuracy.
+
+**R315 implementation:** `--early-stopping-metric {ce, hrc}` (default `ce`). When `hrc`, the best-checkpoint and patience criterion switch to the per-epoch validation HRC proxy MAE (already computed in R314). Falls back to CE if `--hrc-loss-weight 0`.
+
+---
+
 ### 48. Validation-guided checkpoint + per-epoch HRC proxy — `wired (R314)`, *novel vs LANL*
 
 **Target:** all corpora.  Training stability improvement with any R303+ full-loss-stack recipe.
@@ -555,9 +575,9 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-25, R314)
+### Operating notes (updated 2026-05-26, R315)
 
-1. **Immediate next run:** R314 `multiseed` — validation-guided checkpoint, 50 epochs with early stop:
+1. **Immediate next run:** R315 `multiseed` — HRC-proxy early stopping + auxiliary loss warmup:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
@@ -573,18 +593,21 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
      --lstm-layers 3 --epochs 50 \
      --validation-fraction 0.15 --early-stopping-patience 7 \
+     --early-stopping-metric hrc \
+     --loss-warmup-epochs 8 \
      --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r314 --outdir /tmp/r314 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r314/wiki_r314.json
+     --tag wiki_r315 --outdir /tmp/r315 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r315/wiki_r315.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
-   Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE.
-   If loss is dominated by HRC term, reduce to 0.1.
+   Key additions vs R314: `--early-stopping-metric hrc` (best-checkpoint aligned with race metric),
+   `--loss-warmup-epochs 8` (prevents auxiliary losses overwhelming CE in first epochs).
+   Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE; reduce to 0.1 if HRC dominates.
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
    `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.

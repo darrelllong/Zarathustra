@@ -17352,3 +17352,74 @@ Key changes vs R313 recipe: `--epochs 50` (up from 25; early stopping guards aga
 - Cosine LR schedule with early stopping: `T_max = (n_train // batch) * epochs`.  If early stopping fires at epoch 30/50, the LR scheduler has only completed 60% of its schedule.  This means the LR is still declining (not yet at eta_min).  The best checkpoint is taken from epoch ≤ 30, which saw a reasonable LR range.  No issue.
 
 No claim until 4-seed cachesim panel measured on vinge.
+
+---
+
+## R315 — HRC-proxy-directed early stopping + auxiliary loss warmup (2026-05-26)
+
+**Motivation.**  R314 added validation-guided checkpointing and early stopping, but both used CE loss as the criterion.  CE minimisation is structurally misaligned with HRC-MAE: a model can have low CE while having systematically miscalibrated P(hit_at_S).  R315 fixes this with two targeted changes.
+
+**Fix 1: HRC-proxy early stopping (`--early-stopping-metric hrc`).**
+
+New flag: `--early-stopping-metric {ce, hrc}` (default `ce` — backward-compatible with R314).  When `hrc`, the validation HRC proxy MAE (mean over all cache sizes of |P_hat(hit) - actual_hit_rate| on held-out mini-batches) replaces CE as the criterion for both best-checkpoint selection and patience counting.  Requires `--hrc-loss-weight > 0` so the HRC masks are present; falls back to CE with a warning if not.
+
+Properties:
+1. **Directly aligned with the race metric.** CE selects the epoch with best next-token prediction; HRC-proxy selects the epoch with best hit-rate calibration.  For the race, the latter is what matters.
+2. **Works with the existing validation infrastructure.** The HRC proxy is already computed each epoch in the validation pass (R314).  No extra forward pass.
+3. **Novel vs LANL r449-r464.** LANL has no validation split, no early stopping, no HRC proxy.  R315 stacks two structural advantages over LANL.
+
+**Fix 2: Auxiliary loss warmup (`--loss-warmup-epochs N`, default 0 = disabled).**
+
+With 7 auxiliary losses (birth-KL, 2D birth-KL, delta birth-KL, WS-KL, 2D WS-KL, delta WS-KL, HRC-BCE), the combined auxiliary signal can overwhelm the primary CE task in early epochs, causing the LSTM to memorise calibration targets before learning the basic rank-prediction task.  R315 adds a curriculum: for epoch `ep < N`, all auxiliary losses are scaled by `(ep+1)/N` (linear ramp from 0 → 1).  CE and short-reuse class weights are always at full strength.
+
+Properties:
+1. **Prevents early-epoch auxiliary dominance.** At `loss_warmup_epochs=10`, epoch 1 applies 10% of auxiliary losses; epoch 10 applies 100%.  The LSTM first learns the basic CE task, then the auxiliary calibration signals refine it.
+2. **Applies uniformly to all auxiliary losses.** Birth-KL (1D, 2D, delta), WS-KL (1D, 2D, delta), HRC-BCE, and aux-WS head are all scaled by `aux_scale`.  Short-reuse class weights are not affected (they modify CE, not add a separate loss).
+3. **Novel vs LANL.** No warmup scheduling in r449-r464.  LANL has reported instability at the r461 birth-KL weight; warmup likely helps.
+
+**Implementation.** `llgan/trace_lstm_ws.py` updated in-place (R315):
+- `train_model()` signature: `+ early_stopping_metric: str = "ce"`, `+ loss_warmup_epochs: int = 0`.
+- Epoch loop: `aux_scale = min(1.0, (ep+1)/loss_warmup_epochs) if loss_warmup_epochs > 0 else 1.0`.  All 7 auxiliary loss additions rewritten as `loss += aux_scale * weight * term`.
+- Validation block: `val_criterion = val_hrc_mean if _es_metric == "hrc" else val_ce`.  `improved = val_criterion < best_val_loss`.
+- Per-epoch print: shows `val_hrc=...` and `val_ce=...` side-by-side; `★` marks improvement in the active criterion; `aux_scale=...` shown when warmup is active.
+- New CLI flags in both `fit` and `multiseed` subparsers.
+
+**Updated R315 recipe for Wikipedia:**
+
+```bash
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF \
+  --fit \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --birth-delta-kl-loss-weight 0.15 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+  --hrc-loss-weight 0.3 \
+  --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 50 \
+  --validation-fraction 0.15 \
+  --early-stopping-patience 7 \
+  --early-stopping-metric hrc \
+  --loss-warmup-epochs 8 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
+  --short-reuse-pressure 2.0 \
+  --temperature 0.9 \
+  --tag wiki_r315 --outdir /tmp/r315 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r315/wiki_r315.json
+```
+
+Key changes vs R314 recipe: `--early-stopping-metric hrc` (aligns epoch selection with race metric), `--loss-warmup-epochs 8` (curriculum: first 8 epochs CE-only, then ramp up all auxiliary losses).
+
+**AD check (self-review):**
+- Does `aux_scale` affect CE?  NO — `loss = F.cross_entropy(...)` is not multiplied by `aux_scale`.  The primary task is always at full strength.
+- Does `early_stopping_metric hrc` work when `--hrc-loss-weight 0`?  NO — the code detects missing HRC masks and falls back to CE with a warning.  Safe.
+- Does warmup interact with cosine LR schedule?  The LR schedule depends only on `total_steps = (n_train // batch) * epochs`.  Aux loss scaling does not change `total_steps` or the optimizer state.  No interaction.
+- Does HRC-proxy early stopping select a checkpoint that overfits the HRC proxy?  The validation HRC proxy is computed on a temporal holdout not seen during training.  The HRC masks themselves are deterministic functions of `rank_edges` — they are not fitted.  No overfitting mechanism.
+
+No claim until 4-seed cachesim panel measured on vinge.

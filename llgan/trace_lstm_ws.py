@@ -1,4 +1,35 @@
-"""R314 — Validation-guided checkpoint selection + per-epoch HRC proxy.
+"""R315 — HRC-proxy-directed early stopping + auxiliary loss warmup.
+
+R314 added validation-guided checkpoint selection (best val-CE) and early stopping
+on CE.  R315 adds two improvements:
+
+1. HRC-proxy-directed early stopping (--early-stopping-metric hrc).
+   The R314 criterion (lowest validation CE) is misaligned with the race metric
+   (HRC-MAE).  CE minimisation does not guarantee calibrated P(hit_at_S): a model
+   can have low CE but systematically miscalibrated hit probabilities.  R315 adds
+   --early-stopping-metric {ce, hrc} (default: ce — backward-compatible with R314).
+   When 'hrc', the validation HRC proxy (mean over all cache sizes of
+   |P_hat(hit) - actual_hit_rate|) replaces CE as the best-checkpoint and patience
+   criterion.  Requires --hrc-loss-weight > 0 so that the HRC masks are computed;
+   falls back to CE if masks are not available.
+   Novel vs LANL r449-r464: LANL has no validation criterion of any kind.
+
+2. Auxiliary loss warmup (--loss-warmup-epochs N, default 0 = disabled).
+   With 7+ auxiliary losses (birth-KL, 2D birth-KL, delta birth-KL, WS-KL,
+   2D WS-KL, delta WS-KL, HRC-BCE), the combined auxiliary signal can overwhelm
+   the primary CE loss in early epochs, preventing the LSTM from first learning the
+   basic next-rank-token task.  R315 adds a curriculum: for epoch ep < N, all
+   auxiliary losses are scaled by (ep+1)/N (ramp from 0 to 1 over N epochs).
+   CE and short-reuse class weights are unaffected.  At epoch N and beyond,
+   all weights are at their full CLI-specified values.
+   Novel vs LANL: no warmup scheduling in r449-r464.
+
+Backward-compatible: --early-stopping-metric ce and --loss-warmup-epochs 0
+reproduce R314 behaviour exactly.
+
+--- (R314 docstring follows) ---
+
+R314 — Validation-guided checkpoint selection + per-epoch HRC proxy.
 
 R313 trained for a fixed number of epochs and always returned the final epoch's
 weights.  With 7+ stacked auxiliary losses, the optimal epoch varies per run and
@@ -595,7 +626,9 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 hrc_loss_weight: float = 0.0,
                 hrc_cache_sizes: list | None = None,
                 validation_fraction: float = 0.0,
-                early_stopping_patience: int = 0):
+                early_stopping_patience: int = 0,
+                early_stopping_metric: str = "ce",
+                loss_warmup_epochs: int = 0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -693,7 +726,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"ws_kl={ws_kl_loss_weight} ws_kl_2d={ws_kl_loss_weight_2d} "
           f"ws_delta_kl={ws_delta_kl_loss_weight} hrc={hrc_loss_weight} "
           f"aux_ws={aux_ws_loss_weight} "
-          f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device}",
+          f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device} "
+          f"es_metric={early_stopping_metric} warmup_ep={loss_warmup_epochs}",
           flush=True)
     print(f"[lstm_ws train] params={sum(p.numel() for p in model.parameters()):,}",
           flush=True)
@@ -704,8 +738,17 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
     best_state: dict | None = None
     patience_counter: int = 0
     _val_batch_cap = 100  # max validation mini-batches per epoch (speed)
+    # R315: resolve early-stopping metric (fall back to CE if no HRC masks).
+    _es_metric = early_stopping_metric
+    if _es_metric == "hrc" and not hrc_masks_t:
+        print("[lstm_ws train] R315 warning: --early-stopping-metric hrc requires "
+              "--hrc-loss-weight > 0; falling back to CE.", flush=True)
+        _es_metric = "ce"
 
     for ep in range(epochs):
+        # R315: auxiliary loss warmup scale — ramp from 0→1 over loss_warmup_epochs.
+        aux_scale = (min(1.0, (ep + 1) / loss_warmup_epochs)
+                     if loss_warmup_epochs > 0 else 1.0)
         model.train()
         perm = rng.permutation(n_train)
         n_batches = n_train // batch
@@ -729,6 +772,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                                    label_smoothing=label_smoothing)
 
             # Birth-KL loss: teach NEW-token logit to match empirical P(NEW|ws0).
+            # R315: scaled by aux_scale (loss warmup curriculum).
             if birth_rate_t is not None or birth_rate_t_2d is not None:
                 birth_logits_flat = logits.reshape(-1, vocab)[:, NEW_TOKEN]
 
@@ -738,7 +782,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                     target_soft = birth_rate_t[ws0_idx]
                     birth_kl = F.binary_cross_entropy_with_logits(
                         birth_logits_flat, target_soft)
-                    loss = loss + birth_kl_loss_weight * birth_kl
+                    loss = loss + aux_scale * birth_kl_loss_weight * birth_kl
 
                 if birth_rate_t_2d is not None and ws_tokens.shape[1] >= 2:
                     ws0_idx2 = y_ws[:, :, 0].reshape(-1).clamp(
@@ -748,7 +792,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                     target_soft_2d = birth_rate_t_2d[ws0_idx2, ws1_idx2]
                     birth_kl_2d = F.binary_cross_entropy_with_logits(
                         birth_logits_flat, target_soft_2d)
-                    loss = loss + birth_kl_loss_weight_2d * birth_kl_2d
+                    loss = loss + aux_scale * birth_kl_loss_weight_2d * birth_kl_2d
 
             # Delta-WS birth-KL loss: teach birth head P(NEW|ws0,delta) — R310.
             if birth_delta_t is not None:
@@ -767,7 +811,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 birth_logits_flat_b = logits.reshape(-1, vocab)[:, NEW_TOKEN]
                 birth_delta_kl = F.binary_cross_entropy_with_logits(
                     birth_logits_flat_b, target_birth_delta)
-                loss = loss + birth_delta_kl_loss_weight * birth_delta_kl
+                loss = loss + aux_scale * birth_delta_kl_loss_weight * birth_delta_kl
 
             # WS-KL loss: align rank distribution to empirical P(rank|ws0).
             if ws_kl_freq_t is not None:
@@ -776,7 +820,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 target_dist = ws_kl_freq_t[ws0_idx_kl]  # [B*T, vocab]
                 pred_log = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
                 kl = (target_dist * (torch.log(target_dist + 1e-10) - pred_log)).sum(dim=-1)
-                loss = loss + ws_kl_loss_weight * kl.mean()
+                loss = loss + aux_scale * ws_kl_loss_weight * kl.mean()
 
             # 2D WS-KL loss: align rank dist to P(rank|ws0,ws1) — R311 / LANL r454.
             if ws_kl_freq_2d_t is not None and y_ws.shape[2] >= 2:
@@ -785,7 +829,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 target_2d = ws_kl_freq_2d_t[ws0_2d, ws1_2d]  # [B*T, vocab]
                 pred_log_2d = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
                 kl_2d = (target_2d * (torch.log(target_2d + 1e-10) - pred_log_2d)).sum(dim=-1)
-                loss = loss + ws_kl_loss_weight_2d * kl_2d.mean()
+                loss = loss + aux_scale * ws_kl_loss_weight_2d * kl_2d.mean()
 
             # Delta-WS KL loss: align rank dist to P(rank|ws0, trajectory) — R308.
             if ws_delta_kl_freq_t is not None:
@@ -807,13 +851,13 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 target_delta = ws_delta_kl_freq_t[ws0_flat, d_flat]  # [B*T, vocab]
                 pred_log_d = F.log_softmax(logits.reshape(-1, vocab), dim=-1)
                 kl_d = (target_delta * (torch.log(target_delta + 1e-10) - pred_log_d)).sum(dim=-1)
-                loss = loss + ws_delta_kl_loss_weight * kl_d.mean()
+                loss = loss + aux_scale * ws_delta_kl_loss_weight * kl_d.mean()
 
             # Auxiliary WS-prediction loss: predict next WS0 bin.
             if ws_logits is not None and aux_ws_loss_weight > 0.0:
                 y_ws0 = y_ws[:, :, 0].reshape(-1)
                 ws_loss = F.cross_entropy(ws_logits.reshape(-1, ws_vocab), y_ws0)
-                loss = loss + aux_ws_loss_weight * ws_loss
+                loss = loss + aux_scale * aux_ws_loss_weight * ws_loss
 
             # HRC-aligned loss (R313): per-step BCE on P(hit at S) — stronger
             # than R312 batch-mean MSE.  At each step t, teaches P(hit_at_S) to
@@ -834,7 +878,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                         hrc_proxy_sum[mi] += float(
                             (pred_p_hit.detach().mean() - actual_hit.mean()).abs())
                 hrc_proxy_n += 1
-                loss = loss + hrc_loss_weight * hrc_loss_val
+                loss = loss + aux_scale * hrc_loss_weight * hrc_loss_val
 
             opt.zero_grad(); loss.backward()
             if grad_clip > 0.0:
@@ -850,11 +894,14 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
         avg_train_loss = running_loss / max(1, n_batches)
         # R314: per-epoch HRC proxy from in-batch accumulation.
         hrc_proxy_str = ""
+        hrc_proxy_mean = float('inf')
         if hrc_masks_t and hrc_proxy_n > 0:
             per_s = [hrc_proxy_sum[i] / hrc_proxy_n for i in range(len(hrc_masks_t))]
             hrc_proxy_mean = sum(per_s) / len(per_s)
             hrc_proxy_str = f" hrc_proxy={hrc_proxy_mean:.5f}"
-        print(f"[lstm_ws train] ep {ep+1}: avg_loss={avg_train_loss:.4f}{hrc_proxy_str}",
+        aux_scale_str = f" aux_scale={aux_scale:.3f}" if loss_warmup_epochs > 0 else ""
+        print(f"[lstm_ws train] ep {ep+1}: avg_loss={avg_train_loss:.4f}"
+              f"{hrc_proxy_str}{aux_scale_str}",
               flush=True)
 
         # R314: validation pass — capped at _val_batch_cap mini-batches.
@@ -886,28 +933,38 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                             val_hrc_sum[mi] += abs(vp_hit - va_hit)
                         val_hrc_n += 1
             val_loss = val_loss_acc / max(1, n_val_batches)
+            val_hrc_mean = float('inf')
             val_hrc_str = ""
             if hrc_masks_t and val_hrc_n > 0:
                 vper = [val_hrc_sum[i] / val_hrc_n for i in range(len(hrc_masks_t))]
-                val_hrc_str = f" val_hrc_proxy={sum(vper)/len(vper):.5f}"
-            improved = val_loss < best_val_loss
+                val_hrc_mean = sum(vper) / len(vper)
+                val_hrc_str = f" val_hrc_proxy={val_hrc_mean:.5f}"
+            # R315: select early-stopping criterion.
+            if _es_metric == "hrc" and val_hrc_mean < float('inf'):
+                val_criterion = val_hrc_mean
+                crit_label = "val_hrc"
+            else:
+                val_criterion = val_loss
+                crit_label = "val_ce"
+            improved = val_criterion < best_val_loss
             best_marker = " ★" if improved else ""
-            print(f"[lstm_ws train] ep {ep+1}: val_loss={val_loss:.4f}{val_hrc_str}{best_marker}",
+            print(f"[lstm_ws train] ep {ep+1}: {crit_label}={val_criterion:.5f} "
+                  f"val_ce={val_loss:.4f}{val_hrc_str}{best_marker}",
                   flush=True)
             if improved:
-                best_val_loss = val_loss
+                best_val_loss = val_criterion
                 best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
                 patience_counter = 0
             else:
                 patience_counter += 1
                 if early_stopping_patience > 0 and patience_counter >= early_stopping_patience:
                     print(f"[lstm_ws train] early stop ep {ep+1}: "
-                          f"no val improvement for {patience_counter} epochs "
+                          f"no {crit_label} improvement for {patience_counter} epochs "
                           f"(patience={early_stopping_patience})", flush=True)
                     break
             model.train()
 
-    # R314: restore best-validation-loss checkpoint (only when val split active).
+    # R314/R315: restore best-checkpoint (criterion = CE or HRC proxy per --early-stopping-metric).
     if best_state is not None:
         model.load_state_dict(best_state)
         model = model.to(device)
@@ -1242,7 +1299,9 @@ def cmd_fit(args):
                         hrc_cache_sizes=([int(x) for x in args.ladder_sizes.split(",")]
                                          if args.hrc_loss_weight > 0.0 else None),
                         validation_fraction=args.validation_fraction,
-                        early_stopping_patience=args.early_stopping_patience)
+                        early_stopping_patience=args.early_stopping_patience,
+                        early_stopping_metric=args.early_stopping_metric,
+                        loss_warmup_epochs=args.loss_warmup_epochs)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1629,7 +1688,13 @@ def main():
     pf.add_argument("--validation-fraction", type=float, default=0.0,
                     help="R314: fraction of records held out as temporal validation (try 0.1–0.2)")
     pf.add_argument("--early-stopping-patience", type=int, default=0,
-                    help="R314: stop if val CE does not improve for N epochs (0=disabled)")
+                    help="R314: stop if val metric does not improve for N epochs (0=disabled)")
+    pf.add_argument("--early-stopping-metric", choices=["ce", "hrc"], default="ce",
+                    help="R315: criterion for early stopping / best-checkpoint: 'ce' (default) "
+                         "or 'hrc' (val HRC proxy MAE; requires --hrc-loss-weight > 0)")
+    pf.add_argument("--loss-warmup-epochs", type=int, default=0,
+                    help="R315: ramp auxiliary losses from 0→full over N epochs (0=disabled; "
+                         "try 5–10 to stabilise early training)")
     pf.set_defaults(fn=cmd_fit)
 
     pg = sub.add_parser("generate")
@@ -1706,7 +1771,11 @@ def main():
     pm.add_argument("--validation-fraction", type=float, default=0.0,
                     help="R314: fraction of records held out as temporal validation (try 0.1–0.2)")
     pm.add_argument("--early-stopping-patience", type=int, default=0,
-                    help="R314: stop if val CE does not improve for N epochs (0=disabled)")
+                    help="R314: stop if val metric does not improve for N epochs (0=disabled)")
+    pm.add_argument("--early-stopping-metric", choices=["ce", "hrc"], default="ce",
+                    help="R315: 'ce' (default) or 'hrc' (val HRC proxy; requires --hrc-loss-weight>0)")
+    pm.add_argument("--loss-warmup-epochs", type=int, default=0,
+                    help="R315: ramp auxiliary losses from 0→full over N epochs (0=disabled)")
     # Fit / load
     pm.add_argument("--fit", action="store_true", default=False,
                     help="train the model before generating (omit to use --model)")
