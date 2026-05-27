@@ -17423,3 +17423,98 @@ Key changes vs R314 recipe: `--early-stopping-metric hrc` (aligns epoch selectio
 - Does HRC-proxy early stopping select a checkpoint that overfits the HRC proxy?  The validation HRC proxy is computed on a temporal holdout not seen during training.  The HRC masks themselves are deterministic functions of `rank_edges` — they are not fitted.  No overfitting mechanism.
 
 No claim until 4-seed cachesim panel measured on vinge.
+
+---
+
+## R316 — Multi-training-seed candidate selection (2026-05-27)
+
+**Motivation.**  R315 trains with a single training seed (default: 42) and uses R314's
+validation-guided checkpointing to select the best epoch within that run.  However, a
+single training seed can land in a sub-optimal basin.  With the full 7-auxiliary-loss
+R315 stack, initialisation sensitivity is real: the WS-KL, HRC-BCE, and delta-KL losses
+create competing gradients in early epochs, and different seeds resolve these differently.
+Pre-Constitution GAN experiments showed 5–15% seed-to-seed spread at comparable loss
+complexity.  R316 adds training-seed parallelism to exploit this variance.
+
+**Fix: `--train-seeds-candidates N` (default 1 = backward-compatible with R315).**
+
+When `--fit` and `--train-seeds-candidates N` with N > 1:
+1. Trains N independent models with seeds `--seed`, `--seed+1`, ..., `--seed+N-1`.
+2. For each candidate, `cmd_fit()` now returns the best validation loss (CE or HRC
+   proxy per `--early-stopping-metric`), saved in the checkpoint as `best_val_loss`.
+3. `cmd_multiseed()` collects `(val_loss, seed, path)` for all candidates, sorts by
+   val_loss ascending, and selects the winner.
+4. Logs the per-candidate val_loss table and the selected seed.
+5. The selected training seed is recorded in the JSON report (`r316_selected_train_seed`)
+   and markdown claim panel.
+
+**Constitution compliance:**
+- Article IV: each candidate independently trained on the reference trace ✓
+- Article V §1-§2: selection uses validation criterion only (never cachesim HRC-MAE) ✓
+- Article VI: 4-seed generation from the selected model, mean + range reported ✓
+
+**Implementation.**  `llgan/trace_lstm_ws.py` updated in-place:
+- `train_model()`: return type changed from `model` to `(model, best_val_loss)`.
+  When no validation split, `best_val_loss = float('inf')` (backward-safe).
+- `cmd_fit()`: unpacks `(model, best_val_loss)`, saves `best_val_loss` in checkpoint,
+  returns `best_val_loss`.
+- `cmd_multiseed()`: loops over N training seeds when `n_candidates > 1`; collects
+  scores; logs ranked table; selects best; resets `args.seed` to selected seed;
+  sets `model_path` to selected checkpoint.
+- `multiseed` argparser: `--train-seeds-candidates` added.
+- JSON payload: `r316_train_seed_candidates` and `r316_selected_train_seed` fields.
+
+**Backward compatibility.**  Default `--train-seeds-candidates 1` → identical behaviour
+to R315.  `cmd_fit()` return value change is internal; no external callers affected.
+
+**Updated R316 recipe for Wikipedia:**
+
+```bash
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF \
+  --fit \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --birth-delta-kl-loss-weight 0.15 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+  --hrc-loss-weight 0.3 \
+  --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 50 \
+  --validation-fraction 0.15 --early-stopping-patience 7 \
+  --early-stopping-metric hrc \
+  --loss-warmup-epochs 8 \
+  --train-seeds-candidates 3 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
+  --short-reuse-pressure 2.0 \
+  --temperature 0.9 \
+  --tag wiki_r316 --outdir /tmp/r316 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r316/wiki_r316.json
+```
+
+Key change vs R315 recipe: `--train-seeds-candidates 3` → trains seeds 42, 43, 44, picks
+best by HRC proxy MAE on the 15% held-out validation slice.  Training cost ~3h on vinge
+(3 × ~1h runs in sequence).  Expected improvement: 2–8% lower 4-seed mean HRC-MAE vs
+single-seed R315.
+
+**AD check (self-review):**
+- Is selecting best training seed by val criterion "optimising against the test set"?
+  NO — the selection criterion is the held-out VALIDATION loss, not the final 4-seed
+  cachesim evaluation.  The 4-seed generation seeds (42, 80, 81, 82) and the real
+  reference CSV are never used during candidate selection.  This is standard model
+  selection in deep learning (e.g., cross-validation, hyper-search on validation set).
+- Does this violate Article V §1 (no coordinate descent on cachesim)?  NO — cachesim
+  is never called during candidate selection.
+- Does this create training-data leakage into the validation split?  NO — the validation
+  split is held fixed (temporal last-N records) and is not used for training or for
+  fitting the empirical tables (`tokenize()` runs on full data before the split).
+- What happens when `--validation-fraction 0`?  All candidates return `best_val_loss=inf`;
+  the first seed wins.  A warning is printed.  To benefit from R316, use
+  `--validation-fraction 0.10-0.20`.
+
+No claim until 4-seed cachesim panel measured on vinge.

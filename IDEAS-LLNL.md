@@ -406,6 +406,37 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 51. Multi-training-seed candidate selection — `wired (R316)`, *novel vs LANL*
+
+**Target:** all corpora.  Highest near-term ROI on first Wikipedia claim.
+
+**Why:** The R315 full auxiliary-loss stack makes training sensitive to the
+initialisation seed.  Different training seeds produce validation criterion
+spread of 5–15% (observed in the pre-Constitution GAN era; LSTM training is
+smoother but still seed-sensitive at init).  Training a single seed and claiming
+the result leaves improvement on the table that can be captured by running 3
+candidates and selecting the best by validation metric.
+
+**R316 implementation:** `--train-seeds-candidates N` (default 1 = backward-
+compatible with R315).  When N > 1 with `--fit`: trains seeds `--seed`,
+`--seed+1`, ..., `--seed+N-1`, selects the lowest validation criterion (CE or
+HRC proxy per `--early-stopping-metric`), uses selected checkpoint for 4-seed
+generation.  Selection is by validation metric only — not cachesim — which is
+Constitution-compliant.  The selected training seed is recorded in the JSON
+report and markdown panel.
+
+**Expected impact:** 2–8% reduction in 4-seed mean HRC-MAE for 3 candidates.
+Constitutional precedent: model selection by validation criterion is standard
+deep learning; it does not require Article V §3 consideration (no per-trace
+verbatim replay) and does not constitute Article V §1-§2 coordinate descent (no
+cachesim in the training loop).
+
+**Recipe addition for Wikipedia:** add `--train-seeds-candidates 3` to the R315
+recipe.  Total training time: 3× single run (~3h vs ~1h).  Expected benefit: best
+of 3 training initializations → lower variance, lower mean.
+
+---
+
 ### 50. Auxiliary loss warmup (curriculum) — `wired (R315)`, *novel vs LANL*
 
 **Target:** all corpora; especially when full R315 auxiliary loss stack is active.
@@ -575,9 +606,9 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-26, R315)
+### Operating notes (updated 2026-05-27, R316)
 
-1. **Immediate next run:** R315 `multiseed` — HRC-proxy early stopping + auxiliary loss warmup:
+1. **Immediate next run:** R316 `multiseed` — multi-training-seed selection + full R315 stack:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
@@ -595,18 +626,22 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --validation-fraction 0.15 --early-stopping-patience 7 \
      --early-stopping-metric hrc \
      --loss-warmup-epochs 8 \
+     --train-seeds-candidates 3 \
      --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r315 --outdir /tmp/r315 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r315/wiki_r315.json
+     --tag wiki_r316 --outdir /tmp/r316 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r316/wiki_r316.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
-   Key additions vs R314: `--early-stopping-metric hrc` (best-checkpoint aligned with race metric),
-   `--loss-warmup-epochs 8` (prevents auxiliary losses overwhelming CE in first epochs).
+   R316 key addition vs R315: `--train-seeds-candidates 3` trains seeds 42, 43, 44 and selects
+   the one with lowest val HRC proxy MAE. Expected 2–8% improvement over single-seed R315.
+   Training cost: ~3× single run (~3–4h on vinge).  The selected training seed is logged and
+   recorded in the JSON report.
+   Note: If time-constrained, omit `--train-seeds-candidates 3` (defaults to 1, same as R315).
    Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE; reduce to 0.1 if HRC dominates.
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,

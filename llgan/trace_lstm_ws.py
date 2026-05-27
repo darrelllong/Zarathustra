@@ -1,4 +1,38 @@
-"""R315 — HRC-proxy-directed early stopping + auxiliary loss warmup.
+"""R316 — Multi-training-seed candidate selection (novel vs LANL).
+
+R315 trained with a single training seed (default: 42).  With complex auxiliary
+loss stacks, the training trajectory is sensitive to the initialisation seed —
+different seeds produce different local optima, with validation criterion spread
+typically 5–15%.  R316 adds training-seed parallelism: train N independent models,
+select the best by validation criterion, use that checkpoint for the 4-seed
+generation.
+
+New flag: `--train-seeds-candidates N` (default 1 = single training run, backward-
+compatible with R315).  When N > 1 and `--fit` is set:
+  1. Trains with seeds `--seed`, `--seed+1`, ..., `--seed+N-1`.
+  2. For each candidate, the best-checkpoint selection criterion is the R314/R315
+     validation loss (CE or HRC proxy per `--early-stopping-metric`).
+  3. The candidate with the lowest validation criterion is selected.
+  4. That checkpoint is used for the 4-seed generation panel.
+
+Constitution compliance:
+  - Article IV (deep-learning three-prong test): each candidate is independently
+    trained on the reference trace ✓
+  - Article V §1-§2 (no cachesim coordinate descent): selection uses validation
+    metric only (never cachesim HRC-MAE) ✓
+  - Article VI (4-seed multi-seed eval): generation uses 4 seeds as required ✓
+
+Expected impact: 2–8% reduction in 4-seed mean HRC-MAE, drawn from avoiding
+bad training basins.  Literature precedent: multi-seed model selection is standard
+practice and does not constitute test-set leakage when the selection criterion is a
+held-out validation loss.
+
+Novel vs LANL r449-r464: LANL has no validation split and no multi-seed training
+selection.
+
+--- (R315 docstring follows) ---
+
+R315 — HRC-proxy-directed early stopping + auxiliary loss warmup.
 
 R314 added validation-guided checkpoint selection (best val-CE) and early stopping
 on CE.  R315 adds two improvements:
@@ -970,7 +1004,7 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
         model = model.to(device)
         print(f"[lstm_ws train] restored best checkpoint: val_loss={best_val_loss:.4f}",
               flush=True)
-    return model
+    return model, best_val_loss
 
 
 def update_ws_state(queues, counts, obj_id, windows, ws_edges):
@@ -1265,7 +1299,8 @@ def cmd_fit(args):
     vocab = len(rank_edges)
     ws_vocab = len(ws_edges) - 1
     n_fp_bins = (len(fp_edges) - 1) if fp_edges is not None else 0
-    model = train_model(rank_tok, ws_tok, vocab=vocab, ws_vocab=ws_vocab,
+    model, best_val_loss = train_model(
+                        rank_tok, ws_tok, vocab=vocab, ws_vocab=ws_vocab,
                         n_windows=len(windows),
                         rank_embed=args.rank_embed, ws_embed=args.ws_embed,
                         hidden=args.hidden, seq_len=args.seq_len,
@@ -1337,9 +1372,13 @@ def cmd_fit(args):
             "n_fp_bins": n_fp_bins,
         },
         "bin_ranks_arr": bin_ranks,
+        "train_seed": args.seed,
+        "best_val_loss": float(best_val_loss) if best_val_loss < float('inf') else None,
     }
     torch.save(state, args.output)
-    print(f"[lstm_ws fit] saved → {args.output}", flush=True)
+    print(f"[lstm_ws fit] saved → {args.output} (best_val_loss={best_val_loss:.6f})",
+          flush=True)
+    return best_val_loss
 
 
 def cmd_generate(args):
@@ -1455,7 +1494,21 @@ def cmd_generate(args):
 
 
 def cmd_multiseed(args):
-    """Fit (optionally) + generate N seeds + cachesim eval → Constitution claim panel."""
+    """Fit (optionally) + generate N seeds + cachesim eval → Constitution claim panel.
+
+    R316: Multi-training-seed candidate selection (--train-seeds-candidates N, default 1).
+    When N > 1, trains N independent models with training seeds derived from --seed
+    (seed, seed+1, ..., seed+N-1), selects the one with the best validation criterion
+    (CE or HRC proxy per --early-stopping-metric), and uses that model for the 4-seed
+    generation.
+
+    Selection is by validation metric (not cachesim HRC-MAE) → Constitution-compliant:
+    - Article IV: model is trained on reference trace ✓
+    - Article VI: 4-seed generation from the selected model ✓
+    - Not Article V §1-§2: no coordinate descent on cachesim ✓
+
+    The selected training seed is recorded in the claim panel.
+    """
     import json
     import datetime
     import torch
@@ -1466,10 +1519,43 @@ def cmd_multiseed(args):
     # 1. Fit or locate existing model
     model_path = args.model
     if args.fit:
-        model_path = os.path.join(args.outdir, f"{args.tag}.pt")
-        args.output = model_path
-        print(f"[multiseed] fitting → {model_path}", flush=True)
-        cmd_fit(args)
+        n_candidates = getattr(args, 'train_seeds_candidates', 1)
+        base_seed = args.seed
+        if n_candidates > 1 and args.validation_fraction <= 0.0:
+            print(f"[multiseed] R316 WARNING: --train-seeds-candidates {n_candidates} with "
+                  f"--validation-fraction 0 cannot compare validation scores. "
+                  f"All candidates will have val_loss=inf; first seed wins. "
+                  f"Use --validation-fraction 0.10-0.20 for meaningful selection.",
+                  flush=True)
+        if n_candidates <= 1:
+            model_path = os.path.join(args.outdir, f"{args.tag}.pt")
+            args.output = model_path
+            print(f"[multiseed] fitting seed={base_seed} → {model_path}", flush=True)
+            cmd_fit(args)
+        else:
+            # R316: train N candidates, select best by validation criterion
+            candidate_scores: list[tuple[float, int, str]] = []  # (val_loss, seed, path)
+            for ci in range(n_candidates):
+                cand_seed = base_seed + ci
+                cand_path = os.path.join(args.outdir, f"{args.tag}_train_s{cand_seed}.pt")
+                args.seed = cand_seed
+                args.output = cand_path
+                print(f"\n[multiseed R316] candidate {ci+1}/{n_candidates} "
+                      f"train_seed={cand_seed} → {cand_path}", flush=True)
+                val_loss = cmd_fit(args)
+                candidate_scores.append((val_loss, cand_seed, cand_path))
+                print(f"[multiseed R316] candidate {ci+1}: "
+                      f"train_seed={cand_seed} val_loss={val_loss:.6f}", flush=True)
+            # Select best candidate
+            candidate_scores.sort(key=lambda x: x[0])
+            best_val, best_seed, best_path = candidate_scores[0]
+            print(f"\n[multiseed R316] SELECTED: train_seed={best_seed} "
+                  f"val_loss={best_val:.6f} (of {n_candidates} candidates)", flush=True)
+            for val, seed, path in candidate_scores:
+                marker = " ← SELECTED" if seed == best_seed else ""
+                print(f"  seed={seed}: val_loss={val:.6f}{marker}", flush=True)
+            args.seed = best_seed
+            model_path = best_path
     if not model_path or not os.path.exists(model_path):
         raise SystemExit(
             f"multiseed: model not found: {model_path!r}. "
@@ -1595,12 +1681,20 @@ def cmd_multiseed(args):
         pol_mean = sum(pol_mae_list) / len(pol_mae_list)
         pol_str  = " / ".join(f"{v:.6f}" for v in pol_mae_list)
         md_lines.append(f"- **{pol}**: {pol_str}  →  mean {pol_mean:.6f}")
+    # R316: record training seed selection metadata
+    n_candidates = getattr(args, 'train_seeds_candidates', 1)
+    selected_train_seed = getattr(args, 'seed', None)
+    r316_note = (f"R316 train_seed_selected={selected_train_seed} "
+                 f"from {n_candidates} candidates"
+                 if args.fit and n_candidates > 1 else "")
     md_lines += [
         "",
         f"> cachesim sizes: `{args.cache_sizes}`  policies: `{args.policies}`",
         f"> model: `{model_path}`",
-        "",
     ]
+    if r316_note:
+        md_lines.append(f"> {r316_note}")
+    md_lines.append("")
     md_panel = "\n".join(md_lines) + "\n"
 
     if args.append_markdown:
@@ -1620,6 +1714,8 @@ def cmd_multiseed(args):
         "cache_sizes": args.cache_sizes,
         "policies": args.policies,
         "per_seed_results": per_seed_results,
+        "r316_train_seed_candidates": n_candidates,
+        "r316_selected_train_seed": selected_train_seed if args.fit and n_candidates > 1 else None,
     }
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(json_payload, indent=2))
@@ -1776,6 +1872,12 @@ def main():
                     help="R315: 'ce' (default) or 'hrc' (val HRC proxy; requires --hrc-loss-weight>0)")
     pm.add_argument("--loss-warmup-epochs", type=int, default=0,
                     help="R315: ramp auxiliary losses from 0→full over N epochs (0=disabled)")
+    pm.add_argument("--train-seeds-candidates", type=int, default=1,
+                    help="R316: train N independent models (seeds: --seed, --seed+1, ..., --seed+N-1), "
+                         "select the best by validation criterion (CE or HRC proxy). "
+                         "Constitution-compliant: selection uses val metric, not cachesim. "
+                         "Requires --fit and --validation-fraction > 0 for meaningful selection. "
+                         "(default 1 = single training run, backward-compatible with R315)")
     # Fit / load
     pm.add_argument("--fit", action="store_true", default=False,
                     help="train the model before generating (omit to use --model)")
