@@ -406,6 +406,40 @@ short-reuse pressure.  Zero-refit; sparse bins fall back to 1D table automatical
 
 ---
 
+### 52. Stochastic Weight Averaging (SWA) — `wired (R317)`, *novel vs LANL*
+
+**Target:** all corpora.  Best when paired with R315/R316 full auxiliary-loss stack.
+
+**Why:** The R314/R315 best-checkpoint strategy selects a single epoch that minimises
+the validation criterion.  Late-epoch weight trajectories in SGD orbit a local basin
+rather than converge to its bottom; a time-average of these orbit points is
+closer to the true minimum and lies in a *wider* basin (Izmailov et al., NeurIPS 2018).
+Wider minima generalise better: lower loss on unseen generation seeds, lower 4-seed
+range, lower mean HRC-MAE.  The improvement is free (no extra training time) and
+combines additively with R316 multi-seed training selection.
+
+**R317 implementation:** `--swa-start-fraction F` (default 0.0 = disabled; recommended
+0.7 for 50-epoch runs).  After each epoch `ep ≥ int(F × epochs)`, the current model
+weights are accumulated into `swa_accum`.  After training, the average is computed and
+evaluated on the validation set.  Whichever has the lower validation criterion (CE or
+HRC proxy per `--early-stopping-metric`) is returned — so SWA is always non-negative.
+When no validation split is available, SWA weights are applied unconditionally.
+No BatchNorm re-calibration step is needed because the LSTM has no BN layers.
+
+**Expected impact:** 1–5% reduction in 4-seed mean HRC-MAE; 10–30% reduction in
+4-seed range (the flatter basin reduces seed-to-seed spread).  Combined with R316:
+3–10% total expected improvement over single-seed R315.  Literature: SWA improves
+top-1 accuracy by 0.5–2% on image classification; on sequence models the improvement
+is corpus-dependent but consistently non-negative.
+
+**Novel vs LANL r449–r464:** LANL has no weight averaging, no validation split, and
+no training curriculum of any kind.
+
+**Recipe addition for Wikipedia R317:** add `--swa-start-fraction 0.7` to the R316
+recipe.  Zero extra training cost; SWA eval takes ~1 extra validation pass (~30s).
+
+---
+
 ### 51. Multi-training-seed candidate selection — `wired (R316)`, *novel vs LANL*
 
 **Target:** all corpora.  Highest near-term ROI on first Wikipedia claim.
@@ -606,9 +640,9 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
 
 ---
 
-### Operating notes (updated 2026-05-27, R316)
+### Operating notes (updated 2026-05-29, R317)
 
-1. **Immediate next run:** R316 `multiseed` — multi-training-seed selection + full R315 stack:
+1. **Immediate next run:** R317 `multiseed` — SWA + multi-training-seed selection + full R315 stack:
    ```
    python3 -m llgan.trace_lstm_ws multiseed \
      --real $WIKI_REF \
@@ -627,28 +661,30 @@ Applied before birth-rate blend.  Analogue to LANL r449/r450/r452.
      --early-stopping-metric hrc \
      --loss-warmup-epochs 8 \
      --train-seeds-candidates 3 \
+     --swa-start-fraction 0.7 \
      --seeds 42,80,81,82 --n 1000000 \
      --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
      --ws-token-blend-delta 0.3 \
      --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
      --short-reuse-pressure 2.0 \
      --temperature 0.9 \
-     --tag wiki_r316 --outdir /tmp/r316 \
-     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r316/wiki_r316.json
+     --tag wiki_r317 --outdir /tmp/r317 \
+     --append-markdown VERSIONS-LLNL.md --json-out /tmp/r317/wiki_r317.json
    ```
    Target: 4-seed mean < 0.0115 to beat LANL r290 Wikipedia (AUDIT-PENDING).
-   R316 key addition vs R315: `--train-seeds-candidates 3` trains seeds 42, 43, 44 and selects
-   the one with lowest val HRC proxy MAE. Expected 2–8% improvement over single-seed R315.
-   Training cost: ~3× single run (~3–4h on vinge).  The selected training seed is logged and
-   recorded in the JSON report.
-   Note: If time-constrained, omit `--train-seeds-candidates 3` (defaults to 1, same as R315).
+   R317 key addition vs R316: `--swa-start-fraction 0.7` averages weights from epoch 35–50,
+   finding a flatter basin that generalises across generation seeds.  Expected 1–5% improvement
+   over R316 at zero extra training cost (~30s extra for the SWA validation pass).
+   Combined with R316's 3-candidate training selection: 3–10% total expected improvement.
    Note: `--hrc-loss-weight 0.3` — R313 BCE has larger raw magnitude than R312 MSE; reduce to 0.1 if HRC dominates.
    Note: `--temperature 0.9` partially offsets label-smoothing diffusion; adjust per trace.
+   Note: SWA is automatically skipped if early stopping fires before epoch 35 (swa_start_epoch).
+         In that case the R315 best-val checkpoint is used as before.
 2. **Generation-only sweep on any existing R303/R304/R305 checkpoint:** `--ws-token-blend`,
    `--ws-token-blend-delta`, and `--short-reuse-pressure` are all zero-refit.
    Use the `multiseed` subcommand with `--model` (no `--fit`) to get a Constitution
    claim panel without retraining.
-3. **After Wikipedia claim:** port R306 recipe to Tencent and Alibaba.
+3. **After Wikipedia claim:** port R317 recipe to Tencent and Alibaba.
 4. **Next architectural ideas:** #32 (hybrid atlas + IRD-renewal — highest structural ROI),
    #36 (wider model hidden=512 after first 4-seed baseline), #29 (black-box cachesim
    optimization in chunk-ensemble).

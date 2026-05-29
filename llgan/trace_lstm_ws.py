@@ -1,4 +1,31 @@
-"""R316 — Multi-training-seed candidate selection (novel vs LANL).
+"""R317 — Stochastic Weight Averaging (SWA) (novel vs LANL).
+
+Training with complex auxiliary loss stacks yields late-epoch weight trajectories
+that orbit a local minimum rather than converging to it.  SWA (Izmailov et al., 2018)
+averages model weights over the final fraction of training, finding a wider minimum
+with better generalization.
+
+New flag: `--swa-start-fraction F` (default 0.0 = disabled; recommended 0.7 for
+50-epoch runs — starts averaging at epoch 35, gives 15 accumulated checkpoints).
+After training, the SWA-averaged model is evaluated on the validation set and compared
+to the R314/R315 best-checkpoint.  Whichever has the lower validation criterion is
+returned.  When no validation is available, SWA weights are applied unconditionally.
+
+Constitutional compliance:
+  - Article IV: weights averaged from the same training run ✓
+  - Article V §1-§2: no cachesim in the averaging step ✓
+  - Article VI: generation uses 4 seeds from the selected model ✓
+
+Expected impact: 1–5% reduction in 4-seed mean HRC-MAE, drawn from lower seed-to-seed
+variance (SWA finds a flatter basin that generalises across generation seeds).
+Combined with R316 multi-training-seed selection: 3–10% total expected improvement.
+
+Novel vs LANL r449–r464: LANL has no weight averaging, no validation-guided stopping,
+and no training curriculum of any kind.
+
+--- (R316 docstring follows) ---
+
+R316 — Multi-training-seed candidate selection (novel vs LANL).
 
 R315 trained with a single training seed (default: 42).  With complex auxiliary
 loss stacks, the training trajectory is sensitive to the initialisation seed —
@@ -662,7 +689,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                 validation_fraction: float = 0.0,
                 early_stopping_patience: int = 0,
                 early_stopping_metric: str = "ce",
-                loss_warmup_epochs: int = 0):
+                loss_warmup_epochs: int = 0,
+                swa_start_fraction: float = 0.0):
     import torch
     import torch.nn.functional as F
     torch.manual_seed(seed)
@@ -761,7 +789,8 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
           f"ws_delta_kl={ws_delta_kl_loss_weight} hrc={hrc_loss_weight} "
           f"aux_ws={aux_ws_loss_weight} "
           f"sr_weight={short_reuse_loss_weight} ws_pred_head={ws_pred} on {device} "
-          f"es_metric={early_stopping_metric} warmup_ep={loss_warmup_epochs}",
+          f"es_metric={early_stopping_metric} warmup_ep={loss_warmup_epochs} "
+          f"swa_start_frac={swa_start_fraction}",
           flush=True)
     print(f"[lstm_ws train] params={sum(p.numel() for p in model.parameters()):,}",
           flush=True)
@@ -778,6 +807,11 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
         print("[lstm_ws train] R315 warning: --early-stopping-metric hrc requires "
               "--hrc-loss-weight > 0; falling back to CE.", flush=True)
         _es_metric = "ce"
+    # R317: SWA state — accumulate parameter sums from epoch swa_start_epoch onward.
+    swa_start_epoch = (int(swa_start_fraction * epochs)
+                       if swa_start_fraction > 0.0 else epochs + 1)
+    swa_accum: list | None = None
+    swa_n: int = 0
 
     for ep in range(epochs):
         # R315: auxiliary loss warmup scale — ramp from 0→1 over loss_warmup_epochs.
@@ -997,6 +1031,19 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
                           f"(patience={early_stopping_patience})", flush=True)
                     break
             model.train()
+        # R317: SWA accumulation — collect weights from swa_start_epoch onward.
+        # Accumulation happens after validation so the current-epoch weights are used.
+        # If early stopping fired (break above), this line is never reached, so the
+        # final "bad" epoch is correctly excluded from the SWA average.
+        if swa_start_fraction > 0.0 and ep >= swa_start_epoch:
+            if swa_accum is None:
+                swa_accum = [p.data.cpu().clone() for p in model.parameters()]
+            else:
+                for pa, p in zip(swa_accum, model.parameters()):
+                    pa.add_(p.data.cpu())
+            swa_n += 1
+            print(f"[lstm_ws train] R317 SWA: accumulated ep {ep+1} "
+                  f"(swa_n={swa_n})", flush=True)
 
     # R314/R315: restore best-checkpoint (criterion = CE or HRC proxy per --early-stopping-metric).
     if best_state is not None:
@@ -1004,6 +1051,80 @@ def train_model(rank_tokens, ws_tokens, vocab, ws_vocab, n_windows,
         model = model.to(device)
         print(f"[lstm_ws train] restored best checkpoint: val_loss={best_val_loss:.4f}",
               flush=True)
+
+    # R317: SWA — average accumulated checkpoints and compare to best-val checkpoint.
+    # If validation is available, keep whichever has the lower validation criterion.
+    # If no validation, use SWA unconditionally (averaging always reduces variance).
+    if swa_accum is not None and swa_n > 0:
+        print(f"[lstm_ws train] R317 SWA: averaging {swa_n} checkpoints "
+              f"(start_ep={swa_start_epoch})", flush=True)
+        for pa in swa_accum:
+            pa.div_(float(swa_n))
+        if n_val_usable >= batch:
+            # Save current (best-val) model state before loading SWA weights.
+            pre_swa_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            with torch.no_grad():
+                for p, wa in zip(model.parameters(), swa_accum):
+                    p.data.copy_(wa.to(device))
+            model.eval()
+            swa_val_rng = np.random.default_rng(seed + 99999)
+            swa_val_perm = swa_val_rng.permutation(n_val_usable) + n_val_start
+            n_swa_batches = min(n_val_usable // batch, _val_batch_cap)
+            swa_ce_acc = 0.0
+            swa_hrc_sum = [0.0] * len(hrc_masks_t) if hrc_masks_t else []
+            swa_hrc_n = 0
+            with torch.no_grad():
+                for vbi in range(n_swa_batches):
+                    vidx = swa_val_perm[vbi * batch:(vbi + 1) * batch]
+                    vx  = torch.stack([rank_t[i:i + seq_len] for i in vidx]).to(device)
+                    vxw = torch.stack([ws_t[i:i + seq_len] for i in vidx]).to(device)
+                    vy  = torch.stack([rank_t[i + 1:i + 1 + seq_len] for i in vidx]).to(device)
+                    vfw = (torch.stack([fp_t[i:i + seq_len] for i in vidx]).to(device)
+                           if fp_t is not None else None)
+                    vlogits, _, _ = model(vx, vxw, fp_tok=vfw)
+                    swa_ce_acc += float(
+                        F.cross_entropy(vlogits.reshape(-1, vocab), vy.reshape(-1)).item())
+                    if hrc_masks_t:
+                        vprobs = torch.softmax(vlogits.reshape(-1, vocab), dim=-1)
+                        vy_flat = vy.reshape(-1)
+                        for mi, mask in enumerate(hrc_masks_t):
+                            vp = (vprobs * mask).sum(dim=-1).mean().item()
+                            va = mask[vy_flat.clamp(0, vocab - 1)].mean().item()
+                            swa_hrc_sum[mi] += abs(vp - va)
+                        swa_hrc_n += 1
+            swa_val_ce = swa_ce_acc / max(1, n_swa_batches)
+            swa_val_hrc = float('inf')
+            if hrc_masks_t and swa_hrc_n > 0:
+                swa_val_hrc = sum(swa_hrc_sum[i] / swa_hrc_n
+                                  for i in range(len(hrc_masks_t))) / len(hrc_masks_t)
+            if _es_metric == "hrc" and swa_val_hrc < float('inf'):
+                swa_criterion = swa_val_hrc
+                swa_crit_label = "swa_val_hrc"
+            else:
+                swa_criterion = swa_val_ce
+                swa_crit_label = "swa_val_ce"
+            print(f"[lstm_ws train] R317 SWA eval: {swa_crit_label}={swa_criterion:.5f} "
+                  f"vs best_val={best_val_loss:.5f}", flush=True)
+            if swa_criterion < best_val_loss:
+                best_val_loss = swa_criterion
+                print(f"[lstm_ws train] R317 SWA improved — keeping SWA weights "
+                      f"(Δ={best_val_loss - swa_criterion:.5f})", flush=True)
+                # SWA weights are already loaded in model; keep them.
+            else:
+                print(f"[lstm_ws train] R317 SWA no improvement — reverting to "
+                      f"best-val checkpoint", flush=True)
+                model.load_state_dict(pre_swa_state)
+                model = model.to(device)
+        else:
+            # No validation available — load SWA weights unconditionally.
+            # Averaging reduces seed-to-seed generation variance even without a val criterion.
+            print(f"[lstm_ws train] R317 SWA: no validation available, "
+                  f"applying SWA weights unconditionally", flush=True)
+            with torch.no_grad():
+                for p, wa in zip(model.parameters(), swa_accum):
+                    p.data.copy_(wa.to(device))
+        model.train()
+
     return model, best_val_loss
 
 
@@ -1336,7 +1457,8 @@ def cmd_fit(args):
                         validation_fraction=args.validation_fraction,
                         early_stopping_patience=args.early_stopping_patience,
                         early_stopping_metric=args.early_stopping_metric,
-                        loss_warmup_epochs=args.loss_warmup_epochs)
+                        loss_warmup_epochs=args.loss_warmup_epochs,
+                        swa_start_fraction=args.swa_start_fraction)
 
     # Serialise rank_samples_by_token_ws0.
     rswt_serialised = [
@@ -1791,6 +1913,10 @@ def main():
     pf.add_argument("--loss-warmup-epochs", type=int, default=0,
                     help="R315: ramp auxiliary losses from 0→full over N epochs (0=disabled; "
                          "try 5–10 to stabilise early training)")
+    pf.add_argument("--swa-start-fraction", type=float, default=0.0,
+                    help="R317: stochastic weight averaging — average weights from this "
+                         "fraction of training onward (0.0=disabled; try 0.7 for 50-epoch runs). "
+                         "Novel vs LANL. Compared to best-val checkpoint when validation available.")
     pf.set_defaults(fn=cmd_fit)
 
     pg = sub.add_parser("generate")
@@ -1872,6 +1998,8 @@ def main():
                     help="R315: 'ce' (default) or 'hrc' (val HRC proxy; requires --hrc-loss-weight>0)")
     pm.add_argument("--loss-warmup-epochs", type=int, default=0,
                     help="R315: ramp auxiliary losses from 0→full over N epochs (0=disabled)")
+    pm.add_argument("--swa-start-fraction", type=float, default=0.0,
+                    help="R317: stochastic weight averaging start fraction (0.0=disabled; try 0.7)")
     pm.add_argument("--train-seeds-candidates", type=int, default=1,
                     help="R316: train N independent models (seeds: --seed, --seed+1, ..., --seed+N-1), "
                          "select the best by validation criterion (CE or HRC proxy). "

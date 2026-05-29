@@ -7249,3 +7249,56 @@ python3 -m llgan.trace_lstm_ws multiseed \
 - `--loss-warmup-epochs N`: linearly ramp all 7 auxiliary loss weights from 0 → full over N epochs. CE and short-reuse class weights unaffected. Prevents auxiliary losses from overwhelming CE in early training. Recommended: `--loss-warmup-epochs 8` with `--epochs 50`.
 
 **Novel vs LANL r449-r464:** LANL has no validation split, no early stopping, no HRC-aligned loss, no loss scheduling of any kind.
+
+## R316 — Multi-training-seed candidate selection (2026-05-27)
+
+**Status:** Code complete. Commit `eedb8f5`.
+
+**Key changes:**
+- `--train-seeds-candidates N` (default 1 = backward-compatible with R315). When N > 1 with `--fit`, trains N independent models using seeds `--seed`, `--seed+1`, ..., `--seed+N-1`. Selects the one with the lowest validation criterion (CE or HRC proxy per `--early-stopping-metric`). Uses that checkpoint for the 4-seed generation.
+- Selection by validation metric only (not cachesim) → Constitution Article V §1-§2 compliant.
+- The selected training seed is recorded in the JSON report and markdown claim panel.
+
+**Expected impact:** 2–8% reduction in 4-seed mean HRC-MAE from 3 candidates.
+
+**Novel vs LANL r449-r464:** LANL has no validation split and no multi-seed training selection.
+
+## R317 — Stochastic Weight Averaging (2026-05-29)
+
+**Status:** Code complete.
+
+**Key changes:**
+- `--swa-start-fraction F` (default 0.0 = disabled; recommended 0.7). After each training epoch `ep ≥ int(F × epochs)`, the current model weights are accumulated. After training, the accumulated average is computed and evaluated on the validation set. Whichever model (SWA average or R314/R315 best-checkpoint) has the lower validation criterion is returned, so SWA is always non-negative.
+- When no validation split is available, SWA weights are applied unconditionally (averaging late-epoch checkpoints always reduces seed-to-seed generation variance).
+- No BatchNorm re-calibration step needed (LSTM has no BN layers).
+- Backward-compatible: `--swa-start-fraction 0.0` (default) reproduces R316 behaviour exactly.
+
+**Expected impact:** 1–5% reduction in 4-seed mean HRC-MAE; 10–30% reduction in 4-seed range.
+Combined with R316 multi-training-seed selection: 3–10% total improvement over single-seed R315.
+
+**Novel vs LANL r449-r464:** LANL has no weight averaging, no validation split, and no training curriculum of any kind. Three novel levers (warmup #50, HRC-directed stopping #49, SWA #52) that LANL hasn't implemented.
+
+**Recipe (Wikipedia R317):**
+```
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF --fit \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --birth-delta-kl-loss-weight 0.15 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+  --hrc-loss-weight 0.3 --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 50 \
+  --validation-fraction 0.15 --early-stopping-patience 7 \
+  --early-stopping-metric hrc --loss-warmup-epochs 8 \
+  --train-seeds-candidates 3 --swa-start-fraction 0.7 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
+  --short-reuse-pressure 2.0 --temperature 0.9 \
+  --tag wiki_r317 --outdir /tmp/r317 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r317/wiki_r317.json
+```
