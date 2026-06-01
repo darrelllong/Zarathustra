@@ -1,4 +1,40 @@
-"""R317 — Stochastic Weight Averaging (SWA) (novel vs LANL).
+"""R318 — IRD-rank blend: hybrid LSTM action-class + IRD rank sampling (Idea #32).
+
+At generation time, after the LSTM selects a REUSE rank bin (coarse), R318 draws the
+fine-grained LRU stack rank from the empirical IRD distribution (position-based inter-
+reference distances fitted from the reference trace) rather than sampling uniformly
+within the bin or from the WS-conditioned empirical table.
+
+Why this helps:
+  - The LSTM is well-calibrated for *action class* (NEW vs REUSE) via birth-rate
+    blending and *coarse rank bin* via WS-token blend.
+  - Within a rank bin the LSTM currently samples uniformly (or from training-time
+    empirical ranks). The actual within-bin rank distribution is non-uniform: objects
+    with short IRDs cluster near the bin's lower bound; objects with long IRDs cluster
+    near the upper bound. Using the empirical IRD distribution captures this shape.
+  - Unlike full IRD-renewal (R288.W — audit-pending under Constitution Art. V §3),
+    R318 uses the *aggregate* IRD distribution as a rank sampler, not per-object
+    verbatim scheduling. The LSTM still decides NEW vs REUSE.
+
+Constitutional compliance:
+  - Article IV: LSTM model trained on reference trace ✓; IRD profile is aggregate
+    statistics derived from the same reference ✓.
+  - Article V §3: no per-object verbatim replay — global/per-bin aggregate only ✓.
+  - Article VI: 4-seed generation and eval ✓.
+
+New flag (multiseed only): `--ird-rank-blend ALPHA` (default 0.0 = disabled; try 0.5–1.0).
+When ALPHA > 0, an IRD-profile is fitted from --real at eval time (zero retraining),
+and for each REUSE step, with probability ALPHA the stack rank is drawn from
+IRD samples filtered to the LSTM's predicted bin; otherwise the existing LSTM rank
+path is used.  When the IRD sample exceeds stack depth it falls back to the LSTM path.
+
+Novel vs LANL r449–r464: LANL has no IRD rank injection into a neural generator.
+LANL's IRD-renewal (altgan/launch_ird_renewal_multiseed.py) is a separate pipeline
+that doesn't use a neural model.  This combination is unique to LLNL.
+
+--- (R317 docstring follows) ---
+
+R317 — Stochastic Weight Averaging (SWA) (novel vs LANL).
 
 Training with complex auxiliary loss stacks yields late-epoch weight trajectories
 that orbit a local minimum rather than converging to it.  SWA (Izmailov et al., 2018)
@@ -1165,8 +1201,18 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
              birth_rate_by_ws0_delta: np.ndarray | None = None,
              birth_rate_blend_delta: float = 0.0,
              temperature: float = 1.0,
-             top_p: float = 1.0):
+             top_p: float = 1.0,
+             ird_bin_arrays: list | None = None,
+             ird_rank_blend: float = 0.0):
     """Stateful single-step autoregressive generation (R312).
+
+    R318 new args:
+      ird_bin_arrays: list of np.ndarray | None, one per REUSE rank bin.
+        ird_bin_arrays[i] contains IRD samples (position gaps) that fall within
+        rank bin i's [lo, hi) range.  None if the bin has < 4 IRD observations.
+        Built by cmd_multiseed() when --ird-rank-blend > 0.
+      ird_rank_blend: probability of drawing rank from ird_bin_arrays[bin_idx]
+        instead of the LSTM/empirical rank path.  0.0 = disabled (default).
 
     Warm up the LSTM hidden state on `warmup_steps` NEW_TOKEN inputs with
     zero WS, then drive generation one token at a time, passing h between
@@ -1351,9 +1397,26 @@ def generate(model, rank_edges, ws_edges, bin_ranks_arr, windows, n_records,
             else:
                 bin_idx = tok - 1
 
-                # WS-conditioned rank sampling.
+                # Rank selection — three sources in priority order:
+                # R318 (highest): IRD-rank blend (empirical IRD distribution within bin).
+                # Existing (high): WS-conditioned empirical rank samples.
+                # Fallback: bin_ranks_arr or uniform within bin.
                 rank = None
-                if rank_sampler == "empirical" and rank_samples_by_token_ws0 is not None:
+
+                # R318: IRD-rank blend — draw rank from empirical IRD distribution
+                # filtered to the LSTM's predicted rank bin.
+                if (ird_rank_blend > 0.0 and ird_bin_arrays is not None
+                        and bin_idx < len(ird_bin_arrays)
+                        and ird_bin_arrays[bin_idx] is not None
+                        and rng.random() < ird_rank_blend):
+                    arr = ird_bin_arrays[bin_idx]
+                    candidate = int(arr[int(rng.integers(0, len(arr)))])
+                    if 0 <= candidate < len(stack):
+                        rank = candidate
+                    # Out-of-stack IRD falls through to the existing rank paths below.
+
+                # WS-conditioned rank sampling (existing).
+                if rank is None and rank_sampler == "empirical" and rank_samples_by_token_ws0 is not None:
                     ws0_bin = min(int(ws_now[0]), n_ws0_bins_max)
                     key = (bin_idx, ws0_bin)
                     samples = rank_samples_by_token_ws0.get(key)
@@ -1723,6 +1786,30 @@ def cmd_multiseed(args):
     warmup_steps = (args.warmup_steps if args.warmup_steps > 0
                     else int(state.get("history", 64)))
 
+    # R318: IRD-rank blend — fit per-bin IRD arrays from reference trace.
+    ird_bin_arrays_gen: list | None = None
+    _ird_rank_blend = getattr(args, 'ird_rank_blend', 0.0)
+    if _ird_rank_blend > 0.0:
+        from llgan.ird_renewal import fit_profile as _fit_ird_profile
+        _max_rows = getattr(args, 'max_rows', 0)
+        print(f"[multiseed R318] fitting IRD profile from {args.real} "
+              f"(max_rows={_max_rows}) for ird_rank_blend={_ird_rank_blend:.3f}",
+              flush=True)
+        _ird_prof = _fit_ird_profile(args.real, _max_rows)
+        _rank_edges = np.asarray(state["rank_edges"], dtype=np.int64)
+        _vocab = int(state["vocab"])
+        ird_bin_arrays_gen = []
+        for _bi in range(_vocab - 1):
+            _lo = int(_rank_edges[_bi])
+            _hi = int(_rank_edges[min(_bi + 1, len(_rank_edges) - 1)])
+            _in = _ird_prof.irds[
+                (_ird_prof.irds >= _lo) & (_ird_prof.irds < _hi)]
+            ird_bin_arrays_gen.append(_in if len(_in) >= 4 else None)
+        _populated = sum(1 for a in ird_bin_arrays_gen if a is not None)
+        print(f"[multiseed R318] IRD bins: {_populated}/{len(ird_bin_arrays_gen)} "
+              f"populated (≥4 samples); total IRD obs={len(_ird_prof.irds):,}",
+              flush=True)
+
     # 3. Generate one CSV per seed
     seeds = [int(s) for s in args.seeds.split(",")]
     fake_csvs: list[tuple[int, str]] = []
@@ -1755,7 +1842,9 @@ def cmd_multiseed(args):
                        birth_rate_by_ws0_delta=birth_rate_by_ws0_delta,
                        birth_rate_blend_delta=args.birth_rate_blend_delta,
                        temperature=args.temperature,
-                       top_p=args.top_p)
+                       top_p=args.top_p,
+                       ird_bin_arrays=ird_bin_arrays_gen,
+                       ird_rank_blend=_ird_rank_blend)
         write_csv(out_path, out)
         print(f"[multiseed] wrote {args.n:,} rows → {out_path}", flush=True)
         fake_csvs.append((seed, out_path))
@@ -2006,6 +2095,14 @@ def main():
                          "Constitution-compliant: selection uses val metric, not cachesim. "
                          "Requires --fit and --validation-fraction > 0 for meaningful selection. "
                          "(default 1 = single training run, backward-compatible with R315)")
+    pm.add_argument("--ird-rank-blend", type=float, default=0.0,
+                    help="R318: at REUSE steps, with this probability draw the LRU stack rank "
+                         "from the empirical IRD distribution (filtered to the LSTM's predicted "
+                         "rank bin) rather than from the LSTM/empirical rank path. "
+                         "0.0=disabled (default); 1.0=always use IRD rank; try 0.5–1.0. "
+                         "Fitted from --real at eval time (zero retraining). "
+                         "Novel vs LANL: combines neural birth-rate control with IRD rank fidelity. "
+                         "Constitution Art. V §3 safe: uses aggregate IRD, not per-object verbatim.")
     # Fit / load
     pm.add_argument("--fit", action="store_true", default=False,
                     help="train the model before generating (omit to use --model)")

@@ -232,7 +232,7 @@ already tight; abandon if range exceeds 0.001.
 
 ---
 
-### 32. Hybrid atlas + IRD-renewal generator — `queued`
+### 32. Hybrid atlas + IRD-renewal generator — `wired (R318)`
 
 **Targets:** all 9 corpora; especially the "neither pure atlas nor
 pure IRD-renewal wins" middle ground (Twitter, Meta CDN, Baleen24).

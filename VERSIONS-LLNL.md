@@ -7302,3 +7302,65 @@ python3 -m llgan.trace_lstm_ws multiseed \
   --tag wiki_r317 --outdir /tmp/r317 \
   --append-markdown VERSIONS-LLNL.md --json-out /tmp/r317/wiki_r317.json
 ```
+
+---
+
+## R318 — IRD-rank blend in LSTM generator — hybrid neural+IRD (2026-06-01)
+
+**Status:** Code complete. Implements Idea #32 (hybrid atlas + IRD-renewal).
+
+**Key changes:**
+- `--ird-rank-blend ALPHA` (default 0.0 = disabled; try 0.5–1.0) on the `multiseed`
+  subcommand. When ALPHA > 0, at each REUSE step: with probability ALPHA, the LRU
+  stack rank is drawn from the empirical IRD distribution filtered to the LSTM's
+  predicted rank bin; otherwise falls back to the existing LSTM/empirical rank path.
+  When the IRD sample exceeds current stack depth it falls back automatically.
+- Zero retraining: the IRD profile is fitted from `--real` at evaluation time.
+- Constitution Art. V §3 compliant: uses *aggregate* IRD statistics, not per-object
+  verbatim replay. The LSTM still controls birth rate (NEW vs REUSE) and coarse
+  rank bin selection.
+
+**Why the LSTM rank PMF is the weak link:**
+The LSTM produces a per-step distribution over rank BINS. Within each bin, the current
+code samples either uniformly or from training-time empirical rank observations. The
+actual within-bin rank distribution is non-uniform: objects accessed at short
+inter-reference distances cluster near the bin lower bound; rarely-accessed objects
+cluster near the upper bound. The IRD distribution captures this shape directly.
+
+**Novel vs LANL r449–r464:** LANL's IRD-renewal (altgan/) is a separate,
+purely-statistical pipeline with no neural component. R318 combines LANL-class IRD
+fidelity with LLNL's neural birth-rate calibration. LANL has not published a hybrid.
+
+**Expected impact:** 2–8% HRC-MAE reduction on corpora where the LSTM rank PMF is
+under-calibrated within bins. Best candidates: Wikipedia (large IRD spread), Meta KV
+(heavy-tail IRD), CloudPhysics (scan-like deep-tail IRD). Use alongside the R317 recipe.
+
+**Recipe addition (Wikipedia R318 = R317 + IRD blend):**
+```
+python3 -m llgan.trace_lstm_ws multiseed \
+  --real $WIKI_REF --fit \
+  --film-cond --dropout 0.1 \
+  --birth-kl-loss-weight 0.25 --birth-kl-loss-weight-2d 0.10 \
+  --birth-delta-kl-loss-weight 0.15 \
+  --ws-kl-loss-weight 0.25 --ws-kl-loss-weight-2d 0.15 --ws-delta-kl-loss-weight 0.15 \
+  --hrc-loss-weight 0.3 --aux-ws-loss-weight 0.1 \
+  --short-reuse-loss-weight 1.0 --rank-sampler empirical \
+  --cache-ladder --ws-cache-ladder --stack-depth-bins 32 \
+  --label-smoothing 0.05 --grad-clip 1.0 --lr-schedule cosine \
+  --lstm-layers 3 --epochs 50 \
+  --validation-fraction 0.15 --early-stopping-patience 7 \
+  --early-stopping-metric hrc --loss-warmup-epochs 8 \
+  --train-seeds-candidates 3 --swa-start-fraction 0.7 \
+  --seeds 42,80,81,82 --n 1000000 \
+  --ws-token-blend 0.5 --ws-token-blend-2d 0.25 --ws-blend-confidence-tau 50 \
+  --ws-token-blend-delta 0.3 \
+  --birth-rate-blend 0.5 --birth-rate-blend-2d 0.25 --birth-rate-blend-delta 0.3 \
+  --short-reuse-pressure 2.0 --temperature 0.9 \
+  --ird-rank-blend 1.0 \
+  --tag wiki_r318 --outdir /tmp/r318 \
+  --append-markdown VERSIONS-LLNL.md --json-out /tmp/r318/wiki_r318.json
+```
+
+**Sweep plan:** First run `wiki_r318` with `--ird-rank-blend 1.0` (full IRD rank).
+If that beats `wiki_r317` base, bank R318. If not, try `--ird-rank-blend 0.5`
+(50/50 blend). Zero retraining cost — only generation changes.
